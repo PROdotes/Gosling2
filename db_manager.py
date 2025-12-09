@@ -158,6 +158,35 @@ class DBManager:
             print(f"Database error during file deletion: {e}")
             return False
 
+    def fetch_artists_for_tree(self):
+        """
+        Fetches a distinct list of all Contributors who have the 'Performer' role,
+        ordered by SortName.
+        Returns: list of (ContributorID, Name)
+        """
+        conn = sqlite3.connect(self.DATABASE_NAME)
+        cursor = conn.cursor()
+
+        # Select distinct Contributors linked to the 'Performer' role
+        query = """
+                SELECT DISTINCT C.ContributorID, \
+                                C.Name
+                FROM Contributors C
+                         JOIN FileContributorRoles FCR ON C.ContributorID = FCR.ContributorID
+                         JOIN Roles R ON FCR.RoleID = R.RoleID
+                WHERE R.Name = 'Performer'
+                ORDER BY C.SortName ASC
+                """
+        try:
+            cursor.execute(query)
+            data = cursor.fetchall()
+            return data
+        except sqlite3.Error as e:
+            print(f"Database error during artist fetch: {e}")
+            return []
+        finally:
+            conn.close()
+
     def update_file_metadata(self, file_id, title, duration, bpm, tags_to_update):
         """
         Updates the metadata fields for an existing file record using its FileID.
@@ -265,4 +294,4 @@ class DBManager:
                                           """, (file_id, contributor_id, role_id))
                     processed_count += 1
 
-        return True if processed_count > 0 else None
+            return True if processed_count > 0 else None

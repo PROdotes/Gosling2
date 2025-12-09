@@ -33,30 +33,32 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(main_widget)
         main_layout.setContentsMargins(5, 3, 5, 3)
 
-        # --- TOP SECTION: ADD SONGS BUTTON & SEARCH BAR ---
-        self._setup_top_controls(main_layout)
-
-        # --- MIDDLE SECTION: THREE MAIN PANELS ---
-        self._setup_middle_panels(main_layout)
-
-        # --- BOTTOM SECTION: PLAYBACK BAR AND CONTROLS ---
-        self._setup_bottom_bar(main_layout)
-
-        # --- CONNECTIONS ---
-        self.add_files_button.clicked.connect(self._open_file_dialog)
-
-        # --- DATABASE ---
+        # --- DATABASE & MODELS (MUST BE INITIALIZED FIRST) ---
         self.db_manager = DBManager()
         self.library_model = QStandardItemModel()
+        self.artist_tree_model = QStandardItemModel()  # <-- FIXED: Initialized early
         self.proxy_model = QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.library_model)
+
+        # --- SETUP SECTIONS (Now models are ready) ---
+        self._setup_top_controls(main_layout)
+        self._setup_middle_panels(main_layout)  # <-- This call will now succeed
+        self._setup_bottom_bar(main_layout)
+
+        # --- TABLE & SORT SETUP (Must run AFTER self.table_view is created in _setup_middle_panels) ---
         self.table_view.setModel(self.proxy_model)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
+
+        # Initial sort state setup
         self._current_sort_column_index = 0
         self._current_sort_order = Qt.SortOrder.DescendingOrder
-        self._setup_table_view()
 
+        self._setup_table_view()  # This method should handle header connections and refresh the data.
+
+        # --- CONNECTIONS ---
+        self.add_files_button.clicked.connect(self._open_file_dialog)
+        self.tree_view.clicked.connect(self._filter_library_by_tree_selection)
         QApplication.instance().aboutToQuit.connect(self._cleanup_on_exit)
 
     def _cleanup_on_exit(self):
@@ -94,6 +96,7 @@ class MainWindow(QMainWindow):
         # 1. Left Panel: Filtering/Browsing (QTreeWidget - using QTreeView placeholder)
         self.tree_view = QTreeView()
         self.tree_view.setHeaderHidden(True)
+        self.tree_view.setModel(self.artist_tree_model)
         song_library_panel = QWidget()
         song_library_panel.setLayout(QVBoxLayout())
         tree_label = QLabel("LIBRARY TREE BROWSER")
@@ -170,6 +173,30 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(bottom_bar_hbox)
 
+    def _populate_artist_tree(self):
+        """Fetches artists and populates the tree view model."""
+        self.artist_tree_model.clear()
+
+        # Set the root header (though it's hidden, it's good practice)
+        self.artist_tree_model.setHorizontalHeaderLabels(["Artist Name"])
+
+        artists_data = self.db_manager.fetch_artists_for_tree()
+
+        root_item = self.artist_tree_model.invisibleRootItem()
+
+        # Add a node for the 'Artists' category
+        artists_root = QStandardItem("Artists")
+        artists_root.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+
+        for contributor_id, name in artists_data:
+            artist_item = QStandardItem(name)
+            # Store the contributor ID for later use (e.g., filtering the table)
+            artist_item.setData(contributor_id, Qt.ItemDataRole.UserRole)
+            artists_root.appendRow(artist_item)
+
+        root_item.appendRow(artists_root)
+        self.tree_view.expandAll()
+
     def _setup_table_view(self):
         """Sets up the QTableView and connects signals."""
         header = self.table_view.horizontalHeader()
@@ -178,10 +205,36 @@ class MainWindow(QMainWindow):
         header.setSortIndicatorShown(True)
         header.sectionClicked.connect(self._sort_library_view)
         self.refresh_library_view()
-        self.table_view.setColumnHidden(0, True)
-        self.table_view.setColumnHidden(2, True)
+        #self.table_view.setColumnHidden(0, True)
+        #self.table_view.setColumnHidden(2, True)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
+
+    def _filter_library_by_tree_selection(self, index):
+        """
+        Filters the library table (proxy model) based on the selected item
+        in the artist tree view.
+        """
+
+        item = self.artist_tree_model.itemFromIndex(index)
+
+        self.proxy_model.setFilterKeyColumn(1)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+        if item.text() == "Artists":
+            filter_text = ""
+
+        elif item.parent() and item.parent().text() == "Artists":
+            artist_name = item.text()
+            import re
+            escaped_name = re.escape(artist_name)
+            filter_text = r"(^|\,\s)" + escaped_name + r"($|\,\s)"
+
+        else:
+            filter_text = ""
+
+        self.proxy_model.setFilterRegularExpression(filter_text)
+        self.table_view.scrollToTop()
 
     def _show_table_context_menu(self, position):
         """Shows a context menu for the table view."""
@@ -205,10 +258,10 @@ class MainWindow(QMainWindow):
         selected_rows = sorted(set(index.row() for index in selected_cells))
 
         for row in selected_rows:
-            file_id_qindex = self.library_model.index(row, 0)
-            file_id = str(self.library_model.data(file_id_qindex))
-            file_path_index = self.library_model.index(row, 2)
-            file_path = self.library_model.data(file_path_index)
+            file_id_qindex = self.proxy_model.index(row, 0)
+            file_id = str(self.proxy_model.data(file_id_qindex))
+            file_path_index = self.proxy_model.index(row, 2)
+            file_path = self.proxy_model.data(file_path_index)
             file_name = os.path.basename(file_path)
             if not file_path:
                 QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
@@ -280,17 +333,9 @@ class MainWindow(QMainWindow):
         deleted_count = 0
 
         for row in unique_selected_rows:
-            # row is an int; build QModelIndex from row, column 0
-            model_index = self.library_model.index(row, 0)
-            if not model_index.isValid():
-                continue
-
-            file_id_variant = self.library_model.data(model_index)
-            try:
-                file_id = int(file_id_variant)
-            except (TypeError, ValueError):
-                # Couldn't parse file id; skip and continue
-                continue
+            file_id_qindex = self.proxy_model.index(row, 0)
+            file_id = str(self.proxy_model.data(file_id_qindex))
+            print(file_id)
 
             if db_manager.delete_file_by_id(file_id):
                 deleted_count += 1
@@ -372,6 +417,7 @@ class MainWindow(QMainWindow):
         )
 
         self.table_view.resizeColumnToContents(0)
+        self._populate_artist_tree()
 
 
     def _sort_library_view(self, index):
