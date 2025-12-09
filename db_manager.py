@@ -22,7 +22,7 @@ class DBManager:
                 FileID INTEGER PRIMARY KEY,
                 Path TEXT NOT NULL UNIQUE,
                 Title TEXT NOT NULL,
-                Duration INTEGER,
+                Duration REAL,
                 TempoBPM INTEGER
             );
         """)
@@ -74,7 +74,7 @@ class DBManager:
                 Duration AS 'Duration',
                 TempoBPM AS 'BPM'
             FROM Files
-            ORDER BY FileID DESC
+            ORDER BY FileID ASC
         """
 
     def delete_file_by_id(self, file_id):
@@ -96,4 +96,41 @@ class DBManager:
 
         except sqlite3.Error as e:
             print(f"Database error during file deletion: {e}")
+            return False
+
+    def update_file_metadata(self, file_id, title, duration, bpm):
+        """
+        Updates the metadata fields for an existing file record using its FileID.
+        """
+        print(f"Trying to update metadata for file ID: {file_id} | Title: {title} | Duration: {duration} | BPM: {bpm}")
+        print(f"[DBManager] Received FileID: {file_id} (Type: {type(file_id)})")
+        try:
+            # Open connection for transaction (stateless model)
+            conn = sqlite3.connect(self.DATABASE_NAME)
+            cursor = conn.cursor()
+
+            try:
+                cursor.execute("""
+                    UPDATE Files
+                    SET Title = ?, Duration = ?, TempoBPM = ?
+                    WHERE FileID = ?
+                """, (title, duration, bpm, file_id))
+
+                conn.commit()
+                updated_count = cursor.rowcount
+                if updated_count > 0:
+                    print("Metadata updated successfully.")
+                    return True
+                else:
+                    print("No rows updated.")
+                    return False
+            except sqlite3.Error as e:
+                print(f"Database error during metadata update: {e}")
+                return False
+
+            finally:
+                conn.close()
+
+        except sqlite3.Error as e:
+            print(f"Database error during metadata update: {e}")
             return False

@@ -179,51 +179,58 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Show ID3 Tags", "No file selected.")
             return
 
-        selected_row = sorted(set(index.row() for index in selected_cells))
-        print(f"Index: {selected_row}")
+        selected_rows = sorted(set(index.row() for index in selected_cells))
 
-        #get the file path from the selected row information
-        file_path_index = self.library_model.index(selected_row[0], 1)
-        file_path = self.library_model.data(file_path_index)
-        if not file_path:
-            QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
-            return
-        try:
-            audio = mutagen.File(file_path)
-            if not audio:
-                QMessageBox.warning(self, "Metadata Error", "Mutagen could not read audio file.")
+        for row in selected_rows:
+            file_path_index = self.library_model.index(row, 1)
+            file_path = self.library_model.data(file_path_index)
+            file_name = os.path.basename(file_path)
+            if not file_path:
+                QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
                 return
-                # --- 1. Format Basic Info ---
-            duration_seconds = audio.info.length if hasattr(audio.info, 'length') else 0
-            minutes = int(duration_seconds // 60)
-            seconds = int(duration_seconds % 60)
+            try:
+                audio = mutagen.File(file_path)
+                if not audio:
+                    QMessageBox.warning(self, "Metadata Error", "Mutagen could not read audio file.")
+                    return
+                    # --- 1. Format Basic Info ---
+                title_tag = audio.get("TIT2", file_name)[0].strip()
+                print(title_tag)
+                duration = audio.info.length if hasattr(audio.info, 'length') else 0
+                duration = float(duration)
+                print(duration)
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                print(minutes, seconds)
+                bpm = audio.get("TBPM", audio.get("bpm"))
+                try:
+                    bpm = int(str(bpm).strip()) if bpm else 0
+                except (ValueError, TypeError):
+                    bpm = 0
+                print(bpm)
 
-            details = f"**File Path:** {file_path}\n"
-            details += f"**Duration:** {minutes:02d}:{seconds:02d}\n"
-            details += "--------------------------------------\n\n"
+                question_text = (
+                    f"**File:** {file_name}\n\n"
+                    f"Do you want to update the database record with the following ID3 tags?\n\n"
+                    f"**Title:** {title_tag}\n"
+                    f"**Duration:** {minutes:02d}:{seconds:02d} ({duration}s)\n"
+                    f"**BPM:** {bpm}"
+                )
 
-            # --- 2. Format All ID3 Tags (for detailed view) ---
-            tag_details = ""
-            for tag, value in audio.items():
-                # Get the common tag name (e.g., 'TIT2', 'TPE1')
-                tag_name = tag.split('/')[-1]
-                # Clean up and format value (join lists/tuples, remove newlines)
-                clean_value = str(value).strip().replace('\n', ' / ')
-
-                # Limit value length for display
-                if len(clean_value) > 100:
-                    clean_value = clean_value[:97] + "..."
-
-                # Use ljust for clean alignment
-                tag_details += f"{tag_name.ljust(15)}: {clean_value}\n"
-
-            # --- 3. Display Result ---
-            msg = QMessageBox(self)
-            msg.setWindowTitle(f"ID3 Data: {os.path.basename(file_path)}")
-            msg.setText(f"Metadata extracted for: **{os.path.basename(file_path)}**\n"+details+tag_details)
-            msg.exec()
-        except Exception as e:
-            QMessageBox.critical(self, "Mutagen Error", f"An error occurred while reading the file metadata:\n{e}")
+                # --- 3. Display Result ---
+                reply = QMessageBox.question(
+                    self, "Update Metadata",
+                    question_text,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    if self.db_manager.update_file_metadata(row+1, title_tag, duration, bpm):
+                        self.refresh_library_view()
+                        QMessageBox.information(self, "Update Metadata", "Metadata updated successfully.")
+                    else:
+                        QMessageBox.warning(self, "Update Metadata", "Failed to update metadata.")
+            except Exception as e:
+                QMessageBox.critical(self, "Mutagen Error", f"An error occurred while reading the file metadata:\n{e}")
 
     def _delete_selected_files(self):
         """Deletes the selected files from the database."""
@@ -323,7 +330,7 @@ class MainWindow(QMainWindow):
         self.library_model = QSqlQueryModel()
         self.refresh_library_view()
         self.table_view.setModel(self.library_model)
-        self.table_view.setColumnHidden(0, True)  # Hide FileID column
+        #self.table_view.setColumnHidden(0, True)  # Hide FileID column
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
 
