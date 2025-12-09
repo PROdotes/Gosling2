@@ -1,12 +1,14 @@
+import os
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeView, QTableView, QListWidget,
     QLineEdit, QPushButton, QLabel,
-    QSlider, QSizePolicy
+    QSlider, QSizePolicy, QFileDialog,
+    QMessageBox
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QStandardPaths
 
 
 class MainWindow(QMainWindow):
@@ -33,8 +35,11 @@ class MainWindow(QMainWindow):
         # --- MIDDLE SECTION: THREE MAIN PANELS ---
         self._setup_middle_panels(main_layout)
 
-        # --- BOTTOM SECTION: PLAYBACK BAR ---
+        # --- BOTTOM SECTION: PLAYBACK BAR AND CONTROLS ---
         self._setup_bottom_bar(main_layout)
+
+        # --- CONNECTIONS ---
+        self.add_files_button.clicked.connect(self._open_file_dialog)
 
     def _setup_top_controls(self, layout: QVBoxLayout):
         """Sets up the Add button and Search bar at the top."""
@@ -139,6 +144,37 @@ class MainWindow(QMainWindow):
         bottom_bar_hbox.addWidget(controls_widget)
 
         layout.addLayout(bottom_bar_hbox)
+
+    def _open_file_dialog(self):
+        """
+        Opens a file dialog to select one or more MP3 files,
+        or a directory, and shows a message box with the selected path(s).
+        """
+        download_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
+        if download_path:
+            start_path = download_path
+        else:
+            start_path = os.getcwd()
+        dialog = QFileDialog(self, directory=start_path)
+        dialog.setWindowTitle("Select MP3 Files or a Directory")
+        dialog.setNameFilter("MP3 Files (*.mp3 *.m4a)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        dialog.setOptions(QFileDialog.Option.DontResolveSymlinks)
+
+        if dialog.exec():
+            selected_paths = dialog.selectedFiles()
+
+            msg = QMessageBox()
+            if selected_paths:
+                file_summary = "\n".join(selected_paths)
+
+                msg.setWindowTitle("File Selection Successful")
+                msg.setText(f"Selected {len(selected_paths)} file(s) for import:")
+                msg.setDetailedText(file_summary)
+                msg.exec()
+            else:
+                msg.setWindowTitle("Selection Error")
+                msg.setText("No files were selected.")
 
 
 # --- Application Execution Entry Point ---
