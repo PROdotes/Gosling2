@@ -105,8 +105,10 @@ class DBManager:
             print(f"Database error during basic file insert: {e}")
             return None
 
-    def get_all_files_query_string(self):
-        return """
+    def fetch_all_library_data(self):
+        conn = sqlite3.connect(self.DATABASE_NAME)
+        cursor = conn.cursor()
+        query = """
                SELECT F.FileID, \
                       GROUP_CONCAT(C.Name, ', ') AS Artists, \
                       F.Path                     AS Path, \
@@ -122,6 +124,18 @@ class DBManager:
                GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
                ORDER BY F.FileID DESC; \
                """
+
+        try:
+            cursor.execute(query)
+            headers = [description[0] for description in cursor.description]
+            data = cursor.fetchall()
+            return headers, data
+        except sqlite3.Error as e:
+            print(f"Database error during basic file insert: {e}")
+            return [], []
+        finally:
+            conn.close()
+
 
     def delete_file_by_id(self, file_id):
         """

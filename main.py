@@ -1,6 +1,7 @@
 import os
 import sys
 import mutagen
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
@@ -9,8 +10,8 @@ from PyQt6.QtWidgets import (
     QSlider, QSizePolicy, QFileDialog,
     QMessageBox, QMenu
 )
-from PyQt6.QtCore import Qt, QStandardPaths
-from PyQt6.QtSql import QSqlDatabase, QSqlQueryModel
+from PyQt6.QtCore import Qt, QStandardPaths, QSortFilterProxyModel
+from PyQt6.QtSql import QSqlDatabase
 from db_manager import DBManager
 
 
@@ -43,8 +44,18 @@ class MainWindow(QMainWindow):
 
         # --- CONNECTIONS ---
         self.add_files_button.clicked.connect(self._open_file_dialog)
+
+        # --- DATABASE ---
         self.db_manager = DBManager()
-        self._setup_library_model()
+        self.library_model = QStandardItemModel()
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setSourceModel(self.library_model)
+        self.table_view.setModel(self.proxy_model)
+        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
+        self._current_sort_column_index = 0
+        self._current_sort_order = Qt.SortOrder.DescendingOrder
+        self._setup_table_view()
 
         QApplication.instance().aboutToQuit.connect(self._cleanup_on_exit)
 
@@ -93,7 +104,6 @@ class MainWindow(QMainWindow):
 
         # 2. Middle Panel: Main Song Library (QTableView)
         self.table_view = QTableView()
-        self.table_view.setSortingEnabled(True)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         database_viewer = QWidget()
@@ -159,6 +169,19 @@ class MainWindow(QMainWindow):
         bottom_bar_hbox.addWidget(controls_widget)
 
         layout.addLayout(bottom_bar_hbox)
+
+    def _setup_table_view(self):
+        """Sets up the QTableView and connects signals."""
+        header = self.table_view.horizontalHeader()
+        self.table_view.setSortingEnabled(True)
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.sectionClicked.connect(self._sort_library_view)
+        self.refresh_library_view()
+        self.table_view.setColumnHidden(0, True)
+        self.table_view.setColumnHidden(2, True)
+        self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.resizeColumnsToContents()
 
     def _show_table_context_menu(self, position):
         """Shows a context menu for the table view."""
@@ -321,26 +344,39 @@ class MainWindow(QMainWindow):
                 msg.setText(f"Inserted {inserted_count} new file(s) into the database.\n\n{file_summary}")
                 msg.exec()
 
-    def _setup_library_model(self):
-        """Initializes the QSqlDatabase connection and sets up QSqlQueryModel for the QTableView."""
-        db = QSqlDatabase.addDatabase("QSQLITE")
-        db.setDatabaseName(DBManager.DATABASE_NAME)
-
-        if not db.open():
-            QMessageBox.critical(self, "Database Error", f"Could not open database: {db.lastError().text()}")
-            return
-
-        self.library_model = QSqlQueryModel()
-        self.refresh_library_view()
-        self.table_view.setModel(self.library_model)
-        self.table_view.setColumnHidden(0, True)  # Hide the FileID column
-        self.table_view.setColumnHidden(2, True)  # Hide the file location column
-        self.table_view.horizontalHeader().setStretchLastSection(True)
-        self.table_view.resizeColumnsToContents()
 
     def refresh_library_view(self):
-        query_string = self.db_manager.get_all_files_query_string()
-        self.library_model.setQuery(query_string)
+        self.library_model.clear()
+        headers, data = self.db_manager.fetch_all_library_data()
+        if not headers:
+            self.library_model.setHorizontalHeaderLabels(['FileID', 'Artist(s)', 'Path', 'Title', 'Duration', 'BPM'])
+            return
+        self.library_model.setHorizontalHeaderLabels(headers)
+        for row_data in data:
+            items = []
+            for col_index, value in enumerate(row_data):
+                item = QStandardItem(str(value) if value is not None else "")
+                if col_index in [0, 4, 5]:  # FileID, Duration, TempoBPM
+                    try:
+                        numeric_value = float(value) if value is not None else 0.0
+                    except (ValueError, TypeError):
+                        numeric_value = 0.0
+                    item.setData(numeric_value, 3)
+
+                items.append(item)
+
+            self.library_model.appendRow(items)
+        self.proxy_model.sort(
+            self.table_view.horizontalHeader().sortIndicatorSection(),
+            self.table_view.horizontalHeader().sortIndicatorOrder()
+        )
+
+        self.table_view.resizeColumnToContents(0)
+
+
+    def _sort_library_view(self, index):
+        """Handles column header clicks by applying the sort to the proxy model."""
+
 
 
 # --- Application Execution Entry Point ---
