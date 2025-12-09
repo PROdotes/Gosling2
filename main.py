@@ -1,12 +1,16 @@
+import os
 import sys
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeView, QTableView, QListWidget,
     QLineEdit, QPushButton, QLabel,
-    QSlider, QSizePolicy
+    QSlider, QSizePolicy, QFileDialog,
+    QMessageBox, QMenu
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QStandardPaths
+from PyQt6.QtSql import QSqlDatabase, QSqlQueryModel
+from db_manager import DBManager
 
 
 class MainWindow(QMainWindow):
@@ -33,8 +37,21 @@ class MainWindow(QMainWindow):
         # --- MIDDLE SECTION: THREE MAIN PANELS ---
         self._setup_middle_panels(main_layout)
 
-        # --- BOTTOM SECTION: PLAYBACK BAR ---
+        # --- BOTTOM SECTION: PLAYBACK BAR AND CONTROLS ---
         self._setup_bottom_bar(main_layout)
+
+        # --- CONNECTIONS ---
+        self.add_files_button.clicked.connect(self._open_file_dialog)
+        self.db_manager = DBManager()
+        self._setup_library_model()
+
+        QApplication.instance().aboutToQuit.connect(self._cleanup_on_exit)
+
+    def _cleanup_on_exit(self):
+        """Cleans up resources on application exit."""
+        db = QSqlDatabase.database()
+        if db.isValid():
+            db.close()
 
     def _setup_top_controls(self, layout: QVBoxLayout):
         """Sets up the Add button and Search bar at the top."""
@@ -76,6 +93,8 @@ class MainWindow(QMainWindow):
         # 2. Middle Panel: Main Song Library (QTableView)
         self.table_view = QTableView()
         self.table_view.setSortingEnabled(True)
+        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         database_viewer = QWidget()
         database_viewer.setLayout(QVBoxLayout())
         library_label = QLabel("SONG LIBRARY")
@@ -139,6 +158,111 @@ class MainWindow(QMainWindow):
         bottom_bar_hbox.addWidget(controls_widget)
 
         layout.addLayout(bottom_bar_hbox)
+
+    def _show_table_context_menu(self, position):
+        """Shows a context menu for the table view."""
+        index = self.table_view.indexAt(position)
+        if not index.isValid():
+            return
+        menu = QMenu()
+        delete_action = menu.addAction("❌ Delete Selected File(s)")
+        delete_action.triggered.connect(self._delete_selected_files)
+        menu.exec(self.table_view.viewport().mapToGlobal(position))
+
+    def _delete_selected_files(self):
+        """Deletes the selected files from the database."""
+        selected_indexes = self.table_view.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            QMessageBox.information(self, "Delete Files", "No files selected for deletion.")
+            return
+
+        unique_selected_rows = set(index.row() for index in selected_indexes)
+
+        reply = QMessageBox.question(
+            self, "Delete Files",
+            f"Are you sure you want to delete the selected {len(unique_selected_rows)} file(s) from the database?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        db_manager = self.db_manager
+        deleted_count = 0
+
+        for index in unique_selected_rows:
+            file_id = self.library_model.data(self.library_model.index(index.row(), 0))
+            if db_manager.delete_file_by_id(file_id):
+                deleted_count += 1
+
+        if deleted_count > 0:
+            self.refresh_library_view()
+
+        msg = QMessageBox()
+        msg.setWindowTitle("Delete Files")
+        msg.setText(f"Deleted {deleted_count} file(s) from the database.")
+        msg.exec()
+
+    def _open_file_dialog(self):
+        """
+        Opens a file dialog to select one or more MP3 files,
+        or a directory, and shows a message box with the selected path(s).
+        """
+        download_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)
+        if download_path:
+            start_path = download_path
+        else:
+            start_path = os.getcwd()
+        dialog = QFileDialog(self, directory=start_path)
+        dialog.setWindowTitle("Select MP3 Files or a Directory")
+        dialog.setNameFilter("MP3 Files (*.mp3 *.m4a)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFiles)
+        dialog.setOptions(QFileDialog.Option.DontResolveSymlinks)
+
+        if dialog.exec():
+            selected_paths = dialog.selectedFiles()
+
+            if selected_paths:
+                db_manager = self.db_manager
+
+                inserted_count = 0
+                file_summary = "--- Selected Files ---\n"
+
+                for path in selected_paths:
+                    title = db_manager.insert_file_basic(path)
+                    if title:
+                        inserted_count += 1
+                        file_summary += f"[ADDED] {title}\n"
+                    else:
+                        file_summary += f"[SKIPPED] {os.path.basename(path)}\n"
+
+                if inserted_count > 0:
+                    self.refresh_library_view()
+
+                msg = QMessageBox()
+                msg.setWindowTitle("File Import Summary")
+                msg.setText(f"Inserted {inserted_count} new file(s) into the database.\n\n{file_summary}")
+                msg.exec()
+
+    def _setup_library_model(self):
+        """Initializes the QSqlDatabase connection and sets up QSqlQueryModel for the QTableView."""
+        db = QSqlDatabase.addDatabase("QSQLITE")
+        db.setDatabaseName(DBManager.DATABASE_NAME)
+
+        if not db.open():
+            QMessageBox.critical(self, "Database Error", f"Could not open database: {db.lastError().text()}")
+            return
+
+        self.library_model = QSqlQueryModel()
+        self.refresh_library_view()
+        self.table_view.setModel(self.library_model)
+        self.table_view.setColumnHidden(0, True)  # Hide FileID column
+        self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.resizeColumnsToContents()
+
+    def refresh_library_view(self):
+        query_string = self.db_manager.get_all_files_query_string()
+        self.library_model.setQuery(query_string)
 
 
 # --- Application Execution Entry Point ---
