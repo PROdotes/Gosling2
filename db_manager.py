@@ -3,9 +3,12 @@ import os
 
 
 class DBManager:
-    DATABASE_NAME = 'gosling2.sqlite3'
+    DATABASE_SUBDIR = 'sqldb'
+    DATABASE_FILE_NAME = 'gosling2.sqlite3'
+    DATABASE_NAME = os.path.join(os.path.dirname(__file__), DATABASE_SUBDIR, DATABASE_FILE_NAME)
 
     def __init__(self):
+        os.makedirs(self.DATABASE_SUBDIR, exist_ok=True)
         self.create_schema()
 
     def create_schema(self):

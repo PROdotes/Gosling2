@@ -1,5 +1,6 @@
 import os
 import sys
+import mutagen
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
@@ -165,9 +166,64 @@ class MainWindow(QMainWindow):
         if not index.isValid():
             return
         menu = QMenu()
+        show_id3_action = menu.addAction("🔍 Show ID3 Data")
+        show_id3_action.triggered.connect(self._show_id3_tags)
         delete_action = menu.addAction("❌ Delete Selected File(s)")
         delete_action.triggered.connect(self._delete_selected_files)
         menu.exec(self.table_view.viewport().mapToGlobal(position))
+
+    def _show_id3_tags(self):
+        """Shows the ID3 tags for the selected file."""
+        selected_cells = self.table_view.selectionModel().selectedIndexes()
+        if not selected_cells:
+            QMessageBox.information(self, "Show ID3 Tags", "No file selected.")
+            return
+
+        selected_row = sorted(set(index.row() for index in selected_cells))
+        print(f"Index: {selected_row}")
+
+        #get the file path from the selected row information
+        file_path_index = self.library_model.index(selected_row[0], 1)
+        file_path = self.library_model.data(file_path_index)
+        if not file_path:
+            QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
+            return
+        try:
+            audio = mutagen.File(file_path)
+            if not audio:
+                QMessageBox.warning(self, "Metadata Error", "Mutagen could not read audio file.")
+                return
+                # --- 1. Format Basic Info ---
+            duration_seconds = audio.info.length if hasattr(audio.info, 'length') else 0
+            minutes = int(duration_seconds // 60)
+            seconds = int(duration_seconds % 60)
+
+            details = f"**File Path:** {file_path}\n"
+            details += f"**Duration:** {minutes:02d}:{seconds:02d}\n"
+            details += "--------------------------------------\n\n"
+
+            # --- 2. Format All ID3 Tags (for detailed view) ---
+            tag_details = ""
+            for tag, value in audio.items():
+                # Get the common tag name (e.g., 'TIT2', 'TPE1')
+                tag_name = tag.split('/')[-1]
+                # Clean up and format value (join lists/tuples, remove newlines)
+                clean_value = str(value).strip().replace('\n', ' / ')
+
+                # Limit value length for display
+                if len(clean_value) > 100:
+                    clean_value = clean_value[:97] + "..."
+
+                # Use ljust for clean alignment
+                tag_details += f"{tag_name.ljust(15)}: {clean_value}\n"
+
+            # --- 3. Display Result ---
+            msg = QMessageBox(self)
+            msg.setWindowTitle(f"ID3 Data: {os.path.basename(file_path)}")
+            msg.setText(f"Metadata extracted for: **{os.path.basename(file_path)}**\n"+details+tag_details)
+            msg.exec()
+        except Exception as e:
+            QMessageBox.critical(self, "Mutagen Error", f"An error occurred while reading the file metadata:\n{e}")
 
     def _delete_selected_files(self):
         """Deletes the selected files from the database."""
