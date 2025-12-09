@@ -176,7 +176,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Delete Files", "No files selected for deletion.")
             return
 
-        unique_selected_rows = set(index.row() for index in selected_indexes)
+        unique_selected_rows = sorted(set(index.row() for index in selected_indexes))
 
         reply = QMessageBox.question(
             self, "Delete Files",
@@ -190,8 +190,19 @@ class MainWindow(QMainWindow):
         db_manager = self.db_manager
         deleted_count = 0
 
-        for index in unique_selected_rows:
-            file_id = self.library_model.data(self.library_model.index(index.row(), 0))
+        for row in unique_selected_rows:
+            # row is an int; build QModelIndex from row, column 0
+            model_index = self.library_model.index(row, 0)
+            if not model_index.isValid():
+                continue
+
+            file_id_variant = self.library_model.data(model_index)
+            try:
+                file_id = int(file_id_variant)
+            except (TypeError, ValueError):
+                # Couldn't parse file id; skip and continue
+                continue
+
             if db_manager.delete_file_by_id(file_id):
                 deleted_count += 1
 
