@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QLabel,
     QSlider, QSizePolicy, QFileDialog,
     QMessageBox, QMenu, QListWidgetItem,
-    QStyledItemDelegate
+    QStyledItemDelegate, QStyle
 )
 from PyQt6.QtCore import QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl
 from PyQt6.QtSql import QSqlDatabase
@@ -26,7 +26,7 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         painter.save()
 
         # Draw background if selected
-        if option.state:
+        if option.state & QStyle.StateFlag.State_Selected:
             custom_color = QColor("#1E5096")
             painter.fillRect(option.rect, custom_color)
 
@@ -63,9 +63,8 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         painter.restore()
 
     def sizeHint(self, option, index):
-        """Make each item taller for two rows"""
-        width = option.rect.width() if option.rect.width() > 0 else 100
-        return QSize(option.rect.width(), 50)  # 50 px height, adjust as needed
+        width = option.rect.width() if option.rect.width() > 0 else 200
+        return QSize(width, 54)  # e.g. 54 px for two rows
 
 
 class PlaylistWidget(QListWidget):
@@ -281,18 +280,21 @@ class MainWindow(QMainWindow):
     def _show_column_context_menu(self, position):
         """Shows a context menu for the table header to toggle column visibility."""
         menu = QMenu(self)
-        proxy_model = self.proxy_model
+        source_model = self.library_model
         table_view = self.table_view
-        for col in range(proxy_model.columnCount()):
-            header_text = proxy_model.headerData(
-                col, Qt.Orientation.Horizontal
-            )
-            action = QAction(header_text, self)
+
+        for col in range(source_model.columnCount()):
+            header_text = source_model.headerData(col, Qt.Orientation.Horizontal)
+            action = QAction(str(header_text), self)
             action.setCheckable(True)
+            # Table view columns are shown/hidden per *view* index (source == proxy in your set-up),
+            # but we assume 1:1 mapping. If you're reordering columns or using a proxy that changes columns,
+            # use proxy_model.mapFromSource/mapToSource as needed.
             action.setChecked(not table_view.isColumnHidden(col))
             action.setData(col)
             action.toggled.connect(self.toggle_column_visibility)
             menu.addAction(action)
+
         global_pos = table_view.horizontalHeader().mapToGlobal(position)
         menu.exec(global_pos)
 
@@ -479,16 +481,21 @@ class MainWindow(QMainWindow):
         self.table_view.scrollToTop()
 
     def _show_table_context_menu(self, position):
-        """Shows a context menu for the table view."""
+        """Shows a context menu for the table view (using non-blocking popup)."""
         index = self.table_view.indexAt(position)
         if not index.isValid():
             return
-        menu = QMenu()
+
+        menu = QMenu(self)
         show_id3_action = menu.addAction("🔍 Show ID3 Data")
-        show_id3_action.triggered.connect(self._show_id3_tags)
         delete_action = menu.addAction("❌ Delete Selected File(s)")
+
+        show_id3_action.triggered.connect(self._show_id3_tags)
         delete_action.triggered.connect(self._delete_selected_files)
-        menu.exec(self.table_view.viewport().mapToGlobal(position))
+
+        # Keep reference so it doesn't get garbage collected
+        self._current_context_menu = menu
+        menu.popup(self.table_view.viewport().mapToGlobal(position))
 
     def _show_id3_tags(self):
         """Shows the ID3 tags for the selected file(s)."""
@@ -520,13 +527,12 @@ class MainWindow(QMainWindow):
                 seconds = int(song.duration % 60)
 
                 info_text = (
-                    f"**File:** {file_name}\n"
-                    f"**Title:** {song.title}\n"
-                    f"**Performers:** {song.performers}\n"
-                    f"**Duration:** {minutes:02d}:{seconds:02d} ({song.duration:.2f}s)\n"
-                    f"**BPM:** {song.bpm}"
+                    f"File: {file_name}\n"
+                    f"Title: {song.title}\n"
+                    f"Performers: {song.performers}\n"
+                    f"Duration: {minutes:02d}:{seconds:02d} ({song.duration:.2f} s)\n"
+                    f"BPM: {song.bpm}"
                 )
-
                 QMessageBox.information(self, "ID3 Tags", info_text)
 
             except Exception as e:
