@@ -1,6 +1,6 @@
 import os
 import sys
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QCloseEvent, QDrag, QFont, QPen, QPainter
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QCloseEvent, QDrag, QFont, QPen, QColor, QPainter
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QMenu, QListWidgetItem,
     QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt, QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl
+from PyQt6.QtCore import QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl
 from PyQt6.QtSql import QSqlDatabase
 from db_manager import DBManager
 from Song import Song
@@ -19,15 +19,16 @@ from Song import Song
 class PlaylistItemDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.artist_font = QFont("Arial", 10, QFont.Weight.Bold)
-        self.title_font = QFont("Arial", 9)
+        self.artist_font = QFont("Arial", 12, QFont.Weight.Bold)
+        self.title_font = QFont("Arial", 10)
 
     def paint(self, painter, option, index):
         painter.save()
 
         # Draw background if selected
-        if option.state & Qt.ItemState.Selected:
-            painter.fillRect(option.rect, option.palette.highlight())
+        if option.state:
+            custom_color = QColor("#1E5096")
+            painter.fillRect(option.rect, custom_color)
 
         # Retrieve data
         display_text = index.data(Qt.ItemDataRole.DisplayRole)
@@ -70,9 +71,13 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 class PlaylistWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.setAcceptDrops(True)
         self.setDragDropMode(QListWidget.DragDropMode.DropOnly)
         self.setDefaultDropAction(Qt.DropAction.CopyAction)
+
+        self._preview_row = None      # row where preview line will display
+        self._preview_after = False   # before or after row
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -81,10 +86,30 @@ class PlaylistWidget(QListWidget):
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.mimeData().hasUrls():
-            event.acceptProposedAction()
-        else:
+        if not event.mimeData().hasUrls():
             event.ignore()
+            return
+
+        pos = event.position().toPoint()
+        index = self.indexAt(pos)
+
+        if index.isValid():
+            rect = self.visualItemRect(self.item(index.row()))
+            midpoint = rect.top() + rect.height() / 2
+
+            self._preview_row = index.row()
+            self._preview_after = pos.y() >= midpoint
+        else:
+            # dropped below all items
+            self._preview_row = self.count() - 1
+            self._preview_after = True
+
+        self.viewport().update()
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._preview_row = None
+        self.viewport().update()
 
     def dropEvent(self, event):
         mime_data = event.mimeData()
@@ -92,20 +117,62 @@ class PlaylistWidget(QListWidget):
             event.ignore()
             return
 
-        # Convert all dropped URLs to local file paths
         urls = mime_data.urls()
-        file_paths = [url.toLocalFile() for url in urls if url.isLocalFile()]
+        file_paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if not file_paths:
             event.ignore()
             return
 
-        # Append dropped files to the playlist safely
+        # Compute final position
+        if self._preview_row is not None:
+            insert_row = self._preview_row + (1 if self._preview_after else 0)
+        else:
+            insert_row = self.count()
+
         for path in file_paths:
-            item = QListWidgetItem(os.path.basename(path))
+            display_text = os.path.basename(path)
+
+            try:
+                song = Song.from_mp3(path, None)
+                if song:
+                    artist = song.performers or "Unknown Artist"
+                    title  = song.title or os.path.basename(path)
+                    display_text = f"{artist} | {title}"
+            except Exception:
+                pass
+
+            item = QListWidgetItem(display_text)
             item.setData(Qt.ItemDataRole.UserRole, {"path": path})
-            self.addItem(item)
+            self.insertItem(insert_row, item)
+            insert_row += 1
+
+        # Reset preview state
+        self._preview_row = None
+        self.viewport().update()
 
         event.acceptProposedAction()
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        if self._preview_row is None:
+            return
+
+        painter = QPainter(self.viewport())
+        pen = QPen(Qt.GlobalColor.red, 2)
+        painter.setPen(pen)
+
+        # Determine line position
+        if self._preview_row < self.count():
+            item = self.item(self._preview_row)
+            rect = self.visualItemRect(item)
+            y = rect.bottom() if self._preview_after else rect.top()
+        else:
+            # dropping at end
+            last_rect = self.visualItemRect(self.item(self.count() - 1))
+            y = last_rect.bottom()
+
+        painter.drawLine(0, y, self.viewport().width(), y)
 
 
 class MainWindow(QMainWindow):
@@ -492,7 +559,6 @@ class MainWindow(QMainWindow):
             file_id = str(self.proxy_model.data(file_id_index))
 
             if db_manager.delete_file_by_id(file_id):
-                #result = db_manager.cleanup_orphaned_contributors()
                 deleted_count += 1
 
         if deleted_count > 0:
@@ -547,26 +613,51 @@ class MainWindow(QMainWindow):
                 msg.exec()
 
     def refresh_library_view(self):
+        """
+        Clears the model, fetches all library data, populates the model,
+        and performs post-refresh setup (sorting, tree, column visibility).
+        """
         self.library_model.clear()
+
+        # 1. Fetch data from the database
         headers, data = self.db_manager.fetch_all_library_data()
+
         if not headers:
             self.library_model.setHorizontalHeaderLabels(['FileID', 'Artists', 'Path', 'Title', 'Duration', 'BPM'])
             return
+
         self.library_model.setHorizontalHeaderLabels(headers)
+
+        # Identify columns that need numeric sorting (used by the ProxyModel)
+        COL_ID = self._get_column_index('FileID')
+        COL_DURATION = self._get_column_index('Duration')
+        COL_BPM = self._get_column_index('BPM')
+
+        NUMERIC_SORT_ROLE = Qt.ItemDataRole.UserRole  # Role 32 for numeric comparison
+
+        # 2. Populate model rows
         for row_data in data:
             items = []
             for col_index, value in enumerate(row_data):
                 item = QStandardItem(str(value) if value is not None else "")
-                if col_index in [0, 4, 5]:  # FileID, Duration, TempoBPM
+
+                # Check if the column requires special numeric data for sorting
+                if col_index in (COL_ID, COL_DURATION, COL_BPM):
                     try:
                         numeric_value = float(value) if value is not None else 0.0
                     except (ValueError, TypeError):
                         numeric_value = 0.0
-                    item.setData(numeric_value, 3)
+
+                    # Set the numeric value using the designated UserRole
+                    item.setData(numeric_value, NUMERIC_SORT_ROLE)
 
                 items.append(item)
 
             self.library_model.appendRow(items)
+
+        # 3. Post-refresh view setup
+
+        # Re-apply the current sort order
         self.proxy_model.sort(
             self.table_view.horizontalHeader().sortIndicatorSection(),
             self.table_view.horizontalHeader().sortIndicatorOrder()
@@ -591,6 +682,7 @@ class MainWindow(QMainWindow):
             if event.buttons() == Qt.MouseButton.LeftButton:
                 self._start_drag(event)
             original_event(event)
+
         return custom_mouseMoveEvent
 
     def _start_drag(self, event):

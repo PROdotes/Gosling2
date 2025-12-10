@@ -120,7 +120,7 @@ class DBManager:
         """
         try:
             with sqlite3.connect(self.DATABASE_NAME) as conn:
-                conn.execute("PRAGMA foreign_keys = ON")
+                #conn.execute("PRAGMA foreign_keys = ON")
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM Files WHERE FileID = ?", (file_id,))
                 return cursor.rowcount > 0
