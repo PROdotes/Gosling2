@@ -1,6 +1,7 @@
 import os
 import sys
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QCloseEvent, QDrag, QFont, QPen, QColor, QPainter
+from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
@@ -8,12 +9,76 @@ from PyQt6.QtWidgets import (
     QLineEdit, QPushButton, QLabel,
     QSlider, QSizePolicy, QFileDialog,
     QMessageBox, QMenu, QListWidgetItem,
-    QStyledItemDelegate, QStyle
+    QStyledItemDelegate, QStyle, QToolTip
 )
-from PyQt6.QtCore import QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl
+from PyQt6.QtCore import QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl, QTimer
 from PyQt6.QtSql import QSqlDatabase
 from db_manager import DBManager
 from Song import Song
+
+GREEN_HEX = "5f8a53"
+
+SLIDER_SIZE = 30
+
+class SeekSlider(QSlider):
+    def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None):
+        super().__init__(orientation, parent)
+        self.setMouseTracking(True)
+        self.player = None
+        self.total_duration_secs = 0
+        self._last_tooltip = None
+
+    def setPlayer(self, player: QMediaPlayer):
+        self.player = player
+        self.player.durationChanged.connect(self._on_duration_changed)
+
+    def _on_duration_changed(self, duration_ms):
+        if duration_ms > 0:
+            self.total_duration_secs = duration_ms / 1000
+            self.setRange(0, duration_ms)
+
+    def enterEvent(self, event):
+        self._update_tooltip(event)
+        super().enterEvent(event)
+
+    def mouseMoveEvent(self, event):
+        self._update_tooltip(event)
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event):
+        if self.total_duration_secs > 0 and event.button() == Qt.MouseButton.LeftButton:
+            pos_ratio = event.position().x() / self.width()
+            pos_ratio = max(0, min(1, pos_ratio))
+            new_value = int(pos_ratio * self.maximum())
+            self.setValue(new_value)
+            if self.player:
+                self.player.setPosition(new_value)
+        else:
+            super().mousePressEvent(event)
+
+    def _update_tooltip(self, event):
+        if self.total_duration_secs <= 0:
+            return
+
+        pos_ratio = event.position().x() / self.width()
+        pos_ratio = max(0, min(1, pos_ratio))
+        hover_time = pos_ratio * self.total_duration_secs
+        time_left = self.total_duration_secs - hover_time
+        minutes = int(hover_time // 60)
+        seconds = int(hover_time % 60)
+        minutes_left = int(time_left // 60)
+        seconds_left = int(time_left % 60)
+        text = f"{minutes:02d}:{seconds:02d} / -{minutes_left:02d}:{seconds_left:02d}"
+
+        if text != self._last_tooltip:
+            QToolTip.showText(self.mapToGlobal(event.position().toPoint()), text)
+            self._last_tooltip = text
+
+    def sizeHint(self):
+        hint = super().sizeHint()
+        if self.orientation() == Qt.Orientation.Horizontal:
+            hint.setHeight(SLIDER_SIZE)  # make the slider taller
+        return hint
 
 
 class PlaylistItemDelegate(QStyledItemDelegate):
@@ -25,39 +90,46 @@ class PlaylistItemDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         painter.save()
 
-        # Draw background if selected
+        # --- Background ---
         if option.state & QStyle.StateFlag.State_Selected:
-            custom_color = QColor("#1E5096")
-            painter.fillRect(option.rect, custom_color)
+            painter.fillRect(option.rect, QColor("#1E5096"))  # selected
+        else:
+            painter.fillRect(option.rect, QColor("#444444"))  # normal
 
-        # Retrieve data
-        display_text = index.data(Qt.ItemDataRole.DisplayRole)
-        if not display_text or not isinstance(display_text, str):
-            display_text = ""
+        # --- Circle (right side, 60% of item height) ---
+        circle_diameter = int(option.rect.height() * 0.75)  # 70% of item height
+        circle_top = option.rect.top() + (option.rect.height() - circle_diameter) // 2
+        circle_right_padding = -int(circle_diameter * 0.3)  # negative to go 40% outside
+        circle_left = option.rect.right() - circle_diameter - circle_right_padding
+        circle_rect = QRect(circle_left, circle_top, circle_diameter, circle_diameter)
+
+        painter.setBrush(QColor("#f44336"))  # red circle
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+
+        # --- Text (avoid overlapping circle) ---
+        display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
         if "|" in display_text:
             artist, title = display_text.split("|", 1)
         else:
             artist, title = display_text, ""
 
-        # Set left alignment with padding
         padding = 5
-        artist_rect = QRect(option.rect.left() + padding,
-                            option.rect.top() + padding,
-                            option.rect.width() - 2 * padding,
-                            option.rect.height() // 2)
-        title_rect = QRect(option.rect.left() + padding,
-                           option.rect.top() + option.rect.height() // 2,
-                           option.rect.width() - 2 * padding,
-                           option.rect.height() // 2 - padding)
+        text_rect = QRect(option.rect.left() + padding,
+                          option.rect.top() + padding,
+                          circle_rect.left() - option.rect.left() - 2 * padding,
+                          option.rect.height() - 2 * padding)
 
-        # Draw artist (top line)
+        artist_rect = QRect(text_rect.left(), text_rect.top(),
+                            text_rect.width(), text_rect.height() // 2)
+        title_rect = QRect(text_rect.left(), text_rect.top() + text_rect.height() // 2,
+                           text_rect.width(), text_rect.height() // 2)
+
         painter.setFont(self.artist_font)
         painter.setPen(QPen(option.palette.text(), 1))
         painter.drawText(artist_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, artist)
 
-        # Draw title (bottom line)
         painter.setFont(self.title_font)
-        painter.setPen(QPen(option.palette.text(), 1))
         painter.drawText(title_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
 
         painter.restore()
@@ -70,36 +142,29 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 class PlaylistWidget(QListWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.setAcceptDrops(True)
-        self.setDragDropMode(QListWidget.DragDropMode.DropOnly)
-        self.setDefaultDropAction(Qt.DropAction.CopyAction)
-
-        self._preview_row = None      # row where preview line will display
-        self._preview_after = False   # before or after row
+        self.setDragEnabled(True)
+        self.setDragDropMode(QListWidget.DragDropMode.InternalMove)  # allow internal moves
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self._preview_row = None
+        self._preview_after = False
 
     def dragEnterEvent(self, event):
-        if event.mimeData().hasUrls():
+        if event.mimeData().hasUrls() or event.source() == self:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if not event.mimeData().hasUrls():
-            event.ignore()
-            return
-
         pos = event.position().toPoint()
         index = self.indexAt(pos)
 
         if index.isValid():
             rect = self.visualItemRect(self.item(index.row()))
             midpoint = rect.top() + rect.height() / 2
-
             self._preview_row = index.row()
             self._preview_after = pos.y() >= midpoint
         else:
-            # dropped below all items
             self._preview_row = self.count() - 1
             self._preview_after = True
 
@@ -111,49 +176,43 @@ class PlaylistWidget(QListWidget):
         self.viewport().update()
 
     def dropEvent(self, event):
-        mime_data = event.mimeData()
-        if not mime_data.hasUrls():
-            event.ignore()
-            return
+        mime = event.mimeData()
 
-        urls = mime_data.urls()
-        file_paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
-        if not file_paths:
-            event.ignore()
-            return
+        if mime.hasUrls():  # external drop
+            pos = event.position().toPoint()
+            index = self.indexAt(pos)
 
-        # Compute final position
-        if self._preview_row is not None:
-            insert_row = self._preview_row + (1 if self._preview_after else 0)
+            if index.isValid():
+                insert_row = index.row() + (1 if self._preview_after else 0)
+            else:
+                insert_row = self.count()  # drop at end if outside any item
+
+            for url in mime.urls():
+                path = url.toLocalFile()
+                if not os.path.isfile(path):
+                    continue
+
+                display_text = os.path.basename(path)
+                try:
+                    song = Song.from_mp3(path, None)
+                    if song:
+                        display_text = f"{song.performers or 'Unknown Artist'} | {song.title or os.path.basename(path)}"
+                except Exception:
+                    pass
+
+                item = QListWidgetItem(display_text)
+                item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+                self.insertItem(insert_row, item)
+                insert_row += 1
+
+            self._preview_row = None
+            self.viewport().update()
+            event.acceptProposedAction()
         else:
-            insert_row = self.count()
-
-        for path in file_paths:
-            display_text = os.path.basename(path)
-
-            try:
-                song = Song.from_mp3(path, None)
-                if song:
-                    artist = song.performers or "Unknown Artist"
-                    title  = song.title or os.path.basename(path)
-                    display_text = f"{artist} | {title}"
-            except Exception:
-                pass
-
-            item = QListWidgetItem(display_text)
-            item.setData(Qt.ItemDataRole.UserRole, {"path": path})
-            self.insertItem(insert_row, item)
-            insert_row += 1
-
-        # Reset preview state
-        self._preview_row = None
-        self.viewport().update()
-
-        event.acceptProposedAction()
+            super().dropEvent(event)
 
     def paintEvent(self, event):
         super().paintEvent(event)
-
         if self._preview_row is None:
             return
 
@@ -161,17 +220,30 @@ class PlaylistWidget(QListWidget):
         pen = QPen(Qt.GlobalColor.red, 2)
         painter.setPen(pen)
 
-        # Determine line position
         if self._preview_row < self.count():
-            item = self.item(self._preview_row)
-            rect = self.visualItemRect(item)
+            rect = self.visualItemRect(self.item(self._preview_row))
             y = rect.bottom() if self._preview_after else rect.top()
         else:
-            # dropping at end
             last_rect = self.visualItemRect(self.item(self.count() - 1))
             y = last_rect.bottom()
 
         painter.drawLine(0, y, self.viewport().width(), y)
+
+
+def update_song_label(song_path: str) -> str:
+    """
+    Returns a formatted string for the current song: "Artist - Title (mm:ss)".
+    Falls back to the file name if metadata cannot be read.
+    """
+    try:
+        song = Song.from_mp3(song_path, None)
+        if song:
+            minutes, seconds = divmod(int(song.duration), 60)
+            return f"{song.performers} - {song.title} ({minutes:02d}:{seconds:02d})"
+    except Exception:
+        pass
+    # fallback
+    return os.path.basename(song_path)
 
 
 class MainWindow(QMainWindow):
@@ -213,6 +285,19 @@ class MainWindow(QMainWindow):
         self.table_view.setDragDropMode(QTableView.DragDropMode.DragOnly)
         self._set_up_drag_and_drop_on_table_view()
 
+        # mp3 player
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        self.player.positionChanged.connect(self._update_slider_position)
+        self.playback_slider.sliderMoved.connect(self._seek_position)
+        self.player.mediaStatusChanged.connect(self._handle_media_status)
+        self.playback_slider.setPlayer(self.player)
+
+        # --- Crossfade setup ---
+        self.crossfade_timer = QTimer(self)
+        self.next_song_path = None
+
         # Initial sort state setup
         self._current_sort_column_index = 0
         self._current_sort_order = Qt.SortOrder.DescendingOrder
@@ -226,6 +311,8 @@ class MainWindow(QMainWindow):
         header = self.table_view.horizontalHeader()
         header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         header.customContextMenuRequested.connect(self._show_column_context_menu)
+        self.play_pause_button.clicked.connect(self._toggle_play_pause)
+        self.skip_button.clicked.connect(self._crossfade_to_next)
 
     def _load_window_geometry(self):
         if self.settings.contains("geometry"):
@@ -381,41 +468,78 @@ class MainWindow(QMainWindow):
         """Sets up the persistent bottom playback bar."""
 
         bottom_bar_hbox = QHBoxLayout()
-        bottom_bar_hbox.setContentsMargins(10, 10, 0, 0)
+        bottom_bar_hbox.setContentsMargins(10, 10, 10, 10)
+        bottom_bar_hbox.setSpacing(15)
 
-        # 1. Current Song Info (Left Side)
-        self.current_song_label = QLabel("Artist Name - Song Title")
-        bottom_bar_hbox.addWidget(self.current_song_label)
+        # --- Left block: Song info + slider + time labels ---
+        left_block = QVBoxLayout()
+        left_block.setSpacing(5)
 
-        # 2. Playback Scroll Bar (Center)
-        self.playback_slider = QSlider(Qt.Orientation.Horizontal)
-        self.playback_slider.setRange(0, 1000)
-        bottom_bar_hbox.addWidget(self.playback_slider)
+        # Song info label (bigger)
+        self.current_song_label = QLabel("Artist Name - Song Title (00:00)")
+        font = self.current_song_label.font()
+        font.setPointSize(20)  # bigger font
+        font.setBold(True)
+        self.current_song_label.setFont(font)
+        self.current_song_label.setStyleSheet("color: #eee;")
+        self.current_song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        left_block.addWidget(self.current_song_label)
 
-        # 3. Time Labels (Flanking the slider)
+        # Slider + time labels
+        slider_block = QHBoxLayout()
+        slider_block.setSpacing(5)
+
+        # Time played label
         self.time_played_label = QLabel("00:00")
-        self.time_separator_label = QLabel("/")
-        self.total_time_label = QLabel("04:30")
-        bottom_bar_hbox.addWidget(self.time_played_label)
-        bottom_bar_hbox.addWidget(self.time_separator_label)
-        bottom_bar_hbox.addWidget(self.total_time_label)
+        self.time_played_label.setFixedWidth(50)
+        self.time_played_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        slider_block.addWidget(self.time_played_label)
 
-        # 4. Playback Controls Box (Right Side)
-        controls_widget = QWidget()
-        controls_layout = QHBoxLayout(controls_widget)
-        controls_layout.setContentsMargins(5, 5, 5, 5)
+        # Playback slider (smaller handle)
+        self.playback_slider = SeekSlider(Qt.Orientation.Horizontal)
+        handle_size = max(8, SLIDER_SIZE // 5)  # smaller handle
+        self.playback_slider.setStyleSheet(f"""
+        QSlider::groove:horizontal {{
+            height: {SLIDER_SIZE}px;
+            background: #ccc;
+            border-radius: {SLIDER_SIZE // 8}px;
+        }}
+        QSlider::handle:horizontal {{
+            width: {handle_size}px;
+            height: {handle_size}px;
+            background: #222;
+            border-radius: {handle_size // 2}px;
+            margin: -{handle_size // 2}px 0;
+        }}
+        """)
+        self.playback_slider.setRange(0, 1000)
+        slider_block.addWidget(self.playback_slider, 1)  # slider stretches
 
-        self.play_pause_button = QPushButton("⏯️ Play/Pause")
-        self.play_pause_button.setFixedWidth(150)
-        self.play_pause_button.setFixedHeight(70)
-        self.skip_button = QPushButton("⏭️ Skip/Fade")
-        self.skip_button.setFixedWidth(150)
-        self.skip_button.setFixedHeight(70)
+        # Total time label
+        self.total_time_label = QLabel("-00:00")
+        self.total_time_label.setFixedWidth(50)
+        self.total_time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        slider_block.addWidget(self.total_time_label)
 
+        left_block.addLayout(slider_block)
+        bottom_bar_hbox.addLayout(left_block, 1)
+
+        # --- Right block: playback buttons ---
+        controls_layout = QHBoxLayout()
+        controls_layout.setSpacing(10)
+
+        self.play_pause_button = QPushButton("▶️ Play")  # default green play
+        self.skip_button = QPushButton("⏭️ Skip")
+        for btn in (self.play_pause_button, self.skip_button):
+            btn.setFixedSize(150, 70)
+            font_btn = btn.font()
+            font_btn.setPointSize(20)
+            btn.setFont(font_btn)
+            btn.setStyleSheet("background-color: #%s; color: white; border-radius: 10px;" % GREEN_HEX)  # green
         controls_layout.addWidget(self.play_pause_button)
         controls_layout.addWidget(self.skip_button)
-        bottom_bar_hbox.addWidget(controls_widget)
 
+        bottom_bar_hbox.addLayout(controls_layout)
         layout.addLayout(bottom_bar_hbox)
 
     def _populate_filter_tree(self):
@@ -719,6 +843,157 @@ class MainWindow(QMainWindow):
         mime_data.setUrls([QUrl.fromLocalFile(p) for p in drag_paths])
         drag.setMimeData(mime_data)
         drag.exec(Qt.DropAction.CopyAction)
+
+    def _toggle_play_pause(self):
+        # If currently playing → pause
+        if self.player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            self.player.pause()
+            self.play_pause_button.setText("▶️ Play")
+            self.play_pause_button.setStyleSheet(
+                "background-color: #f44336; color: white; border-radius: 10px;"
+            )
+            return
+
+        # Not playing → try to start playback
+        if self.player.source().isEmpty():
+            # Load first song from playlist if available
+            if self.queue_list.count() > 0:
+                item = self.queue_list.item(0)
+                song_data = item.data(Qt.ItemDataRole.UserRole)
+                if song_data and "path" in song_data:
+                    song_path = song_data["path"]
+                    self.player.setSource(QUrl.fromLocalFile(song_path))
+                    self.current_song_label.setText(update_song_label(song_path))
+                    self.queue_list.takeItem(0)
+            else:
+                # Nothing to play → do not change button
+                return
+
+        # Start playback
+        self.player.play()
+
+        # Immediately update button (no need to check playbackState)
+        self.play_pause_button.setText("⏸️ Pause")
+        self.play_pause_button.setStyleSheet(
+            f"background-color: #%s; color: white; border-radius: 10px;" % GREEN_HEX
+        )
+
+    def _update_slider_position(self, position):
+        """Update the playback slider as the song plays."""
+        self.playback_slider.setValue(position)
+        minutes, seconds = divmod(position // 1000, 60)
+        remaining_ms = self.playback_slider.maximum() - position
+        minutes_left, seconds_left = divmod(remaining_ms // 1000, 60)
+        self.time_played_label.setText(f"{minutes:02d}:{seconds:02d}")
+        self.total_time_label.setText(f"-{minutes_left:02d}:{seconds_left:02d}")
+
+    def _seek_position(self, position):
+        """Seek to a specific position when slider is moved."""
+        self.player.setPosition(position)
+
+    def _handle_media_status(self, status):
+        """Auto-play next song when current ends."""
+        if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            if self.queue_list.count() > 0:
+                item = self.queue_list.item(0)
+                song_data = item.data(Qt.ItemDataRole.UserRole)
+                if song_data and "path" in song_data:
+                    song_path = song_data["path"]
+                    self.player.setSource(QUrl.fromLocalFile(song_path))
+                    self.current_song_label.setText(update_song_label(song_path))
+                    self.player.play()
+                    self.queue_list.takeItem(0)
+
+    def _crossfade_to_next(self):
+        if self.queue_list.count() == 0:
+            return
+
+        next_item = self.queue_list.item(0)
+        song_data = next_item.data(Qt.ItemDataRole.UserRole)
+        if not song_data or "path" not in song_data:
+            return
+        self.next_song_path = song_data["path"]
+
+        # Disable buttons during fade
+        self.play_pause_button.setEnabled(False)
+        self.skip_button.setEnabled(False)
+        self.play_pause_button.setStyleSheet(
+            "background-color: #003300; color: white; border-radius: 10px;"
+        )
+        self.skip_button.setStyleSheet(
+            "background-color: #003300; color: white; border-radius: 10px;"
+        )
+
+        # Initialize fade volumes
+        self.fade_out_volume = self.audio_output.volume()
+        self.fade_in_volume = 0.0
+
+        # Ensure timer is connected to fade-out
+        try:
+            self.crossfade_timer.timeout.disconnect()
+        except TypeError:
+            pass
+        self.crossfade_timer.timeout.connect(self._fade_out_next)
+        self.crossfade_timer.setInterval(50)
+        self.crossfade_timer.start()
+
+    def _fade_out_next(self):
+        # Logarithmic fade-out
+        fadeout_time = 1.5  # seconds
+        fade_out_start_volume = self.audio_output.volume()
+        fade_out_elapsed = 0.0
+        fade_out_timer_step = self.crossfade_timer.interval() / 80  # seconds per tick
+        fade_out_elapsed += fade_out_timer_step
+        t = min(fade_out_elapsed / fadeout_time, 1.0)
+        new_volume = fade_out_start_volume * (1 - t ** 2)
+        print(t, new_volume)
+        self.audio_output.setVolume(new_volume)
+        self.audio_output.setVolume(max(0.0, new_volume))
+
+        if new_volume < 0.0001:
+            # Fade-out complete, start next song
+            self.crossfade_timer.stop()
+            self.audio_output.setVolume(0.0)
+
+            # Play next song
+            self.player.setSource(QUrl.fromLocalFile(self.next_song_path))
+            self.player.play()
+            self.queue_list.takeItem(0)
+            self.next_song_path = None
+
+            # Switch timer to fade-in
+            try:
+                self.crossfade_timer.timeout.disconnect()
+            except TypeError:
+                pass
+            self.crossfade_timer.timeout.connect(self._fade_in_next)
+            self.fade_in_volume = 0.0
+            self.crossfade_timer.start()
+
+    def _fade_in_next(self):
+        # Logarithmic fade-in (perceived faster)
+        if self.fade_in_volume < 0.99:
+            self.fade_in_volume += (1.0 - self.fade_in_volume) * 0.2
+            self.audio_output.setVolume(self.fade_in_volume)
+        else:
+            # Fade-in complete
+            self.audio_output.setVolume(1.0)
+            self.crossfade_timer.stop()
+            self.play_pause_button.setEnabled(True)
+            self.skip_button.setEnabled(True)
+            self.play_pause_button.setStyleSheet(
+                "background-color: #%s; color: white; border-radius: 10px;" % GREEN_HEX
+            )
+            self.skip_button.setStyleSheet(
+                "background-color: #%s; color: white; border-radius: 10px;" % GREEN_HEX
+            )
+
+            # Reconnect timer to crossfade function for future skips
+            try:
+                self.crossfade_timer.timeout.disconnect()
+            except TypeError:
+                pass
+            self.crossfade_timer.timeout.connect(self._fade_out_next)
 
 
 # --- Application Execution Entry Point ---
