@@ -44,10 +44,8 @@ class DBManager:
                 );
             """)
             # --- INITIAL ROLE INSERTION (Crucial for first run) ---
-            cursor.execute("INSERT OR IGNORE INTO Roles (Name) VALUES ('Performer')")
-            cursor.execute("INSERT OR IGNORE INTO Roles (Name) VALUES ('Composer')")
-            cursor.execute("INSERT OR IGNORE INTO Roles (Name) VALUES ('Lyricist')")
-            cursor.execute("INSERT OR IGNORE INTO Roles (Name) VALUES ('Producer')")
+            default_roles = ["Performer", "Composer", "Lyricist", "Producer"]
+            cursor.executemany("INSERT OR IGNORE INTO Roles (Name) VALUES (?)", [(r,) for r in default_roles])
             # --- Create the FileContributorRoles Table ---
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS FileContributorRoles (
@@ -55,8 +53,8 @@ class DBManager:
                     ContributorID INTEGER NOT NULL,
                     RoleID INTEGER NOT NULL,
                     PRIMARY KEY (FileID, ContributorID, RoleID),
-                    FOREIGN KEY (FileID) REFERENCES Files(FileID),
-                    FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID),
+                    FOREIGN KEY (FileID) REFERENCES Files(FileID) ON DELETE CASCADE,
+                    FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID) ON DELETE CASCADE,
                     FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
                 );
             """)
@@ -76,20 +74,15 @@ class DBManager:
         Inserts a file path and placeholder data into the Files table.
         Returns True if inserted, or None if it already exists/fails.
         """
+        file_title = os.path.basename(file_path)
         try:
-            file_title = os.path.basename(file_path)
-
-            # Open connection for transaction
             with sqlite3.connect(self.DATABASE_NAME) as conn:
                 cursor = conn.cursor()
-
                 cursor.execute("""
-                    INSERT OR IGNORE INTO Files (Path, Title, Duration, TempoBPM)
-                    VALUES (?, ?, ?, ?)
-                """, (file_path, file_title, 0, 0))
-
-                return cursor.rowcount != 0
-
+                    INSERT OR IGNORE INTO Files (Path, Title)
+                    VALUES (?, ?)
+                """, (file_path, file_title))
+                return cursor.lastrowid if cursor.rowcount > 0 else None
         except sqlite3.Error as e:
             print(f"Database error during basic file insert: {e}")
             return None
@@ -98,22 +91,20 @@ class DBManager:
         with sqlite3.connect(self.DATABASE_NAME) as conn:
             cursor = conn.cursor()
             query = """
-                   SELECT F.FileID, \
-                          GROUP_CONCAT(C.Name, ', ') AS Artists, \
-                          F.Path                     AS Path, \
-                          F.Title                    AS Title, \
-                          F.Duration                 AS Duration, \
-                          F.TempoBPM                 AS BPM
-                   FROM Files F
-                            LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                            LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                            LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                   WHERE R.Name = 'Performer' \
-                      OR R.RoleID IS NULL
-                   GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                   ORDER BY F.FileID DESC; \
-                   """
-
+                        SELECT F.FileID,
+                               GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Artists,
+                               F.Title AS Title,
+                               F.Duration AS Duration,
+                               F.Path AS Path,
+                               GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
+                               F.TempoBPM AS BPM
+                        FROM Files F
+                                 LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
+                                 LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                                 LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
+                        GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
+                        ORDER BY F.FileID DESC;
+                    """
             try:
                 cursor.execute(query)
                 headers = [description[0] for description in cursor.description]
@@ -123,145 +114,110 @@ class DBManager:
                 print(f"Database error during basic file insert: {e}")
                 return [], []
 
-
     def delete_file_by_id(self, file_id):
         """
         Deletes a record from the Files table using its FileID.
         """
         try:
-            # Open connection for transaction
             with sqlite3.connect(self.DATABASE_NAME) as conn:
+                conn.execute("PRAGMA foreign_keys = ON")
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM Files WHERE FileID = ?", (file_id,))
                 return cursor.rowcount > 0
-
         except sqlite3.Error as e:
             print(f"Database error during file deletion: {e}")
             return False
 
-    def fetch_artists_for_tree(self):
+    def fetch_data_for_tree(self, role_name: str):
         """
-        Fetches a distinct list of all Contributors who have the 'Performer' role,
+        Fetches a distinct list of all Contributors who have the :role_name role,
         ordered by SortName.
         Returns: list of (ContributorID, Name)
         """
-        conn = sqlite3.connect(self.DATABASE_NAME)
-        cursor = conn.cursor()
-
-        # Select distinct Contributors linked to the 'Performer' role
-        query = """
-                SELECT DISTINCT C.ContributorID, \
-                                C.Name
-                FROM Contributors C
-                         JOIN FileContributorRoles FCR ON C.ContributorID = FCR.ContributorID
-                         JOIN Roles R ON FCR.RoleID = R.RoleID
-                WHERE R.Name = 'Performer'
-                ORDER BY C.SortName ASC
-                """
         try:
-            cursor.execute(query)
-            data = cursor.fetchall()
-            return data
+            # Use the 'with' statement for automatic connection management
+            with sqlite3.connect(self.DATABASE_NAME) as conn:
+                cursor = conn.cursor()
+                # Select distinct Contributors linked to the 'Performer' role
+                query = """
+                        SELECT DISTINCT C.ContributorID,
+                                        C.Name
+                        FROM Contributors C
+                                 JOIN FileContributorRoles FCR ON C.ContributorID = FCR.ContributorID
+                                 JOIN Roles R ON FCR.RoleID = R.RoleID
+                        WHERE R.Name = ?
+                        ORDER BY C.SortName ASC
+                        """
+                cursor.execute(query, (role_name,))
+                data = cursor.fetchall()
+                return data
         except sqlite3.Error as e:
+            # The connection is automatically closed even if an error occurs here
             print(f"Database error during artist fetch: {e}")
             return []
-        finally:
-            conn.close()
 
-    def update_file_metadata(self, file_id, title, duration, bpm, tags_to_update):
+    def update_file_data(self, song):
         """
         Updates the metadata fields for an existing file record using its FileID.
         """
         try:
             # Open connection for transaction (stateless model)
             with sqlite3.connect(self.DATABASE_NAME) as conn:
+                conn.execute("PRAGMA foreign_keys = ON")
                 cursor = conn.cursor()
-
                 cursor.execute("""
                     UPDATE Files
                     SET Title = ?, Duration = ?, TempoBPM = ?
                     WHERE FileID = ?
-                """, (title, duration, bpm, file_id))
-
-                self._clear_contributor_links(file_id, conn)
-                self.insert_contributor_roles(file_id, tags_to_update, conn)
-                return cursor.rowcount > 0
-
-
+                """, (song.title, song.duration, song.bpm, song.file_id))
+                cursor.execute("DELETE FROM FileContributorRoles WHERE FileID = ?", (song.file_id,))
+                self._sync_contributor_roles(song, conn)
+                return True
         except sqlite3.Error as e:
             print(f"Database error during metadata update: {e}")
             return False
 
-    def _get_or_create_id(self, conn, table, id_col, name_col, name, other_col=None, other_val=None):
-        """Internal helper to get an ID or create a new row in a simple lookup table."""
-        cursor = conn.cursor()
-
-        # 1. Try to find existing ID
-        cursor.execute(f"SELECT {id_col} FROM {table} WHERE {name_col} = ?", (name,))
-        result = cursor.fetchone()
-        if result:
-            return result[0]
-        # 2. If not found, insert new row
-        if other_col and other_val is not None:
-            # For Contributors (which has Name and SortName)
-            cursor.execute(f"INSERT INTO {table} ({name_col}, {other_col}) VALUES (?, ?)", (name, other_val))
-        else:
-            # For Roles (which only has Name)
-            cursor.execute(f"INSERT INTO {table} ({name_col}) VALUES (?)", (name,))
-
-        # 3. Return the ID of the newly inserted row
-        return cursor.lastrowid
-
-    def _clear_contributor_links(self, file_id, conn):
-        """Removes all entries for a specific FileID from the FileContributorRoles table."""
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM FileContributorRoles WHERE FileID = ?", (file_id,))
-        # Do NOT commit here; the calling method handles the transaction commit.
-        return cursor.rowcount
-
-    def insert_contributor_roles(self, file_id, tags, conn):
+    def _sync_contributor_roles(self, song, conn):
         """
-        Processes a dictionary of tags (e.g., {'Performer': ['Pink'], 'Composer': ['Alecia...']})
-        and links them to the FileID.
+        Adds contributors to the database
         """
-        # Define mappings from common tags to canonical roles
-        role_mappings = {
-            'TPE1': 'Performer',  # Primary Artist/Performer
-            'TCOM': 'Composer',  # Composer
-            'TOLY': 'Lyricist', #Original lyricist
-            'TIT1': 'Group',  # Content Group/Part of a Set
+        cursor = conn.cursor()
+        role_map = {
+            'performers': 'Performer',
+            'composers': 'Composer',
+            'lyricists': 'Lyricist',
+            'producers': 'Producer'
         }
+        for attr, role_name in role_map.items():
+            contributors = getattr(song, attr, [])
+            if not contributors:
+                continue
 
-        processed_count = 0
+            # Get RoleID
+            cursor.execute("SELECT RoleID FROM Roles WHERE Name = ?", (role_name,))
+            role_row = cursor.fetchone()
+            if not role_row:
+                continue
+            role_id = role_row[0]
 
-        for tag_key, role_name in role_mappings.items():
-            if tag_key in tags and tags[tag_key]:
-                # Assumes tags are a list, like ['Artist Name', 'Other Artist']
-                names = tags[tag_key] if isinstance(tags[tag_key], list) else [tags[tag_key]]
+            for contributor_name in contributors:
+                # Insert contributor if not exists
+                cursor.execute("""
+                    INSERT OR IGNORE INTO Contributors (Name, SortName)
+                    VALUES (?, ?)
+                """, (contributor_name, contributor_name))
+                # Get ContributorID
+                cursor.execute("""
+                    SELECT ContributorID FROM Contributors WHERE Name = ?
+                """, (contributor_name,))
+                contributor_row = cursor.fetchone()
+                if not contributor_row:
+                    continue
+                contributor_id = contributor_row[0]
 
-                for name in names:
-                    name = str(name).strip()
-                    if not name:
-                        continue
-
-                    # Simple sort name for now (full logic can be added later)
-                    sort_name = name.upper()
-
-                    # Get or create Contributor and Role IDs
-                    contributor_id = self._get_or_create_id(
-                        conn, 'Contributors', 'ContributorID', 'Name', name,
-                        other_col='SortName', other_val=sort_name
-                    )
-                    role_id = self._get_or_create_id(
-                        conn, 'Roles', 'RoleID', 'Name', role_name
-                    )
-
-                    # Link them in the join table
-                    conn.cursor().execute("""
-                                          INSERT
-                                          OR IGNORE INTO FileContributorRoles 
-                        (FileID, ContributorID, RoleID) VALUES (?, ?, ?)
-                                          """, (file_id, contributor_id, role_id))
-                    processed_count += 1
-
-        return True if processed_count > 0 else None
+                # Insert into FileContributorRoles
+                cursor.execute("""
+                    INSERT OR IGNORE INTO FileContributorRoles (FileID, ContributorID, RoleID)
+                    VALUES (?, ?, ?)
+                """, (song.file_id, contributor_id, role_id))
+        return True

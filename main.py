@@ -1,31 +1,124 @@
 import os
 import sys
-import mutagen
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QCloseEvent, QDrag, QFont, QPen, QPainter
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeView, QTableView, QListWidget,
     QLineEdit, QPushButton, QLabel,
     QSlider, QSizePolicy, QFileDialog,
-    QMessageBox, QMenu
+    QMessageBox, QMenu, QListWidgetItem,
+    QStyledItemDelegate
 )
-from PyQt6.QtCore import Qt, QStandardPaths, QSortFilterProxyModel
+from PyQt6.QtCore import Qt, QStandardPaths, QSortFilterProxyModel, QSettings, QMimeData, Qt, QRect, QSize, QUrl
 from PyQt6.QtSql import QSqlDatabase
 from db_manager import DBManager
+from Song import Song
+
+
+class PlaylistItemDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.artist_font = QFont("Arial", 10, QFont.Weight.Bold)
+        self.title_font = QFont("Arial", 9)
+
+    def paint(self, painter, option, index):
+        painter.save()
+
+        # Draw background if selected
+        if option.state & Qt.ItemState.Selected:
+            painter.fillRect(option.rect, option.palette.highlight())
+
+        # Retrieve data
+        display_text = index.data(Qt.ItemDataRole.DisplayRole)
+        if not display_text or not isinstance(display_text, str):
+            display_text = ""
+        if "|" in display_text:
+            artist, title = display_text.split("|", 1)
+        else:
+            artist, title = display_text, ""
+
+        # Set left alignment with padding
+        padding = 5
+        artist_rect = QRect(option.rect.left() + padding,
+                            option.rect.top() + padding,
+                            option.rect.width() - 2 * padding,
+                            option.rect.height() // 2)
+        title_rect = QRect(option.rect.left() + padding,
+                           option.rect.top() + option.rect.height() // 2,
+                           option.rect.width() - 2 * padding,
+                           option.rect.height() // 2 - padding)
+
+        # Draw artist (top line)
+        painter.setFont(self.artist_font)
+        painter.setPen(QPen(option.palette.text(), 1))
+        painter.drawText(artist_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, artist)
+
+        # Draw title (bottom line)
+        painter.setFont(self.title_font)
+        painter.setPen(QPen(option.palette.text(), 1))
+        painter.drawText(title_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        """Make each item taller for two rows"""
+        width = option.rect.width() if option.rect.width() > 0 else 100
+        return QSize(option.rect.width(), 50)  # 50 px height, adjust as needed
+
+
+class PlaylistWidget(QListWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setDragDropMode(QListWidget.DragDropMode.DropOnly)
+        self.setDefaultDropAction(Qt.DropAction.CopyAction)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        mime_data = event.mimeData()
+        if not mime_data.hasUrls():
+            event.ignore()
+            return
+
+        # Convert all dropped URLs to local file paths
+        urls = mime_data.urls()
+        file_paths = [url.toLocalFile() for url in urls if url.isLocalFile()]
+        if not file_paths:
+            event.ignore()
+            return
+
+        # Append dropped files to the playlist safely
+        for path in file_paths:
+            item = QListWidgetItem(os.path.basename(path))
+            item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+            self.addItem(item)
+
+        event.acceptProposedAction()
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gosling2 - Music Library")
-        window_width = 1200
-        window_height = 800
-        window_top = (QApplication.primaryScreen().size().height() - window_height) // 2
-        window_left = (QApplication.primaryScreen().size().width() - window_width) // 2
-        self.setGeometry(window_left, window_top, window_width, window_height)
 
-        # 1. Main Container Widget
+        # Settings
+        QApplication.setOrganizationName("Prodo")
+        QApplication.setApplicationName("Gosling2")
+        self.settings = QSettings()
+
+        # Main Window Setup
+        self._load_window_geometry()
         main_widget = QWidget()
         self.setCentralWidget(main_widget)
 
@@ -36,7 +129,7 @@ class MainWindow(QMainWindow):
         # --- DATABASE & MODELS (MUST BE INITIALIZED FIRST) ---
         self.db_manager = DBManager()
         self.library_model = QStandardItemModel()
-        self.artist_tree_model = QStandardItemModel()  # <-- FIXED: Initialized early
+        self.filter_tree_model = QStandardItemModel()  # <-- FIXED: Initialized early
         self.proxy_model = QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.library_model)
 
@@ -49,6 +142,10 @@ class MainWindow(QMainWindow):
         self.table_view.setModel(self.proxy_model)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
+        self.table_view.setDragEnabled(True)
+        self.table_view.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+        self.table_view.setDragDropMode(QTableView.DragDropMode.DragOnly)
+        self._set_up_drag_and_drop_on_table_view()
 
         # Initial sort state setup
         self._current_sort_column_index = 0
@@ -60,12 +157,84 @@ class MainWindow(QMainWindow):
         self.add_files_button.clicked.connect(self._open_file_dialog)
         self.tree_view.clicked.connect(self._filter_library_by_tree_selection)
         QApplication.instance().aboutToQuit.connect(self._cleanup_on_exit)
+        header = self.table_view.horizontalHeader()
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._show_column_context_menu)
 
-    def _cleanup_on_exit(self):
+    def _load_window_geometry(self):
+        if self.settings.contains("geometry"):
+            self.restoreGeometry(self.settings.value("geometry"))
+        else:
+            window_width = 1200
+            window_height = 800
+            window_top = (QApplication.primaryScreen().size().height() - window_height) // 2
+            window_left = (QApplication.primaryScreen().size().width() - window_width) // 2
+            self.setGeometry(window_left, window_top, window_width, window_height)
+
+    def _save_settings(self):
+        """Saves window geometry and other settings."""
+        self.settings.setValue("geometry", self.saveGeometry())
+        if hasattr(self, "splitter"):
+            self.settings.setValue("splitter_state", self.splitter.saveState())
+        self._save_column_visibility()
+
+    def _save_column_visibility(self):
+        """Saves the visibility state of each column in the table view."""
+        header_model = self.library_model
+        table_view = self.table_view
+        for i in range(header_model.columnCount()):
+            header_name = header_model.headerData(i, Qt.Orientation.Horizontal)
+            is_hidden = table_view.isColumnHidden(i)
+            key = f"column_hidden/{header_name}"
+            self.settings.setValue(key, is_hidden)
+
+    def _load_column_visibility(self):
+        """Loads the visibility state for all columns."""
+        headers = [self.library_model.headerData(i, Qt.Orientation.Horizontal)
+                   for i in range(self.library_model.columnCount())]
+        for i, header_name in enumerate(headers):
+            # QSettings key for column visibility: "column_hidden/<Column Header Name>"
+            key = f"column_hidden/{header_name}"
+            # Default is False (not hidden).
+            is_hidden = self.settings.value(key, False, type=bool)
+            self.table_view.setColumnHidden(i, is_hidden)
+
+    @staticmethod
+    def _cleanup_on_exit():
         """Cleans up resources on application exit."""
         db = QSqlDatabase.database()
         if db.isValid():
             db.close()
+
+    def closeEvent(self, event: QCloseEvent):
+        """Saves window state before closing."""
+        self._save_settings()
+        super().closeEvent(event)
+
+    def _show_column_context_menu(self, position):
+        """Shows a context menu for the table header to toggle column visibility."""
+        menu = QMenu(self)
+        proxy_model = self.proxy_model
+        table_view = self.table_view
+        for col in range(proxy_model.columnCount()):
+            header_text = proxy_model.headerData(
+                col, Qt.Orientation.Horizontal
+            )
+            action = QAction(header_text, self)
+            action.setCheckable(True)
+            action.setChecked(not table_view.isColumnHidden(col))
+            action.setData(col)
+            action.toggled.connect(self.toggle_column_visibility)
+            menu.addAction(action)
+        global_pos = table_view.horizontalHeader().mapToGlobal(position)
+        menu.exec(global_pos)
+
+    def toggle_column_visibility(self, checked):
+        """Toggles the visibility of a column in the table view."""
+        action = self.sender()
+        if action:
+            column = action.data()
+            self.table_view.setColumnHidden(column, not checked)
 
     def _setup_top_controls(self, layout: QVBoxLayout):
         """Sets up the Add button and Search bar at the top."""
@@ -91,19 +260,19 @@ class MainWindow(QMainWindow):
         """Sets up the three main content panels (Filter, List, Queue)."""
 
         # Use QSplitter to allow panels to be resized by the user
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # 1. Left Panel: Filtering/Browsing (QTreeWidget - using QTreeView placeholder)
         self.tree_view = QTreeView()
         self.tree_view.setHeaderHidden(True)
-        self.tree_view.setModel(self.artist_tree_model)
+        self.tree_view.setModel(self.filter_tree_model)
         song_library_panel = QWidget()
         song_library_panel.setLayout(QVBoxLayout())
         tree_label = QLabel("LIBRARY TREE BROWSER")
         tree_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         song_library_panel.layout().addWidget(tree_label)
         song_library_panel.layout().addWidget(self.tree_view)
-        splitter.addWidget(song_library_panel)
+        self.splitter.addWidget(song_library_panel)
 
         # 2. Middle Panel: Main Song Library (QTableView)
         self.table_view = QTableView()
@@ -115,22 +284,29 @@ class MainWindow(QMainWindow):
         library_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         database_viewer.layout().addWidget(library_label)
         database_viewer.layout().addWidget(self.table_view)
-        splitter.addWidget(database_viewer)
+        self.splitter.addWidget(database_viewer)
 
-        # 3. Right Panel: Real-Time Queue (QListWidget)
-        self.queue_list = QListWidget()
+        # 3. Right Panel: Real-Time Queue (PlaylistWidget)
+        self.queue_list = PlaylistWidget()
+        self.queue_list.setItemDelegate(PlaylistItemDelegate(self.queue_list))
+        self.queue_list.setSpacing(2)  # Optional spacing between items
         playlist_panel = QWidget()
         playlist_panel.setLayout(QVBoxLayout())
         playlist_label = QLabel("PLAYLIST")
         playlist_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         playlist_panel.layout().addWidget(playlist_label)
         playlist_panel.layout().addWidget(self.queue_list)
-        splitter.addWidget(playlist_panel)
+        self.splitter.addWidget(playlist_panel)
 
         # Set initial sizes for better visual balance
-        splitter.setSizes([200, 600, 300])
+        splitter_state = self.settings.value("splitter_state")
+        print(splitter_state)
+        if splitter_state:
+            self.splitter.restoreState(splitter_state)
+        else:
+            self.splitter.setSizes([200, 600, 300])
 
-        layout.addWidget(splitter, 1)
+        layout.addWidget(self.splitter, 1)
 
     def _setup_bottom_bar(self, layout: QVBoxLayout):
         """Sets up the persistent bottom playback bar."""
@@ -173,28 +349,29 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(bottom_bar_hbox)
 
-    def _populate_artist_tree(self):
-        """Fetches artists and populates the tree view model."""
-        self.artist_tree_model.clear()
+    def _populate_filter_tree(self):
+        """Clears and repopulates the filter tree view with data from the database."""
+        self.filter_tree_model.clear()
+        root_item = self.filter_tree_model.invisibleRootItem()
 
-        # Set the root header (though it's hidden, it's good practice)
-        self.artist_tree_model.setHorizontalHeaderLabels(["Artist Name"])
-
-        artists_data = self.db_manager.fetch_artists_for_tree()
-
-        root_item = self.artist_tree_model.invisibleRootItem()
-
-        # Add a node for the 'Artists' category
-        artists_root = QStandardItem("Artists")
+        artists_root = QStandardItem("Performers")
         artists_root.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-
+        artists_data = self.db_manager.fetch_data_for_tree("Performer")
         for contributor_id, name in artists_data:
             artist_item = QStandardItem(name)
             # Store the contributor ID for later use (e.g., filtering the table)
             artist_item.setData(contributor_id, Qt.ItemDataRole.UserRole)
             artists_root.appendRow(artist_item)
-
         root_item.appendRow(artists_root)
+
+        composers_root = QStandardItem("Composers")
+        composers_root.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        composers_data = self.db_manager.fetch_data_for_tree("Composer")
+        for contributor_id, name in composers_data:
+            composer_item = QStandardItem(name)
+            composer_item.setData(contributor_id, Qt.ItemDataRole.UserRole)
+            composers_root.appendRow(composer_item)
+        root_item.appendRow(composers_root)
         self.tree_view.expandAll()
 
     def _setup_table_view(self):
@@ -203,10 +380,7 @@ class MainWindow(QMainWindow):
         self.table_view.setSortingEnabled(True)
         header.setSectionsClickable(True)
         header.setSortIndicatorShown(True)
-        header.sectionClicked.connect(self._sort_library_view)
         self.refresh_library_view()
-        #self.table_view.setColumnHidden(0, True)
-        #self.table_view.setColumnHidden(2, True)
         self.table_view.horizontalHeader().setStretchLastSection(True)
         self.table_view.resizeColumnsToContents()
 
@@ -215,25 +389,26 @@ class MainWindow(QMainWindow):
         Filters the library table (proxy model) based on the selected item
         in the artist tree view.
         """
-
-        item = self.artist_tree_model.itemFromIndex(index)
-
-        self.proxy_model.setFilterKeyColumn(1)
-        self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-
-        if item.text() == "Artists":
-            filter_text = ""
-
-        elif item.parent() and item.parent().text() == "Artists":
-            artist_name = item.text()
-            import re
-            escaped_name = re.escape(artist_name)
-            filter_text = r"(^|\,\s)" + escaped_name + r"($|\,\s)"
-
+        role_to_column = {
+            "Performers": self._get_column_index('Performers'),
+            "Composers": self._get_column_index('Composers'),
+        }
+        item = self.filter_tree_model.itemFromIndex(index)
+        if item.parent():
+            role_name = item.parent().text()
+            if role_name in role_to_column:
+                self.proxy_model.setFilterKeyColumn(role_to_column[role_name])
+                contributor_name = item.text()
+                import re
+                escaped_name = re.escape(contributor_name)
+                filter_text = r"(^|,\s)" + escaped_name + r"($|,\s)"
+                self.proxy_model.setFilterRegularExpression(filter_text)
+            else:
+                # top-level node like "Performers" or "Composers" shows all
+                self.proxy_model.setFilterRegularExpression("")
         else:
-            filter_text = ""
+            self.proxy_model.setFilterRegularExpression("")
 
-        self.proxy_model.setFilterRegularExpression(filter_text)
         self.table_view.scrollToTop()
 
     def _show_table_context_menu(self, position):
@@ -249,67 +424,47 @@ class MainWindow(QMainWindow):
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 
     def _show_id3_tags(self):
-        """Shows the ID3 tags for the selected file."""
+        """Shows the ID3 tags for the selected file(s)."""
         selected_cells = self.table_view.selectionModel().selectedIndexes()
         if not selected_cells:
             QMessageBox.information(self, "Show ID3 Tags", "No file selected.")
             return
 
         selected_rows = sorted(set(index.row() for index in selected_cells))
+        path_col_index = self._get_column_index('Path')
 
         for row in selected_rows:
-            file_id_qindex = self.proxy_model.index(row, 0)
-            file_id = str(self.proxy_model.data(file_id_qindex))
-            file_path_index = self.proxy_model.index(row, 2)
+            file_path_index = self.proxy_model.index(row, path_col_index)
             file_path = self.proxy_model.data(file_path_index)
             file_name = os.path.basename(file_path)
             if not file_path:
                 QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
-                return
+                continue
+
             try:
-                audio = mutagen.File(file_path)
-                if not audio:
-                    QMessageBox.warning(self, "Metadata Error", "Mutagen could not read audio file.")
-                    return
+                # Load the song metadata from the MP3 file
+                song = Song.from_mp3(file_path, file_path_index)
+                if song is None:
+                    QMessageBox.warning(self, "Metadata Error", f"Mutagen could not read audio file:\n{file_name}")
+                    continue
 
-                # --- Format Basic Info ---
-                tags_to_update = audio.tags if audio.tags else {}
-                title_tag = audio.get("TIT2", file_name)[0].strip()
-                artist_tag = audio.get("TPE1", ["Unknown artist"])[0].strip()
-                duration = audio.info.length if hasattr(audio.info, 'length') else 0
-                duration = float(duration)
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-                bpm = audio.get("TBPM", audio.get("bpm"))
-                try:
-                    bpm = int(str(bpm).strip()) if bpm else 0
-                except (ValueError, TypeError, IndexError):
-                    bpm = 0
+                # Format basic info
+                minutes = int(song.duration // 60)
+                seconds = int(song.duration % 60)
 
-                question_text = (
-                    f"**File ID3:** {file_id}\n"
-                    f"**File:** {file_name}\n\n"
-                    f"Do you want to update the database record with the following ID3 tags?\n\n"
-                    f"**Artist:** {artist_tag}\n"
-                    f"**Title:** {title_tag}\n"
-                    f"**Duration:** {minutes:02d}:{seconds:02d} ({duration:.2f}s)\n"
-                    f"**BPM:** {bpm}"
+                info_text = (
+                    f"**File:** {file_name}\n"
+                    f"**Title:** {song.title}\n"
+                    f"**Performers:** {song.performers}\n"
+                    f"**Duration:** {minutes:02d}:{seconds:02d} ({song.duration:.2f}s)\n"
+                    f"**BPM:** {song.bpm}"
                 )
 
-                # --- Display Result ---
-                reply = QMessageBox.question(
-                    self, "Update Metadata",
-                    question_text,
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.Yes:
-                    if self.db_manager.update_file_metadata(file_id, title_tag, duration, bpm, tags_to_update):
-                        self.refresh_library_view()
-                        QMessageBox.information(self, "Update Metadata", "Metadata updated successfully.")
-                    else:
-                        QMessageBox.warning(self, "Update Metadata", "Failed to update metadata.")
+                QMessageBox.information(self, "ID3 Tags", info_text)
+
             except Exception as e:
-                QMessageBox.critical(self, "Mutagen Error", f"An error occurred while reading the file metadata:\n{e}")
+                QMessageBox.critical(self, "Mutagen Error",
+                                     f"An error occurred while reading the file metadata for {file_name}:\n{e}")
 
     def _delete_selected_files(self):
         """Deletes the selected files from the database."""
@@ -333,11 +488,11 @@ class MainWindow(QMainWindow):
         deleted_count = 0
 
         for row in unique_selected_rows:
-            file_id_qindex = self.proxy_model.index(row, 0)
-            file_id = str(self.proxy_model.data(file_id_qindex))
-            print(file_id)
+            file_id_index = self.proxy_model.index(row, 0)
+            file_id = str(self.proxy_model.data(file_id_index))
 
             if db_manager.delete_file_by_id(file_id):
+                #result = db_manager.cleanup_orphaned_contributors()
                 deleted_count += 1
 
         if deleted_count > 0:
@@ -374,10 +529,12 @@ class MainWindow(QMainWindow):
                 file_summary = "--- Selected Files ---\n"
 
                 for path in selected_paths:
-                    title = db_manager.insert_file_basic(path)
-                    if title:
+                    file_id = db_manager.insert_file_basic(path)
+                    if file_id:
                         inserted_count += 1
-                        file_summary += f"[ADDED] {title}\n"
+                        song = Song.from_mp3(path, file_id)
+                        db_manager.update_file_data(song)
+                        file_summary += f"[ADDED] {song.title}\n"
                     else:
                         file_summary += f"[SKIPPED] {os.path.basename(path)}\n"
 
@@ -389,12 +546,11 @@ class MainWindow(QMainWindow):
                 msg.setText(f"Inserted {inserted_count} new file(s) into the database.\n\n{file_summary}")
                 msg.exec()
 
-
     def refresh_library_view(self):
         self.library_model.clear()
         headers, data = self.db_manager.fetch_all_library_data()
         if not headers:
-            self.library_model.setHorizontalHeaderLabels(['FileID', 'Artist(s)', 'Path', 'Title', 'Duration', 'BPM'])
+            self.library_model.setHorizontalHeaderLabels(['FileID', 'Artists', 'Path', 'Title', 'Duration', 'BPM'])
             return
         self.library_model.setHorizontalHeaderLabels(headers)
         for row_data in data:
@@ -417,12 +573,54 @@ class MainWindow(QMainWindow):
         )
 
         self.table_view.resizeColumnToContents(0)
-        self._populate_artist_tree()
+        self._populate_filter_tree()
+        self._load_column_visibility()
 
+    def _get_column_index(self, header_name: str) -> int:
+        """Returns the column index for a given header name."""
+        for col in range(self.library_model.columnCount()):
+            if self.library_model.headerData(col, Qt.Orientation.Horizontal) == header_name:
+                return col
+        return -1
 
-    def _sort_library_view(self, index):
-        """Handles column header clicks by applying the sort to the proxy model."""
+    def _set_up_drag_and_drop_on_table_view(self):
+        self.table_view.mouseMoveEvent = self._table_view_mouse_move_event_factory(self.table_view.mouseMoveEvent)
 
+    def _table_view_mouse_move_event_factory(self, original_event):
+        def custom_mouseMoveEvent(event):
+            if event.buttons() == Qt.MouseButton.LeftButton:
+                self._start_drag(event)
+            original_event(event)
+        return custom_mouseMoveEvent
+
+    def _start_drag(self, event):
+        selected_indexes = self.table_view.selectionModel().selectedIndexes()
+        if not selected_indexes:
+            return
+
+        # Only unique rows
+        unique_rows = sorted(set(index.row() for index in selected_indexes))
+        path_col_index = self._get_column_index('Path')
+        if path_col_index == -1:
+            return
+
+        # Collect valid file paths
+        drag_paths = []
+        for row in unique_rows:
+            index = self.proxy_model.index(row, path_col_index)
+            path = self.proxy_model.data(index, Qt.ItemDataRole.DisplayRole)
+            if path and os.path.isfile(path):
+                drag_paths.append(path)
+
+        if not drag_paths:
+            return
+
+        # Keep the drag object alive until exec() finishes
+        drag = QDrag(self.table_view)
+        mime_data = QMimeData()
+        mime_data.setUrls([QUrl.fromLocalFile(p) for p in drag_paths])
+        drag.setMimeData(mime_data)
+        drag.exec(Qt.DropAction.CopyAction)
 
 
 # --- Application Execution Entry Point ---
