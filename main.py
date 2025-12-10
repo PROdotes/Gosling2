@@ -1,5 +1,7 @@
 import os
 import sys
+import mutagen
+from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout, QSplitter,
@@ -8,8 +10,8 @@ from PyQt6.QtWidgets import (
     QSlider, QSizePolicy, QFileDialog,
     QMessageBox, QMenu
 )
-from PyQt6.QtCore import Qt, QStandardPaths
-from PyQt6.QtSql import QSqlDatabase, QSqlQueryModel
+from PyQt6.QtCore import Qt, QStandardPaths, QSortFilterProxyModel
+from PyQt6.QtSql import QSqlDatabase
 from db_manager import DBManager
 
 
@@ -31,20 +33,32 @@ class MainWindow(QMainWindow):
         main_layout = QVBoxLayout(main_widget)
         main_layout.setContentsMargins(5, 3, 5, 3)
 
-        # --- TOP SECTION: ADD SONGS BUTTON & SEARCH BAR ---
+        # --- DATABASE & MODELS (MUST BE INITIALIZED FIRST) ---
+        self.db_manager = DBManager()
+        self.library_model = QStandardItemModel()
+        self.artist_tree_model = QStandardItemModel()  # <-- FIXED: Initialized early
+        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model.setSourceModel(self.library_model)
+
+        # --- SETUP SECTIONS (Now models are ready) ---
         self._setup_top_controls(main_layout)
-
-        # --- MIDDLE SECTION: THREE MAIN PANELS ---
-        self._setup_middle_panels(main_layout)
-
-        # --- BOTTOM SECTION: PLAYBACK BAR AND CONTROLS ---
+        self._setup_middle_panels(main_layout)  # <-- This call will now succeed
         self._setup_bottom_bar(main_layout)
+
+        # --- TABLE & SORT SETUP (Must run AFTER self.table_view is created in _setup_middle_panels) ---
+        self.table_view.setModel(self.proxy_model)
+        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
+
+        # Initial sort state setup
+        self._current_sort_column_index = 0
+        self._current_sort_order = Qt.SortOrder.DescendingOrder
+
+        self._setup_table_view()  # This method should handle header connections and refresh the data.
 
         # --- CONNECTIONS ---
         self.add_files_button.clicked.connect(self._open_file_dialog)
-        self.db_manager = DBManager()
-        self._setup_library_model()
-
+        self.tree_view.clicked.connect(self._filter_library_by_tree_selection)
         QApplication.instance().aboutToQuit.connect(self._cleanup_on_exit)
 
     def _cleanup_on_exit(self):
@@ -82,6 +96,7 @@ class MainWindow(QMainWindow):
         # 1. Left Panel: Filtering/Browsing (QTreeWidget - using QTreeView placeholder)
         self.tree_view = QTreeView()
         self.tree_view.setHeaderHidden(True)
+        self.tree_view.setModel(self.artist_tree_model)
         song_library_panel = QWidget()
         song_library_panel.setLayout(QVBoxLayout())
         tree_label = QLabel("LIBRARY TREE BROWSER")
@@ -92,7 +107,6 @@ class MainWindow(QMainWindow):
 
         # 2. Middle Panel: Main Song Library (QTableView)
         self.table_view = QTableView()
-        self.table_view.setSortingEnabled(True)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         database_viewer = QWidget()
@@ -159,15 +173,143 @@ class MainWindow(QMainWindow):
 
         layout.addLayout(bottom_bar_hbox)
 
+    def _populate_artist_tree(self):
+        """Fetches artists and populates the tree view model."""
+        self.artist_tree_model.clear()
+
+        # Set the root header (though it's hidden, it's good practice)
+        self.artist_tree_model.setHorizontalHeaderLabels(["Artist Name"])
+
+        artists_data = self.db_manager.fetch_artists_for_tree()
+
+        root_item = self.artist_tree_model.invisibleRootItem()
+
+        # Add a node for the 'Artists' category
+        artists_root = QStandardItem("Artists")
+        artists_root.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+
+        for contributor_id, name in artists_data:
+            artist_item = QStandardItem(name)
+            # Store the contributor ID for later use (e.g., filtering the table)
+            artist_item.setData(contributor_id, Qt.ItemDataRole.UserRole)
+            artists_root.appendRow(artist_item)
+
+        root_item.appendRow(artists_root)
+        self.tree_view.expandAll()
+
+    def _setup_table_view(self):
+        """Sets up the QTableView and connects signals."""
+        header = self.table_view.horizontalHeader()
+        self.table_view.setSortingEnabled(True)
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(True)
+        header.sectionClicked.connect(self._sort_library_view)
+        self.refresh_library_view()
+        #self.table_view.setColumnHidden(0, True)
+        #self.table_view.setColumnHidden(2, True)
+        self.table_view.horizontalHeader().setStretchLastSection(True)
+        self.table_view.resizeColumnsToContents()
+
+    def _filter_library_by_tree_selection(self, index):
+        """
+        Filters the library table (proxy model) based on the selected item
+        in the artist tree view.
+        """
+
+        item = self.artist_tree_model.itemFromIndex(index)
+
+        self.proxy_model.setFilterKeyColumn(1)
+        self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+
+        if item.text() == "Artists":
+            filter_text = ""
+
+        elif item.parent() and item.parent().text() == "Artists":
+            artist_name = item.text()
+            import re
+            escaped_name = re.escape(artist_name)
+            filter_text = r"(^|\,\s)" + escaped_name + r"($|\,\s)"
+
+        else:
+            filter_text = ""
+
+        self.proxy_model.setFilterRegularExpression(filter_text)
+        self.table_view.scrollToTop()
+
     def _show_table_context_menu(self, position):
         """Shows a context menu for the table view."""
         index = self.table_view.indexAt(position)
         if not index.isValid():
             return
         menu = QMenu()
+        show_id3_action = menu.addAction("🔍 Show ID3 Data")
+        show_id3_action.triggered.connect(self._show_id3_tags)
         delete_action = menu.addAction("❌ Delete Selected File(s)")
         delete_action.triggered.connect(self._delete_selected_files)
         menu.exec(self.table_view.viewport().mapToGlobal(position))
+
+    def _show_id3_tags(self):
+        """Shows the ID3 tags for the selected file."""
+        selected_cells = self.table_view.selectionModel().selectedIndexes()
+        if not selected_cells:
+            QMessageBox.information(self, "Show ID3 Tags", "No file selected.")
+            return
+
+        selected_rows = sorted(set(index.row() for index in selected_cells))
+
+        for row in selected_rows:
+            file_id_qindex = self.proxy_model.index(row, 0)
+            file_id = str(self.proxy_model.data(file_id_qindex))
+            file_path_index = self.proxy_model.index(row, 2)
+            file_path = self.proxy_model.data(file_path_index)
+            file_name = os.path.basename(file_path)
+            if not file_path:
+                QMessageBox.warning(self, "Metadata Error", f"File path not found or invalid:\n{file_path}")
+                return
+            try:
+                audio = mutagen.File(file_path)
+                if not audio:
+                    QMessageBox.warning(self, "Metadata Error", "Mutagen could not read audio file.")
+                    return
+
+                # --- Format Basic Info ---
+                tags_to_update = audio.tags if audio.tags else {}
+                title_tag = audio.get("TIT2", file_name)[0].strip()
+                artist_tag = audio.get("TPE1", ["Unknown artist"])[0].strip()
+                duration = audio.info.length if hasattr(audio.info, 'length') else 0
+                duration = float(duration)
+                minutes = int(duration // 60)
+                seconds = int(duration % 60)
+                bpm = audio.get("TBPM", audio.get("bpm"))
+                try:
+                    bpm = int(str(bpm).strip()) if bpm else 0
+                except (ValueError, TypeError, IndexError):
+                    bpm = 0
+
+                question_text = (
+                    f"**File ID3:** {file_id}\n"
+                    f"**File:** {file_name}\n\n"
+                    f"Do you want to update the database record with the following ID3 tags?\n\n"
+                    f"**Artist:** {artist_tag}\n"
+                    f"**Title:** {title_tag}\n"
+                    f"**Duration:** {minutes:02d}:{seconds:02d} ({duration:.2f}s)\n"
+                    f"**BPM:** {bpm}"
+                )
+
+                # --- Display Result ---
+                reply = QMessageBox.question(
+                    self, "Update Metadata",
+                    question_text,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    if self.db_manager.update_file_metadata(file_id, title_tag, duration, bpm, tags_to_update):
+                        self.refresh_library_view()
+                        QMessageBox.information(self, "Update Metadata", "Metadata updated successfully.")
+                    else:
+                        QMessageBox.warning(self, "Update Metadata", "Failed to update metadata.")
+            except Exception as e:
+                QMessageBox.critical(self, "Mutagen Error", f"An error occurred while reading the file metadata:\n{e}")
 
     def _delete_selected_files(self):
         """Deletes the selected files from the database."""
@@ -191,17 +333,9 @@ class MainWindow(QMainWindow):
         deleted_count = 0
 
         for row in unique_selected_rows:
-            # row is an int; build QModelIndex from row, column 0
-            model_index = self.library_model.index(row, 0)
-            if not model_index.isValid():
-                continue
-
-            file_id_variant = self.library_model.data(model_index)
-            try:
-                file_id = int(file_id_variant)
-            except (TypeError, ValueError):
-                # Couldn't parse file id; skip and continue
-                continue
+            file_id_qindex = self.proxy_model.index(row, 0)
+            file_id = str(self.proxy_model.data(file_id_qindex))
+            print(file_id)
 
             if db_manager.delete_file_by_id(file_id):
                 deleted_count += 1
@@ -255,25 +389,40 @@ class MainWindow(QMainWindow):
                 msg.setText(f"Inserted {inserted_count} new file(s) into the database.\n\n{file_summary}")
                 msg.exec()
 
-    def _setup_library_model(self):
-        """Initializes the QSqlDatabase connection and sets up QSqlQueryModel for the QTableView."""
-        db = QSqlDatabase.addDatabase("QSQLITE")
-        db.setDatabaseName(DBManager.DATABASE_NAME)
-
-        if not db.open():
-            QMessageBox.critical(self, "Database Error", f"Could not open database: {db.lastError().text()}")
-            return
-
-        self.library_model = QSqlQueryModel()
-        self.refresh_library_view()
-        self.table_view.setModel(self.library_model)
-        self.table_view.setColumnHidden(0, True)  # Hide FileID column
-        self.table_view.horizontalHeader().setStretchLastSection(True)
-        self.table_view.resizeColumnsToContents()
 
     def refresh_library_view(self):
-        query_string = self.db_manager.get_all_files_query_string()
-        self.library_model.setQuery(query_string)
+        self.library_model.clear()
+        headers, data = self.db_manager.fetch_all_library_data()
+        if not headers:
+            self.library_model.setHorizontalHeaderLabels(['FileID', 'Artist(s)', 'Path', 'Title', 'Duration', 'BPM'])
+            return
+        self.library_model.setHorizontalHeaderLabels(headers)
+        for row_data in data:
+            items = []
+            for col_index, value in enumerate(row_data):
+                item = QStandardItem(str(value) if value is not None else "")
+                if col_index in [0, 4, 5]:  # FileID, Duration, TempoBPM
+                    try:
+                        numeric_value = float(value) if value is not None else 0.0
+                    except (ValueError, TypeError):
+                        numeric_value = 0.0
+                    item.setData(numeric_value, 3)
+
+                items.append(item)
+
+            self.library_model.appendRow(items)
+        self.proxy_model.sort(
+            self.table_view.horizontalHeader().sortIndicatorSection(),
+            self.table_view.horizontalHeader().sortIndicatorOrder()
+        )
+
+        self.table_view.resizeColumnToContents(0)
+        self._populate_artist_tree()
+
+
+    def _sort_library_view(self, index):
+        """Handles column header clicks by applying the sort to the proxy model."""
+
 
 
 # --- Application Execution Entry Point ---
