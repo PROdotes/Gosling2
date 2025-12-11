@@ -20,6 +20,7 @@ GREEN_HEX = "5f8a53"
 
 SLIDER_SIZE = 30
 
+
 class SeekSlider(QSlider):
     def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None):
         super().__init__(orientation, parent)
@@ -210,6 +211,7 @@ class PlaylistWidget(QListWidget):
             event.acceptProposedAction()
         else:
             super().dropEvent(event)
+            self._preview_row = None
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -284,6 +286,7 @@ class MainWindow(QMainWindow):
         self.table_view.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.table_view.setDragDropMode(QTableView.DragDropMode.DragOnly)
         self._set_up_drag_and_drop_on_table_view()
+        self._edit_mode_enabled = False
 
         # mp3 player
         self.player = QMediaPlayer()
@@ -303,6 +306,7 @@ class MainWindow(QMainWindow):
         self._current_sort_order = Qt.SortOrder.DescendingOrder
 
         self._setup_table_view()  # This method should handle header connections and refresh the data.
+        self._apply_library_mode(self._edit_mode_enabled)
 
         # --- CONNECTIONS ---
         self.add_files_button.clicked.connect(self._open_file_dialog)
@@ -313,6 +317,9 @@ class MainWindow(QMainWindow):
         header.customContextMenuRequested.connect(self._show_column_context_menu)
         self.play_pause_button.clicked.connect(self._toggle_play_pause)
         self.skip_button.clicked.connect(self._crossfade_to_next)
+        self.library_mode_toggle_button.clicked.connect(self._toggle_library_mode)
+        self.table_view.doubleClicked.connect(self._handle_table_double_click)
+        self.library_model.dataChanged.connect(self._handle_cell_edit_logging)
 
     def _load_window_geometry(self):
         if self.settings.contains("geometry"):
@@ -402,6 +409,12 @@ class MainWindow(QMainWindow):
         self.add_files_button.setFixedWidth(150)
         self.add_files_button.setFixedHeight(35)
         top_hbox.addWidget(self.add_files_button)
+
+        # Library Mode Toggle Button
+        self.library_mode_toggle_button = QPushButton("📝 Library Edit Mode: OFF")
+        self.library_mode_toggle_button.setFixedWidth(200)
+        self.library_mode_toggle_button.setFixedHeight(35)
+        top_hbox.addWidget(self.library_mode_toggle_button)
 
         # Search Bar (Top Middle/Right)
         self.search_bar = QLineEdit()
@@ -994,6 +1007,61 @@ class MainWindow(QMainWindow):
             except TypeError:
                 pass
             self.crossfade_timer.timeout.connect(self._fade_out_next)
+
+    def _toggle_library_mode(self):
+        self._edit_mode_enabled = not self._edit_mode_enabled
+        self._apply_library_mode(self._edit_mode_enabled)
+
+    def _apply_library_mode(self, edit_mode: bool):
+        if edit_mode:
+            self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectItems)
+            self.table_view.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
+            self.table_view.setEditTriggers(QTableView.EditTrigger.DoubleClicked)
+            self.library_mode_toggle_button.setText("📝 Library Edit Mode: ON")
+        else:
+            self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+            self.table_view.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+            self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+            self.library_mode_toggle_button.setText("👀 Library Select Mode: OFF")
+
+    def _handle_table_double_click(self, index):
+        """
+        Handles double-click events on the library table.
+        If Edit Mode is OFF (Select Mode), adds the selected song to the playlist queue.
+        """
+        if self._edit_mode_enabled:
+            return
+        path_col_index = self._get_column_index('Path')
+        if path_col_index == -1:
+            return
+        path_index = self.proxy_model.index(index.row(), path_col_index)
+        song_path = self.proxy_model.data(path_index, Qt.ItemDataRole.DisplayRole)
+        if not song_path or not os.path.isfile(song_path):
+            return
+        display_text = os.path.basename(song_path)
+        try:
+            song = Song.from_mp3(song_path, None)
+            if song:
+                display_text = f"{song.performers or 'Unknown Artist'} | {song.title or os.path.basename(song_path)}"
+        except Exception:
+            pass
+        item = QListWidgetItem(display_text)
+        item.setData(Qt.ItemDataRole.UserRole, {"path": song_path})
+        self.queue_list.addItem(item)
+
+    def _handle_cell_edit_logging(self, top_left_index, bottom_right_index, roles):
+        """
+        Logs the details of the cell that was just edited by the user.
+        NOTE: This is the correct place to implement database persistence (UPDATE query).
+        """
+        edited_index = top_left_index
+        row = edited_index.row()
+        col = edited_index.column()
+        file_id_index = self.library_model.index(row, 0)
+        file_id = self.library_model.data(file_id_index, Qt.ItemDataRole.DisplayRole)
+        header_name = self.library_model.headerData(col, Qt.Orientation.Horizontal)
+        new_value = self.library_model.data(edited_index, Qt.ItemDataRole.DisplayRole)
+        print(f"ID: {file_id}, {header_name}: {new_value}")
 
 
 # --- Application Execution Entry Point ---
