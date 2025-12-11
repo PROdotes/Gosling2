@@ -35,8 +35,10 @@ class MainWindow(QMainWindow):
         # Initialize UI
         self._init_ui()
         self._load_window_geometry()
+        self._load_splitter_states()
         self._setup_connections()
         self._load_library()
+        self._load_column_visibility_states()
 
     def _init_ui(self):
         """Initialize the user interface"""
@@ -99,6 +101,7 @@ class MainWindow(QMainWindow):
         self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.setSortingEnabled(True)
+        self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
 
         center_layout.addWidget(self.search_box)
         center_layout.addWidget(self.table_view)
@@ -131,18 +134,66 @@ class MainWindow(QMainWindow):
         # Song info label
         self.song_label = QLabel("No song loaded")
         self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        song_font = self.song_label.font()
+        song_font.setPointSize(22)
+        song_font.setBold(True)
+        self.song_label.setFont(song_font)
+
+        # Slider layout
+        slider_layout = QHBoxLayout()
+
+        # Left label: Time Passed (mm:ss)
+        self.lbl_time_passed = QLabel("00:00")
+        self.lbl_time_passed.setMinimumWidth(40)
+        self.lbl_time_passed.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        time_font = self.lbl_time_passed.font()
+        time_font.setPointSize(16)
+        self.lbl_time_passed.setFont(time_font)
 
         # Seek slider
         self.playback_slider = SeekSlider()
         self.playback_slider.setPlayer(self.playback_service.player)
+        playback_slider_style = """
+                    QSlider::groove:horizontal {
+                        height: 30px; /* Increase thickness of the track */
+                        background: #404040; /* Darker background for the track */
+                        border-radius: 2px;
+                    }
+                    QSlider::handle:horizontal {
+                        width: 3px; /* Size of the handle */
+                        height: 5px;
+                        border-radius: 6px; /* Make it circular */
+                        background: #5f8a53; /* Use the GREEN_HEX color */
+                        margin: -4px 0; /* Adjust vertically to center the handle on the 5px track */
+                    }
+                """
+        self.playback_slider.setStyleSheet(playback_slider_style)
+
+        # Right label: Time Remaining (-mm:ss)
+        self.lbl_time_remaining = QLabel("- 00:00")
+        self.lbl_time_remaining.setMinimumWidth(40)
+        self.lbl_time_remaining.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
+        self.lbl_time_remaining.setFont(time_font)
+
+        slider_layout.addWidget(self.lbl_time_passed)
+        slider_layout.addWidget(self.playback_slider)
+        slider_layout.addWidget(self.lbl_time_remaining)
 
         # Playback controls
         controls_layout = QHBoxLayout()
 
-        self.btn_previous = QPushButton("⏮")
-        self.btn_play_pause = QPushButton("▶")
-        self.btn_stop = QPushButton("⏹")
-        self.btn_next = QPushButton("⏭")
+        self.btn_play_pause = QPushButton("▶ Play")
+        self.btn_next = QPushButton(">> Skip")
+        media_control_button_style = """
+                    QPushButton {
+                        min-height: 40px; 
+                        min-width: 80px;
+                        font-size: 20pt; 
+                        padding: 5px; 
+                    }
+                """
+        self.btn_play_pause.setStyleSheet(media_control_button_style)
+        self.btn_next.setStyleSheet(media_control_button_style)
 
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
@@ -150,16 +201,14 @@ class MainWindow(QMainWindow):
         self.volume_slider.setMaximumWidth(100)
 
         controls_layout.addStretch()
-        controls_layout.addWidget(self.btn_previous)
-        controls_layout.addWidget(self.btn_play_pause)
-        controls_layout.addWidget(self.btn_stop)
-        controls_layout.addWidget(self.btn_next)
         controls_layout.addWidget(QLabel("Volume:"))
         controls_layout.addWidget(self.volume_slider)
+        controls_layout.addWidget(self.btn_play_pause)
+        controls_layout.addWidget(self.btn_next)
         controls_layout.addStretch()
 
         bottom_layout.addWidget(self.song_label)
-        bottom_layout.addWidget(self.playback_slider)
+        bottom_layout.addLayout(slider_layout)
         bottom_layout.addLayout(controls_layout)
 
         parent_layout.addLayout(bottom_layout)
@@ -176,15 +225,15 @@ class MainWindow(QMainWindow):
 
         # Table
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
-        self.table_view.doubleClicked.connect(self._on_table_double_click)
+        self.table_view.doubleClicked.connect(self._add_selected_to_playlist)
+        self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
 
         # Playlist
         self.playlist_widget.itemDoubleClicked.connect(self._on_playlist_double_click)
 
         # Playback controls
         self.btn_play_pause.clicked.connect(self._toggle_play_pause)
-        self.btn_stop.clicked.connect(self._stop_playback)
-        self.btn_previous.clicked.connect(self._play_previous)
         self.btn_next.clicked.connect(self._play_next)
         self.volume_slider.valueChanged.connect(self._on_volume_changed)
 
@@ -192,6 +241,7 @@ class MainWindow(QMainWindow):
         self.playback_service.position_changed.connect(self._update_position)
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
         self.playback_service.state_changed.connect(self._on_playback_state_changed)
+        self.playback_service.player.durationChanged.connect(self._on_duration_changed)
 
     def _load_window_geometry(self):
         """Load window geometry from settings"""
@@ -341,17 +391,6 @@ class MainWindow(QMainWindow):
                 item.setData(Qt.ItemDataRole.UserRole, {"path": path})
                 self.playlist_widget.addItem(item)
 
-    def _on_table_double_click(self, index):
-        """Handle table double-click"""
-        source_index = self.proxy_model.mapToSource(index)
-        path_item = self.library_model.item(source_index.row(), 4)
-
-        if path_item:
-            path = path_item.text()
-            self.playback_service.load(path)
-            self.playback_service.play()
-            self._update_song_label(path)
-
     def _on_playlist_double_click(self, item):
         """Handle playlist double-click"""
         data = item.data(Qt.ItemDataRole.UserRole)
@@ -362,33 +401,35 @@ class MainWindow(QMainWindow):
             self._update_song_label(path)
 
     def _toggle_play_pause(self):
-        """Toggle play/pause"""
+        """Toggle play/pause. If nothing is loaded, play the first item in the playlist."""
         if self.playback_service.is_playing():
             self.playback_service.pause()
-        else:
+        elif self.playback_service.player.playbackState() == QMediaPlayer.PlaybackState.PausedState:
             self.playback_service.play()
+        elif self.playlist_widget.count() > 0:
+            first_item = self.playlist_widget.item(0)
+            self.playlist_widget.setCurrentRow(0)  # Select the first item
+            self._on_playlist_double_click(first_item)
+        else:
+            self.playback_service.play()  # Call play, which might just resume a paused track if playbackState is not available.
 
     def _stop_playback(self):
         """Stop playback"""
         self.playback_service.stop()
 
-    def _play_previous(self):
-        """Play previous song"""
-        current_row = self.playlist_widget.currentRow()
-        if current_row > 0:
-            self.playlist_widget.setCurrentRow(current_row - 1)
-            item = self.playlist_widget.currentItem()
-            if item:
-                self._on_playlist_double_click(item)
-
     def _play_next(self):
-        """Play next song"""
-        current_row = self.playlist_widget.currentRow()
-        if current_row < self.playlist_widget.count() - 1:
-            self.playlist_widget.setCurrentRow(current_row + 1)
-            item = self.playlist_widget.currentItem()
-            if item:
-                self._on_playlist_double_click(item)
+        """
+        Play next song: go to the second song on the playlist, and delete the first one that's currently playing.
+        The song playing is always the top one (index 0).
+        """
+        playlist_count = self.playlist_widget.count()
+        if playlist_count > 1:
+            next_item = self.playlist_widget.item(1)
+            if next_item:
+                self.playlist_widget.setCurrentRow(1)
+                self._on_playlist_double_click(next_item)
+                item_to_delete = self.playlist_widget.takeItem(0)
+                del item_to_delete  # Clean up the item object
 
     def _on_volume_changed(self, value):
         """Handle volume change"""
@@ -399,6 +440,13 @@ class MainWindow(QMainWindow):
         self.playback_slider.blockSignals(True)
         self.playback_slider.setValue(position)
         self.playback_slider.blockSignals(False)
+        duration = self.playback_service.player.duration()
+        self.lbl_time_passed.setText(self._format_time(position))
+        remaining_time = duration - position
+        if remaining_time < 0:
+            remaining_time = 0  # Should not happen, but for safety near the end
+        formatted_remaining = self._format_time(remaining_time)
+        self.lbl_time_remaining.setText(f"- {formatted_remaining}")
 
     def _on_media_status_changed(self, status):
         """Handle media status changes"""
@@ -408,9 +456,9 @@ class MainWindow(QMainWindow):
     def _on_playback_state_changed(self, state):
         """Handle playback state changes"""
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.btn_play_pause.setText("⏸")
+            self.btn_play_pause.setText("|| Pause")
         else:
-            self.btn_play_pause.setText("▶")
+            self.btn_play_pause.setText("▶ Play")
 
     def _update_song_label(self, path: str):
         """Update the current song label"""
@@ -419,10 +467,81 @@ class MainWindow(QMainWindow):
             text = f"{song.get_display_artists()} - {song.get_display_title()} ({song.get_formatted_duration()})"
             self.song_label.setText(text)
         except Exception:
+            #TODO: add time duration if possible, also needs to call database to get song information
             self.song_label.setText(os.path.basename(path))
 
     def closeEvent(self, event):
         """Handle window close"""
         self._save_window_geometry()
+        self._save_splitter_states()
+        self._save_column_visibility_states()
         event.accept()
 
+    def _format_time(self, ms: int) -> str:
+        """Helper to format milliseconds to mm:ss string"""
+        seconds = int(ms / 1000)
+        minutes = seconds // 60
+        seconds %= 60
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def _on_duration_changed(self, duration):
+        """Handle media duration changes (in milliseconds)"""
+        self.playback_slider.setMaximum(duration)
+
+        # Update the time remaining label for the full duration
+        formatted_time = self._format_time(duration)
+        self.lbl_time_remaining.setText(f"-{formatted_time}")
+
+    def _load_splitter_states(self):
+        """Load splitter states from settings"""
+        splitter_state = self.settings.value("splitterState")
+        if splitter_state:
+            self.centralWidget().findChild(QSplitter).restoreState(splitter_state)
+
+    def _save_splitter_states(self):
+        """Save splitter states to settings"""
+        splitter_state = self.centralWidget().findChild(QSplitter).saveState()
+        self.settings.setValue("splitterState", splitter_state)
+
+    def _show_column_context_menu(self, position):
+        """Shows a context menu for the table header to toggle column visibility."""
+        menu = QMenu(self)
+        source_model = self.library_model
+        table_view = self.table_view
+
+        for col in range(source_model.columnCount()):
+            header_text = source_model.headerData(col, Qt.Orientation.Horizontal)
+            action = QAction(str(header_text), self)
+            action.setCheckable(True)
+            # Table view columns are shown/hidden per *view* index (source == proxy in your set-up),
+            # but we assume 1:1 mapping. If you're reordering columns or using a proxy that changes columns,
+            # use proxy_model.mapFromSource/mapToSource as needed.
+            action.setChecked(not table_view.isColumnHidden(col))
+            action.setData(col)
+            action.toggled.connect(self.toggle_column_visibility)
+            menu.addAction(action)
+
+        global_pos = table_view.horizontalHeader().mapToGlobal(position)
+        menu.exec(global_pos)
+
+    def toggle_column_visibility(self, checked):
+        """Toggles the visibility of a column in the table view."""
+        action = self.sender()
+        if action:
+            column = action.data()
+            self.table_view.setColumnHidden(column, not checked)
+
+    def _load_column_visibility_states(self):
+        """Load column visibility states from settings"""
+        visibility_states = self.settings.value("columnVisibility", {})
+        for col_str, visible in visibility_states.items():
+            col = int(col_str)
+            self.table_view.setColumnHidden(col, not visible)
+
+    def _save_column_visibility_states(self):
+        """Save column visibility states to settings"""
+        visibility_states = {}
+        for col in range(self.library_model.columnCount()):
+            visible = not self.table_view.isColumnHidden(col)
+            visibility_states[str(col)] = visible
+        self.settings.setValue("columnVisibility", visibility_states)

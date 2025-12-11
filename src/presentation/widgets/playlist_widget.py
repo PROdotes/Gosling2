@@ -160,6 +160,7 @@ class PlaylistWidget(QListWidget):
             event.acceptProposedAction()
         else:
             super().dropEvent(event)
+            self._preview_row = None
 
     def paintEvent(self, event):
         """Custom paint to show drop preview line"""
