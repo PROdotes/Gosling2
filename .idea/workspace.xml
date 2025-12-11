@@ -4,11 +4,54 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="21471e4f-d810-44ef-8db4-c311e8c7bfae" name="Changes" comment="added file selection">
-      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/db_manager.py" afterDir="false" />
+    <list default="true" id="21471e4f-d810-44ef-8db4-c311e8c7bfae" name="Changes" comment="First commit">
+      <change afterPath="$PROJECT_DIR$/ARCHITECTURE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/MIGRATION.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/PROJECT_SUMMARY.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/QUICK_START.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/pytest.ini" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/requirements-dev.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/setup.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/business/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/business/services/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/business/services/library_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/business/services/metadata_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/business/services/playback_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/database_config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/models/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/models/contributor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/models/role.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/models/song.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/repositories/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/repositories/base_repository.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/repositories/contributor_repository.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data/repositories/song_repository.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/views/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/views/main_window.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/widgets/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/widgets/playlist_widget.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/presentation/widgets/seek_slider.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/resources/constants.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/conftest.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/integration/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/integration/test_main_window_integration.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_contributor_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_library_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_playback_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_role_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_song_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/unit/test_song_repository.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -24,23 +67,42 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="UPDATE_TYPE" value="REBASE" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5
-}]]></component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;MarcvsHR&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/PROdotes/Gosling2.git&quot;,
+    &quot;accountId&quot;: &quot;7b380c84-5d13-4c64-982b-e99b3eef2585&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="36bdxl2eaLFmaTVE6FOn6RLb7bs" />
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.main.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager">
     <configuration name="main" type="PythonConfigurationType" factoryName="Python" nameIsGenerated="true">
       <module name="gosling2" />
@@ -68,7 +130,7 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-0509580d9d50-746f403e7f0c-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-241.14494.241" />
+        <option value="bundled-python-sdk-ce6832f46686-7b97d883f26b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.25557.178" />
       </set>
     </attachedChunks>
   </component>
@@ -116,10 +178,29 @@
     <option name="localTasksCounter" value="5" />
     <servers />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="First commit" />
     <MESSAGE value="added main window elements" />
     <MESSAGE value="added file selection" />
     <option name="LAST_COMMIT_MESSAGE" value="added file selection" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
   </component>
 </project>

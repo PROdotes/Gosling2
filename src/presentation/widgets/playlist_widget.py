@@ -1,0 +1,182 @@
+"""Custom playlist widget with drag and drop support"""
+import os
+from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QStyledItemDelegate, QStyle
+from PyQt6.QtCore import Qt, QRect, QSize, QUrl
+from PyQt6.QtGui import QFont, QPen, QColor, QPainter
+from ...business.services.metadata_service import MetadataService
+
+
+class PlaylistItemDelegate(QStyledItemDelegate):
+    """Custom delegate for playlist items"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.artist_font = QFont("Arial", 12, QFont.Weight.Bold)
+        self.title_font = QFont("Arial", 10)
+
+    def paint(self, painter, option, index):
+        """Custom paint for playlist items"""
+        painter.save()
+
+        # Background
+        if option.state & QStyle.StateFlag.State_Selected:
+            painter.fillRect(option.rect, QColor("#1E5096"))
+        else:
+            painter.fillRect(option.rect, QColor("#444444"))
+
+        # Circle (right side)
+        circle_diameter = int(option.rect.height() * 0.75)
+        circle_top = option.rect.top() + (option.rect.height() - circle_diameter) // 2
+        circle_right_padding = -int(circle_diameter * 0.3)
+        circle_left = option.rect.right() - circle_diameter - circle_right_padding
+        circle_rect = QRect(circle_left, circle_top, circle_diameter, circle_diameter)
+
+        painter.setBrush(QColor("#f44336"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawEllipse(circle_rect)
+
+        # Text
+        display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        if "|" in display_text:
+            artist, title = display_text.split("|", 1)
+        else:
+            artist, title = display_text, ""
+
+        padding = 5
+        text_rect = QRect(
+            option.rect.left() + padding,
+            option.rect.top() + padding,
+            circle_rect.left() - option.rect.left() - 2 * padding,
+            option.rect.height() - 2 * padding
+        )
+
+        artist_rect = QRect(
+            text_rect.left(), text_rect.top(),
+            text_rect.width(), text_rect.height() // 2
+        )
+        title_rect = QRect(
+            text_rect.left(), text_rect.top() + text_rect.height() // 2,
+            text_rect.width(), text_rect.height() // 2
+        )
+
+        painter.setFont(self.artist_font)
+        painter.setPen(QPen(option.palette.text(), 1))
+        painter.drawText(
+            artist_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            artist
+        )
+
+        painter.setFont(self.title_font)
+        painter.drawText(
+            title_rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+            title
+        )
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        """Return preferred size"""
+        width = option.rect.width() if option.rect.width() > 0 else 200
+        return QSize(width, 54)
+
+
+class PlaylistWidget(QListWidget):
+    """Custom list widget with drag and drop for playlists"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+        self.setDragDropMode(QListWidget.DragDropMode.InternalMove)
+        self.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.setItemDelegate(PlaylistItemDelegate())
+        self._preview_row = None
+        self._preview_after = False
+
+    def dragEnterEvent(self, event):
+        """Handle drag enter"""
+        if event.mimeData().hasUrls() or event.source() == self:
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Handle drag move with preview line"""
+        pos = event.position().toPoint()
+        index = self.indexAt(pos)
+
+        if index.isValid():
+            rect = self.visualItemRect(self.item(index.row()))
+            midpoint = rect.top() + rect.height() / 2
+            self._preview_row = index.row()
+            self._preview_after = pos.y() >= midpoint
+        else:
+            self._preview_row = self.count() - 1
+            self._preview_after = True
+
+        self.viewport().update()
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        """Handle drag leave"""
+        self._preview_row = None
+        self.viewport().update()
+
+    def dropEvent(self, event):
+        """Handle drop event"""
+        mime = event.mimeData()
+
+        if mime.hasUrls():
+            pos = event.position().toPoint()
+            index = self.indexAt(pos)
+
+            if index.isValid():
+                insert_row = index.row() + (1 if self._preview_after else 0)
+            else:
+                insert_row = self.count()
+
+            for url in mime.urls():
+                path = url.toLocalFile()
+                if not os.path.isfile(path):
+                    continue
+
+                display_text = os.path.basename(path)
+                try:
+                    song = MetadataService.extract_from_mp3(path)
+                    if song:
+                        display_text = f"{song.get_display_artists()} | {song.get_display_title()}"
+                except Exception:
+                    pass
+
+                item = QListWidgetItem(display_text)
+                item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+                self.insertItem(insert_row, item)
+                insert_row += 1
+
+            self._preview_row = None
+            self.viewport().update()
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
+
+    def paintEvent(self, event):
+        """Custom paint to show drop preview line"""
+        super().paintEvent(event)
+        if self._preview_row is None:
+            return
+
+        painter = QPainter(self.viewport())
+        pen = QPen(Qt.GlobalColor.red, 2)
+        painter.setPen(pen)
+
+        if self._preview_row < self.count():
+            rect = self.visualItemRect(self.item(self._preview_row))
+            y = rect.bottom() if self._preview_after else rect.top()
+        else:
+            last_rect = self.visualItemRect(self.item(self.count() - 1))
+            y = last_rect.bottom()
+
+        painter.drawLine(0, y, self.viewport().width(), y)
+
