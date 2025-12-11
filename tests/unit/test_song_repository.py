@@ -2,6 +2,7 @@
 import pytest
 import tempfile
 import os
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from src.data.repositories.song_repository import SongRepository
 from src.data.models.song import Song
@@ -18,7 +19,10 @@ class TestSongRepository:
         yield db_path
         # Cleanup
         if os.path.exists(db_path):
-            os.unlink(db_path)
+            try:
+                os.unlink(db_path)
+            except PermissionError:
+                pass # Can happen if db is still open
 
     @pytest.fixture
     def repository(self, temp_db):
@@ -95,4 +99,100 @@ class TestSongRepository:
         row = data[0]
         # Check title (index 2)
         assert row[2] == "Test Song"
+
+    def test_get_by_artist(self, repository):
+        """Test getting songs by artist"""
+        # Insert a file first
+        file_id = repository.insert("/path/to/test.mp3")
+
+        # Update with artist info
+        song = Song(
+            file_id=file_id,
+            title="Test Song",
+            performers=["Target Artist"]
+        )
+        repository.update(song)
+
+        # Get by artist
+        headers, data = repository.get_by_artist("Target Artist")
+        assert len(data) == 1
+        assert data[0][2] == "Test Song"
+
+        # Get by non-existent artist
+        headers, data = repository.get_by_artist("Non-existent")
+        assert len(data) == 0
+
+    def test_insert_error(self, repository):
+        """Test error handling during insert"""
+        with patch.object(repository, 'get_connection') as mock_conn:
+            mock_conn.side_effect = Exception("DB Connection Error")
+            file_id = repository.insert("path")
+            assert file_id is None
+
+    def test_get_all_error(self, repository):
+        """Test error handling during get_all"""
+        with patch.object(repository, 'get_connection') as mock_conn:
+            mock_conn.side_effect = Exception("DB Error")
+            headers, data = repository.get_all()
+            assert headers == []
+            assert data == []
+
+    def test_delete_error(self, repository):
+        """Test error handling during delete"""
+        with patch.object(repository, 'get_connection') as mock_conn:
+            mock_conn.side_effect = Exception("DB Error")
+            result = repository.delete(1)
+            assert result is False
+
+    def test_update_error(self, repository):
+        """Test error handling during update"""
+        song = Song(file_id=1, title="Test")
+        with patch.object(repository, 'get_connection') as mock_conn:
+            mock_conn.side_effect = Exception("DB Error")
+            result = repository.update(song)
+            assert result is False
+
+    def test_get_by_artist_error(self, repository):
+        """Test error handling during get_by_artist"""
+        with patch.object(repository, 'get_connection') as mock_conn:
+            mock_conn.side_effect = Exception("DB Error")
+            headers, data = repository.get_by_artist("Artist")
+            assert headers == []
+            assert data == []
+
+    def test_sync_contributor_roles_branches(self, repository):
+        """Test various branches in _sync_contributor_roles"""
+        file_id = repository.insert("/path/to/test.mp3")
+        
+        # 1. Invalid role name (should continue)
+        # Note: We can't easily inject invalid role names via Song object because 
+        # _sync_contributor_roles uses hardcoded mapping.
+        # But we can test empty contributor list "if not contributors: continue"
+        
+        song_empty = Song(file_id=file_id, title="Empty", performers=[])
+        repository.update(song_empty) 
+        # Verify no relations created
+        with repository.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM FileContributorRoles WHERE FileID=?", (file_id,))
+            assert cursor.fetchone() is None
+
+        # 2. Empty contributor name "if not contributor_name.strip(): continue"
+        song_blank_name = Song(file_id=file_id, title="Blank", performers=["   "])
+        repository.update(song_blank_name)
+        with repository.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM FileContributorRoles WHERE FileID=?", (file_id,))
+            assert cursor.fetchone() is None
+            
+        # 3. Simulate "if not role_row: continue" and "if not contributor_row: continue"
+        # Ideally we'd delete a role from DB to test role_row check, 
+        # but roles are hardcoded on init. 
+        # We can delete "Performer" role from DB temporarily
+        with repository.get_connection() as conn:
+            conn.execute("DELETE FROM Roles WHERE Name='Performer'")
+            
+        song_missing_role = Song(file_id=file_id, title="Missing Role", performers=["Artist"])
+        repository.update(song_missing_role)
+        # Should not crash, just not add anything
 

@@ -48,15 +48,15 @@ class TestMainWindowIntegration:
 
     def test_ui_elements_exist(self, window):
         """Test that all UI elements are created"""
-        assert window.btn_import is not None
-        assert window.btn_scan_folder is not None
-        assert window.btn_refresh is not None
-        assert window.search_box is not None
-        assert window.table_view is not None
+        assert window.library_widget.btn_import is not None
+        assert window.library_widget.btn_scan_folder is not None
+        assert window.library_widget.btn_refresh is not None
+        assert window.library_widget.search_box is not None
+        assert window.library_widget.table_view is not None
         assert window.playlist_widget is not None
-        assert window.playback_slider is not None
-        assert window.btn_play_pause is not None
-        assert window.volume_slider is not None
+        assert window.playback_widget.playback_slider is not None
+        assert window.playback_widget.btn_play_pause is not None
+        assert window.playback_widget.volume_slider is not None
 
     def test_services_initialized(self, window):
         """Test that services are initialized"""
@@ -66,6 +66,6 @@ class TestMainWindowIntegration:
 
     def test_library_model_initialized(self, window):
         """Test that library model is initialized"""
-        assert window.library_model is not None
-        assert window.proxy_model is not None
+        assert window.library_widget.library_model is not None
+        assert window.library_widget.proxy_model is not None
 
