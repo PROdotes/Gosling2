@@ -138,3 +138,32 @@ class SongRepository(BaseRepository):
                     VALUES (?, ?, ?)
                 """, (song.file_id, contributor_id, role_id))
 
+    def get_by_artist(self, artist_name):
+        """Get all songs by a specific artist"""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT F.FileID,
+                       GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Artists,
+                       F.Title AS Title,
+                       F.Duration AS Duration,
+                       F.Path AS Path,
+                       GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
+                       F.TempoBPM AS BPM
+                FROM Files F
+                LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
+                LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
+                WHERE C.Name = ? AND R.Name = 'Performer'
+                GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
+                ORDER BY F.FileID DESC
+            """
+            try:
+                cursor.execute(query, (artist_name,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+            except Exception as e:
+                print(f"Error fetching songs by artist: {e}")
+                return [], []
+

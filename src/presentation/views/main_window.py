@@ -38,7 +38,6 @@ class MainWindow(QMainWindow):
         self._load_splitter_states()
         self._setup_connections()
         self._load_library()
-        self._load_column_visibility_states()
 
     def _init_ui(self):
         """Initialize the user interface"""
@@ -223,6 +222,9 @@ class MainWindow(QMainWindow):
         # Search
         self.search_box.textChanged.connect(self._on_search)
 
+        # Filter Tree
+        self.filter_tree_view.clicked.connect(self._on_filter_tree_clicked)
+
         # Table
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table_view.doubleClicked.connect(self._add_selected_to_playlist)
@@ -268,6 +270,8 @@ class MainWindow(QMainWindow):
             self.library_model.appendRow(items)
 
         # Resize columns
+        self._load_column_visibility_states()
+        self._populate_filter_tree()
         self.table_view.resizeColumnsToContents()
 
     def _import_files(self):
@@ -545,3 +549,51 @@ class MainWindow(QMainWindow):
             visible = not self.table_view.isColumnHidden(col)
             visibility_states[str(col)] = visible
         self.settings.setValue("columnVisibility", visibility_states)
+
+    def _populate_filter_tree(self):
+        """Populate the filter tree with a hierarchy (e.g., Artists > A-Z > Artist)"""
+        artist_list_tuple = self.library_service.get_contributors_by_role("Performer")
+        artist_list = [artist_name for _, artist_name in artist_list_tuple]
+        model = self.filter_tree_model
+        model.clear()
+        artist_root_item = QStandardItem("Artists")
+        artist_root_item.setFlags(artist_root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        first_chars = set()
+        for artist_name in artist_list:
+            if artist_name:
+                first_chars.add(artist_name[0].upper())
+        sorted_chars = sorted(first_chars)
+        print(f"First characters in artist names: {sorted(first_chars)}")
+        alpha_map = {}
+        for char in sorted_chars:
+            letter_item = QStandardItem(char)
+            letter_item.setFlags(letter_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            alpha_map[char] = letter_item
+            artist_root_item.appendRow(letter_item)
+        for artist_name in artist_list:
+            if not artist_name:
+                continue
+            first_letter = artist_name[0].upper()
+            parent_item = alpha_map.get(first_letter)
+            if parent_item:
+                artist_item = QStandardItem(artist_name)
+                artist_item.setFlags(artist_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                artist_item.setData(artist_name, Qt.ItemDataRole.UserRole)
+                parent_item.appendRow(artist_item)
+        model.appendRow(artist_root_item)
+        self.filter_tree_view.expand(artist_root_item.index())
+
+    def _on_filter_tree_clicked(self, index):
+        """Handle click in the filter tree to filter the main library table."""
+        item = self.filter_tree_model.itemFromIndex(index)
+        artist_name = item.data(Qt.ItemDataRole.UserRole)
+        if artist_name:
+            headers, data = self.library_service.get_songs_by_artist(artist_name)
+            self.library_model.clear()
+            if headers:
+                self.library_model.setHorizontalHeaderLabels(headers)
+            for row_data in data:
+                items = [QStandardItem(str(cell) if cell else "") for cell in row_data]
+                self.library_model.appendRow(items)
+        elif item.text() == "Artists":
+            self._load_library()

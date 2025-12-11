@@ -31,3 +31,8 @@ class LibraryService:
         """Get all contributors for a specific role"""
         return self.contributor_repository.get_by_role(role_name)
 
+    def get_songs_by_artist(self, artist_name):
+        """Get all songs by a specific artist"""
+        return self.song_repository.get_by_artist(artist_name)
+
+
