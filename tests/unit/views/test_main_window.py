@@ -10,19 +10,18 @@ class TestMainWindow:
         with patch('src.presentation.views.main_window.LibraryService') as mock_library_cls, \
              patch('src.presentation.views.main_window.MetadataService') as mock_metadata_cls, \
              patch('src.presentation.views.main_window.PlaybackService') as mock_playback_cls, \
-             patch('src.presentation.views.main_window.QSettings') as mock_settings_cls:
+             patch('src.presentation.views.main_window.SettingsManager') as mock_settings_cls:
 
+            # Mock SettingsManager
             mock_settings = MagicMock()
             mock_settings_cls.return_value = mock_settings
-            
-            def settings_value_side_effect(key, default=None):
-                if key == "geometry":
-                    return None
-                if key == "columnVisibility":
-                    return {}
-                return default
-
-            mock_settings.value.side_effect = settings_value_side_effect
+            mock_settings.get_window_geometry.return_value = None
+            mock_settings.get_main_splitter_state.return_value = None
+            mock_settings.get_default_window_size.return_value = (1200, 800)
+            mock_settings.get_column_visibility.return_value = {}
+            mock_settings.get_volume.return_value = 50
+            mock_settings.get_last_playlist.return_value = []
+            mock_settings.get_last_import_directory.return_value = None
 
             mock_library = MagicMock()
             mock_library_cls.return_value = mock_library
@@ -41,7 +40,8 @@ class TestMainWindow:
             yield {
                 'library': mock_library,
                 'metadata': mock_metadata,
-                'playback': mock_playback
+                'playback': mock_playback,
+                'settings': mock_settings
             }
 
     @pytest.fixture

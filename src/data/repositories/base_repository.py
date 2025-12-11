@@ -27,7 +27,7 @@ class BaseRepository:
         finally:
             conn.close()
 
-    def _ensure_schema(self):
+    def _ensure_schema(self) -> None:
         """Create database schema if it doesn't exist"""
         with self.get_connection() as conn:
             cursor = conn.cursor()

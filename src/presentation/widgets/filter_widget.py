@@ -9,13 +9,13 @@ class FilterWidget(QWidget):
     filter_by_artist = pyqtSignal(str) # Emitted when an artist is selected
     reset_filter = pyqtSignal()        # Emitted when "Artists" root is clicked (show all)
 
-    def __init__(self, library_service, parent=None):
+    def __init__(self, library_service, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self._init_ui()
         self.populate()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
@@ -27,7 +27,7 @@ class FilterWidget(QWidget):
         
         layout.addWidget(self.tree_view)
 
-    def populate(self):
+    def populate(self) -> None:
         """Populate the filter tree with a hierarchy"""
         artist_list_tuple = self.library_service.get_contributors_by_role("Performer")
         artist_list = [artist_name for _, artist_name in artist_list_tuple]
@@ -66,7 +66,7 @@ class FilterWidget(QWidget):
         self.tree_model.appendRow(artist_root_item)
         self.tree_view.expand(artist_root_item.index())
 
-    def _on_tree_clicked(self, index):
+    def _on_tree_clicked(self, index) -> None:
         """Handle click in the filter tree"""
         item = self.tree_model.itemFromIndex(index)
         artist_name = item.data(Qt.ItemDataRole.UserRole)

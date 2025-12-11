@@ -93,7 +93,7 @@ class SongRepository(BaseRepository):
             print(f"Error updating song: {e}")
             return False
 
-    def _sync_contributor_roles(self, song: Song, conn):
+    def _sync_contributor_roles(self, song: Song, conn) -> None:
         """Sync contributors and their roles"""
         cursor = conn.cursor()
         role_map = {
@@ -140,7 +140,7 @@ class SongRepository(BaseRepository):
                     VALUES (?, ?, ?)
                 """, (song.file_id, contributor_id, role_id))
 
-    def get_by_artist(self, artist_name):
+    def get_by_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific artist"""
         try:
             with self.get_connection() as conn:

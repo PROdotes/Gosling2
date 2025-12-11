@@ -1,5 +1,5 @@
 """Metadata extraction service"""
-from typing import Optional
+from typing import Optional, List
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, ID3NoHeaderError
 from ...data.models.song import Song
@@ -28,7 +28,7 @@ class MetadataService:
             tags = {}
 
         # Helper to read text frames as list[str]
-        def get_text_list(frame_id):
+        def get_text_list(frame_id: str) -> List[str]:
             if frame_id not in tags:
                 return []
             frame = tags.getall(frame_id)
@@ -40,11 +40,31 @@ class MetadataService:
                             values.append(str(item).strip())
             return values
 
-        # Extract title
-        title = None
-        if "TIT2" in tags:
-            title_items = tags.getall("TIT2")[0].text
-            title = title_items[0].strip() if title_items else None
+        # Helper to deduplicate lists while preserving order
+        def deduplicate(items: List[str]) -> List[str]:
+            return list(dict.fromkeys(items))
+
+        # Helper to extract producers from TIPL and TXXX tags
+        def get_producers() -> List[str]:
+            producers = []
+            
+            # Extract from TIPL (Involved People List)
+            if "TIPL" in tags:
+                for p in tags.getall("TIPL"):
+                    if hasattr(p, "people"):
+                        for role, name in p.people:
+                            if role.lower() == "producer":
+                                producers.append(name.strip())
+            
+            # Extract from TXXX:PRODUCER
+            if "TXXX:PRODUCER" in tags:
+                producers.extend(get_text_list("TXXX:PRODUCER"))
+            
+            return producers
+
+        # Extract title (use get_text_list for consistency)
+        title_list = get_text_list("TIT2")
+        title = title_list[0] if title_list else None
 
         # Extract contributors
         performers = get_text_list("TPE1")
@@ -57,16 +77,7 @@ class MetadataService:
         bpm = int(bpm_list[0]) if bpm_list else None
 
         # Extract producers
-        producers = []
-        if "TIPL" in tags:
-            for p in tags.getall("TIPL"):
-                if hasattr(p, "people"):
-                    for role, name in p.people:
-                        if role.lower() == "producer":
-                            producers.append(name.strip())
-
-        if "TXXX:PRODUCER" in tags:
-            producers.extend(get_text_list("TXXX:PRODUCER"))
+        producers = get_producers()
 
         return Song(
             file_id=file_id,
@@ -74,10 +85,10 @@ class MetadataService:
             title=title,
             duration=duration,
             bpm=bpm,
-            performers=list(dict.fromkeys(performers)),
-            composers=list(dict.fromkeys(composers)),
-            lyricists=list(dict.fromkeys(lyricists)),
-            producers=list(dict.fromkeys(producers)),
-            groups=list(dict.fromkeys(groups)),
+            performers=deduplicate(performers),
+            composers=deduplicate(composers),
+            lyricists=deduplicate(lyricists),
+            producers=deduplicate(producers),
+            groups=deduplicate(groups),
         )
 

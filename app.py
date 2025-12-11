@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication
 from src.presentation.views import MainWindow
 
 
-def main():
+def main() -> None:
     """Main application entry point"""
     app = QApplication(sys.argv)
     app.setApplicationName("Gosling2")

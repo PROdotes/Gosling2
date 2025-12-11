@@ -12,13 +12,14 @@ class PlaybackControlWidget(QWidget):
     volume_changed = pyqtSignal(int)
     seek_request = pyqtSignal(int) # Emitted when slider is dragged? SeekSlider handles this directly via player usually.
 
-    def __init__(self, playback_service, parent=None):
+    def __init__(self, playback_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
         self.playback_service = playback_service
+        self.settings_manager = settings_manager
         self._init_ui()
         self._setup_connections()
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
@@ -85,7 +86,7 @@ class PlaybackControlWidget(QWidget):
         
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
-        self.volume_slider.setValue(50)
+        # Don't set default value here - will be set by MainWindow from settings
         self.volume_slider.setMaximumWidth(100)
         
         controls_layout.addStretch()
@@ -99,7 +100,7 @@ class PlaybackControlWidget(QWidget):
         layout.addLayout(slider_layout)
         layout.addLayout(controls_layout)
 
-    def _setup_connections(self):
+    def _setup_connections(self) -> None:
         # UI -> Signals
         self.btn_play_pause.clicked.connect(self.play_pause_clicked.emit)
         self.btn_next.clicked.connect(self.next_clicked.emit)
@@ -112,18 +113,18 @@ class PlaybackControlWidget(QWidget):
         self.playback_service.state_changed.connect(self.update_play_button_state)
         self.playback_service.player.durationChanged.connect(self.update_duration)
 
-    def update_play_button_state(self, state):
+    def update_play_button_state(self, state) -> None:
         if state == QMediaPlayer.PlaybackState.PlayingState:
             self.btn_play_pause.setText("|| Pause")
         else:
             self.btn_play_pause.setText("▶ Play")
 
-    def update_duration(self, duration):
+    def update_duration(self, duration) -> None:
         self.playback_slider.setMaximum(duration)
         formatted_time = self._format_time(duration)
         self.lbl_time_remaining.setText(f"-{formatted_time}")
 
-    def update_position(self, position):
+    def update_position(self, position) -> None:
         self.playback_slider.blockSignals(True)
         self.playback_slider.setValue(position)
         self.playback_slider.blockSignals(False)
@@ -134,7 +135,7 @@ class PlaybackControlWidget(QWidget):
         remaining = max(0, duration - position)
         self.lbl_time_remaining.setText(f"- {self._format_time(remaining)}")
 
-    def update_song_label(self, text):
+    def update_song_label(self, text) -> None:
         self.song_label.setText(text)
 
     def _format_time(self, ms: int) -> str:
@@ -142,3 +143,11 @@ class PlaybackControlWidget(QWidget):
         minutes = seconds // 60
         seconds %= 60
         return f"{minutes:02d}:{seconds:02d}"
+    
+    def set_volume(self, volume: int) -> None:
+        """Set volume slider value"""
+        self.volume_slider.setValue(volume)
+    
+    def get_volume(self) -> int:
+        """Get current volume slider value"""
+        return self.volume_slider.value()

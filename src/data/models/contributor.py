@@ -11,7 +11,7 @@ class Contributor:
     name: str = ""
     sort_name: Optional[str] = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure sort_name is set"""
         if self.sort_name is None:
             self.sort_name = self.name

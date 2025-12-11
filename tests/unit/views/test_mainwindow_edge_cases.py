@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QMessageBox, QMenu
-from PyQt6.QtCore import Qt, QSettings, QPoint
+from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtGui import QAction
 from src.presentation.views.main_window import MainWindow
 
@@ -19,12 +19,16 @@ class TestMainWindowEdgeCases:
 
     @pytest.fixture
     def window(self, qapp):
-        with patch('src.presentation.views.main_window.QSettings') as mock_settings:
-            # Mock settings value to return default if provided, else None
-            def get_value(key, default=None):
-                return default
-            
-            mock_settings.return_value.value.side_effect = get_value
+        with patch('src.presentation.views.main_window.SettingsManager') as mock_settings_class:
+            # Create a mock instance
+            mock_settings = MagicMock()
+            mock_settings.get_window_geometry.return_value = None
+            mock_settings.get_main_splitter_state.return_value = None
+            mock_settings.get_default_window_size.return_value = (1200, 800)
+            mock_settings.get_column_visibility.return_value = {}
+            mock_settings.get_volume.return_value = 50
+            mock_settings.get_last_playlist.return_value = []
+            mock_settings_class.return_value = mock_settings
             
             window = MainWindow()
             # Mock services to avoid DB/Audio hits
@@ -79,12 +83,9 @@ class TestMainWindowEdgeCases:
         event = MagicMock()
         window.closeEvent(event)
         
-        # Check settings.setValue calls
-        # We mocked QSettings class, so window.settings is the mock instance
-        # window.settings.setValue.assert_called() 
-        # Actually correct way is to check the specific keys if we care, 
-        # or just that it was called multiple times
-        assert window.settings.setValue.call_count >= 2 # geometry, splitter (columns moved to library widget)
+        # Check settings_manager methods were called
+        window.settings_manager.set_window_geometry.assert_called_once()
+        window.settings_manager.set_main_splitter_state.assert_called_once()
         event.accept.assert_called_once()
 
     def test_column_visibility_toggle(self, window):

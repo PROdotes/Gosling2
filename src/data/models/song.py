@@ -18,7 +18,7 @@ class Song:
     producers: List[str] = field(default_factory=list)
     groups: List[str] = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Ensure lists are initialized properly"""
         if self.performers is None:
             self.performers = []

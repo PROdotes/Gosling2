@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QSettings
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal
 
 from .filter_widget import FilterWidget
 
@@ -24,17 +24,17 @@ class LibraryWidget(QWidget):
     play_song = pyqtSignal(str) # Path
     add_to_playlist = pyqtSignal(list) # List of dicts {path, artist, title}
 
-    def __init__(self, library_service, metadata_service, parent=None):
+    def __init__(self, library_service, metadata_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
-        self.settings = QSettings("Prodo", "Gosling2")
+        self.settings_manager = settings_manager
         
         self._init_ui()
         self._setup_connections()
         self.load_library() # Public method calling internal logic? Or just calls internal load
 
-    def _init_ui(self):
+    def _init_ui(self) -> None:
         """Initialize UI components"""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -78,7 +78,7 @@ class LibraryWidget(QWidget):
         
         main_layout.addWidget(self.splitter)
 
-    def _setup_top_controls(self, parent_layout):
+    def _setup_top_controls(self, parent_layout) -> None:
         layout = QHBoxLayout()
         self.btn_import = QPushButton("Import File(s)")
         self.btn_scan_folder = QPushButton("Scan Folder")
@@ -91,7 +91,7 @@ class LibraryWidget(QWidget):
         
         parent_layout.addLayout(layout)
 
-    def _setup_connections(self):
+    def _setup_connections(self) -> None:
         self.btn_import.clicked.connect(self._import_files)
         self.btn_scan_folder.clicked.connect(self._scan_folder)
         self.btn_refresh.clicked.connect(self.load_library)
@@ -105,7 +105,7 @@ class LibraryWidget(QWidget):
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
 
-    def load_library(self):
+    def load_library(self) -> None:
         """Load library from database"""
         headers, data = self.library_service.get_all_songs()
         self._populate_table(headers, data)
@@ -113,7 +113,7 @@ class LibraryWidget(QWidget):
         self.filter_widget.populate()
         self.table_view.resizeColumnsToContents()
 
-    def _populate_table(self, headers, data):
+    def _populate_table(self, headers, data) -> None:
         self.library_model.clear()
         if headers:
             self.library_model.setHorizontalHeaderLabels(headers)
@@ -121,7 +121,7 @@ class LibraryWidget(QWidget):
             items = [QStandardItem(str(cell) if cell else "") for cell in row_data]
             self.library_model.appendRow(items)
 
-    def _filter_by_artist(self, artist_name):
+    def _filter_by_artist(self, artist_name) -> None:
         headers, data = self.library_service.get_songs_by_artist(artist_name)
         self._populate_table(headers, data)
 
@@ -137,12 +137,18 @@ class LibraryWidget(QWidget):
             print(f"Error importing {file_path}: {e}")
         return False
 
-    def _import_files(self):
+    def _import_files(self) -> None:
+        # Get last used directory or default to empty string
+        last_dir = self.settings_manager.get_last_import_directory() or ""
+        
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Select Audio Files", "", "Audio Files (*.mp3 *.flac *.wav *.m4a)"
+            self, "Select Audio Files", last_dir, "Audio Files (*.mp3 *.flac *.wav *.m4a)"
         )
         if not files:
             return
+        
+        # Save the directory for next time
+        self.settings_manager.set_last_import_directory(os.path.dirname(files[0]))
             
         imported_count = sum(1 for file_path in files if self._import_file(file_path))
                 
@@ -150,10 +156,16 @@ class LibraryWidget(QWidget):
             QMessageBox.information(self, "Import Complete", f"Imported {imported_count} file(s)")
             self.load_library()
 
-    def _scan_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Folder")
+    def _scan_folder(self) -> None:
+        # Get last used directory or default to empty string
+        last_dir = self.settings_manager.get_last_import_directory() or ""
+        
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder", last_dir)
         if not folder:
             return
+        
+        # Save the directory for next time
+        self.settings_manager.set_last_import_directory(folder)
             
         imported_count = 0
         for root, dirs, files in os.walk(folder):
@@ -167,10 +179,10 @@ class LibraryWidget(QWidget):
             QMessageBox.information(self, "Scan Complete", f"Imported {imported_count} file(s)")
             self.load_library()
 
-    def _on_search(self, text):
+    def _on_search(self, text) -> None:
         self.proxy_model.setFilterWildcard(f"*{text}*")
 
-    def _show_table_context_menu(self, position):
+    def _show_table_context_menu(self, position) -> None:
         menu = QMenu()
         delete_action = QAction("Delete", self)
         delete_action.triggered.connect(self._delete_selected)
@@ -182,7 +194,7 @@ class LibraryWidget(QWidget):
         
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 
-    def _show_column_context_menu(self, position):
+    def _show_column_context_menu(self, position) -> None:
         menu = QMenu(self)
         for col in range(self.library_model.columnCount()):
             header_text = self.library_model.headerData(col, Qt.Orientation.Horizontal)
@@ -194,28 +206,28 @@ class LibraryWidget(QWidget):
             menu.addAction(action)
         menu.exec(self.table_view.horizontalHeader().mapToGlobal(position))
 
-    def _toggle_column_visibility(self, checked):
+    def _toggle_column_visibility(self, checked) -> None:
         action = self.sender()
         if action:
             column = action.data()
             self.table_view.setColumnHidden(column, not checked)
             self._save_column_visibility_states()
 
-    def _load_column_visibility_states(self):
-        visibility_states = self.settings.value("columnVisibility", {})
+    def _load_column_visibility_states(self) -> None:
+        visibility_states = self.settings_manager.get_column_visibility()
         if isinstance(visibility_states, dict):
             for col_str, visible in visibility_states.items():
                 if isinstance(col_str, str) and col_str.isdigit():
                     self.table_view.setColumnHidden(int(col_str), not visible)
 
-    def _save_column_visibility_states(self):
+    def _save_column_visibility_states(self) -> None:
         visibility_states = {}
         for col in range(self.library_model.columnCount()):
             visible = not self.table_view.isColumnHidden(col)
             visibility_states[str(col)] = visible
-        self.settings.setValue("columnVisibility", visibility_states)
+        self.settings_manager.set_column_visibility(visibility_states)
 
-    def _delete_selected(self):
+    def _delete_selected(self) -> None:
         indexes = self.table_view.selectionModel().selectedRows()
         if not indexes:
             return
@@ -234,11 +246,11 @@ class LibraryWidget(QWidget):
                     self.library_service.delete_song(file_id)
             self.load_library()
 
-    def _on_table_double_click(self, index):
+    def _on_table_double_click(self, index) -> None:
         """Double click adds to playlist (as per original behavior)"""
         self._emit_add_to_playlist()
 
-    def _emit_add_to_playlist(self):
+    def _emit_add_to_playlist(self) -> None:
         """Gather selected items and emit signal"""
         indexes = self.table_view.selectionModel().selectedRows()
         items = []

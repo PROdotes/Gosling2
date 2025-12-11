@@ -19,7 +19,8 @@ class TestPlaybackControlWidget:
     def widget(self, qapp):
         mock_service = MagicMock()
         mock_service.player = MagicMock()
-        return PlaybackControlWidget(mock_service)
+        mock_settings = MagicMock()
+        return PlaybackControlWidget(mock_service, mock_settings)
 
     def test_update_play_button_state(self, widget):
         """Test play button text updates based on state"""

@@ -17,8 +17,9 @@ class TestPlaybackControlWidgetMutation:
         mock_service = MagicMock()
         mock_service.player = MagicMock()
         # Default duration 300s (5 min)
-        mock_service.player.duration.return_value = 300000 
-        return PlaybackControlWidget(mock_service)
+        mock_service.player.duration.return_value = 300000
+        mock_settings = MagicMock()
+        return PlaybackControlWidget(mock_service, mock_settings)
 
     def test_format_time_logic(self, widget):
         """Kill Mutants: _format_time logic (div/mod constants)"""

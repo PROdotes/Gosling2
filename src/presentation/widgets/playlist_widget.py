@@ -9,26 +9,37 @@ from ...business.services.metadata_service import MetadataService
 class PlaylistItemDelegate(QStyledItemDelegate):
     """Custom delegate for playlist items"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.artist_font = QFont("Arial", 12, QFont.Weight.Bold)
         self.title_font = QFont("Arial", 10)
 
-    def paint(self, painter, option, index):
+    ITEM_SPACING = 4 # Gap between items in pixels
+
+    def paint(self, painter, option, index) -> None:
         """Custom paint for playlist items"""
         painter.save()
+        
+        # Adjust rect for spacing - make the visual item slightly smaller than the allocated space
+        # This creates a transparent gap between items
+        visual_rect = QRect(
+            option.rect.left(),
+            option.rect.top(),
+            option.rect.width(),
+            option.rect.height() - self.ITEM_SPACING
+        )
 
         # Background
         if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(option.rect, QColor("#1E5096"))
+            painter.fillRect(visual_rect, QColor("#1E5096"))
         else:
-            painter.fillRect(option.rect, QColor("#444444"))
+            painter.fillRect(visual_rect, QColor("#444444"))
 
         # Circle (right side)
-        circle_diameter = int(option.rect.height() * 0.75)
-        circle_top = option.rect.top() + (option.rect.height() - circle_diameter) // 2
+        circle_diameter = int(visual_rect.height() * 0.75)
+        circle_top = visual_rect.top() + (visual_rect.height() - circle_diameter) // 2
         circle_right_padding = -int(circle_diameter * 0.3)
-        circle_left = option.rect.right() - circle_diameter - circle_right_padding
+        circle_left = visual_rect.right() - circle_diameter - circle_right_padding
         circle_rect = QRect(circle_left, circle_top, circle_diameter, circle_diameter)
 
         painter.setBrush(QColor("#f44336"))
@@ -44,10 +55,10 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 
         padding = 5
         text_rect = QRect(
-            option.rect.left() + padding,
-            option.rect.top() + padding,
-            circle_rect.left() - option.rect.left() - 2 * padding,
-            option.rect.height() - 2 * padding
+            visual_rect.left() + padding,
+            visual_rect.top() + padding,
+            circle_rect.left() - visual_rect.left() - 2 * padding,
+            visual_rect.height() - 2 * padding
         )
 
         artist_rect = QRect(
@@ -64,28 +75,29 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         painter.drawText(
             artist_rect,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            artist
+            artist.strip()
         )
 
         painter.setFont(self.title_font)
         painter.drawText(
             title_rect,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            title
+            title.strip()
         )
 
         painter.restore()
 
-    def sizeHint(self, option, index):
+    def sizeHint(self, option, index) -> QSize:
         """Return preferred size"""
         width = option.rect.width() if option.rect.width() > 0 else 200
-        return QSize(width, 54)
+        # Base height 54 + spacing
+        return QSize(width, 54 + self.ITEM_SPACING)
 
 
 class PlaylistWidget(QListWidget):
     """Custom list widget with drag and drop for playlists"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
@@ -95,14 +107,14 @@ class PlaylistWidget(QListWidget):
         self._preview_row = None
         self._preview_after = False
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event) -> None:
         """Handle drag enter"""
         if event.mimeData().hasUrls() or event.source() == self:
             event.acceptProposedAction()
         else:
             event.ignore()
 
-    def dragMoveEvent(self, event):
+    def dragMoveEvent(self, event) -> None:
         """Handle drag move with preview line"""
         pos = event.position().toPoint()
         index = self.indexAt(pos)
@@ -119,12 +131,12 @@ class PlaylistWidget(QListWidget):
         self.viewport().update()
         event.acceptProposedAction()
 
-    def dragLeaveEvent(self, event):
+    def dragLeaveEvent(self, event) -> None:
         """Handle drag leave"""
         self._preview_row = None
         self.viewport().update()
 
-    def dropEvent(self, event):
+    def dropEvent(self, event) -> None:
         """Handle drop event"""
         mime = event.mimeData()
 
@@ -162,7 +174,7 @@ class PlaylistWidget(QListWidget):
             super().dropEvent(event)
             self._preview_row = None
 
-    def paintEvent(self, event):
+    def paintEvent(self, event) -> None:
         """Custom paint to show drop preview line"""
         super().paintEvent(event)
         if self._preview_row is None:

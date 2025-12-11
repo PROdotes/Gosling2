@@ -10,35 +10,35 @@ SLIDER_SIZE = 30
 class SeekSlider(QSlider):
     """Custom slider with hover tooltip showing time"""
 
-    def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None):
+    def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None) -> None:
         super().__init__(orientation, parent)
         self.setMouseTracking(True)
         self.player = None
         self.total_duration_secs = 0
         self._last_tooltip = None
 
-    def setPlayer(self, player: QMediaPlayer):
+    def setPlayer(self, player: QMediaPlayer) -> None:
         """Connect to a media player"""
         self.player = player
         self.player.durationChanged.connect(self._on_duration_changed)
 
-    def _on_duration_changed(self, duration_ms):
+    def _on_duration_changed(self, duration_ms) -> None:
         """Update duration when media changes"""
         if duration_ms > 0:
             self.total_duration_secs = duration_ms / 1000
             self.setRange(0, duration_ms)
 
-    def enterEvent(self, event):
+    def enterEvent(self, event) -> None:
         """Show tooltip on mouse enter"""
         self._update_tooltip(event)
         super().enterEvent(event)
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event) -> None:
         """Update tooltip on mouse move"""
         self._update_tooltip(event)
         super().mouseMoveEvent(event)
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event) -> None:
         """Seek on click"""
         if self.total_duration_secs > 0 and event.button() == Qt.MouseButton.LeftButton:
             pos_ratio = event.position().x() / self.width()
@@ -50,7 +50,7 @@ class SeekSlider(QSlider):
         else:
             super().mousePressEvent(event)
 
-    def _update_tooltip(self, event):
+    def _update_tooltip(self, event) -> None:
         """Update the time tooltip"""
         if self.total_duration_secs <= 0:
             return
@@ -71,7 +71,7 @@ class SeekSlider(QSlider):
             QToolTip.showText(self.mapToGlobal(event.position().toPoint()), text)
             self._last_tooltip = text
 
-    def sizeHint(self):
+    def sizeHint(self) -> QSize:
         """Return preferred size"""
         hint = super().sizeHint()
         if self.orientation() == Qt.Orientation.Horizontal:
