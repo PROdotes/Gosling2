@@ -23,10 +23,11 @@ The application follows a 3-tier architecture:
 - **LibraryService**: Music library management
 - **MetadataService**: Audio file metadata extraction
 - **PlaybackService**: Audio playback control
+- **SettingsManager**: Application settings persistence
 
 ### 3. Presentation Layer (`src/presentation/`)
 - **Views**: Main application window
-- **Widgets**: Custom UI components (SeekSlider, PlaylistWidget)
+- **Widgets**: Custom UI components (LibraryWidget, FilterWidget, PlaylistWidget, etc.)
 - **Dialogs**: User interaction dialogs
 
 ## Project Structure
@@ -48,19 +49,24 @@ Gosling2/
 │   │   └── services/
 │   │       ├── library_service.py
 │   │       ├── metadata_service.py
-│   │       └── playback_service.py
+│   │       ├── playback_service.py
+│   │       └── settings_manager.py
 │   └── presentation/
 │       ├── views/
 │       │   └── main_window.py
 │       └── widgets/
-│           ├── seek_slider.py
-│           └── playlist_widget.py
+│           ├── library_widget.py
+│           ├── filter_widget.py
+│           ├── playlist_widget.py
+│           ├── playback_control_widget.py
+│           └── seek_slider.py
 ├── tests/
 │   ├── unit/
 │   └── integration/
 ├── app.py
 ├── requirements.txt
-└── README.md
+├── README.md
+└── DATABASE.md
 ```
 
 ## Installation

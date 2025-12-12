@@ -21,10 +21,10 @@ Gosling2/
 │   │   ├── models/        # Song, Contributor, Role
 │   │   └── repositories/  # Database operations
 │   ├── business/          # Business Logic Layer
-│   │   └── services/      # Library, Metadata, Playback services
+│   │   └── services/      # Library, Metadata, Playback, Settings
 │   └── presentation/      # Presentation Layer
 │       ├── views/         # MainWindow
-│       └── widgets/       # SeekSlider, PlaylistWidget
+│       └── widgets/       # Library, Playlist, Filter, Playback controls
 ├── tests/
 │   ├── unit/             # 35 unit tests
 │   └── integration/      # Integration tests
@@ -151,6 +151,7 @@ python setup.py
 - `LibraryService` - Library management (add/remove/update songs)
 - `MetadataService` - MP3 metadata extraction (ID3 tags)
 - `PlaybackService` - Audio playback control
+- `SettingsManager` - Application configuration and persistence
 
 **Features:**
 - Independent of UI
@@ -162,7 +163,7 @@ python setup.py
 
 **Components:**
 - `views/` - Main application window
-- `widgets/` - Custom UI components (SeekSlider, PlaylistWidget)
+- `widgets/` - Custom UI components (LibraryWidget, PlaylistWidget, PlaybackControlWidget, etc.)
 
 **Features:**
 - PyQt6-based UI

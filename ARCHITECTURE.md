@@ -57,7 +57,8 @@ Gosling2/
 │   │   │   ├── __init__.py
 │   │   │   ├── library_service.py      # Library management
 │   │   │   ├── metadata_service.py     # Metadata extraction
-│   │   │   └── playback_service.py     # Playback control
+│   │   │   ├── playback_service.py     # Playback control
+│   │   │   └── settings_manager.py     # Application settings
 │   │   └── __init__.py
 │   │
 │   ├── presentation/             # Presentation Layer
@@ -66,8 +67,11 @@ Gosling2/
 │   │   │   └── main_window.py    # Main application window
 │   │   ├── widgets/              # Custom widgets
 │   │   │   ├── __init__.py
-│   │   │   ├── seek_slider.py    # Custom seek slider
-│   │   │   └── playlist_widget.py # Custom playlist widget
+│   │   │   ├── seek_slider.py        # Custom seek slider
+│   │   │   ├── playlist_widget.py    # Custom playlist widget
+│   │   │   ├── library_widget.py     # Library grid/list view
+│   │   │   ├── filter_widget.py      # Search and filter controls
+│   │   │   └── playback_control_widget.py # Playback controls
 │   │   ├── dialogs/              # Dialog windows
 │   │   │   └── __init__.py
 │   │   └── __init__.py
@@ -149,6 +153,12 @@ Gosling2/
   - Manage playlist
   - Volume control
   - Playback state management
+:
+- **SettingsManager**:
+  - Centralized application settings
+  - Window geometry persistence
+  - Library view preferences
+  - Volume and playback state persistence
 
 **Key Features**:
 - Separation of business logic from UI
@@ -169,6 +179,9 @@ Gosling2/
 **Widgets**:
 - **SeekSlider**: Custom slider with time tooltip
 - **PlaylistWidget**: Drag-and-drop playlist with custom rendering
+- **LibraryWidget**: Displays song library with sorting and selection
+- **FilterWidget**: Handles search input and filter criteria
+- **PlaybackControlWidget**: Manages play/pause, seek, and volume controls
 
 **Key Features**:
 - PyQt6-based UI

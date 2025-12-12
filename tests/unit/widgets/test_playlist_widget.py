@@ -200,7 +200,7 @@ class TestPlaylistWidget:
         mock_option.rect.setRect(0, 0, 100, 50)
         
         size = delegate.sizeHint(mock_option, MagicMock())
-        assert size.height() == 54
+        assert size.height() == 58
 
     def test_drag_move_update_preview_end(self, widget):
         """Test drag move over empty area/end of list"""

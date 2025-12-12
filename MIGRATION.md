@@ -135,6 +135,10 @@ song = metadata_service.extract_from_mp3(path)
 # Playback control
 playback_service = PlaybackService()
 playback_service.play()
+
+# Settings management
+settings_manager = SettingsManager()
+volume = settings_manager.get_volume()
 ```
 
 ### UI Components
@@ -143,8 +147,10 @@ playback_service.play()
 
 **New:** Separated into views and widgets
 - Main window: `src/presentation/views/main_window.py`
-- Custom slider: `src/presentation/widgets/seek_slider.py`
+- Library view: `src/presentation/widgets/library_widget.py`
+- Playback controls: `src/presentation/widgets/playback_control_widget.py`
 - Playlist widget: `src/presentation/widgets/playlist_widget.py`
+- Search filter: `src/presentation/widgets/filter_widget.py`
 
 ## Feature Parity
 

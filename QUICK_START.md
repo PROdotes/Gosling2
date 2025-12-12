@@ -109,7 +109,8 @@ python setup.py
 ┌───────────▼─────────────────────┐
 │   Business Logic Layer          │
 │   - Services (Library,          │
-│     Metadata, Playback)         │
+│     Metadata, Playback,         │
+│     SettingsManager)            │
 └───────────┬─────────────────────┘
             │
 ┌───────────▼─────────────────────┐
