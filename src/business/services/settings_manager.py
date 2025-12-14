@@ -21,11 +21,15 @@ class SettingsManager:
     KEY_LAST_PLAYLIST = "playback/lastPlaylist"
     KEY_LAST_SONG_PATH = "playback/lastSongPath"
     KEY_LAST_POSITION = "playback/lastPosition"
+    KEY_CROSSFADE_ENABLED = "playback/crossfadeEnabled"
+    KEY_CROSSFADE_DURATION = "playback/crossfadeDuration"
     
     # Default values
     DEFAULT_VOLUME = 50
     DEFAULT_WINDOW_WIDTH = 1200
     DEFAULT_WINDOW_HEIGHT = 800
+    DEFAULT_CROSSFADE_ENABLED = True
+    DEFAULT_CROSSFADE_DURATION = 3000
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -126,6 +130,22 @@ class SettingsManager:
     def set_last_position(self, position: int) -> None:
         """Save last playback position in milliseconds"""
         self._settings.setValue(self.KEY_LAST_POSITION, position)
+        
+    def get_crossfade_enabled(self) -> bool:
+        """Get whether crossfade is enabled"""
+        return self._settings.value(self.KEY_CROSSFADE_ENABLED, self.DEFAULT_CROSSFADE_ENABLED, type=bool)
+
+    def set_crossfade_enabled(self, enabled: bool) -> None:
+        """Set whether crossfade is enabled"""
+        self._settings.setValue(self.KEY_CROSSFADE_ENABLED, enabled)
+
+    def get_crossfade_duration(self) -> int:
+        """Get crossfade duration in milliseconds"""
+        return self._settings.value(self.KEY_CROSSFADE_DURATION, self.DEFAULT_CROSSFADE_DURATION, type=int)
+
+    def set_crossfade_duration(self, duration: int) -> None:
+        """Set crossfade duration in milliseconds"""
+        self._settings.setValue(self.KEY_CROSSFADE_DURATION, duration)
     
     # ===== Utility Methods =====
     

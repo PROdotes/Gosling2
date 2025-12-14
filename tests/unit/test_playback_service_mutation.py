@@ -7,7 +7,14 @@ from src.business.services.playback_service import PlaybackService
 class TestPlaybackServiceMutation:
     @pytest.fixture
     def service(self):
-        return PlaybackService()
+        with unittest.mock.patch('src.business.services.settings_manager.SettingsManager'), \
+             unittest.mock.patch('src.business.services.playback_service.QMediaPlayer') as mock_player_cls, \
+             unittest.mock.patch('src.business.services.playback_service.QAudioOutput') as mock_audio_cls:
+            
+            mock_player_cls.side_effect = lambda: MagicMock()
+            mock_audio_cls.side_effect = lambda: MagicMock()
+            
+            return PlaybackService()
 
     def test_initial_state_index(self, service):
         """Kill Mutant: Initial index must be -1, not 0"""

@@ -34,8 +34,8 @@ class TestMainWindow:
             mock_playback_cls.return_value = mock_playback
             
             # Setup player for SeekSlider
-            mock_playback.player = MagicMock()
-            mock_playback.player.duration.return_value = 0
+            mock_playback.active_player = MagicMock()
+            mock_playback.active_player.duration.return_value = 0
 
             yield {
                 'library': mock_library,
@@ -240,11 +240,11 @@ class TestMainWindow:
         # Check text format
         assert args.text() == "performer | Title"
 
-    def test_on_playlist_double_click(self, main_window, mock_services):
+    def test_play_item_internal(self, main_window, mock_services):
         mock_item = MagicMock()
         mock_item.data.return_value = {"path": "/path/to/song.mp3"}
         
-        main_window._on_playlist_double_click(mock_item)
+        main_window._play_item(mock_item)
         
         mock_services['playback'].load.assert_called_with("/path/to/song.mp3")
         mock_services['playback'].play.assert_called()
@@ -307,9 +307,8 @@ class TestMainWindow:
         
         main_window._play_next()
         
-        # Verify playing second item
-        mock_services['playback'].load.assert_called_with("song2.mp3")
-        mock_services['playback'].play.assert_called()
+        # Verify calling crossfade_to
+        mock_services['playback'].crossfade_to.assert_called_with("song2.mp3")
         
         assert main_window.playlist_widget.count() == 1
         assert main_window.playlist_widget.item(0).text() == "Song 2"
@@ -327,7 +326,7 @@ class TestMainWindow:
         
         # We need to ensure the service player mock returns the duration
         # because update_position reads it from there
-        mock_services['playback'].player.duration.return_value = 10000
+        mock_services['playback'].get_duration.return_value = 10000
 
         # Use widget methods directly to test widget logic
         main_window.playback_widget.update_duration(10000)

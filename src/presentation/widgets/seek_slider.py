@@ -1,6 +1,6 @@
 """Custom seek slider widget with time tooltip"""
 from PyQt6.QtWidgets import QSlider, QToolTip
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 
 
@@ -9,24 +9,22 @@ SLIDER_SIZE = 30
 
 class SeekSlider(QSlider):
     """Custom slider with hover tooltip showing time"""
+    
+    seekRequested = pyqtSignal(int)
 
     def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None) -> None:
         super().__init__(orientation, parent)
         self.setMouseTracking(True)
-        self.player = None
         self.total_duration_secs = 0
         self._last_tooltip = None
 
-    def setPlayer(self, player: QMediaPlayer) -> None:
-        """Connect to a media player"""
-        self.player = player
-        self.player.durationChanged.connect(self._on_duration_changed)
-
-    def _on_duration_changed(self, duration_ms) -> None:
+    def updateDuration(self, duration_ms: int) -> None:
         """Update duration when media changes"""
+        self.setRange(0, duration_ms)
         if duration_ms > 0:
             self.total_duration_secs = duration_ms / 1000
-            self.setRange(0, duration_ms)
+        else:
+            self.total_duration_secs = 0
 
     def enterEvent(self, event) -> None:
         """Show tooltip on mouse enter"""
@@ -45,8 +43,7 @@ class SeekSlider(QSlider):
             pos_ratio = max(0, min(1, pos_ratio))
             new_value = int(pos_ratio * self.maximum())
             self.setValue(new_value)
-            if self.player:
-                self.player.setPosition(new_value)
+            self.seekRequested.emit(new_value)
         else:
             super().mousePressEvent(event)
 

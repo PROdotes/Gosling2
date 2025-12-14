@@ -84,12 +84,22 @@ class MainWindow(QMainWindow):
         self.library_widget.add_to_playlist.connect(self._add_to_playlist)
         
         # Playlist interactions
-        self.playlist_widget.itemDoubleClicked.connect(self._on_playlist_double_click)
+        # Double-click disabled by user request (prevent accidental play)
+        # self.playlist_widget.itemDoubleClicked.connect(self._on_playlist_double_click)
 
         # Playback Controls
         self.playback_widget.play_pause_clicked.connect(self._toggle_play_pause)
         self.playback_widget.next_clicked.connect(self._play_next)
         self.playback_widget.volume_changed.connect(self._on_volume_changed)
+        
+        # Monitor playlist count
+        model = self.playlist_widget.model()
+        model.rowsInserted.connect(self._on_playlist_changed)
+        model.rowsRemoved.connect(self._on_playlist_changed)
+
+    def _on_playlist_changed(self, parent, start, end):
+        # Update widget with new count
+        self.playback_widget.set_playlist_count(self.playlist_widget.count())
 
         # Media Status (auto-advance)
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
@@ -106,8 +116,8 @@ class MainWindow(QMainWindow):
             list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
             self.playlist_widget.addItem(list_item)
 
-    def _on_playlist_double_click(self, item) -> None:
-        """Handle playlist double-click"""
+    def _play_item(self, item) -> None:
+        """Play specific playlist item (Internal helper)"""
         data = item.data(Qt.ItemDataRole.UserRole)
         if data and "path" in data:
             path = data["path"]
@@ -119,12 +129,12 @@ class MainWindow(QMainWindow):
         """Toggle play/pause/resume"""
         if self.playback_service.is_playing():
             self.playback_service.pause()
-        elif self.playback_service.player.playbackState() == QMediaPlayer.PlaybackState.PausedState:
+        elif self.playback_service.active_player.playbackState() == QMediaPlayer.PlaybackState.PausedState:
             self.playback_service.play()
         elif self.playlist_widget.count() > 0:
             first_item = self.playlist_widget.item(0)
             self.playlist_widget.setCurrentRow(0)
-            self._on_playlist_double_click(first_item)
+            self._play_item(first_item)
         else:
             self.playback_service.play()
 
@@ -133,8 +143,16 @@ class MainWindow(QMainWindow):
         if self.playlist_widget.count() > 1:
             next_item = self.playlist_widget.item(1)
             if next_item:
+                # Get data directly
+                data = next_item.data(Qt.ItemDataRole.UserRole)
+                if data and "path" in data:
+                    path = data["path"]
+                    # Use Crossfade-aware transition
+                    self.playback_service.crossfade_to(path)
+                    self._update_song_label(path)
+                
+                # Update UI list
                 self.playlist_widget.setCurrentRow(1)
-                self._on_playlist_double_click(next_item)
                 item_to_delete = self.playlist_widget.takeItem(0)
                 del item_to_delete
 
@@ -212,6 +230,9 @@ class MainWindow(QMainWindow):
                 list_item = QListWidgetItem(display_text)
                 list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
                 self.playlist_widget.addItem(list_item)
+        
+        # Initial update of button state
+        self.playback_widget.set_playlist_count(self.playlist_widget.count())
     
     def _save_playlist(self) -> None:
         """Save current playlist"""

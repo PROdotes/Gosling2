@@ -15,9 +15,9 @@ class TestPlaybackControlWidgetMutation:
     @pytest.fixture
     def widget(self, qapp):
         mock_service = MagicMock()
-        mock_service.player = MagicMock()
-        # Default duration 300s (5 min)
-        mock_service.player.duration.return_value = 300000
+        mock_service = MagicMock()
+        mock_service.active_player = MagicMock()
+        mock_service.get_duration.return_value = 300000
         mock_settings = MagicMock()
         return PlaybackControlWidget(mock_service, mock_settings)
 
@@ -40,7 +40,7 @@ class TestPlaybackControlWidgetMutation:
 
     def test_update_position_labels(self, widget):
         """Kill Mutants: update_position label updates"""
-        widget.playback_service.player.duration.return_value = 120000 # 2 mins
+        widget.playback_service.get_duration.return_value = 120000 # 2 mins
         
         # Position 30s
         widget.update_position(30000)
@@ -54,7 +54,7 @@ class TestPlaybackControlWidgetMutation:
 
     def test_update_position_past_duration(self, widget):
         """Kill Mutants: max(0, duration - position)"""
-        widget.playback_service.player.duration.return_value = 10000 # 10s
+        widget.playback_service.get_duration.return_value = 10000 # 10s
         
         # Position 20s (weird but possible glitch)
         widget.update_position(20000)

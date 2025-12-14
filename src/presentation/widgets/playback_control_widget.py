@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QCheckBox, QMenu
+from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 from .seek_slider import SeekSlider
@@ -16,6 +17,11 @@ class PlaybackControlWidget(QWidget):
         super().__init__(parent)
         self.playback_service = playback_service
         self.settings_manager = settings_manager
+        
+        # State
+        self._playlist_count = 0
+        self._is_crossfading = False
+        
         self._init_ui()
         self._setup_connections()
 
@@ -42,7 +48,7 @@ class PlaybackControlWidget(QWidget):
         self.lbl_time_passed.setFont(time_font)
         
         self.playback_slider = SeekSlider()
-        self.playback_slider.setPlayer(self.playback_service.player)
+        # Removed setPlayer: Slider is now passive view
         playback_slider_style = """
             QSlider::groove:horizontal {
                 height: 30px; 
@@ -92,6 +98,22 @@ class PlaybackControlWidget(QWidget):
         controls_layout.addStretch()
         controls_layout.addWidget(QLabel("Volume:"))
         controls_layout.addWidget(self.volume_slider)
+        
+        # Crossfade Controls
+        self.chk_crossfade = QCheckBox("Crossfade")
+        self.chk_crossfade.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.chk_crossfade.customContextMenuRequested.connect(self._show_crossfade_context_menu)
+        self.chk_crossfade.setToolTip("Right-click to set duration")
+        
+        # Initialize state from service
+        # We need to do this here or in a separate init method, 
+        # but we can't access service properties cleanly before init is done? 
+        # We can, service is passed in __init__.
+        self.chk_crossfade.setChecked(self.playback_service.crossfade_enabled)
+        self._update_crossfade_text()
+        
+        controls_layout.addWidget(self.chk_crossfade)
+        
         controls_layout.addWidget(self.btn_play_pause)
         controls_layout.addWidget(self.btn_next)
         controls_layout.addStretch()
@@ -100,18 +122,80 @@ class PlaybackControlWidget(QWidget):
         layout.addLayout(slider_layout)
         layout.addLayout(controls_layout)
 
+    def _update_crossfade_text(self):
+        """Update checkbox text to show current duration"""
+        duration = self.playback_service.crossfade_duration
+        seconds = duration // 1000
+        self.chk_crossfade.setText(f"Crossfade ({seconds}s)")
+
+    def _show_crossfade_context_menu(self, position):
+        """Show context menu for crossfade duration"""
+        menu = QMenu(self)
+        menu.setStyleSheet("QMenu { background-color: #2b2b2b; color: #e0e0e0; border: 1px solid #3d3d3d; } QMenu::item:selected { background-color: #3d3d3d; }")
+        
+        durations = [
+            ("1 Second", 1000),
+            ("3 Seconds", 3000),
+            ("5 Seconds", 5000),
+            ("10 Seconds", 10000)
+        ]
+        
+        current_duration = self.playback_service.crossfade_duration
+        
+        for label, ms in durations:
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setChecked(ms == current_duration)
+            action.triggered.connect(lambda checked, d=ms: self._set_crossfade_duration(d))
+            menu.addAction(action)
+            
+        menu.exec(self.chk_crossfade.mapToGlobal(position))
+
+    def _set_crossfade_duration(self, duration_ms: int):
+        self.playback_service.crossfade_duration = duration_ms
+        self._update_crossfade_text()
+
     def _setup_connections(self) -> None:
         # UI -> Signals
         self.btn_play_pause.clicked.connect(self.play_pause_clicked.emit)
         self.btn_next.clicked.connect(self.next_clicked.emit)
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
+        self.playback_slider.seekRequested.connect(self.playback_service.seek)
+        
+        # Crossfade Toggle
+        # Lambda creates a closure, need to be careful? 
+        # checked is boolean. 
+        self.chk_crossfade.toggled.connect(lambda checked: setattr(self.playback_service, 'crossfade_enabled', checked))
         
         # Service -> UI updates
         # We can connect service signals directly to our update methods here
         # This keeps MainWindow cleaner
         self.playback_service.position_changed.connect(self.update_position)
         self.playback_service.state_changed.connect(self.update_play_button_state)
-        self.playback_service.player.durationChanged.connect(self.update_duration)
+        self.playback_service.duration_changed.connect(self.update_duration)
+        
+        # Crossfade UI locking
+        # Crossfade UI locking
+        self.playback_service.crossfade_started.connect(self._on_crossfade_started)
+        self.playback_service.crossfade_finished.connect(self._on_crossfade_finished)
+
+    def _on_crossfade_started(self):
+        self._is_crossfading = True
+        self._update_skip_button_state()
+
+    def _on_crossfade_finished(self):
+        self._is_crossfading = False
+        self._update_skip_button_state()
+
+    def set_playlist_count(self, count: int) -> None:
+        """Update playlist count to enable/disable controls"""
+        self._playlist_count = count
+        self._update_skip_button_state()
+
+    def _update_skip_button_state(self) -> None:
+        """Skip enabled only if >1 songs AND not crossfading"""
+        can_skip = (self._playlist_count > 1) and (not self._is_crossfading)
+        self.btn_next.setEnabled(can_skip)
 
     def update_play_button_state(self, state) -> None:
         if state == QMediaPlayer.PlaybackState.PlayingState:
@@ -120,7 +204,7 @@ class PlaybackControlWidget(QWidget):
             self.btn_play_pause.setText("▶ Play")
 
     def update_duration(self, duration) -> None:
-        self.playback_slider.setMaximum(duration)
+        self.playback_slider.updateDuration(duration)
         formatted_time = self._format_time(duration)
         self.lbl_time_remaining.setText(f"-{formatted_time}")
 
@@ -129,7 +213,7 @@ class PlaybackControlWidget(QWidget):
         self.playback_slider.setValue(position)
         self.playback_slider.blockSignals(False)
         
-        duration = self.playback_service.player.duration()
+        duration = self.playback_service.get_duration()
         self.lbl_time_passed.setText(self._format_time(position))
         
         remaining = max(0, duration - position)

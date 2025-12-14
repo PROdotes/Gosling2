@@ -21,23 +21,18 @@ class TestSeekSlider:
 
     def test_initialization(self, slider):
         assert slider.hasMouseTracking() is True
-        assert slider.player is None
         assert slider.total_duration_secs == 0
 
-    def test_set_player(self, slider, mock_player):
-        slider.setPlayer(mock_player)
-        assert slider.player == mock_player
-        # Verify signal connection - this is tricky with mocks, but we can verify the attribute exists
-        assert hasattr(mock_player, 'durationChanged')
+
 
     def test_duration_changed(self, slider):
         # 120,000 ms = 120 seconds = 2 minutes
-        slider._on_duration_changed(120000)
+        slider.updateDuration(120000)
         assert slider.total_duration_secs == 120.0
         assert slider.maximum() == 120000
 
     def test_update_tooltip_logic(self, slider):
-        slider._on_duration_changed(120000) # 2 mins total
+        slider.updateDuration(120000) # 2 mins total
         
         # Mock event at middle of slider (50%)
         event = MagicMock()
@@ -58,9 +53,8 @@ class TestSeekSlider:
             args = mock_show.call_args[0]
             assert args[1] == expected_text
 
-    def test_mouse_press_seek(self, slider, mock_player):
-        slider.setPlayer(mock_player)
-        slider._on_duration_changed(100000) # 100s
+    def test_mouse_press_seek(self, slider, qtbot):
+        slider.updateDuration(100000) # 100s
         slider.width = MagicMock(return_value=100)
         
         # Click at 25% mark
@@ -73,18 +67,16 @@ class TestSeekSlider:
         )
         
         with patch.object(slider, 'width', return_value=100):
-            with patch.object(slider.player, 'setPosition') as mock_set_pos:
+            with qtbot.waitSignal(slider.seekRequested, timeout=1000) as blocker:
                 slider.mousePressEvent(event)
                 
-                # Should seek to approx 25000
-                mock_set_pos.assert_called()
-                # Allow some floating point tolerance in pixel math
-                call_arg = mock_set_pos.call_args[0][0]
-                assert 24000 <= call_arg <= 26000
+            # Allow tolerance
+            assert blocker.signal_triggered
+            args = blocker.args
+            assert 24000 <= args[0] <= 26000
 
-    def test_mouse_press_ignore_right_click(self, slider, mock_player):
-        slider.setPlayer(mock_player)
-        slider._on_duration_changed(100000)
+    def test_mouse_press_ignore_right_click(self, slider, qtbot):
+        slider.updateDuration(100000)
         
         event = QMouseEvent(
             QMouseEvent.Type.MouseButtonPress,
@@ -94,9 +86,9 @@ class TestSeekSlider:
             Qt.KeyboardModifier.NoModifier
         )
         
-        with patch.object(slider.player, 'setPosition') as mock_set_pos:
-            slider.mousePressEvent(event)
-            mock_set_pos.assert_not_called()
+        # Should NOT emit signal
+        with qtbot.assertNotEmitted(slider.seekRequested):
+             slider.mousePressEvent(event)
 
     def test_size_hint(self, slider):
         hint = slider.sizeHint()
@@ -104,7 +96,7 @@ class TestSeekSlider:
 
     def test_tooltip_events(self, slider):
         """Test enter and move events trigger tooltip update"""
-        slider._on_duration_changed(100000)
+        slider.updateDuration(100000)
         
         # Enter Event
         event_enter = MagicMock()
@@ -127,7 +119,7 @@ class TestSeekSlider:
 
     def test_tooltip_zero_duration(self, slider):
         """Test tooltip does not show if duration is 0"""
-        slider._on_duration_changed(0)
+        slider.updateDuration(0)
         assert slider.total_duration_secs == 0
         
         event = MagicMock()

@@ -19,6 +19,7 @@ class TestPlaybackControlWidget:
     def widget(self, qapp):
         mock_service = MagicMock()
         mock_service.player = MagicMock()
+        mock_service.get_duration.return_value = 0
         mock_settings = MagicMock()
         return PlaybackControlWidget(mock_service, mock_settings)
 

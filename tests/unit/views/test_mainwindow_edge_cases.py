@@ -149,7 +149,7 @@ class TestMainWindowEdgeCases:
         """Test toggle when paused -> play"""
         from PyQt6.QtMultimedia import QMediaPlayer
         window.playback_service.is_playing.return_value = False
-        window.playback_service.player.playbackState.return_value = QMediaPlayer.PlaybackState.PausedState
+        window.playback_service.active_player.playbackState.return_value = QMediaPlayer.PlaybackState.PausedState
         
         window._toggle_play_pause()
         window.playback_service.play.assert_called()
@@ -158,15 +158,15 @@ class TestMainWindowEdgeCases:
         """Test toggle when stopped -> auto play first item"""
         from PyQt6.QtMultimedia import QMediaPlayer
         window.playback_service.is_playing.return_value = False
-        window.playback_service.player.playbackState.return_value = QMediaPlayer.PlaybackState.StoppedState
+        window.playback_service.active_player.playbackState.return_value = QMediaPlayer.PlaybackState.StoppedState
         
         window.playlist_widget.count.return_value = 1
         item = MagicMock()
         window.playlist_widget.item.return_value = item
         
-        with patch.object(window, '_on_playlist_double_click') as mock_dbl_click:
+        with patch.object(window, '_play_item') as mock_play:
             window._toggle_play_pause()
-            mock_dbl_click.assert_called_with(item)
+            mock_play.assert_called_with(item)
 
 
 
