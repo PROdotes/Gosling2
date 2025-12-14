@@ -34,7 +34,7 @@ class LibraryWidget(QWidget):
         
         self._init_ui()
         self._setup_connections()
-        self.load_library() # Public method calling internal logic? Or just calls internal load
+        self.load_library()
 
     def _init_ui(self) -> None:
         """Initialize UI components"""

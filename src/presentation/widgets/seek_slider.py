@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 
 
-SLIDER_SIZE = 30
+from ...resources.constants import SLIDER_SIZE
 
 
 class SeekSlider(QSlider):

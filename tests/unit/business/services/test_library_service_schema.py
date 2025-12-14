@@ -11,7 +11,8 @@ def test_get_all_songs_schema_pass_through():
     If the repository schema changes (which is caught by test_song_repository_schema.py),
     this test ensures the Service layer doesn't silently swallow or transform it unexpectedly.
     """
-    service = LibraryService()
+    from src.data.repositories import SongRepository, ContributorRepository
+    service = LibraryService(SongRepository(), ContributorRepository())
     service.song_repository = MagicMock()
     
     # Simulate Repository output
@@ -35,7 +36,8 @@ def test_get_all_songs_schema_change_detection():
     Simulate a Schema Change from Repository and ensure Service propagates it.
     If we add 'Genre' to Repository, Service typically should pass it through.
     """
-    service = LibraryService()
+    from src.data.repositories import SongRepository, ContributorRepository
+    service = LibraryService(SongRepository(), ContributorRepository())
     service.song_repository = MagicMock()
     
     # Simulate NEW Schema

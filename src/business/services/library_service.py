@@ -7,9 +7,9 @@ from ...data.models.song import Song
 class LibraryService:
     """Service for managing the music library"""
 
-    def __init__(self):
-        self.song_repository = SongRepository()
-        self.contributor_repository = ContributorRepository()
+    def __init__(self, song_repository: SongRepository, contributor_repository: ContributorRepository):
+        self.song_repository = song_repository
+        self.contributor_repository = contributor_repository
 
     def add_file(self, file_path: str) -> Optional[int]:
         """Add a file to the library"""

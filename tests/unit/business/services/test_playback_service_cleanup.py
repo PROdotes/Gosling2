@@ -13,12 +13,17 @@ class TestPlaybackServiceCleanup:
     def mock_dependencies(self):
         with patch('src.business.services.settings_manager.SettingsManager'), \
              patch('src.business.services.playback_service.QMediaPlayer', side_effect=lambda: MagicMock()) as MockPlayer, \
-             patch('src.business.services.playback_service.QAudioOutput', side_effect=lambda: MagicMock()) as MockAudio:
-            yield
+             patch('src.business.services.playback_service.QAudioOutput', side_effect=lambda: MagicMock()) as MockAudio, \
+             patch('src.business.services.settings_manager.SettingsManager') as MockSettings:
+             # Make MockSettings available to tests via class attribute or context?
+             # Easier: Just return/yield the mock, but the tests use `self`.
+             # Standard pytest way: use argument `mock_dependencies` which yields nothing currently.
+             # I'll update the yield to return the mock.
+            yield MockSettings.return_value
 
-    def test_cleanup_stops_playback(self, qtbot):
+    def test_cleanup_stops_playback(self, qtbot, mock_dependencies):
         """Test that cleanup stops playback on all players"""
-        service = PlaybackService()
+        service = PlaybackService(mock_dependencies)
         
         # Mock stop on all players
         for player in service._players:
@@ -29,9 +34,9 @@ class TestPlaybackServiceCleanup:
         for player in service._players:
             player.stop.assert_called_once()
 
-    def test_cleanup_clears_media_source(self, qtbot):
+    def test_cleanup_clears_media_source(self, qtbot, mock_dependencies):
         """Test that cleanup clears the media source on all players"""
-        service = PlaybackService()
+        service = PlaybackService(mock_dependencies)
         
         # Mock setSource
         for player in service._players:
@@ -45,9 +50,9 @@ class TestPlaybackServiceCleanup:
             call_args = player.setSource.call_args[0][0]
             assert call_args.isEmpty()
 
-    def test_cleanup_deletes_resources(self, qtbot):
+    def test_cleanup_deletes_resources(self, qtbot, mock_dependencies):
         """Test that cleanup schedules resources for deletion"""
-        service = PlaybackService()
+        service = PlaybackService(mock_dependencies)
         
         # Spy on deleteLater
         for player in service._players:
@@ -67,9 +72,9 @@ class TestPlaybackServiceCleanup:
         assert len(service._players) == 0
         assert len(service._audio_outputs) == 0
 
-    def test_cleanup_can_be_called_multiple_times(self, qtbot):
+    def test_cleanup_can_be_called_multiple_times(self, qtbot, mock_dependencies):
         """Test that cleanup can be safely called multiple times"""
-        service = PlaybackService()
+        service = PlaybackService(mock_dependencies)
         
         service.cleanup()
         service.cleanup() # Second call

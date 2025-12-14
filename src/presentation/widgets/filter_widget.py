@@ -6,9 +6,9 @@ class FilterWidget(QWidget):
     """Widget for filtering the library (e.g. by Artist)"""
     
     # Signals
-    filter_by_performer = pyqtSignal(str) # Emitted when a performer is selected
-    filter_by_composer = pyqtSignal(str)  # Emitted when a composer is selected
-    reset_filter = pyqtSignal()        # Emitted when "Performers" root is clicked (show all)
+    filter_by_performer = pyqtSignal(str)
+    filter_by_composer = pyqtSignal(str)
+    reset_filter = pyqtSignal()
 
     def __init__(self, library_service, parent=None) -> None:
         super().__init__(parent)
@@ -33,7 +33,6 @@ class FilterWidget(QWidget):
         self.tree_model.clear()
         
         # Standard Roles (Ordered for generic consistency)
-        # In a perfect world, we'd fetch these definitions from the DB/Service
         self._add_category_to_tree("Performer", "Performers")
         self._add_category_to_tree("Composer", "Composers")
         self._add_category_to_tree("Lyricist", "Lyricists")
@@ -77,8 +76,8 @@ class FilterWidget(QWidget):
             if parent_item:
                 item = QStandardItem(name)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setData(name, Qt.ItemDataRole.UserRole)     # Name
-                item.setData(role_name, Qt.ItemDataRole.UserRole + 1) # Role
+                item.setData(name, Qt.ItemDataRole.UserRole)
+                item.setData(role_name, Qt.ItemDataRole.UserRole + 1)
                 parent_item.appendRow(item)
                 
         self.tree_model.appendRow(root_item)
@@ -96,7 +95,6 @@ class FilterWidget(QWidget):
             elif role == "Composer":
                 self.filter_by_composer.emit(name)
             elif role in ["Lyricist", "Producer"]:
-                # TODO: Implement specific signals or generic filter
                 print(f"Filter requested for {role}: {name}")
         elif item.text() in ["Performers", "Composers", "Lyricists", "Producers"]:
              # Or if role is set on root items too

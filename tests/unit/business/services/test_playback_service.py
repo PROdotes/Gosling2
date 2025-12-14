@@ -21,7 +21,7 @@ class TestPlaybackService:
     @pytest.fixture
     def service(self, qapp):
         """Create a playback service instance with mocked player"""
-        with patch('src.business.services.settings_manager.SettingsManager'), \
+        with patch('src.business.services.settings_manager.SettingsManager') as MockSettingsManager, \
              patch('src.business.services.playback_service.QMediaPlayer') as mock_player_cls, \
              patch('src.business.services.playback_service.QAudioOutput') as mock_audio_cls:
             
@@ -35,7 +35,8 @@ class TestPlaybackService:
             mock_player_cls.side_effect = lambda: MagicMock()
             mock_audio_cls.side_effect = lambda: MagicMock()
 
-            service = PlaybackService()
+            mock_settings_instance = MockSettingsManager.return_value
+            service = PlaybackService(mock_settings_instance)
             
             return service
 

@@ -28,7 +28,7 @@ def playback_service_mocked():
         MockPlayer.side_effect = lambda: MagicMock()
         MockAudioOutput.side_effect = lambda: MagicMock()
 
-        service = PlaybackService()
+        service = PlaybackService(mock_settings_instance)
         
         yield service, MockPlayer, MockTimer
         

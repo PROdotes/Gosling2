@@ -21,7 +21,6 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         painter.save()
         
         # Adjust rect for spacing - make the visual item slightly smaller than the allocated space
-        # This creates a transparent gap between items
         visual_rect = QRect(
             option.rect.left(),
             option.rect.top(),

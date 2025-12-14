@@ -11,7 +11,7 @@ class PlaybackControlWidget(QWidget):
     play_pause_clicked = pyqtSignal()
     next_clicked = pyqtSignal()
     volume_changed = pyqtSignal(int)
-    seek_request = pyqtSignal(int) # Emitted when slider is dragged? SeekSlider handles this directly via player usually.
+    seek_request = pyqtSignal(int) # Emitted when slider is dragged
 
     def __init__(self, playback_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
@@ -48,7 +48,7 @@ class PlaybackControlWidget(QWidget):
         self.lbl_time_passed.setFont(time_font)
         
         self.playback_slider = SeekSlider()
-        # Removed setPlayer: Slider is now passive view
+        # Slider is now passive view
         playback_slider_style = """
             QSlider::groove:horizontal {
                 height: 30px; 
@@ -106,9 +106,6 @@ class PlaybackControlWidget(QWidget):
         self.chk_crossfade.setToolTip("Right-click to set duration")
         
         # Initialize state from service
-        # We need to do this here or in a separate init method, 
-        # but we can't access service properties cleanly before init is done? 
-        # We can, service is passed in __init__.
         self.chk_crossfade.setChecked(self.playback_service.crossfade_enabled)
         self._update_crossfade_text()
         
@@ -163,8 +160,6 @@ class PlaybackControlWidget(QWidget):
         self.playback_slider.seekRequested.connect(self.playback_service.seek)
         
         # Crossfade Toggle
-        # Lambda creates a closure, need to be careful? 
-        # checked is boolean. 
         self.chk_crossfade.toggled.connect(lambda checked: setattr(self.playback_service, 'crossfade_enabled', checked))
         
         # Service -> UI updates
@@ -174,7 +169,6 @@ class PlaybackControlWidget(QWidget):
         self.playback_service.state_changed.connect(self.update_play_button_state)
         self.playback_service.duration_changed.connect(self.update_duration)
         
-        # Crossfade UI locking
         # Crossfade UI locking
         self.playback_service.crossfade_started.connect(self._on_crossfade_started)
         self.playback_service.crossfade_finished.connect(self._on_crossfade_finished)

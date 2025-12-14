@@ -223,13 +223,7 @@ class SongRepository(BaseRepository):
                 # Fetch contributors
                 song = Song(
                     file_id=file_id,
-                    path=path, # Use original requested path or normalized?
-                    # Let's use the one from DB if we queried it, but we queried by path. 
-                    # Actually standardizing on the input path or normalized path is fine.
-                    # Let's stick to the normalized path stored in DB (schema says unique).
-                    # Actually, the DB stores normalized path? 
-                    # insert() does: file_path = os.path.normcase(os.path.abspath(file_path))
-                    # So we should return that.
+                    path=path,
                     title=title,
                     duration=duration,
                     bpm=bpm

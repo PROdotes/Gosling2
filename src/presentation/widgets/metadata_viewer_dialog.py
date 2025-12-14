@@ -44,10 +44,8 @@ class MetadataViewerDialog(QDialog):
         try:
             import json
             import os
-            # Resolve path: src/presentation/widgets/../../resources/id3_frames.json
-            # Current file: src/presentation/widgets/metadata_viewer_dialog.py
+            # Resolve path: src/resources/id3_frames.json
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            # Go up two levels to src
             src_dir = os.path.dirname(os.path.dirname(base_dir))
             json_path = os.path.join(src_dir, 'resources', 'id3_frames.json')
             
@@ -116,15 +114,13 @@ class MetadataViewerDialog(QDialog):
         header_item = QTableWidgetItem(title)
         
         # Enhanced Styling for Headers
-        # Dark Blue-Grey background for distinction
         header_item.setBackground(QColor(40, 50, 60)) 
-        header_item.setForeground(QColor(220, 230, 240)) # Off-white/blueish
-        header_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter) # Center text
+        header_item.setForeground(QColor(220, 230, 240))
+        header_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         header_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
         font = header_item.font()
         font.setBold(True)
-        # font.setPointSize(font.pointSize() + 1) # Slightly larger?
         header_item.setFont(font)
         
         self.table.setItem(row, 0, header_item)

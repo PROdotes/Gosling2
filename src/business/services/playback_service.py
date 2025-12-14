@@ -2,6 +2,10 @@
 from typing import List, Optional, Callable
 from PyQt6.QtCore import QObject, pyqtSignal, QUrl, QTimer
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .settings_manager import SettingsManager
 
 
 class PlaybackService(QObject):
@@ -16,10 +20,9 @@ class PlaybackService(QObject):
     crossfade_started = pyqtSignal()
     crossfade_finished = pyqtSignal()
 
-    def __init__(self) -> None:
+    def __init__(self, settings_manager: "SettingsManager") -> None:
         super().__init__()
-        from .settings_manager import SettingsManager
-        self._settings = SettingsManager()
+        self._settings = settings_manager
         
         # Dual Player Architecture ("Ping-Pong")
         self._players: List[QMediaPlayer] = []
@@ -89,9 +92,6 @@ class PlaybackService(QObject):
         player.durationChanged.connect(self.duration_changed.emit)
         player.playbackStateChanged.connect(self.state_changed.emit)
         player.mediaStatusChanged.connect(self.media_status_changed.emit)
-        # Auto-advance handled by checking media status? 
-        # Or usually `mediaStatusChanged` -> EndOfMedia triggers next.
-        # We need to hook that up.
         player.mediaStatusChanged.connect(self._handle_media_status)
 
     def _disconnect_signals(self, player: QMediaPlayer) -> None:
@@ -203,16 +203,7 @@ class PlaybackService(QObject):
         if not (0 <= index < len(self._playlist)):
             return
 
-        is_sequential = (index == self._current_index + 1) # simple heuristic, or always fade?
-        # User requirement: "Crossfade to next" implies Play Next.
-        # Basic click? Usually hard switch. 
-        # But `play_next` calls this. 
-        # Let's add an internal flag or inspect state?
-        # Better: Assume `play_at_index` forces Hard Switch unless called via specific crossfade method?
-        # Or check if playing?
-        # Let's support an optional arg in internal helper, but public API needs careful design.
-        # For simplicity: `play_at_index` does HARD SWITCH (clicked in library).
-        # `play_next` does CROSSFADE.
+        is_sequential = (index == self._current_index + 1)
         
         self._stop_crossfade()
         

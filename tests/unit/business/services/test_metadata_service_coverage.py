@@ -19,15 +19,15 @@ def test_metadata_extraction_coverage():
     # 1. Get Expected Fields from Song Model
     model_fields = {f.name for f in dataclasses.fields(Song)}
     
-    # 1. Get Expected Fields from Song Model
-    model_fields = {f.name for f in dataclasses.fields(Song)}
+
     
     # 2. Parse the File Directly (Robust path resolution)
     from pathlib import Path
     # Resolve project root relative to this test file:
-    # tests/unit/services/test_metadata_service_coverage.py -> ... -> src/
-    # parents[0]=services, [1]=unit, [2]=tests, [3]=ProjectRoot
-    project_root = Path(__file__).resolve().parents[3]
+    # Resolve project root relative to this test file:
+    # tests/unit/business/services/test_metadata_service_coverage.py -> ... -> src/
+    # parents[0]=services, [1]=business, [2]=unit, [3]=tests, [4]=ProjectRoot
+    project_root = Path(__file__).resolve().parents[4]
     service_path = project_root / "src" / "business" / "services" / "metadata_service.py"
     
     with open(service_path, "r", encoding="utf-8") as f:

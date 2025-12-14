@@ -17,11 +17,16 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
-        # Initialize services
-        self.library_service = LibraryService()
-        self.metadata_service = MetadataService()
-        self.playback_service = PlaybackService()
+        # Initialize Data Access Layer
+        from ...data.repositories import SongRepository, ContributorRepository
+        self.song_repository = SongRepository()
+        self.contributor_repository = ContributorRepository()
+
+        # Initialize Services
         self.settings_manager = SettingsManager()
+        self.library_service = LibraryService(self.song_repository, self.contributor_repository)
+        self.metadata_service = MetadataService()
+        self.playback_service = PlaybackService(self.settings_manager)
 
         # Initialize UI
         self._init_ui()
@@ -29,7 +34,6 @@ class MainWindow(QMainWindow):
         self._load_splitter_states()
         self._setup_connections()
         
-        # Restore saved settings
         self._restore_volume()
         self._restore_playlist()
 
