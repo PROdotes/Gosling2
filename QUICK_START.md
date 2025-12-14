@@ -36,7 +36,7 @@ src/
   ├── data/         ← Database layer
   ├── business/     ← Business logic  
   └── presentation/ ← UI layer
-tests/              ← 35 unit tests!
+tests/              ← 230+ tests!
 ```
 
 ---
@@ -92,7 +92,6 @@ python setup.py
 |------|---------|
 | `README.md` | Complete user guide |
 | `ARCHITECTURE.md` | Architecture details |
-| `MIGRATION.md` | Migration guide |
 | `PROJECT_SUMMARY.md` | Project overview |
 | `QUICK_START.md` | This file |
 
@@ -293,7 +292,6 @@ pytest -v
 
 - **How do I...?** → Check `README.md`
 - **Why is it structured this way?** → Check `ARCHITECTURE.md`
-- **What changed?** → Check `MIGRATION.md`
 - **What was done?** → Check `PROJECT_SUMMARY.md`
 
 ---

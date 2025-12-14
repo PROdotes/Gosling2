@@ -149,8 +149,9 @@ Gosling2/
   - Normalize metadata
 
 - **PlaybackService**:
-  - Control audio playback
-  - Manage playlist
+  - **Dual-Player Engine**: "Ping-Pong" architecture using two `QMediaPlayer` instances
+  - **Crossfade**: Volume interpolation between tracks
+  - Manage playlist and queue
   - Volume control
   - Playback state management
 :
@@ -229,6 +230,11 @@ Tables:
 - Mock external dependencies
 - Fast execution
 - High coverage of business logic
+
+### Schema Integrity Tests
+- **Prevention of Silent Data Loss**: Ensures Code and Database never drift
+- **Checks**: Table existence, Column presence, Persistence method completeness
+- **Location**: `tests/unit/test_*_schema.py`
 
 ### Integration Tests
 - Test interaction between components

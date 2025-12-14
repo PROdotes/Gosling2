@@ -4,6 +4,7 @@ A desktop music library and player application built with PyQt6 using 3-tier arc
 
 ## Features
 
+- [x] Crossfade Playback (Seamless transitions)
 - Music library management with metadata extraction
 - Audio playback with playlist support
 - Search and filter functionality
@@ -22,7 +23,7 @@ The application follows a 3-tier architecture:
 ### 2. Business Logic Layer (`src/business/`)
 - **LibraryService**: Music library management
 - **MetadataService**: Audio file metadata extraction
-- **PlaybackService**: Audio playback control
+- **PlaybackService**: Audio playback control (Dual-Player Crossfade)
 - **SettingsManager**: Application settings persistence
 
 ### 3. Presentation Layer (`src/presentation/`)
@@ -66,6 +67,7 @@ Gosling2/
 ├── app.py
 ├── requirements.txt
 ├── README.md
+├── TESTING.md
 └── DATABASE.md
 ```
 
