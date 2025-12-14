@@ -23,56 +23,76 @@ class TestFilterWidget:
         return FilterWidget(mock_library)
 
     def test_reset_filter_signal(self, widget):
-        """Test that clicking 'Artists' emits reset_filter"""
+        """Test that clicking 'Performers' emits reset_filter"""
         # Connect signal to mock
         mock_slot = MagicMock()
         widget.reset_filter.connect(mock_slot)
         
-        # Manually create the "Artists" item as it would be in the tree
-        # We need to find the index of the "Artists" item. 
-        # Since we mocked populate with empty list, row 0 is "Artists"
+        # Manually create the "Performers" item as it would be in the tree
+        # With empty mock, populate() creates 2 roots: Performers(0), Composers(1)
         root_index = widget.tree_model.index(0, 0)
         item = widget.tree_model.itemFromIndex(root_index)
-        assert item.text() == "Artists"
+        assert item.text() == "Performers"
         
         # Simulate click
         widget._on_tree_clicked(root_index)
         
         mock_slot.assert_called_once()
 
-    def test_filter_by_artist_signal(self, widget):
-        """Test that clicking an artist emits filter_by_artist"""
+    def test_filter_by_performer_signal(self, widget):
+        """Test that clicking a performer emits filter_by_performer"""
         mock_slot = MagicMock()
-        widget.filter_by_artist.connect(mock_slot)
+        widget.filter_by_performer.connect(mock_slot)
         
-        # Add a fake artist item
+        # Add a fake performer item
         from PyQt6.QtGui import QStandardItem
-        artist_item = QStandardItem("Test Artist")
-        artist_item.setData("Test Artist", Qt.ItemDataRole.UserRole)
-        widget.tree_model.appendRow(artist_item)
+        performer_item = QStandardItem("Test Performer")
+        performer_item.setData("Test Performer", Qt.ItemDataRole.UserRole)
+        performer_item.setData("Performer", Qt.ItemDataRole.UserRole + 1) # Set Role
+        widget.tree_model.appendRow(performer_item)
         
-        index = widget.tree_model.indexFromItem(artist_item)
+        index = widget.tree_model.indexFromItem(performer_item)
         
         # Simulate click
         widget._on_tree_clicked(index)
         
-        mock_slot.assert_called_with("Test Artist")
+        mock_slot.assert_called_with("Test Performer")
 
-    def test_populate_empty_artist(self, widget):
-        """Test population with empty artist name"""
+    def test_filter_by_composer_signal(self, widget):
+        """Test that clicking a composer emits filter_by_composer"""
+        mock_slot = MagicMock()
+        widget.filter_by_composer.connect(mock_slot)
+        
+        # Add a fake composer item
+        from PyQt6.QtGui import QStandardItem
+        composer_item = QStandardItem("Test Composer")
+        composer_item.setData("Test Composer", Qt.ItemDataRole.UserRole)
+        composer_item.setData("Composer", Qt.ItemDataRole.UserRole + 1) # Set Role
+        widget.tree_model.appendRow(composer_item)
+        
+        index = widget.tree_model.indexFromItem(composer_item)
+        
+        # Simulate click
+        widget._on_tree_clicked(index)
+        
+        mock_slot.assert_called_with("Test Composer")
+
+    def test_populate_empty_performer(self, widget):
+        """Test population with empty performer name"""
         # Set mock to return mix of valid and empty
-        widget.library_service.get_contributors_by_role.return_value = [
-            (1, "Valid Artist"),
-            (2, ""),
-            (3, None)
-        ]
+        def side_effect(role):
+            if role == "Performer":
+                return [(1, "Valid Performer"), (2, ""), (3, None)]
+            return []
+        
+        widget.library_service.get_contributors_by_role.side_effect = side_effect
         
         widget.populate()
         
-        # Should have 1 actual artist group + root
-        # Root is at row 0.
+        # Should have 1 actual performer group + root
+        # Root is at row 0 (Populated sequentially, Performer first)
         root = widget.tree_model.item(0)
-        assert root.text() == "Artists"
+        assert root.text() == "Performers"
         
         # Valid Artist starts with V.
         # Check that we don't have items for empty strings
@@ -88,4 +108,4 @@ class TestFilterWidget:
         v_group = root.child(0)
         assert v_group.text() == "V"
         assert v_group.rowCount() == 1
-        assert v_group.child(0).text() == "Valid Artist"
+        assert v_group.child(0).text() == "Valid Performer"

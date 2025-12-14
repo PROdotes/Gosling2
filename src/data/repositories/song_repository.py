@@ -34,7 +34,7 @@ class SongRepository(BaseRepository):
                 cursor = conn.cursor()
                 query = """
                     SELECT F.FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Artists,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
                            F.Title AS Title,
                            F.Duration AS Duration,
                            F.Path AS Path,
@@ -140,14 +140,14 @@ class SongRepository(BaseRepository):
                     VALUES (?, ?, ?)
                 """, (song.file_id, contributor_id, role_id))
 
-    def get_by_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific artist"""
+    def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific performer"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
                     SELECT F.FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Artists,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
                            F.Title AS Title,
                            F.Duration AS Duration,
                            F.Path AS Path,
@@ -161,11 +161,101 @@ class SongRepository(BaseRepository):
                     GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
                     ORDER BY F.FileID DESC
                 """
-                cursor.execute(query, (artist_name,))
+                cursor.execute(query, (performer_name,))
                 headers = [description[0] for description in cursor.description]
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by artist: {e}")
+            print(f"Error fetching songs by performer: {e}")
             return [], []
 
+    def get_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific composer"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT F.FileID,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
+                           F.Title AS Title,
+                           F.Duration AS Duration,
+                           F.Path AS Path,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
+                           F.TempoBPM AS BPM
+                    FROM Files F
+                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
+                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
+                    WHERE C.Name = ? AND R.Name = 'Composer'
+                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
+                    ORDER BY F.FileID DESC
+                """
+                cursor.execute(query, (composer_name,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            print(f"Error fetching songs by composer: {e}")
+            return [], []
+
+    def get_by_path(self, path: str) -> Optional[Song]:
+        """Get full song object by path"""
+        try:
+            # Normalize path for lookup
+            norm_path = os.path.normcase(os.path.abspath(path))
+            
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Fetch basic info
+                cursor.execute("""
+                    SELECT FileID, Title, Duration, TempoBPM
+                    FROM Files
+                    WHERE Path = ?
+                """, (norm_path,))
+                
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                
+                file_id, title, duration, bpm = row
+                
+                # Fetch contributors
+                song = Song(
+                    file_id=file_id,
+                    path=path, # Use original requested path or normalized?
+                    # Let's use the one from DB if we queried it, but we queried by path. 
+                    # Actually standardizing on the input path or normalized path is fine.
+                    # Let's stick to the normalized path stored in DB (schema says unique).
+                    # Actually, the DB stores normalized path? 
+                    # insert() does: file_path = os.path.normcase(os.path.abspath(file_path))
+                    # So we should return that.
+                    title=title,
+                    duration=duration,
+                    bpm=bpm
+                )
+                song.path = norm_path
+                
+                # Fetch roles
+                cursor.execute("""
+                    SELECT R.Name, C.Name
+                    FROM FileContributorRoles FCR
+                    JOIN Roles R ON FCR.RoleID = R.RoleID
+                    JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                    WHERE FCR.FileID = ?
+                """, (file_id,))
+                
+                for role_name, contributor_name in cursor.fetchall():
+                    if role_name == 'Performer':
+                        song.performers.append(contributor_name)
+                    elif role_name == 'Composer':
+                        song.composers.append(contributor_name)
+                    elif role_name == 'Lyricist':
+                        song.lyricists.append(contributor_name)
+                    elif role_name == 'Producer':
+                        song.producers.append(contributor_name)
+                
+                return song
+        except Exception as e:
+            print(f"Error getting song by path: {e}")
+            return None

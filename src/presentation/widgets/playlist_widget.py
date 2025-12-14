@@ -11,7 +11,7 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.artist_font = QFont("Arial", 12, QFont.Weight.Bold)
+        self.performer_font = QFont("Arial", 12, QFont.Weight.Bold)
         self.title_font = QFont("Arial", 10)
 
     ITEM_SPACING = 4 # Gap between items in pixels
@@ -49,9 +49,9 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         # Text
         display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
         if "|" in display_text:
-            artist, title = display_text.split("|", 1)
+            performer, title = display_text.split("|", 1)
         else:
-            artist, title = display_text, ""
+            performer, title = display_text, ""
 
         padding = 5
         text_rect = QRect(
@@ -61,7 +61,7 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             visual_rect.height() - 2 * padding
         )
 
-        artist_rect = QRect(
+        performer_rect = QRect(
             text_rect.left(), text_rect.top(),
             text_rect.width(), text_rect.height() // 2
         )
@@ -70,12 +70,12 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             text_rect.width(), text_rect.height() // 2
         )
 
-        painter.setFont(self.artist_font)
+        painter.setFont(self.performer_font)
         painter.setPen(QPen(option.palette.text(), 1))
         painter.drawText(
-            artist_rect,
+            performer_rect,
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-            artist.strip()
+            performer.strip()
         )
 
         painter.setFont(self.title_font)
@@ -158,7 +158,7 @@ class PlaylistWidget(QListWidget):
                 try:
                     song = MetadataService.extract_from_mp3(path)
                     if song:
-                        display_text = f"{song.get_display_artists()} | {song.get_display_title()}"
+                        display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
                 except Exception:
                     pass
 

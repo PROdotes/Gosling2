@@ -1,9 +1,12 @@
 import os
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu
+    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
+from PyQt6.QtGui import (
+    QStandardItemModel, QStandardItem, QAction, 
+    QPainter, QColor, QPixmap, QIcon, QImage
+)
 from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal
 
 from .filter_widget import FilterWidget
@@ -13,7 +16,7 @@ class LibraryWidget(QWidget):
 
     # Column indices for library table
     COL_FILE_ID = 0
-    COL_ARTIST = 1
+    COL_PERFORMER = 1
     COL_TITLE = 2
     COL_DURATION = 3
     COL_PATH = 4
@@ -21,8 +24,7 @@ class LibraryWidget(QWidget):
     COL_BPM = 6
 
     # Signals
-    play_song = pyqtSignal(str) # Path
-    add_to_playlist = pyqtSignal(list) # List of dicts {path, artist, title}
+    add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
 
     def __init__(self, library_service, metadata_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
@@ -59,7 +61,9 @@ class LibraryWidget(QWidget):
         self.library_model = QStandardItemModel()
         self.proxy_model = QSortFilterProxyModel()
         self.proxy_model.setSourceModel(self.library_model)
+        self.proxy_model.setFilterKeyColumn(-1) # Search all columns
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.proxy_model.setSortRole(Qt.ItemDataRole.UserRole) # Use UserRole for sorting
         
         self.table_view = QTableView()
         self.table_view.setModel(self.proxy_model)
@@ -97,7 +101,8 @@ class LibraryWidget(QWidget):
         self.btn_refresh.clicked.connect(self.load_library)
         self.search_box.textChanged.connect(self._on_search)
         
-        self.filter_widget.filter_by_artist.connect(self._filter_by_artist)
+        self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
+        self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
         self.filter_widget.reset_filter.connect(self.load_library)
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
@@ -117,12 +122,47 @@ class LibraryWidget(QWidget):
         self.library_model.clear()
         if headers:
             self.library_model.setHorizontalHeaderLabels(headers)
+        
         for row_data in data:
-            items = [QStandardItem(str(cell) if cell else "") for cell in row_data]
+            items = []
+            for col_idx, cell in enumerate(row_data):
+                display_text = str(cell) if cell is not None else ""
+                sort_value = cell
+                
+                # Special handling for specific columns
+                if col_idx == self.COL_DURATION and isinstance(cell, (int, float)):
+                    display_text = self._format_duration(cell)
+                    sort_value = float(cell)
+                elif col_idx in (self.COL_BPM, self.COL_FILE_ID) and isinstance(cell, (int, float)):
+                    # Display as string, sort as number
+                    sort_value = float(cell)
+                else:
+                    # For non-numeric columns, sort value is same as display text
+                    # We ensure sort_value is set to something non-None for stable sorting
+                    sort_value = display_text
+                
+                item = QStandardItem(display_text)
+                item.setData(sort_value, Qt.ItemDataRole.UserRole)
+                item.setEditable(False) # Ensure items are not editable by default
+                items.append(item)
+            
             self.library_model.appendRow(items)
+            
+    def _format_duration(self, seconds: float) -> str:
+        """Format seconds into mm:ss"""
+        try:
+            m = int(seconds // 60)
+            s = int(seconds % 60)
+            return f"{m:02d}:{s:02d}"
+        except Exception:
+            return "00:00"
 
-    def _filter_by_artist(self, artist_name) -> None:
-        headers, data = self.library_service.get_songs_by_artist(artist_name)
+    def _filter_by_performer(self, performer_name) -> None:
+        headers, data = self.library_service.get_songs_by_performer(performer_name)
+        self._populate_table(headers, data)
+
+    def _filter_by_composer(self, composer_name) -> None:
+        headers, data = self.library_service.get_songs_by_composer(composer_name)
         self._populate_table(headers, data)
 
     def _import_file(self, file_path: str) -> bool:
@@ -137,6 +177,13 @@ class LibraryWidget(QWidget):
             print(f"Error importing {file_path}: {e}")
         return False
 
+    def import_files_list(self, files: list) -> int:
+        """Import a list of files and return the count of successfully imported ones."""
+        imported_count = sum(1 for file_path in files if self._import_file(file_path))
+        if imported_count > 0:
+            self.load_library()
+        return imported_count
+
     def _import_files(self) -> None:
         # Get last used directory or default to empty string
         last_dir = self.settings_manager.get_last_import_directory() or ""
@@ -150,11 +197,27 @@ class LibraryWidget(QWidget):
         # Save the directory for next time
         self.settings_manager.set_last_import_directory(os.path.dirname(files[0]))
             
-        imported_count = sum(1 for file_path in files if self._import_file(file_path))
+        imported_count = self.import_files_list(files)
                 
+        QMessageBox.information(
+            self, 
+            "Import Result", 
+            f"Imported {imported_count} file(s)"
+        )
+
+    def scan_directory(self, folder: str) -> int:
+        """Scan a directory recursively and import audio files."""
+        imported_count = 0
+        for root, dirs, files in os.walk(folder):
+            for file in files:
+                if file.lower().endswith(('.mp3', '.flac', '.wav', '.m4a')):
+                    file_path = os.path.join(root, file)
+                    if self._import_file(file_path):
+                        imported_count += 1
+        
         if imported_count > 0:
-            QMessageBox.information(self, "Import Complete", f"Imported {imported_count} file(s)")
             self.load_library()
+        return imported_count
 
     def _scan_folder(self) -> None:
         # Get last used directory or default to empty string
@@ -167,30 +230,68 @@ class LibraryWidget(QWidget):
         # Save the directory for next time
         self.settings_manager.set_last_import_directory(folder)
             
-        imported_count = 0
-        for root, dirs, files in os.walk(folder):
-            for file in files:
-                if file.lower().endswith(('.mp3', '.flac', '.wav', '.m4a')):
-                    file_path = os.path.join(root, file)
-                    if self._import_file(file_path):
-                        imported_count += 1
+        imported_count = self.scan_directory(folder)
                         
-        if imported_count > 0:
-            QMessageBox.information(self, "Scan Complete", f"Imported {imported_count} file(s)")
-            self.load_library()
+        QMessageBox.information(
+            self, 
+            "Scan Result", 
+            f"Imported {imported_count} file(s)"
+        )
 
     def _on_search(self, text) -> None:
-        self.proxy_model.setFilterWildcard(f"*{text}*")
+        self.proxy_model.setFilterRegularExpression(text)
+
+    def _get_colored_icon(self, standard_pixmap) -> QIcon:
+        """Helper to invert icon colors for visibility on dark backgrounds"""
+        icon = self.style().standardIcon(standard_pixmap)
+        pixmap = icon.pixmap(16, 16)
+        
+        if pixmap.isNull():
+            return icon
+
+        img = pixmap.toImage()
+        img = img.convertToFormat(QImage.Format.Format_ARGB32)
+        
+        for x in range(img.width()):
+            for y in range(img.height()):
+                color = img.pixelColor(x, y)
+                # Only invert sufficiently opaque pixels
+                if color.alpha() > 0:
+                    # Invert RGB channels
+                    new_color = QColor(
+                        255 - color.red(),
+                        255 - color.green(),
+                        255 - color.blue(),
+                        color.alpha()
+                    )
+                    img.setPixelColor(x, y, new_color)
+        
+        return QIcon(QPixmap.fromImage(img))
 
     def _show_table_context_menu(self, position) -> None:
         menu = QMenu()
-        delete_action = QAction("Delete", self)
-        delete_action.triggered.connect(self._delete_selected)
-        menu.addAction(delete_action)
         
+        # 1. Playback / Primary Actions
         add_to_playlist_action = QAction("Add to Playlist", self)
+        add_to_playlist_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay))
         add_to_playlist_action.triggered.connect(self._emit_add_to_playlist)
         menu.addAction(add_to_playlist_action)
+        
+        menu.addSeparator()
+
+        # 2. Information / Tools
+        show_id3_action = QAction("Show ID3 Data", self)
+        show_id3_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        show_id3_action.triggered.connect(self._show_id3_tags)
+        menu.addAction(show_id3_action)
+        
+        menu.addSeparator()
+        
+        # 3. Destructive Actions
+        delete_action = QAction("Delete from Library", self)
+        delete_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_TrashIcon))
+        delete_action.triggered.connect(self._delete_selected)
+        menu.addAction(delete_action)
         
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 
@@ -257,15 +358,50 @@ class LibraryWidget(QWidget):
         for index in indexes:
             source_index = self.proxy_model.mapToSource(index)
             path_item = self.library_model.item(source_index.row(), self.COL_PATH)
-            artist_item = self.library_model.item(source_index.row(), self.COL_ARTIST)
+            performer_item = self.library_model.item(source_index.row(), self.COL_PERFORMER)
             title_item = self.library_model.item(source_index.row(), self.COL_TITLE)
             
             if path_item:
                 items.append({
                     "path": path_item.text(),
-                    "artist": artist_item.text() if artist_item else "Unknown",
+                    "performer": performer_item.text() if performer_item else "Unknown",
                     "title": title_item.text() if title_item else "Unknown"
                 })
         
         if items:
             self.add_to_playlist.emit(items)
+
+    def _show_id3_tags(self) -> None:
+        """Shows the ID3 tags comparison dialog."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        # Use the first selected row (simpler for dialog)
+        index = indexes[0]
+        source_index = self.proxy_model.mapToSource(index)
+        path_item = self.library_model.item(source_index.row(), self.COL_PATH)
+        
+        if not path_item or not path_item.text():
+            return
+            
+        file_path = path_item.text()
+        file_name = os.path.basename(file_path)
+        
+        try:
+            # 1. Fetch File Metadata (Fresh)
+            file_song = self.metadata_service.extract_from_mp3(file_path)
+            raw_tags = self.metadata_service.get_raw_tags(file_path)
+            
+            # 2. Fetch DB Metadata (Stored)
+            db_song = self.library_service.get_song_by_path(file_path)
+            
+            # 3. Show Dialog
+            from .metadata_viewer_dialog import MetadataViewerDialog
+            dialog = MetadataViewerDialog(file_song, db_song, raw_tags, self)
+            dialog.exec()
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(self, "Metadata Error", f"Could not read metadata for {file_name}:\n{e}")

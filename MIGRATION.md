@@ -80,7 +80,7 @@ Settings are stored in the same location using QSettings:
 - Organization: "Prodo"
 - Application: "Gosling2"
 
-Your window geometry and other settings will be preserved.
+**Note:** The new `SettingsManager` uses namespaced keys (e.g., `window/geometry` instead of `geometry`). Consequently, previous window positions and volume settings will **reset to defaults** upon the first run of the new application.
 
 ## Code Mapping
 

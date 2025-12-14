@@ -72,7 +72,7 @@ class TestPlaylistWidget:
         
         # Mock MetadataService
         mock_song = MagicMock()
-        mock_song.get_display_artists.return_value = "Artist"
+        mock_song.get_display_performers.return_value = "Performer"
         mock_song.get_display_title.return_value = "Title"
         mock_metadata.extract_from_mp3.return_value = mock_song
         
@@ -81,7 +81,7 @@ class TestPlaylistWidget:
             
         assert widget.count() == 1
         item = widget.item(0)
-        assert item.text() == "Artist | Title"
+        assert item.text() == "Performer | Title"
         event.acceptProposedAction.assert_called()
 
     def test_drop_event_invalid_file(self, widget):

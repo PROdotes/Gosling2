@@ -301,7 +301,7 @@ pytest -v
 ## 🎉 You're All Set!
 
 The application is ready to use with:
-- ✅ All features working
+- ✅ Core features working (see `MIGRATION_GAPS.md`)
 - ✅ 35 tests passing
 - ✅ Clean architecture
 - ✅ Full documentation

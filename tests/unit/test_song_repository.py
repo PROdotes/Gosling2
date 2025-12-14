@@ -85,7 +85,7 @@ class TestSongRepository:
             title="Test Song",
             duration=180.0,
             bpm=120,
-            performers=["Artist 1"],
+            performers=["performer 1"],
             composers=["Composer 1"]
         )
 
@@ -100,26 +100,26 @@ class TestSongRepository:
         # Check title (index 2)
         assert row[2] == "Test Song"
 
-    def test_get_by_artist(self, repository):
-        """Test getting songs by artist"""
+    def test_get_by_performer(self, repository):
+        """Test getting songs by performer"""
         # Insert a file first
         file_id = repository.insert("/path/to/test.mp3")
 
-        # Update with artist info
+        # Update with performer info
         song = Song(
             file_id=file_id,
             title="Test Song",
-            performers=["Target Artist"]
+            performers=["Target performer"]
         )
         repository.update(song)
 
-        # Get by artist
-        headers, data = repository.get_by_artist("Target Artist")
+        # Get by performer
+        headers, data = repository.get_by_performer("Target performer")
         assert len(data) == 1
         assert data[0][2] == "Test Song"
 
-        # Get by non-existent artist
-        headers, data = repository.get_by_artist("Non-existent")
+        # Get by non-existent performer
+        headers, data = repository.get_by_performer("Non-existent")
         assert len(data) == 0
 
     def test_insert_error(self, repository):
@@ -152,11 +152,11 @@ class TestSongRepository:
             result = repository.update(song)
             assert result is False
 
-    def test_get_by_artist_error(self, repository):
-        """Test error handling during get_by_artist"""
+    def test_get_by_performer_error(self, repository):
+        """Test error handling during get_by_performer"""
         with patch.object(repository, 'get_connection') as mock_conn:
             mock_conn.side_effect = Exception("DB Error")
-            headers, data = repository.get_by_artist("Artist")
+            headers, data = repository.get_by_performer("performer")
             assert headers == []
             assert data == []
 
@@ -192,7 +192,7 @@ class TestSongRepository:
         with repository.get_connection() as conn:
             conn.execute("DELETE FROM Roles WHERE Name='Performer'")
             
-        song_missing_role = Song(file_id=file_id, title="Missing Role", performers=["Artist"])
+        song_missing_role = Song(file_id=file_id, title="Missing Role", performers=["performer"])
         repository.update(song_missing_role)
         # Should not crash, just not add anything
 

@@ -31,8 +31,16 @@ class LibraryService:
         """Get all contributors for a specific role"""
         return self.contributor_repository.get_by_role(role_name)
 
-    def get_songs_by_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific artist"""
-        return self.song_repository.get_by_artist(artist_name)
+    def get_songs_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific performer"""
+        return self.song_repository.get_by_performer(performer_name)
+
+    def get_songs_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific composer"""
+        return self.song_repository.get_by_composer(composer_name)
+
+    def get_song_by_path(self, path: str) -> Optional[Song]:
+        """Get full song object by path"""
+        return self.song_repository.get_by_path(path)
 
 

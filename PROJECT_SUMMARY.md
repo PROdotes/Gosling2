@@ -2,7 +2,7 @@
 
 ## ✅ Project Status: COMPLETE
 
-The Gosling2 music library and player application has been successfully refactored using best practices with a 3-tier architecture.
+The Gosling2 music library and player application has been successfully refactored using best practices with a 3-tier architecture. While the core refactor is complete, some legacy features are still being ported (see `MIGRATION_GAPS.md`).
 
 ---
 

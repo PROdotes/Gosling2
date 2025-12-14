@@ -31,15 +31,20 @@ class Song:
         if self.groups is None:
             self.groups = []
 
-    def get_display_artists(self) -> str:
-        """Get formatted artists for display"""
+    def get_display_performers(self) -> str:
+        """Get formatted performers for display"""
         if self.performers:
             return ', '.join(self.performers)
-        return 'Unknown Artist'
+        return 'Unknown Performer'
 
     def get_display_title(self) -> str:
         """Get formatted title for display"""
         return self.title or 'Unknown Title'
+
+    @property
+    def formatted_duration(self) -> str:
+        """Get duration formatted as mm:ss"""
+        return self.get_formatted_duration()
 
     def get_formatted_duration(self) -> str:
         """Get duration formatted as mm:ss"""

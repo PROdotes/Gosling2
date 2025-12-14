@@ -130,19 +130,20 @@ class TestMainWindowEdgeCases:
 
     def test_on_search(self, window):
         """Test search filter update"""
-        with patch.object(window.library_widget.proxy_model, 'setFilterWildcard') as mock_filter:
+        with patch.object(window.library_widget.proxy_model, 'setFilterRegularExpression') as mock_filter:
             window.library_widget._on_search("test")
-            mock_filter.assert_called_with("*test*")
+            mock_filter.assert_called_with("test")
 
     def test_import_files_exception(self, window):
         """Test exception handling during file import"""
         with patch('src.presentation.widgets.library_widget.QFileDialog.getOpenFileNames', return_value=(["bad.mp3"], "")):
-            # Raise exception when adding file
-            window.library_service.add_file.side_effect = Exception("DB Error")
-            # Should catch and print, not crash
-            window.library_widget._import_files()
-            # Verify it tried
-            window.library_service.add_file.assert_called()
+            with patch('src.presentation.widgets.library_widget.QMessageBox') as mock_msg:
+                # Raise exception when adding file
+                window.library_service.add_file.side_effect = Exception("DB Error")
+                # Should catch and print, not crash
+                window.library_widget._import_files()
+                # Verify it tried
+                window.library_service.add_file.assert_called()
 
     def test_toggle_play_pause_paused(self, window):
         """Test toggle when paused -> play"""

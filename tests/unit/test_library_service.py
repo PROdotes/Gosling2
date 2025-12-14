@@ -77,7 +77,7 @@ class TestLibraryService:
         song = Song(
             file_id=file_id,
             title="Test Song",
-            performers=["Artist 1", "Artist 2"]
+            performers=["performer 1", "performer 2"]
         )
         service.update_song(song)
 
@@ -86,24 +86,24 @@ class TestLibraryService:
         assert len(contributors) == 2
 
 
-    def test_get_songs_by_artist(self, service):
-        """Test getting songs by artist"""
-        # Add a song with artist
+    def test_get_songs_by_performer(self, service):
+        """Test getting songs by performer"""
+        # Add a song with performer
         file_id = service.add_file("/path/to/test.mp3")
         song = Song(
             file_id=file_id,
             title="Test Song",
-            performers=["Target Artist"]
+            performers=["Target performer"]
         )
         service.update_song(song)
         
-        # Query by artist
-        headers, data = service.get_songs_by_artist("Target Artist")
+        # Query by performer
+        headers, data = service.get_songs_by_performer("Target performer")
         
         # Verify results
         assert headers is not None
         assert len(data) == 1
-        # Data format is row values, verify one of them is the artist
-        # The exact implementation of get_by_artist isn't shown, but we know it returns a list of lists/tuples
-        # One of the fields should be "Target Artist" or the song title
+        # Data format is row values, verify one of them is the performer
+        # The exact implementation of get_by_performer isn't shown, but we know it returns a list of lists/tuples
+        # One of the fields should be "Target performer" or the song title
         assert "Test Song" in [str(x) for x in data[0]]

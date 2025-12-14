@@ -92,3 +92,28 @@ class MetadataService:
             groups=deduplicate(groups),
         )
 
+    @staticmethod
+    def get_raw_tags(path: str) -> dict:
+        """
+        Extract all raw ID3 tags from the file.
+        Returns a dictionary of {Key: Value}.
+        """
+        try:
+            tags = ID3(path)
+            raw_data = {}
+            for frame_key in tags.keys():
+                frame = tags[frame_key]
+                # Try to get a human readable description or key
+                key = frame_key
+                val = str(frame)
+                
+                # Unwrap text frames if possible to look nicer
+                if hasattr(frame, 'text'):
+                     val = ", ".join([str(t) for t in frame.text])
+                
+                raw_data[key] = val
+            return raw_data
+        except Exception as e:
+            print(f"Error reading raw tags: {e}")
+            return {}
+

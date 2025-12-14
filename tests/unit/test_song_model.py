@@ -29,7 +29,7 @@ class TestSongModel:
             title="Test Song",
             duration=180.5,
             bpm=120,
-            performers=["Artist 1", "Artist 2"],
+            performers=["performer 1", "performer 2"],
             composers=["Composer 1"]
         )
 
@@ -38,18 +38,18 @@ class TestSongModel:
         assert song.title == "Test Song"
         assert song.duration == 180.5
         assert song.bpm == 120
-        assert song.performers == ["Artist 1", "Artist 2"]
+        assert song.performers == ["performer 1", "performer 2"]
         assert song.composers == ["Composer 1"]
 
-    def test_get_display_artists_with_performers(self):
-        """Test getting display artists when performers exist"""
-        song = Song(performers=["Artist 1", "Artist 2"])
-        assert song.get_display_artists() == "Artist 1, Artist 2"
+    def test_get_display_performers_with_performers(self):
+        """Test getting display performers when performers exist"""
+        song = Song(performers=["performer 1", "performer 2"])
+        assert song.get_display_performers() == "performer 1, performer 2"
 
-    def test_get_display_artists_without_performers(self):
-        """Test getting display artists when no performers"""
+    def test_get_display_performers_without_performers(self):
+        """Test getting display performers when no performers"""
         song = Song()
-        assert song.get_display_artists() == "Unknown Artist"
+        assert song.get_display_performers() == "Unknown Performer"
 
     def test_get_display_title_with_title(self):
         """Test getting display title when title exists"""

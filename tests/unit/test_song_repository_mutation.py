@@ -30,21 +30,21 @@ class TestSongRepositoryMutation:
             # If mutated to index 1, headers would be ["STRING", "STRING"]
             assert headers == ["FileID", "Title"]
 
-    def test_get_by_artist_headers_integrity(self, repository):
-        """Kill Mutant: Verify get_by_artist returns correct headers"""
+    def test_get_by_performer_headers_integrity(self, repository):
+        """Kill Mutant: Verify get_by_performer returns correct headers"""
         mock_cursor = MagicMock()
         mock_connection = MagicMock()
         mock_connection.cursor.return_value = mock_cursor
         
         mock_cursor.description = [
             ("FileID", "INTEGER"), 
-            ("Artists", "STRING")
+            ("performers", "STRING")
         ]
         mock_cursor.fetchall.return_value = []
         
         with patch.object(repository, 'get_connection') as mock_get_conn:
             mock_get_conn.return_value.__enter__.return_value = mock_connection
             
-            headers, _ = repository.get_by_artist("Any")
+            headers, _ = repository.get_by_performer("Any")
             
-            assert headers == ["FileID", "Artists"]
+            assert headers == ["FileID", "performers"]

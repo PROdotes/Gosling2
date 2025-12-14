@@ -25,7 +25,7 @@ class TestMainWindow:
 
             mock_library = MagicMock()
             mock_library_cls.return_value = mock_library
-            mock_library.get_all_songs.return_value = (["ID", "Artist", "Title", "Dur", "Path"], [])
+            mock_library.get_all_songs.return_value = (["ID", "performer", "Title", "Dur", "Path"], [])
 
             mock_metadata = MagicMock()
             mock_metadata_cls.return_value = mock_metadata
@@ -88,14 +88,14 @@ class TestMainWindow:
     def test_load_library_populates_model(self, main_window, mock_services):
         # Setup mock data
         mock_services['library'].get_all_songs.return_value = (
-            ["ID", "Artist", "Title"],
-            [[1, "Artist 1", "Song 1"], [2, "Artist 2", "Song 2"]]
+            ["ID", "performer", "Title"],
+            [[1, "performer 1", "Song 1"], [2, "performer 2", "Song 2"]]
         )
         
         main_window.library_widget.load_library()
         
         assert main_window.library_widget.library_model.rowCount() == 2
-        assert main_window.library_widget.library_model.item(0, 1).text() == "Artist 1"
+        assert main_window.library_widget.library_model.item(0, 1).text() == "performer 1"
         assert main_window.library_widget.library_model.item(1, 2).text() == "Song 2"
 
     @patch('src.presentation.widgets.library_widget.QFileDialog')
@@ -215,14 +215,14 @@ class TestMainWindow:
         # Setup Library Item Data
         mock_path_item = MagicMock()
         mock_path_item.text.return_value = "/path/to/song.mp3"
-        mock_artist = MagicMock()
-        mock_artist.text.return_value = "Artist"
+        mock_performer = MagicMock()
+        mock_performer.text.return_value = "performer"
         mock_title = MagicMock()
         mock_title.text.return_value = "Title"
         
         def item_side_effect(row, col):
             if col == 4: return mock_path_item
-            if col == 1: return mock_artist
+            if col == 1: return mock_performer
             if col == 2: return mock_title
             return None
             
@@ -238,7 +238,7 @@ class TestMainWindow:
         main_window.playlist_widget.addItem.assert_called()
         args = main_window.playlist_widget.addItem.call_args[0][0]
         # Check text format
-        assert args.text() == "Artist | Title"
+        assert args.text() == "performer | Title"
 
     def test_on_playlist_double_click(self, main_window, mock_services):
         mock_item = MagicMock()
@@ -277,7 +277,7 @@ class TestMainWindow:
         # Verify root item via widget model
         model = main_window.library_widget.filter_widget.tree_model
         root = model.item(0)
-        assert root.text() == "Artists"
+        assert root.text() == "Performers"
         assert root.hasChildren()
         
         # Check A group
@@ -288,12 +288,12 @@ class TestMainWindow:
     def test_filter_tree_clicked(self, main_window, mock_services):
         # Verify it calls service to filter (Logic in MainWindow)
         # MUST setup mock return value BEFORE emit because signal is synchronous
-        mock_services['library'].get_songs_by_artist.return_value = (["Cols"], [[1, "Abba", "Song"]])
+        mock_services['library'].get_songs_by_performer.return_value = (["Cols"], [[1, "Abba", "Song"]])
 
         # Trigger signal manually to simulate click
-        main_window.library_widget.filter_widget.filter_by_artist.emit("Abba")
+        main_window.library_widget.filter_widget.filter_by_performer.emit("Abba")
         
-        mock_services['library'].get_songs_by_artist.assert_called_with("Abba")
+        mock_services['library'].get_songs_by_performer.assert_called_with("Abba")
         assert main_window.library_widget.library_model.rowCount() == 1
 
     def test_play_next(self, main_window, mock_services):

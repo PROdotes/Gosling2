@@ -99,10 +99,10 @@ class MainWindow(QMainWindow):
         from PyQt6.QtWidgets import QListWidgetItem
         for item_data in items:
             path = item_data["path"]
-            artist = item_data["artist"]
+            performer = item_data["performer"]
             title = item_data["title"]
             
-            list_item = QListWidgetItem(f"{artist} | {title}")
+            list_item = QListWidgetItem(f"{performer} | {title}")
             list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
             self.playlist_widget.addItem(list_item)
 
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
     def _update_song_label(self, path: str) -> None:
         try:
             song = self.metadata_service.extract_from_mp3(path)
-            text = f"{song.get_display_artists()} - {song.get_display_title()} ({song.get_formatted_duration()})"
+            text = f"{song.get_display_performers()} - {song.get_display_title()} ({song.get_formatted_duration()})"
             self.playback_widget.update_song_label(text)
         except Exception:
             self.playback_widget.update_song_label(os.path.basename(path))
@@ -205,7 +205,7 @@ class MainWindow(QMainWindow):
                 # Try to extract metadata for display
                 try:
                     song = self.metadata_service.extract_from_mp3(path)
-                    display_text = f"{song.get_display_artists()} | {song.get_display_title()}"
+                    display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
                 except Exception:
                     display_text = os.path.basename(path)
                 
