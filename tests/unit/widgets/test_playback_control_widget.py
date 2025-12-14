@@ -36,3 +36,22 @@ class TestPlaybackControlWidget:
         # Test Paused State
         widget.update_play_button_state(QMediaPlayer.PlaybackState.PausedState)
         assert widget.btn_play_pause.text() == "▶ Play"
+
+    def test_crossfade_label_updates(self, widget):
+        """Test checkbox label updates with duration"""
+        # Initial state (from default mock 0? or we set it?)
+        # Let's override the mock for this test or call update directly
+        
+        widget.playback_service.crossfade_duration = 5000
+        widget._update_crossfade_text()
+        assert widget.chk_crossfade.text() == "Crossfade (5s)"
+        
+        widget.playback_service.crossfade_duration = 3000
+        widget._update_crossfade_text()
+        assert widget.chk_crossfade.text() == "Crossfade (3s)"
+
+    def test_crossfade_duration_context_menu_action(self, widget):
+        """Test setting duration via helper updates label"""
+        widget._set_crossfade_duration(10000)
+        assert widget.playback_service.crossfade_duration == 10000
+        assert widget.chk_crossfade.text() == "Crossfade (10s)"
