@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QCheckBox, QMenu
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QComboBox
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
@@ -100,16 +100,22 @@ class PlaybackControlWidget(QWidget):
         controls_layout.addWidget(self.volume_slider)
         
         # Crossfade Controls
-        self.chk_crossfade = QCheckBox("Crossfade")
-        self.chk_crossfade.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.chk_crossfade.customContextMenuRequested.connect(self._show_crossfade_context_menu)
-        self.chk_crossfade.setToolTip("Right-click to set duration")
+        controls_layout.addWidget(QLabel("Crossfade:"))
+        self.combo_crossfade = QComboBox()
+        # Options: Text, UserData (Duration in ms)
+        self.combo_crossfade.addItem("0s (Off)", 0)
+        self.combo_crossfade.addItem("1s", 1000)
+        self.combo_crossfade.addItem("2s", 2000)
+        self.combo_crossfade.addItem("3s", 3000)
+        self.combo_crossfade.addItem("4s", 4000)
+        self.combo_crossfade.addItem("5s", 5000)
+        self.combo_crossfade.addItem("10s", 10000)
         
         # Initialize state from service
-        self.chk_crossfade.setChecked(self.playback_service.crossfade_enabled)
-        self._update_crossfade_text()
+        self._sync_crossfade_combo()
         
-        controls_layout.addWidget(self.chk_crossfade)
+        self.combo_crossfade.setFixedWidth(80) # Fixed width for neatness
+        controls_layout.addWidget(self.combo_crossfade)
         
         controls_layout.addWidget(self.btn_play_pause)
         controls_layout.addWidget(self.btn_next)
@@ -119,38 +125,38 @@ class PlaybackControlWidget(QWidget):
         layout.addLayout(slider_layout)
         layout.addLayout(controls_layout)
 
-    def _update_crossfade_text(self):
-        """Update checkbox text to show current duration"""
+    def _sync_crossfade_combo(self):
+        """Sync combo box state with service settings"""
+        enabled = self.playback_service.crossfade_enabled
         duration = self.playback_service.crossfade_duration
-        seconds = duration // 1000
-        self.chk_crossfade.setText(f"Crossfade ({seconds}s)")
+        
+        if not enabled:
+            # Select 0s (Off)
+            index = self.combo_crossfade.findData(0)
+            if index >= 0:
+                self.combo_crossfade.setCurrentIndex(index)
+        else:
+            # Select matching duration
+            index = self.combo_crossfade.findData(duration)
+            if index >= 0:
+                self.combo_crossfade.setCurrentIndex(index)
+            else:
+                # If custom duration not in list, maybe add it or default to something?
+                # For now, default to Off if unknown to prevent confusion
+                self.combo_crossfade.setCurrentIndex(0)
 
-    def _show_crossfade_context_menu(self, position):
-        """Show context menu for crossfade duration"""
-        menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background-color: #2b2b2b; color: #e0e0e0; border: 1px solid #3d3d3d; } QMenu::item:selected { background-color: #3d3d3d; }")
+    def _on_crossfade_combo_changed(self, index):
+        """Handle crossfade selection change"""
+        duration_ms = self.combo_crossfade.currentData()
         
-        durations = [
-            ("1 Second", 1000),
-            ("3 Seconds", 3000),
-            ("5 Seconds", 5000),
-            ("10 Seconds", 10000)
-        ]
-        
-        current_duration = self.playback_service.crossfade_duration
-        
-        for label, ms in durations:
-            action = QAction(label, self)
-            action.setCheckable(True)
-            action.setChecked(ms == current_duration)
-            action.triggered.connect(lambda checked, d=ms: self._set_crossfade_duration(d))
-            menu.addAction(action)
+        if duration_ms == 0:
+            self.playback_service.crossfade_enabled = False
+        else:
+            self.playback_service.crossfade_enabled = True
+            self.playback_service.crossfade_duration = duration_ms
             
-        menu.exec(self.chk_crossfade.mapToGlobal(position))
-
-    def _set_crossfade_duration(self, duration_ms: int):
-        self.playback_service.crossfade_duration = duration_ms
-        self._update_crossfade_text()
+        # Ensure button state remains consistent
+        self._update_skip_button_state()
 
     def _setup_connections(self) -> None:
         # UI -> Signals
@@ -160,7 +166,7 @@ class PlaybackControlWidget(QWidget):
         self.playback_slider.seekRequested.connect(self.playback_service.seek)
         
         # Crossfade Toggle
-        self.chk_crossfade.toggled.connect(lambda checked: setattr(self.playback_service, 'crossfade_enabled', checked))
+        self.combo_crossfade.currentIndexChanged.connect(self._on_crossfade_combo_changed)
         
         # Service -> UI updates
         # We can connect service signals directly to our update methods here

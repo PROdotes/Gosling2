@@ -1,46 +1,72 @@
-# Implementation Plan - ZIP File Import
+# Incomplete Song Filter Implementation Plan
 
-## Goal
-Allow users to drop `.zip` files into the library. The app should automatically extract any `.mp3` files found inside the zip into the **same directory as the zip file**, then import them into the library.
+## Goal Description
+Implement a feature to filter and manifest "incomplete" songs in the library view. A "complete" song is defined by a set of criteria specified in a JSON file (e.g., must have a title, at least one performer, minimum duration). The user can toggle a "Show Incomplete Only" mode to identify songs that need metadata attention.
 
 ## User Review Required
-> [!IMPORTANT]
-> **Duplicate Handling Strategy**:
-> 1. **File System**: If `song.mp3` already exists in the destination folder, we **SKIP** extraction for that file (to preserve existing files).
-> 2. **Database**: We use the existing `library_service.add_file` which already handles DB duplicates (likely by path or hash).
+> [!NOTE]
+> The criteria for "completeness" are defined in `src/completeness_criteria.json`. Currently, this supports checking fields present in the main library view (Title, Performer, Duration, BPM, Composer) and basic logic (presence, minimum numerical value).
 
 ## Proposed Changes
 
-### `src/presentation/widgets/library_widget.py`
+### Configuration
+#### [NEW] [completeness_criteria.json](file:///c:/Users/prodo/Antigrav projects/Gosling2/Gosling2/src/completeness_criteria.json)
+- JSON file defining the validation rules for ALL tracked fields.
+- Structure maps field names to their validation rules (required/optional, constraints).
+- Example structure:
+    ```json
+    {
+        "fields": {
+            "title": { "required": true, "type": "string" },
+            "performers": { "required": true, "type": "list", "min_length": 1 },
+            "duration": { "required": true, "type": "number", "min_value": 30 },
+            "bpm": { "required": false, "type": "number" },
+            "composers": { "required": false, "type": "list" },
+            "lyricists": { "required": false, "type": "list" },
+            "producers": { "required": false, "type": "list" },
+            "groups": { "required": false, "type": "list" },
+            "path": { "required": true, "type": "string" },
+            "file_id": { "required": true, "type": "number" }
+        }
+    }
+    ```
 
-#### [MODIFY] `dragEnterEvent`
-- Allow `.zip` extension in addition to `.mp3`.
+### Presentation Layer
+#### [MODIFY] [library_widget.py](file:///c:/Users/prodo/Antigrav projects/Gosling2/Gosling2/src/presentation/widgets/library_widget.py)
+- **UI**: Add `QCheckBox` "Show Incomplete" to the top controls area.
+- **Logic**:
+    - Load `completeness_criteria.json` on init.
+    - Implement `_is_incomplete(row_data, song_object)` method.
+        - *Note*: Row data might not have all fields (like lyricists), so we might need to rely on the `LibraryService` to fetch the full song object or check what's available in the model.
+        - For efficient filtering in the view without fetching every full song, we might initially filter on what's in the columns (Title, Performer, Duration). If deeper checking is required, we might need a more complex approach or just stick to column data for the live filter.
+        - **Decision**: The filter will primarily validate against the `Song` model fields. If the table view only has partial data, we will map the table columns to the JSON keys where possible.
 
-#### [MODIFY] `_process_zip_file(zip_path) -> list[str]`
-**New Logic:**
-1.  **Pre-check**: Open Zip, iterate all `.mp3` members.
-2.  **Collision Detection**: Check if `os.path.join(base_dir, member)` exists for *any* file.
-    -   If **Any Exists**:
-        -   Show `QMessageBox.warning("File(s) already exist. Aborting.")`
-        -   Return empty list (Do nothing).
-3.  **Extraction**:
-    -   If **None Exist**:
-        -   Extract all MP3s.
-        -   **Delete** the original `.zip` file (`os.remove(zip_path)`).
-        -   Return list of extracted paths for import.
+### Tests
+#### [NEW] [tests/unit/test_criteria_sync.py](file:///c:/Users/prodo/Antigrav projects/Gosling2/Gosling2/tests/unit/test_criteria_sync.py)
+- **Goal**: Ensure `completeness_criteria.json` covers all database fields and roles.
+- **Test Strategy**:
+    - Initialize a temporary in-memory database using `BaseRepository`.
+    - **Introspect Files Table**: 
+        - Query `PRAGMA table_info(Files)` to get all column names.
+        - Map valid business columns (e.g., `Title`, `Duration`, `TempoBPM`) to expected JSON keys (`title`, `duration`, `bpm`).
+    - **Introspect Roles**:
+        - Query `SELECT Name FROM Roles` to get all dynamic roles.
+        - Map roles to pluralized keys (e.g., `Performer` -> `performers`).
+    - **Validation**:
+        - Load `src/completeness_criteria.json`.
+        - Assert that the JSON config contains entries for ALL discovered columns and roles.
+        - Fail if the database has a column/role that isn't defined in the validation rules.
+- This ensures that if a new column is added to `Files` or a new Role is inserted, the test forces an update to the criteria.
 
 ## Verification Plan
 
-### Automated Tests
-**File**: `tests/unit/presentation/widgets/test_library_widget_drag_drop.py`
-**Global Mock**: Patch `QMessageBox` in the `widget` fixture to ensure no windows open during testing.
-
-- **`test_drop_zip_extracts_and_deletes`**:
-    -   Mock `os.path.exists` (False).
-    -   Verify `extract` called.
-    -   Verify `os.remove` called.
--   **`test_drop_zip_aborts_on_collision`**:
-    -   Mock `os.path.exists` (True).
-    -   Verify `extract` NOT called.
-    -   Verify `os.remove` NOT called.
-    -   Verify `QMessageBox.warning` called.
+### Manual Verification
+1.  **Setup**: Ensure `completeness_criteria.json` exists with strict rules (e.g., min duration 30s).
+2.  **Launch App**: Run `python app.py`.
+3.  **Import**: Import a mix of complete songs and short/empty-metadata clips.
+4.  **Test Toggle**:
+    - Click "Show Incomplete".
+    - Verify only songs missing metadata or too short are shown.
+    - Uncheck "Show Incomplete".
+    - Verify all songs are shown.
+5.  **Modify Criteria**: Edit the JSON (e.g., remove "performer" requirement) and restart/refresh to verify the filter updates.

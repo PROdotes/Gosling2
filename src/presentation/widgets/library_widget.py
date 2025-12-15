@@ -2,8 +2,10 @@ import os
 import zipfile
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel
+    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
+    QCheckBox
 )
+import json
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QDragEnterEvent, QDropEvent
@@ -24,6 +26,17 @@ class LibraryWidget(QWidget):
     COL_COMPOSER = 5
     COL_BPM = 6
 
+    # Map Column Index -> Field Name for criteria checking
+    COL_TO_FIELD = {
+        COL_FILE_ID: 'file_id',
+        COL_PERFORMER: 'performers',
+        COL_TITLE: 'title',
+        COL_DURATION: 'duration',
+        COL_PATH: 'path',
+        COL_COMPOSER: 'composers',
+        COL_BPM: 'bpm'
+    }
+
     # Signals
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
 
@@ -34,8 +47,23 @@ class LibraryWidget(QWidget):
         self.settings_manager = settings_manager
         
         self._init_ui()
+        self._load_criteria()
         self._setup_connections()
         self.load_library()
+
+    def _load_criteria(self) -> None:
+        """Load completeness criteria from JSON"""
+        try:
+            criteria_path = os.path.join(
+                os.path.dirname(__file__), 
+                '../../completeness_criteria.json'
+            )
+            criteria_path = os.path.normpath(criteria_path)
+            with open(criteria_path, 'r') as f:
+                self.completeness_criteria = json.load(f).get('fields', {})
+        except Exception as e:
+            print(f"Error loading criteria: {e}")
+            self.completeness_criteria = {}
 
     def _init_ui(self) -> None:
         """Initialize UI components"""
@@ -229,9 +257,13 @@ class LibraryWidget(QWidget):
         self.btn_scan_folder = QPushButton("Scan Folder")
         self.btn_refresh = QPushButton("Refresh Library")
         
+        self.chk_show_incomplete = QCheckBox("Show Incomplete Only")
+        
         layout.addWidget(self.btn_import)
         layout.addWidget(self.btn_scan_folder)
         layout.addWidget(self.btn_refresh)
+        layout.addSpacing(20)
+        layout.addWidget(self.chk_show_incomplete)
         layout.addStretch()
         
         parent_layout.addLayout(layout)
@@ -240,6 +272,7 @@ class LibraryWidget(QWidget):
         self.btn_import.clicked.connect(self._import_files)
         self.btn_scan_folder.clicked.connect(self._scan_folder)
         self.btn_refresh.clicked.connect(self.load_library)
+        self.chk_show_incomplete.toggled.connect(self.load_library)
         self.search_box.textChanged.connect(self._on_search)
         
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
@@ -254,10 +287,36 @@ class LibraryWidget(QWidget):
     def load_library(self) -> None:
         """Load library from database"""
         headers, data = self.library_service.get_all_songs()
+        
+        if self.chk_show_incomplete.isChecked():
+            data = [
+                row for row in data 
+                if self._get_incomplete_fields(row)
+            ]
+            
         self._populate_table(headers, data)
-        self._load_column_visibility_states()
+
+        if self.chk_show_incomplete.isChecked():
+            self._apply_incomplete_view_columns()
+        else:
+            self._load_column_visibility_states()
+
         self.filter_widget.populate()
         self.table_view.resizeColumnsToContents()
+
+    def _apply_incomplete_view_columns(self) -> None:
+        """Show only columns that are required by the criteria."""
+        for col in range(self.library_model.columnCount()):
+            field = self.COL_TO_FIELD.get(col)
+            is_required = False
+            if field:
+                # Check if this field is marked as required in criteria
+                rules = self.completeness_criteria.get(field, {})
+                if rules.get('required', False):
+                    is_required = True
+            
+            # Show if required, Hide if not required (or unknown)
+            self.table_view.setColumnHidden(col, not is_required)
 
     def _populate_table(self, headers, data) -> None:
         self.library_model.clear()
@@ -272,7 +331,13 @@ class LibraryWidget(QWidget):
         if headers:
             self.library_model.setHorizontalHeaderLabels(headers)
         
+        show_incomplete = self.chk_show_incomplete.isChecked()
+
         for row_data in data:
+            failing_fields = set()
+            if show_incomplete:
+                failing_fields = self._get_incomplete_fields(row_data)
+
             items = []
             for col_idx, cell in enumerate(row_data):
                 display_text = str(cell) if cell is not None else ""
@@ -293,6 +358,15 @@ class LibraryWidget(QWidget):
                 item = QStandardItem(display_text)
                 item.setData(sort_value, Qt.ItemDataRole.UserRole)
                 item.setEditable(False) # Ensure items are not editable by default
+                
+                # Visual Indicator for Incomplete Fields
+                if show_incomplete:
+                    field_name = self.COL_TO_FIELD.get(col_idx)
+                    if field_name and field_name in failing_fields:
+                        # Light Red Background
+                        item.setBackground(QColor("#FFCDD2"))
+                        item.setToolTip(f"{field_name} is incomplete")
+
                 items.append(item)
             
             self.library_model.appendRow(items)
@@ -471,6 +545,11 @@ class LibraryWidget(QWidget):
                     self.table_view.setColumnHidden(int(col_str), not visible)
 
     def _save_column_visibility_states(self) -> None:
+        # Do not save visibility states if we are in "Incomplete View" mode
+        # as this mode temporarily hides/shows columns programmatically.
+        if self.chk_show_incomplete.isChecked():
+            return
+
         visibility_states = {}
         for col in range(self.library_model.columnCount()):
             visible = not self.table_view.isColumnHidden(col)
@@ -551,6 +630,58 @@ class LibraryWidget(QWidget):
             dialog.exec()
             
         except Exception as e:
-            import traceback
             traceback.print_exc()
             QMessageBox.warning(self, "Metadata Error", f"Could not read metadata for {file_name}:\n{e}")
+
+    def _get_incomplete_fields(self, row_data) -> set:
+        """Identify which fields are incomplete based on criteria.
+        Returns a set of field names that failed validation.
+        """
+        failed_fields = set()
+        
+        # Map table columns to criteria keys
+        # Map table columns to criteria keys dynamically
+        val_map = {}
+        for col_idx, field_name in self.COL_TO_FIELD.items():
+            if col_idx < len(row_data):
+                val_map[field_name] = row_data[col_idx]
+        
+        for field, rules in self.completeness_criteria.items():
+            # Skip fields not present in our table view mapping
+            if field not in val_map:
+                continue
+                
+            value = val_map[field]
+            is_valid = True
+            
+            # Check Required
+            if rules.get('required', False):
+                if value is None or (isinstance(value, str) and not value.strip()):
+                    is_valid = False
+                    
+            # Check List (Performers, Composers come as strings "A, B" or None)
+            if is_valid and rules.get('type') == 'list':
+                if rules.get('required', False) and not value:
+                     is_valid = False
+                
+                # If we have content, check min_length if specified (e.g. at least 1)
+                if is_valid and value:
+                    # Naively split by comma
+                    items = [x.strip() for x in value.split(',') if x.strip()]
+                    if len(items) < rules.get('min_length', 0):
+                        is_valid = False
+            
+            # Check Number (Duration, BPM)
+            if is_valid and rules.get('type') == 'number':
+                if value is not None:
+                    try:
+                        num_val = float(value)
+                        if num_val < rules.get('min_value', float('-inf')):
+                            is_valid = False
+                    except ValueError:
+                        pass # Should be number but isn't?
+            
+            if not is_valid:
+                failed_fields.add(field)
+                        
+        return failed_fields

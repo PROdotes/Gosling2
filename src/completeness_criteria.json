@@ -1,0 +1,43 @@
+{
+    "fields": {
+        "title": {
+            "required": true,
+            "type": "string"
+        },
+        "performers": {
+            "required": true,
+            "type": "list",
+            "min_length": 1
+        },
+        "duration": {
+            "required": true,
+            "type": "number",
+            "min_value": 30
+        },
+        "bpm": {
+            "required": false,
+            "type": "number"
+        },
+        "composers": {
+            "required": true,
+            "type": "list",
+            "min_length": 1
+        },
+        "lyricists": {
+            "required": false,
+            "type": "list"
+        },
+        "producers": {
+            "required": false,
+            "type": "list"
+        },
+        "path": {
+            "required": true,
+            "type": "string"
+        },
+        "file_id": {
+            "required": true,
+            "type": "number"
+        }
+    }
+}

@@ -19,7 +19,22 @@ This list prioritizes features from **Easiest** (Quick Wins) to **Hardest** (Com
     - [x] `_handle_zip_drop`: Check exists -> Warn or (Extract + Import + Delete).
     - [x] Update tests (Mock `zipfile`, `os.remove`, `QMessageBox`).
 
-## 🟡 2. Library Item Types (Issue #6)
+## 🟢 1b. Incomplete Song Filter (Request)
+**Complexity**: ⭐ (Easy)
+**Focus**: Metadata Quality Assurance.
+- [x] Create `completion_criteria.json`.
+- [x] Implement Logic & UI (Toggle + Highlighting).
+- [x] Verify Schema Sync (`test_criteria_sync.py`).
+- [x] Verify Filtering & UI (`test_library_widget_filtering.py`).
+
+## � 1c. Crossfade Controls Refactor (Request)
+**Complexity**: ⭐ (Easy)
+**Focus**: UI/UX & Reliability.
+- [x] Replace Checkbox with Dropdown (0s, 1s, ..., 10s).
+- [x] Fix Regression: Skip button disabled when Off (0s).
+- [x] Verify with `tests/unit/presentation/widgets/test_playback_control_widget.py`.
+
+## �🟡 2. Library Item Types (Issue #6)
 **Complexity**: ⭐⭐ (Medium)
 **Focus**: Distinguishing Songs vs. Jingles vs. Spots.
 - [ ] **Step 1 (Model)**: Add `item_type` field (Enum) to `Song` class.
