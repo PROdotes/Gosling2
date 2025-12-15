@@ -15,6 +15,7 @@ def test_song_model_schema_stability():
         "title",
         "duration",
         "bpm",
+        "recording_year",
         "performers",
         "composers",
         "lyricists",

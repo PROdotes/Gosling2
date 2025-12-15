@@ -39,9 +39,16 @@ class BaseRepository:
                     Path TEXT NOT NULL UNIQUE,
                     Title TEXT NOT NULL,
                     Duration REAL,
-                    TempoBPM INTEGER
+                    TempoBPM INTEGER,
+                    RecordingYear INTEGER
                 )
             """)
+
+            # Migration: Ensure RecordingYear exists (for existing databases)
+            cursor.execute("PRAGMA table_info(Files)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if "RecordingYear" not in columns:
+                cursor.execute("ALTER TABLE Files ADD COLUMN RecordingYear INTEGER")
 
             # Create Contributors table
             cursor.execute("""

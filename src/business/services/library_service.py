@@ -44,3 +44,11 @@ class LibraryService:
         return self.song_repository.get_by_path(path)
 
 
+
+    def get_all_years(self) -> List[int]:
+        """Get all distinct recording years"""
+        return self.song_repository.get_all_years()
+
+    def get_songs_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific year"""
+        return self.song_repository.get_by_year(year)

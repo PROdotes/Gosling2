@@ -40,7 +40,8 @@ def test_cross_reference_integrity(tmp_path):
         "Path": "path",
         "Title": "title",
         "Duration": "duration",
-        "TempoBPM": "bpm"
+        "TempoBPM": "bpm",
+        "RecordingYear": "recording_year"
     }
     
     # Model Fields -> Expected DB Column (or Relationship Check/Exclusion)
@@ -50,6 +51,7 @@ def test_cross_reference_integrity(tmp_path):
         "title": "Title",
         "duration": "Duration",
         "bpm": "TempoBPM",
+        "recording_year": "RecordingYear",
         
         # Relationships (Not columns in Files, but exist in DB schema somewhere)
         # We explicitly allow these to NOT be columns in Files, but we should verify they mean something

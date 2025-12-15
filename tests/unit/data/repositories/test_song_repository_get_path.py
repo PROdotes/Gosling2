@@ -30,7 +30,8 @@ def temp_db():
                 Path TEXT UNIQUE NOT NULL,
                 Title TEXT,
                 Duration REAL,
-                TempoBPM INTEGER
+                TempoBPM INTEGER,
+                RecordingYear INTEGER
             )
         """)
         cursor.execute("""

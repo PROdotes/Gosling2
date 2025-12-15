@@ -76,6 +76,18 @@ class MetadataService:
         bpm_list = get_text_list("TBPM")
         bpm = int(bpm_list[0]) if bpm_list else None
 
+        # Extract Year
+        year_list = get_text_list("TDRC") or get_text_list("TYER")
+        recording_year = None
+        if year_list:
+            try:
+                # TDRC might be "2023-01-01", TYER "2023"
+                s = str(year_list[0]).strip()
+                # Take first 4 digits
+                recording_year = int(s[:4])
+            except (ValueError, IndexError):
+                pass
+
         # Extract producers
         producers = get_producers()
 
@@ -85,6 +97,7 @@ class MetadataService:
             title=title,
             duration=duration,
             bpm=bpm,
+            recording_year=recording_year,
             performers=deduplicate(performers),
             composers=deduplicate(composers),
             lyricists=deduplicate(lyricists),

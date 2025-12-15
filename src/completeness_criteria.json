@@ -18,6 +18,10 @@
             "required": false,
             "type": "number"
         },
+        "recording_year": {
+            "required": true,
+            "type": "number"
+        },
         "composers": {
             "required": true,
             "type": "list",

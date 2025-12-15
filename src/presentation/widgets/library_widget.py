@@ -25,6 +25,7 @@ class LibraryWidget(QWidget):
     COL_PATH = 4
     COL_COMPOSER = 5
     COL_BPM = 6
+    COL_YEAR = 7
 
     # Map Column Index -> Field Name for criteria checking
     COL_TO_FIELD = {
@@ -34,7 +35,8 @@ class LibraryWidget(QWidget):
         COL_DURATION: 'duration',
         COL_PATH: 'path',
         COL_COMPOSER: 'composers',
-        COL_BPM: 'bpm'
+        COL_BPM: 'bpm',
+        COL_YEAR: 'recording_year'
     }
 
     # Signals
@@ -277,6 +279,7 @@ class LibraryWidget(QWidget):
         
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
         self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
+        self.filter_widget.filter_by_year.connect(self._filter_by_year)
         self.filter_widget.reset_filter.connect(self.load_library)
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
@@ -347,7 +350,7 @@ class LibraryWidget(QWidget):
                 if col_idx == self.COL_DURATION and isinstance(cell, (int, float)):
                     display_text = self._format_duration(cell)
                     sort_value = float(cell)
-                elif col_idx in (self.COL_BPM, self.COL_FILE_ID) and isinstance(cell, (int, float)):
+                elif col_idx in (self.COL_BPM, self.COL_FILE_ID, self.COL_YEAR) and isinstance(cell, (int, float)):
                     # Display as string, sort as number
                     sort_value = float(cell)
                 else:
@@ -386,6 +389,10 @@ class LibraryWidget(QWidget):
 
     def _filter_by_composer(self, composer_name) -> None:
         headers, data = self.library_service.get_songs_by_composer(composer_name)
+        self._populate_table(headers, data)
+
+    def _filter_by_year(self, year: int) -> None:
+        headers, data = self.library_service.get_songs_by_year(year)
         self._populate_table(headers, data)
 
     def _import_file(self, file_path: str) -> bool:

@@ -8,6 +8,7 @@ class FilterWidget(QWidget):
     # Signals
     filter_by_performer = pyqtSignal(str)
     filter_by_composer = pyqtSignal(str)
+    filter_by_year = pyqtSignal(int)
     reset_filter = pyqtSignal()
 
     def __init__(self, library_service, parent=None) -> None:
@@ -37,6 +38,7 @@ class FilterWidget(QWidget):
         self._add_category_to_tree("Composer", "Composers")
         self._add_category_to_tree("Lyricist", "Lyricists")
         self._add_category_to_tree("Producer", "Producers")
+        self._add_years_to_tree()
 
     def _add_category_to_tree(self, role_name: str, display_name: str) -> None:
         """Helper to add a category (role) and its contributors to the tree"""
@@ -83,6 +85,40 @@ class FilterWidget(QWidget):
         self.tree_model.appendRow(root_item)
         self.tree_view.expand(root_item.index())
 
+    def _add_years_to_tree(self) -> None:
+        """Add years to the tree view."""
+        years = self.library_service.get_all_years()
+        if not years:
+            return
+
+        root_item = QStandardItem("Years")
+        root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        root_item.setData("Year", Qt.ItemDataRole.UserRole + 1)
+        
+        # Group by Decade
+        decades = {}
+        for year in years:
+            decade = (year // 10) * 10
+            if decade not in decades:
+                decades[decade] = []
+            decades[decade].append(year)
+            
+        for decade in sorted(decades.keys(), reverse=True):
+            decade_item = QStandardItem(f"{decade}s")
+            decade_item.setFlags(decade_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            # Make decade click distinct if we want to filter by decade, for now just container
+            
+            for year in decades[decade]:
+                year_item = QStandardItem(str(year))
+                year_item.setFlags(year_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                year_item.setData(year, Qt.ItemDataRole.UserRole)
+                year_item.setData("Year", Qt.ItemDataRole.UserRole + 1)
+                decade_item.appendRow(year_item)
+                
+            root_item.appendRow(decade_item)
+            
+        self.tree_model.appendRow(root_item)
+
     def _on_tree_clicked(self, index) -> None:
         """Handle click in the filter tree"""
         item = self.tree_model.itemFromIndex(index)
@@ -96,6 +132,9 @@ class FilterWidget(QWidget):
                 self.filter_by_composer.emit(name)
             elif role in ["Lyricist", "Producer"]:
                 print(f"Filter requested for {role}: {name}")
-        elif item.text() in ["Performers", "Composers", "Lyricists", "Producers"]:
+            elif role == "Year":
+                # Name is stored as int in UserRole for years
+                self.filter_by_year.emit(name)
+        elif item.text() in ["Performers", "Composers", "Lyricists", "Producers", "Years"]:
              # Or if role is set on root items too
              self.reset_filter.emit()

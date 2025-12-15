@@ -29,7 +29,7 @@ class TestCriteriaSync(unittest.TestCase):
 
     def _init_schema(self, conn):
         cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS Files (FileID INTEGER PRIMARY KEY, Path TEXT NOT NULL UNIQUE, Title TEXT NOT NULL, Duration REAL, TempoBPM INTEGER)")
+        cursor.execute("CREATE TABLE IF NOT EXISTS Files (FileID INTEGER PRIMARY KEY, Path TEXT NOT NULL UNIQUE, Title TEXT NOT NULL, Duration REAL, TempoBPM INTEGER, RecordingYear INTEGER)")
         cursor.execute("CREATE TABLE IF NOT EXISTS Contributors (ContributorID INTEGER PRIMARY KEY, Name TEXT NOT NULL UNIQUE, SortName TEXT)")
         cursor.execute("CREATE TABLE IF NOT EXISTS Roles (RoleID INTEGER PRIMARY KEY, Name TEXT NOT NULL UNIQUE)")
         default_roles = ["Performer", "Composer", "Lyricist", "Producer"]
@@ -58,7 +58,8 @@ class TestCriteriaSync(unittest.TestCase):
             'Path': 'path',
             'Title': 'title',
             'Duration': 'duration',
-            'TempoBPM': 'bpm'
+            'TempoBPM': 'bpm',
+            'RecordingYear': 'recording_year'
         }
         
         for col in columns:

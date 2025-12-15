@@ -21,10 +21,10 @@ def library_widget(qtbot, mock_dependencies):
     
     # Setup default return for get_all_songs so load_library works
     lib_service.get_all_songs.return_value = (
-        ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM"],
+        ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM", "Year"],
         [ # 2 rows of sample data
-            [1, "Performer A", "Title A", "3:00", "/path/a.mp3", "Comp A", 120],
-            [2, "Performer B", "Title B", "4:00", "/path/b.mp3", "Comp B", 128]
+            [1, "Performer A", "Title A", "3:00", "/path/a.mp3", "Comp A", 120, 2020],
+            [2, "Performer B", "Title B", "4:00", "/path/b.mp3", "Comp B", 128, 2021]
         ]
     )
     
@@ -201,7 +201,23 @@ def test_filter_by_performer(library_widget, mock_dependencies):
     
     lib_service.get_songs_by_performer.assert_called_with("Performer A")
     # Should clear model and repopulate
+    # Should clear model and repopulate
     assert library_widget.library_model.rowCount() == 0 # Mock returned empty list
+
+def test_filter_by_year(library_widget, mock_dependencies):
+    """Test filtering by year requests data from service."""
+    lib_service, _, _ = mock_dependencies
+    
+    # Mock return
+    lib_service.get_songs_by_year.return_value = (["ID", "Year"], [[1, 2020]])
+    
+    # Call slot directly (simulate signal emission)
+    library_widget._filter_by_year(2020)
+    
+    lib_service.get_songs_by_year.assert_called_with(2020)
+    # Check model update
+    assert library_widget.library_model.rowCount() == 1
+    assert library_widget.library_model.item(0, 1).text() == "2020"
 
 def test_column_visibility_toggle(library_widget, mock_dependencies):
     """Test toggling columns updates view and saves settings."""
@@ -268,9 +284,9 @@ def test_show_column_context_menu(library_widget):
         library_widget._show_column_context_menu(QPoint(0,0))
         
         # INTEGRITY CHECK:
-        # Standard schema has 7 columns: ID, Performer, Title, Duration, Path, Composer, BPM
+        # Standard schema has 8 columns: ID, Performer, Title, Duration, Path, Composer, BPM, Year
         # If developers add a column, they MUST allow toggling its visibility.
-        expected_columns = 7
+        expected_columns = 8
         assert library_widget.library_model.columnCount() == expected_columns, \
             "Model column count changed! Update this test."
             
@@ -347,6 +363,16 @@ def test_metadata_viewer_dialog_logic():
     assert item_file2.text() == "Same"
     # Should not be colored (default background is distinct from our highlight)
     assert item_db2.background().color() != expected_bg
+
+    # Case 3: Year Check (Integrity)
+    # Ensure "Year" is displayed in the Core Metadata
+    found_year = False
+    for r in range(dlg2.table.rowCount()):
+        item = dlg2.table.item(r, 0)
+        if item and item.text() == "Year":
+            found_year = True
+            break
+    assert found_year, "Year field not found in Metadata Viewer Dialog! It may be missing from mapped_fields."
 
     # --- Test Description Logic ---
     # Adding raw tags with a known code "TSSE"
@@ -493,18 +519,18 @@ def test_sorting_all_columns(library_widget, mock_dependencies):
     # [ID, Perf, Title, Duration, Path, Comp, BPM]
     # We use distinct values to make sort order unambiguous
     
-    # Row A: ID=1, Perf="A", Title="Z", Dur=10,  Path="C", Comp="M", BPM=10
-    # Row B: ID=2, Perf="B", Title="Y", Dur=20,  Path="B", Comp="L", BPM=20
-    # Row C: ID=3, Perf="C", Title="X", Dur=100, Path="A", Comp="K", BPM=100
+    # Row A: ID=1, Perf="A", Title="Z", Dur=10,  Path="C", Comp="M", BPM=10, Year=2000
+    # Row B: ID=2, Perf="B", Title="Y", Dur=20,  Path="B", Comp="L", BPM=20, Year=2010
+    # Row C: ID=3, Perf="C", Title="X", Dur=100, Path="A", Comp="K", BPM=100, Year=2020
     
     raw_data = [
-        [1, "Performer A", "Title Z", 10.0, "/path/c", "Comp M", 10], 
-        [2, "Performer B", "Title Y", 20.0, "/path/b", "Comp L", 20], 
-        [3, "Performer C", "Title X", 100.0, "/path/a", "Comp K", 100],
+        [1, "Performer A", "Title Z", 10.0, "/path/c", "Comp M", 10, 2000], 
+        [2, "Performer B", "Title Y", 20.0, "/path/b", "Comp L", 20, 2010], 
+        [3, "Performer C", "Title X", 100.0, "/path/a", "Comp K", 100, 2020],
     ]
     
     lib_service.get_all_songs.return_value = (
-        ["ID", "Perf", "Title", "Duration", "Path", "Comp", "BPM"],
+        ["ID", "Perf", "Title", "Duration", "Path", "Comp", "BPM", "Year"],
         raw_data
     )
     library_widget.load_library()
@@ -548,19 +574,23 @@ def test_sorting_all_columns(library_widget, mock_dependencies):
     check_sort(5, Qt.SortOrder.AscendingOrder, ["Comp K", "Comp L", "Comp M"])
     check_sort(5, Qt.SortOrder.DescendingOrder, ["Comp M", "Comp L", "Comp K"])
 
-    # 7. BPM (Numeric)
+    # 8. BMP (Numeric)
     check_sort(6, Qt.SortOrder.AscendingOrder, ["10", "20", "100"])
     check_sort(6, Qt.SortOrder.DescendingOrder, ["100", "20", "10"])
+
+    # 9. Year (Numeric) - 2000, 2010, 2020
+    check_sort(7, Qt.SortOrder.AscendingOrder, ["2000", "2010", "2020"])
+    check_sort(7, Qt.SortOrder.DescendingOrder, ["2020", "2010", "2000"])
     
-    # 8. Integrity Check: Ensure we tested ALL columns
+    # 10. Integrity Check: Ensure we tested ALL columns
     # If a developer adds a column (e.g., Genre) but doesn't add a check_sort above, this will fail.
-    assert library_widget.proxy_model.columnCount() == 7, "New column detected! You must add a check_sort test case for it above."
+    assert library_widget.proxy_model.columnCount() == 8, "New column detected! You must add a check_sort test case for it above."
 
 def test_table_schema_integrity(library_widget):
     """Ensure table structure matches expected schema. Fails if columns are added/removed."""
     model = library_widget.library_model
     
-    expected_columns = ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM"]
+    expected_columns = ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM", "Year"]
     
     assert model.columnCount() == len(expected_columns), \
         f"Column count mismatch. Expected {len(expected_columns)}, got {model.columnCount()}"

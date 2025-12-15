@@ -39,7 +39,8 @@ class SongRepository(BaseRepository):
                            F.Duration AS Duration,
                            F.Path AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM
+                           F.TempoBPM AS BPM,
+                           F.RecordingYear AS Year
                     FROM Files F
                     LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
                     LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
@@ -75,9 +76,9 @@ class SongRepository(BaseRepository):
                 # Update basic file info
                 cursor.execute("""
                     UPDATE Files
-                    SET Title = ?, Duration = ?, TempoBPM = ?
+                    SET Title = ?, Duration = ?, TempoBPM = ?, RecordingYear = ?
                     WHERE FileID = ?
-                """, (song.title, song.duration, song.bpm, song.file_id))
+                """, (song.title, song.duration, song.bpm, song.recording_year, song.file_id))
 
                 # Clear existing contributor roles
                 cursor.execute(
@@ -209,7 +210,7 @@ class SongRepository(BaseRepository):
                 
                 # Fetch basic info
                 cursor.execute("""
-                    SELECT FileID, Title, Duration, TempoBPM
+                    SELECT FileID, Title, Duration, TempoBPM, RecordingYear
                     FROM Files
                     WHERE Path = ?
                 """, (norm_path,))
@@ -218,7 +219,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                file_id, title, duration, bpm = row
+                file_id, title, duration, bpm, recording_year = row
                 
                 # Fetch contributors
                 song = Song(
@@ -226,7 +227,8 @@ class SongRepository(BaseRepository):
                     path=path,
                     title=title,
                     duration=duration,
-                    bpm=bpm
+                    bpm=bpm,
+                    recording_year=recording_year
                 )
                 song.path = norm_path
                 
@@ -253,3 +255,44 @@ class SongRepository(BaseRepository):
         except Exception as e:
             print(f"Error getting song by path: {e}")
             return None
+
+    def get_all_years(self) -> List[int]:
+        """Get list of distinct recording years"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT RecordingYear FROM Files WHERE RecordingYear IS NOT NULL ORDER BY RecordingYear DESC")
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error getting all years: {e}")
+            return []
+
+    def get_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific recording year"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT F.FileID,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
+                           F.Title AS Title,
+                           F.Duration AS Duration,
+                           F.Path AS Path,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
+                           F.TempoBPM AS BPM,
+                           F.RecordingYear AS Year
+                    FROM Files F
+                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
+                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
+                    WHERE F.RecordingYear = ?
+                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
+                    ORDER BY F.FileID DESC
+                """
+                cursor.execute(query, (year,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            print(f"Error fetching songs by year: {e}")
+            return [], []

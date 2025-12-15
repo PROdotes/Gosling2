@@ -38,7 +38,7 @@ def test_get_all_schema_integrity(tmp_path):
             "Path": "Path",
             "Title": "Title", 
             "Duration": "Duration",
-            # If RecordingYear is added, it maps to "RecordingYear" (default) or needs mapping.
+            "RecordingYear": "Year",
         }
         
         # 4. Verify Coverage

@@ -69,6 +69,7 @@ class MetadataViewerDialog(QDialog):
             ("Producer(s)", "producers", ["TIPL", "TMCL", "TXXX:PRODUCER"]), # Approximate mapping
             ("Duration", "formatted_duration", ["TLEN"]), 
             ("BPM", "bpm", ["TBPM"]),
+            ("Year", "recording_year", ["TDRC", "TYER"]),
         ]
 
         # Tracking used raw keys to avoid duplication

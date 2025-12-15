@@ -12,6 +12,7 @@ class Song:
     title: Optional[str] = None
     duration: Optional[float] = None
     bpm: Optional[int] = None
+    recording_year: Optional[int] = None
     performers: List[str] = field(default_factory=list)
     composers: List[str] = field(default_factory=list)
     lyricists: List[str] = field(default_factory=list)
