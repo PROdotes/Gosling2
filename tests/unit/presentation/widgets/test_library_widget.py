@@ -586,15 +586,32 @@ def test_sorting_all_columns(library_widget, mock_dependencies):
     # If a developer adds a column (e.g., Genre) but doesn't add a check_sort above, this will fail.
     assert library_widget.proxy_model.columnCount() == 8, "New column detected! You must add a check_sort test case for it above."
 
-def test_table_schema_integrity(library_widget):
-    """Ensure table structure matches expected schema. Fails if columns are added/removed."""
+    assert library_widget.proxy_model.columnCount() == 8, "New column detected! You must add a check_sort test case for it above."
+
+def test_table_schema_integrity(library_widget, mock_dependencies):
+    """
+    STRICT UI Schema Integrity:
+    Ensures that the LibraryWidget strictly displays all columns provided by the LibraryService.
+    
+    This replaces hardcoded expected columns with a dynamic check against the Service's output.
+    If the Service layer adds a column (e.g. 'Genre'), this test will FAIL until the 
+    LibraryWidget is updated to handle it (or explicitly decides to hide it, which must be asserted).
+    """
+    lib_service, _, _ = mock_dependencies
+    
+    # 1. Get what the Service is providing (Truth)
+    service_headers, _ = lib_service.get_all_songs()
+    
+    # 2. Get what the UI is displaying (Reality)
     model = library_widget.library_model
     
-    expected_columns = ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM", "Year"]
-    
-    assert model.columnCount() == len(expected_columns), \
-        f"Column count mismatch. Expected {len(expected_columns)}, got {model.columnCount()}"
+    # 3. Assert Count Match
+    # If Service sends 8 cols, UI Model must have 8 cols.
+    assert model.columnCount() == len(service_headers), \
+        f"UI Model Column Count Mismatch! Service provides {len(service_headers)}, UI has {model.columnCount()}"
         
-    for i, name in enumerate(expected_columns):
-        header = model.headerData(i, Qt.Orientation.Horizontal)
-        assert header == name, f"Column {i} mismatch. Expected '{name}', got '{header}'"
+    # 4. Assert Header Match
+    for i, expected_name in enumerate(service_headers):
+        ui_header = model.headerData(i, Qt.Orientation.Horizontal)
+        assert ui_header == expected_name, \
+            f"Column {i} Header Mismatch. Service sends '{expected_name}', UI displays '{ui_header}'"

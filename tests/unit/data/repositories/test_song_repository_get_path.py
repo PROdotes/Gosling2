@@ -18,51 +18,17 @@ def temp_db():
     DatabaseConfig.get_database_path = lambda: db_path
     
     # Initialize DB (create tables)
-    # We can use the connection to run the schema script or rely on existing init logic if any.
-    # Since we are testing repository which assumes tables exist, we should init them.
-    # For simplicity, let's look at how other tests do it or just run the create statements.
+    # Initialize DB using the application's actual schema logic
+    from src.data.repositories.base_repository import BaseRepository
+    BaseRepository(db_path)
     
+    # Verify tables exist (sanity check)
     with sqlite3.connect(db_path) as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS Files (
-                FileID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Path TEXT UNIQUE NOT NULL,
-                Title TEXT,
-                Duration REAL,
-                TempoBPM INTEGER,
-                RecordingYear INTEGER
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS Roles (
-                RoleID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT UNIQUE NOT NULL
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS Contributors (
-                ContributorID INTEGER PRIMARY KEY AUTOINCREMENT,
-                Name TEXT UNIQUE NOT NULL,
-                SortName TEXT
-            )
-        """)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS FileContributorRoles (
-                FileID INTEGER,
-                ContributorID INTEGER,
-                RoleID INTEGER,
-                PRIMARY KEY (FileID, ContributorID, RoleID),
-                FOREIGN KEY (FileID) REFERENCES Files(FileID),
-                FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID),
-                FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
-            )
-        """)
-        
-        # Seed Roles
-        roles = ['Performer', 'Composer', 'Lyricist', 'Producer']
-        for role in roles:
-             cursor.execute("INSERT INTO Roles (Name) VALUES (?)", (role,))
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = {row[0] for row in cursor.fetchall()}
+        assert "Files" in tables
+        assert "Contributors" in tables
         
     yield db_path
     

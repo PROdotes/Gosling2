@@ -15,26 +15,28 @@ class TestCriteriaSync(unittest.TestCase):
         )
         self.criteria_path = os.path.normpath(self.criteria_path)
         
-        # FIX: For :memory: databases, we can't let BaseRepository open/close new connections.
-        # We will manually create a connection and initialize the schema on it.
-        self.conn = sqlite3.connect(":memory:")
-        self.conn.row_factory = sqlite3.Row
+        # FIX: Use Real BaseRepository with a temp file to ensure we test the ACTUAL schema
+        import tempfile
+        fd, self.temp_db_path = tempfile.mkstemp()
+        os.close(fd)
         
-        # Manually run the schema creation from BaseRepository logic
-        # (We duplicate the logic slightly here or we could invoke a method if we refactored BaseRepo)
-        self._init_schema(self.conn)
+        # Initialize Schema via actual Repository logic
+        self.repo = BaseRepository(self.temp_db_path)
+        
+        # Connect for Test Introspection
+        self.conn = sqlite3.connect(self.temp_db_path)
+        self.conn.row_factory = sqlite3.Row
 
     def tearDown(self):
-        self.conn.close()
-
-    def _init_schema(self, conn):
-        cursor = conn.cursor()
-        cursor.execute("CREATE TABLE IF NOT EXISTS Files (FileID INTEGER PRIMARY KEY, Path TEXT NOT NULL UNIQUE, Title TEXT NOT NULL, Duration REAL, TempoBPM INTEGER, RecordingYear INTEGER)")
-        cursor.execute("CREATE TABLE IF NOT EXISTS Contributors (ContributorID INTEGER PRIMARY KEY, Name TEXT NOT NULL UNIQUE, SortName TEXT)")
-        cursor.execute("CREATE TABLE IF NOT EXISTS Roles (RoleID INTEGER PRIMARY KEY, Name TEXT NOT NULL UNIQUE)")
-        default_roles = ["Performer", "Composer", "Lyricist", "Producer"]
-        cursor.executemany("INSERT OR IGNORE INTO Roles (Name) VALUES (?)", [(r,) for r in default_roles])
-        conn.commit()
+        if self.conn:
+            self.conn.close()
+            
+        # Cleanup temp file
+        if hasattr(self, 'temp_db_path') and os.path.exists(self.temp_db_path):
+            try:
+                os.remove(self.temp_db_path)
+            except PermissionError:
+                pass # Windows file locking might delay delete, permissible in test cleanup
 
     def test_json_matches_db_schema(self):
         """Verify that all DB columns and Roles are present in the JSON config"""
@@ -45,6 +47,22 @@ class TestCriteriaSync(unittest.TestCase):
         
         defined_fields = set(criteria.get('fields', {}).keys())
         
+        # 1a. Strict Table Whitelisting
+        # Ensure JSON matches DB tables exactly
+        defined_tables = set(criteria.get('tables', []))
+        
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        db_tables = {row['name'] for row in cursor.fetchall()}
+        
+        # Verify no unknown tables
+        unknown_tables = db_tables - defined_tables
+        self.assertFalse(unknown_tables, f"Unknown tables detected in DB not in JSON Criteria: {unknown_tables}")
+        
+        # Verify no missing tables
+        missing_tables = defined_tables - db_tables
+        self.assertFalse(missing_tables, f"JSON Criteria lists tables not found in DB: {missing_tables}")
+
         # 2. Introspect 'Files' Table
         db_fields = set()
         # Use existing connection

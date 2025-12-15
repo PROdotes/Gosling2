@@ -54,14 +54,13 @@ class MetadataViewerDialog(QDialog):
         except Exception as e:
             print(f"Failed to load ID3 frames JSON: {e}")
             # Fallback basics if file missing
-            ID3_FRAMES = {
-                "TIT2": "Title",
-                "TPE1": "Artist",
-                "TALB": "Album"
-            }
+            pass
+            
+        self.ID3_FRAMES = ID3_FRAMES
 
         # 1. Mapped Fields
-        mapped_fields = [
+        # Format: (Label, Song Attribute, [ID3 Tags])
+        self.mapped_fields = [
             ("Title", "title", ["TIT2"]),
             ("Performer(s)", "performers", ["TPE1"]),
             ("Composer(s)", "composers", ["TCOM"]),
@@ -74,15 +73,15 @@ class MetadataViewerDialog(QDialog):
 
         # Tracking used raw keys to avoid duplication
         used_id3_keys = set()
-        for _, _, keys in mapped_fields:
+        for _, _, keys in self.mapped_fields:
             used_id3_keys.update(keys)
 
         self.table.setRowCount(0)
-
+        
         # -- Section: Core Metadata --
         self._add_section_header("Core Metadata")
         
-        for label, attr, _ in mapped_fields:
+        for label, attr, _ in self.mapped_fields:
             file_val = getattr(self.file_song, attr, None)
             db_val = getattr(self.db_song, attr, None) if self.db_song else None
             

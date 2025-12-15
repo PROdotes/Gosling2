@@ -11,6 +11,17 @@ class FilterWidget(QWidget):
     filter_by_year = pyqtSignal(int)
     reset_filter = pyqtSignal()
 
+    # STRICT SCHEMA: Explicitly list DB columns from 'Files' that are NOT used for filtering.
+    # If a new column is added to 'Files', it must be either used (implemented) or added here.
+    IGNORED_DB_COLUMNS = {
+        "FileID",       # Internal ID, not useful for grouping
+        "Path",         # Unique per file
+        "Title",        # Unique per file (mostly)
+        "Duration",     # Continuous value
+        "TempoBPM",     # Continuous value (could be ranged later, but currently ignored)
+        # "RecordingYear" is USED, so it is NOT in this list.
+    }
+
     def __init__(self, library_service, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service

@@ -1,4 +1,11 @@
 {
+    "tables": [
+        "Files",
+        "Contributors",
+        "Roles",
+        "FileContributorRoles",
+        "GroupMembers"
+    ],
     "fields": {
         "title": {
             "required": true,

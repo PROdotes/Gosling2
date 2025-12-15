@@ -54,6 +54,44 @@ def test_get_all_schema_integrity(tmp_path):
                 if mapped_name in repo_columns_set:
                     continue
             
-            # If we reach here, the DB column is NOT returned by the Repository
             pytest.fail(f"SongRepository.get_all() is missing DB Column '{db_col}'! "
                         f"Update the SQL query to include it.")
+
+def test_strict_table_whitelist(tmp_path):
+    """
+    STRICT Table Whitelisting:
+    Ensures that the SongRepository accounts for EVERY table in the database.
+    
+    If a developer adds a table (e.g. 'Genres'), this test will FAIL until 
+    that table is explicitly added to the Repository's KNOWN_TABLES list.
+    """
+    db_path = tmp_path / "test_repo_schema_tables.db"
+    repo = SongRepository(str(db_path))
+    
+    with repo.get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # 1. Fetch ALL Tables in physical DB
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        actual_tables = {row[0] for row in cursor.fetchall()}
+        
+        # 2. Define Repository's Known Tables
+        # These are the tables the repository claims to manage/interact with.
+        known_tables = {
+            "Files",
+            "Contributors",
+            "Roles",
+            "FileContributorRoles",
+            "GroupMembers"
+        }
+        
+        # 3. Assert Exact Match
+        # Any extra table in DB means "I don't know this table, thus I might break integration."
+        extra_tables = actual_tables - known_tables
+        if extra_tables:
+            pytest.fail(f"STRICT CHECK FAILED: Unknown tables detected in database: {extra_tables}. "
+                        f"The SongRepository must explicitly whitelist these tables to prove it handles them.")
+        
+        # Verify we aren't missing expected tables either (which would be a fundamental breakage)
+        missing_tables = known_tables - actual_tables
+        assert not missing_tables, f"Database is missing expected tables: {missing_tables}"
