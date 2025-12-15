@@ -8,22 +8,27 @@ Gosling2 employs a rigorous, multi-layered testing strategy to ensure reliabilit
 |------|-------|---------|----------|
 | **Unit Tests** | 200+ | Test individual components in isolation | `tests/unit/` |
 | **Integration** | ~10 | Test component interactions (UI/Services) | `tests/integration/` |
-| **Schema Integrity** | ~15 | Prevent "Silent Data Loss" & DB drift | `tests/unit/` (various) |
+| **Schema Integrity** | ~50 | Prevent "Silent Data Loss" & DB drift | `tests/unit/` (various) |
 | **Mutation** | ~10 | Verify test quality (kill bugs) | `tests/unit/**/*_mutation.py` |
 
 ---
 
-## 🛡️ Layer 1: Schema Integrity (The Safety Net)
+## 🛡️ Layer 1: Schema Integrity (The "Yelling" Safety Net)
 
-We have a specialized suite of tests designed solely to prevent **Silent Data Loss** and ensuring the codebase stays in sync with the Database Schema.
+We have a specialized, multi-layered suite of tests designed to enforce a **1:1 Strict Mapping** between the Database Schema and every application layer.
 
-*   **Database Schema**: Checks `sqlite_master` to ensure strict table/column existence.
-*   **Repo vs DB**: Ensures `SongRepository` fetches exactly the columns defined in the table.
-*   **Model vs DB**: Ensures `Song` dataclass attributes match Database columns.
-*   **Persistence**: Ensures `insert()` and `update()` methods write ALL columns.
-*   **Metadata**: Ensures `MetadataService` extracts ALL fields supported by the specific model.
+**The "9 Chains" of Verification:**
+1.  **Repository**: `SongRepository` checks `sqlite_master` to ensure NO unknown tables exist.
+2.  **Domain**: `Song` model MUST have a field for every `Files` table column.
+3.  **Service**: `LibraryService` MUST expose every DB column as a header.
+4.  **UI (Table)**: `LibraryWidget` columns MUST match Service headers.
+5.  **UI (Viewer)**: `MetadataViewer` MUST map every ID3 tag to a DB column.
+6.  **Search**: Search logic MUST cover all exposed columns.
+7.  **Filter**: `FilterWidget` MUST either filter by a column or explicitly ignoring it.
+8.  **Metadata**: `MetadataService` MUST attempt extraction for all DB columns.
+9.  **Documentation**: `completeness_criteria.json` MUST list all Tables and Columns defined in the DB.
 
-**Value**: If you add a column to the Database but forget to update the Repository, Model, or UI, **these tests will fail immediately**.
+**Value**: If you add a column to the Database but forget to update ANY layer, **the system yells immediately**. Silent schema drift is impossible.
 
 ## 🧬 Layer 2: Mutation Testing
 

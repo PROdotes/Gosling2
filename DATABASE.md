@@ -8,6 +8,17 @@ This document describes the SQLite database structure used by the Gosling2 appli
 - **File Location**: `sqldb/gosling2.sqlite3`
 - **Foreign Keys**: Enabled (`PRAGMA foreign_keys = ON`)
 
+## 🛡️ Schema Governance (Strict Mode)
+
+This database schema is **Strictly Enforced** by the test suite. 
+Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompanied by updates to:
+1.  `src/completeness_criteria.json`
+2.  `Song` Model (`src/data/models/song.py`)
+3.  `SongRepository` Whitelists
+4.  UI and Service components
+
+**Do not manually modify the schema** without running `pytest` to identify all 9 layers of broken dependencies. The system is designed to "yell" at you if you simply `ALTER TABLE` without updating the code.
+
 ## Schema Diagram
 
 ```mermaid

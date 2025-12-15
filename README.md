@@ -122,11 +122,12 @@ pytest tests/unit/test_song_model.py
 ### Best Practices
 - Clear separation of concerns
 - Single Responsibility Principle
-- Context managers for resource management
-- Type hints for better code documentation
-- Comprehensive unit tests
+- Context## Key Features
 
-## License
+- **Robust 3-Tier Architecture**: Clean separation of Data, Business Logic, and UI.
+- **Strict Schema Integrity**: Comprehensive test suite prevents "silent data drift" by enforcing 1:1 mapping between DB and UI.
+- **Drag & Drop Import**: Seamlessly import MP3s or extracted ZIP archives directly into the library.
+- **Smart Metadata**: Automatic ID3 tag extraction and discrepancy highlighting.
+- **Atomic Operations**: Safe database transactions and file handling.
 
 MIT License
-
