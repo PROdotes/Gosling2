@@ -1,2 +1,0 @@
-DB Columns: {'Title', 'Duration', 'RecordingYear', 'Path', 'FileID', 'TempoBPM'}
-Mapped Attributes: {'bpm', 'album_artists', 'formatted_duration', 'performers', 'title', 'recording_year', 'producers', 'composers'}

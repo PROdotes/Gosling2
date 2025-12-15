@@ -19,7 +19,6 @@ class FilterWidget(QWidget):
         "Title",        # Unique per file (mostly)
         "Duration",     # Continuous value
         "TempoBPM",     # Continuous value (could be ranged later, but currently ignored)
-        # "RecordingYear" is USED, so it is NOT in this list.
     }
 
     def __init__(self, library_service, parent=None) -> None:

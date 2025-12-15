@@ -31,6 +31,9 @@ MANIFEST
 *.manifest
 *.spec
 
+# Planning
+tomorrow.md
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
