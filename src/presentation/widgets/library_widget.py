@@ -1,13 +1,14 @@
 import os
+import zipfile
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle
+    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel
 )
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
-    QPainter, QColor, QPixmap, QIcon, QImage
+    QPainter, QColor, QPixmap, QIcon, QImage, QDragEnterEvent, QDropEvent
 )
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent
 
 from .filter_widget import FilterWidget
 
@@ -72,6 +73,17 @@ class LibraryWidget(QWidget):
         self.table_view.setSortingEnabled(True)
         self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         
+        # Enable Drag & Drop
+        self.table_view.setAcceptDrops(True)
+        self.table_view.installEventFilter(self)
+        
+        # Empty State Label
+        self.empty_label = QLabel("Drag audio files here to import", self.table_view)
+        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_label.setStyleSheet("QLabel { color: gray; font-size: 14pt; font-weight: bold; }")
+        self.empty_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.empty_label.hide()
+        
         center_layout.addWidget(self.search_box)
         center_layout.addWidget(self.table_view)
         
@@ -81,6 +93,135 @@ class LibraryWidget(QWidget):
         self.splitter.setStretchFactor(1, 3)
         
         main_layout.addWidget(self.splitter)
+
+    def eventFilter(self, source, event):
+        """Handle events for the table view (Drag & Drop + Resize)"""
+        if source == self.table_view:
+            if event.type() == QEvent.Type.Resize:
+                # Center the empty label
+                self._update_empty_label_position()
+            elif event.type() == QEvent.Type.DragEnter:
+                self.dragEnterEvent(event)
+                return True
+            elif event.type() == QEvent.Type.DragMove:
+                # Necessary to accept move for drop to work
+                event.acceptProposedAction()
+                return True
+            elif event.type() == QEvent.Type.DragLeave:
+                self.dragLeaveEvent(event)
+                return True # Optional, but good to handle
+            elif event.type() == QEvent.Type.Drop:
+                self.dropEvent(event)
+                return True
+        return super().eventFilter(source, event)
+
+    def _update_empty_label_position(self):
+        """Center the empty label in the table view"""
+        if self.empty_label.isVisible():
+            self.empty_label.resize(self.table_view.size())
+            self.empty_label.move(0, 0)
+
+    def dragEnterEvent(self, event):
+        """Validate dragged files (MP3 or ZIP)"""
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    ext = path.lower().split('.')[-1]
+                    if ext in ['mp3', 'zip']:
+                        event.acceptProposedAction()
+                        # Visual Feedback: Highlight Border
+                        self.table_view.setStyleSheet("QTableView { border: 2px solid #4CAF50; }")
+                        return
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        """Reset visual feedback"""
+        self.table_view.setStyleSheet("")
+        event.accept()
+
+    def dropEvent(self, event):
+        """Handle dropped files"""
+        # Reset visual feedback immediately
+        self.table_view.setStyleSheet("")
+        
+        if not event.mimeData().hasUrls():
+            event.ignore()
+            return
+            
+        file_paths = []
+        for url in event.mimeData().urls():
+            if url.isLocalFile():
+                path = url.toLocalFile()
+                ext = path.lower().split('.')[-1]
+                if ext == 'mp3':
+                    file_paths.append(path)
+                elif ext == 'zip':
+                    # Extract zip and add valid mp3s to list
+                    extracted = self._process_zip_file(path)
+                    file_paths.extend(extracted)
+        
+        if file_paths:
+            event.acceptProposedAction()
+            count = self.import_files_list(file_paths)
+            QMessageBox.information(self, "Import Result", f"Imported {count} file(s)")
+        else:
+            event.ignore()
+
+    def _process_zip_file(self, zip_path):
+        """Extract valid MP3s from zip to the same folder.
+        
+        Logic:
+        1. Check if ANY of the mp3s in the zip already exist in destination.
+        2. If YES: Warn user and abort (do nothing).
+        3. If NO: Extract all mp3s, verify they are there, then DELETE the zip file.
+        
+        Returns list of absolute paths to the extracted MP3s.
+        """
+        extracted_paths = []
+        base_dir = os.path.dirname(zip_path)
+        mp3_members = []
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                # 1. Identify MP3s
+                for member in zip_ref.namelist():
+                    if member.lower().endswith('.mp3'):
+                        # Security check: prevent Zip Slip
+                        if '..' not in member:
+                            mp3_members.append(member)
+                
+                if not mp3_members:
+                    return []
+
+                # 2. Check Collisions
+                for member in mp3_members:
+                    target_path = os.path.join(base_dir, member)
+                    if os.path.exists(target_path):
+                        # Collision detected!
+                        QMessageBox.warning(
+                            self, 
+                            "Import Aborted", 
+                            f"The file '{member}' already exists in the destination folder.\n\nAborting import to prevent overwriting."
+                        )
+                        return []
+
+                # 3. Extract All
+                for member in mp3_members:
+                    zip_ref.extract(member, base_dir)
+                    target_path = os.path.join(base_dir, member)
+                    extracted_paths.append(os.path.abspath(target_path))
+                    
+            # 4. Delete Zip (only if we reached here successfully)
+            try:
+                os.remove(zip_path)
+            except OSError as e:
+                print(f"Error deleting zip file {zip_path}: {e}")
+                
+        except zipfile.BadZipFile:
+            print(f"Error: {zip_path} is not a valid zip file")
+            
+        return extracted_paths
 
     def _setup_top_controls(self, parent_layout) -> None:
         layout = QHBoxLayout()
@@ -120,6 +261,14 @@ class LibraryWidget(QWidget):
 
     def _populate_table(self, headers, data) -> None:
         self.library_model.clear()
+        
+        # Update Empty State
+        if not data:
+            self.empty_label.show()
+            self._update_empty_label_position()
+        else:
+            self.empty_label.hide()
+            
         if headers:
             self.library_model.setHorizontalHeaderLabels(headers)
         
