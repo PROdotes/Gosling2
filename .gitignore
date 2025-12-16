@@ -68,3 +68,4 @@ sqldb/
 *.log
 settings.ini
 
+.idea/workspace.xml

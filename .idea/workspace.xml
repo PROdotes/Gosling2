@@ -4,12 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="21471e4f-d810-44ef-8db4-c311e8c7bfae" name="Changes" comment="fixed red line bug&#10;added the option to double click to insert into playlist&#10;changed formating of the main window&#10;added visible column dropbox to right click&#10;added loading and saving for splitter and columns">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/business/services/library_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/business/services/library_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data/repositories/song_repository.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data/repositories/song_repository.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/presentation/views/main_window.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/presentation/views/main_window.py" afterDir="false" />
-    </list>
+    <list default="true" id="21471e4f-d810-44ef-8db4-c311e8c7bfae" name="Changes" comment="added artists to tree view" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -183,7 +178,15 @@
       <option name="project" value="LOCAL" />
       <updated>1765461338385</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="added artists to tree view">
+      <option name="closed" value="true" />
+      <created>1765463624821</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1765463624821</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -203,7 +206,8 @@
     <MESSAGE value="added file selection" />
     <MESSAGE value="fixed red line bug&#10;added edit mode for library&#10;added the option to double click to insert into playlist&#10;added a print when you edit an entry in the table, eventually this needs to be sent to the database" />
     <MESSAGE value="fixed red line bug&#10;added the option to double click to insert into playlist&#10;changed formating of the main window&#10;added visible column dropbox to right click&#10;added loading and saving for splitter and columns" />
-    <option name="LAST_COMMIT_MESSAGE" value="fixed red line bug&#10;added the option to double click to insert into playlist&#10;changed formating of the main window&#10;added visible column dropbox to right click&#10;added loading and saving for splitter and columns" />
+    <MESSAGE value="added artists to tree view" />
+    <option name="LAST_COMMIT_MESSAGE" value="added artists to tree view" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
