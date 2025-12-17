@@ -26,6 +26,12 @@
         *   [x] **Context Menu**: "Done" / "Not Done" toggling with validation. ✅
         *   [x] **Validation Logic**: Preventing incomplete songs from being marked "Done". ✅
         *   [ ] **Schema Update**: Add `Album`, `Publisher`, `Genre` to SQLite. (`ISRC` is ✅ Implemented).
+        *   [ ] **Album Management**: Implement Albums table with many-to-many FileAlbums (songs on multiple albums/compilations).
+        *   [ ] **Publisher Hierarchy**: Implement Publishers table with self-referencing parent relationships (subsidiaries).
+        *   [ ] **Album-Publisher Link**: Link publishers to albums (via AlbumPublishers), not directly to songs.
+        *   [ ] **Genre Filter Tree**: Add genre filtering to FilterWidget (click "House" → show all House songs).
+        *   [ ] **Genre Tag Editor**: Implement tag-style genre editor with autocomplete (comma-separated UI, normalized storage).
+        *   [ ] **Publisher Filter Tree**: Flat alphabetical list with search, hierarchical query support.
         *   [ ] **"Done" Flag**: Implement `TKEY` read/write (stores "true" or " ") for compatibility.
         *   [ ] **Renaming Service**: Port the `generateNewFilename` logic (Genre + Year folder structure) to a new service.
         *   [ ] **Metadata Write**: Connect `MetadataService` to write tags using `mutagen`.
@@ -33,7 +39,10 @@
 
 **Backlog (Harder / Later)**:
 *   [Issue #7] Broadcast Automation (Complex timing logic).
-*   [Feat] Advanced Search Syntax (Parser implementation).
+*   [Feat] Advanced Search Syntax (Parser implementation):
+    *   Support field-specific queries: `genre:house`, `year:2020`, `bpm:>120`
+    *   Support multi-value fields: `genres:house,electronic` (songs with both)
+    *   Support boolean operators: `genre:house AND year:2020`
 
 **Design & Assets**:
 *   [ ] **Review Icon Vector Work**: The conceptual sheets are saved in `resources/design/`. Need to manually refine the selected "Cabinet + Note" icon into a proper SVG/Vector format.
