@@ -164,13 +164,86 @@ class MetadataService:
     def write_tags(song: Song) -> bool:
         """
         Write metadata from Song object to MP3 file.
+        Preserves existing frames not managed by Gosling (e.g., APIC album art, COMM comments).
         Returns True on success, False on failure.
         """
+        if not song.path:
+            return False
+        
         try:
-            print(f"DEBUG: write_tags called for {song.path}")
-            # Placeholder for Issue #3 logic
+            from mutagen.id3 import TIT2, TPE1, TCOM, TEXT, TOLY, TBPM, TDRC, TSRC, TKEY, TXXX, TIT1, TIPL
+            
+            # Load file
+            audio = MP3(song.path, ID3=ID3)
+            
+            # Ensure tags exist
+            if audio.tags is None:
+                audio.add_tags()
+            
+            # Update title (only if not None/empty)
+            if song.title:
+                audio.tags.delall('TIT2')
+                audio.tags.add(TIT2(encoding=3, text=song.title))
+            
+            # Update performers (handle list)
+            if song.performers:
+                audio.tags.delall('TPE1')
+                audio.tags.add(TPE1(encoding=3, text=song.performers))
+            
+            # Update composers
+            if song.composers:
+                audio.tags.delall('TCOM')
+                audio.tags.add(TCOM(encoding=3, text=song.composers))
+            
+            # Update lyricists (use TEXT, which is the standard frame)
+            if song.lyricists:
+                audio.tags.delall('TEXT')
+                audio.tags.delall('TOLY')  # Also clear legacy frame
+                audio.tags.add(TEXT(encoding=3, text=song.lyricists))
+            
+            # Update groups
+            if song.groups:
+                audio.tags.delall('TIT1')
+                audio.tags.add(TIT1(encoding=3, text=song.groups))
+            
+            # Update BPM
+            if song.bpm is not None:
+                audio.tags.delall('TBPM')
+                audio.tags.add(TBPM(encoding=3, text=str(song.bpm)))
+            
+            # Update recording year
+            if song.recording_year is not None:
+                audio.tags.delall('TDRC')
+                audio.tags.delall('TYER')  # Also clear legacy frame
+                audio.tags.add(TDRC(encoding=3, text=str(song.recording_year)))
+            
+            # Update ISRC
+            if song.isrc:
+                audio.tags.delall('TSRC')
+                audio.tags.add(TSRC(encoding=3, text=song.isrc))
+            
+            # Update producers (dual mode: TIPL + TXXX:PRODUCER)
+            if song.producers:
+                # TIPL format: list of (role, name) tuples
+                audio.tags.delall('TIPL')
+                people_list = [(role, name) for name in song.producers for role in ['producer']]
+                audio.tags.add(TIPL(encoding=3, people=people_list))
+                
+                # Also write to TXXX:PRODUCER for compatibility
+                audio.tags.delall('TXXX:PRODUCER')
+                audio.tags.add(TXXX(encoding=3, desc='PRODUCER', text=song.producers))
+            
+            # Update is_done (dual mode: TKEY + TXXX:GOSLING_DONE)
+            audio.tags.delall('TKEY')
+            audio.tags.delall('TXXX:GOSLING_DONE')
+            audio.tags.add(TKEY(encoding=3, text='true' if song.is_done else ' '))
+            audio.tags.add(TXXX(encoding=3, desc='GOSLING_DONE', text='1' if song.is_done else '0'))
+            
+            # Save file (v1=1 preserves existing ID3v1, doesn't create new)
+            audio.save(v1=1)
             return True
+            
         except Exception as e:
-            print(f"Error writing tags: {e}")
+            print(f"Error writing tags to {song.path}: {e}")
             return False
 
