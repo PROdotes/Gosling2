@@ -83,7 +83,7 @@
 
 | Task | Category | Priority | Complexity | Score | Status | Notes |
 |------|----------|----------|------------|-------|--------|-------|
-| **Metadata Write** | Metadata | 5 | 3 | 15 | 📋 | ⭐ Mutagen integration, uses existing Song model |
+| **Metadata Write** | Metadata | 5 | 3 | 15 | ✅ | ⭐ Complete with validation, 28 tests passing |
 | **Library View Modes** | UI | 3 | 2 | 12 | 📋 | ⭐ Quick win - UI toggle, no schema impact |
 | **Genre Filter Tree** | Metadata | 4 | 3 | 12 | 📋 | UI + query logic (after schema done) |
 | **Schema Update (bundled)** | Metadata | 5 | 4 | 10 | 📋 | All tables at once: Genre, Publisher, Album, AlbumPublishers, FileAlbums |
@@ -109,9 +109,10 @@
 - ✅ Context Menu validation
 - ✅ Validation Logic
 - ✅ "Done" Flag Read (TKEY - write covered by Metadata Write)
+- ✅ Metadata Write (100% complete - 28 tests, defensive validation)
 
 **Recommended Order (by Score & Dependencies):**
-1. **Metadata Write** (Score: 15) - Highest value, enables TKEY/ID3 writing ⭐
+1. ~~**Metadata Write** (Score: 15)~~ ✅ **COMPLETE**
 2. **Library View Modes** (Score: 12) - Quick UI win, no schema impact ⭐
 3. **Test Suite Audit** (Score: 8) - Quick cleanup win ⭐
 4. **Schema Update (bundled)** (Score: 10) - Do all tables at once (Genre, Publisher, Album)

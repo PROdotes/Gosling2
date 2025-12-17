@@ -1,2 +1,2 @@
-DB Columns: {'FileID', 'IsDone', 'Path', 'ISRC', 'TempoBPM', 'RecordingYear', 'Title', 'Duration'}
-Mapped Attributes: {'bpm', 'recording_year', 'album_artists', 'title', 'formatted_duration', 'performers', 'composers', 'is_done', 'isrc', 'producers'}
+DB Columns: {'Duration', 'ISRC', 'IsDone', 'TempoBPM', 'FileID', 'Title', 'Path', 'RecordingYear'}
+Mapped Attributes: {'album_artists', 'recording_year', 'bpm', 'producers', 'formatted_duration', 'is_done', 'title', 'composers', 'performers', 'isrc'}

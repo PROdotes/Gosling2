@@ -193,6 +193,34 @@ class MetadataService:
             print(f"Warning: Invalid BPM {song.bpm}, skipping BPM write")
             song.bpm = None
         
+        # Validate string lengths (prevent ID3 corruption from oversized data)
+        MAX_TEXT_LENGTH = 1000
+        if song.title and len(song.title) > MAX_TEXT_LENGTH:
+            print(f"Warning: Title too long ({len(song.title)} chars), truncating to {MAX_TEXT_LENGTH}")
+            song.title = song.title[:MAX_TEXT_LENGTH]
+        
+        if song.isrc and len(song.isrc) > 50:  # ISRC should be 12 chars max
+            print(f"Warning: ISRC too long, truncating")
+            song.isrc = song.isrc[:50]
+        
+        # Validate and clean lists (remove empty/invalid items)
+        def clean_list(items):
+            """Remove empty strings, None, and non-strings from list"""
+            if not items:
+                return []
+            return [str(item).strip() for item in items if item and str(item).strip()]
+        
+        if song.performers:
+            song.performers = clean_list(song.performers)
+        if song.composers:
+            song.composers = clean_list(song.composers)
+        if song.lyricists:
+            song.lyricists = clean_list(song.lyricists)
+        if song.producers:
+            song.producers = clean_list(song.producers)
+        if song.groups:
+            song.groups = clean_list(song.groups)
+        
         try:
             from mutagen.id3 import TIT2, TPE1, TCOM, TEXT, TOLY, TBPM, TDRC, TSRC, TKEY, TXXX, TIT1, TIPL
             
