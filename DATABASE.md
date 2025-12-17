@@ -48,6 +48,7 @@ erDiagram
         INTEGER ContributorID PK
         TEXT Name
         TEXT SortName
+        TEXT Type
     }
 
     Roles {
@@ -129,6 +130,12 @@ Stores unique names of all people or groups involved in the music (artists, comp
 | `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier for the contributor |
 | `Name` | TEXT | NOT NULL UNIQUE | Display name |
 | `SortName` | TEXT | - | Name used for sorting (e.g., "Beatles, The") |
+| `Type` | TEXT | CHECK(Type IN ('person', 'group')) | Contributor type: 'person' or 'group' |
+
+**Type Column:**
+- `'person'`: Individual contributor (e.g., "John Lennon")
+- `'group'`: Band/ensemble (e.g., "The Beatles")
+- Prevents circular group membership (groups can only contain persons)
 
 ### 3. `Roles`
 Defines the types of participation a contributor can have.
@@ -168,6 +175,11 @@ Represents relationships between contributors (e.g., a band and its members).
 **Constraints:**
 - Primary Key: `(GroupID, MemberID)`
 
+**Validation:**
+- `GroupID` must reference a Contributor with Type='group'
+- `MemberID` must reference a Contributor with Type='person'
+- Prevents circular group membership
+
 ### 6. `Genres`
 Stores the master list of music genres.
 
@@ -178,6 +190,7 @@ Stores the master list of music genres.
 
 **Notes:**
 - Genres are auto-created when user enters a new genre name
+- **Normalization:** Names stored in title case ("House", "Hip Hop") to prevent duplicates
 - Case-sensitive uniqueness enforced
 
 ### 7. `FileGenres` (Junction Table)
@@ -251,6 +264,8 @@ Stores album information. Songs can appear on multiple albums (original release,
 - Singles are treated as albums (e.g., "Hey Jude (Single)")
 - Compilations and re-releases are separate albums with different years
 - Publishers are linked to albums, not individual songs
+- **Duplicate names allowed:** "Greatest Hits" can exist multiple times (different artists/years)
+- **Year validation:** Application warns if Year < 1860 or Year > current_year + 1
 
 **Example Data:**
 ```

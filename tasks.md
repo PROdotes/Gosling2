@@ -8,9 +8,9 @@
 
 **Priorities for Next Session (Easy Wins First)**:
 
-1.  **[Refactor] Centralize Settings Manager** (Warm-up)
+1.  **[Refactor] Centralize Settings Manager** ✅ **COMPLETE**
     *   **Goal**: Fix the scattered `QSettings` usage.
-    *   **Why**: Quick mechanical cleanup to get the brain working. Ensures testing consistency.
+    *   **Status**: Fully centralized in `SettingsManager` service. All widgets use dependency injection.
 
 2.  **[Refactor] Test Suite Audit** (Cleanup)
     *   **Goal**: Check for redundant fixtures, duplicated mocks, and opportunities to simplify property verification.
@@ -71,3 +71,52 @@
         *   Direct management of `QMediaPlayer` pairs (`player1`/`player2`) makes the code fragile and hard to test.
         *   Timer-based logic is coupled tightly with playback state.
     *   **Plan**: Extract `Crossfader` into a separate class. Create a `DualDeckPlayer` abstraction that manages the swapping internally, exposing a simple `play(track, transition=Crossfade)` interface.
+
+---
+
+## 📊 Priority & Complexity Matrix
+
+**Legend:**
+- **Priority:** 1 (Low) → 5 (Critical)
+- **Complexity:** 1 (Simple) → 5 (Very Complex)
+- **Score:** Priority × (6 - Complexity) = Higher is better (high value, low effort)
+
+| Task | Category | Priority | Complexity | Score | Status | Notes |
+|------|----------|----------|------------|-------|--------|-------|
+| **Metadata Write** | Metadata | 5 | 3 | 15 | 📋 | ⭐ Mutagen integration, uses existing Song model |
+| **Library View Modes** | UI | 3 | 2 | 12 | 📋 | ⭐ Quick win - UI toggle, no schema impact |
+| **Genre Filter Tree** | Metadata | 4 | 3 | 12 | 📋 | UI + query logic (after schema done) |
+| **Schema Update (bundled)** | Metadata | 5 | 4 | 10 | 📋 | All tables at once: Genre, Publisher, Album, AlbumPublishers, FileAlbums |
+| **Album Management** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update, not standalone |
+| **Publisher Hierarchy** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update, recursive CTEs |
+| **Album-Publisher Link** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update (triggers 9-layer yelling) |
+| **Test Suite Audit** | Tech Debt | 2 | 2 | 8 | 📋 | ⭐ Quick win - cleanup, no schema changes |
+| **Renaming Service** | Metadata | 4 | 4 | 8 | 📋 | Complex file system logic, genre routing |
+| **Genre Tag Editor** | Metadata | 4 | 4 | 8 | 📋 | Custom widget, autocomplete, tag UI |
+| **Publisher Filter Tree** | Metadata | 3 | 3 | 9 | 📋 | Similar to genre but with hierarchy |
+| **Refactor song_repository.py** | Tech Debt | 3 | 4 | 6 | 📋 | SQL cleanup, query builder |
+| **Refactor playback_service.py** | Tech Debt | 2 | 4 | 4 | 📋 | Crossfade extraction, state machine |
+| **Advanced Search Syntax** | Backlog | 2 | 4 | 4 | 📋 | Parser, query builder |
+| **Refactor library_widget.py** | Tech Debt | 3 | 5 | 3 | 📋 | Large refactor, high risk |
+| **Broadcast Automation** | Backlog | 2 | 5 | 2 | 📋 | Complex timing, scheduling logic |
+
+**Status Legend:**
+- ✅ Complete
+- 📋 Not started
+
+**Completed (not in matrix):**
+- ✅ Settings Manager Refactor
+- ✅ Context Menu validation
+- ✅ Validation Logic
+- ✅ "Done" Flag Read (TKEY - write covered by Metadata Write)
+
+**Recommended Order (by Score & Dependencies):**
+1. **Metadata Write** (Score: 15) - Highest value, enables TKEY/ID3 writing ⭐
+2. **Library View Modes** (Score: 12) - Quick UI win, no schema impact ⭐
+3. **Test Suite Audit** (Score: 8) - Quick cleanup win ⭐
+4. **Schema Update (bundled)** (Score: 10) - Do all tables at once (Genre, Publisher, Album)
+5. **Genre Filter Tree** (Score: 12) - After schema is complete
+6. **UI Components** (Tag editors, filters) - After schema is stable
+
+**Key Insight:** Schema changes trigger 9-layer validation cascade. Bundle them together, don't do piecemeal.
+
