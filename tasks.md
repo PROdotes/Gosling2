@@ -98,6 +98,7 @@
 | **Refactor playback_service.py** | Tech Debt | 2 | 4 | 4 | 📋 | Crossfade extraction, state machine |
 | **Advanced Search Syntax** | Backlog | 2 | 4 | 4 | 📋 | Parser, query builder |
 | **Refactor library_widget.py** | Tech Debt | 3 | 5 | 3 | 📋 | Large refactor, high risk |
+| **Field Registry Pattern** | Refactor | 3 | 4 | 6 | 📋 | Replace manual 10-layer enforcement with central registry |
 | **Broadcast Automation** | Backlog | 2 | 5 | 2 | 📋 | Complex timing, scheduling logic |
 
 **Status Legend:**
