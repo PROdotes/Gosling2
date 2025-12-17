@@ -170,6 +170,29 @@ class MetadataService:
         if not song.path:
             return False
         
+        # Validate data before writing
+        from datetime import datetime
+        current_year = datetime.now().year
+        
+        # Validate year (1860 to current_year + 1)
+        if song.recording_year is not None:
+            if song.recording_year < 1860 or song.recording_year > current_year + 1:
+                print(f"Warning: Invalid year {song.recording_year}, skipping year write")
+                song.recording_year = None  # Don't write invalid year
+        
+        # Validate ISRC format (CC-XXX-YY-NNNNN)
+        if song.isrc:
+            import re
+            isrc_pattern = r'^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$'
+            if not re.match(isrc_pattern, song.isrc.replace('-', '')):
+                print(f"Warning: Invalid ISRC format {song.isrc}, skipping ISRC write")
+                song.isrc = None  # Don't write invalid ISRC
+        
+        # Validate BPM (positive integer)
+        if song.bpm is not None and song.bpm <= 0:
+            print(f"Warning: Invalid BPM {song.bpm}, skipping BPM write")
+            song.bpm = None
+        
         try:
             from mutagen.id3 import TIT2, TPE1, TCOM, TEXT, TOLY, TBPM, TDRC, TSRC, TKEY, TXXX, TIT1, TIPL
             
