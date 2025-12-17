@@ -16,89 +16,100 @@ A single, declarative definition of every data field in the system.
 ```python
 from enum import Enum, auto
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional, Callable, List
 
-class Layer(Enum):
-    DB = auto()
-    MODEL = auto()
-    SERVICE = auto()
-    UI_TABLE = auto()
-    METADATA_READ = auto()
-    METADATA_WRITE = auto()
-    # ... etc
+class FieldType(Enum):
+    SCALAR = auto()      # Normal column in Files table
+    RELATIONAL = auto()  # Many-to-many or Hierarchical (linked tables)
+
+class RelationType(Enum):
+    MANY_TO_MANY = auto() # e.g., Genres, Albums
+    HIERARCHICAL = auto() # e.g., Publishers
 
 @dataclass
 class DataField:
     name: str                  # Internal system name
-    db_col: str                # Database column name
-    model_attr: str            # Song model attribute
     ui_header: str             # UI Table Header
-    id3_frame: Optional[str]   # ID3 Frame ID (if applicable)
+    field_type: FieldType = FieldType.SCALAR
     
-    # Validation flags
-    required_layers: list[Layer] = field(default_factory=lambda: [l for l in Layer])
+    # 1. Database Mapping
+    db_col: Optional[str] = None      # For SCALAR
+    db_path: Optional[List[str]] = None # For RELATIONAL (e.g., ["FileGenres", "Genres"])
+    
+    # 2. Logic Mapping
+    model_attr: str            # Song model attribute
+    id3_frame: Optional[str] = None   # Primary ID3 Frame ID (e.g., "TIT2")
+    id3_fallback: Optional[str] = None # Fallback frame (e.g., "TPE1" vs "TIPL")
+    
+    # 3. Validation & UI
     is_editable: bool = True
-    
-    # Future extensibility
+    ui_widget: str = "LineEdit" # Default widget type
     validator: Optional[Callable] = None
-
-# THE SOURCE OF TRUTH
-FIELD_REGISTRY = [
-    DataField(
-        name="title",
-        db_col="Title",
-        model_attr="title",
-        ui_header="Title",
-        id3_frame="TIT2"
-    ),
-    DataField(
-        name="isrc",
-        db_col="ISRC",
-        model_attr="isrc",
-        ui_header="ISRC",
-        id3_frame="TSRC",
-        validator=validate_isrc
-    ),
-    # ... defining all fields here
-]
 ```
 
-### 2. Implementation Strategy
+## 🗺️ The "Master Path" (Order of Operations)
 
-#### Phase 1: Passive Enforcement (Test-Only Refactor)
-Instead of 10 disparate test files manually listing fields, we have **one** master integrity test that iterates the registry.
+To avoid duplicate work, we follow this strict sequence:
 
+1.  **Test Audit & Cleanup:** Consolidate 56 test files down to ~30 to ensure a clear workspace.
+2.  **Phase 1: The Manager (Integrity):** Build the automated test that iterates the Registry.
+3.  **Phase 2: The Chef (Logic):** Refactor `MetadataService` and `LibraryWidget` to use the Registry.
+4.  **Schema Update (Bundled):** Add Genres, Publishers, and Albums by simply adding entries to the Registry.
+
+---
+
+## 🔗 Handling Complex Relationships (The "Big Three")
+
+Mapping the Registry to the `DATABASE.md` specifications:
+
+### 1. Genres (Many-to-Many)
 ```python
-# tests/integrity/test_registry_integrity.py
-
-def test_database_layer():
-    """Layer 1: Verify DB has all registry columns"""
-    db_cols = get_db_columns()
-    for field in FIELD_REGISTRY:
-        assert field.db_col in db_cols
-
-def test_model_layer():
-    """Layer 2: Verify Song model has attributes"""
-    for field in FIELD_REGISTRY:
-        assert hasattr(Song, field.model_attr)
-
-# ... and so on for all 10 layers
+DataField(
+    name="genres",
+    ui_header="Genres",
+    field_type=FieldType.RELATIONAL,
+    db_path=["Files", "FileGenres", "Genres"],
+    id3_frame="TCON",
+    ui_widget="TagEditor" # Comma-separated UI, normalized storage
+)
 ```
 
-**benefit:** Adding a field means adding 1 line to `registry.py`. The test suite automatically "yells" if you miss any implementation detail in the actual code.
+### 2. Publishers (Recursive Hierarchical)
+```python
+DataField(
+    name="publisher",
+    ui_header="Publisher",
+    field_type=FieldType.RELATIONAL,
+    db_path=["Files", "FileAlbums", "Albums", "AlbumPublishers", "Publishers"],
+    id3_frame="TPUB",
+    ui_widget="TreeSearch" # Displays breadcrumb/hierarchy chain
+)
+```
 
-#### Phase 2: Active Generation (Code Refactor)
-The application code itself uses the registry to generate UI and logic.
+### 3. Albums (Many-to-Many)
+```python
+DataField(
+    name="albums",
+    ui_header="Albums",
+    field_type=FieldType.RELATIONAL,
+    db_path=["Files", "FileAlbums", "Albums"],
+    id3_frame="TALB"
+)
+```
 
-*   **MetadataService:** `for field in FIELD_REGISTRY: ...`
-*   **LibraryWidget:** `columns = [f.ui_header for f in FIELD_REGISTRY]`
+---
 
-### 3. Benefits
-1.  **Single Source of Truth:** `registry.py` defines the entire data shape.
-2.  **Automated Yelling:** Tests are generated dynamically; you can't "forget" to write a test for a new field.
-3.  **DRY (Don't Repeat Yourself):** Removes massive duplication across the codebase.
-4.  **Extensibility:** Easy to add new layers (e.g., "Export") by adding a flag to the registry.
+## 🕵️ The "Bi-Directional Manager" (Silent Drift Protection)
 
-### 4. Risk / Cost
-*   **High Refactor Cost:** requires touching core files (`Song`, `LibraryService`, `MetadataService`).
-*   **Recommendation:** Implement **Phase 1** first (Test-Only). It provides 80% of the value (safety) with 20% of the risk.
+The Registry Integrity Test will perform a dual scan to ensure perfect alignment:
+
+1.  **Registry → Code:** *"The Registry says field 'X' exists. Is it in the DB? Table? Metadata? Search? Service?"*
+2.  **Code → Registry (The Neat-Freak):**
+    -   Scan `sqlite_master`: *"Found column 'Y' in DB. Is it in the Registry? NO? -> **YELL.**"*
+    -   Scan `id3_frames.json`: *"Found frame 'Z' assigned in code. Is it in the Registry? NO? -> **YELL.**"*
+
+## 🚀 Benefits Recap
+- **Adding a field:** Add 1 line in `registry.py`.
+- **Database Safety:** Zero "mystery columns" allowed.
+- **UI Consistency:** Headers and search fields always match the data.
+- **Architectural Shift:** From **Building** features to **Describing** data.

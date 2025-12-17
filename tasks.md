@@ -84,22 +84,22 @@
 | Task | Category | Priority | Complexity | Score | Status | Notes |
 |------|----------|----------|------------|-------|--------|-------|
 | **Metadata Write** | Metadata | 5 | 3 | 15 | ✅ | ⭐ Complete with validation, 28 tests passing |
-| **Library View Modes** | UI | 3 | 2 | 12 | 📋 | ⭐ Quick win - UI toggle, no schema impact |
-| **Genre Filter Tree** | Metadata | 4 | 3 | 12 | 📋 | UI + query logic (after schema done) |
-| **Schema Update (bundled)** | Metadata | 5 | 4 | 10 | 📋 | All tables at once: Genre, Publisher, Album, AlbumPublishers, FileAlbums |
-| **Album Management** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update, not standalone |
-| **Publisher Hierarchy** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update, recursive CTEs |
-| **Album-Publisher Link** | Metadata | 5 | 4 | 10 | 📋 | Part of schema update (triggers 9-layer yelling) |
-| **Test Suite Audit** | Tech Debt | 2 | 2 | 8 | 📋 | ⭐ Quick win - cleanup, no schema changes |
-| **Renaming Service** | Metadata | 4 | 4 | 8 | 📋 | Complex file system logic, genre routing |
-| **Genre Tag Editor** | Metadata | 4 | 4 | 8 | 📋 | Custom widget, autocomplete, tag UI |
-| **Publisher Filter Tree** | Metadata | 3 | 3 | 9 | 📋 | Similar to genre but with hierarchy |
-| **Refactor song_repository.py** | Tech Debt | 3 | 4 | 6 | 📋 | SQL cleanup, query builder |
-| **Refactor playback_service.py** | Tech Debt | 2 | 4 | 4 | 📋 | Crossfade extraction, state machine |
-| **Advanced Search Syntax** | Backlog | 2 | 4 | 4 | 📋 | Parser, query builder |
-| **Refactor library_widget.py** | Tech Debt | 3 | 5 | 3 | 📋 | Large refactor, high risk |
-| **Field Registry Pattern** | Refactor | 3 | 4 | 6 | 📋 | Replace manual 10-layer enforcement with central registry |
-| **Broadcast Automation** | Backlog | 2 | 5 | 2 | 📋 | Complex timing, scheduling logic |
+| **Library View Modes** | UI | 3 | 2 | 12 | � | **Plan**: `.agent/PROPOSAL_LIBRARY_VIEWS.md` |
+| **App Context Modes** | UI | 3 | 3 | 9 | 📜 | **Plan**: `.agent/PROPOSAL_APP_MODES.md` |
+| **Field Registry Pattern** | Refactor | 5 | 4 | 10 | � | **Plan**: `.agent/PROPOSAL_FIELD_REGISTRY.md` |
+| **Schema Update (bundled)** | Metadata | 5 | 4 | 10 | � | **Plan**: `.agent/PROPOSAL_FIELD_REGISTRY.md` |
+| **Transaction Log (Undo)** | Data | 5 | 4 | 10 | � | **Plan**: `.agent/PROPOSAL_TRANSACTION_LOG.md` |
+| **Metadata Editor** | UI | 5 | 3 | 10 | � | **Plan**: `.agent/PROPOSAL_METADATA_EDITOR.md` |
+| **Renaming Service** | Logic | 4 | 4 | 8 | � | **Plan**: `.agent/PROPOSAL_RENAMING_SERVICE.md` |
+| **Test Suite Audit** | Tech Debt | 4 | 2 | 8 | � | **Plan**: `.agent/TEST_AUDIT_PLAN.md` |
+| **Album Management** | Metadata | 4 | 4 | 8 | � | **Plan**: `.agent/PROPOSAL_ALBUMS.md` |
+| **Filter Trees (Genre/Pub)** | Metadata | 3 | 3 | 9 | � | **Plan**: `.agent/PROPOSAL_FILTER_TREES.md` (Blocked) |
+| **Genre Tag Editor** | Metadata | 4 | 4 | 8 | � | **Plan**: `.agent/PROPOSAL_TAG_EDITOR.md` |
+| **Refactor song_repository** | Tech Debt | 3 | 4 | 6 | 📋 | Low priority until Registry is in |
+| **Refactor playback_service** | Tech Debt | 2 | 4 | 4 | 📋 | Crossfade logic (independent) |
+| **Advanced Search Syntax** | Backlog | 2 | 4 | 4 | 📋 | Parser logic (independent) |
+| **Refactor library_widget** | Tech Debt | 3 | 5 | 3 | 📋 | Large refactor, defer until Views done |
+| **Broadcast Automation** | Backlog | 2 | 5 | 2 | 📋 | Complex scheduling (Phase 3) |
 
 **Status Legend:**
 - ✅ Complete
@@ -112,13 +112,34 @@
 - ✅ "Done" Flag Read (TKEY - write covered by Metadata Write)
 - ✅ Metadata Write (100% complete - 28 tests, defensive validation)
 
-**Recommended Order (by Score & Dependencies):**
-1. ~~**Metadata Write** (Score: 15)~~ ✅ **COMPLETE**
-2. **Library View Modes** (Score: 12) - Quick UI win, no schema impact ⭐
-3. **Test Suite Audit** (Score: 8) - Quick cleanup win ⭐
-4. **Schema Update (bundled)** (Score: 10) - Do all tables at once (Genre, Publisher, Album)
-5. **Genre Filter Tree** (Score: 12) - After schema is complete
-6. **UI Components** (Tag editors, filters) - After schema is stable
+---
 
-**Key Insight:** Schema changes trigger 9-layer validation cascade. Bundle them together, don't do piecemeal.
+## 🚀 The Golden Path (Execution Order)
+
+*Suggested workflow to minimize friction and respect dependencies:*
+
+### 1. The Cleanup (Warm-up) 🧹
+*   **Task:** **Test Suite Audit** (`.agent/TEST_AUDIT_PLAN.md`)
+*   **Why:** Low cognitive load. Prune dead code. Get the tests blazing fast.
+*   **Status:** Independent.
+
+### 2. The Foundation (Focus Block) 🏗️
+*   **Task:** **Field Registry (Phase 1)** (`.agent/PROPOSAL_FIELD_REGISTRY.md`)
+*   **Why:** The "Manager" class. Nothing else (Editor, Log) works without this definition.
+*   **Status:** Independent (but critical).
+
+### 3. The Structure (The Schema) 🧱
+*   **Task:** **Schema Update** (`.agent/PROPOSAL_FIELD_REGISTRY.md` logic)
+*   **Why:** Build the `Genres`, `Publishers`, `Albums` tables.
+*   **Status:** Blocked by Field Registry.
+
+### 4. The Data Logic (The Brain) 📜
+*   **Task:** **Transaction Log** (`.agent/PROPOSAL_TRANSACTION_LOG.md`)
+*   **Why:** Implement logging *with* the new tables. Easier to build now than retrofit later.
+*   **Status:** Blocked by Schema.
+
+### 5. The Visuals (The Reward) 🎨
+*   **Task:** **Library View Modes** (`.agent/PROPOSAL_LIBRARY_VIEWS.md`)
+*   **Why:** High-impact UI work. See your data in new ways (Grid/Compact).
+*   **Status:** Can be done anytime, but best after data is solid.
 
