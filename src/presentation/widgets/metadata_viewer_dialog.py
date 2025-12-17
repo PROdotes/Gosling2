@@ -1,22 +1,33 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, 
-    QHeaderView, QPushButton, QDialogButtonBox, QLabel
+    QHeaderView, QPushButton, QDialogButtonBox, QLabel, QHBoxLayout
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
 
 class MetadataViewerDialog(QDialog):
     """Dialog to compare File metadata vs Library metadata"""
     
+    # Signals
+    import_requested = pyqtSignal()
+    export_requested = pyqtSignal()
+
     def __init__(self, file_song, db_song, raw_tags=None, parent=None):
         super().__init__(parent)
         self.file_song = file_song
         self.db_song = db_song
         self.raw_tags = raw_tags or {}
+        
+        # State tracking
+        self.has_discrepancies = False
+        self.file_has_newer = False
+        self.db_has_newer = False # Conceptual, really just different
+        
         self.setWindowTitle("Metadata Comparison")
         self.resize(800, 600)
         self._init_ui()
         self._populate_table()
+        self._update_button_state()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -34,11 +45,51 @@ class MetadataViewerDialog(QDialog):
         layout.addWidget(self.table)
 
         # Buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        button_layout = QHBoxLayout()
+        
+        self.btn_import = QPushButton("Import to Database (File -> DB)")
+        self.btn_import.setToolTip("Update the library database with values from the MP3 file tags.")
+        self.btn_import.clicked.connect(self._on_import_clicked)
+        
+        self.btn_export = QPushButton("Export to File (DB -> File)")
+        self.btn_export.setToolTip("Update the MP3 file tags with values from the library database.")
+        self.btn_export.clicked.connect(self._on_export_clicked)
+        
+        self.btn_close = QPushButton("Close")
+        self.btn_close.clicked.connect(self.accept)
+        
+        button_layout.addWidget(self.btn_import)
+        button_layout.addWidget(self.btn_export)
+        button_layout.addStretch()
+        button_layout.addWidget(self.btn_close)
+        
+        layout.addLayout(button_layout)
+
+    def _update_button_state(self):
+        # Enable import if there are ANY discrepancies (assuming File is truth usually)
+        # OR if DB entry is missing completely
+        missing_db = self.db_song is None
+        
+        self.btn_import.setEnabled(missing_db or self.has_discrepancies)
+        
+        # Enable export only if DB exists AND there are discrepancies
+        # Note: Writing logic checks will happen in the signal handler or upstream
+        self.btn_export.setEnabled(not missing_db and self.has_discrepancies)
+
+    def _on_import_clicked(self):
+        # Emit signal to let parent handle the actual repository update
+        self.import_requested.emit()
+        self.accept()
+
+    def _on_export_clicked(self):
+        # Emit signal to let parent handle file writing
+        self.export_requested.emit()
+        self.accept()
 
     def _populate_table(self):
+        # Reset state
+        self.has_discrepancies = False
+        
         # Common ID3v2.3/v2.4 frames
         ID3_FRAMES = {}
         try:
@@ -53,7 +104,6 @@ class MetadataViewerDialog(QDialog):
                 ID3_FRAMES = json.load(f)
         except Exception as e:
             print(f"Failed to load ID3 frames JSON: {e}")
-            # Fallback basics if file missing
             pass
             
         self.ID3_FRAMES = ID3_FRAMES
@@ -69,6 +119,8 @@ class MetadataViewerDialog(QDialog):
             ("Duration", "formatted_duration", ["TLEN"]), 
             ("BPM", "bpm", ["TBPM"]),
             ("Year", "recording_year", ["TDRC", "TYER"]),
+            ("ISRC", "isrc", ["TSRC"]),
+            ("Done", "is_done", ["TXXX:GOSLING_DONE", "TKEY"]),
         ]
 
         # Tracking used raw keys to avoid duplication
@@ -96,7 +148,6 @@ class MetadataViewerDialog(QDialog):
                 continue
             
             # Use description if available
-            # Check for colon in key (e.g. TXXX:PRODUCER)
             base_key = key.split(':')[0]
             desc = ID3_FRAMES.get(base_key, "")
             
@@ -160,6 +211,7 @@ class MetadataViewerDialog(QDialog):
                  db_item.setForeground(QColor("gray"))
             elif file_str != db_str:
                 # Discrepancy!
+                self.has_discrepancies = True
                 bg_color = QColor(255, 220, 220) # Light red/pink
                 file_item.setBackground(bg_color)
                 db_item.setBackground(bg_color)

@@ -48,7 +48,7 @@ Implement distinct views for different audio types.
 *   **Requirements**: Filter tabs or specific views for Songs, Jingles, Spots, Beds.
 
 ### 2.3 Drag & Drop Import (Issue #8)
-Finish implementing drag & drop import for easier library management.
+Implemented drag & drop import for easier library management.
 
 ---
 
@@ -79,4 +79,4 @@ Grid view of the daily schedule managed via `PlaylistQueue`.
 | **[#4](https://github.com/PROdotes/Gosling2/issues/4)** | **Database Schema** | 🏗️ In Progress | **Phase 1**. Defines `AutomationPhases`, `PlaylistQueue`. |
 | **[#3](https://github.com/PROdotes/Gosling2/issues/3)** | **Side-Panel Editor** | 📅 Planned | **Phase 2.1**. Spec for the "Quick Edit" interface. |
 | **[#6](https://github.com/PROdotes/Gosling2/issues/6)** | **Library View Modes** | 📅 Planned | **Phase 2.2**. Requirement for Type separation. |
-| **[#8](https://github.com/PROdotes/Gosling2/issues/8)** | **Library Drag & Drop** | 📅 Planned | **Phase 2.3**. UX requirement. |
+| **[#8](https://github.com/PROdotes/Gosling2/issues/8)** | **Library Drag & Drop** | ✅ Completed | **Phase 2.3**. UX requirement. |

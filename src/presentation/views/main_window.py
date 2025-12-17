@@ -86,6 +86,7 @@ class MainWindow(QMainWindow):
         """Setup signal/slot connections"""
         # Library interactions
         self.library_widget.add_to_playlist.connect(self._add_to_playlist)
+        self.library_widget.remove_from_playlist.connect(self._remove_from_playlist)
         
         # Playlist interactions
         # Double-click disabled by user request (prevent accidental play)
@@ -119,6 +120,13 @@ class MainWindow(QMainWindow):
             list_item = QListWidgetItem(f"{performer} | {title}")
             list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
             self.playlist_widget.addItem(list_item)
+
+    def _remove_from_playlist(self, rows: list) -> None:
+        """Remove items from playlist by row index"""
+        # Sort rows descending to avoid index shifting issues
+        for row in sorted(rows, reverse=True):
+            if 0 <= row < self.playlist_widget.count():
+                self.playlist_widget.takeItem(row)
 
     def _play_item(self, item) -> None:
         """Play specific playlist item (Internal helper)"""

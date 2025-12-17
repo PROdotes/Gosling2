@@ -9,6 +9,7 @@ class FilterWidget(QWidget):
     filter_by_performer = pyqtSignal(str)
     filter_by_composer = pyqtSignal(str)
     filter_by_year = pyqtSignal(int)
+    filter_by_status = pyqtSignal(bool)
     reset_filter = pyqtSignal()
 
     # STRICT SCHEMA: Explicitly list DB columns from 'Files' that are NOT used for filtering.
@@ -19,6 +20,7 @@ class FilterWidget(QWidget):
         "Title",        # Unique per file (mostly)
         "Duration",     # Continuous value
         "TempoBPM",     # Continuous value (could be ranged later, but currently ignored)
+        "ISRC",         # Metadata identifier, not for grouping
     }
 
     def __init__(self, library_service, parent=None) -> None:
@@ -49,6 +51,7 @@ class FilterWidget(QWidget):
         self._add_category_to_tree("Lyricist", "Lyricists")
         self._add_category_to_tree("Producer", "Producers")
         self._add_years_to_tree()
+        self._add_status_to_tree()
 
     def _add_category_to_tree(self, role_name: str, display_name: str) -> None:
         """Helper to add a category (role) and its contributors to the tree"""
@@ -129,6 +132,22 @@ class FilterWidget(QWidget):
             
         self.tree_model.appendRow(root_item)
 
+    def _add_status_to_tree(self) -> None:
+        """Add Status (Ready/Not Ready) to tree"""
+        root_item = QStandardItem("Workflow Status")
+        root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        root_item.setData("Status", Qt.ItemDataRole.UserRole + 1)
+        
+        # Not Done
+        not_done = QStandardItem("Not Done (Pending)")
+        not_done.setFlags(not_done.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        not_done.setData(False, Qt.ItemDataRole.UserRole)
+        not_done.setData("Status", Qt.ItemDataRole.UserRole + 1)
+        root_item.appendRow(not_done)
+        
+        self.tree_model.appendRow(root_item)
+        self.tree_view.expand(root_item.index())
+
     def _on_tree_clicked(self, index) -> None:
         """Handle click in the filter tree"""
         item = self.tree_model.itemFromIndex(index)
@@ -145,6 +164,9 @@ class FilterWidget(QWidget):
             elif role == "Year":
                 # Name is stored as int in UserRole for years
                 self.filter_by_year.emit(name)
-        elif item.text() in ["Performers", "Composers", "Lyricists", "Producers", "Years"]:
+            elif role == "Status":
+                # Name is boolean
+                self.filter_by_status.emit(name)
+        elif item.text() in ["Performers", "Composers", "Lyricists", "Producers", "Years", "Workflow Status"]:
              # Or if role is set on root items too
              self.reset_filter.emit()

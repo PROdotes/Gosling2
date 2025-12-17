@@ -40,15 +40,24 @@ class BaseRepository:
                     Title TEXT NOT NULL,
                     Duration REAL,
                     TempoBPM INTEGER,
-                    RecordingYear INTEGER
+                    RecordingYear INTEGER,
+                    ISRC TEXT,
+                    IsDone BOOLEAN
                 )
             """)
 
-            # Migration: Ensure RecordingYear exists (for existing databases)
+            # Migration: Ensure columns exist
             cursor.execute("PRAGMA table_info(Files)")
             columns = [info[1] for info in cursor.fetchall()]
+            
             if "RecordingYear" not in columns:
                 cursor.execute("ALTER TABLE Files ADD COLUMN RecordingYear INTEGER")
+                
+            if "ISRC" not in columns:
+                cursor.execute("ALTER TABLE Files ADD COLUMN ISRC TEXT")
+
+            if "IsDone" not in columns:
+                cursor.execute("ALTER TABLE Files ADD COLUMN IsDone BOOLEAN DEFAULT 0")
 
             # Create Contributors table
             cursor.execute("""

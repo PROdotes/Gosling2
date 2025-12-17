@@ -9,6 +9,8 @@ class Song:
 
     file_id: Optional[int] = None
     path: Optional[str] = None
+    is_done: bool = False
+    isrc: Optional[str] = None
     title: Optional[str] = None
     duration: Optional[float] = None
     bpm: Optional[int] = None

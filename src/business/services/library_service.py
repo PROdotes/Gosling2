@@ -27,6 +27,10 @@ class LibraryService:
         """Update song metadata"""
         return self.song_repository.update(song)
 
+    def update_song_status(self, file_id: int, is_done: bool) -> bool:
+        """Update song status"""
+        return self.song_repository.update_status(file_id, is_done)
+
     def get_contributors_by_role(self, role_name: str) -> List[Tuple[int, str]]:
         """Get all contributors for a specific role"""
         return self.contributor_repository.get_by_role(role_name)
@@ -52,3 +56,7 @@ class LibraryService:
     def get_songs_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific year"""
         return self.song_repository.get_by_year(year)
+
+    def get_songs_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by status"""
+        return self.song_repository.get_by_status(is_done)

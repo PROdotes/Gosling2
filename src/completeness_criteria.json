@@ -46,9 +46,17 @@
             "required": true,
             "type": "string"
         },
+        "isrc": {
+            "required": false,
+            "type": "string"
+        },
         "file_id": {
             "required": true,
             "type": "number"
+        },
+        "is_done": {
+            "required": false,
+            "type": "boolean"
         }
     }
 }

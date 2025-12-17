@@ -26,6 +26,8 @@ class LibraryWidget(QWidget):
     COL_COMPOSER = 5
     COL_BPM = 6
     COL_YEAR = 7
+    COL_ISRC = 8
+    COL_IS_DONE = 9
 
     # Map Column Index -> Field Name for criteria checking
     COL_TO_FIELD = {
@@ -36,11 +38,14 @@ class LibraryWidget(QWidget):
         COL_PATH: 'path',
         COL_COMPOSER: 'composers',
         COL_BPM: 'bpm',
-        COL_YEAR: 'recording_year'
+        COL_YEAR: 'recording_year',
+        COL_ISRC: 'isrc',
+        COL_IS_DONE: 'is_done'
     }
 
     # Signals
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
+    remove_from_playlist = pyqtSignal(list) # List of paths to remove from playlist
 
     def __init__(self, library_service, metadata_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
@@ -106,6 +111,7 @@ class LibraryWidget(QWidget):
         # Enable Drag & Drop
         self.table_view.setAcceptDrops(True)
         self.table_view.installEventFilter(self)
+        self.setAcceptDrops(True) # Allow dropping on the widget itself
         
         # Empty State Label
         self.empty_label = QLabel("Drag audio files here to import", self.table_view)
@@ -124,25 +130,47 @@ class LibraryWidget(QWidget):
         
         main_layout.addWidget(self.splitter)
 
+        # Install event filters for global drag/drop handling on child widgets
+        widgets_to_watch = [
+            self.table_view.viewport(), 
+            self.search_box, 
+            self.filter_widget, 
+            self.empty_label
+        ]
+        if hasattr(self.filter_widget, 'tree_view'):
+            widgets_to_watch.append(self.filter_widget.tree_view)
+            widgets_to_watch.append(self.filter_widget.tree_view.viewport())
+            
+        for widget in widgets_to_watch:
+            widget.installEventFilter(self)
+
     def eventFilter(self, source, event):
-        """Handle events for the table view (Drag & Drop + Resize)"""
-        if source == self.table_view:
-            if event.type() == QEvent.Type.Resize:
-                # Center the empty label
-                self._update_empty_label_position()
-            elif event.type() == QEvent.Type.DragEnter:
+        """Handle events for the table view and children (Drag & Drop + Resize)"""
+        # Handle Resize for Empty Label Position
+        if source == self.table_view and event.type() == QEvent.Type.Resize:
+            self._update_empty_label_position()
+
+        # Handle Drag & Drop for ALL watched widgets
+        if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.DragLeave, QEvent.Type.Drop):
+            if event.type() == QEvent.Type.DragEnter:
                 self.dragEnterEvent(event)
-                return True
+                if event.isAccepted():
+                    return True
             elif event.type() == QEvent.Type.DragMove:
-                # Necessary to accept move for drop to work
-                event.acceptProposedAction()
-                return True
+                # Accept if matches our formats
+                mime = event.mimeData()
+                if mime.hasFormat("application/x-gosling-playlist-rows") or \
+                   (mime.hasUrls() and any(u.isLocalFile() for u in mime.urls())):
+                    event.acceptProposedAction()
+                    return True
             elif event.type() == QEvent.Type.DragLeave:
                 self.dragLeaveEvent(event)
-                return True # Optional, but good to handle
+                # Allow propagation for cleanup
             elif event.type() == QEvent.Type.Drop:
                 self.dropEvent(event)
-                return True
+                if event.isAccepted():
+                    return True
+
         return super().eventFilter(source, event)
 
     def _update_empty_label_position(self):
@@ -152,15 +180,24 @@ class LibraryWidget(QWidget):
             self.empty_label.move(0, 0)
 
     def dragEnterEvent(self, event):
-        """Validate dragged files (MP3 or ZIP)"""
-        if event.mimeData().hasUrls():
-            for url in event.mimeData().urls():
+        """Validate dragged files (MP3 or ZIP) or Playlist Items"""
+        mime = event.mimeData()
+        
+        # 1. Custom Playlist Drag (Remove from Playlist)
+        if mime.hasFormat("application/x-gosling-playlist-rows"):
+            event.acceptProposedAction()
+            self.table_view.setStyleSheet("QTableView { border: 2px solid #F44336; }") # Red border for removal
+            return
+
+        # 2. File Import
+        if mime.hasUrls():
+            for url in mime.urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     ext = path.lower().split('.')[-1]
                     if ext in ['mp3', 'zip']:
                         event.acceptProposedAction()
-                        # Visual Feedback: Highlight Border
+                        # Visual Feedback: Highlight Border (Green)
                         self.table_view.setStyleSheet("QTableView { border: 2px solid #4CAF50; }")
                         return
         event.ignore()
@@ -171,16 +208,33 @@ class LibraryWidget(QWidget):
         event.accept()
 
     def dropEvent(self, event):
-        """Handle dropped files"""
+        """Handle dropped files or playlist items"""
         # Reset visual feedback immediately
         self.table_view.setStyleSheet("")
         
-        if not event.mimeData().hasUrls():
+        mime = event.mimeData()
+
+        # 1. Handle Playlist Drop (Remove)
+        if mime.hasFormat("application/x-gosling-playlist-rows"):
+            try:
+                data = mime.data("application/x-gosling-playlist-rows")
+                rows = json.loads(data.data().decode('utf-8'))
+                if rows:
+                    self.remove_from_playlist.emit(rows)
+                event.acceptProposedAction()
+                return
+            except Exception as e:
+                print(f"Error handling playlist drop: {e}")
+                event.ignore()
+                return
+
+        # 2. Handle File Drop (Import)
+        if not mime.hasUrls():
             event.ignore()
             return
             
         file_paths = []
-        for url in event.mimeData().urls():
+        for url in mime.urls():
             if url.isLocalFile():
                 path = url.toLocalFile()
                 ext = path.lower().split('.')[-1]
@@ -280,6 +334,7 @@ class LibraryWidget(QWidget):
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
         self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
         self.filter_widget.filter_by_year.connect(self._filter_by_year)
+        self.filter_widget.filter_by_status.connect(self._filter_by_status)
         self.filter_widget.reset_filter.connect(self.load_library)
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
@@ -362,6 +417,17 @@ class LibraryWidget(QWidget):
                 item.setData(sort_value, Qt.ItemDataRole.UserRole)
                 item.setEditable(False) # Ensure items are not editable by default
                 
+                # Checkbox for IsDone
+                if col_idx == self.COL_IS_DONE:
+                    item.setCheckable(True)
+                    item.setEditable(False) 
+                    # Remove ItemIsUserCheckable to make it read-only
+                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    # Set State
+                    is_done_bool = bool(cell) if cell is not None else False
+                    item.setCheckState(Qt.CheckState.Checked if is_done_bool else Qt.CheckState.Unchecked)
+                    item.setText("")
+                
                 # Visual Indicator for Incomplete Fields
                 if show_incomplete:
                     field_name = self.COL_TO_FIELD.get(col_idx)
@@ -393,6 +459,10 @@ class LibraryWidget(QWidget):
 
     def _filter_by_year(self, year: int) -> None:
         headers, data = self.library_service.get_songs_by_year(year)
+        self._populate_table(headers, data)
+
+    def _filter_by_status(self, is_done: bool) -> None:
+        headers, data = self.library_service.get_songs_by_status(is_done)
         self._populate_table(headers, data)
 
     def _import_file(self, file_path: str) -> bool:
@@ -507,6 +577,34 @@ class LibraryWidget(QWidget):
         add_to_playlist_action.triggered.connect(self._emit_add_to_playlist)
         menu.addAction(add_to_playlist_action)
         
+        # Smart Status Toggle
+        indexes = self.table_view.selectionModel().selectedRows()
+        if indexes:
+            statuses = []
+            for idx in indexes:
+                source_idx = self.proxy_model.mapToSource(idx)
+                # COL_IS_DONE is column 9
+                item = self.library_model.item(source_idx.row(), self.COL_IS_DONE)
+                # Checkbox state: Checked=2, Unchecked=0
+                is_done = (item.checkState() == Qt.CheckState.Checked) if item else False
+                statuses.append(is_done)
+            
+            all_done = all(statuses)
+            all_not_done = all(not s for s in statuses)
+            
+            status_action = QAction(self)
+            if all_done:
+                status_action.setText("Mark as Not Done")
+                status_action.triggered.connect(lambda: self._toggle_status(False))
+            elif all_not_done:
+                status_action.setText("Mark as Done")
+                status_action.triggered.connect(lambda: self._toggle_status(True))
+            else:
+                status_action.setText("Mixed Status (Cannot Toggle)")
+                status_action.setEnabled(False)
+            
+            menu.addAction(status_action)
+        
         menu.addSeparator()
 
         # 2. Information / Tools
@@ -562,6 +660,50 @@ class LibraryWidget(QWidget):
             visible = not self.table_view.isColumnHidden(col)
             visibility_states[str(col)] = visible
         self.settings_manager.set_column_visibility(visibility_states)
+
+    def _toggle_status(self, new_status: bool) -> None:
+        """Bulk update status for selected rows with validation"""
+        indexes = self.table_view.selectionModel().selectedRows()
+        
+        # Validation Check (Only when marking as Done)
+        if new_status:
+            failed_items = []
+            
+            for index in indexes:
+                source_index = self.proxy_model.mapToSource(index)
+                
+                # Get full row data for validation
+                row_data = []
+                for col in range(self.library_model.columnCount()):
+                     item = self.library_model.item(source_index.row(), col)
+                     row_data.append(item.data(Qt.ItemDataRole.UserRole) if item else None)
+
+                incomplete = self._get_incomplete_fields(row_data)
+                if incomplete:
+                    title_item = self.library_model.item(source_index.row(), self.COL_TITLE)
+                    title = title_item.text() if title_item else "Unknown"
+                    failed_items.append(f"- {title}: Missing {', '.join(incomplete)}")
+            
+            if failed_items:
+                msg = "Cannot mark selection as Done because some items are incomplete:\n\n"
+                msg += "\n".join(failed_items[:10])
+                if len(failed_items) > 10:
+                    msg += f"\n...and {len(failed_items)-10} more."
+                QMessageBox.warning(self, "Validation Failed", msg)
+                return
+
+        # Proceed with update
+        count = 0
+        for index in indexes:
+            source_index = self.proxy_model.mapToSource(index)
+            file_id_item = self.library_model.item(source_index.row(), self.COL_FILE_ID)
+            if file_id_item:
+                file_id = int(file_id_item.text())
+                if self.library_service.update_song_status(file_id, new_status):
+                    count += 1
+        
+        if count > 0:
+            self.load_library()
 
     def _delete_selected(self) -> None:
         indexes = self.table_view.selectionModel().selectedRows()
@@ -634,11 +776,60 @@ class LibraryWidget(QWidget):
             # 3. Show Dialog
             from .metadata_viewer_dialog import MetadataViewerDialog
             dialog = MetadataViewerDialog(file_song, db_song, raw_tags, self)
+            
+            # Connect Actions
+            dialog.import_requested.connect(lambda: self._handle_metadata_import(file_song))
+            dialog.export_requested.connect(lambda: self._handle_metadata_export(db_song))
+            
             dialog.exec()
             
         except Exception as e:
+            import traceback
             traceback.print_exc()
             QMessageBox.warning(self, "Metadata Error", f"Could not read metadata for {file_name}:\n{e}")
+
+    def _handle_metadata_import(self, song):
+        """Update repository with values from file (Import to DB)"""
+        try:
+            # If song already exists in DB (checked by path), this updates it.
+            # If it's new, we might need add_file logic? 
+            # But the viewer is usually opened on existing items.
+            # If db_song was None, we definitely need to insert first?
+            # library_service.update_song handles updates.
+            
+            # Ensure it has an ID if it's new?
+            # The song object from extract_from_mp3 might not have ID if not passed in.
+            
+            existing = self.library_service.get_song_by_path(song.path)
+            if existing:
+                song.file_id = existing.file_id
+                self.library_service.update_song(song)
+                QMessageBox.information(self, "Success", "Library updated from file metadata.")
+            else:
+                # New file case
+                self.library_service.add_file(song.path)
+                # Then update with full metadata
+                new_song_ref = self.library_service.get_song_by_path(song.path)
+                if new_song_ref:
+                    song.file_id = new_song_ref.file_id
+                    self.library_service.update_song(song)
+                QMessageBox.information(self, "Success", "New song added to library.")
+                
+            self.load_library()
+            
+        except Exception as e:
+             QMessageBox.critical(self, "Import Error", f"Failed to update library:\n{e}")
+
+    def _handle_metadata_export(self, song):
+        """Update file tags from database (Export to File)"""
+        try:
+           result = self.metadata_service.write_tags(song)
+           if result:
+               QMessageBox.information(self, "Success", "Metadata export logic triggered (Check console/debug).")
+           else:
+               QMessageBox.warning(self, "Failure", "Failed to triggered write logic.")
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to write tags:\n{e}")
 
     def _get_incomplete_fields(self, row_data) -> set:
         """Identify which fields are incomplete based on criteria.
@@ -652,6 +843,9 @@ class LibraryWidget(QWidget):
         for col_idx, field_name in self.COL_TO_FIELD.items():
             if col_idx < len(row_data):
                 val_map[field_name] = row_data[col_idx]
+        
+        # DEBUG
+        # print(f"Checking incomplete criteria={self.completeness_criteria} val_map={val_map}")
         
         for field, rules in self.completeness_criteria.items():
             # Skip fields not present in our table view mapping

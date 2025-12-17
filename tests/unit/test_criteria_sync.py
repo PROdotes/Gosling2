@@ -77,7 +77,9 @@ class TestCriteriaSync(unittest.TestCase):
             'Title': 'title',
             'Duration': 'duration',
             'TempoBPM': 'bpm',
-            'RecordingYear': 'recording_year'
+            'RecordingYear': 'recording_year',
+            'ISRC': 'isrc',
+            'IsDone': 'is_done'
         }
         
         for col in columns:

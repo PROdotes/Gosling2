@@ -106,10 +106,52 @@ class PlaylistWidget(QListWidget):
         self._preview_row = None
         self._preview_after = False
 
+    def mimeData(self, items):
+        """Override to add custom mime type for internal D&D verification"""
+        mime = super().mimeData(items)
+        if items:
+            import json
+            # Store paths (legacy/debug)
+            paths = []
+            # Store rows (for specific removal)
+            rows = []
+            
+            for item in items:
+                row = self.row(item)
+                if row >= 0:
+                    rows.append(row)
+                
+                data = item.data(Qt.ItemDataRole.UserRole)
+                if data and "path" in data:
+                    paths.append(data["path"])
+            
+            if paths:
+                mime.setData("application/x-gosling-playlist-items", json.dumps(paths).encode('utf-8'))
+            if rows:
+                mime.setData("application/x-gosling-playlist-rows", json.dumps(rows).encode('utf-8'))
+        
+        return mime
+
     def dragEnterEvent(self, event) -> None:
         """Handle drag enter"""
-        if event.mimeData().hasUrls() or event.source() == self:
-            event.acceptProposedAction()
+        mime = event.mimeData()
+        if mime.hasUrls():
+            # Check if at least one file is valid audio
+            has_audio = False
+            for url in mime.urls():
+                if url.isLocalFile():
+                    path = url.toLocalFile()
+                    ext = path.lower().split('.')[-1]
+                    if ext in ['mp3']:
+                        has_audio = True
+                        break
+            
+            if has_audio:
+                event.acceptProposedAction()
+            else:
+                event.ignore()
+        elif event.source() == self:
+             event.acceptProposedAction()
         else:
             event.ignore()
 
@@ -151,6 +193,11 @@ class PlaylistWidget(QListWidget):
             for url in mime.urls():
                 path = url.toLocalFile()
                 if not os.path.isfile(path):
+                    continue
+                
+                # Check extension
+                ext = path.lower().split('.')[-1]
+                if ext not in ['mp3']:
                     continue
 
                 display_text = os.path.basename(path)

@@ -49,6 +49,8 @@ def test_strict_extraction_coverage():
         # Path/FileID are args
         "Path": ("path", None, "/test/path.mp3"),
         "FileID": ("file_id", None, 1),
+        "ISRC": ("isrc", "TSRC", "US-Test-123"),
+        "IsDone": ("is_done", "TXXX:GOSLING_DONE", "1"),
     }
     
     # 3. Verify Coverage
@@ -69,7 +71,7 @@ def test_strict_extraction_coverage():
         
         # Helper to simulate getall behavior
         def getall_side_effect(key):
-            if key in ["TIT2", "TBPM", "TDRC", "TPE1", "TCOM", "TIT1", "TOLY", "TEXT", "TXXX:PRODUCER", "TIPL"]:
+            if key in ["TIT2", "TBPM", "TDRC", "TPE1", "TCOM", "TIT1", "TOLY", "TEXT", "TXXX:PRODUCER", "TIPL", "TSRC", "TXXX:GOSLING_DONE"]:
                 # Map specific keys to our schema map values if present
                 for col, info in schema_tag_map.items():
                     if info[1] == key:
@@ -114,5 +116,9 @@ def test_strict_extraction_coverage():
                 assert actual_val == "/test/path.mp3"
             elif col == "FileID":
                 assert actual_val == 1
+            elif col == "ISRC":
+                assert actual_val == "US-Test-123"
+            elif col == "IsDone":
+                assert actual_val is True
                 
             # If we reached here, the service effectively extracted the value we wanted!

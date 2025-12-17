@@ -43,6 +43,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False # Default to not being a playlist drop
         url = QUrl.fromLocalFile("C:/Downloads/archive.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -74,6 +75,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("C:/Downloads/archive.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -111,6 +113,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         
         # Valid MP3 URL
         url = QUrl.fromLocalFile("C:/Music/song.mp3")
@@ -128,6 +131,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         
         url = QUrl.fromLocalFile("C:/Music/SONG.MP3")
         mime_data.urls.return_value = [url]
@@ -144,6 +148,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         
         # Invalid Text File
         url = QUrl.fromLocalFile("C:/Docs/notes.txt")
@@ -162,6 +167,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("song.mp3")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -182,6 +188,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("song.mp3")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -205,6 +212,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("archive.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -219,6 +227,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("C:/Downloads/malicious.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -252,6 +261,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("C:/Downloads/corrupt.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -271,6 +281,7 @@ class TestLibraryWidgetDragDrop:
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
         url = QUrl.fromLocalFile("C:/Downloads/archive.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
@@ -342,3 +353,40 @@ class TestLibraryWidgetDragDrop:
         widget.load_library()
         
         assert empty_label.isVisible(), "Label should reappear when table is empty"
+
+    def test_drop_playlist_removes_from_playlist(self, widget):
+        """Test that dropping internal playlist items emits signal to remove them."""
+        event = MagicMock(spec=QDropEvent)
+        mime_data = MagicMock(spec=QMimeData)
+        
+        # Setup Playlist Mime Data
+        mime_data.hasFormat.side_effect = lambda fmt: fmt == "application/x-gosling-playlist-rows"
+        mime_data.hasUrls.return_value = False
+        
+        # Mock Data (Rows)
+        import json
+        rows = [1, 3] # Indices
+        data_mock = MagicMock()
+        data_mock.data.return_value = json.dumps(rows).encode('utf-8')
+        mime_data.data.return_value = data_mock
+        
+        event.mimeData.return_value = mime_data
+        
+        # Connect signal
+        mock_signal = MagicMock()
+        widget.remove_from_playlist.connect(mock_signal)
+        
+        # Act
+        widget.dropEvent(event)
+        
+        # Assert
+        event.acceptProposedAction.assert_called_once()
+        mock_signal.assert_called_once()
+        args = mock_signal.call_args[0][0]
+        assert args == rows
+        
+        # Ensure imports were NOT called
+        # (We can check by mocking import_files_list logic if needed, but it shouldn't be reached)
+        with patch.object(widget, 'import_files_list') as mock_import:
+            widget.dropEvent(event)
+            mock_import.assert_not_called()

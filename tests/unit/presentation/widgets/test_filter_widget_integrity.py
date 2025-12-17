@@ -51,7 +51,8 @@ def test_strict_filter_coverage():
     # Ideally we'd inspect the code, but verifying via a known list is acceptable strictness 
     # as long as we maintain it.
     used = {
-        "RecordingYear"
+        "RecordingYear",
+        "IsDone"
     }
     
     # "Contributors" etc are not columns in Files (they are Foreign Keys usually, but linked via tables).

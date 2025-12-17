@@ -24,7 +24,7 @@ def test_database_schema_integrity(tmp_path):
     
     # Expected Columns per table (Name only, we could check type too but Name is sufficient trigger)
     expected_columns = {
-        "Files": {"FileID", "Path", "Title", "Duration", "TempoBPM", "RecordingYear"},
+        "Files": {"FileID", "Path", "Title", "Duration", "TempoBPM", "RecordingYear", "ISRC", "IsDone"},
         "Contributors": {"ContributorID", "Name", "SortName"},
         "Roles": {"RoleID", "Name"},
     }

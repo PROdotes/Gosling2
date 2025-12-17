@@ -20,7 +20,9 @@ def test_song_model_schema_stability():
         "composers",
         "lyricists",
         "producers",
-        "groups"
+        "groups",
+        "isrc",
+        "is_done"
     }
     
     actual_fields = {f.name for f in dataclasses.fields(Song)}
@@ -81,7 +83,9 @@ def test_strict_column_mapping():
             "Title": "title",
             "Duration": "duration",
             "TempoBPM": "bpm",
-            "RecordingYear": "recording_year"
+            "RecordingYear": "recording_year",
+            "ISRC": "isrc",
+            "IsDone": "is_done"
         }
         
         # 4. Strict Check

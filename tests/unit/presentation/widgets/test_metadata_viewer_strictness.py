@@ -59,7 +59,9 @@ def test_metadata_viewer_strict_mapping(qtbot):
         "Title": "title",
         "Duration": "formatted_duration", # Dialog calculates this from Duration? No, Song model property.
         "TempoBPM": "bpm",
-        "RecordingYear": "recording_year"
+        "RecordingYear": "recording_year",
+        "ISRC": "isrc",
+        "IsDone": "is_done"
     }
     
     # Join on Contributors? 

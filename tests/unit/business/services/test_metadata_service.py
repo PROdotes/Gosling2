@@ -115,3 +115,32 @@ class TestMetadataService:
         song = MetadataService.extract_from_mp3("txxx.mp3")
 
         assert "TXXX Prod" in song.producers
+
+    def test_get_raw_tags_exception(self, mock_id3):
+        """Verify get_raw_tags returns empty dict on error"""
+        mock_id3.side_effect = Exception("Read Error")
+        
+        tags = MetadataService.get_raw_tags("error.mp3")
+        assert tags == {}
+        assert isinstance(tags, dict)
+
+    def test_extract_invalid_year(self, mock_mp3, mock_id3):
+        """Test resilience against malformed year tags"""
+        audio_mock = MagicMock()
+        mock_mp3.return_value = audio_mock
+        
+        tags_mock = MagicMock()
+        def getall_side_effect(key):
+            if key == "TDRC":
+                mock_frame = MagicMock()
+                mock_frame.text = ["NotAYear"]
+                return [mock_frame]
+            return []
+            
+        tags_mock.getall.side_effect = getall_side_effect
+        tags_mock.__contains__.side_effect = lambda key: key == "TDRC"
+        mock_id3.return_value = tags_mock
+
+        song = MetadataService.extract_from_mp3("bad_year.mp3")
+        assert song.recording_year is None
+

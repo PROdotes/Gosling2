@@ -40,7 +40,9 @@ class SongRepository(BaseRepository):
                            F.Path AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
                            F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year
+                           F.RecordingYear AS Year,
+                           F.ISRC AS ISRC,
+                           F.IsDone AS IsDone
                     FROM Files F
                     LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
                     LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
@@ -76,9 +78,9 @@ class SongRepository(BaseRepository):
                 # Update basic file info
                 cursor.execute("""
                     UPDATE Files
-                    SET Title = ?, Duration = ?, TempoBPM = ?, RecordingYear = ?
+                    SET Title = ?, Duration = ?, TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?
                     WHERE FileID = ?
-                """, (song.title, song.duration, song.bpm, song.recording_year, song.file_id))
+                """, (song.title, song.duration, song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, song.file_id))
 
                 # Clear existing contributor roles
                 cursor.execute(
@@ -92,6 +94,22 @@ class SongRepository(BaseRepository):
                 return True
         except Exception as e:
             print(f"Error updating song: {e}")
+            return False
+
+
+
+    def update_status(self, file_id: int, is_done: bool) -> bool:
+        """Update just the IsDone status of a song"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE Files SET IsDone = ? WHERE FileID = ?",
+                    (1 if is_done else 0, file_id)
+                )
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating song status: {e}")
             return False
 
     def _sync_contributor_roles(self, song: Song, conn) -> None:
@@ -153,7 +171,10 @@ class SongRepository(BaseRepository):
                            F.Duration AS Duration,
                            F.Path AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM
+                           F.TempoBPM AS BPM,
+                           F.RecordingYear AS Year,
+                           F.ISRC AS ISRC,
+                           F.IsDone AS IsDone
                     FROM Files F
                     LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
                     LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
@@ -182,7 +203,10 @@ class SongRepository(BaseRepository):
                            F.Duration AS Duration,
                            F.Path AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM
+                           F.TempoBPM AS BPM,
+                           F.RecordingYear AS Year,
+                           F.ISRC AS ISRC,
+                           F.IsDone AS IsDone
                     FROM Files F
                     LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
                     LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
@@ -210,7 +234,7 @@ class SongRepository(BaseRepository):
                 
                 # Fetch basic info
                 cursor.execute("""
-                    SELECT FileID, Title, Duration, TempoBPM, RecordingYear
+                    SELECT FileID, Title, Duration, TempoBPM, RecordingYear, ISRC, IsDone
                     FROM Files
                     WHERE Path = ?
                 """, (norm_path,))
@@ -219,7 +243,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                file_id, title, duration, bpm, recording_year = row
+                file_id, title, duration, bpm, recording_year, isrc, is_done_int = row
                 
                 # Fetch contributors
                 song = Song(
@@ -228,7 +252,9 @@ class SongRepository(BaseRepository):
                     title=title,
                     duration=duration,
                     bpm=bpm,
-                    recording_year=recording_year
+                    recording_year=recording_year,
+                    isrc=isrc,
+                    is_done=bool(is_done_int)
                 )
                 song.path = norm_path
                 
@@ -295,4 +321,37 @@ class SongRepository(BaseRepository):
                 return headers, data
         except Exception as e:
             print(f"Error fetching songs by year: {e}")
+            return [], []
+
+    def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by their Done status"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT F.FileID,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
+                           F.Title AS Title,
+                           F.Duration AS Duration,
+                           F.Path AS Path,
+                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
+                           F.TempoBPM AS BPM,
+                           F.RecordingYear AS Year,
+                           F.IsDone AS IsDone
+                    FROM Files F
+                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
+                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
+                    WHERE F.IsDone = ?
+                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
+                    ORDER BY F.FileID DESC
+                """
+                # Convert bool to int (0/1) for SQLite
+                status_val = 1 if is_done else 0
+                cursor.execute(query, (status_val,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            print(f"Error fetching songs by status: {e}")
             return [], []

@@ -1,4 +1,4 @@
-# Plan for Tomorrow
+# Gosling2 - Current Tasks (Dec 17th)
 
 **Current State**:
 - **Strict Schema Awareness** is fully active ("The Yelling Mechanism").
@@ -20,9 +20,16 @@
     *   **Goal**: "Edit Mode" vs "Broadcast Mode" toggle.
     *   **Why**: Leveraging recent UI work. High impact, low logic complexity.
 
-3.  **[Issue #3] Edit Song Metadata** (Logic)
-    *   **Goal**: Enable "Save" button in Metadata Viewer.
-    *   **Why**: Completes the feature we started today.
+3.  **[Issue #3] Edit Song Metadata & File Organization** (Logic - High Priority) - **ACTIVE**
+    *   **Goal**: Full parity with legacy "Save" functionality.
+    *   **Sub-tasks**:
+        *   [x] **Context Menu**: "Done" / "Not Done" toggling with validation. ✅
+        *   [x] **Validation Logic**: Preventing incomplete songs from being marked "Done". ✅
+        *   [ ] **Schema Update**: Add `Album`, `Publisher`, `Genre` to SQLite. (`ISRC` is ✅ Implemented).
+        *   [ ] **"Done" Flag**: Implement `TKEY` read/write (stores "true" or " ") for compatibility.
+        *   [ ] **Renaming Service**: Port the `generateNewFilename` logic (Genre + Year folder structure) to a new service.
+        *   [ ] **Metadata Write**: Connect `MetadataService` to write tags using `mutagen`.
+    *   **Why**: Completes the feature we started today and ensures library backward compatibility.
 
 **Backlog (Harder / Later)**:
 *   [Issue #7] Broadcast Automation (Complex timing logic).

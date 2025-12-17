@@ -74,6 +74,7 @@ The following tests explicitly reference the `TempoBPM` field or column. These a
 - `tests/unit/presentation/widgets/test_filter_widget.py`
 - `tests/unit/presentation/widgets/test_filter_widget_integrity.py`
 - `tests/unit/presentation/widgets/test_library_widget.py`
+- `tests/unit/presentation/widgets/test_library_context_menu.py`
 - `tests/unit/presentation/widgets/test_library_widget_constants.py`
 - `tests/unit/presentation/widgets/test_library_widget_drag_drop.py`
 - `tests/unit/presentation/widgets/test_library_widget_filtering.py`

@@ -72,6 +72,12 @@ Stores information about each music file in the library.
 | `Title` | TEXT | NOT NULL | Track title (from metadata or filename) |
 | `Duration` | REAL | - | Duration in seconds |
 | `TempoBPM` | INTEGER | - | Beats per minute |
+| `RecordingYear` | INTEGER | - | Year of recording |
+| `ISRC` | TEXT | - | International Standard Recording Code |
+| `IsDone` | BOOLEAN | - | Status flag (Processed/Not Processed) |
+| `Album` | TEXT | - | Album Name (Planned) |
+| `Publisher` | TEXT | - | Publisher (Planned) |
+| `Genre` | TEXT | - | Genre (Planned) |
 
 ### 2. `Contributors`
 Stores unique names of all people or groups involved in the music (artists, composers, etc.).

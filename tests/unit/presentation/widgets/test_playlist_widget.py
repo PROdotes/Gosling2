@@ -22,6 +22,8 @@ class TestPlaylistWidget:
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
+        url = QUrl.fromLocalFile("song.mp3") 
+        mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
         event.source.return_value = None
         
@@ -41,7 +43,9 @@ class TestPlaylistWidget:
     def test_drag_enter_event_invalid(self, widget):
         event = MagicMock(spec=QDragEnterEvent)
         mime_data = MagicMock(spec=QMimeData)
-        mime_data.hasUrls.return_value = False
+        mime_data.hasUrls.return_value = True # Has URLs
+        url = QUrl.fromLocalFile("notes.txt") # But invalid type
+        mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
         event.source.return_value = None
         

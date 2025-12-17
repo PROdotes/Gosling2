@@ -62,6 +62,27 @@ class MetadataService:
             
             return producers
 
+        # Helper to extract Done flag (Dual Mode)
+        def get_is_done() -> bool:
+            # 1. Check TXXX:GOSLING_DONE (New Standard)
+            if "TXXX:GOSLING_DONE" in tags:
+                raw_list = get_text_list("TXXX:GOSLING_DONE")
+                if raw_list:
+                    val = raw_list[0].strip().lower()
+                    return val in ["1", "true"]
+            
+            # 2. Fallback to TKEY (Legacy)
+            if "TKEY" in tags:
+                raw_list = get_text_list("TKEY")
+                if raw_list:
+                    val = raw_list[0] # Do not strip! " " is meant to be false.
+                    if val == "true":
+                        return True
+                    # If val is a real key (e.g. "Am", "12B"), we do NOT consider it Done.
+                    # Legacy logic only wrote "true" or " ".
+            
+            return False
+
         # Extract title (use get_text_list for consistency)
         title_list = get_text_list("TIT2")
         title = title_list[0] if title_list else None
@@ -71,6 +92,13 @@ class MetadataService:
         composers = get_text_list("TCOM")
         lyricists = get_text_list("TOLY") or get_text_list("TEXT")
         groups = get_text_list("TIT1")
+        
+        # Extract ISRC
+        isrc_list = get_text_list("TSRC")
+        isrc = isrc_list[0] if isrc_list else None
+
+        # Extract IsDone
+        is_done = get_is_done()
 
         # Extract BPM
         bpm_list = get_text_list("TBPM")
@@ -95,9 +123,11 @@ class MetadataService:
             file_id=file_id,
             path=path,
             title=title,
+            isrc=isrc,
             duration=duration,
             bpm=bpm,
             recording_year=recording_year,
+            is_done=is_done,
             performers=deduplicate(performers),
             composers=deduplicate(composers),
             lyricists=deduplicate(lyricists),
@@ -129,4 +159,18 @@ class MetadataService:
         except Exception as e:
             print(f"Error reading raw tags: {e}")
             return {}
+
+    @staticmethod
+    def write_tags(song: Song) -> bool:
+        """
+        Write metadata from Song object to MP3 file.
+        Returns True on success, False on failure.
+        """
+        try:
+            print(f"DEBUG: write_tags called for {song.path}")
+            # Placeholder for Issue #3 logic
+            return True
+        except Exception as e:
+            print(f"Error writing tags: {e}")
+            return False
 

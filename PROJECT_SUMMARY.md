@@ -126,9 +126,9 @@ python setup.py
 | Data Models | ~20 | ✅ Passed |
 | Repositories | ~30 | ✅ Passed |
 | Services | ~40 | ✅ Passed |
-| Widgets | ~100 | ✅ Passed |
+| Widgets | ~110 | ✅ Passed |
 | Schema Strictness | ~50 | ✅ Passed |
-| **Total** | **259** | **✅ All Passing** |
+| **Total** | **274** | **✅ All Passing** |
 
 ---
 
