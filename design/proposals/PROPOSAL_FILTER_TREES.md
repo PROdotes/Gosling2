@@ -13,6 +13,27 @@ Since we decided in `DATABASE.md` that Genres are a flat list (to avoid "Is Deep
     - Click "House" + "Vocal": Shows intersection (AND logic).
 - **UI Widget:** `QListWidget` or Tag Cloud.
 
+### Functional Requirements
+- Hierarchical tree view (Genres, Decades, Moods)
+- **Checkboxes for multi-selection** (Select "Pop" + "Rock")
+- Filtering logic: OR within category, AND across categories
+  - `(Genre=Pop OR Genre=Rock) AND (Mood=Happy)`
+- Expand/Collapse sections
+- Show item counts: `Pop (145)`
+
+### Usability Features (Crucial)
+1. **Search-within-Tree:** 
+   - Input box at top of sidebar ("Filter lists...")
+   - Typing "Pink" hides all non-matching nodes
+   - Instantly reveals "Artists > P > Pink" without manual expansion
+2. **Active Filters Area:**
+   - Pinned section at top showing selected chips
+   - `[x] Pink` `[x] Pop`
+   - One-click clear for individual filters
+3. **Smart Sections:**
+   - Artists section shows "Top 20" by default
+   - "Show All" expands the full A-Z tree structure
+
 ## 2. The Publisher Tree (True Hierarchy)
 Unlike Genres, Publishers have a strict corporate hierarchy (Parent -> Subsidiary).
 

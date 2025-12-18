@@ -98,7 +98,7 @@ erDiagram
     }
 
     Songs {
-        INTEGER SourceID PK_FK
+        INTEGER SourceID PK
         INTEGER TempoBPM
         INTEGER RecordingYear
         TEXT ISRC
@@ -106,13 +106,13 @@ erDiagram
     }
 
     Streams {
-        INTEGER SourceID PK_FK
+        INTEGER SourceID PK
         TEXT FailoverURL
         TEXT StreamFormat
     }
 
     Commercials {
-        INTEGER SourceID PK_FK
+        INTEGER SourceID PK
         INTEGER CampaignID FK
     }
 

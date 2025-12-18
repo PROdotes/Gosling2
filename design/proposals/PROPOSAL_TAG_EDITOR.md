@@ -29,6 +29,17 @@ Create a reusable UI component for managing many-to-many relationships (Genres, 
 - [ ] Handle Backspace to delete last
 - [ ] Handle X button to remove specific
 
+### Visual Style
+- **Label-style chips:** Colored background, rounded corners (pill shape)
+- Remove button (x) inside the chip
+- Semantic colors (e.g., green for Language, blue for Genre) as seen in mockups
+
+### Interaction
+- Click "Add Tag" → Opens chip input/dropdown
+- Type and filtered list appears
+- Enter to create/add
+- Click 'x' on chip to remove specific
+
 ---
 
 ## 📍 Phase 2: Smart Chips (Feature)
