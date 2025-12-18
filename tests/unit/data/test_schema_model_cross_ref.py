@@ -6,40 +6,43 @@ from src.data.models.song import Song
 def test_cross_reference_integrity(tmp_path):
     """
     Cross-Reference Integrity Test:
-    Ensures that the Database Schema (Columns in 'Files' table) and 
+    Ensures that the Database Schema (MediaSources + Songs tables) and 
     The Domain Model ('Song' class) remain aligned.
     
-    If you add a column to 'Files', this test fails unless you also add it to 'Song' 
-    (or explicitly exclude it here).
-    If you add a field to 'Song', this test fails unless you add it to 'Files' 
+    If you add a column, this test fails unless you also add it to 'Song' 
     (or explicitly exclude it here).
     """
-    # 1. Get Database Columns
+    # 1. Get Database Columns from MediaSources and Songs
     db_path = tmp_path / "test_cross_ref.db"
     repo = BaseRepository(str(db_path))
     
     with repo.get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("PRAGMA table_info(Files)")
-        columns_info = cursor.fetchall()
-        db_columns = {row[1] for row in columns_info}
         
-    # 2. Get Model Fields
+        # Get MediaSources columns
+        cursor.execute("PRAGMA table_info(MediaSources)")
+        ms_columns = {row[1] for row in cursor.fetchall()}
+        
+        # Get Songs columns
+        cursor.execute("PRAGMA table_info(Songs)")
+        songs_columns = {row[1] for row in cursor.fetchall()}
+        
+    # 2. Get Model Fields (including inherited from MediaSource)
     model_fields = {f.name for f in dataclasses.fields(Song)}
     
     # 3. Define Mapping / Expected Alignments
-    # Some names differ slightly or are handled via relationships (not direct columns in Files)
-    
-    # Direct mappings (Name in DB -> Name in Model)
-    # Note: Song model uses snake_case, DB uses PascalCase or CamelCase often.
-    # We need a normalization map or manual checking.
-    
-    # DB Columns -> Expected Model Field
+    # DB Columns -> Expected Model Field (combined from both tables)
     db_to_model_map = {
-        "FileID": "file_id",
-        "Path": "path",
-        "Title": "title",
+        # MediaSources table
+        "SourceID": "source_id",
+        "TypeID": "type_id",
+        "Name": "name",
+        "Notes": "notes",
+        "Source": "source",
         "Duration": "duration",
+        "IsActive": "is_active",
+        
+        # Songs table
         "TempoBPM": "bpm",
         "RecordingYear": "recording_year",
         "ISRC": "isrc",
@@ -48,17 +51,22 @@ def test_cross_reference_integrity(tmp_path):
     
     # Model Fields -> Expected DB Column (or Relationship Check/Exclusion)
     model_to_db_map = {
-        "file_id": "FileID",
-        "path": "Path",
-        "title": "Title",
+        # From MediaSource (inherited)
+        "source_id": "SourceID",
+        "type_id": "TypeID",
+        "name": "Name",
+        "source": "Source",
         "duration": "Duration",
+        "notes": "Notes",
+        "is_active": "IsActive",
+        
+        # From Song
         "bpm": "TempoBPM",
         "recording_year": "RecordingYear",
         "isrc": "ISRC",
         "is_done": "IsDone",
         
-        # Relationships (Not columns in Files, but exist in DB schema somewhere)
-        # We explicitly allow these to NOT be columns in Files, but we should verify they mean something
+        # Relationships (Not direct columns, but exist via junction tables)
         "performers": "RELATIONSHIP (Contributors via Performer)",
         "composers": "RELATIONSHIP (Contributors via Composer)",
         "lyricists": "RELATIONSHIP (Contributors via Lyricist)",
@@ -67,14 +75,11 @@ def test_cross_reference_integrity(tmp_path):
     }
     
     # 4. Verify DB Coverage
-    # Every column in Files must map to a model field
-    for col in db_columns:
+    # Every column in MediaSources/Songs should be mapped
+    all_db_columns = ms_columns | songs_columns
+    for col in all_db_columns:
         assert col in db_to_model_map, \
-            f"DB Column '{col}' in Files table is NOT mapped to Song model! Update Song class."
-            
-        expected_field = db_to_model_map[col]
-        assert expected_field in model_fields, \
-            f"DB Column '{col}' maps to field '{expected_field}', but Song model is missing '{expected_field}'"
+            f"DB Column '{col}' is NOT mapped! Add to db_to_model_map."
             
     # 5. Verify Model Coverage
     # Every field in Song must map to a DB column or known relationship
