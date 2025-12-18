@@ -1,3 +1,15 @@
+---
+tags:
+  - layer/ui
+  - layer/core
+  - domain/audio
+  - status/planned
+  - type/architecture
+  - size/medium
+links:
+  - "[[PROPOSAL_ONAIR_UI]]"
+  - "[[PROPOSAL_LIBRARY_VIEWS]]"
+---
 # Architectural Proposal: Application Context Modes
 
 ## Objective

@@ -1,3 +1,14 @@
+---
+tags:
+  - layer/ui
+  - domain/tags
+  - status/planned
+  - type/widget
+  - size/medium
+links:
+  - "[[PROPOSAL_FIELD_REGISTRY]]"
+  - "[[PROPOSAL_METADATA_EDITOR]]"
+---
 # Architectural Proposal: Tag Editor Widget
 
 ## Objective

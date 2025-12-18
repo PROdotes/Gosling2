@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/core
+  - domain/database
+  - status/planned
+  - type/architecture
+  - size/large
+  - priority/high
+links:
+  - "[[DATABASE]]"
+  - "[[PROPOSAL_METADATA_EDITOR]]"
+  - "[[PROPOSAL_TAG_EDITOR]]"
+---
 # Architectural Proposal: Field Registry Pattern
 
 ## Problem

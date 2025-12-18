@@ -27,6 +27,21 @@ python app.py
 
 ---
 
+## 🎯 Core Philosophy: Portable Metadata
+
+> **The MP3 file IS the database.**
+
+When you share an MP3 between radio stations, ALL metadata travels with it inside the ID3 tags. The receiving Gosling 2 instance imports the file and auto-populates its database from the embedded tags.
+
+| Field Type | Examples | ID3 Sync |
+|------------|----------|----------|
+| **Portable** | Artists, Title, Year, ISRC, BPM | ✅ Synced to/from ID3 |
+| **Local-only** | Song ID, Play Count, Done Status | ❌ Station-specific |
+
+This design ensures data consistency across stations without external databases or cloud sync.
+
+---
+
 ## 🏗️ Architecture
 
 The application follows a clean **3-tier architecture**:

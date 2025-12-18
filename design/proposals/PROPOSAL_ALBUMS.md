@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/data
+  - domain/database
+  - domain/audio
+  - status/planned
+  - type/feature
+  - size/medium
+  - blocked/schema
+links:
+  - "[[DATABASE]]"
+  - "[[PROPOSAL_LIBRARY_VIEWS]]"
+---
 # Architectural Proposal: Album Management
 
 ## 🚧 Blocker Warning

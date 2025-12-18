@@ -149,7 +149,13 @@ class MetadataViewerDialog(QDialog):
             
             # Use description if available
             base_key = key.split(':')[0]
-            desc = ID3_FRAMES.get(base_key, "")
+            frame_info = ID3_FRAMES.get(base_key, "")
+            
+            # Handle both old (string) and new (object) formats
+            if isinstance(frame_info, dict):
+                desc = frame_info.get("description", "")
+            else:
+                desc = frame_info
             
             if desc:
                 label = f"{key} - {desc}"

@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/ui
+  - domain/audio
+  - domain/playlist
+  - status/future
+  - type/feature
+  - size/xlarge
+  - complexity/high
+links:
+  - "[[PROPOSAL_BROADCAST_AUTOMATION]]"
+  - "[[PROPOSAL_APP_MODES]]"
+---
 # On-Air UI Proposal
 
 **GitHub Issue:** Part of #7  

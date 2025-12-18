@@ -116,7 +116,6 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         required=True,
         min_length=1,
-        id3_frame="TPE1",
         filterable=True, # Filter by Artist
         searchable=True,
     ),
@@ -125,7 +124,6 @@ FIELDS: List[FieldDef] = [
         ui_header="Title",
         db_column="MS.Name",
         required=True,
-        id3_frame="TIT2",
         filterable=False, # Don't filter by unique titles
         searchable=True,
     ),
@@ -171,36 +169,54 @@ def get_required_fields() -> List[FieldDef]:
 
 ## Implementation Plan
 
-### Phase 1: Create Yellberus (Day 1)
-- [ ] Create `src/core/yellberus.py` with `FieldDef` dataclass
-- [ ] Define current 10 fields in `FIELDS` list
-- [ ] Add helper functions
+### Phase 1: Create Yellberus (Day 1) ✅ COMPLETE
+- [x] Create `src/core/yellberus.py` with `FieldDef` dataclass
+- [x] Define current 14 fields in `FIELDS` list
+- [x] Add helper functions
+- [x] Add `portable` flag for ID3 sync distinction
+- [x] Add `validate_schema()` for full chain validation
+- [x] Add `row_to_tagged_tuples()` for Song data flow
+- [x] Add `yell()` function for error reporting
 
-### Phase 2: Integrate with LibraryWidget (Day 1-2)
-- [ ] Replace `COL_*` constants with index lookup
-- [ ] Replace `COL_TO_FIELD` with registry-based map
-- [ ] Generate column headers from registry
+### Phase 2: Integrate with LibraryWidget (Day 1-2) ✅ COMPLETE
+- [x] Replace `COL_*` constants with index lookup
+- [x] Replace `COL_TO_FIELD` with registry-based map
+- [x] Generate column headers from registry
 
-### Phase 3: Integrate with Validation (Day 2)
-- [ ] Replace `completeness_criteria.json` with registry-derived rules
-- [ ] Update `_get_incomplete_fields()` to use registry
+### Phase 3: Integrate with Validation (Day 2) ✅ COMPLETE
+- [x] Expanded `id3_frames.json` with field mappings
+- [x] `Song.from_row()` uses JSON lookup for mapping
+- [x] `validate_schema()` checks FIELDS → JSON → Song chain
+- [x] Added tests: `test_validate_schema`, `test_portable_flag`, `test_row_to_tagged_tuples`, `test_song_from_row`
 
-### Phase 4: Dynamic Filter Widget (Day 2)
-- [ ] Refactor `populate_tree` to iterate `yellberus.get_filterable_fields()`
-- [ ] Implement generic tree node builder (Value/Range strategies)
-- [ ] Remove hardcoded Years/Status logic
+### Phase 4: Dynamic Filter Widget (Day 2) ✅ COMPLETE
+- [x] Refactor `populate_tree` to iterate `yellberus.get_filterable_fields()`
+- [x] Implement generic tree node builder (list, boolean, range strategies)
+- [x] Remove hardcoded Years/Status logic
+- [x] Add generic `filter_changed` signal
+- [x] Maintain backward compatible legacy signals
 
-### Phase 5: Integrity Tests (Day 3)
-- [ ] Create `test_yellberus.py` — Registry → Code check
-- [ ] Create reverse check: DB columns → Registry
-- [ ] Remove old scattered tests
+### Phase 5: Integrity Tests (Day 3) ✅ COMPLETE
+- [x] Create `test_yellberus_integrity.py` with DB ↔ Registry checks
+- [x] Test BASE_QUERY executes without error
+- [x] Test query returns correct column count
+- [x] Test all DB columns accounted for in Yellberus
+- [x] Test field names unique, portable fields have id3_frame
 
-### Phase 6: Add TypeID (Day 3)
-- [ ] Add `type_id` to registry (already in example above)
-- [ ] Verify it appears in query
-- [ ] Unblocks T-01 Type Tabs
+### Phase 6: Add TypeID (Day 3) ✅ COMPLETE
+- [x] Add `type_id` to registry
+- [x] Verify it appears in query
+- [x] Unblocks T-01 Type Tabs
 
 ---
+
+## 📋 TODO (Post-Implementation)
+- [ ] **Review field definitions** — Some pre-generated FieldDefs may have incorrect values
+- [x] **Remove id3_frame references** — id3_frame removed from FieldDef (now comes from JSON)
+  - [x] Updated `validate_schema()` to look up frames using field name
+  - [x] Updated `row_to_tagged_tuples()` to look up frames from JSON
+  - [x] Updated tests that referenced `.id3_frame`
+- [ ] **Remove GroupMembers reference** — Table doesn't exist, Groups column returns NULL
 
 ## Checklist
 

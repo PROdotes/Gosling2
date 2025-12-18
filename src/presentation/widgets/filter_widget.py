@@ -1,27 +1,20 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QTreeView
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from PyQt6.QtCore import Qt, pyqtSignal
+from src.core import yellberus
 
 class FilterWidget(QWidget):
-    """Widget for filtering the library (e.g. by Artist)"""
+    """Widget for filtering the library using Yellberus registry."""
     
-    # Signals
+    # Signals - one generic signal with (field_name, value)
+    filter_changed = pyqtSignal(str, object)  # (field_name, value)
+    reset_filter = pyqtSignal()
+    
+    # Legacy signals for backward compatibility
     filter_by_performer = pyqtSignal(str)
     filter_by_composer = pyqtSignal(str)
     filter_by_year = pyqtSignal(int)
     filter_by_status = pyqtSignal(bool)
-    reset_filter = pyqtSignal()
-
-    # STRICT SCHEMA: Explicitly list DB columns from 'Files' that are NOT used for filtering.
-    # If a new column is added to 'Files', it must be either used (implemented) or added here.
-    IGNORED_DB_COLUMNS = {
-        "FileID",       # Internal ID, not useful for grouping
-        "Path",         # Unique per file
-        "Title",        # Unique per file (mostly)
-        "Duration",     # Continuous value
-        "TempoBPM",     # Continuous value (could be ranged later, but currently ignored)
-        "ISRC",         # Metadata identifier, not for grouping
-    }
 
     def __init__(self, library_service, parent=None) -> None:
         super().__init__(parent)
@@ -42,131 +35,165 @@ class FilterWidget(QWidget):
         layout.addWidget(self.tree_view)
 
     def populate(self) -> None:
-        """Populate the filter tree with a hierarchy"""
+        """Populate the filter tree from Yellberus registry."""
         self.tree_model.clear()
         
-        # Standard Roles (Ordered for generic consistency)
-        self._add_category_to_tree("Performer", "Performers")
-        self._add_category_to_tree("Composer", "Composers")
-        self._add_category_to_tree("Lyricist", "Lyricists")
-        self._add_category_to_tree("Producer", "Producers")
-        self._add_years_to_tree()
-        self._add_status_to_tree()
+        # Get filterable fields from Yellberus
+        for field in yellberus.get_filterable_fields():
+            if field.filter_type == "list":
+                self._add_list_filter(field)
+            elif field.filter_type == "boolean":
+                self._add_boolean_filter(field)
+            elif field.filter_type == "range":
+                self._add_range_filter(field)
 
-    def _add_category_to_tree(self, role_name: str, display_name: str) -> None:
-        """Helper to add a category (role) and its contributors to the tree"""
-        # Fetch data
-        contributors_tuple = self.library_service.get_contributors_by_role(role_name)
-        # Extract names from tuples (id, name)
-        names = [name for _, name in contributors_tuple]
+    def _add_list_filter(self, field: yellberus.FieldDef) -> None:
+        """Add a list-type filter (performers, years, etc.)."""
+        # Get values based on field name
+        values = self._get_field_values(field)
+        if not values:
+            return
         
-        # Create Root Item
-        root_item = QStandardItem(display_name)
+        root_item = QStandardItem(field.ui_header)
         root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        # Store role name in data for click handling
-        root_item.setData(role_name, Qt.ItemDataRole.UserRole + 1) 
+        root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
         
-        # Group by first letter
+        # Check if field has a grouping function
+        if field.grouping_function:
+            self._add_grouped_items(root_item, field, values)
+        elif field.field_type == yellberus.FieldType.LIST:
+            # Text list (performers, composers) - group by first letter
+            self._add_alpha_grouped_items(root_item, field, values)
+        else:
+            # Simple list (no grouping)
+            for value in values:
+                item = QStandardItem(str(value))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setData(value, Qt.ItemDataRole.UserRole)
+                item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+                root_item.appendRow(item)
+        
+        self.tree_model.appendRow(root_item)
+        
+    def _add_grouped_items(self, root_item, field, values):
+        """Add items grouped by field's grouping_function (e.g., decade)."""
+        groups = {}
+        for value in values:
+            group_name = field.grouping_function(value)
+            if group_name not in groups:
+                groups[group_name] = []
+            groups[group_name].append(value)
+        
+        # Sort groups (e.g., "2020s", "2010s" - reverse for years)
+        for group_name in sorted(groups.keys(), reverse=True):
+            group_item = QStandardItem(group_name)
+            group_item.setFlags(group_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            
+            for value in sorted(groups[group_name], reverse=True):
+                item = QStandardItem(str(value))
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                item.setData(value, Qt.ItemDataRole.UserRole)
+                item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+                group_item.appendRow(item)
+            
+            root_item.appendRow(group_item)
+
+    def _add_alpha_grouped_items(self, root_item, field, values):
+        """Add items grouped by first letter (A-Z)."""
+        # Get unique first letters
         first_chars = set()
-        for name in names:
-            if name:
-                first_chars.add(name[0].upper())
+        for value in values:
+            if value:
+                first_chars.add(str(value)[0].upper())
         
-        sorted_chars = sorted(first_chars)
         alpha_map = {}
-        
-        # Create A-Z sub-nodes
-        for char in sorted_chars:
+        for char in sorted(first_chars):
             letter_item = QStandardItem(char)
             letter_item.setFlags(letter_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
             alpha_map[char] = letter_item
             root_item.appendRow(letter_item)
-            
-        # Add contributors to A-Z nodes
-        for name in names:
-            if not name:
+        
+        for value in values:
+            if not value:
                 continue
-            first_letter = name[0].upper()
+            first_letter = str(value)[0].upper()
             parent_item = alpha_map.get(first_letter)
             if parent_item:
-                item = QStandardItem(name)
+                item = QStandardItem(str(value))
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                item.setData(name, Qt.ItemDataRole.UserRole)
-                item.setData(role_name, Qt.ItemDataRole.UserRole + 1)
+                item.setData(value, Qt.ItemDataRole.UserRole)
+                item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
                 parent_item.appendRow(item)
-                
-        self.tree_model.appendRow(root_item)
+        
         self.tree_view.expand(root_item.index())
 
-    def _add_years_to_tree(self) -> None:
-        """Add years to the tree view."""
-        years = self.library_service.get_all_years()
-        if not years:
-            return
-
-        root_item = QStandardItem("Years")
+    def _add_boolean_filter(self, field: yellberus.FieldDef) -> None:
+        """Add a boolean filter (done/not done)."""
+        root_item = QStandardItem(field.ui_header)
         root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        root_item.setData("Year", Qt.ItemDataRole.UserRole + 1)
+        root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
         
-        # Group by Decade
-        decades = {}
-        for year in years:
-            decade = (year // 10) * 10
-            if decade not in decades:
-                decades[decade] = []
-            decades[decade].append(year)
-            
-        for decade in sorted(decades.keys(), reverse=True):
-            decade_item = QStandardItem(f"{decade}s")
-            decade_item.setFlags(decade_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            # Make decade click distinct if we want to filter by decade, for now just container
-            
-            for year in decades[decade]:
-                year_item = QStandardItem(str(year))
-                year_item.setFlags(year_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                year_item.setData(year, Qt.ItemDataRole.UserRole)
-                year_item.setData("Year", Qt.ItemDataRole.UserRole + 1)
-                decade_item.appendRow(year_item)
-                
-            root_item.appendRow(decade_item)
-            
-        self.tree_model.appendRow(root_item)
-
-    def _add_status_to_tree(self) -> None:
-        """Add Status (Ready/Not Ready) to tree"""
-        root_item = QStandardItem("Workflow Status")
-        root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        root_item.setData("Status", Qt.ItemDataRole.UserRole + 1)
-        
-        # Not Done
+        # Not Done option
         not_done = QStandardItem("Not Done (Pending)")
         not_done.setFlags(not_done.flags() & ~Qt.ItemFlag.ItemIsEditable)
         not_done.setData(False, Qt.ItemDataRole.UserRole)
-        not_done.setData("Status", Qt.ItemDataRole.UserRole + 1)
+        not_done.setData(field.name, Qt.ItemDataRole.UserRole + 1)
         root_item.appendRow(not_done)
+        
+        # Done option
+        done = QStandardItem("Done (Complete)")
+        done.setFlags(done.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        done.setData(True, Qt.ItemDataRole.UserRole)
+        done.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+        root_item.appendRow(done)
         
         self.tree_model.appendRow(root_item)
         self.tree_view.expand(root_item.index())
 
+    def _add_range_filter(self, field: yellberus.FieldDef) -> None:
+        """Add a range filter (BPM, etc.) - placeholder for future."""
+        # TODO: Implement range slider or input
+        pass
+
+    def _get_field_values(self, field: yellberus.FieldDef):
+        """Get unique values for a field from the library service."""
+        # Map field names to library service methods
+        if field.name == "performers":
+            return [name for _, name in self.library_service.get_contributors_by_role("Performer")]
+        elif field.name == "composers":
+            return [name for _, name in self.library_service.get_contributors_by_role("Composer")]
+        elif field.name == "lyricists":
+            return [name for _, name in self.library_service.get_contributors_by_role("Lyricist")]
+        elif field.name == "producers":
+            return [name for _, name in self.library_service.get_contributors_by_role("Producer")]
+        elif field.name == "recording_year":
+            return self.library_service.get_all_years()
+        elif field.name == "type_id":
+            # TODO: Get types from service
+            return []
+        else:
+            return []
+
     def _on_tree_clicked(self, index) -> None:
-        """Handle click in the filter tree"""
+        """Handle click in the filter tree."""
         item = self.tree_model.itemFromIndex(index)
-        name = item.data(Qt.ItemDataRole.UserRole)
-        role = item.data(Qt.ItemDataRole.UserRole + 1)
+        value = item.data(Qt.ItemDataRole.UserRole)
+        field_name = item.data(Qt.ItemDataRole.UserRole + 1)
         
-        if name is not None and role:
-            if role == "Performer":
-                self.filter_by_performer.emit(name)
-            elif role == "Composer":
-                self.filter_by_composer.emit(name)
-            elif role in ["Lyricist", "Producer"]:
-                print(f"Filter requested for {role}: {name}")
-            elif role == "Year":
-                # Name is stored as int in UserRole for years
-                self.filter_by_year.emit(name)
-            elif role == "Status":
-                # Name is boolean
-                self.filter_by_status.emit(name)
-        elif item.text() in ["Performers", "Composers", "Lyricists", "Producers", "Years", "Workflow Status"]:
-             # Or if role is set on root items too
-             self.reset_filter.emit()
+        if value is not None and field_name:
+            # Emit generic signal
+            self.filter_changed.emit(field_name, value)
+            
+            # Also emit legacy signals for backward compatibility
+            if field_name == "performers":
+                self.filter_by_performer.emit(value)
+            elif field_name == "composers":
+                self.filter_by_composer.emit(value)
+            elif field_name == "recording_year":
+                self.filter_by_year.emit(value)
+            elif field_name == "is_done":
+                self.filter_by_status.emit(value)
+        else:
+            # Clicked on a category header - reset filter
+            if item.parent() is None:
+                self.reset_filter.emit()

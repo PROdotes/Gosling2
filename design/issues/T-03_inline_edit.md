@@ -1,3 +1,13 @@
+---
+tags:
+  - layer/ui
+  - domain/table
+  - status/planned
+  - type/task
+  - size/medium
+links:
+  - "[[PROPOSAL_METADATA_EDITOR]]"
+---
 # Inline Edit
 
 **Task ID:** T-03  

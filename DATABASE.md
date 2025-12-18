@@ -51,7 +51,70 @@ A song can only be marked as "Done" (`IsDone = true`) if it passes validation de
 > **Config location:** `src/completeness_criteria.json`
 > **Enforcement:** Validation service checks before setting IsDone
 
-## Schema Diagram
+
+## Schema Diagrams
+
+### 1. Current Implemented Schema
+
+```mermaid
+erDiagram
+    Types ||--|{ MediaSources : "categorizes"
+    MediaSources ||--o| Songs : "extends"
+    MediaSources ||--|{ MediaSourceContributorRoles : "has"
+    Contributors ||--|{ MediaSourceContributorRoles : "participates in"
+    Roles ||--|{ MediaSourceContributorRoles : "defines role"
+    Contributors ||--|{ GroupMembers : "is group"
+    Contributors ||--|{ GroupMembers : "is member"
+
+    Types {
+        INTEGER TypeID PK
+        TEXT TypeName
+    }
+
+    MediaSources {
+        INTEGER SourceID PK
+        INTEGER TypeID FK
+        TEXT Name
+        TEXT Notes
+        TEXT Source
+        REAL Duration
+        BOOLEAN IsActive
+    }
+
+    Songs {
+        INTEGER SourceID PK
+        INTEGER TempoBPM
+        INTEGER RecordingYear
+        TEXT ISRC
+        BOOLEAN IsDone
+    }
+
+    Contributors {
+        INTEGER ContributorID PK
+        TEXT Name
+        TEXT SortName
+    }
+
+    Roles {
+        INTEGER RoleID PK
+        TEXT Name
+    }
+
+    MediaSourceContributorRoles {
+        INTEGER SourceID PK
+        INTEGER ContributorID PK
+        INTEGER RoleID PK
+    }
+
+    GroupMembers {
+        INTEGER GroupID PK
+        INTEGER MemberID PK
+    }
+```
+
+### 2. Target Architecture Schema (Future)
+
+The following diagram represents the complete planned architecture.
 
 ```mermaid
 erDiagram
@@ -81,6 +144,7 @@ erDiagram
     MediaSources ||--o{ PlayHistory : "played as"
     MediaSources ||--o{ ChangeLog : "edited in"
     MediaSources ||--o{ ActionLog : "acted on"
+    MediaSources ||--o{ DeletedRecords : "archived in"
 
     Types {
         INTEGER TypeID PK
@@ -103,6 +167,12 @@ erDiagram
         INTEGER RecordingYear
         TEXT ISRC
         BOOLEAN IsDone
+        REAL CueIn
+        REAL CueOut
+        REAL Intro
+        REAL Outro
+        REAL HookIn
+        REAL HookOut
     }
 
     Streams {
@@ -125,6 +195,23 @@ erDiagram
     MediaSourceTags {
         INTEGER SourceID FK
         INTEGER TagID FK
+    }
+
+    TagRelations {
+        INTEGER ParentTagID FK
+        INTEGER ChildTagID FK
+    }
+
+    AutoTagRules {
+        INTEGER RuleID PK
+        INTEGER TargetTagID FK
+        TEXT RuleType
+        TEXT FieldName
+        TEXT Operator
+        TEXT Value1
+        TEXT Value2
+        INTEGER SourceTagID FK
+        INTEGER ContributorID FK
     }
 
     Contributors {
@@ -156,13 +243,21 @@ erDiagram
         INTEGER PlaylistID PK
         TEXT Name
         TEXT Description
+        DATETIME CreatedAt
+        DATETIME UpdatedAt
     }
 
     PlayHistory {
         INTEGER PlayID PK
         INTEGER SourceID FK
+        INTEGER TypeID
         DATETIME PlayedAt
+        REAL Duration
+        TEXT EndedBy
         TEXT SnapshotName
+        TEXT SnapshotPerformer
+        TEXT SnapshotPublisher
+        TEXT SnapshotTags
     }
 
     ChangeLog {
@@ -170,59 +265,137 @@ erDiagram
         TEXT TableName
         INTEGER RecordID
         TEXT FieldName
+        TEXT OldValue
+        TEXT NewValue
+        DATETIME Timestamp
+        TEXT BatchID
+    }
+
+    DeletedRecords {
+        INTEGER DeleteID PK
+        TEXT TableName
+        INTEGER RecordID
+        TEXT FullSnapshot
+        DATETIME DeletedAt
+        DATETIME RestoredAt
+        TEXT BatchID
     }
 
     ActionLog {
         INTEGER ActionID PK
         TEXT ActionType
+        TEXT TargetTable
         INTEGER TargetID
         TEXT Details
+        DATETIME Timestamp
+        TEXT UserID
+    }
+
+    MediaSourceContributorRoles {
+        INTEGER SourceID PK
+        INTEGER ContributorID PK
+        INTEGER RoleID PK
+    }
+
+    GroupMembers {
+        INTEGER GroupID PK
+        INTEGER MemberID PK
+    }
+
+    SongAlbums {
+        INTEGER SourceID PK
+        INTEGER AlbumID PK
+        INTEGER TrackNumber
+    }
+
+    AlbumPublishers {
+        INTEGER AlbumID PK
+        INTEGER PublisherID PK
+    }
+
+    Publishers {
+        INTEGER PublisherID PK
+        TEXT Name
+        INTEGER ParentPublisherID FK
+    }
+
+    PlaylistItems {
+        INTEGER PlaylistItemID PK
+        INTEGER PlaylistID FK
+        INTEGER SourceID FK
+        INTEGER Position
     }
 
     Agencies {
         INTEGER AgencyID PK
         TEXT Name
+        TEXT ContactName
+        TEXT ContactEmail
+        TEXT ContactPhone
     }
 
     Clients {
         INTEGER ClientID PK
         INTEGER AgencyID FK
         TEXT Name
+        TEXT ContactName
+        TEXT ContactEmail
+        TEXT ContactPhone
+        TEXT Notes
     }
 
     Campaigns {
         INTEGER CampaignID PK
         INTEGER ClientID FK
         TEXT CampaignName
+        DATE StartDate
+        DATE EndDate
+        INTEGER RequestedPlays
+        TEXT ScheduleNotes
+        TEXT Notes
     }
 
-    Timeslots["Timeslots (PLANNED)"] {
+    Timeslots {
         INTEGER TimeslotID PK
         TEXT Name
         TEXT StartTime
         TEXT EndTime
+        TEXT DaysOfWeek
+        INTEGER Priority
+        BOOLEAN IsDefault
     }
 
-    ContentRules["ContentRules (PLANNED)"] {
+    ContentRules {
         INTEGER RuleID PK
         INTEGER TimeslotID FK
         INTEGER Position
         TEXT ContentType
+        TEXT Filters
+        INTEGER LoopTo
+    }
+
+    EntityTimeline {
+        TEXT EventType
+        INTEGER SourceID
+        TEXT Summary
+        DATETIME Timestamp
     }
 
     Timeslots ||--|{ ContentRules : "defines"
 ```
 
-> **Implementation Status:**
-> - ✅ **Implemented:** Types, MediaSources, Songs, Streams, Commercials, Tags, Contributors, Playlists, and related junction tables
-> - ⏸️ **Planned (Audit):** ChangeLog, PlayHistory, ActionLog, DeletedRecords — schema defined, not yet active
-> - 🔮 **Future:** Timeslots, ContentRules — see [PROPOSAL_BROADCAST_AUTOMATION.md](.agent/PROPOSAL_BROADCAST_AUTOMATION.md)
+> **Implementation Status Overview:**
+> - ✅ **Implemented (7 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers
+> - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, ContributorAliases, Albums, SongAlbums, AlbumPublishers, Publishers, Agencies, Clients, Campaigns
+> - ⏸️ **Planned (Audit):** ChangeLog, DeletedRecords, PlayHistory, ActionLog
+> - 🔮 **Future (Broadcast):** Timeslots, ContentRules
 
 ---
 
 ## Core Tables
 
-### 1. `Types` (Lookup)
+### 1. `Types` (Lookup) ✅ Implemented
+
 Defines the content type for each media source.
 
 | Column | Type | Constraints | Description |
@@ -240,7 +413,8 @@ Defines the content type for each media source.
 | 5 | Recording | Shows, interviews, reruns |
 | 6 | Stream | Live audio feeds |
 
-### 2. `MediaSources` (Base Table)
+### 2. `MediaSources` (Base Table) ✅ Implemented
+
 The base table for all playable content. Every audio item starts here.
 
 | Column | Type | Constraints | Description |
@@ -258,7 +432,8 @@ The base table for all playable content. Every audio item starts here.
 - `IsActive = 0` hides the item from library without deleting
 - Use for seasonal content, expired ads, or soft-delete
 
-### 3. `Songs` (Music-Specific)
+### 3. `Songs` (Music-Specific) ✅ Implemented
+
 Extends `MediaSources` for music tracks with additional metadata and timing.
 
 | Column | Type | Constraints | Description |
@@ -268,12 +443,12 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 | `RecordingYear` | INTEGER | - | Original recording year |
 | `ISRC` | TEXT | - | International Standard Recording Code |
 | `IsDone` | BOOLEAN | DEFAULT 0 | Marked as complete/processed |
-| `CueIn` | REAL | DEFAULT 0 | Playback start trim (seconds) |
-| `CueOut` | REAL | - | Playback end trim (seconds) |
-| `Intro` | REAL | - | End of talk-over zone at start |
-| `Outro` | REAL | - | Start of talk-over zone at end |
-| `HookIn` | REAL | - | Teaser segment start |
-| `HookOut` | REAL | - | Teaser segment end |
+| `CueIn` | REAL | DEFAULT 0 | ❌ Playback start trim (seconds) |
+| `CueOut` | REAL | - | ❌ Playback end trim (seconds) |
+| `Intro` | REAL | - | ❌ End of talk-over zone at start |
+| `Outro` | REAL | - | ❌ Start of talk-over zone at end |
+| `HookIn` | REAL | - | ❌ Teaser segment start |
+| `HookOut` | REAL | - | ❌ Teaser segment end |
 
 **Timing Fields:**
 ```
@@ -291,7 +466,8 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 **Constraints:**
 - `ON DELETE CASCADE` from `MediaSources`
 
-### 4. `Streams` (Remote Audio)
+### 4. `Streams` (Remote Audio) ❌ Not Implemented
+
 Extends `MediaSources` for live audio streams.
 
 | Column | Type | Constraints | Description |
@@ -303,7 +479,8 @@ Extends `MediaSources` for live audio streams.
 **Constraints:**
 - `ON DELETE CASCADE` from `MediaSources`
 
-### 5. `Commercials` (Ad-Specific)
+### 5. `Commercials` (Ad-Specific) ❌ Not Implemented
+
 Extends `MediaSources` for advertisements with campaign linking.
 
 | Column | Type | Constraints | Description |
@@ -319,7 +496,8 @@ Extends `MediaSources` for advertisements with campaign linking.
 
 ## Business Tables
 
-### 6. `Agencies`
+### 6. `Agencies` ❌ Not Implemented
+
 Advertising agencies that represent clients.
 
 | Column | Type | Constraints | Description |
@@ -330,7 +508,8 @@ Advertising agencies that represent clients.
 | `ContactEmail` | TEXT | - | Contact email |
 | `ContactPhone` | TEXT | - | Contact phone |
 
-### 7. `Clients`
+### 7. `Clients` ❌ Not Implemented
+
 Advertisers who commission commercials.
 
 | Column | Type | Constraints | Description |
@@ -346,7 +525,8 @@ Advertisers who commission commercials.
 **Constraints:**
 - `ON DELETE SET NULL` for `AgencyID`
 
-### 8. `Campaigns`
+### 8. `Campaigns` ❌ Not Implemented
+
 Advertising campaigns with scheduling information.
 
 | Column | Type | Constraints | Description |
@@ -369,7 +549,8 @@ Advertising campaigns with scheduling information.
 
 All categorization (Genre, Language, Mood, custom) uses the Tags system.
 
-### 9. `Tags`
+### 9. `Tags` ❌ Not Implemented
+
 Master list of all tags with optional category grouping.
 
 | Column | Type | Constraints | Description |
@@ -390,7 +571,8 @@ Master list of all tags with optional category grouping.
 | Usage | Morning, Ad-break, Event | No |
 | *(NULL)* | Custom user tags | No |
 
-### 10. `MediaSourceTags` (Junction)
+### 10. `MediaSourceTags` (Junction) ❌ Not Implemented
+
 Links media sources to tags.
 
 | Column | Type | Constraints | Description |
@@ -402,7 +584,8 @@ Links media sources to tags.
 - Primary Key: `(SourceID, TagID)`
 - `ON DELETE CASCADE` for both FKs
 
-### 11. `TagRelations`
+### 11. `TagRelations` ❌ Not Implemented
+
 Hierarchical tag relationships for smart searching.
 
 | Column | Type | Constraints | Description |
@@ -419,7 +602,8 @@ Hierarchical tag relationships for smart searching.
 - `Rock` → `Classic Rock` → `80s Rock` (genre hierarchy)
 - Searching parent finds all children
 
-### 12. `AutoTagRules`
+### 12. `AutoTagRules` ❌ Not Implemented
+
 Automatic tag application based on conditions.
 
 | Column | Type | Constraints | Description |
@@ -452,7 +636,8 @@ Automatic tag application based on conditions.
 
 ## Playlists
 
-### 13. `Playlists`
+### 13. `Playlists` ❌ Not Implemented
+
 Saved playlists/queues.
 
 | Column | Type | Constraints | Description |
@@ -463,7 +648,8 @@ Saved playlists/queues.
 | `CreatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Creation time |
 | `UpdatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Last modification |
 
-### 14. `PlaylistItems` (Junction)
+### 14. `PlaylistItems` (Junction) ❌ Not Implemented
+
 Links media sources to playlists with ordering.
 
 | Column | Type | Constraints | Description |
@@ -480,7 +666,8 @@ Links media sources to playlists with ordering.
 
 ## Audit & Recovery
 
-### 15. `ChangeLog`
+### 15. `ChangeLog` ⏸️ Planned (Audit)
+
 Transaction log for undo/audit functionality.
 
 | Column | Type | Constraints | Description |
@@ -494,7 +681,8 @@ Transaction log for undo/audit functionality.
 | `Timestamp` | DATETIME | DEFAULT CURRENT_TIMESTAMP | When changed |
 | `BatchID` | TEXT | - | Groups related changes |
 
-### 16. `DeletedRecords`
+### 16. `DeletedRecords` ⏸️ Planned (Audit)
+
 Snapshots of deleted records for recovery.
 
 | Column | Type | Constraints | Description |
@@ -507,7 +695,8 @@ Snapshots of deleted records for recovery.
 | `RestoredAt` | DATETIME | - | NULL until restored |
 | `BatchID` | TEXT | - | Groups cascaded deletes |
 
-### 17. `PlayHistory` (As-Run Log)
+### 17. `PlayHistory` (As-Run Log) ⏸️ Planned (Audit)
+
 Broadcast log tracking what played and when. **Snapshots metadata** at play time for backward-compatible exports (deleted songs remain queryable).
 
 | Column | Type | Constraints | Description |
@@ -544,7 +733,8 @@ WHERE TypeID = 1
   AND PlayedAt > datetime('now', '-3 years');
 ```
 
-### 18. `ActionLog` (User Actions)
+### 18. `ActionLog` (User Actions) ⏸️ Planned (Audit)
+
 Tracks user actions for audit trail (who changed the playlist, imported files, etc.).
 
 | Column | Type | Constraints | Description |
@@ -593,7 +783,8 @@ SELECT * FROM EntityTimeline WHERE SourceID = 123 ORDER BY Timestamp DESC;
 
 ## Contributors & Albums
 
-### 19. `Contributors`
+### 19. `Contributors` ✅ Implemented
+
 Artists, composers, and other credited individuals or groups.
 
 | Column | Type | Constraints | Description |
@@ -601,9 +792,10 @@ Artists, composers, and other credited individuals or groups.
 | `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `Name` | TEXT | NOT NULL UNIQUE | Display name |
 | `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
-| `Type` | TEXT | CHECK(Type IN ('person', 'group')) | Individual or band |
+| `Type` | TEXT | CHECK(Type IN ('person', 'group')) | ❌ Individual or band |
 
-### 18. `ContributorAliases`
+### 18. `ContributorAliases` ❌ Not Implemented
+
 Alternative names for contributors (for search).
 
 | Column | Type | Constraints | Description |
@@ -622,7 +814,8 @@ Searching for "Moore" finds all P!nk songs.
 **Constraints:**
 - `ON DELETE CASCADE` from `Contributors`
 
-### 19. `Roles`
+### 19. `Roles` ✅ Implemented
+
 Types of participation (Performer, Composer, etc.).
 
 | Column | Type | Constraints | Description |
@@ -636,7 +829,8 @@ Types of participation (Performer, Composer, etc.).
 - Lyricist
 - Producer
 
-### 20. `MediaSourceContributorRoles` (Junction)
+### 20. `MediaSourceContributorRoles` (Junction) ✅ Implemented
+
 Links media sources to contributors with roles.
 
 | Column | Type | Constraints | Description |
@@ -649,7 +843,8 @@ Links media sources to contributors with roles.
 - Primary Key: `(SourceID, ContributorID, RoleID)`
 - `ON DELETE CASCADE` for all FKs
 
-### 21. `GroupMembers` (Self-Reference)
+### 21. `GroupMembers` (Self-Reference) ✅ Implemented
+
 Band membership relationships.
 
 | Column | Type | Constraints | Description |
@@ -666,7 +861,8 @@ Band membership relationships.
 
 ## Albums & Publishers
 
-### 22. `Publishers`
+### 22. `Publishers` ❌ Not Implemented
+
 Music publishers/labels with hierarchy.
 
 | Column | Type | Constraints | Description |
@@ -683,7 +879,8 @@ Universal Music Group (NULL parent)
 └── Republic Records
 ```
 
-### 23. `Albums`
+### 23. `Albums` ❌ Not Implemented
+
 Album/release information.
 
 | Column | Type | Constraints | Description |
@@ -697,7 +894,8 @@ Album/release information.
 - Albums must have at least 1 song in SongAlbums
 - When removing last song: Ask "Delete album or keep empty?"
 
-### 24. `SongAlbums` (Junction)
+### 24. `SongAlbums` (Junction) ❌ Not Implemented
+
 Links songs to albums.
 
 | Column | Type | Constraints | Description |
@@ -710,7 +908,8 @@ Links songs to albums.
 - Primary Key: `(SourceID, AlbumID)`
 - `ON DELETE CASCADE` for both FKs
 
-### 25. `AlbumPublishers` (Junction)
+### 25. `AlbumPublishers` (Junction) ❌ Not Implemented
+
 Links albums to publishers.
 
 | Column | Type | Constraints | Description |

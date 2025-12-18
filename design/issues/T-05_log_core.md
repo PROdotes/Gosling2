@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/core
+  - domain/audit
+  - domain/database
+  - status/planned
+  - type/task
+  - size/medium
+  - blocked/schema
+links:
+  - "[[PROPOSAL_TRANSACTION_LOG]]"
+  - "[[DATABASE]]"
+---
 # Log Core
 
 **Task ID:** T-05  

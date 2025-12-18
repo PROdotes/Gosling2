@@ -1,3 +1,14 @@
+---
+tags:
+  - layer/core
+  - domain/database
+  - status/planned
+  - type/task
+  - size/large
+links:
+  - "[[PROPOSAL_FIELD_REGISTRY]]"
+  - "[[T-02_field_registry]]"
+---
 # TODO: Field Registry Pattern Implementation
 
 ## Overview

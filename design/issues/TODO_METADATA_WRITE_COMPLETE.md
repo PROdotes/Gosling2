@@ -1,3 +1,11 @@
+---
+tags:
+  - layer/core
+  - domain/audio
+  - status/done
+  - type/task
+links: []
+---
 # Metadata Write Implementation TODO
 
 ## Overview

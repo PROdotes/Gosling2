@@ -3,6 +3,7 @@ import os
 from typing import List, Optional, Tuple
 from .base_repository import BaseRepository
 from ..models.song import Song
+from ...core import yellberus
 
 
 class SongRepository(BaseRepository):
@@ -43,26 +44,9 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT MS.SourceID AS FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           MS.Name AS Title,
-                           MS.Duration AS Duration,
-                           MS.Source AS Path,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           S.TempoBPM AS BPM,
-                           S.RecordingYear AS Year,
-                           S.ISRC AS ISRC,
-                           S.IsDone AS IsDone
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    WHERE MS.IsActive = 1
-                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
-                    ORDER BY MS.SourceID DESC
-                """
+                # Use Yellberus definitions
+                query = f"{yellberus.BASE_QUERY} ORDER BY MS.SourceID DESC"
+                
                 cursor.execute(query)
                 headers = [description[0] for description in cursor.description]
                 data = cursor.fetchall()
@@ -184,24 +168,12 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT MS.SourceID AS FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           MS.Name AS Title,
-                           MS.Duration AS Duration,
-                           MS.Source AS Path,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           S.TempoBPM AS BPM,
-                           S.RecordingYear AS Year,
-                           S.ISRC AS ISRC,
-                           S.IsDone AS IsDone
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                # Filter by Contributor Name where Role is Performer
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
                     WHERE C.Name = ? AND R.Name = 'Performer' AND MS.IsActive = 1
-                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (performer_name,))
@@ -217,24 +189,12 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT MS.SourceID AS FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           MS.Name AS Title,
-                           MS.Duration AS Duration,
-                           MS.Source AS Path,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           S.TempoBPM AS BPM,
-                           S.RecordingYear AS Year,
-                           S.ISRC AS ISRC,
-                           S.IsDone AS IsDone
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                # Filter by Contributor Name where Role is Composer
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
                     WHERE C.Name = ? AND R.Name = 'Composer' AND MS.IsActive = 1
-                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (composer_name,))
@@ -320,22 +280,11 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT MS.SourceID AS FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           MS.Name AS Title,
-                           MS.Duration AS Duration,
-                           MS.Source AS Path,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           S.TempoBPM AS BPM,
-                           S.RecordingYear AS Year
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
                     WHERE S.RecordingYear = ? AND MS.IsActive = 1
-                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (year,))
@@ -351,23 +300,11 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT MS.SourceID AS FileID,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           MS.Name AS Title,
-                           MS.Duration AS Duration,
-                           MS.Source AS Path,
-                           GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           S.TempoBPM AS BPM,
-                           S.RecordingYear AS Year,
-                           S.IsDone AS IsDone
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
                     WHERE S.IsDone = ? AND MS.IsActive = 1
-                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
                 # Convert bool to int (0/1) for SQLite

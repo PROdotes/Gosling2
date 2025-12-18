@@ -67,6 +67,66 @@ class TestSettingsManager:
         """Test that column visibility returns empty dict when not set"""
         assert settings_manager.get_column_visibility() == {}
 
+    # ===== New Column Layout Tests =====
+    
+    def test_column_layout_get_set(self, settings_manager):
+        """Test getting and setting column layout"""
+        order = [0, 2, 1, 3, 4, 5]
+        hidden = [4, 5]
+        
+        settings_manager.set_column_layout(order, hidden, "default")
+        layout = settings_manager.get_column_layout("default")
+        
+        assert layout["order"] == order
+        assert layout["hidden"] == hidden
+    
+    def test_column_layout_empty_when_not_set(self, settings_manager):
+        """Test that column layout returns empty dict when not set"""
+        assert settings_manager.get_column_layout("default") == {}
+    
+    def test_column_layout_order_includes_all_columns(self, settings_manager):
+        """Test that order includes all columns even hidden ones"""
+        # All columns in custom order, with some hidden
+        order = [0, 2, 1, 3, 4, 5, 6, 7, 8]  # All columns
+        hidden = [6, 7, 8]  # Some hidden
+        
+        settings_manager.set_column_layout(order, hidden, "default")
+        layout = settings_manager.get_column_layout("default")
+        
+        # Order should include all columns
+        assert len(layout["order"]) == 9
+        # Hidden should only include the hidden ones
+        assert layout["hidden"] == [6, 7, 8]
+    
+    def test_column_layout_hidden_column_position_preserved(self, settings_manager):
+        """Test that hidden columns keep their position in order array"""
+        # Column 2 is at position 2 but hidden
+        order = [0, 1, 2, 3, 4]
+        hidden = [2]
+        
+        settings_manager.set_column_layout(order, hidden, "default")
+        layout = settings_manager.get_column_layout("default")
+        
+        # Column 2 should still be at index 2 in order
+        assert layout["order"][2] == 2
+        assert 2 in layout["hidden"]
+    
+    def test_column_layout_named_layouts(self, settings_manager):
+        """Test saving multiple named layouts"""
+        order1 = [0, 1, 2, 3]
+        order2 = [3, 2, 1, 0]
+        
+        settings_manager.set_column_layout(order1, [], "Editing")
+        settings_manager.set_column_layout(order2, [0, 1], "Browsing")
+        
+        layout1 = settings_manager.get_column_layout("Editing")
+        layout2 = settings_manager.get_column_layout("Browsing")
+        
+        assert layout1["order"] == order1
+        assert layout2["order"] == order2
+        assert layout2["hidden"] == [0, 1]
+
+
     def test_last_import_directory_get_set(self, settings_manager):
         """Test getting and setting last import directory"""
         test_dir = "/path/to/music"

@@ -1,3 +1,11 @@
+---
+tags:
+  - layer/ui
+  - status/done
+  - type/design
+links:
+  - "[[PROPOSAL_UX_STYLING]]"
+---
 # UX Design Brainstorm: The "Gosling" Experience
 
 ## Overview

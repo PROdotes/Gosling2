@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/ui
+  - domain/table
+  - domain/audio
+  - status/planned
+  - type/feature
+  - size/large
+links:
+  - "[[PROPOSAL_FIELD_REGISTRY]]"
+  - "[[PROPOSAL_TRANSACTION_LOG]]"
+  - "[[PROPOSAL_TAG_EDITOR]]"
+---
 # Architectural Proposal: Metadata Editor
 
 ## Objective

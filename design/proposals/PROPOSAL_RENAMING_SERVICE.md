@@ -1,3 +1,14 @@
+---
+tags:
+  - layer/core
+  - domain/audio
+  - status/planned
+  - type/service
+  - size/medium
+links:
+  - "[[PROPOSAL_FIELD_REGISTRY]]"
+  - "[[PROPOSAL_METADATA_EDITOR]]"
+---
 # Architectural Proposal: Metadata-Driven Renaming Service
 
 ## Objective

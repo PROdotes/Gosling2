@@ -1,3 +1,11 @@
+---
+tags:
+  - layer/core
+  - domain/audio
+  - status/done
+  - type/reference
+links: []
+---
 # ID3 Metadata & Logic Analysis
 
 This document provides a detailed breakdown of ID3 data manipulation in the legacy Java Controller (`SongController.java`) compared to the current Python `MetadataService.py` implementation.

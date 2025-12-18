@@ -1,3 +1,19 @@
+---
+tags:
+  - layer/core
+  - layer/data
+  - domain/audio
+  - domain/playlist
+  - domain/database
+  - status/future
+  - type/feature
+  - size/xlarge
+  - complexity/high
+links:
+  - "[[DATABASE]]"
+  - "[[PROPOSAL_PLAYLISTS]]"
+  - "[[PROPOSAL_TRANSACTION_LOG]]"
+---
 # Broadcast Automation Proposal
 
 **GitHub Issue:** #7  

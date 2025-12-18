@@ -1,0 +1,22 @@
+{
+  "collapse-filter": false,
+  "search": "-tag:#status/done  -tag:#domain/audio  -file:index -file:wishlist -file:tags",
+  "showTags": false,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": true,
+  "colorGroups": [],
+  "collapse-display": true,
+  "showArrow": false,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0,
+  "repelStrength": 20,
+  "linkStrength": 0,
+  "linkDistance": 500,
+  "scale": 0.06699745686127392,
+  "close": false
+}

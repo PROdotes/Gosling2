@@ -1,3 +1,17 @@
+---
+tags:
+  - layer/core
+  - layer/data
+  - domain/audit
+  - domain/database
+  - status/planned
+  - type/system
+  - size/large
+  - safety/critical
+links:
+  - "[[DATABASE]]"
+  - "[[PROPOSAL_METADATA_EDITOR]]"
+---
 # Architectural Proposal: Transaction Log
 
 ## Objective

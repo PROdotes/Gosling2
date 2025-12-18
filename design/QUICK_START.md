@@ -1,3 +1,9 @@
+---
+tags:
+  - type/reference
+  - status/done
+links: []
+---
 # 🚀 Gosling2 - Quick Start Guide
 
 ## Welcome to the New Gosling2!

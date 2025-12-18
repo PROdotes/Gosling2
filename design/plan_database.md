@@ -1,3 +1,12 @@
+---
+tags:
+  - layer/data
+  - domain/database
+  - status/done
+  - type/design
+links:
+  - "[[DATABASE]]"
+---
 # Gosling2 - Database & Data Management Plan (Active)
 
 ## 📋 Overview

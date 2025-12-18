@@ -1,3 +1,16 @@
+---
+tags:
+  - layer/ui
+  - domain/tags
+  - domain/table
+  - status/planned
+  - type/feature
+  - size/large
+  - blocked/schema
+links:
+  - "[[DATABASE]]"
+  - "[[PROPOSAL_TAG_EDITOR]]"
+---
 # Architectural Proposal: Filter Trees (Genre & Publisher)
 
 ## 🚧 Blocker Warning

@@ -1,3 +1,14 @@
+---
+tags:
+  - layer/ui
+  - domain/table
+  - status/planned
+  - type/feature
+  - size/medium
+links:
+  - "[[PROPOSAL_FIELD_REGISTRY]]"
+  - "[[T-01_type_tabs]]"
+---
 # Architectural Proposal: Library Views
 
 ## Objective

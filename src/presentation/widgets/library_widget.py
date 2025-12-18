@@ -3,45 +3,78 @@ import zipfile
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
-    QCheckBox
+    QCheckBox, QHeaderView
 )
 import json
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
-    QPainter, QColor, QPixmap, QIcon, QImage, QDragEnterEvent, QDropEvent
+    QPainter, QColor, QPixmap, QIcon, QImage, QDragEnterEvent, QDropEvent, QPen
 )
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QPoint
 
 from .filter_widget import FilterWidget
+from ...core import yellberus
+
+
+class DropIndicatorHeaderView(QHeaderView):
+    """Custom header view that shows a drop indicator line when reordering columns."""
+    
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        self._drop_indicator_pos = -1
+        self._dragging = False
+    
+    def mousePressEvent(self, event):
+        self._dragging = True
+        super().mousePressEvent(event)
+    
+    def mouseReleaseEvent(self, event):
+        self._dragging = False
+        self._drop_indicator_pos = -1
+        self.viewport().update()
+        super().mouseReleaseEvent(event)
+    
+    def mouseMoveEvent(self, event):
+        if self._dragging:
+            # Calculate drop position
+            pos = event.position().toPoint()
+            self._drop_indicator_pos = self._calculate_drop_position(pos.x())
+            self.viewport().update()
+        super().mouseMoveEvent(event)
+    
+    def _calculate_drop_position(self, x: int) -> int:
+        """Calculate the x position for the drop indicator line."""
+        for visual_idx in range(self.count()):
+            logical_idx = self.logicalIndex(visual_idx)
+            section_pos = self.sectionPosition(logical_idx)
+            section_size = self.sectionSize(logical_idx)
+            section_mid = section_pos + section_size // 2
+            
+            if x < section_mid:
+                return section_pos
+        
+        # After last column
+        if self.count() > 0:
+            last_logical = self.logicalIndex(self.count() - 1)
+            return self.sectionPosition(last_logical) + self.sectionSize(last_logical)
+        return -1
+    
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        
+        # Draw drop indicator line
+        if self._dragging and self._drop_indicator_pos >= 0:
+            painter = QPainter(self.viewport())
+            pen = QPen(QColor("#00FF00"), 4)  # Bright lime green, 4px wide
+            painter.setPen(pen)
+            
+            x = self._drop_indicator_pos - self.offset()
+            painter.drawLine(x, 0, x, self.height())
+            painter.end()
+
 
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
-
-    # Column indices for library table
-    COL_FILE_ID = 0
-    COL_PERFORMER = 1
-    COL_TITLE = 2
-    COL_DURATION = 3
-    COL_PATH = 4
-    COL_COMPOSER = 5
-    COL_BPM = 6
-    COL_YEAR = 7
-    COL_ISRC = 8
-    COL_IS_DONE = 9
-
-    # Map Column Index -> Field Name for criteria checking
-    COL_TO_FIELD = {
-        COL_FILE_ID: 'file_id',
-        COL_PERFORMER: 'performers',
-        COL_TITLE: 'title',
-        COL_DURATION: 'duration',
-        COL_PATH: 'path',
-        COL_COMPOSER: 'composers',
-        COL_BPM: 'bpm',
-        COL_YEAR: 'recording_year',
-        COL_ISRC: 'isrc',
-        COL_IS_DONE: 'is_done'
-    }
 
     # Signals
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
@@ -52,6 +85,9 @@ class LibraryWidget(QWidget):
         self.library_service = library_service
         self.metadata_service = metadata_service
         self.settings_manager = settings_manager
+        
+        # Cache Yellberus Indices
+        self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
         
         self._init_ui()
         self._load_criteria()
@@ -107,6 +143,30 @@ class LibraryWidget(QWidget):
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.setSortingEnabled(True)
         self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        
+        # Use custom header with drop indicator
+        custom_header = DropIndicatorHeaderView(Qt.Orientation.Horizontal, self.table_view)
+        self.table_view.setHorizontalHeader(custom_header)
+        
+        # Enable column reordering with visual feedback
+        header = self.table_view.horizontalHeader()
+        header.setSectionsMovable(True)
+        header.setHighlightSections(True)  # Highlight section being dragged
+        header.setSectionsClickable(True)  # Required for highlight to work
+        
+        # Style the header with visual feedback
+        header.setStyleSheet("""
+            QHeaderView::section {
+                padding: 4px;
+            }
+            QHeaderView::section:hover {
+                background-color: #3a3a3a;
+            }
+            QHeaderView::section:pressed {
+                background-color: rgba(74, 144, 217, 0.5);
+                color: white;
+            }
+        """)
         
         # Enable Drag & Drop
         self.table_view.setAcceptDrops(True)
@@ -341,6 +401,7 @@ class LibraryWidget(QWidget):
         self.table_view.doubleClicked.connect(self._on_table_double_click)
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
+        self.table_view.horizontalHeader().sectionMoved.connect(self._on_column_moved)
 
     def load_library(self) -> None:
         """Load library from database"""
@@ -365,16 +426,12 @@ class LibraryWidget(QWidget):
     def _apply_incomplete_view_columns(self) -> None:
         """Show only columns that are required by the criteria."""
         for col in range(self.library_model.columnCount()):
-            field = self.COL_TO_FIELD.get(col)
-            is_required = False
-            if field:
-                # Check if this field is marked as required in criteria
-                rules = self.completeness_criteria.get(field, {})
-                if rules.get('required', False):
-                    is_required = True
-            
-            # Show if required, Hide if not required (or unknown)
-            self.table_view.setColumnHidden(col, not is_required)
+            if col < len(yellberus.FIELDS):
+                field_def = yellberus.FIELDS[col]
+                # Hide if not visible (e.g. ID, Path)
+                self.table_view.setColumnHidden(col, not field_def.visible)
+            else:
+                self.table_view.setColumnHidden(col, True)
 
     def _populate_table(self, headers, data) -> None:
         self.library_model.clear()
@@ -387,7 +444,10 @@ class LibraryWidget(QWidget):
             self.empty_label.hide()
             
         if headers:
-            self.library_model.setHorizontalHeaderLabels(headers)
+            # IGNORE SQL headers! Use Yellberus headers for consistency.
+            # This ensures "Title" instead of "MS.Name" without aliasing every SQL column.
+            ui_headers = [f.ui_header for f in yellberus.FIELDS]
+            self.library_model.setHorizontalHeaderLabels(ui_headers)
         
         show_incomplete = self.chk_show_incomplete.isChecked()
 
@@ -401,10 +461,10 @@ class LibraryWidget(QWidget):
                 sort_value = cell
                 
                 # Special handling for specific columns
-                if col_idx == self.COL_DURATION and isinstance(cell, (int, float)):
+                if col_idx == self.field_indices['duration'] and isinstance(cell, (int, float)):
                     display_text = self._format_duration(cell)
                     sort_value = float(cell)
-                elif col_idx in (self.COL_BPM, self.COL_FILE_ID, self.COL_YEAR) and isinstance(cell, (int, float)):
+                elif col_idx in (self.field_indices['bpm'], self.field_indices['file_id'], self.field_indices['recording_year']) and isinstance(cell, (int, float)):
                     # Display as string, sort as number
                     sort_value = float(cell)
                 else:
@@ -415,7 +475,7 @@ class LibraryWidget(QWidget):
                 item.setEditable(False) # Ensure items are not editable by default
                 
                 # Checkbox for IsDone
-                if col_idx == self.COL_IS_DONE:
+                if col_idx == self.field_indices['is_done']:
                     item.setCheckable(True)
                     item.setEditable(False) 
                     
@@ -432,11 +492,12 @@ class LibraryWidget(QWidget):
                 
                 # Visual Indicator for Incomplete Fields
                 if show_incomplete:
-                    field_name = self.COL_TO_FIELD.get(col_idx)
-                    if field_name and field_name in failing_fields:
-                        # Light Red Background
-                        item.setBackground(QColor("#FFCDD2"))
-                        item.setToolTip(f"{field_name} is incomplete")
+                    if col_idx < len(yellberus.FIELDS):
+                        field_name = yellberus.FIELDS[col_idx].name
+                        if field_name and field_name in failing_fields:
+                            # Light Red Background
+                            item.setBackground(QColor("#FFCDD2"))
+                            item.setToolTip(f"{field_name} is incomplete")
 
                 items.append(item)
             
@@ -586,7 +647,7 @@ class LibraryWidget(QWidget):
             for idx in indexes:
                 source_idx = self.proxy_model.mapToSource(idx)
                 # COL_IS_DONE is column 9
-                item = self.library_model.item(source_idx.row(), self.COL_IS_DONE)
+                item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
                 # Checkbox state: Checked=2, Unchecked=0
                 is_done = (item.checkState() == Qt.CheckState.Checked) if item else False
                 statuses.append(is_done)
@@ -604,7 +665,7 @@ class LibraryWidget(QWidget):
                 all_valid = True
                 for idx in indexes:
                     source_idx = self.proxy_model.mapToSource(idx)
-                    item = self.library_model.item(source_idx.row(), self.COL_IS_DONE)
+                    item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
                     if not item.isEnabled():
                         all_valid = False
                         break
@@ -641,41 +702,111 @@ class LibraryWidget(QWidget):
 
     def _show_column_context_menu(self, position) -> None:
         menu = QMenu(self)
-        for col in range(self.library_model.columnCount()):
-            header_text = self.library_model.headerData(col, Qt.Orientation.Horizontal)
+        header = self.table_view.horizontalHeader()
+        
+        # Iterate by visual order so menu matches displayed column order
+        for visual_idx in range(header.count()):
+            logical_idx = header.logicalIndex(visual_idx)
+            header_text = self.library_model.headerData(logical_idx, Qt.Orientation.Horizontal)
             action = QAction(str(header_text), self)
             action.setCheckable(True)
-            action.setChecked(not self.table_view.isColumnHidden(col))
-            action.setData(col)
+            action.setChecked(not self.table_view.isColumnHidden(logical_idx))
+            action.setData(logical_idx)
             action.toggled.connect(self._toggle_column_visibility)
             menu.addAction(action)
-        menu.exec(self.table_view.horizontalHeader().mapToGlobal(position))
+        
+        menu.addSeparator()
+        reset_action = QAction("Reset to Default", self)
+        reset_action.triggered.connect(self._reset_column_layout)
+        menu.addAction(reset_action)
+        
+        menu.exec(header.mapToGlobal(position))
 
     def _toggle_column_visibility(self, checked) -> None:
         action = self.sender()
         if action:
             column = action.data()
             self.table_view.setColumnHidden(column, not checked)
-            self._save_column_visibility_states()
+            self._save_column_layout()
 
-    def _load_column_visibility_states(self) -> None:
-        visibility_states = self.settings_manager.get_column_visibility()
-        if isinstance(visibility_states, dict):
-            for col_str, visible in visibility_states.items():
-                if isinstance(col_str, str) and col_str.isdigit():
-                    self.table_view.setColumnHidden(int(col_str), not visible)
+    def _reset_column_layout(self) -> None:
+        """Reset columns to default order and visibility."""
+        header = self.table_view.horizontalHeader()
+        col_count = header.count()
+        
+        # Reset order: move each column to its logical position
+        for logical_idx in range(col_count):
+            current_visual = header.visualIndex(logical_idx)
+            if current_visual != logical_idx:
+                header.moveSection(current_visual, logical_idx)
+        
+        # Reset visibility: show all columns
+        for col in range(col_count):
+            self.table_view.setColumnHidden(col, False)
+        
+        # Clear saved layout
+        self.settings_manager.remove_setting("library/layouts")
 
-    def _save_column_visibility_states(self) -> None:
-        # Do not save visibility states if we are in "Incomplete View" mode
-        # as this mode temporarily hides/shows columns programmatically.
+    def _on_column_moved(self, logical_index: int, old_visual: int, new_visual: int) -> None:
+        """Save column layout when user drags a column."""
+        self._save_column_layout()
+
+    def _load_column_layout(self) -> None:
+        """Load and apply column layout (order + visibility) from settings."""
+        layout = self.settings_manager.get_column_layout("default")
+        if not layout:
+            return
+        
+        header = self.table_view.horizontalHeader()
+        order = layout.get("order", [])
+        hidden = layout.get("hidden", [])
+        
+        # Restore order: move each column to its saved visual position
+        if order:
+            for visual_idx, logical_idx in enumerate(order):
+                if logical_idx < header.count():
+                    current_visual = header.visualIndex(logical_idx)
+                    if current_visual != visual_idx:
+                        header.moveSection(current_visual, visual_idx)
+        
+        # Restore visibility
+        for col in range(header.count()):
+            self.table_view.setColumnHidden(col, col in hidden)
+
+    def _save_column_layout(self) -> None:
+        """Save column layout (order + visibility) to settings."""
+        # Do not save if we are in "Incomplete View" mode
         if self.chk_show_incomplete.isChecked():
             return
+        
+        header = self.table_view.horizontalHeader()
+        col_count = header.count()
+        
+        # Order: list of logical indices in visual order (includes ALL columns)
+        order = [header.logicalIndex(visual_idx) for visual_idx in range(col_count)]
+        
+        # Hidden: list of logical indices that are hidden
+        hidden = [col for col in range(col_count) if self.table_view.isColumnHidden(col)]
+        
+        self.settings_manager.set_column_layout(order, hidden, "default")
 
-        visibility_states = {}
-        for col in range(self.library_model.columnCount()):
-            visible = not self.table_view.isColumnHidden(col)
-            visibility_states[str(col)] = visible
-        self.settings_manager.set_column_visibility(visibility_states)
+    # Legacy method for backward compatibility
+    def _load_column_visibility_states(self) -> None:
+        """Load column layout. Uses new format, falls back to legacy if needed."""
+        layout = self.settings_manager.get_column_layout("default")
+        if layout:
+            self._load_column_layout()
+        else:
+            # Fallback to legacy format
+            visibility_states = self.settings_manager.get_column_visibility()
+            if isinstance(visibility_states, dict):
+                for col_str, visible in visibility_states.items():
+                    if isinstance(col_str, str) and col_str.isdigit():
+                        self.table_view.setColumnHidden(int(col_str), not visible)
+
+    def _save_column_visibility_states(self) -> None:
+        """Save column layout (wraps new method for compatibility)."""
+        self._save_column_layout()
 
     def _toggle_status(self, new_status: bool) -> None:
         """Bulk update status for selected rows with validation"""
@@ -696,7 +827,7 @@ class LibraryWidget(QWidget):
 
                 incomplete = self._get_incomplete_fields(row_data)
                 if incomplete:
-                    title_item = self.library_model.item(source_index.row(), self.COL_TITLE)
+                    title_item = self.library_model.item(source_index.row(), self.field_indices['title'])
                     title = title_item.text() if title_item else "Unknown"
                     failed_items.append(f"- {title}: Missing {', '.join(incomplete)}")
             
@@ -712,7 +843,7 @@ class LibraryWidget(QWidget):
         count = 0
         for index in indexes:
             source_index = self.proxy_model.mapToSource(index)
-            file_id_item = self.library_model.item(source_index.row(), self.COL_FILE_ID)
+            file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])
             if file_id_item:
                 file_id = int(file_id_item.text())
                 if self.library_service.update_song_status(file_id, new_status):
@@ -734,7 +865,7 @@ class LibraryWidget(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             for index in indexes:
                 source_index = self.proxy_model.mapToSource(index)
-                file_id_item = self.library_model.item(source_index.row(), self.COL_FILE_ID)
+                file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])
                 if file_id_item:
                     file_id = int(file_id_item.text())
                     self.library_service.delete_song(file_id)
@@ -750,14 +881,16 @@ class LibraryWidget(QWidget):
         items = []
         for index in indexes:
             source_index = self.proxy_model.mapToSource(index)
-            path_item = self.library_model.item(source_index.row(), self.COL_PATH)
-            performer_item = self.library_model.item(source_index.row(), self.COL_PERFORMER)
-            title_item = self.library_model.item(source_index.row(), self.COL_TITLE)
+            row = source_index.row()
+            
+            path_item = self.library_model.item(row, self.field_indices['path'])
+            perf_item = self.library_model.item(row, self.field_indices['performers'])
+            title_item = self.library_model.item(row, self.field_indices['title'])
             
             if path_item:
                 items.append({
                     "path": path_item.text(),
-                    "performer": performer_item.text() if performer_item else "Unknown",
+                    "performer": perf_item.text() if perf_item else "Unknown",
                     "title": title_item.text() if title_item else "Unknown"
                 })
         
@@ -773,7 +906,7 @@ class LibraryWidget(QWidget):
         # Use the first selected row (simpler for dialog)
         index = indexes[0]
         source_index = self.proxy_model.mapToSource(index)
-        path_item = self.library_model.item(source_index.row(), self.COL_PATH)
+        path_item = self.library_model.item(source_index.row(), self.field_indices['path'])
         
         if not path_item or not path_item.text():
             return
@@ -855,10 +988,12 @@ class LibraryWidget(QWidget):
         
         # Map table columns to criteria keys
         # Map table columns to criteria keys dynamically
+        # Map table columns to criteria keys dynamically
         val_map = {}
-        for col_idx, field_name in self.COL_TO_FIELD.items():
-            if col_idx < len(row_data):
-                val_map[field_name] = row_data[col_idx]
+        for col_idx, cell_value in enumerate(row_data):
+            if col_idx < len(yellberus.FIELDS):
+                field_name = yellberus.FIELDS[col_idx].name
+                val_map[field_name] = cell_value
         
         # DEBUG
         # print(f"Checking incomplete criteria={self.completeness_criteria} val_map={val_map}")

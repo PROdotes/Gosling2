@@ -1,3 +1,7 @@
+---
+tags:
+  - type/index
+---
 # Design Documents
 
 ```

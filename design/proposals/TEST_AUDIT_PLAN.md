@@ -1,3 +1,12 @@
+---
+tags:
+  - layer/core
+  - domain/database
+  - status/planned
+  - type/task
+  - size/medium
+links: []
+---
 # Test Suite Audit Plan
 
 ## Overview

@@ -1,3 +1,14 @@
+---
+tags:
+  - layer/ui
+  - domain/table
+  - status/future
+  - type/design
+  - size/medium
+links:
+  - "[[PROPOSAL_LIBRARY_VIEWS]]"
+  - "[[PROPOSAL_APP_MODES]]"
+---
 # UX Styling Proposal
 
 **Status:** 🔮 Future  

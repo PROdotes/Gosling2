@@ -1,17 +1,43 @@
 {
+    "TDRC": {
+        "description": "Recording time",
+        "field": "recording_year",
+        "type": "integer"
+    },
+    "TIPL": {
+        "description": "Involved people list",
+        "field": "producers",
+        "type": "list"
+    },
     "TALB": "Album",
-    "TBPM": "BPM (Beats Per Minute)",
-    "TCOM": "Composer",
+    "TBPM": {
+        "description": "BPM (Beats Per Minute)",
+        "field": "bpm",
+        "type": "integer"
+    },
+    "TCOM": {
+        "description": "Composer",
+        "field": "composers",
+        "type": "list"
+    },
     "TCON": "Content type (Genre)",
     "TCOP": "Copyright",
     "TDAT": "Date",
     "TDLY": "Playlist delay",
     "TENC": "Encoded by",
-    "TEXT": "Lyricist/Text writer",
+    "TEXT": {
+        "description": "Lyricist/Text writer",
+        "field": "lyricists",
+        "type": "list"
+    },
     "TFLT": "File type",
     "TIME": "Time",
     "TIT1": "Content group description",
-    "TIT2": "Title/songname/content description",
+    "TIT2": {
+        "description": "Title/songname/content description",
+        "field": "title",
+        "type": "text"
+    },
     "TIT3": "Subtitle/Description refinement",
     "TKEY": "Initial key",
     "TLAN": "Language(s)",
@@ -23,7 +49,11 @@
     "TOPE": "Original artist(s)/performer(s)",
     "TORY": "Original release year",
     "TOWN": "File owner/licensee",
-    "TPE1": "Lead performer(s)/Soloist(s)",
+    "TPE1": {
+        "description": "Lead performer(s)/Soloist(s)",
+        "field": "performers",
+        "type": "list"
+    },
     "TPE2": "Band/orchestra/accompaniment",
     "TPE3": "Conductor/performer refinement",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
@@ -34,7 +64,11 @@
     "TRSN": "Internet radio station name",
     "TRSO": "Internet radio station owner",
     "TSIZ": "Size",
-    "TSRC": "ISRC (international standard recording code)",
+    "TSRC": {
+        "description": "ISRC (international standard recording code)",
+        "field": "isrc",
+        "type": "text"
+    },
     "TSSE": "Software/Hardware and settings used for encoding",
     "TYER": "Year",
     "TXXX": "User defined text information frame",

@@ -1,3 +1,12 @@
+---
+tags:
+  - layer/data
+  - domain/database
+  - status/done
+  - type/architecture
+links:
+  - "[[DATABASE]]"
+---
 # Architectural Proposal: Schema Inheritance Model (v5 — Simplified)
 
 ## Problem

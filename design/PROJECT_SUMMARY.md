@@ -1,3 +1,9 @@
+---
+tags:
+  - type/reference
+  - status/done
+links: []
+---
 # Gosling2 - Project Summary
 
 ## ✅ Project Status: ACTIVE DEVELOPMENT

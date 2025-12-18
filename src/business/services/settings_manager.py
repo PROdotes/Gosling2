@@ -13,7 +13,8 @@ class SettingsManager:
     KEY_MAIN_SPLITTER_STATE = "window/mainSplitterState"
     
     # Library settings
-    KEY_COLUMN_VISIBILITY = "library/columnVisibility"
+    KEY_COLUMN_VISIBILITY = "library/columnVisibility"  # Legacy
+    KEY_LIBRARY_LAYOUTS = "library/layouts"  # New: loadout-ready structure
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
     
     # Playback settings
@@ -80,6 +81,43 @@ class SettingsManager:
     def set_last_import_directory(self, directory: str) -> None:
         """Save last directory used for importing files"""
         self._settings.setValue(self.KEY_LAST_IMPORT_DIRECTORY, directory)
+    
+    def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:
+        """
+        Get column layout (order and hidden) for a named layout.
+        
+        Returns dict with 'order' (list of all column indices) and 'hidden' (list of hidden column indices).
+        Returns empty dict if no layout saved.
+        """
+        layouts = self._settings.value(self.KEY_LIBRARY_LAYOUTS, {})
+        if not isinstance(layouts, dict):
+            return {}
+        layout = layouts.get(layout_name, {})
+        return layout.get("columns", {})
+    
+    def set_column_layout(self, order: list, hidden: list, layout_name: str = "default") -> None:
+        """
+        Save column layout (order and hidden) for a named layout.
+        
+        Args:
+            order: List of ALL column indices in visual order
+            hidden: List of column indices that are hidden
+            layout_name: Name of the layout (default: "default")
+        """
+        layouts = self._settings.value(self.KEY_LIBRARY_LAYOUTS, {})
+        if not isinstance(layouts, dict):
+            layouts = {}
+        
+        if layout_name not in layouts:
+            layouts[layout_name] = {}
+        
+        layouts[layout_name]["columns"] = {
+            "order": order,
+            "hidden": hidden
+        }
+        layouts["_active"] = layout_name
+        
+        self._settings.setValue(self.KEY_LIBRARY_LAYOUTS, layouts)
     
     # ===== Playback Settings =====
     

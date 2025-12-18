@@ -1,3 +1,8 @@
+---
+tags:
+  - type/index
+  - status/future
+---
 # Feature Ideas — Future / Backlog
 
 > **Purpose:** Capture ideas for radio automation features that are NOT planned for current development. This prevents feature creep while ensuring good ideas aren't forgotten.

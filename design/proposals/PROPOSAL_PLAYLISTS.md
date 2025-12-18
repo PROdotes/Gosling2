@@ -1,3 +1,15 @@
+---
+tags:
+  - layer/data
+  - layer/ui
+  - domain/playlist
+  - domain/database
+  - status/planned
+  - type/feature
+  - size/large
+links:
+  - "[[DATABASE]]"
+---
 # Architectural Proposal: Saved Playlists
 
 ## Problem

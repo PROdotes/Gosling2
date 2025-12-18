@@ -1,3 +1,15 @@
+---
+tags:
+  - layer/ui
+  - domain/table
+  - status/active
+  - type/task
+  - size/small
+  - priority/high
+links:
+  - "[[PROPOSAL_LIBRARY_VIEWS]]"
+  - "[[DATABASE]]"
+---
 # Type Tabs
 
 **Task ID:** T-01  

@@ -1,3 +1,13 @@
+---
+tags:
+  - layer/core
+  - domain/audio
+  - status/done
+  - type/design
+links:
+  - "[[PROPOSAL_BROADCAST_AUTOMATION]]"
+  - "[[PROPOSAL_ONAIR_UI]]"
+---
 # Gosling2 - Player & Audio Engine Roadmap (Deferred)
 
 ## ⏸️ Status: DEFERRED
