@@ -15,18 +15,23 @@ def test_database_schema_integrity(tmp_path):
     repo = BaseRepository(str(db_path))
     
     expected_tables = {
-        "Files",
+        "Types",
+        "MediaSources",
+        "Songs",
         "Contributors",
         "Roles",
-        "FileContributorRoles",
+        "MediaSourceContributorRoles",
         "GroupMembers"
     }
     
-    # Expected Columns per table (Name only, we could check type too but Name is sufficient trigger)
+    # Expected Columns per table
     expected_columns = {
-        "Files": {"FileID", "Path", "Title", "Duration", "TempoBPM", "RecordingYear", "ISRC", "IsDone"},
+        "Types": {"TypeID", "TypeName"},
+        "MediaSources": {"SourceID", "TypeID", "Name", "Notes", "Source", "Duration", "IsActive"},
+        "Songs": {"SourceID", "TempoBPM", "RecordingYear", "ISRC", "IsDone"},
         "Contributors": {"ContributorID", "Name", "SortName"},
         "Roles": {"RoleID", "Name"},
+        "MediaSourceContributorRoles": {"SourceID", "ContributorID", "RoleID"},
     }
     
     with repo.get_connection() as conn:

@@ -23,8 +23,18 @@ def test_strict_extraction_coverage():
         repo = BaseRepository(path)
         with sqlite3.connect(path) as conn:
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(Files)")
-            db_columns = {row[1] for row in cursor.fetchall()}
+            # Get columns from MediaSources
+            cursor.execute("PRAGMA table_info(MediaSources)")
+            ms_columns = {row[1] for row in cursor.fetchall()}
+            
+            # Get columns from Songs
+            cursor.execute("PRAGMA table_info(Songs)")
+            song_columns = {row[1] for row in cursor.fetchall()}
+            
+            # Combine relevant columns we care about in the model
+            # Filter out utility/foreign keys if needed, but for now let's map them
+            db_columns = ms_columns.union(song_columns) - {"TypeID", "Notes", "IsActive", "CueIn", "CueOut", "Intro", "Outro", "HookIn", "HookOut"}
+            
     finally:
         import gc
         gc.collect()
@@ -41,14 +51,14 @@ def test_strict_extraction_coverage():
     # This is the "Contract".
     # Column Name -> (Expected Song Field, ID3 Tag to Mock, Expected Value)
     schema_tag_map = {
-        "Title": ("title", "TIT2", "Test Title"),
+        "Name": ("name", "TIT2", "Test Title"),
         "TempoBPM": ("bpm", "TBPM", ["120"]), # text list
         "RecordingYear": ("recording_year", "TDRC", ["2023"]),
         # Duration is special (audio.info)
         "Duration": ("duration", None, 123.45),
-        # Path/FileID are args
-        "Path": ("path", None, "/test/path.mp3"),
-        "FileID": ("file_id", None, 1),
+        # Source/SourceID are args
+        "Source": ("source", None, "/test/path.mp3"),
+        "SourceID": ("source_id", None, 1),
         "ISRC": ("isrc", "TSRC", "US-Test-123"),
         "IsDone": ("is_done", "TXXX:GOSLING_DONE", "1"),
     }
@@ -94,7 +104,7 @@ def test_strict_extraction_coverage():
         MockID3.return_value = mock_tags
         
         # Run SUT
-        song = MetadataService.extract_from_mp3("/test/path.mp3", file_id=1)
+        song = MetadataService.extract_from_mp3("/test/path.mp3", source_id=1)
         
         # 5. Assertions
         for col in db_columns:
@@ -109,12 +119,12 @@ def test_strict_extraction_coverage():
                 assert actual_val == 2023
             elif col == "Duration":
                 assert actual_val == 123.45
-            elif col == "Title":
+            elif col == "Name":
                 assert actual_val == "Test Title"
             # Path/FileID
-            elif col == "Path":
+            elif col == "Source":
                 assert actual_val == "/test/path.mp3"
-            elif col == "FileID":
+            elif col == "SourceID":
                 assert actual_val == 1
             elif col == "ISRC":
                 assert actual_val == "US-Test-123"

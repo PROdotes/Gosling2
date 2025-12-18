@@ -16,15 +16,26 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # 1. Insert into MediaSources
                 cursor.execute(
-                    "INSERT OR IGNORE INTO Files (Path, Title) VALUES (?, ?)",
-                    (file_path, file_title)
+                    """
+                    INSERT INTO MediaSources (TypeID, Name, Source, IsActive) 
+                    VALUES (1, ?, ?, 1)
+                    """,
+                    (file_title, file_path)
                 )
-                if cursor.rowcount > 0:
-                    return cursor.lastrowid
-                return None
+                source_id = cursor.lastrowid
+                
+                # 2. Insert into Songs
+                cursor.execute(
+                    "INSERT INTO Songs (SourceID) VALUES (?)",
+                    (source_id,)
+                )
+                
+                return source_id
         except Exception as e:
-            print(f"Error inserting file: {e}")
+            print(f"Error inserting song: {e}")
             return None
 
     def get_all(self) -> Tuple[List[str], List[Tuple]]:
@@ -33,22 +44,24 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT F.FileID,
+                    SELECT MS.SourceID AS FileID,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           F.Title AS Title,
-                           F.Duration AS Duration,
-                           F.Path AS Path,
+                           MS.Name AS Title,
+                           MS.Duration AS Duration,
+                           MS.Source AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year,
-                           F.ISRC AS ISRC,
-                           F.IsDone AS IsDone
-                    FROM Files F
-                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                    ORDER BY F.FileID DESC
+                           S.TempoBPM AS BPM,
+                           S.RecordingYear AS Year,
+                           S.ISRC AS ISRC,
+                           S.IsDone AS IsDone
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
+                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE MS.IsActive = 1
+                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query)
                 headers = [description[0] for description in cursor.description]
@@ -63,10 +76,11 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("DELETE FROM Files WHERE FileID = ?", (file_id,))
+                # Deleting from MediaSources cascades to Songs and Roles
+                cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (file_id,))
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"Error deleting file: {e}")
+            print(f"Error deleting song: {e}")
             return False
 
     def update(self, song: Song) -> bool:
@@ -75,20 +89,28 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # Update basic file info
+                # 1. Update MediaSources (Base info)
                 cursor.execute("""
-                    UPDATE Files
-                    SET Title = ?, Duration = ?, TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?
-                    WHERE FileID = ?
-                """, (song.title, song.duration, song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, song.file_id))
+                    UPDATE MediaSources
+                    SET Name = ?, Duration = ?
+                    WHERE SourceID = ?
+                """, (song.name, song.duration, song.source_id))
 
-                # Clear existing contributor roles
+                # 2. Update Songs (Extended info)
+                # Note: Created helper query to ensure record exists if it was manually messed with
+                cursor.execute("""
+                    UPDATE Songs
+                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?
+                    WHERE SourceID = ?
+                """, (song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, song.source_id))
+
+                # 3. Clear existing contributor roles
                 cursor.execute(
-                    "DELETE FROM FileContributorRoles WHERE FileID = ?",
-                    (song.file_id,)
+                    "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ?",
+                    (song.source_id,)
                 )
 
-                # Sync contributor roles
+                # 4. Sync new contributor roles
                 self._sync_contributor_roles(song, conn)
 
                 return True
@@ -96,15 +118,13 @@ class SongRepository(BaseRepository):
             print(f"Error updating song: {e}")
             return False
 
-
-
     def update_status(self, file_id: int, is_done: bool) -> bool:
         """Update just the IsDone status of a song"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
-                    "UPDATE Files SET IsDone = ? WHERE FileID = ?",
+                    "UPDATE Songs SET IsDone = ? WHERE SourceID = ?",
                     (1 if is_done else 0, file_id)
                 )
                 return cursor.rowcount > 0
@@ -153,11 +173,11 @@ class SongRepository(BaseRepository):
                     continue
                 contributor_id = contributor_row[0]
 
-                # Link file, contributor, and role
+                # Link source, contributor, and role
                 cursor.execute("""
-                    INSERT OR IGNORE INTO FileContributorRoles (FileID, ContributorID, RoleID)
+                    INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID)
                     VALUES (?, ?, ?)
-                """, (song.file_id, contributor_id, role_id))
+                """, (song.source_id, contributor_id, role_id))
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific performer"""
@@ -165,23 +185,24 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT F.FileID,
+                    SELECT MS.SourceID AS FileID,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           F.Title AS Title,
-                           F.Duration AS Duration,
-                           F.Path AS Path,
+                           MS.Name AS Title,
+                           MS.Duration AS Duration,
+                           MS.Source AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year,
-                           F.ISRC AS ISRC,
-                           F.IsDone AS IsDone
-                    FROM Files F
-                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                    WHERE C.Name = ? AND R.Name = 'Performer'
-                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                    ORDER BY F.FileID DESC
+                           S.TempoBPM AS BPM,
+                           S.RecordingYear AS Year,
+                           S.ISRC AS ISRC,
+                           S.IsDone AS IsDone
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
+                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE C.Name = ? AND R.Name = 'Performer' AND MS.IsActive = 1
+                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (performer_name,))
                 headers = [description[0] for description in cursor.description]
@@ -197,23 +218,24 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT F.FileID,
+                    SELECT MS.SourceID AS FileID,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           F.Title AS Title,
-                           F.Duration AS Duration,
-                           F.Path AS Path,
+                           MS.Name AS Title,
+                           MS.Duration AS Duration,
+                           MS.Source AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year,
-                           F.ISRC AS ISRC,
-                           F.IsDone AS IsDone
-                    FROM Files F
-                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                    WHERE C.Name = ? AND R.Name = 'Composer'
-                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                    ORDER BY F.FileID DESC
+                           S.TempoBPM AS BPM,
+                           S.RecordingYear AS Year,
+                           S.ISRC AS ISRC,
+                           S.IsDone AS IsDone
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
+                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE C.Name = ? AND R.Name = 'Composer' AND MS.IsActive = 1
+                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (composer_name,))
                 headers = [description[0] for description in cursor.description]
@@ -232,40 +254,40 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Fetch basic info
+                # Fetch basic info from JOIN
                 cursor.execute("""
-                    SELECT FileID, Title, Duration, TempoBPM, RecordingYear, ISRC, IsDone
-                    FROM Files
-                    WHERE Path = ?
+                    SELECT MS.SourceID, MS.Name, MS.Duration, S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    WHERE MS.Source = ?
                 """, (norm_path,))
                 
                 row = cursor.fetchone()
                 if not row:
                     return None
                 
-                file_id, title, duration, bpm, recording_year, isrc, is_done_int = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int = row
                 
                 # Fetch contributors
                 song = Song(
-                    file_id=file_id,
-                    path=path,
-                    title=title,
+                    source_id=source_id,
+                    source=norm_path,
+                    name=name,
                     duration=duration,
                     bpm=bpm,
                     recording_year=recording_year,
                     isrc=isrc,
                     is_done=bool(is_done_int)
                 )
-                song.path = norm_path
                 
                 # Fetch roles
                 cursor.execute("""
                     SELECT R.Name, C.Name
-                    FROM FileContributorRoles FCR
-                    JOIN Roles R ON FCR.RoleID = R.RoleID
-                    JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    WHERE FCR.FileID = ?
-                """, (file_id,))
+                    FROM MediaSourceContributorRoles MSCR
+                    JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    WHERE MSCR.SourceID = ?
+                """, (source_id,))
                 
                 for role_name, contributor_name in cursor.fetchall():
                     if role_name == 'Performer':
@@ -287,7 +309,7 @@ class SongRepository(BaseRepository):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT RecordingYear FROM Files WHERE RecordingYear IS NOT NULL ORDER BY RecordingYear DESC")
+                cursor.execute("SELECT DISTINCT RecordingYear FROM Songs WHERE RecordingYear IS NOT NULL ORDER BY RecordingYear DESC")
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
             print(f"Error getting all years: {e}")
@@ -299,21 +321,22 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT F.FileID,
+                    SELECT MS.SourceID AS FileID,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           F.Title AS Title,
-                           F.Duration AS Duration,
-                           F.Path AS Path,
+                           MS.Name AS Title,
+                           MS.Duration AS Duration,
+                           MS.Source AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year
-                    FROM Files F
-                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                    WHERE F.RecordingYear = ?
-                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                    ORDER BY F.FileID DESC
+                           S.TempoBPM AS BPM,
+                           S.RecordingYear AS Year
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
+                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE S.RecordingYear = ? AND MS.IsActive = 1
+                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    ORDER BY MS.SourceID DESC
                 """
                 cursor.execute(query, (year,))
                 headers = [description[0] for description in cursor.description]
@@ -329,22 +352,23 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT F.FileID,
+                    SELECT MS.SourceID AS FileID,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-                           F.Title AS Title,
-                           F.Duration AS Duration,
-                           F.Path AS Path,
+                           MS.Name AS Title,
+                           MS.Duration AS Duration,
+                           MS.Source AS Path,
                            GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-                           F.TempoBPM AS BPM,
-                           F.RecordingYear AS Year,
-                           F.IsDone AS IsDone
-                    FROM Files F
-                    LEFT JOIN FileContributorRoles FCR ON F.FileID = FCR.FileID
-                    LEFT JOIN Contributors C ON FCR.ContributorID = C.ContributorID
-                    LEFT JOIN Roles R ON FCR.RoleID = R.RoleID
-                    WHERE F.IsDone = ?
-                    GROUP BY F.FileID, F.Path, F.Title, F.Duration, F.TempoBPM
-                    ORDER BY F.FileID DESC
+                           S.TempoBPM AS BPM,
+                           S.RecordingYear AS Year,
+                           S.IsDone AS IsDone
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
+                    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE S.IsDone = ? AND MS.IsActive = 1
+                    GROUP BY MS.SourceID, MS.Source, MS.Name, MS.Duration, S.TempoBPM
+                    ORDER BY MS.SourceID DESC
                 """
                 # Convert bool to int (0/1) for SQLite
                 status_val = 1 if is_done else 0

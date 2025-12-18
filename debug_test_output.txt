@@ -1,2 +1,2 @@
-DB Columns: {'IsDone', 'Path', 'RecordingYear', 'FileID', 'ISRC', 'Duration', 'TempoBPM', 'Title'}
-Mapped Attributes: {'bpm', 'composers', 'title', 'recording_year', 'is_done', 'performers', 'formatted_duration', 'producers', 'isrc', 'album_artists'}
+DB Columns: set()
+Mapped Attributes: {'formatted_duration', 'title', 'is_done', 'composers', 'album_artists', 'isrc', 'bpm', 'recording_year', 'performers', 'producers'}

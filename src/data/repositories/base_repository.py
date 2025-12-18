@@ -32,34 +32,48 @@ class BaseRepository:
         with self.get_connection() as conn:
             cursor = conn.cursor()
 
-            # Create Files table
+            # 1. Types (Lookup)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS Files (
-                    FileID INTEGER PRIMARY KEY,
-                    Path TEXT NOT NULL UNIQUE,
-                    Title TEXT NOT NULL,
+                CREATE TABLE IF NOT EXISTS Types (
+                    TypeID INTEGER PRIMARY KEY,
+                    TypeName TEXT NOT NULL UNIQUE
+                )
+            """)
+            
+            # Insert default types
+            default_types = ["Song", "Jingle", "Commercial", "VoiceTrack", "Recording", "Stream"]
+            cursor.executemany(
+                "INSERT OR IGNORE INTO Types (TypeName) VALUES (?)",
+                [(t,) for t in default_types]
+            )
+
+            # 2. MediaSources (Base Table)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS MediaSources (
+                    SourceID INTEGER PRIMARY KEY,
+                    TypeID INTEGER NOT NULL,
+                    Name TEXT NOT NULL,
+                    Notes TEXT,
+                    Source TEXT NOT NULL UNIQUE,
                     Duration REAL,
-                    TempoBPM INTEGER,
-                    RecordingYear INTEGER,
-                    ISRC TEXT,
-                    IsDone BOOLEAN
+                    IsActive BOOLEAN DEFAULT 1,
+                    FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
                 )
             """)
 
-            # Migration: Ensure columns exist
-            cursor.execute("PRAGMA table_info(Files)")
-            columns = [info[1] for info in cursor.fetchall()]
-            
-            if "RecordingYear" not in columns:
-                cursor.execute("ALTER TABLE Files ADD COLUMN RecordingYear INTEGER")
-                
-            if "ISRC" not in columns:
-                cursor.execute("ALTER TABLE Files ADD COLUMN ISRC TEXT")
+            # 3. Songs (Extension Table)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Songs (
+                    SourceID INTEGER PRIMARY KEY,
+                    TempoBPM INTEGER,
+                    RecordingYear INTEGER,
+                    ISRC TEXT,
+                    IsDone BOOLEAN DEFAULT 0,
+                    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
+                )
+            """)
 
-            if "IsDone" not in columns:
-                cursor.execute("ALTER TABLE Files ADD COLUMN IsDone BOOLEAN DEFAULT 0")
-
-            # Create Contributors table
+            # 4. Contributors
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Contributors (
                     ContributorID INTEGER PRIMARY KEY,
@@ -68,7 +82,7 @@ class BaseRepository:
                 )
             """)
 
-            # Create Roles table
+            # 5. Roles
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Roles (
                     RoleID INTEGER PRIMARY KEY,
@@ -83,20 +97,20 @@ class BaseRepository:
                 [(r,) for r in default_roles]
             )
 
-            # Create FileContributorRoles table
+            # 6. MediaSourceContributorRoles (Junction)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS FileContributorRoles (
-                    FileID INTEGER NOT NULL,
+                CREATE TABLE IF NOT EXISTS MediaSourceContributorRoles (
+                    SourceID INTEGER NOT NULL,
                     ContributorID INTEGER NOT NULL,
                     RoleID INTEGER NOT NULL,
-                    PRIMARY KEY (FileID, ContributorID, RoleID),
-                    FOREIGN KEY (FileID) REFERENCES Files(FileID) ON DELETE CASCADE,
+                    PRIMARY KEY (SourceID, ContributorID, RoleID),
+                    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
                     FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID) ON DELETE CASCADE,
                     FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
                 )
             """)
 
-            # Create GroupMembers table
+            # 7. GroupMembers
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS GroupMembers (
                     GroupID INTEGER NOT NULL,

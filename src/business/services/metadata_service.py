@@ -9,7 +9,7 @@ class MetadataService:
     """Service for extracting metadata from audio files"""
 
     @staticmethod
-    def extract_from_mp3(path: str, file_id: Optional[int] = None) -> Song:
+    def extract_from_mp3(path: str, source_id: Optional[int] = None) -> Song:
         """
         Extract metadata from an MP3 file and return a Song object.
         Handles missing tags gracefully.
@@ -120,9 +120,9 @@ class MetadataService:
         producers = get_producers()
 
         return Song(
-            file_id=file_id,
-            path=path,
-            title=title,
+            source_id=source_id,
+            source=path,
+            name=title,
             isrc=isrc,
             duration=duration,
             bpm=bpm,

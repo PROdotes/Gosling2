@@ -60,7 +60,10 @@ def test_metadata_extraction_coverage():
     extracted_fields = {kw.arg for kw in song_instantiation.keywords}
     
     # 6. Compare
-    missing_fields = model_fields - extracted_fields
+    ignored_fields = {
+        'type_id', 'notes', 'is_active'
+    }
+    missing_fields = model_fields - extracted_fields - ignored_fields
     
     assert not missing_fields, \
         f"MetadataService is failing to populate these Song fields: {missing_fields}. " \

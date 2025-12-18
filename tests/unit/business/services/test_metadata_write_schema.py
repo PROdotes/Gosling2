@@ -19,7 +19,7 @@ class TestMetadataWriteSchema:
         
         # Fields that write_tags() currently handles
         handled_fields = {
-            'title',           # → TIT2
+            'name',            # → TIT2 (via .title alias)
             'performers',      # → TPE1
             'composers',       # → TCOM
             'lyricists',       # → TEXT/TOLY
@@ -33,9 +33,12 @@ class TestMetadataWriteSchema:
         
         # Fields that are OK to skip (internal/read-only)
         skip_fields = {
-            'file_id',   # Database ID (not in ID3)
-            'path',      # File path (not in ID3)
+            'source_id', # Database ID (not in ID3)
+            'source',    # File path (not in ID3)
             'duration',  # Calculated from audio (not writable)
+            'type_id',   # DB Type (Song/Jingle etc) - internal
+            'notes',     # Internal notes - not written to ID3 yet
+            'is_active', # Soft delete flag - internal
         }
         
         # Check for missing fields
@@ -60,7 +63,7 @@ class TestMetadataWriteSchema:
         
         # Fields that write_tags() handles (from above test)
         handled_fields = {
-            'title', 'performers', 'composers', 'lyricists', 
+            'name', 'performers', 'composers', 'lyricists', 
             'producers', 'groups', 'bpm', 'recording_year', 
             'isrc', 'is_done'
         }

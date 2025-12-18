@@ -7,41 +7,124 @@ This document describes the SQLite database structure used by the Gosling2 appli
 - **Database Engine**: SQLite 3
 - **File Location**: `sqldb/gosling2.sqlite3`
 - **Foreign Keys**: Enabled (`PRAGMA foreign_keys = ON`)
+- **Total Tables**: 25 (including junctions and lookups)
 
 ## 🛡️ Schema Governance (Strict Mode)
 
 This database schema is **Strictly Enforced** by the test suite. 
 Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompanied by updates to:
 1.  `src/completeness_criteria.json`
-2.  `Song` Model (`src/data/models/song.py`)
-3.  `SongRepository` Whitelists
+2.  Models in `src/data/models/`
+3.  Repository Whitelists in `src/data/repositories/`
 4.  UI and Service components
 
-**Do not manually modify the schema** without running `pytest` to identify all 9 layers of broken dependencies. The system is designed to "yell" at you if you simply `ALTER TABLE` without updating the code.
+**Do not manually modify the schema** without running `pytest` to identify all layers of broken dependencies. The system is designed to "yell" at you if you simply `ALTER TABLE` without updating the code.
+
+> [!IMPORTANT]
+> **Priority Rule:** The "9 Layers of Yell" validation steps take priority over everything. You are strictly forbidden from adding columns to the database if they are not actively used by the application logic. **Dead schema elements are treated as bugs.**
+
+## ✅ Completeness Criteria (IsDone Flag)
+
+A song can only be marked as "Done" (`IsDone = true`) if it passes validation defined in `src/completeness_criteria.json`.
+
+### Mandatory Fields (All Types)
+| Field | Requirement | Notes |
+|-------|-------------|-------|
+| `name` | Not empty | From ID3 or filename |
+| `source` | Not empty | File path or URL must be valid |
+| `duration` | ≥ 30 seconds | Prevents stub files |
+
+### Mandatory Tags (Songs Only)
+| Category | Requirement |
+|----------|-------------|
+| Genre | At least 1 tag with `Category = 'Genre'` |
+| Language | At least 1 tag with `Category = 'Language'` |
+| Artist | At least 1 Contributor with Role = 'Performer' |
+
+### Optional Fields
+| Field | Notes |
+|-------|-------|
+| `TempoBPM` | Recommended for mixing |
+| `ISRC` | International Standard Recording Code |
+| `RecordingYear` | Original recording year |
+
+> **Config location:** `src/completeness_criteria.json`
+> **Enforcement:** Validation service checks before setting IsDone
 
 ## Schema Diagram
 
 ```mermaid
 erDiagram
-    Files ||--|{ FileContributorRoles : "has"
-    Contributors ||--|{ FileContributorRoles : "participates in"
-    Roles ||--|{ FileContributorRoles : "defines role"
+    Types ||--|{ MediaSources : "categorizes"
+    MediaSources ||--o| Songs : "extends"
+    MediaSources ||--o| Streams : "extends"
+    MediaSources ||--o| Commercials : "extends"
+    MediaSources ||--|{ MediaSourceTags : "has"
+    Tags ||--|{ MediaSourceTags : "applied to"
+    Tags ||--o{ TagRelations : "parent of"
+    Tags ||--o{ AutoTagRules : "applied by"
+    MediaSources ||--|{ MediaSourceContributorRoles : "has"
+    Contributors ||--|{ MediaSourceContributorRoles : "participates in"
+    Contributors ||--|{ ContributorAliases : "known as"
+    Roles ||--|{ MediaSourceContributorRoles : "defines role"
     Contributors ||--|{ GroupMembers : "is group"
     Contributors ||--|{ GroupMembers : "is member"
-    Files ||--|{ FileGenres : "has"
-    Genres ||--|{ FileGenres : "categorizes"
-    Files ||--|{ FileAlbums : "appears on"
-    Albums ||--|{ FileAlbums : "contains"
+    Songs ||--|{ SongAlbums : "appears on"
+    Albums ||--|{ SongAlbums : "contains"
     Albums ||--|{ AlbumPublishers : "published by"
     Publishers ||--|{ AlbumPublishers : "publishes"
-    Publishers ||--o| Publishers : "subsidiary of"
+    Commercials ||--o| Campaigns : "belongs to"
+    Campaigns ||--o| Clients : "belongs to"
+    Clients ||--o| Agencies : "represented by"
+    Playlists ||--|{ PlaylistItems : "contains"
+    MediaSources ||--|{ PlaylistItems : "appears in"
+    MediaSources ||--o{ PlayHistory : "played as"
+    MediaSources ||--o{ ChangeLog : "edited in"
+    MediaSources ||--o{ ActionLog : "acted on"
 
-    Files {
-        INTEGER FileID PK
-        TEXT Path
-        TEXT Title
+    Types {
+        INTEGER TypeID PK
+        TEXT TypeName
+    }
+
+    MediaSources {
+        INTEGER SourceID PK
+        INTEGER TypeID FK
+        TEXT Name
+        TEXT Source
         REAL Duration
+        TEXT Notes
+        BOOLEAN IsActive
+    }
+
+    Songs {
+        INTEGER SourceID PK_FK
         INTEGER TempoBPM
+        INTEGER RecordingYear
+        TEXT ISRC
+        BOOLEAN IsDone
+    }
+
+    Streams {
+        INTEGER SourceID PK_FK
+        TEXT FailoverURL
+        TEXT StreamFormat
+    }
+
+    Commercials {
+        INTEGER SourceID PK_FK
+        INTEGER CampaignID FK
+    }
+
+    Tags {
+        INTEGER TagID PK
+        TEXT TagName
+        TEXT Category
+    }
+
+    MediaSourceTags {
+        INTEGER SourceID FK
+        INTEGER TagID FK
     }
 
     Contributors {
@@ -51,297 +134,708 @@ erDiagram
         TEXT Type
     }
 
+    ContributorAliases {
+        INTEGER AliasID PK
+        INTEGER ContributorID FK
+        TEXT AliasName
+    }
+
     Roles {
         INTEGER RoleID PK
         TEXT Name
     }
 
-    FileContributorRoles {
-        INTEGER FileID FK
-        INTEGER ContributorID FK
-        INTEGER RoleID FK
-    }
-
-    GroupMembers {
-        INTEGER GroupID FK
-        INTEGER MemberID FK
-    }
-
-    Genres {
-        INTEGER GenreID PK
-        TEXT Name
-    }
-
-    FileGenres {
-        INTEGER FileID FK
-        INTEGER GenreID FK
-    }
-
-    Publishers {
-        INTEGER PublisherID PK
-        TEXT Name
-        INTEGER ParentPublisherID FK
-    }
-
     Albums {
         INTEGER AlbumID PK
+        TEXT Title
+        TEXT AlbumType
+        INTEGER ReleaseYear
+    }
+
+    Playlists {
+        INTEGER PlaylistID PK
         TEXT Name
-        INTEGER Year
+        TEXT Description
     }
 
-    AlbumPublishers {
-        INTEGER AlbumID FK
-        INTEGER PublisherID FK
+    PlayHistory {
+        INTEGER PlayID PK
+        INTEGER SourceID FK
+        DATETIME PlayedAt
+        TEXT SnapshotName
     }
 
-    FileAlbums {
-        INTEGER FileID FK
-        INTEGER AlbumID FK
+    ChangeLog {
+        INTEGER LogID PK
+        TEXT TableName
+        INTEGER RecordID
+        TEXT FieldName
     }
+
+    ActionLog {
+        INTEGER ActionID PK
+        TEXT ActionType
+        INTEGER TargetID
+        TEXT Details
+    }
+
+    Agencies {
+        INTEGER AgencyID PK
+        TEXT Name
+    }
+
+    Clients {
+        INTEGER ClientID PK
+        INTEGER AgencyID FK
+        TEXT Name
+    }
+
+    Campaigns {
+        INTEGER CampaignID PK
+        INTEGER ClientID FK
+        TEXT CampaignName
+    }
+
+    Timeslots["Timeslots (PLANNED)"] {
+        INTEGER TimeslotID PK
+        TEXT Name
+        TEXT StartTime
+        TEXT EndTime
+    }
+
+    ContentRules["ContentRules (PLANNED)"] {
+        INTEGER RuleID PK
+        INTEGER TimeslotID FK
+        INTEGER Position
+        TEXT ContentType
+    }
+
+    Timeslots ||--|{ ContentRules : "defines"
 ```
 
-## Tables
+> **Implementation Status:**
+> - ✅ **Implemented:** Types, MediaSources, Songs, Streams, Commercials, Tags, Contributors, Playlists, and related junction tables
+> - ⏸️ **Planned (Audit):** ChangeLog, PlayHistory, ActionLog, DeletedRecords — schema defined, not yet active
+> - 🔮 **Future:** Timeslots, ContentRules — see [PROPOSAL_BROADCAST_AUTOMATION.md](.agent/PROPOSAL_BROADCAST_AUTOMATION.md)
 
-### 1. `Files`
-Stores information about each music file in the library.
+---
+
+## Core Tables
+
+### 1. `Types` (Lookup)
+Defines the content type for each media source.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `FileID` | INTEGER | PRIMARY KEY | Unique identifier for the file |
-| `Path` | TEXT | NOT NULL UNIQUE | Absolute file path |
-| `Title` | TEXT | NOT NULL | Track title (from metadata or filename) |
-| `Duration` | REAL | - | Duration in seconds |
+| `TypeID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TypeName` | TEXT | NOT NULL UNIQUE | Type name |
+
+**Default Types:**
+| TypeID | TypeName | Description |
+|--------|----------|-------------|
+| 1 | Song | Music tracks |
+| 2 | Jingle | Station identifiers |
+| 3 | Commercial | Advertisements |
+| 4 | VoiceTrack | Pre-recorded voice segments |
+| 5 | Recording | Shows, interviews, reruns |
+| 6 | Stream | Live audio feeds |
+
+### 2. `MediaSources` (Base Table)
+The base table for all playable content. Every audio item starts here.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `SourceID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TypeID` | INTEGER | FK NOT NULL | Reference to `Types` |
+| `Name` | TEXT | NOT NULL | Display name (from ID3 or filename) |
+| `Notes` | TEXT | - | Searchable description |
+| `Source` | TEXT | NOT NULL | File path (C:\...) or URL (https://...) |
+| `Duration` | REAL | - | Duration in seconds (NULL for streams) |
+| `IsActive` | BOOLEAN | DEFAULT 1 | Show in library (0 = hidden/inactive) |
+
+**Notes:**
+- `Source` field holds either a local file path or stream URL
+- `IsActive = 0` hides the item from library without deleting
+- Use for seasonal content, expired ads, or soft-delete
+
+### 3. `Songs` (Music-Specific)
+Extends `MediaSources` for music tracks with additional metadata and timing.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `SourceID` | INTEGER | PK, FK | Reference to `MediaSources` |
 | `TempoBPM` | INTEGER | - | Beats per minute |
-| `RecordingYear` | INTEGER | - | Year of recording |
+| `RecordingYear` | INTEGER | - | Original recording year |
 | `ISRC` | TEXT | - | International Standard Recording Code |
-| `IsDone` | BOOLEAN | - | Status flag (Processed/Not Processed) |
-| `Album` | TEXT | - | Album Name (Planned) - Deprecated, use `FileAlbums` |
+| `IsDone` | BOOLEAN | DEFAULT 0 | Marked as complete/processed |
+| `CueIn` | REAL | DEFAULT 0 | Playback start trim (seconds) |
+| `CueOut` | REAL | - | Playback end trim (seconds) |
+| `Intro` | REAL | - | End of talk-over zone at start |
+| `Outro` | REAL | - | Start of talk-over zone at end |
+| `HookIn` | REAL | - | Teaser segment start |
+| `HookOut` | REAL | - | Teaser segment end |
 
-**Note:** 
-- Genre is stored via the `FileGenres` junction table for many-to-many relationships.
-- Album is stored via the `FileAlbums` junction table (songs can appear on multiple albums).
-- Publisher is linked to Albums (via `AlbumPublishers`), not directly to songs.
+**Timing Fields:**
+```
+|<--CueIn--|=====INTRO=====|-------BODY-------|=====OUTRO=====|--CueOut-->|
+           ^               ^                   ^               ^
+           0:02            0:15                3:30            3:45
+           
+|---HOOK---|
+^          ^
+1:00       1:10
+```
 
-### 2. `Contributors`
-Stores unique names of all people or groups involved in the music (artists, composers, etc.).
+
+
+**Constraints:**
+- `ON DELETE CASCADE` from `MediaSources`
+
+### 4. `Streams` (Remote Audio)
+Extends `MediaSources` for live audio streams.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier for the contributor |
+| `SourceID` | INTEGER | PK, FK | Reference to `MediaSources` |
+| `FailoverURL` | TEXT | - | Backup stream URL |
+| `StreamFormat` | TEXT | - | 'MP3', 'AAC', 'FLAC' |
+
+**Constraints:**
+- `ON DELETE CASCADE` from `MediaSources`
+
+### 5. `Commercials` (Ad-Specific)
+Extends `MediaSources` for advertisements with campaign linking.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `SourceID` | INTEGER | PK, FK | Reference to `MediaSources` |
+| `CampaignID` | INTEGER | FK | Reference to `Campaigns` |
+
+**Constraints:**
+- `ON DELETE CASCADE` from `MediaSources`
+- `ON DELETE SET NULL` for `CampaignID`
+
+---
+
+## Business Tables
+
+### 6. `Agencies`
+Advertising agencies that represent clients.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `AgencyID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Name` | TEXT | NOT NULL UNIQUE | Agency name |
+| `ContactName` | TEXT | - | Primary contact person |
+| `ContactEmail` | TEXT | - | Contact email |
+| `ContactPhone` | TEXT | - | Contact phone |
+
+### 7. `Clients`
+Advertisers who commission commercials.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `ClientID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `AgencyID` | INTEGER | FK | Reference to `Agencies` |
+| `Name` | TEXT | NOT NULL UNIQUE | Client/brand name |
+| `ContactName` | TEXT | - | Primary contact person |
+| `ContactEmail` | TEXT | - | Contact email |
+| `ContactPhone` | TEXT | - | Contact phone |
+| `Notes` | TEXT | - | Additional notes |
+
+**Constraints:**
+- `ON DELETE SET NULL` for `AgencyID`
+
+### 8. `Campaigns`
+Advertising campaigns with scheduling information.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `CampaignID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `ClientID` | INTEGER | FK NOT NULL | Reference to `Clients` |
+| `CampaignName` | TEXT | NOT NULL | Campaign name |
+| `StartDate` | DATE | - | Campaign start date |
+| `EndDate` | DATE | - | Campaign end date |
+| `RequestedPlays` | INTEGER | - | Total plays requested |
+| `ScheduleNotes` | TEXT | - | Scheduling requirements (e.g., "3x morning, 2x evening") |
+| `Notes` | TEXT | - | Additional notes |
+
+**Constraints:**
+- `ON DELETE CASCADE` from `Clients`
+
+---
+
+## Tags System (Unified)
+
+All categorization (Genre, Language, Mood, custom) uses the Tags system.
+
+### 9. `Tags`
+Master list of all tags with optional category grouping.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `TagID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TagName` | TEXT | NOT NULL | Tag display name |
+| `Category` | TEXT | - | 'Genre', 'Language', 'Mood', 'Usage', or NULL for custom |
+
+**Constraints:**
+- `UNIQUE(TagName, Category)` — Same name can exist in different categories
+
+**Built-in Categories:**
+| Category | Examples | Mandatory |
+|----------|----------|-----------|
+| Genre | Rock, Pop, Jazz, House | Yes (Songs) |
+| Language | English, Croatian, Instrumental | Yes (Songs) |
+| Mood | Upbeat, Mellow, Chill | No |
+| Usage | Morning, Ad-break, Event | No |
+| *(NULL)* | Custom user tags | No |
+
+### 10. `MediaSourceTags` (Junction)
+Links media sources to tags.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `SourceID` | INTEGER | FK NOT NULL | Reference to `MediaSources` |
+| `TagID` | INTEGER | FK NOT NULL | Reference to `Tags` |
+
+**Constraints:**
+- Primary Key: `(SourceID, TagID)`
+- `ON DELETE CASCADE` for both FKs
+
+### 11. `TagRelations`
+Hierarchical tag relationships for smart searching.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `ParentTagID` | INTEGER | FK NOT NULL | Parent tag |
+| `ChildTagID` | INTEGER | FK NOT NULL | Child tag |
+
+**Constraints:**
+- Primary Key: `(ParentTagID, ChildTagID)`
+- `ON DELETE CASCADE` for both FKs
+
+**Use Cases:**
+- `1980s` → `1987` (decade contains year)
+- `Rock` → `Classic Rock` → `80s Rock` (genre hierarchy)
+- Searching parent finds all children
+
+### 12. `AutoTagRules`
+Automatic tag application based on conditions.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `RuleID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TargetTagID` | INTEGER | FK NOT NULL | Tag to apply when rule matches |
+| `RuleType` | TEXT | NOT NULL | 'FIELD', 'TAG', or 'CONTRIBUTOR' |
+| `FieldName` | TEXT | - | For FIELD rules: 'RecordingYear', 'TempoBPM', etc. |
+| `Operator` | TEXT | - | 'BETWEEN', '=', '<', '>', 'LIKE' |
+| `Value1` | TEXT | - | First comparison value |
+| `Value2` | TEXT | - | Second value (for BETWEEN) |
+| `SourceTagID` | INTEGER | FK | For TAG rules: if has this tag |
+| `ContributorID` | INTEGER | FK | For CONTRIBUTOR rules: if has this artist |
+
+**Rule Examples:**
+| Rule | Effect |
+|------|--------|
+| FIELD: RecordingYear BETWEEN 1960-1969 | → Tag "1960s" |
+| FIELD: TempoBPM > 120 | → Tag "Upbeat" |
+| CONTRIBUTOR: The Beatles | → Tag "Oldies" |
+| TAG: Rock | → Tag "Music" |
+
+**Implementation Notes:**
+- **Execution order:** FIELD rules → TAG rules → CONTRIBUTOR rules
+- **Cascading:** Rules can trigger other rules (intentional design)
+- **Cycle detection:** App must detect and break infinite loops
+- **Rule visualization:** UI should show rule graph (future feature)
+
+---
+
+## Playlists
+
+### 13. `Playlists`
+Saved playlists/queues.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `PlaylistID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Name` | TEXT | NOT NULL | Playlist name |
+| `Description` | TEXT | - | Optional description |
+| `CreatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Creation time |
+| `UpdatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Last modification |
+
+### 14. `PlaylistItems` (Junction)
+Links media sources to playlists with ordering.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `PlaylistItemID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `PlaylistID` | INTEGER | FK NOT NULL | Reference to `Playlists` |
+| `SourceID` | INTEGER | FK NOT NULL | Reference to `MediaSources` |
+| `Position` | INTEGER | NOT NULL | Order in playlist (1-based) |
+
+**Constraints:**
+- `ON DELETE CASCADE` for both FKs
+
+---
+
+## Audit & Recovery
+
+### 15. `ChangeLog`
+Transaction log for undo/audit functionality.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `LogID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TableName` | TEXT | NOT NULL | Affected table |
+| `RecordID` | INTEGER | NOT NULL | Affected record ID |
+| `FieldName` | TEXT | NOT NULL | Changed field |
+| `OldValue` | TEXT | - | Value before change |
+| `NewValue` | TEXT | - | Value after change |
+| `Timestamp` | DATETIME | DEFAULT CURRENT_TIMESTAMP | When changed |
+| `BatchID` | TEXT | - | Groups related changes |
+
+### 16. `DeletedRecords`
+Snapshots of deleted records for recovery.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `DeleteID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TableName` | TEXT | NOT NULL | Deleted from table |
+| `RecordID` | INTEGER | NOT NULL | Original record ID |
+| `FullSnapshot` | TEXT | NOT NULL | JSON of record + related data |
+| `DeletedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Deletion time |
+| `RestoredAt` | DATETIME | - | NULL until restored |
+| `BatchID` | TEXT | - | Groups cascaded deletes |
+
+### 17. `PlayHistory` (As-Run Log)
+Broadcast log tracking what played and when. **Snapshots metadata** at play time for backward-compatible exports (deleted songs remain queryable).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `PlayID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `SourceID` | INTEGER | FK | Reference to `MediaSources` (NULL if deleted) |
+| `TypeID` | INTEGER | NOT NULL | Content type at time of play |
+| `PlayedAt` | DATETIME | NOT NULL | When playback started |
+| `Duration` | REAL | - | Actual play duration (may differ from file) |
+| `EndedBy` | TEXT | - | 'natural', 'fade', 'stop', 'crash' |
+| `SnapshotName` | TEXT | NOT NULL | Title/Name at time of play |
+| `SnapshotPerformer` | TEXT | - | Performer(s) at time of play |
+| `SnapshotPublisher` | TEXT | - | Publisher at time of play |
+| `SnapshotTags` | TEXT | - | JSON array of tags (Genre, Language) |
+
+**Design Notes:**
+- `SourceID` is a soft FK — points to MediaSources if still exists, NULL if deleted
+- `Snapshot*` fields preserve metadata at play time for historical accuracy
+- Query by date range, type, tags for As-Run reports
+- Export service can split by day, filter by type, select columns
+
+**Use Cases:**
+```sql
+-- All jingles last Monday
+SELECT * FROM PlayHistory 
+WHERE TypeID = 2 
+  AND PlayedAt BETWEEN '2024-12-16' AND '2024-12-17';
+
+-- All Croatian songs in last 3 years (including deleted)
+SELECT SnapshotName, SnapshotPerformer, PlayedAt 
+FROM PlayHistory 
+WHERE TypeID = 1 
+  AND SnapshotTags LIKE '%Croatian%'
+  AND PlayedAt > datetime('now', '-3 years');
+```
+
+### 18. `ActionLog` (User Actions)
+Tracks user actions for audit trail (who changed the playlist, imported files, etc.).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `ActionID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `ActionType` | TEXT | NOT NULL | 'PLAYLIST_ADD', 'PLAYLIST_MOVE', 'IMPORT', 'DELETE', etc. |
+| `TargetTable` | TEXT | - | Affected table ('PlaylistItems', 'MediaSources') |
+| `TargetID` | INTEGER | - | Affected record ID |
+| `Details` | TEXT | - | JSON with action-specific data |
+| `Timestamp` | DATETIME | DEFAULT CURRENT_TIMESTAMP | When action occurred |
+| `UserID` | TEXT | - | User identifier (for multi-user future) |
+
+**Action Types:**
+- `PLAYLIST_ADD` / `PLAYLIST_REMOVE` / `PLAYLIST_MOVE`
+- `IMPORT_FILE` / `DELETE_FILE`
+- `PLAYBACK_START` / `PLAYBACK_STOP` (manual actions)
+- `MARK_DONE` / `MARK_UNDONE`
+
+### `EntityTimeline` (VIEW)
+Unified view combining all activity for a single entity. Read-only VIEW, not a table.
+
+```sql
+CREATE VIEW EntityTimeline AS
+  SELECT 'EDIT' AS EventType, RecordID AS SourceID, 
+         FieldName || ': ' || OldValue || ' → ' || NewValue AS Summary, 
+         Timestamp
+  FROM ChangeLog WHERE TableName = 'MediaSources'
+  UNION ALL
+  SELECT 'PLAY' AS EventType, SourceID, 
+         'Played' AS Summary, 
+         PlayedAt AS Timestamp
+  FROM PlayHistory
+  UNION ALL
+  SELECT ActionType AS EventType, TargetID AS SourceID, 
+         Details AS Summary, 
+         Timestamp
+  FROM ActionLog WHERE TargetTable = 'MediaSources';
+```
+
+**Use Case:** View full history for "Hey Jude":
+```sql
+SELECT * FROM EntityTimeline WHERE SourceID = 123 ORDER BY Timestamp DESC;
+```
+
+---
+
+## Contributors & Albums
+
+### 19. `Contributors`
+Artists, composers, and other credited individuals or groups.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `Name` | TEXT | NOT NULL UNIQUE | Display name |
-| `SortName` | TEXT | - | Name used for sorting (e.g., "Beatles, The") |
-| `Type` | TEXT | CHECK(Type IN ('person', 'group')) | Contributor type: 'person' or 'group' |
+| `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
+| `Type` | TEXT | CHECK(Type IN ('person', 'group')) | Individual or band |
 
-**Type Column:**
-- `'person'`: Individual contributor (e.g., "John Lennon")
-- `'group'`: Band/ensemble (e.g., "The Beatles")
-- Prevents circular group membership (groups can only contain persons)
-
-### 3. `Roles`
-Defines the types of participation a contributor can have.
+### 18. `ContributorAliases`
+Alternative names for contributors (for search).
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `RoleID` | INTEGER | PRIMARY KEY | Unique identifier for the role |
-| `Name` | TEXT | NOT NULL UNIQUE | Role name (e.g., "Performer", "Composer") |
+| `AliasID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `ContributorID` | INTEGER | FK NOT NULL | Reference to `Contributors` |
+| `AliasName` | TEXT | NOT NULL | Alternative name |
+
+**Example:**
+```
+ContributorID=42, Name="P!nk"
+Aliases: "Pink", "Alecia Moore", "Alecia Beth Moore"
+```
+Searching for "Moore" finds all P!nk songs.
+
+**Constraints:**
+- `ON DELETE CASCADE` from `Contributors`
+
+### 19. `Roles`
+Types of participation (Performer, Composer, etc.).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `RoleID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Name` | TEXT | NOT NULL UNIQUE | Role name |
 
 **Default Roles:**
 - Performer
-- Composer
+- Composer  
 - Lyricist
 - Producer
 
-### 4. `FileContributorRoles` (Junction Table)
-Links Files, Contributors, and Roles to represent "Who did what on which track".
+### 20. `MediaSourceContributorRoles` (Junction)
+Links media sources to contributors with roles.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `FileID` | INTEGER | FK, NOT NULL | Reference to `Files` |
-| `ContributorID` | INTEGER | FK, NOT NULL | Reference to `Contributors` |
-| `RoleID` | INTEGER | FK, NOT NULL | Reference to `Roles` |
+| `SourceID` | INTEGER | FK NOT NULL | Reference to `MediaSources` |
+| `ContributorID` | INTEGER | FK NOT NULL | Reference to `Contributors` |
+| `RoleID` | INTEGER | FK NOT NULL | Reference to `Roles` |
 
 **Constraints:**
-- Primary Key: `(FileID, ContributorID, RoleID)`
-- `ON DELETE CASCADE` for FileID and ContributorID
+- Primary Key: `(SourceID, ContributorID, RoleID)`
+- `ON DELETE CASCADE` for all FKs
 
-### 5. `GroupMembers` (Self-Reference Junction)
-Represents relationships between contributors (e.g., a band and its members).
+### 21. `GroupMembers` (Self-Reference)
+Band membership relationships.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `GroupID` | INTEGER | FK, NOT NULL | ID of the group (from `Contributors`) |
-| `MemberID` | INTEGER | FK, NOT NULL | ID of the member (from `Contributors`) |
+| `GroupID` | INTEGER | FK NOT NULL | The group (from `Contributors`) |
+| `MemberID` | INTEGER | FK NOT NULL | The member (from `Contributors`) |
 
 **Constraints:**
 - Primary Key: `(GroupID, MemberID)`
+- `GroupID` must reference Type='group'
+- `MemberID` must reference Type='person'
 
-**Validation:**
-- `GroupID` must reference a Contributor with Type='group'
-- `MemberID` must reference a Contributor with Type='person'
-- Prevents circular group membership
+---
 
-### 6. `Genres`
-Stores the master list of music genres.
+## Albums & Publishers
 
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `GenreID` | INTEGER | PRIMARY KEY | Unique identifier for the genre |
-| `Name` | TEXT | NOT NULL UNIQUE | Genre name (e.g., "House", "Electronic", "Dance") |
-
-**Notes:**
-- Genres are auto-created when user enters a new genre name
-- **Normalization:** Names stored in title case ("House", "Hip Hop") to prevent duplicates
-- Case-sensitive uniqueness enforced
-
-### 7. `FileGenres` (Junction Table)
-Links Files to Genres in a many-to-many relationship (a song can have multiple genres).
+### 22. `Publishers`
+Music publishers/labels with hierarchy.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `FileID` | INTEGER | FK, NOT NULL | Reference to `Files` |
-| `GenreID` | INTEGER | FK, NOT NULL | Reference to `Genres` |
+| `PublisherID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Name` | TEXT | NOT NULL UNIQUE | Publisher name |
+| `ParentPublisherID` | INTEGER | FK (self) | Parent publisher for subsidiaries |
+
+**Hierarchy Example:**
+```
+Universal Music Group (NULL parent)
+├── Island Records
+│   └── Def Jam Recordings
+└── Republic Records
+```
+
+### 23. `Albums`
+Album/release information.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `AlbumID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Title` | TEXT | NOT NULL | Album title |
+| `AlbumType` | TEXT | - | 'Single', 'EP', 'Album', 'Compilation', 'Live', 'Soundtrack' |
+| `ReleaseYear` | INTEGER | - | Release year |
+
+**Enforcement (in code):**
+- Albums must have at least 1 song in SongAlbums
+- When removing last song: Ask "Delete album or keep empty?"
+
+### 24. `SongAlbums` (Junction)
+Links songs to albums.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `SourceID` | INTEGER | FK NOT NULL | Reference to `Songs` |
+| `AlbumID` | INTEGER | FK NOT NULL | Reference to `Albums` |
+| `TrackNumber` | INTEGER | - | Position on album |
 
 **Constraints:**
-- Primary Key: `(FileID, GenreID)`
-- `ON DELETE CASCADE` for FileID
+- Primary Key: `(SourceID, AlbumID)`
+- `ON DELETE CASCADE` for both FKs
 
-**UI Representation:**
-- Displayed as comma-separated string in table view: "House, Electronic, Dance"
-- Edited via tag-style input with autocomplete
-- Stored as normalized many-to-many relationships
-
-### 8. `Publishers`
-Stores music publishers/labels with hierarchical relationships (subsidiaries, acquisitions).
+### 25. `AlbumPublishers` (Junction)
+Links albums to publishers.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `PublisherID` | INTEGER | PRIMARY KEY | Unique identifier for the publisher |
-| `Name` | TEXT | NOT NULL UNIQUE | Publisher name (e.g., "Yugoton", "Croatia Records") |
-| `ParentPublisherID` | INTEGER | FK (self-reference) | Reference to parent publisher (for subsidiaries) |
-
-**Hierarchical Structure:**
-- Self-referencing foreign key enables unlimited hierarchy depth
-- Example: Def Jam → Island Records → Universal Music Group
-- `ParentPublisherID = NULL` indicates top-level publisher
-
-**Example Data:**
-```
-PublisherID | Name                    | ParentPublisherID
-1           | Universal Music Group   | NULL
-2           | Island Records          | 1
-3           | Def Jam Recordings      | 2
-4           | Croatia Records         | NULL
-5           | Yugoton                 | 4
-```
-
-**UI Representation:**
-- **Table View:** Shows full hierarchy chain: "Yugoton, Croatia Records"
-- **Filter Tree:** Flat alphabetical list with search, tooltip shows parent
-- **Search:** Searching "Croatia Records" includes all subsidiary songs (Yugoton)
-
-**Query Pattern (Recursive CTE):**
-```sql
--- Find all publishers under "Universal Music Group" (including descendants)
-WITH RECURSIVE publisher_tree AS (
-  SELECT PublisherID FROM Publishers WHERE Name = 'Universal Music Group'
-  UNION
-  SELECT p.PublisherID FROM Publishers p
-  JOIN publisher_tree pt ON p.ParentPublisherID = pt.PublisherID
-)
-SELECT * FROM Files WHERE PublisherID IN (SELECT PublisherID FROM publisher_tree);
-```
-
-### 9. `Albums`
-Stores album information. Songs can appear on multiple albums (original release, compilations, re-releases).
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `AlbumID` | INTEGER | PRIMARY KEY | Unique identifier for the album |
-| `Name` | TEXT | NOT NULL | Album name (e.g., "Abbey Road", "1", "Hey Jude (Single)") |
-| `Year` | INTEGER | - | Album release year |
-
-**Notes:**
-- Singles are treated as albums (e.g., "Hey Jude (Single)")
-- Compilations and re-releases are separate albums with different years
-- Publishers are linked to albums, not individual songs
-- **Duplicate names allowed:** "Greatest Hits" can exist multiple times (different artists/years)
-- **Year validation:** Application warns if Year < 1860 or Year > current_year + 1
-
-**Example Data:**
-```
-AlbumID | Name                      | Year
-1       | Hey Jude (Single)         | 1968
-2       | The Beatles 1967-1970     | 1973
-3       | 1                         | 2000
-```
-
-### 10. `AlbumPublishers` (Junction Table)
-Links Albums to Publishers in a many-to-many relationship (an album can have multiple publishers).
-
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| `AlbumID` | INTEGER | FK, NOT NULL | Reference to `Albums` |
-| `PublisherID` | INTEGER | FK, NOT NULL | Reference to `Publishers` |
+| `AlbumID` | INTEGER | FK NOT NULL | Reference to `Albums` |
+| `PublisherID` | INTEGER | FK NOT NULL | Reference to `Publishers` |
 
 **Constraints:**
 - Primary Key: `(AlbumID, PublisherID)`
 - `ON DELETE CASCADE` for AlbumID
 
-**Use Cases:**
-- Co-publishing agreements
-- Territorial distribution deals
-- Label acquisitions/mergers
+---
 
-### 11. `FileAlbums` (Junction Table)
-Links Files (songs) to Albums in a many-to-many relationship.
+## Summary: All Tables
+
+| # | Table | Purpose |
+|---|-------|---------|
+| 1 | Types | Content type lookup |
+| 2 | MediaSources | Base for all playable items |
+| 3 | Songs | Music-specific (timing, BPM) |
+| 4 | Streams | Stream-specific (failover) |
+| 5 | Commercials | Ad-specific (campaign link) |
+| 6 | Agencies | Ad agencies |
+| 7 | Clients | Advertisers |
+| 8 | Campaigns | Ad campaigns |
+| 9 | Tags | All categorization |
+| 10 | MediaSourceTags | Tag assignments |
+| 11 | TagRelations | Tag hierarchy |
+| 12 | AutoTagRules | Smart auto-tagging |
+| 13 | Playlists | Saved playlists |
+| 14 | PlaylistItems | Playlist contents |
+| 15 | ChangeLog | Audit trail |
+| 16 | DeletedRecords | Deletion recovery |
+| 17 | PlayHistory | As-run broadcast log |
+| 18 | ActionLog | User action audit trail |
+| 19 | Contributors | Artists, composers |
+| 20 | ContributorAliases | Name variants |
+| 21 | Roles | Contribution types |
+| 22 | MediaSourceContributorRoles | Credits |
+| 23 | GroupMembers | Band membership |
+| 24 | Publishers | Labels hierarchy |
+| 25 | Albums | Album info + type |
+| 26 | SongAlbums | Song-album links |
+| 27 | AlbumPublishers | Album-publisher links |
+
+**Total: 27 tables** (including junctions and lookups) + 1 VIEW (EntityTimeline)
+
+---
+
+## 🔮 Future: Broadcast Automation
+
+> [!NOTE]
+> The following tables are **planned** for the Broadcast Automation feature (Issue #7). They are NOT yet implemented in code.
+
+### `Timeslots` (Planned)
+Defines time-based slots for automated programming. Any unfilled time falls back to the "Default" slot.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `FileID` | INTEGER | FK, NOT NULL | Reference to `Files` |
-| `AlbumID` | INTEGER | FK, NOT NULL | Reference to `Albums` |
+| `TimeslotID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Name` | TEXT | NOT NULL UNIQUE | e.g., "Default", "Morning Drive", "Jazz Hour" |
+| `StartTime` | TEXT | NOT NULL | e.g., "06:00", "22:30" (HH:MM format) |
+| `EndTime` | TEXT | NOT NULL | e.g., "10:00", "23:00" |
+| `DaysOfWeek` | TEXT | - | JSON array: `["Mon","Tue","Wed"]` or NULL for all |
+| `Priority` | INTEGER | DEFAULT 0 | Higher priority slots override lower |
+| `IsDefault` | BOOLEAN | DEFAULT 0 | TRUE for the fallback slot |
 
-**Constraints:**
-- Primary Key: `(FileID, AlbumID)`
-- `ON DELETE CASCADE` for FileID
+**Design Notes:**
+- One slot should have `IsDefault = TRUE` as the fallback
+- Slots can overlap; higher priority wins
+- The sequence of content within a slot is defined by `ContentRules`
 
-**Example:**
+### `ContentRules` (Planned)
+Defines the content sequence and rules within each slot. Each rule specifies what type of content to play and optional filters.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `RuleID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `TimeslotID` | INTEGER | FK NOT NULL | Reference to `Timeslots` |
+| `Position` | INTEGER | NOT NULL | Order in sequence (0, 1, 2...) |
+| `ContentType` | TEXT | NOT NULL | 'Song', 'Jingle', 'Commercial', 'Any' |
+| `Filters` | TEXT | - | JSON filter criteria |
+| `LoopTo` | INTEGER | - | If set, loop back to this position after completing |
+
+**Filter Examples:**
+```json
+{"genre": "Pop", "mood": "Happy", "year": 2024}
+{"genre": "Jazz", "mood": "Sad"}
 ```
-Song: "Hey Jude" (FileID=101, RecordingYear=1968)
-├─ Album: "Hey Jude (Single)" (AlbumID=1, Year=1968)
-│  └─ Publisher: Apple Records
-└─ Album: "1" (AlbumID=3, Year=2000)
-   └─ Publishers: Apple Records, EMI
 
-Table Display: 
-- Albums: "Hey Jude (Single), 1"
-- Publishers: "Apple Records, EMI" (aggregated from all albums)
-```
+**Sequence Example: "Jazz Hour"**
+| Position | ContentType | Filters | LoopTo |
+|----------|-------------|---------|--------|
+| 0 | Jingle | {} | - |
+| 1 | Song | {"genre": "Jazz", "mood": "Mellow"} | - |
+| 2 | Song | {"genre": "Jazz", "mood": "Upbeat"} | - |
+| 3 | Song | {"genre": "Jazz"} | 1 |
 
-**Year Filtering Note:**
-- **Current Implementation:** Year filter uses `Files.RecordingYear` (original recording year)
-- **Future Consideration:** May add option to filter by `Albums.Year` (album release year) to find songs on compilations
-- **Example:** Filtering "2000" currently shows songs recorded in 2000, not songs appearing on 2000 albums
+See [PROPOSAL_BROADCAST_AUTOMATION.md](.agent/PROPOSAL_BROADCAST_AUTOMATION.md) for full design and interference detection requirements.
 
-
-
+---
 
 ## Repositories
 
 Database access is managed through the Repository pattern in `src/data/repositories/`:
 
 - **`BaseRepository`**: Handles connection lifecycle and schema creation.
-- **`SongRepository`**: Manages `Files` and related `FileContributorRoles`.
-- **`ContributorRepository`**: Manages `Contributors` and `GroupMembers`.
+- **`MediaSourceRepository`**: Manages `MediaSources` and type-specific tables.
+- **`SongRepository`**: Song-specific operations including timing and completeness.
+- **`ContributorRepository`**: Manages `Contributors`, `Aliases`, and `GroupMembers`.
+- **`TagRepository`**: Manages `Tags`, `MediaSourceTags`, and `AutoTagRules`.
+- **`PlaylistRepository`**: Manages `Playlists` and `PlaylistItems`.
 
-## Usage Example
+---
 
-Relationship querying is typically handled via `JOIN` operations.
+## Migration Notes
 
-**Get all performers for a song:**
-```sql
-SELECT c.Name
-FROM Contributors c
-JOIN FileContributorRoles fcr ON c.ContributorID = fcr.ContributorID
-JOIN Roles r ON fcr.RoleID = r.RoleID
-WHERE fcr.FileID = ? AND r.Name = 'Performer'
-```
+This schema (v5) replaces the previous file-centric design:
+
+| Before | After |
+|--------|-------|
+| `Files` table | `MediaSources` + `Songs` |
+| `FileGenres` | `MediaSourceTags` with Category='Genre' |
+| `FileAlbums` | `SongAlbums` |
+| `FileContributorRoles` | `MediaSourceContributorRoles` |
+| Separate Genres/Languages tables | Unified Tags with Category |
+
+See `.agent/PROPOSAL_SCHEMA_INHERITANCE.md` for full migration plan.

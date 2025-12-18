@@ -21,6 +21,7 @@ The current "Ping-Pong" player is good, but radio needs "Segue" logic, not just 
 *   **Live Assist**: Human driver. "Stops" at break points.
 *   **Full Automation**: System picks next songs to fill time based on Logs.
 *   **Manual**: Simple player (current state).
+*   **Sound Cue Detection**: Listen for audio cue (e.g., beep tone) to trigger stop/transition from stream.
 
 ---
 

@@ -24,22 +24,29 @@ class TestSongModel:
     def test_song_creation_with_values(self):
         """Test creating a song with specific values"""
         song = Song(
-            file_id=1,
-            path="/path/to/song.mp3",
-            title="Test Song",
+            source_id=1,
+            source="C:/Test/Path/song.mp3",
+            name="Test Song",
             duration=180.5,
             bpm=120,
-            performers=["performer 1", "performer 2"],
-            composers=["Composer 1"]
+            recording_year=2023,
+            performers=["Dua Lipa"],
+            composers=["Writer 1", "Writer 2"]
         )
-
+        
+        # Test backward compatibility properties
         assert song.file_id == 1
-        assert song.path == "/path/to/song.mp3"
+        assert song.path == "C:/Test/Path/song.mp3"
         assert song.title == "Test Song"
+        
+        assert song.source_id == 1
+        assert song.source == "C:/Test/Path/song.mp3"
+        assert song.name == "Test Song"
         assert song.duration == 180.5
         assert song.bpm == 120
-        assert song.performers == ["performer 1", "performer 2"]
-        assert song.composers == ["Composer 1"]
+        assert song.recording_year == 2023
+        assert song.performers == ["Dua Lipa"]
+        assert song.composers == ["Writer 1", "Writer 2"]
 
     def test_get_display_performers_with_performers(self):
         """Test getting display performers when performers exist"""
@@ -53,7 +60,7 @@ class TestSongModel:
 
     def test_get_display_title_with_title(self):
         """Test getting display title when title exists"""
-        song = Song(title="My Song")
+        song = Song(name="My Song")
         assert song.get_display_title() == "My Song"
 
     def test_get_display_title_without_title(self):

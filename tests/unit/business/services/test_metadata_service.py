@@ -45,7 +45,7 @@ class TestMetadataService:
         tags_mock.__contains__.side_effect = lambda key: key in ["TIT2", "TPE1", "TBPM", "TIPL"]
         mock_id3.return_value = tags_mock
 
-        song = MetadataService.extract_from_mp3("dummy.mp3", file_id=1)
+        song = MetadataService.extract_from_mp3("dummy.mp3", source_id=1)
 
         assert isinstance(song, Song)
         assert song.file_id == 1

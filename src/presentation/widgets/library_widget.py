@@ -114,7 +114,7 @@ class LibraryWidget(QWidget):
         self.setAcceptDrops(True) # Allow dropping on the widget itself
         
         # Empty State Label
-        self.empty_label = QLabel("Drag audio files here to import", self.table_view)
+        self.empty_label = QLabel("Drag audio files here to import", self.table_view.viewport())
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.setStyleSheet("QLabel { color: gray; font-size: 14pt; font-weight: bold; }")
         self.empty_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -147,7 +147,7 @@ class LibraryWidget(QWidget):
     def eventFilter(self, source, event):
         """Handle events for the table view and children (Drag & Drop + Resize)"""
         # Handle Resize for Empty Label Position
-        if source == self.table_view and event.type() == QEvent.Type.Resize:
+        if source == self.table_view.viewport() and event.type() == QEvent.Type.Resize:
             self._update_empty_label_position()
 
         # Handle Drag & Drop for ALL watched widgets
@@ -176,7 +176,7 @@ class LibraryWidget(QWidget):
     def _update_empty_label_position(self):
         """Center the empty label in the table view"""
         if self.empty_label.isVisible():
-            self.empty_label.resize(self.table_view.size())
+            self.empty_label.resize(self.table_view.viewport().size())
             self.empty_label.move(0, 0)
 
     def dragEnterEvent(self, event):
@@ -392,9 +392,8 @@ class LibraryWidget(QWidget):
         show_incomplete = self.chk_show_incomplete.isChecked()
 
         for row_data in data:
-            failing_fields = set()
-            if show_incomplete:
-                failing_fields = self._get_incomplete_fields(row_data)
+            # Always calculate completeness for validation
+            failing_fields = self._get_incomplete_fields(row_data)
 
             items = []
             for col_idx, cell in enumerate(row_data):
@@ -409,8 +408,6 @@ class LibraryWidget(QWidget):
                     # Display as string, sort as number
                     sort_value = float(cell)
                 else:
-                    # For non-numeric columns, sort value is same as display text
-                    # We ensure sort_value is set to something non-None for stable sorting
                     sort_value = display_text
                 
                 item = QStandardItem(display_text)
@@ -421,8 +418,13 @@ class LibraryWidget(QWidget):
                 if col_idx == self.COL_IS_DONE:
                     item.setCheckable(True)
                     item.setEditable(False) 
-                    # Remove ItemIsUserCheckable to make it read-only
-                    item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    
+                    # Determine Flags: Selectable always, Enabled only if complete
+                    flags = Qt.ItemFlag.ItemIsSelectable
+                    if not failing_fields:
+                        flags |= Qt.ItemFlag.ItemIsEnabled
+                    item.setFlags(flags)
+                    
                     # Set State
                     is_done_bool = bool(cell) if cell is not None else False
                     item.setCheckState(Qt.CheckState.Checked if is_done_bool else Qt.CheckState.Unchecked)
@@ -598,6 +600,20 @@ class LibraryWidget(QWidget):
                 status_action.triggered.connect(lambda: self._toggle_status(False))
             elif all_not_done:
                 status_action.setText("Mark as Done")
+                # Check if all selected items are valid (Enabled)
+                all_valid = True
+                for idx in indexes:
+                    source_idx = self.proxy_model.mapToSource(idx)
+                    item = self.library_model.item(source_idx.row(), self.COL_IS_DONE)
+                    if not item.isEnabled():
+                        all_valid = False
+                        break
+                
+                if not all_valid:
+                    status_action.setEnabled(False)
+                    status_action.setToolTip("Cannot mark as Done: Some selected items are incomplete")
+                    status_action.setText("Mark as Done (Fix Errors First)")
+                
                 status_action.triggered.connect(lambda: self._toggle_status(True))
             else:
                 status_action.setText("Mixed Status (Cannot Toggle)")

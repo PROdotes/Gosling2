@@ -1,20 +1,22 @@
 """Song Data Model"""
 from typing import Optional, List
 from dataclasses import dataclass, field
+from .media_source import MediaSource
 
 
 @dataclass
-class Song:
+class Song(MediaSource):
     """Represents a song with its metadata"""
 
-    file_id: Optional[int] = None
-    path: Optional[str] = None
+    # Inherited fields: source_id, type_id, name, source, duration, ...
+    
+    # Specific fields
     is_done: bool = False
     isrc: Optional[str] = None
-    title: Optional[str] = None
-    duration: Optional[float] = None
     bpm: Optional[int] = None
     recording_year: Optional[int] = None
+    
+    # Relationships
     performers: List[str] = field(default_factory=list)
     composers: List[str] = field(default_factory=list)
     lyricists: List[str] = field(default_factory=list)
@@ -23,6 +25,9 @@ class Song:
 
     def __post_init__(self) -> None:
         """Ensure lists are initialized properly"""
+        # Ensure type_id is set to Song (1)
+        self.type_id = 1
+        
         if self.performers is None:
             self.performers = []
         if self.composers is None:
@@ -34,6 +39,36 @@ class Song:
         if self.groups is None:
             self.groups = []
 
+    @property
+    def title(self) -> Optional[str]:
+        """Alias for name for backward compatibility"""
+        return self.name
+
+    @title.setter
+    def title(self, value: Optional[str]):
+        """Alias for name for backward compatibility"""
+        self.name = value
+
+    @property
+    def path(self) -> Optional[str]:
+        """Alias for source for backward compatibility"""
+        return self.source
+
+    @path.setter
+    def path(self, value: Optional[str]):
+        """Alias for source for backward compatibility"""
+        self.source = value
+
+    @property
+    def file_id(self) -> Optional[int]:
+        """Alias for source_id for backward compatibility"""
+        return self.source_id
+
+    @file_id.setter
+    def file_id(self, value: Optional[int]):
+        """Alias for source_id for backward compatibility"""
+        self.source_id = value
+
     def get_display_performers(self) -> str:
         """Get formatted performers for display"""
         if self.performers:
@@ -42,7 +77,7 @@ class Song:
 
     def get_display_title(self) -> str:
         """Get formatted title for display"""
-        return self.title or 'Unknown Title'
+        return self.name or 'Unknown Title'
 
     @property
     def formatted_duration(self) -> str:

@@ -81,8 +81,8 @@ class TestSongRepository:
 
         # Create song with metadata
         song = Song(
-            file_id=file_id,
-            title="Test Song",
+            source_id=file_id,
+            name="Test Song",
             duration=180.0,
             bpm=120,
             performers=["performer 1"],
@@ -97,7 +97,7 @@ class TestSongRepository:
         headers, data = repository.get_all()
         assert len(data) == 1
         row = data[0]
-        # Check title (index 2)
+        # Check title (index 2 - Name/Title)
         assert row[2] == "Test Song"
 
     def test_get_by_performer(self, repository):
@@ -107,8 +107,8 @@ class TestSongRepository:
 
         # Update with performer info
         song = Song(
-            file_id=file_id,
-            title="Test Song",
+            source_id=file_id,
+            name="Test Song",
             performers=["Target performer"]
         )
         repository.update(song)
@@ -146,7 +146,7 @@ class TestSongRepository:
 
     def test_update_error(self, repository):
         """Test error handling during update"""
-        song = Song(file_id=1, title="Test")
+        song = Song(source_id=1, name="Test")
         with patch.object(repository, 'get_connection') as mock_conn:
             mock_conn.side_effect = Exception("DB Error")
             result = repository.update(song)
@@ -169,20 +169,20 @@ class TestSongRepository:
         # _sync_contributor_roles uses hardcoded mapping.
         # But we can test empty contributor list "if not contributors: continue"
         
-        song_empty = Song(file_id=file_id, title="Empty", performers=[])
+        song_empty = Song(source_id=file_id, name="Empty", performers=[])
         repository.update(song_empty) 
         # Verify no relations created
         with repository.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM FileContributorRoles WHERE FileID=?", (file_id,))
+            cursor.execute("SELECT * FROM MediaSourceContributorRoles WHERE SourceID=?", (file_id,))
             assert cursor.fetchone() is None
 
         # 2. Empty contributor name "if not contributor_name.strip(): continue"
-        song_blank_name = Song(file_id=file_id, title="Blank", performers=["   "])
+        song_blank_name = Song(source_id=file_id, name="Blank", performers=["   "])
         repository.update(song_blank_name)
         with repository.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM FileContributorRoles WHERE FileID=?", (file_id,))
+            cursor.execute("SELECT * FROM MediaSourceContributorRoles WHERE SourceID=?", (file_id,))
             assert cursor.fetchone() is None
             
         # 3. Simulate "if not role_row: continue" and "if not contributor_row: continue"
@@ -192,7 +192,7 @@ class TestSongRepository:
         with repository.get_connection() as conn:
             conn.execute("DELETE FROM Roles WHERE Name='Performer'")
             
-        song_missing_role = Song(file_id=file_id, title="Missing Role", performers=["performer"])
+        song_missing_role = Song(source_id=file_id, name="Missing Role", performers=["performer"])
         repository.update(song_missing_role)
         # Should not crash, just not add anything
 

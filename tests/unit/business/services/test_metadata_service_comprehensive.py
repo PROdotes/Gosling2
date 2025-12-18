@@ -497,9 +497,9 @@ class TestMetadataServiceComprehensive:
         ]
         mock_id3.return_value = tags_mock
         
-        song = MetadataService.extract_from_mp3("test.mp3", file_id=42)
+        song = MetadataService.extract_from_mp3("test.mp3", source_id=42)
         
-        assert song.file_id == 42
+        assert song.source_id == 42
         assert song.title == "Full Title"
         assert song.duration == 300.0
         assert song.bpm == 140

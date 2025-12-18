@@ -19,8 +19,8 @@ class TestWriteTags:
     def test_write_tags_basic(self, test_mp3):
         """Write all fields to MP3"""
         song = Song(
-            path=test_mp3,
-            title="New Title",
+            source=test_mp3,
+            name="New Title",
             performers=["Artist 1", "Artist 2"],
             composers=["Composer 1"],
             lyricists=["Lyricist 1"],
@@ -49,8 +49,8 @@ class TestWriteTags:
     def test_write_tags_preserves_album_art(self, test_mp3_with_album_art):
         """Album art (APIC) is not deleted when writing tags"""
         song = Song(
-            path=test_mp3_with_album_art,
-            title="Updated Title",
+            source=test_mp3_with_album_art,
+            name="Updated Title",
             performers=["New Artist"]
         )
         
@@ -69,8 +69,8 @@ class TestWriteTags:
     def test_write_tags_preserves_comments(self, test_mp3_with_comments):
         """Comments (COMM) are not deleted when writing tags"""
         song = Song(
-            path=test_mp3_with_comments,
-            title="Updated Title"
+            source=test_mp3_with_comments,
+            name="Updated Title"
         )
         
         # Verify comment exists before
@@ -89,8 +89,8 @@ class TestWriteTags:
         """None/empty fields don't delete existing data"""
         # First write some data
         song1 = Song(
-            path=test_mp3,
-            title="Original Title",
+            source=test_mp3,
+            name="Original Title",
             performers=["Original Artist"],
             bpm=100
         )
@@ -98,8 +98,8 @@ class TestWriteTags:
         
         # Now write with some fields empty
         song2 = Song(
-            path=test_mp3,
-            title="New Title",
+            source=test_mp3,
+            name="New Title",
             # performers is None/empty - should preserve existing
             bpm=None  # None - should preserve existing
         )
@@ -113,7 +113,7 @@ class TestWriteTags:
     
     def test_write_tags_is_done_true(self, test_mp3):
         """is_done=True writes TKEY='true' and TXXX:GOSLING_DONE='1'"""
-        song = Song(path=test_mp3, title="Test", is_done=True)
+        song = Song(source=test_mp3, name="Test", is_done=True)
         
         MetadataService.write_tags(song)
         
@@ -123,7 +123,7 @@ class TestWriteTags:
     
     def test_write_tags_is_done_false(self, test_mp3):
         """is_done=False writes TKEY=' ' and TXXX:GOSLING_DONE='0'"""
-        song = Song(path=test_mp3, title="Test", is_done=False)
+        song = Song(source=test_mp3, name="Test", is_done=False)
         
         MetadataService.write_tags(song)
         
@@ -134,8 +134,8 @@ class TestWriteTags:
     def test_write_tags_roundtrip(self, test_mp3):
         """Write then read, data matches"""
         original_song = Song(
-            path=test_mp3,
-            title="Roundtrip Test",
+            source=test_mp3,
+            name="Roundtrip Test",
             performers=["Artist A", "Artist B"],
             composers=["Composer X"],
             bpm=140,
@@ -165,14 +165,14 @@ class TestWriteTags:
         bad_file = tmp_path / "not_an_mp3.txt"
         bad_file.write_text("This is not an MP3")
         
-        song = Song(path=str(bad_file), title="Test")
+        song = Song(source=str(bad_file), name="Test")
         result = MetadataService.write_tags(song)
         
         assert result is False
     
     def test_write_tags_no_path(self):
         """Returns False if song has no path"""
-        song = Song(title="Test")  # No path
+        song = Song(name="Test")  # No path
         result = MetadataService.write_tags(song)
         
         assert result is False
@@ -180,8 +180,8 @@ class TestWriteTags:
     def test_write_tags_creates_tags_if_missing(self, test_mp3_empty):
         """Creates ID3v2 tags if file has none"""
         song = Song(
-            path=test_mp3_empty,
-            title="New Song",
+            source=test_mp3_empty,
+            name="New Song",
             performers=["New Artist"]
         )
         
@@ -197,7 +197,7 @@ class TestWriteTags:
     def test_write_tags_handles_multiple_performers(self, test_mp3):
         """Multiple performers are written correctly"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             performers=["Artist 1", "Artist 2", "Artist 3"]
         )
         
@@ -212,7 +212,7 @@ class TestWriteTags:
     def test_write_tags_producers_dual_mode(self, test_mp3):
         """Producers written to both TIPL and TXXX:PRODUCER"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             producers=["Producer A", "Producer B"]
         )
         

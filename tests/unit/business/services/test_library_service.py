@@ -62,8 +62,8 @@ class TestLibraryService:
         file_id = service.add_file("/path/to/test.mp3")
 
         song = Song(
-            file_id=file_id,
-            title="Updated Title",
+            source_id=file_id,
+            name="Updated Title",
             duration=200.0,
             bpm=130
         )
@@ -76,8 +76,8 @@ class TestLibraryService:
         # Add a song with contributors
         file_id = service.add_file("/path/to/test.mp3")
         song = Song(
-            file_id=file_id,
-            title="Test Song",
+            source_id=file_id,
+            name="Test Song",
             performers=["performer 1", "performer 2"]
         )
         service.update_song(song)
@@ -92,8 +92,8 @@ class TestLibraryService:
         # Add a song with performer
         file_id = service.add_file("/path/to/test.mp3")
         song = Song(
-            file_id=file_id,
-            title="Test Song",
+            source_id=file_id,
+            name="Test Song",
             performers=["Target performer"]
         )
         service.update_song(song)

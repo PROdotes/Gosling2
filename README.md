@@ -1,104 +1,85 @@
-# Gosling2 Music Library and Player
+# Gosling2 Music Library Manager
 
-A desktop music library and player application built with PyQt6 using 3-tier architecture.
+A professional radio music library application built with PyQt6, featuring strict schema governance, metadata management, and seamless audio playback.
 
-## Features
+---
 
-- [x] Crossfade Playback (Seamless transitions)
-- Music library management with metadata extraction
-- Audio playback with playlist support
-- Search and filter functionality
-- Drag and drop support
-- Custom UI components
+## ⚡ Quick Start
 
-## Architecture
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
 
-The application follows a 3-tier architecture:
+# 2. Run the app
+python app.py
+```
 
-### 1. Data Access Layer (`src/data/`)
-- **Models**: Data entities (Song, Contributor, Role)
-- **Repositories**: Database operations (SongRepository, ContributorRepository)
-- **Database**: SQLite database with proper schema management
+---
 
-### 2. Business Logic Layer (`src/business/`)
-- **LibraryService**: Music library management
-- **MetadataService**: Audio file metadata extraction
-- **PlaybackService**: Audio playback control (Dual-Player Crossfade)
-- **SettingsManager**: Application settings persistence
+## ✨ Key Features
 
-### 3. Presentation Layer (`src/presentation/`)
-- **Views**: Main application window
-- **Widgets**: Custom UI components (LibraryWidget, FilterWidget, PlaylistWidget, etc.)
-- **Dialogs**: User interaction dialogs
+- **Drag & Drop Import** — Import MP3s or ZIP archives directly into the library
+- **Smart Metadata** — Automatic ID3 tag extraction with discrepancy highlighting
+- **Crossfade Playback** — Seamless transitions between tracks
+- **Filter & Search** — Browse by Artist, Decade, Genre, or Status
+- **Playlist Queue** — Drag and drop songs to build playlists
+- **Strict Schema Integrity** — 9-layer validation prevents silent data drift
 
-## Project Structure
+---
+
+## 🏗️ Architecture
+
+The application follows a clean **3-tier architecture**:
+
+```
+┌─────────────────────────────────┐
+│   Presentation Layer (UI)       │
+│   - Views, Widgets, Dialogs     │
+└───────────┬─────────────────────┘
+            │
+┌───────────▼─────────────────────┐
+│   Business Logic Layer          │
+│   - LibraryService              │
+│   - MetadataService             │
+│   - PlaybackService             │
+│   - SettingsManager             │
+└───────────┬─────────────────────┘
+            │
+┌───────────▼─────────────────────┐
+│   Data Access Layer             │
+│   - Models (Song, Contributor)  │
+│   - Repositories                │
+│   - SQLite Database             │
+└─────────────────────────────────┘
+```
+
+### Project Structure
 
 ```
 Gosling2/
 ├── src/
-│   ├── data/
-│   │   ├── models/
-│   │   │   ├── song.py
-│   │   │   ├── contributor.py
-│   │   │   └── role.py
-│   │   ├── repositories/
-│   │   │   ├── base_repository.py
-│   │   │   ├── song_repository.py
-│   │   │   └── contributor_repository.py
-│   │   └── database_config.py
-│   ├── business/
-│   │   └── services/
-│   │       ├── library_service.py
-│   │       ├── metadata_service.py
-│   │       ├── playback_service.py
-│   │       └── settings_manager.py
-│   └── presentation/
-│       ├── views/
-│       │   └── main_window.py
-│       └── widgets/
-│           ├── library_widget.py
-│           ├── filter_widget.py
-│           ├── playlist_widget.py
-│           ├── playback_control_widget.py
-│           └── seek_slider.py
+│   ├── data/              # Data Access Layer
+│   │   ├── models/        # Song, Contributor, Role dataclasses
+│   │   └── repositories/  # Database operations
+│   ├── business/          # Business Logic Layer
+│   │   └── services/      # Library, Metadata, Playback services
+│   └── presentation/      # Presentation Layer
+│       ├── views/         # MainWindow
+│       └── widgets/       # Library, Playlist, Filter widgets
 ├── tests/
-│   ├── unit/
-│   └── integration/
-├── app.py
-├── requirements.txt
-├── README.md
-├── TESTING.md
-└── DATABASE.md
+│   ├── unit/              # 250+ unit tests
+│   └── integration/       # Integration tests
+├── app.py                 # Entry point
+├── requirements.txt       # Production dependencies
+├── DATABASE.md            # Schema specification
+└── TESTING.md             # Test strategy
 ```
 
-## Installation
+---
 
-1. Create a virtual environment:
-```bash
-python -m venv .venv
-```
+## 🧪 Testing
 
-2. Activate the virtual environment:
-```bash
-# Windows
-.venv\Scripts\activate
-
-# Linux/Mac
-source .venv/bin/activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-## Running the Application
-
-```bash
-python app.py
-```
-
-## Running Tests
+**260+ tests**, all passing:
 
 ```bash
 # Run all tests
@@ -108,26 +89,81 @@ pytest
 pytest --cov=src tests/
 
 # Run specific test file
-pytest tests/unit/test_song_model.py
+pytest tests/unit/data/test_database_schema.py
 ```
 
-## Development
+| Category | Tests | Status |
+|----------|-------|--------|
+| Data Models | ~20 | ✅ |
+| Repositories | ~30 | ✅ |
+| Services | ~120 | ✅ |
+| Schema Strictness | ~50 | ✅ |
+| Integration | ~40 | ✅ |
 
-### Design Patterns Used
-- **Repository Pattern**: For data access abstraction
-- **Service Layer Pattern**: For business logic encapsulation
-- **Model-View Pattern**: For UI separation
-- **Dependency Injection**: For loose coupling between layers
+---
 
-### Best Practices
-- Clear separation of concerns
-- Single Responsibility Principle
-- Context## Key Features
+## 📦 Dependencies
 
-- **Robust 3-Tier Architecture**: Clean separation of Data, Business Logic, and UI.
-- **Strict Schema Integrity**: Comprehensive test suite prevents "silent data drift" by enforcing 1:1 mapping between DB and UI.
-- **Drag & Drop Import**: Seamlessly import MP3s or extracted ZIP archives directly into the library.
-- **Smart Metadata**: Automatic ID3 tag extraction and discrepancy highlighting.
-- **Atomic Operations**: Safe database transactions and file handling.
+### Production
+- `PyQt6 >= 6.4.0` — UI framework
+- `mutagen >= 1.45.1` — Audio metadata
+
+### Development
+- `pytest >= 7.4.0` — Testing
+- `pytest-cov >= 4.1.0` — Coverage
+- `pytest-qt >= 4.2.0` — Qt testing
+
+---
+
+## 🎓 Design Patterns
+
+- **Repository Pattern** — Data access abstraction
+- **Service Layer Pattern** — Business logic encapsulation
+- **Model-View Pattern** — UI separation
+- **Dependency Injection** — Loose coupling between layers
+- **Context Managers** — Safe resource handling
+
+---
+
+## 🐛 Troubleshooting
+
+### Import Errors
+```bash
+pip install -r requirements.txt
+```
+
+### Database Not Found
+The database is created automatically at `sqldb/gosling2.sqlite3` on first run.
+
+### Tests Failing
+```bash
+pip install -r requirements-dev.txt
+pytest -v
+```
+
+---
+
+## 📚 Documentation
+
+| File | Purpose |
+|------|---------|
+| [DATABASE.md](DATABASE.md) | Schema specification & governance |
+| [TESTING.md](TESTING.md) | Test strategy & "9 layers of yell" |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed architecture guide |
+| [tasks.md](tasks.md) | Development roadmap |
+
+---
+
+## 🔮 Roadmap
+
+See [tasks.md](tasks.md) for the current development roadmap, including:
+- Type Tabs (filter by content type)
+- Field Registry (centralized field definitions)
+- Transaction Logging (undo/audit)
+- Broadcast Automation (future)
+
+---
+
+## 📄 License
 
 MIT License

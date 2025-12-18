@@ -21,7 +21,7 @@ class TestWriteTagsAdditional:
         audio.save()
         
         # Write metadata
-        song = Song(path=test_mp3, title="New Title")
+        song = Song(source=test_mp3, name="New Title")
         result = MetadataService.write_tags(song)
         assert result is True
         
@@ -38,7 +38,7 @@ class TestWriteTagsAdditional:
             audio.delete()
         
         # Write metadata
-        song = Song(path=test_mp3, title="New Song")
+        song = Song(source=test_mp3, name="New Song")
         result = MetadataService.write_tags(song)
         assert result is True
         
@@ -51,7 +51,7 @@ class TestWriteTagsAdditional:
         """ID3v1 tags are preserved if they exist (v1=1 behavior)"""
         # This test verifies the v1=1 parameter works
         # We can't easily create v1-only tags in test, but we verify the save call
-        song = Song(path=test_mp3, title="Test")
+        song = Song(source=test_mp3, name="Test")
         result = MetadataService.write_tags(song)
         assert result is True
         # If file had v1, it would be preserved
@@ -60,7 +60,7 @@ class TestWriteTagsAdditional:
     def test_write_tags_file_locked_simulation(self, test_mp3):
         """Handles file access errors gracefully"""
         # Simulate by using invalid path
-        song = Song(path="Z:/nonexistent/locked.mp3", title="Test")
+        song = Song(source="Z:/nonexistent/locked.mp3", name="Test")
         result = MetadataService.write_tags(song)
         
         # Should return False, not crash
@@ -76,7 +76,7 @@ class TestWriteTagsAdditional:
         shutil.copy(test_mp3, readonly_file)
         os.chmod(readonly_file, 0o444)  # Read-only
         
-        song = Song(path=str(readonly_file), title="Test")
+        song = Song(source=str(readonly_file), name="Test")
         result = MetadataService.write_tags(song)
         
         # Should return False (can't write to read-only)

@@ -154,7 +154,7 @@ class FilterWidget(QWidget):
         name = item.data(Qt.ItemDataRole.UserRole)
         role = item.data(Qt.ItemDataRole.UserRole + 1)
         
-        if name and role:
+        if name is not None and role:
             if role == "Performer":
                 self.filter_by_performer.emit(name)
             elif role == "Composer":

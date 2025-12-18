@@ -14,7 +14,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_very_long_title(self, test_mp3):
         """Very long title is truncated to prevent corruption"""
         long_title = "A" * 5000  # 5000 chars
-        song = Song(path=test_mp3, title=long_title)
+        song = Song(source=test_mp3, name=long_title)
         
         result = MetadataService.write_tags(song)
         assert result is True
@@ -27,8 +27,8 @@ class TestWriteTagsDefensive:
     def test_write_tags_unicode_emoji(self, test_mp3):
         """Unicode and emoji characters are handled correctly"""
         song = Song(
-            path=test_mp3,
-            title="🎵 Test Song 🎶",
+            source=test_mp3,
+            name="🎵 Test Song 🎶",
             performers=["Artist 😎"]
         )
         
@@ -42,8 +42,8 @@ class TestWriteTagsDefensive:
     def test_write_tags_special_characters(self, test_mp3):
         """Special characters (Croatian, Cyrillic, etc.) work correctly"""
         song = Song(
-            path=test_mp3,
-            title="Željko Čirić",
+            source=test_mp3,
+            name="Željko Čirić",
             performers=["Владимир"]  # Cyrillic
         )
         
@@ -56,7 +56,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_list_with_empty_strings(self, test_mp3):
         """Empty strings in lists are filtered out"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             performers=["Artist 1", "", "  ", "Artist 2", None]
         )
         
@@ -72,7 +72,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_list_with_non_strings(self, test_mp3):
         """Non-string items in lists are converted/filtered"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             performers=["Artist 1", 123, True, "Artist 2"]
         )
         
@@ -85,7 +85,7 @@ class TestWriteTagsDefensive:
     
     def test_write_tags_all_fields_none(self, test_mp3):
         """Song with all None fields doesn't crash"""
-        song = Song(path=test_mp3)  # All fields None
+        song = Song(source=test_mp3)  # All fields None
         
         result = MetadataService.write_tags(song)
         assert result is True  # Should succeed without writing anything
@@ -93,7 +93,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_extremely_long_isrc(self, test_mp3):
         """Extremely long ISRC is truncated"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             isrc="X" * 1000  # Way too long
         )
         
@@ -108,7 +108,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_negative_year(self, test_mp3):
         """Negative year is rejected"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             recording_year=-100
         )
         
@@ -122,7 +122,7 @@ class TestWriteTagsDefensive:
     def test_write_tags_zero_bpm(self, test_mp3):
         """Zero BPM is rejected"""
         song = Song(
-            path=test_mp3,
+            source=test_mp3,
             bpm=0
         )
         
@@ -136,8 +136,8 @@ class TestWriteTagsDefensive:
     def test_write_tags_newlines_in_title(self, test_mp3):
         """Newlines in title are handled"""
         song = Song(
-            path=test_mp3,
-            title="Line 1\nLine 2\rLine 3"
+            source=test_mp3,
+            name="Line 1\nLine 2\rLine 3"
         )
         
         result = MetadataService.write_tags(song)
@@ -150,8 +150,8 @@ class TestWriteTagsDefensive:
     def test_write_tags_null_bytes(self, test_mp3):
         """Null bytes in strings are handled"""
         song = Song(
-            path=test_mp3,
-            title="Test\x00Song"
+            source=test_mp3,
+            name="Test\x00Song"
         )
         
         result = MetadataService.write_tags(song)
