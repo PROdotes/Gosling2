@@ -9,7 +9,11 @@
         "field": "producers",
         "type": "list"
     },
-    "TALB": "Album",
+    "TALB": {
+        "description": "Album",
+        "field": "album",
+        "type": "text"
+    },
     "TBPM": {
         "description": "BPM (Beats Per Minute)",
         "field": "bpm",
@@ -20,7 +24,11 @@
         "field": "composers",
         "type": "list"
     },
-    "TCON": "Content type (Genre)",
+    "TCON": {
+        "description": "Content type (Genre)",
+        "field": "genre",
+        "type": "text"
+    },
     "TCOP": "Copyright",
     "TDAT": "Date",
     "TDLY": "Playlist delay",
@@ -66,7 +74,11 @@
     "TPE3": "Conductor/performer refinement",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
     "TPOS": "Part of a set",
-    "TPUB": "Publisher",
+    "TPUB": {
+        "description": "Publisher",
+        "field": "publisher",
+        "type": "text"
+    },
     "TRCK": "Track number/Position in set",
     "TRDA": "Recording dates",
     "TRSN": "Internet radio station name",

@@ -33,19 +33,19 @@ class FieldDef:
     min_length: Optional[int] = None
     
     # UI behavior
-    visible: bool = True           # Show in table by default
-    editable: bool = True          # Allow inline editing
+    visible: bool = True
+    editable: bool = True
     sortable: bool = True
     searchable: bool = True
     
     # Filter behavior
-    filterable: bool = False          # Show in filter sidebar
+    filterable: bool = False
     filter_type: str = "list"         # "list", "range", "boolean"
     grouping_function: Optional[Callable[[Any], str]] = None # Logic for branches (e.g. 1984 -> "1980s")
     
     # Mapping
     model_attr: Optional[str] = None  # Song model property (defaults to name)
-    portable: bool = True             # If True, must have id3_frame (travels with MP3)
+    portable: bool = True
 
 # ==================== THE REGISTRY ====================
 
@@ -102,17 +102,6 @@ def decade_grouper(year: Any) -> str:
 # NOTE: The order of this list MUST match the columns in BASE_QUERY!
 FIELDS: List[FieldDef] = [
     FieldDef(
-        name="file_id",
-        ui_header="ID",
-        db_column="MS.SourceID",
-        field_type=FieldType.INTEGER,
-        visible=False,
-        editable=False,
-        required=True,
-        model_attr="source_id",
-        portable=False,  # Local-only: database ID
-    ),
-    FieldDef(
         name="type_id",
         ui_header="Type",
         db_column="MS.TypeID",
@@ -120,44 +109,34 @@ FIELDS: List[FieldDef] = [
         visible=False,
         editable=False,
         filterable=True,
-        portable=False,  # Local-only: type classification
+        searchable=False,
+        required=False,
+        portable=False,
     ),
     FieldDef(
         name="title",
         ui_header="Title",
         db_column="MS.Name",
-        required=True,
-        min_length=1,
-        searchable=True,
+        visible=True,
+        editable=True,
         filterable=False,
-    ),
-    FieldDef(
-        name="performers",
-        ui_header="Artist",
-        db_column="Performers", 
-        field_type=FieldType.LIST,
-        required=True,
-        min_length=1,
-        filterable=True,
         searchable=True,
-    ),
-    FieldDef(
-        name="composers",
-        ui_header="Composer",
-        db_column="Composers",
-        field_type=FieldType.LIST,
         required=True,
+        portable=True,
         min_length=1,
-        filterable=True,
-        searchable=True,
     ),
     FieldDef(
-        name="lyricists",
-        ui_header="Lyricist",
-        db_column="Lyricists",
-        field_type=FieldType.LIST,
-        visible=False,
+        name="recording_year",
+        ui_header="Year",
+        db_column="S.RecordingYear",
+        field_type=FieldType.INTEGER,
+        visible=True,
+        editable=True,
         filterable=True,
+        searchable=False,
+        required=True,
+        portable=True,
+        grouping_function=decade_grouper,
     ),
     FieldDef(
         name="producers",
@@ -165,24 +144,24 @@ FIELDS: List[FieldDef] = [
         db_column="Producers",
         field_type=FieldType.LIST,
         visible=False,
+        editable=True,
         filterable=True,
+        searchable=False,
+        required=False,
+        portable=True,
     ),
     FieldDef(
-        name="groups",
-        ui_header="Groups",
-        db_column="S.Groups",
+        name="performers",
+        ui_header="Artist",
+        db_column="Performers",
         field_type=FieldType.LIST,
-        visible=False,
+        visible=True,
+        editable=True,
         filterable=True,
-    ),
-    FieldDef(
-        name="duration",
-        ui_header="Duration",
-        db_column="MS.Duration",
-        field_type=FieldType.DURATION,
+        searchable=False,
         required=True,
-        min_value=30,
-        portable=False,  # Local-only: calculated from audio stream
+        portable=True,
+        min_length=1,
     ),
     FieldDef(
         name="path",
@@ -190,49 +169,58 @@ FIELDS: List[FieldDef] = [
         db_column="MS.Source",
         visible=False,
         editable=False,
+        filterable=False,
+        searchable=False,
         required=True,
+        portable=False,
         model_attr="source",
-        portable=False,  # Local-only: filesystem path
-    ),
-    FieldDef(
-        name="recording_year",
-        ui_header="Year",
-        db_column="S.RecordingYear",
-        field_type=FieldType.INTEGER,
-        required=True,
-        filterable=True,
-        grouping_function=decade_grouper,
-    ),
-    FieldDef(
-        name="bpm",
-        ui_header="BPM",
-        db_column="S.TempoBPM",
-        field_type=FieldType.INTEGER,
-        min_value=0,
-        filterable=True,
-        filter_type="range",
-    ),
-    FieldDef(
-        name="is_done",
-        ui_header="Status",
-        db_column="S.IsDone",
-        field_type=FieldType.BOOLEAN,
-        filterable=True,
-        filter_type="boolean",
-        portable=False,  # Local-only: station-specific status
-    ),
-    FieldDef(
-        name="isrc",
-        ui_header="ISRC",
-        db_column="S.ISRC",
-        visible=False,
     ),
     FieldDef(
         name="notes",
         ui_header="Notes",
         db_column="MS.Notes",
         visible=False,
+        editable=True,
+        filterable=False,
+        searchable=False,
+        required=False,
         portable=False,
+    ),
+    FieldDef(
+        name="lyricists",
+        ui_header="Lyricist",
+        db_column="Lyricists",
+        field_type=FieldType.LIST,
+        visible=False,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=True,
+    ),
+    FieldDef(
+        name="isrc",
+        ui_header="ISRC",
+        db_column="S.ISRC",
+        visible=False,
+        editable=True,
+        filterable=False,
+        searchable=False,
+        required=False,
+        portable=True,
+    ),
+    FieldDef(
+        name="is_done",
+        ui_header="Status",
+        db_column="S.IsDone",
+        field_type=FieldType.BOOLEAN,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=False,
+        filter_type="boolean",
     ),
     FieldDef(
         name="is_active",
@@ -240,7 +228,76 @@ FIELDS: List[FieldDef] = [
         db_column="MS.IsActive",
         field_type=FieldType.BOOLEAN,
         visible=False,
+        editable=True,
+        filterable=False,
+        searchable=False,
+        required=False,
         portable=False,
+    ),
+    FieldDef(
+        name="groups",
+        ui_header="Groups",
+        db_column="S.Groups",
+        field_type=FieldType.LIST,
+        visible=False,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=True,
+    ),
+    FieldDef(
+        name="file_id",
+        ui_header="ID",
+        db_column="MS.SourceID",
+        field_type=FieldType.INTEGER,
+        visible=False,
+        editable=False,
+        filterable=False,
+        searchable=False,
+        required=True,
+        portable=False,
+        model_attr="source_id",
+    ),
+    FieldDef(
+        name="duration",
+        ui_header="Duration",
+        db_column="MS.Duration",
+        field_type=FieldType.DURATION,
+        visible=True,
+        editable=True,
+        filterable=False,
+        searchable=False,
+        required=True,
+        portable=False,
+        min_value=30,
+    ),
+    FieldDef(
+        name="composers",
+        ui_header="Composer",
+        db_column="Composers",
+        field_type=FieldType.LIST,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=True,
+        portable=True,
+        min_length=1,
+    ),
+    FieldDef(
+        name="bpm",
+        ui_header="BPM",
+        db_column="S.TempoBPM",
+        field_type=FieldType.INTEGER,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=True,
+        min_value=0,
+        filter_type="range",
     ),
 ]
 

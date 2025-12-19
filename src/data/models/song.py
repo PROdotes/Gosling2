@@ -11,6 +11,7 @@ class Song(MediaSource):
     is_done: bool = False
     isrc: Optional[str] = None
     bpm: Optional[int] = None
+
     recording_year: Optional[int] = None
     
     # Relationships

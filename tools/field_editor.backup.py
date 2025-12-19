@@ -199,30 +199,6 @@ class FieldEditorWindow(QMainWindow):
         button_row.addWidget(self.add_field_btn)
         button_row.addStretch()
         button_row.addWidget(self.delete_field_btn)
-        
-        # Spacer
-        spacer_label = QLabel("")
-        spacer_label.setFixedWidth(16)
-        button_row.addWidget(spacer_label)
-
-        # Save button (Moved from toolbar)
-        self.save_btn = QPushButton("Save All")
-        self.save_btn.clicked.connect(self._on_save_clicked)
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4a4a2d;
-                color: white;
-                border: 1px solid #6a6a3d;
-                padding: 6px 16px;
-                border-radius: 3px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #6a6a3d;
-            }
-        """)
-        button_row.addWidget(self.save_btn)
-        
         fields_layout.addLayout(button_row)
 
         layout.addWidget(fields_group)
@@ -291,17 +267,25 @@ class FieldEditorWindow(QMainWindow):
         # For verification compatibility
         self.load_action = self.load_btn
 
-        # For verification compatibility
-        self.load_action = self.load_btn
+        # Save button
+        self.save_btn = QPushButton("Save All")
+        self.save_btn.clicked.connect(self._on_save_clicked)
+        self.save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4a4a2d;
+                color: white;
+                border: 1px solid #6a6a3d;
+                padding: 6px 12px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #6a6a3d;
+            }
+        """)
+        toolbar.addWidget(self.save_btn)
         
-        # Save button moved to bottom row (self.save_btn created in _setup_central_widget)
-        # We can keep self.save_action pointing to it if needed for external tests, 
-        # but the button isn't created here anymore.
-        # Ideally, we should initialize self.save_btn in __init__ or handle order dependency.
-        # _setup_central_widget is called BEFORE _setup_toolbar in __init__.
-        # So self.save_btn exists now.
-        if hasattr(self, 'save_btn'):
-            self.save_action = self.save_btn
+        # For verification compatibility
+        self.save_action = self.save_btn
 
     def _on_load_clicked(self):
         """Load field definitions from yellberus.py and FIELD_REGISTRY.md."""
@@ -410,15 +394,6 @@ class FieldEditorWindow(QMainWindow):
             if db_item and not db_item.text():  # Only if empty
                 self.fields_table.blockSignals(True)
                 db_item.setText(db_column)
-                self.fields_table.blockSignals(False)
-                
-        # 8.2: Auto-lookup ID3 Tag
-        id3_tag = self._lookup_id3_tag(name)
-        if id3_tag:
-            tag_item = self.fields_table.item(row, 9)
-            if tag_item and not tag_item.text(): # Only if empty
-                self.fields_table.blockSignals(True)
-                tag_item.setText(id3_tag)
                 self.fields_table.blockSignals(False)
 
     def _lookup_db_column(self, field_name: str) -> str:

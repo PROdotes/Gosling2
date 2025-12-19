@@ -13,7 +13,7 @@ class SettingsManager:
     KEY_MAIN_SPLITTER_STATE = "window/mainSplitterState"
     
     # Library settings
-    KEY_COLUMN_VISIBILITY = "library/columnVisibility"  # Legacy
+
     KEY_LIBRARY_LAYOUTS = "library/layouts"  # New: loadout-ready structure
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
     KEY_TYPE_FILTER = "library/typeFilter"
@@ -67,13 +67,7 @@ class SettingsManager:
     
     # ===== Library Settings =====
     
-    def get_column_visibility(self) -> Dict[str, bool]:
-        """Get column visibility states"""
-        return self._settings.value(self.KEY_COLUMN_VISIBILITY, {})
-    
-    def set_column_visibility(self, visibility_states: Dict[str, bool]) -> None:
-        """Save column visibility states"""
-        self._settings.setValue(self.KEY_COLUMN_VISIBILITY, visibility_states)
+
     
     def get_last_import_directory(self) -> Optional[str]:
         """Get last directory used for importing files"""

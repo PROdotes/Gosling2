@@ -25,11 +25,11 @@ links: []
 ### Quick Wins (Score ≥10)
 | Task | Pri | Cmplx | Score | Status |
 |------|-----|-------|-------|--------|
+| **Test Audit** | 5 | 3 | 10 | 🚀 (Next) |
+| **Legacy Sync** | 5 | 1 | 20 | � |
 | **Type Tabs** | 3 | 1 | 15 | ✅ |
-| **Field Registry** | 5 | 4 | 10 | ✅ (T-02) |
 | **Completeness Check** | 3 | 1 | 15 | ✅ |
-| **Inline Edit** | 4 | 2 | 8 | 📋 |
-| **Test Audit** | 4 | 2 | 8 | 📋 |
+| **Field Registry** | 5 | 4 | 10 | ✅ (T-02) |
 
 ### Foundation Work
 | Task | Pri | Cmplx | Score | Status | Blocked By |
@@ -41,9 +41,10 @@ links: []
 ### Feature Work
 | Task | Pri | Cmplx | Score | Status | Blocked By |
 |------|-----|-------|-------|--------|------------|
+| **Side Panel** | 5 | 3 | 10 | 📋 | Legacy Sync |
+| **Inline Edit** | 4 | 2 | 8 | 📋 | — |
 | **Basic Chips** | 3 | 2 | 6 | 📋 | — |
 | **View Modes** | 3 | 4 | 6 | 📋 | Type Tabs |
-| **Side Panel** | 4 | 3 | 8 | 📋 | Field Registry |
 | **Smart Chips** | 3 | 3 | 6 | 📋 | Basic Chips |
 
 ### Heavy Lift (Defer)
@@ -53,8 +54,8 @@ links: []
 | **Saved Playlists** | 4 | 3 | 8 | 📋 | — |
 | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core |
 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging |
-| **Albums** | 4 | 4 | 8 | 📋 | — |
-| **Filter Trees** | 3 | 3 | 6 | 📋 | — |
+| **Albums** | 4 | 4 | 8 | 📋 | Legacy Sync |
+| **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync |
 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry |
 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core |
 | **Advanced Search** | 3 | 3 | 9 | 📋 | — | <!-- Issue #10 -->
@@ -64,36 +65,35 @@ links: []
 
 ---
 
-## 🚀 The Golden Path (v2)
+## 🚀 The Golden Path (v2.2)
 
-> **Parallel Tracks** — UI features and Core infrastructure can proceed independently.
+> **Revised**: Tests must be hardened (dynamic) BEFORE schema expansion to avoid breaking the build.
 
 ```
- TRACK A (UI):     Type Tabs ──► Inline Edit ──► Side Panel ──► Bulk Edit
-                       🏷️           ✏️              📋            📝
-                   [1 day]       [1 day]        [2 days]      [2 days]
+ TRACK A (Data):   Test Audit ──► Legacy Sync ──► Log+Undo
+                       🧪             💾             📜
+                   [Immediate]       [Next]         [Soon]
 
- TRACK B (Core):   Field Registry ──► Test Audit ──► Log+Undo
-                        🏗️              🧹             📜
-                     [2 days]        [1 day]       [2 days]
+ TRACK B (UI):     Side Panel ──► Inline Edit ──► Bulk Edit
+                       📋              ✏️             📝
+                   [Blocked]       [Parallel]      [Later]
 
-                   ✅ Schema Migration — DONE
+                   ✅ Field Editor — DONE
 ```
 
-### Track A: User-Facing (UI)
-1. **Type Tabs** — Filter by content type (immediate, no blockers)
-2. **Inline Edit** — Editable metadata cells
-3. **Side Panel** — Selection-aware metadata (needs Field Registry)
-4. **Bulk Edit** — Multi-select operations
+### Track A: Data Integrity (Critical Path)
+1. **Test Audit (Part 1)** — Silence/Skip "9-Layer" tests to allow schema changes
+2. **Legacy Sync** — Add Album, Genre, Publisher
+3. **Test Audit (Part 2)** — Re-enable checks & make them dynamic
 
-### Track B: Developer-Facing (Core)
-1. **Field Registry** — Single source of truth for field definitions
-2. **Test Audit** — Consolidate tests using the Registry
-3. **Log+Undo** — Transaction safety net
+### Track B: User Experience (UI)
+1. **Side Panel** — Requires Legacy Sync data
+2. **Inline Edit** — Can proceed in parallel
+3. **Bulk Edit** — Dependent on Side Panel logic
 
 ### Crossover Points
-- **Side Panel** requires Field Registry (Track B must reach step 1)
-- **Test Audit** cleans up the "9 layers of yell" into Registry-based checks
+- **Test Audit** PROTECTS **Legacy Sync** (Prevents broken tests).
+- **Legacy Sync** UNBLOCKS **Side Panel**.
 
 ---
 

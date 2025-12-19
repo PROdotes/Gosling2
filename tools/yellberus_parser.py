@@ -359,24 +359,12 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
         else:
             new_code_lines.append(f'        field_type=FieldType.{f.field_type},')
             
-        # Boolean flags - Write ONLY if they differ from active_defaults
-        if f.visible != active_defaults.get('visible', True): 
-            new_code_lines.append(f'        visible={f.visible},')
-            
-        if f.editable != active_defaults.get('editable', True):
-            new_code_lines.append(f'        editable={f.editable},')
-            
-        if f.filterable != active_defaults.get('filterable', False):
-            new_code_lines.append(f'        filterable={f.filterable},')
-            
-        if f.searchable != active_defaults.get('searchable', False):
-            new_code_lines.append(f'        searchable={f.searchable},')
-            
-        if f.required != active_defaults.get('required', False):
-            new_code_lines.append(f'        required={f.required},')
-            
-        if f.portable != active_defaults.get('portable', True):
-            new_code_lines.append(f'        portable={f.portable},')
+        new_code_lines.append(f'        visible={f.visible},')
+        new_code_lines.append(f'        editable={f.editable},')
+        new_code_lines.append(f'        filterable={f.filterable},')
+        new_code_lines.append(f'        searchable={f.searchable},')
+        new_code_lines.append(f'        required={f.required},')
+        new_code_lines.append(f'        portable={f.portable},')
         
         # Preserved fields (that aren't in UI)
         if f.model_attr: new_code_lines.append(f'        model_attr="{f.model_attr}",')
