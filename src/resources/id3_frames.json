@@ -32,7 +32,11 @@
     },
     "TFLT": "File type",
     "TIME": "Time",
-    "TIT1": "Content group description",
+    "TIT1": {
+        "description": "Content group description (Groups)",
+        "field": "groups",
+        "type": "list"
+    },
     "TIT2": {
         "description": "Title/songname/content description",
         "field": "title",
@@ -41,7 +45,11 @@
     "TIT3": "Subtitle/Description refinement",
     "TKEY": "Initial key",
     "TLAN": "Language(s)",
-    "TLEN": "Length",
+    "TLEN": {
+        "description": "Length",
+        "field": "duration",
+        "type": "integer"
+    },
     "TMED": "Media type",
     "TOAL": "Original album/movie/show title",
     "TOFN": "Original filename",
