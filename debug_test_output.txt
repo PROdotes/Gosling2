@@ -1,2 +1,2 @@
 DB Columns: set()
-Mapped Attributes: {'formatted_duration', 'is_done', 'album_artists', 'producers', 'recording_year', 'title', 'bpm', 'performers', 'isrc', 'composers'}
+Mapped Attributes: {'recording_year', 'performers', 'producers', 'composers', 'is_done', 'album_artists', 'formatted_duration', 'title', 'bpm', 'isrc'}

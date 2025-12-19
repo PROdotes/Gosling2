@@ -3,7 +3,7 @@ import zipfile
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
-    QCheckBox, QHeaderView
+    QCheckBox, QHeaderView, QTabBar
 )
 import json
 from PyQt6.QtGui import (
@@ -73,6 +73,40 @@ class DropIndicatorHeaderView(QHeaderView):
             painter.end()
 
 
+class LibraryFilterProxyModel(QSortFilterProxyModel):
+    """Proxy model that supports both search text and content type filtering."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._type_filter_id_list = [] # Empty means show all
+        self._type_column = -1
+        
+    def setTypeFilter(self, type_ids: list, column: int):
+        self._type_filter_id_list = type_ids
+        self._type_column = column
+        self.invalidateFilter()
+        
+    def filterAcceptsRow(self, source_row, source_parent):
+        # 1. Type Filter
+        if self._type_filter_id_list and self._type_column >= 0:
+            model = self.sourceModel()
+            index = model.index(source_row, self._type_column, source_parent)
+            
+            # Use UserRole because it contains the raw ID
+            raw_val = model.data(index, Qt.ItemDataRole.UserRole)
+            try:
+                # Handle potential float/string/None from DB/Model
+                type_id = int(float(raw_val)) if raw_val is not None else -1
+            except (ValueError, TypeError):
+                type_id = -1
+                
+            if type_id not in self._type_filter_id_list:
+                return False
+                
+        # 2. Search Text (standard behavior)
+        return super().filterAcceptsRow(source_row, source_parent)
+
+
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
 
@@ -89,24 +123,19 @@ class LibraryWidget(QWidget):
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
         
+        
         self._init_ui()
-        self._load_criteria()
         self._setup_connections()
+        
+        # Restore saved type filter
+        saved_index = self.settings_manager.get_type_filter()
+        if 0 <= saved_index < self.type_tab_bar.count():
+            self.type_tab_bar.setCurrentIndex(saved_index)
+            self._on_type_tab_changed(saved_index)
+            
         self.load_library()
 
-    def _load_criteria(self) -> None:
-        """Load completeness criteria from JSON"""
-        try:
-            criteria_path = os.path.join(
-                os.path.dirname(__file__), 
-                '../../completeness_criteria.json'
-            )
-            criteria_path = os.path.normpath(criteria_path)
-            with open(criteria_path, 'r') as f:
-                self.completeness_criteria = json.load(f).get('fields', {})
-        except Exception as e:
-            print(f"Error loading criteria: {e}")
-            self.completeness_criteria = {}
+
 
     def _init_ui(self) -> None:
         """Initialize UI components"""
@@ -130,8 +159,44 @@ class LibraryWidget(QWidget):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search library...")
         
+        # Type Tabs
+        self.type_tab_bar = QTabBar()
+        self.type_tab_bar.setExpanding(False)
+        self.type_tab_bar.setDrawBase(False)
+        self.type_tab_bar.setStyleSheet("""
+            QTabBar::tab {
+                padding: 8px 16px;
+                background: #2b2b2b;
+                border: 1px solid #333;
+                border-bottom: none;
+                margin-right: 2px;
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+            }
+            QTabBar::tab:selected {
+                background: #3c3c3c;
+                border-color: #444;
+            }
+            QTabBar::tab:hover {
+                background: #333;
+            }
+        """)
+        
+        # Define Tab Data: (Label, [TypeIDs])
+        self.type_tabs = [
+            ("All", []),
+            ("Music", [1]),
+            ("Jingles", [2]),
+            ("Commercials", [3]),
+            ("Speech", [4, 5]),
+            ("Streams", [6]),
+        ]
+        
+        for label, _ in self.type_tabs:
+            self.type_tab_bar.addTab(label)
+        
         self.library_model = QStandardItemModel()
-        self.proxy_model = QSortFilterProxyModel()
+        self.proxy_model = LibraryFilterProxyModel()
         self.proxy_model.setSourceModel(self.library_model)
         self.proxy_model.setFilterKeyColumn(-1) # Search all columns
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -181,6 +246,7 @@ class LibraryWidget(QWidget):
         self.empty_label.hide()
         
         center_layout.addWidget(self.search_box)
+        center_layout.addWidget(self.type_tab_bar)
         center_layout.addWidget(self.table_view)
         
         self.splitter.addWidget(self.filter_widget)
@@ -390,6 +456,7 @@ class LibraryWidget(QWidget):
         self.btn_refresh.clicked.connect(self.load_library)
         self.chk_show_incomplete.toggled.connect(self.load_library)
         self.search_box.textChanged.connect(self._on_search)
+        self.type_tab_bar.currentChanged.connect(self._on_type_tab_changed)
         
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
         self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
@@ -421,6 +488,7 @@ class LibraryWidget(QWidget):
             self._load_column_visibility_states()
 
         self.filter_widget.populate()
+        self._update_tab_counts()
         self.table_view.resizeColumnsToContents()
 
     def _apply_incomplete_view_columns(self) -> None:
@@ -432,6 +500,44 @@ class LibraryWidget(QWidget):
                 self.table_view.setColumnHidden(col, not field_def.visible)
             else:
                 self.table_view.setColumnHidden(col, True)
+
+    def _on_type_tab_changed(self, index: int) -> None:
+        """Handle type tab change"""
+        if 0 <= index < len(self.type_tabs):
+            _, type_ids = self.type_tabs[index]
+            self.proxy_model.setTypeFilter(type_ids, self.field_indices['type_id'])
+            self.settings_manager.set_type_filter(index)
+
+    def _update_tab_counts(self) -> None:
+        """Update the item counts on each tab label."""
+        # 1. Count items per type from the source model
+        # Index 0 is "All", others map to self.type_tabs
+        counts = {i: 0 for i in range(len(self.type_tabs))}
+        
+        type_col = self.field_indices['type_id']
+        for row in range(self.library_model.rowCount()):
+            item = self.library_model.item(row, type_col)
+            if item:
+                raw_val = item.data(Qt.ItemDataRole.UserRole)
+                try:
+                    type_id = int(float(raw_val)) if raw_val is not None else -1
+                except (ValueError, TypeError):
+                    type_id = -1
+                
+                # Increment "All"
+                counts[0] += 1
+                
+                # Check which other tabs this belongs to
+                for i in range(1, len(self.type_tabs)):
+                    _, type_ids = self.type_tabs[i]
+                    if type_id in type_ids:
+                        counts[i] += 1
+        
+        # 2. Update Tab Labels
+        for i in range(len(self.type_tabs)):
+            label, _ = self.type_tabs[i]
+            count = counts[i]
+            self.type_tab_bar.setTabText(i, f"{label} ({count})")
 
     def _populate_table(self, headers, data) -> None:
         self.library_model.clear()
@@ -980,60 +1086,52 @@ class LibraryWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to write tags:\n{e}")
 
-    def _get_incomplete_fields(self, row_data) -> set:
-        """Identify which fields are incomplete based on criteria.
+    def _get_incomplete_fields(self, row_data: list) -> set:
+        """Identify which fields are incomplete based on Yellberus registry.
         Returns a set of field names that failed validation.
         """
         failed_fields = set()
         
-        # Map table columns to criteria keys
-        # Map table columns to criteria keys dynamically
-        # Map table columns to criteria keys dynamically
-        val_map = {}
         for col_idx, cell_value in enumerate(row_data):
-            if col_idx < len(yellberus.FIELDS):
-                field_name = yellberus.FIELDS[col_idx].name
-                val_map[field_name] = cell_value
-        
-        # DEBUG
-        # print(f"Checking incomplete criteria={self.completeness_criteria} val_map={val_map}")
-        
-        for field, rules in self.completeness_criteria.items():
-            # Skip fields not present in our table view mapping
-            if field not in val_map:
-                continue
+            if col_idx >= len(yellberus.FIELDS):
+                break
                 
-            value = val_map[field]
+            field_def = yellberus.FIELDS[col_idx]
             is_valid = True
             
-            # Check Required
-            if rules.get('required', False):
-                if value is None or (isinstance(value, str) and not value.strip()):
+            # 1. Check Required
+            if field_def.required:
+                if cell_value is None or (isinstance(cell_value, str) and not cell_value.strip()):
                     is_valid = False
-                    
-            # Check List (Performers, Composers come as strings "A, B" or None)
-            if is_valid and rules.get('type') == 'list':
-                if rules.get('required', False) and not value:
-                     is_valid = False
-                
-                # If we have content, check min_length if specified (e.g. at least 1)
-                if is_valid and value:
-                    # Naively split by comma
-                    items = [x.strip() for x in value.split(',') if x.strip()]
-                    if len(items) < rules.get('min_length', 0):
+            
+            # 2. Check List Type
+            if is_valid and field_def.field_type == yellberus.FieldType.LIST:
+                if field_def.required and not cell_value:
+                    is_valid = False
+                elif cell_value and field_def.min_length is not None:
+                    # cell_value from DB for LIST is GROUP_CONCAT string
+                    items = [x.strip() for x in str(cell_value).split(',') if x.strip()]
+                    if len(items) < field_def.min_length:
                         is_valid = False
             
-            # Check Number (Duration, BPM)
-            if is_valid and rules.get('type') == 'number':
-                if value is not None:
+            # 3. Check Text Min Length
+            elif is_valid and field_def.field_type == yellberus.FieldType.TEXT:
+                if cell_value and field_def.min_length is not None:
+                    if len(str(cell_value).strip()) < field_def.min_length:
+                        is_valid = False
+            
+            # 4. Check Numeric/Duration Min Value
+            elif is_valid and field_def.field_type in (yellberus.FieldType.INTEGER, yellberus.FieldType.REAL, yellberus.FieldType.DURATION):
+                if cell_value is not None and field_def.min_value is not None:
                     try:
-                        num_val = float(value)
-                        if num_val < rules.get('min_value', float('-inf')):
+                        num_val = float(cell_value)
+                        if num_val < field_def.min_value:
                             is_valid = False
-                    except ValueError:
-                        pass # Should be number but isn't?
+                    except (ValueError, TypeError):
+                        # Non-numeric value in numeric field is caught by integrity tests or 'required'
+                        pass 
             
             if not is_valid:
-                failed_fields.add(field)
-                        
+                failed_fields.add(field_def.name)
+                
         return failed_fields

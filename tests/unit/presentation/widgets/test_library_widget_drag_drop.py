@@ -20,6 +20,7 @@ class TestLibraryWidgetDragDrop:
     def widget(self, qtbot, mock_deps):
         """Create LibraryWidget with mocks"""
         mock_deps['settings_manager'].get_column_visibility.return_value = {}
+        mock_deps['settings_manager'].get_type_filter.return_value = 0
         mock_deps['library_service'].get_all_songs.return_value = ([], [])
 
         widget = LibraryWidget(

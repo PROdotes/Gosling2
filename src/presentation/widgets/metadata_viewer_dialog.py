@@ -116,6 +116,7 @@ class MetadataViewerDialog(QDialog):
             ("Composer(s)", "composers", ["TCOM"]),
             ("Album Artist", "album_artists", ["TPE2"]),
             ("Producer(s)", "producers", ["TIPL", "TMCL", "TXXX:PRODUCER"]), # Approximate mapping
+            ("Lyricist(s)", "lyricists", ["TEXT"]),
             ("Duration", "formatted_duration", ["TLEN"]), 
             ("BPM", "bpm", ["TBPM"]),
             ("Year", "recording_year", ["TDRC", "TYER"]),

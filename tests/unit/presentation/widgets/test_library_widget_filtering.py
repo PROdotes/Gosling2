@@ -9,25 +9,17 @@ def library_widget(qtbot):
     meta_service = MagicMock()
     settings = MagicMock()
     settings.get_column_visibility.return_value = {}
+    settings.get_type_filter.return_value = 0
     
     # Setup data with unique values in every column to test search isolation
-    headers = ["ID", "Performer", "Title", "Duration", "Path", "Composer", "BPM", "Year", "Genre"]
-    # We add "Genre" to simulate future column addition
-    
-    # Unique values for Row 1
+    # 0:ID, 1:Type, 2:Title, 3:Artist, 4:Composer, 5:Lyricist, 6:Producer, 7:Dur, 8:Path, 9:Year, 10:BPM, 11:Done, 12:ISRC
     row_data = [
-        1, 
-        "UniquePerformer", 
-        "UniqueTitle", 
-        "10:00", 
-        "/unique/path", 
-        "UniqueComposer", 
-        999,      # Unique BPM
-        1888,     # Unique Year
-        "UniqueGenre"
+        "1", "1", "UniqueTitle", "UniquePerformer", "UniqueComposer", 
+        "UniqueLyricist", "UniqueProducer", "00:10", "/unique/path", 
+        "1888", "999", "Done", "UniqueISRC"
     ]
     
-    lib_service.get_all_songs.return_value = (headers, [row_data])
+    lib_service.get_all_songs.return_value = ([], [row_data])
     
     widget = LibraryWidget(lib_service, meta_service, settings)
     qtbot.addWidget(widget)

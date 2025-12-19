@@ -16,7 +16,7 @@ links:
 **GitHub Issue:** #6  
 **Layer:** UI  
 **Score:** 15  
-**Status:** 🟢 Next
+**Status:** ✅ Complete
 
 ---
 
@@ -89,15 +89,15 @@ def filter_by_type(type_id: int | None):
 
 ## Checklist
 
-- [ ] Add `QTabBar` widget to library layout (above table)
-- [ ] Populate tabs from `Types` table or hardcode MVP
-- [ ] Connect `currentChanged` signal to filter method
-- [ ] Implement filter in proxy model
-- [ ] Add `library/type_filter` to SettingsManager
-- [ ] Load saved tab on startup
-- [ ] Save tab on change
-- [ ] Test: Switching tabs filters correctly
-- [ ] Test: Tab persists across app restart
+- [x] Add `QTabBar` widget to library layout (above table)
+- [x] Populate tabs from `Types` table or hardcode MVP
+- [x] Connect `currentChanged` signal to filter method
+- [x] Implement filter in proxy model
+- [x] Add `library/type_filter` to SettingsManager
+- [x] Load saved tab on startup
+- [x] Save tab on change
+- [x] Test: Switching tabs filters correctly
+- [x] Test: Tab persists across app restart
 
 ---
 

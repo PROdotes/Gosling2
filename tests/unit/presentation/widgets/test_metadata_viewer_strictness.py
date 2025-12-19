@@ -1,92 +1,63 @@
 import pytest
 from unittest.mock import MagicMock
 from src.presentation.widgets.metadata_viewer_dialog import MetadataViewerDialog
+from src.core import yellberus
 
 def test_metadata_viewer_strict_mapping(qtbot):
     """
     STRICT Metadata Viewer Mapping:
-    Ensures that MetadataViewerDialog contains a mapping for EVERY column in the 'Files' table.
+    Ensures that MetadataViewerDialog contains a mapping for EVERY portable column 
+    defined in Yellberus (excluding local-only fields like IDs or Paths).
     
-    If 'Genre' is added to the database, this test will fail until it's added to 
-    MetadataViewerDialog.mapped_fields (ensuring users can see the discrepancy).
+    If 'Genre' is added to Yellberus and marked as portable=True, 
+    this test will fail until it's added to MetadataViewerDialog.mapped_fields.
     """
-    import sqlite3
-    import tempfile
-    import os
-    from src.data.repositories.base_repository import BaseRepository
-    
-    # 1. Get DB Schema
-    fd, path = tempfile.mkstemp()
-    os.close(fd)
-    try:
-        repo = BaseRepository(path)
-        with sqlite3.connect(path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(Files)")
-            db_columns = {row[1] for row in cursor.fetchall()}
-    finally:
-        import gc
-        gc.collect()
-        if os.path.exists(path):
-            import time
-            for _ in range(3):
-                try:
-                    os.remove(path)
-                    break 
-                except PermissionError:
-                    time.sleep(0.1)
-    
-    # 3. Inspect MetadataViewerDialog Schema Logic
-    # We create a dummy dialog to inspect its schema rules
+    # 1. Inspect MetadataViewerDialog Schema Logic
     mock_file = MagicMock()
     mock_db = MagicMock()
     
-    # We patch the ID3 loading parts to avoid IO if possible, or just let it run (it handles errors).
+    # Create dialog to inspect its schema rules
     dlg = MetadataViewerDialog(mock_file, mock_db)
     
     # Extract the set of SONG ATTRIBUTES it maps to.
-    # mapped_fields format: (Label, SongAttribute, ID3Tags)
+    # mapped_fields format: (Label, SongAttribute, [ID3Tags])
     mapped_attributes = {entry[1] for entry in dlg.mapped_fields}
     
-    # 4. Define Expected Attributes for Files Table Columns
-    # Map DB Column Name -> Song Attribute Name
-    # This Mapping MUST exactly match what the dialog EXPECTS to display.
-    # If DB has "TempoBPM", Dialog must map "bpm".
+    # 2. Get Portable Fields from Yellberus
+    # Portable fields are those that can/should live in ID3 tags.
+    # We ignore file_id, path, type_id etc if marked portable=False.
+    portable_field_names = [f.name for f in yellberus.FIELDS if f.portable]
     
-    db_to_attribute = {
-        "FileID": None, # Ignored
-        "Path": None,   # Handled by Header/Layout, not table mapping
-        "Title": "title",
-        "Duration": "formatted_duration", # Dialog calculates this from Duration? No, Song model property.
-        "TempoBPM": "bpm",
-        "RecordingYear": "recording_year",
-        "ISRC": "isrc",
-        "IsDone": "is_done"
+    # 3. Handle Special Display Attribute Mappings
+    # The Dialog might use a presentation property (e.g. 'formatted_duration' instead of 'duration')
+    attribute_overrides = {
+        "duration": "formatted_duration"
     }
-    
-    # Join on Contributors? 
-    # The Tables Contributors/Roles etc mean we have 'performers', 'composers' etc.
-    # But strictly speaking, those aren't COLUMNS in 'Files'.
-    # This test enforces that 'Files' table columns are covered.
-    
-    with open("debug_test_output.txt", "w") as f:
-        f.write(f"DB Columns: {db_columns}\n")
-        f.write(f"Mapped Attributes: {mapped_attributes}\n")
 
-    for col in db_columns:
-        if col not in db_to_attribute:
-            with open("debug_test_output.txt", "a") as f:
-                f.write(f"FAIL: Unknown DB Column '{col}'\n")
-            pytest.fail(f"Strict Check: DB Column '{col}' is unknown to test logic! Update test mapping.")
+    # 4. Verify Coverage
+    missing_fields = []
+    for field_name in portable_field_names:
+        expected_attr = attribute_overrides.get(field_name, field_name)
+        if expected_attr not in mapped_attributes:
+            missing_fields.append(field_name)
             
-        attr = db_to_attribute[col]
-        if attr:
-            if attr not in mapped_attributes:
-                with open("debug_test_output.txt", "a") as f:
-                    f.write(f"FAIL: Missing mapping for '{col}' -> '{attr}'\n")
-                pytest.fail(f"MetadataViewerDialog is missing mapping for DB Column '{col}' (Attribute '{attr}'). "
-                            f"Update MetadataViewerDialog.mapped_fields.")
-                            
-    # Optional: ensure we don't have broken mappings?
-    # (Checked by other tests)
+    if missing_fields:
+        pytest.fail(
+            f"MetadataViewerDialog is missing mapping for Yellberus portable fields: {missing_fields}. "
+            "Update MetadataViewerDialog.mapped_fields to ensure users can view/sync these tags."
+        )
 
+    # 5. Verify No "Dead" Mappings (Optional but good)
+    # Ensure every attribute mapped in Dialog actually exists in Yellberus 
+    # (or is a known presentation override)
+    all_yellberus_names = {f.name for f in yellberus.FIELDS}
+    yellberus_overrides_rev = {v: k for k, v in attribute_overrides.items()}
+    
+    for _, attr, _ in dlg.mapped_fields:
+        original_name = yellberus_overrides_rev.get(attr, attr)
+        # Exception: album_artists is a model-only field for now, not in DB yet?
+        if attr == "album_artists":
+            continue
+            
+        assert original_name in all_yellberus_names, \
+            f"MetadataViewerDialog maps to unknown attribute '{attr}' (not in Yellberus)."

@@ -25,9 +25,9 @@ links: []
 ### Quick Wins (Score ≥10)
 | Task | Pri | Cmplx | Score | Status |
 |------|-----|-------|-------|--------|
-| **Type Tabs** | 3 | 1 | 15 | 📋 |
+| **Type Tabs** | 3 | 1 | 15 | ✅ |
 | **Field Registry** | 5 | 4 | 10 | ✅ (T-02) |
-| **Completeness Check** | 3 | 1 | 15 | 📋 Uses `required` from Yellberus |
+| **Completeness Check** | 3 | 1 | 15 | ✅ |
 | **Inline Edit** | 4 | 2 | 8 | 📋 |
 | **Test Audit** | 4 | 2 | 8 | 📋 |
 

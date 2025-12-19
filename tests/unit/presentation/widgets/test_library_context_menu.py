@@ -18,6 +18,7 @@ class TestLibraryContextMenu:
         
         # Mock initial load
         library_service.get_all_songs.return_value = ([], [])
+        settings_manager.get_type_filter.return_value = 0
         
         widget = LibraryWidget(library_service, metadata_service, settings_manager)
         qtbot.addWidget(widget)
@@ -36,7 +37,7 @@ class TestLibraryContextMenu:
         
         for i, is_done in enumerate(status_list):
             items = []
-            for col in range(10):
+            for col in range(13):
                 text = f"Item {col}"
                 if col == 0: # ID
                     text = str(i+100)
@@ -46,12 +47,12 @@ class TestLibraryContextMenu:
                 item.setData(text, Qt.ItemDataRole.UserRole)
                 items.append(item)
             
-            # Setup IsDone (col 9) - Override CheckState
-            items[9].setCheckable(True)
+            # Setup IsDone (col 11) - Override CheckState
+            items[11].setCheckable(True)
             check_state = Qt.CheckState.Checked if is_done else Qt.CheckState.Unchecked
-            items[9].setCheckState(check_state)
+            items[11].setCheckState(check_state)
             # Ensure IsDone UserRole matches boolean for completeness check if needed
-            items[9].setData(is_done, Qt.ItemDataRole.UserRole)
+            items[11].setData(is_done, Qt.ItemDataRole.UserRole)
             
             widget.library_model.appendRow(items)
             
@@ -161,13 +162,14 @@ class TestLibraryContextMenu:
         
         # Explicit patch to mirror drag_drop test success pattern
         with patch('PyQt6.QtWidgets.QMessageBox.warning') as local_mock_warn:
-            # Replace item 0,2 with explicitly empty/none item
+            # Replace item for title with explicitly empty/none item
+            title_idx = widget.field_indices['title']
             bad_item = QStandardItem("")
             bad_item.setData(None, Qt.ItemDataRole.UserRole)
-            widget.library_model.setItem(0, widget.COL_TITLE, bad_item)
+            widget.library_model.setItem(0, title_idx, bad_item)
             
             # Verify Model State
-            check_item = widget.library_model.item(0, widget.COL_TITLE)
+            check_item = widget.library_model.item(0, title_idx)
             assert check_item.text() == ""
             assert check_item.data(Qt.ItemDataRole.UserRole) is None
             

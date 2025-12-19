@@ -16,6 +16,7 @@ class SettingsManager:
     KEY_COLUMN_VISIBILITY = "library/columnVisibility"  # Legacy
     KEY_LIBRARY_LAYOUTS = "library/layouts"  # New: loadout-ready structure
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
+    KEY_TYPE_FILTER = "library/typeFilter"
     
     # Playback settings
     KEY_VOLUME = "playback/volume"
@@ -81,6 +82,14 @@ class SettingsManager:
     def set_last_import_directory(self, directory: str) -> None:
         """Save last directory used for importing files"""
         self._settings.setValue(self.KEY_LAST_IMPORT_DIRECTORY, directory)
+    
+    def get_type_filter(self) -> int:
+        """Get last selected type tab index (0 = All)"""
+        return int(self._settings.value(self.KEY_TYPE_FILTER, 0))
+    
+    def set_type_filter(self, index: int) -> None:
+        """Save selected type tab index"""
+        self._settings.setValue(self.KEY_TYPE_FILTER, index)
     
     def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:
         """

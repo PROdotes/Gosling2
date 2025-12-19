@@ -22,6 +22,7 @@ def mock_dependencies():
     settings_manager.get_last_import_directory.return_value = ""
     settings_manager.get_column_visibility.return_value = {}
     settings_manager.get_column_layout.return_value = None # Important for legacy fallback
+    settings_manager.get_type_filter.return_value = 0
     return library_service, metadata_service, settings_manager
 
 @pytest.fixture
@@ -33,10 +34,10 @@ def library_widget(qtbot, mock_dependencies):
     # Headers are somewhat irrelevant as Widget ignores them now, but good to likely match SQL names
     headers = [f.db_column for f in yellberus.FIELDS] 
     
-    # 0:ID, 1:Type, 2:Title, 3:Perf, 4:Comp, 5:Lyr, 6:Prod, 7:Grp, 8:Dur, 9:Path, 10:Yr, 11:BPM, 12:Done, 13:Isrc
+    # 0:ID, 1:Type, 2:Title, 3:Perf, 4:Comp, 5:Lyr, 6:Prod, 7:Dur, 8:Path, 9:Yr, 10:BPM, 11:Done, 12:Isrc
     data = [
-        [1, 1, "Title A", "Performer A", "Comp A", "Lyr A", "Prod A", "Group A", 180.0, "/path/a.mp3", 2020, 120, 1, "ISRC1"],
-        [2, 1, "Title B", "Performer B", "Comp B", "Lyr B", "Prod B", "Group B", 240.0, "/path/b.mp3", 2021, 128, 0, "ISRC2"]
+        [1, 1, "Title A", "Performer A", "Comp A", "Lyr A", "Prod A", 180.0, "/path/a.mp3", 2020, 120, 1, "ISRC1"],
+        [2, 1, "Title B", "Performer B", "Comp B", "Lyr B", "Prod B", 240.0, "/path/b.mp3", 2021, 128, 0, "ISRC2"]
     ]
     
     lib_service.get_all_songs.return_value = (headers, data)
@@ -231,7 +232,7 @@ def test_filter_by_year(library_widget, mock_dependencies):
     lib_service, _, _ = mock_dependencies
     
     # Return 1 row
-    row = [1, 1, "T", "P", "C", "L", "Pr", "G", 1.0, "p", 2020, 100, 1, "I"]
+    row = [1, 1, "T", "P", "C", "L", "Pr", 1.0, "p", 2020, 100, 1, "I"]
     lib_service.get_songs_by_year.return_value = ([f.name for f in yellberus.FIELDS], [row])
     
     library_widget._filter_by_year(2020)
@@ -289,9 +290,9 @@ def test_show_column_context_menu(library_widget):
         library_widget._show_column_context_menu(QPoint(0,0))
         
         # INTEGRITY CHECK:
-        # Schema has 14 columns
-        # Plus "Reset to Default" action = 15
-        expected_columns = 14
+        # Schema has 13 columns
+        # Plus "Reset to Default" action = 14
+        expected_columns = 13
         expected_total = expected_columns + 1
         
         assert library_widget.library_model.columnCount() == expected_columns, \
@@ -324,10 +325,10 @@ def test_numeric_sorting(library_widget, mock_dependencies):
     from PyQt6.QtCore import Qt
     lib_service, _, _ = mock_dependencies
     
-    # Cols: 8=Duration, 11=BPM, 10=Year
-    rowA = [1,1,"A","P","C","L","Pr","G", 10.0, "p", 2000, 10, 1, "I"]
-    rowB = [2,1,"B","P","C","L","Pr","G", 20.0, "p", 2010, 20, 1, "I"]
-    rowC = [3,1,"C","P","C","L","Pr","G", 30.0, "p", 2020, 30, 1, "I"]
+    # Cols: 7=Duration, 10=BPM, 9=Year
+    rowA = [1,1,"A","P","C","L","Pr", 10.0, "p", 2000, 10, 1, "I"]
+    rowB = [2,1,"B","P","C","L","Pr", 20.0, "p", 2010, 20, 1, "I"]
+    rowC = [3,1,"C","P","C","L","Pr", 30.0, "p", 2020, 30, 1, "I"]
     
     # Shuffle for testing
     data = [rowC, rowA, rowB] 

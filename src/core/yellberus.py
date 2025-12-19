@@ -105,6 +105,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         visible=False,
         editable=False,
+        required=True,
         model_attr="source_id",
         portable=False,  # Local-only: database ID
     ),
@@ -142,6 +143,8 @@ FIELDS: List[FieldDef] = [
         ui_header="Composer",
         db_column="Composers",
         field_type=FieldType.LIST,
+        required=True,
+        min_length=1,
         filterable=True,
         searchable=True,
     ),
@@ -176,6 +179,7 @@ FIELDS: List[FieldDef] = [
         db_column="MS.Source",
         visible=False,
         editable=False,
+        required=True,
         model_attr="source",
         portable=False,  # Local-only: filesystem path
     ),
@@ -184,6 +188,7 @@ FIELDS: List[FieldDef] = [
         ui_header="Year",
         db_column="S.RecordingYear",
         field_type=FieldType.INTEGER,
+        required=True,
         filterable=True,
         grouping_function=decade_grouper,
     ),
