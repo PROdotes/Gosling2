@@ -68,6 +68,7 @@ class BaseRepository:
                     TempoBPM INTEGER,
                     RecordingYear INTEGER,
                     ISRC TEXT,
+                    Groups TEXT,
                     IsDone BOOLEAN DEFAULT 0,
                     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
                 )

@@ -16,29 +16,35 @@ def test_get_all_schema_integrity(tmp_path):
     with repo.get_connection() as conn:
         cursor = conn.cursor()
         
-        # 1. Get Physical DB Columns from 'Files'
-        cursor.execute("PRAGMA table_info(Files)")
-        db_columns_info = cursor.fetchall()
-        db_columns = {row[1] for row in db_columns_info}
+        # 1. Get Physical DB Columns from 'MediaSources' and 'Songs'
+        cursor.execute("PRAGMA table_info(MediaSources)")
+        ms_cols = {row[1] for row in cursor.fetchall()}
+        
+        cursor.execute("PRAGMA table_info(Songs)")
+        song_cols = {row[1] for row in cursor.fetchall()}
+        
+        db_columns = ms_cols | song_cols
         
         # 2. Get Repository Query Columns
-        # We execute the ACTUAL query from the class (using the same logic as the class)
-        # Note: We duplicate the query here to statically analyze it, or we could call the method?
-        # Calling the method on empty DB is fine, returns empty data but we can inspect headers?
-        # Repo.get_all() returns (headers, data).
         repo_headers, _ = repo.get_all()
         repo_columns_set = set(repo_headers)
         
         # 3. Define Known Mappings (DB Column -> Repo Header)
-        # Some columns are renamed in the view.
+        # Yellberus BASE_QUERY might use Aliases (S.Groups, MS.Name, etc.)
+        # The Repo description[0] usually returns the column name or alias.
         column_mapping = {
-            "TempoBPM": "BPM", 
-            # Relationships are complex, but for 'Files' table columns:
-            "FileID": "FileID",
-            "Path": "Path",
-            "Title": "Title", 
+            "TempoBPM": "TempoBPM",
+            "RecordingYear": "RecordingYear",
+            "Name": "Name",
+            "Source": "Source",
+            "SourceID": "SourceID",
+            "TypeID": "TypeID",
             "Duration": "Duration",
-            "RecordingYear": "Year",
+            "IsActive": "IsActive",
+            "Notes": "Notes",
+            "ISRC": "ISRC",
+            "IsDone": "IsDone",
+            "Groups": "Groups"
         }
         
         # 4. Verify Coverage
@@ -78,10 +84,12 @@ def test_strict_table_whitelist(tmp_path):
         # 2. Define Repository's Known Tables
         # These are the tables the repository claims to manage/interact with.
         known_tables = {
-            "Files",
+            "MediaSources",
+            "Songs",
+            "Types",
             "Contributors",
             "Roles",
-            "FileContributorRoles",
+            "MediaSourceContributorRoles",
             "GroupMembers"
         }
         

@@ -46,7 +46,8 @@ def test_cross_reference_integrity(tmp_path):
         "TempoBPM": "bpm",
         "RecordingYear": "recording_year",
         "ISRC": "isrc",
-        "IsDone": "is_done"
+        "IsDone": "is_done",
+        "Groups": "groups"
     }
     
     # Model Fields -> Expected DB Column (or Relationship Check/Exclusion)
@@ -71,7 +72,7 @@ def test_cross_reference_integrity(tmp_path):
         "composers": "RELATIONSHIP (Contributors via Composer)",
         "lyricists": "RELATIONSHIP (Contributors via Lyricist)",
         "producers": "RELATIONSHIP (Contributors via Producer)",
-        "groups": "RELATIONSHIP (GroupMembers)"
+        "groups": "Groups"
     }
     
     # 4. Verify DB Coverage

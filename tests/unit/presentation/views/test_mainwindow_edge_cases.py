@@ -28,6 +28,7 @@ class TestMainWindowEdgeCases:
             mock_settings.get_column_visibility.return_value = {}
             mock_settings.get_volume.return_value = 50
             mock_settings.get_last_playlist.return_value = []
+            mock_settings.get_type_filter.return_value = 0
             mock_settings_class.return_value = mock_settings
             
             window = MainWindow()

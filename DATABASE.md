@@ -13,19 +13,19 @@ This document describes the SQLite database structure used by the Gosling2 appli
 
 This database schema is **Strictly Enforced** by the test suite. 
 Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompanied by updates to:
-1.  `src/completeness_criteria.json`
+1.  **Yellberus Registry** (`src/core/yellberus.py`)
 2.  Models in `src/data/models/`
-3.  Repository Whitelists in `src/data/repositories/`
+3.  Repository Queries in `src/data/repositories/`
 4.  UI and Service components
 
 **Do not manually modify the schema** without running `pytest` to identify all layers of broken dependencies. The system is designed to "yell" at you if you simply `ALTER TABLE` without updating the code.
 
 > [!IMPORTANT]
-> **Priority Rule:** The "9 Layers of Yell" validation steps take priority over everything. You are strictly forbidden from adding columns to the database if they are not actively used by the application logic. **Dead schema elements are treated as bugs.**
+> **Priority Rule:** The "9 Layers of Yell" validation steps (enforced by Yellberus) take priority over everything. You are strictly forbidden from adding columns to the database if they are not actively used by the application logic. **Dead schema elements are treated as bugs.**
 
 ## ✅ Completeness Criteria (IsDone Flag)
 
-A song can only be marked as "Done" (`IsDone = true`) if it passes validation defined in `src/completeness_criteria.json`.
+A song can only be marked as "Done" (`IsDone = true`) if it passes validation defined in the **Yellberus Field Registry**.
 
 ### Mandatory Fields (All Types)
 | Field | Requirement | Notes |
@@ -48,8 +48,8 @@ A song can only be marked as "Done" (`IsDone = true`) if it passes validation de
 | `ISRC` | International Standard Recording Code |
 | `RecordingYear` | Original recording year |
 
-> **Config location:** `src/completeness_criteria.json`
-> **Enforcement:** Validation service checks before setting IsDone
+> **Config location:** `src/core/yellberus.py`
+> **Enforcement:** Validation service checks against Registry before setting IsDone
 
 
 ## Schema Diagrams
@@ -86,6 +86,7 @@ erDiagram
         INTEGER TempoBPM
         INTEGER RecordingYear
         TEXT ISRC
+        TEXT Groups
         BOOLEAN IsDone
     }
 
@@ -166,6 +167,7 @@ erDiagram
         INTEGER TempoBPM
         INTEGER RecordingYear
         TEXT ISRC
+        TEXT Groups
         BOOLEAN IsDone
         REAL CueIn
         REAL CueOut
@@ -442,6 +444,7 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 | `TempoBPM` | INTEGER | - | Beats per minute |
 | `RecordingYear` | INTEGER | - | Original recording year |
 | `ISRC` | TEXT | - | International Standard Recording Code |
+| `Groups` | TEXT | - | Content group description (TIT1) |
 | `IsDone` | BOOLEAN | DEFAULT 0 | Marked as complete/processed |
 | `CueIn` | REAL | DEFAULT 0 | ❌ Playback start trim (seconds) |
 | `CueOut` | REAL | - | ❌ Playback end trim (seconds) |

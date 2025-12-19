@@ -28,7 +28,7 @@ def test_database_schema_integrity(tmp_path):
     expected_columns = {
         "Types": {"TypeID", "TypeName"},
         "MediaSources": {"SourceID", "TypeID", "Name", "Notes", "Source", "Duration", "IsActive"},
-        "Songs": {"SourceID", "TempoBPM", "RecordingYear", "ISRC", "IsDone"},
+        "Songs": {"SourceID", "TempoBPM", "RecordingYear", "ISRC", "IsDone", "Groups"},
         "Contributors": {"ContributorID", "Name", "SortName"},
         "Roles": {"RoleID", "Name"},
         "MediaSourceContributorRoles": {"SourceID", "ContributorID", "RoleID"},

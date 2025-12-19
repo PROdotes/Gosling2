@@ -107,27 +107,36 @@ class MetadataViewerDialog(QDialog):
             pass
             
         self.ID3_FRAMES = ID3_FRAMES
+        from src.core import yellberus
 
-        # 1. Mapped Fields
-        # Format: (Label, Song Attribute, [ID3 Tags])
-        self.mapped_fields = [
-            ("Title", "title", ["TIT2"]),
-            ("Performer(s)", "performers", ["TPE1"]),
-            ("Composer(s)", "composers", ["TCOM"]),
-            ("Album Artist", "album_artists", ["TPE2"]),
-            ("Producer(s)", "producers", ["TIPL", "TMCL", "TXXX:PRODUCER"]), # Approximate mapping
-            ("Lyricist(s)", "lyricists", ["TEXT"]),
-            ("Duration", "formatted_duration", ["TLEN"]), 
-            ("BPM", "bpm", ["TBPM"]),
-            ("Year", "recording_year", ["TDRC", "TYER"]),
-            ("ISRC", "isrc", ["TSRC"]),
-            ("Done", "is_done", ["TXXX:GOSLING_DONE", "TKEY"]),
-        ]
-
-        # Tracking used raw keys to avoid duplication
+        # 1. Mapped Fields (Using Yellberus Registry)
+        self.mapped_fields = []
         used_id3_keys = set()
-        for _, _, keys in self.mapped_fields:
-            used_id3_keys.update(keys)
+        
+        # Reverse lookup for ID3 frames from JSON
+        field_to_frames = {}
+        for frame_code, frame_info in ID3_FRAMES.items():
+            if isinstance(frame_info, dict) and 'field' in frame_info:
+                f_name = frame_info['field']
+                if f_name not in field_to_frames:
+                    field_to_frames[f_name] = []
+                field_to_frames[f_name].append(frame_code)
+
+        for field in yellberus.FIELDS:
+            # Show portable fields + duration
+            if not field.portable and field.name != "duration":
+                continue
+            
+            attr = field.model_attr or field.name
+            if attr == "name": attr = "title"  # Property alias
+            if attr == "duration": attr = "formatted_duration" # Property alias
+            
+            frames = field_to_frames.get(field.name, [])
+            self.mapped_fields.append((field.ui_header, attr, frames))
+            used_id3_keys.update(frames)
+
+        # Ensure legacy/dual keys are tracked as used
+        used_id3_keys.update(["TKEY", "TYER", "TIPL", "TEXT"])
 
         self.table.setRowCount(0)
         

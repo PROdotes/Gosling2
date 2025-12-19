@@ -27,7 +27,8 @@ def temp_db():
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in cursor.fetchall()}
-        assert "Files" in tables
+        assert "MediaSources" in tables
+        assert "Songs" in tables
         assert "Contributors" in tables
         
     yield db_path
@@ -47,8 +48,8 @@ def test_get_by_path_found(repository):
     """Test retrieving a song by path returns full object."""
     # 1. Insert a song
     song = Song(
-        title="Test Title",
-        path="/music/test.mp3",
+        name="Test Title",
+        source="/music/test.mp3",
         duration=180.5,
         bpm=120,
         performers=["Alice", "Bob"],
@@ -57,18 +58,18 @@ def test_get_by_path_found(repository):
     
     # We need to insert it properly. Repository.insert only does basic file info.
     # Repository.update does full metadata.
-    file_id = repository.insert(song.path)
+    file_id = repository.insert(song.source)
     assert file_id is not None
-    song.file_id = file_id
+    song.source_id = file_id
     repository.update(song)
     
     # 2. Retrieve it
-    retrieved_song = repository.get_by_path(song.path)
+    retrieved_song = repository.get_by_path(song.source)
     
     # 3. Assertions
     assert retrieved_song is not None
-    assert retrieved_song.file_id == file_id
-    assert retrieved_song.title == "Test Title"
+    assert retrieved_song.source_id == file_id
+    assert retrieved_song.name == "Test Title"
     assert retrieved_song.duration == 180.5
     assert retrieved_song.bpm == 120
     
@@ -87,19 +88,19 @@ def test_get_by_path_not_found(repository):
 def test_get_by_path_complex_contributors(repository):
     """Test that all contributor types are retrieved correctly."""
     song = Song(
-        path="/music/complex.mp3",
-        title="Complex Song",
+        source="/music/complex.mp3",
+        name="Complex Song",
         performers=["P1"],
         composers=["C1"],
         lyricists=["L1"],
         producers=["Pr1"]
     )
     
-    file_id = repository.insert(song.path)
-    song.file_id = file_id
+    file_id = repository.insert(song.source)
+    song.source_id = file_id
     repository.update(song)
     
-    retrieved = repository.get_by_path(song.path)
+    retrieved = repository.get_by_path(song.source)
     assert retrieved is not None
     assert retrieved.performers == ["P1"]
     assert retrieved.composers == ["C1"]

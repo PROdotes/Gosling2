@@ -1,4 +1,3 @@
-"""Song Data Model"""
 from typing import Optional, List
 from dataclasses import dataclass, field
 from .media_source import MediaSource
@@ -8,8 +7,6 @@ from .media_source import MediaSource
 class Song(MediaSource):
     """Represents a song with its metadata"""
 
-    # Inherited fields: source_id, type_id, name, source, duration, ...
-    
     # Specific fields
     is_done: bool = False
     isrc: Optional[str] = None
@@ -21,6 +18,7 @@ class Song(MediaSource):
     composers: List[str] = field(default_factory=list)
     lyricists: List[str] = field(default_factory=list)
     producers: List[str] = field(default_factory=list)
+    groups: List[str] = field(default_factory=list)
 
     @classmethod
     def from_row(cls, row: tuple) -> 'Song':
@@ -84,8 +82,13 @@ class Song(MediaSource):
         return song
 
     def __post_init__(self) -> None:
-        """Set type_id for Song."""
+        """Set type_id and normalize lists."""
         self.type_id = 1
+        if self.performers is None: self.performers = []
+        if self.composers is None: self.composers = []
+        if self.lyricists is None: self.lyricists = []
+        if self.producers is None: self.producers = []
+        if self.groups is None: self.groups = []
 
     @property
     def title(self) -> Optional[str]:

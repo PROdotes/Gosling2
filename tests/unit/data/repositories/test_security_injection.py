@@ -30,15 +30,15 @@ class TestSQLInjectionSafety:
     def test_insert_malicious_filename(self, repo):
         """Test that SQL injection in filename is safely escaped"""
         # Classic Bobby Tables attack
-        malicious_path = "test'); DROP TABLE Files;--.mp3"
+        malicious_path = "test'); DROP TABLE MediaSources;--.mp3"
         
         file_id = repo.insert(malicious_path)
         assert file_id is not None, "Insert should succeed with parameterized query"
         
-        # Verify Files table still exists and contains the record
+        # Verify MediaSources table still exists and contains the record
         headers, data = repo.get_all()
         assert len(data) == 1, "Table should not be dropped"
-        assert "FileID" in headers, "Files table should still exist"
+        assert "SourceID" in headers, "MediaSources table should still exist"
 
     def test_update_malicious_artist_name(self, repo):
         """Test that SQL injection in artist name is safely escaped"""
@@ -48,9 +48,9 @@ class TestSQLInjectionSafety:
         
         # Create a song with malicious artist name
         malicious_song = Song(
-            file_id=file_id,
-            path="normal_song.mp3",
-            title="Normal Title",
+            source_id=file_id,
+            source="normal_song.mp3",
+            name="Normal Title",
             performers=["Bobby'; DROP TABLE Contributors;--"],
             composers=[],
             lyricists=[],

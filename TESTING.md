@@ -95,11 +95,18 @@ The "Yelling Mechanism" is a living system. As we add features that consume or e
 
 ---
 
-## 🔮 Coming Soon: Field Registry
+## 🏗️ The Field Registry (Yellberus) — LIVE
 
-> The "9 Layers of Yell" will eventually be **consolidated** into a centralized **Field Registry** — a single source of truth for all field definitions.
-> 
-> Once implemented, many of these validation layers will reference the Registry directly, reducing duplication and making schema changes even easier.
-> 
-> See [tasks.md](tasks.md) for current status.
+The "9 Layers of Yell" have been **consolidated** into a centralized **Field Registry (Yellberus)**. This is now the single source of truth for:
+*   **Database Columns**: Dynamic mapping via `yellberus.BASE_QUERY`.
+*   **UI Headers**: Automatically derived from field definitions.
+*   **Validation Rules**: "Requiredness" and min-lengths are defined once.
+*   **Metadata Mapping**: Connection between ID3 frames and Song attributes.
+
+## 🧹 2025-12-19: Consolidation Plan (In Progress)
+
+After the major schema migration, the test suite is currently efficient but fragmented (60+ files). We are in the process of:
+1.  **Merging Fragments**: Folding `add_..._tests.py` and `append_tests.py` snippets back into their core functional counterparts.
+2.  **Shared Fixtures**: Moving repetitive service mocks into a global `conftest.py`.
+3.  **Integrity Folder**: Moving all "Strict Coverage" and "Cross-Ref" tests into a dedicated `tests/unit/integrity/` folder to separate "Infrastructure Tests" from "Logic Tests".
 

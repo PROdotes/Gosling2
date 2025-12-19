@@ -10,19 +10,22 @@ def test_song_model_schema_stability():
     forcing them to explicitly update this test (and hopefully recall to check DB/Repo).
     """
     expected_fields = {
-        "file_id",
-        "path",
-        "title",
+        "source_id",
+        "type_id",
+        "name",
+        "source",
         "duration",
+        "notes",
+        "is_active",
+        "is_done",
+        "isrc",
         "bpm",
         "recording_year",
         "performers",
         "composers",
         "lyricists",
         "producers",
-        "groups",
-        "isrc",
-        "is_done"
+        "groups"
     }
     
     actual_fields = {f.name for f in dataclasses.fields(Song)}
@@ -61,47 +64,45 @@ def test_strict_column_mapping():
         
         with sqlite3.connect(path) as conn:
             cursor = conn.cursor()
-            cursor.execute("PRAGMA table_info(Files)")
-            columns_info = cursor.fetchall()
-            # row[1] is name
-            db_columns = {row[1] for row in columns_info}
+            
+            # 1. MediaSources
+            cursor.execute("PRAGMA table_info(MediaSources)")
+            ms_cols = {row[1] for row in cursor.fetchall()}
+            
+            # 2. Songs
+            cursor.execute("PRAGMA table_info(Songs)")
+            song_cols = {row[1] for row in cursor.fetchall()}
+            
+            db_columns = ms_cols | song_cols
             
         # 2. Get Model Fields
         model_fields = {f.name for f in dataclasses.fields(Song)}
         
         # 3. Define Mapping (DB -> Model)
-        # Most are 1:1 snake_case or direct.
-        # We need to calculate what the expected model field name is?
-        # Or just assert that *some* field covers it.
-        # 'TempoBPM' -> 'bpm'
-        # 'RecordingYear' -> 'recording_year'
-        # 'FileID' -> 'file_id'
-        
         mapping = {
-            "FileID": "file_id",
-            "Path": "path",
-            "Title": "title",
+            "SourceID": "source_id",
+            "TypeID": "type_id",
+            "Name": "name",
+            "Source": "source",
             "Duration": "duration",
+            "Notes": "notes",
+            "IsActive": "is_active",
+            
             "TempoBPM": "bpm",
             "RecordingYear": "recording_year",
             "ISRC": "isrc",
-            "IsDone": "is_done"
+            "IsDone": "is_done",
+            "Groups": "groups"
         }
         
         # 4. Strict Check
         for col in db_columns:
-            # If we add "SecretField", it won't be in mapping, so we fail?
-            # Or if it IS in mapping, we check if target exists in model.
-            
-            # The test should fail if DB has a column that we haven't accounted for.
-            
             if col in mapping:
                 target_field = mapping[col]
                 if target_field not in model_fields:
                      pytest.fail(f"DB Column '{col}' maps to field '{target_field}', but Song model is missing '{target_field}'.")
                 continue
             
-            # If strictly 1:1 naming isn't enforced, we require it to be in the mapping.
             pytest.fail(f"Strict Check: DB Column '{col}' is not mapped to any Song model field! "
                         f"Update the mapping in this test and the Song dataclass.")
             

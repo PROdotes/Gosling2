@@ -61,6 +61,7 @@ def test_strict_extraction_coverage():
         "SourceID": ("source_id", None, 1),
         "ISRC": ("isrc", "TSRC", "US-Test-123"),
         "IsDone": ("is_done", "TXXX:GOSLING_DONE", "1"),
+        "Groups": ("groups", "TIT1", ["G1", "G2"]),
     }
     
     # 3. Verify Coverage
@@ -130,5 +131,7 @@ def test_strict_extraction_coverage():
                 assert actual_val == "US-Test-123"
             elif col == "IsDone":
                 assert actual_val is True
+            elif col == "Groups":
+                assert actual_val == ["G1", "G2"]
                 
             # If we reached here, the service effectively extracted the value we wanted!

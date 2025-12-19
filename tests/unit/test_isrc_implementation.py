@@ -10,7 +10,7 @@ class TestISRCImplementation:
 
     def test_song_model_has_isrc(self):
         """Verify Song model accepts isrc"""
-        song = Song(title="Test", isrc="US-S1Z-23-00001")
+        song = Song(name="Test", isrc="US-S1Z-23-00001")
         assert song.isrc == "US-S1Z-23-00001"
         # Check default is None
         song_empty = Song()
@@ -56,8 +56,8 @@ class TestISRCImplementation:
         repo = SongRepository(str(db_path))
         
         song = Song(
-            path="C:/music/test.mp3",
-            title="ISRC Test",
+            source="C:/music/test.mp3",
+            name="ISRC Test",
             isrc="US-RC1-76-00123",
             duration=180,
             recording_year=2023,
@@ -73,7 +73,7 @@ class TestISRCImplementation:
         # library_service.py: update_song -> repo.update(song)
         
         # So flow is: Insert (Create ID) -> Update (Save Metadata)
-        song.file_id = file_id
+        song.source_id = file_id
         repo.update(song)
         
         # Fetch back

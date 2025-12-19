@@ -22,6 +22,7 @@ class TestMainWindow:
             mock_settings.get_volume.return_value = 50
             mock_settings.get_last_playlist.return_value = []
             mock_settings.get_last_import_directory.return_value = None
+            mock_settings.get_type_filter.return_value = 0
 
             mock_library = MagicMock()
             mock_library_cls.return_value = mock_library
@@ -221,8 +222,8 @@ class TestMainWindow:
         mock_title.text.return_value = "Title"
         
         def item_side_effect(row, col):
-            if col == 4: return mock_path_item
-            if col == 1: return mock_performer
+            if col == 9: return mock_path_item
+            if col == 3: return mock_performer
             if col == 2: return mock_title
             return None
             
@@ -277,7 +278,7 @@ class TestMainWindow:
         # Verify root item via widget model
         model = main_window.library_widget.filter_widget.tree_model
         root = model.item(0)
-        assert root.text() == "Performers"
+        assert root.text() == "Artist"
         assert root.hasChildren()
         
         # Check A group

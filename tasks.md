@@ -26,11 +26,12 @@
 
 | ID | Task | Layer | Score | Status | Spec |
 |----|------|-------|-------|--------|------|
-| T-01 | Type Tabs | UI | 15 | 🟢 Next | [spec](design/issues/T-01_type_tabs.md) |
-| T-02 | Field Registry | Core | 10 | 🟡 Planned | [spec](design/issues/T-02_field_registry.md) |
+| T-01 | Type Tabs | UI | 15 | ✅ Done | [spec](design/issues/T-01_type_tabs.md) |
+| T-02 | Field Registry | Core | 10 | ✅ Done | [spec](design/issues/T-02_field_registry.md) |
 | T-03 | Inline Edit | UI | 8 | 🟡 Planned | [spec](design/issues/T-03_inline_edit.md) |
-| T-04 | Test Audit | Core | 8 | 🟡 Planned | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
+| T-04 | Test Audit | Core | 8 | 🟢 In Progress | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
 | T-05 | Log Core | Core | 8 | 🟡 Planned | [spec](design/issues/T-05_log_core.md) |
+| T-06 | Legacy Sync | Data | 12 | 🟢 Next | design/LEGACY_LOGIC.md |
 
 ---
 
@@ -46,6 +47,8 @@
 | T-15 | Column Customization | UI | 8 | 📋 | — | [spec](design/issues/T-15_column_customization.md) |
 | T-16 | Advanced Search | UI | 9 | 📋 | — | GitHub #10 |
 | T-17 | Splashscreen | UI | 10 | 📋 | — | GitHub #11 |
+| T-18 | Smart Paste | UI | 7 | 📋 | T-12 Side Panel | design/LEGACY_LOGIC.md |
+| T-19 | Import Wizard | UI | 9 | 📋 | — | design/LEGACY_LOGIC.md |
 
 ---
 
@@ -75,11 +78,13 @@
 
 ## ✅ Completed
 
+- Field Registry (Yellberus)
 - Schema Migration (MVP)
 - Drag & Drop Import (Issue #8)
 - Settings Manager Centralization (Issue #9)
 - Main Window Elements (Issue #1)
 - Database Schema (Issue #4)
+- Type Tabs (Issue #12)
 
 ---
 

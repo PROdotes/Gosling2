@@ -81,13 +81,13 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching FIELDS order (13 columns)
-    row = (1, 1, "Title", "Artist", "Composer", None, None, 180, "/path", 2024, 120, False, "ISRC")
+    # Create a mock row matching FIELDS order (14 columns)
+    row = (1, 1, "Title", "Artist", "Composer", None, None, "G1, G2", 180, "/path", 2024, 120, False, "ISRC")
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 13 tuples
-    assert len(tagged) == 13
+    # Should have 14 tuples
+    assert len(tagged) == 14
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -101,7 +101,7 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    row = (1, 1, "Test Song", "Artist 1, Artist 2", "Bach", None, None, 200, "/music/test.mp3", 2024, 128, True, "USMV123")
+    row = (1, 1, "Test Song", "Artist 1, Artist 2", "Bach", None, None, "Group A", 200, "/music/test.mp3", 2024, 128, True, "USMV123")
     
     song = Song.from_row(row)
     

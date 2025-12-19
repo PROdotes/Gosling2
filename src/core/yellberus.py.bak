@@ -109,8 +109,8 @@ FIELDS: List[FieldDef] = [
         visible=False,
         editable=False,
         required=True,
-        portable=False,
         model_attr="source_id",
+        portable=False,  # Local-only: database ID
     ),
     FieldDef(
         name="type_id",
@@ -120,35 +120,36 @@ FIELDS: List[FieldDef] = [
         visible=False,
         editable=False,
         filterable=True,
-        portable=False,
+        portable=False,  # Local-only: type classification
     ),
     FieldDef(
         name="title",
         ui_header="Title",
         db_column="MS.Name",
-        searchable=True,
         required=True,
         min_length=1,
+        searchable=True,
+        filterable=False,
     ),
     FieldDef(
         name="performers",
         ui_header="Artist",
-        db_column="Performers",
+        db_column="Performers", 
         field_type=FieldType.LIST,
-        filterable=True,
-        searchable=True,
         required=True,
         min_length=1,
+        filterable=True,
+        searchable=True,
     ),
     FieldDef(
         name="composers",
         ui_header="Composer",
         db_column="Composers",
         field_type=FieldType.LIST,
-        filterable=True,
-        searchable=True,
         required=True,
         min_length=1,
+        filterable=True,
+        searchable=True,
     ),
     FieldDef(
         name="lyricists",
@@ -180,8 +181,8 @@ FIELDS: List[FieldDef] = [
         db_column="MS.Duration",
         field_type=FieldType.DURATION,
         required=True,
-        portable=False,
         min_value=30,
+        portable=False,  # Local-only: calculated from audio stream
     ),
     FieldDef(
         name="path",
@@ -190,16 +191,16 @@ FIELDS: List[FieldDef] = [
         visible=False,
         editable=False,
         required=True,
-        portable=False,
         model_attr="source",
+        portable=False,  # Local-only: filesystem path
     ),
     FieldDef(
         name="recording_year",
         ui_header="Year",
         db_column="S.RecordingYear",
         field_type=FieldType.INTEGER,
-        filterable=True,
         required=True,
+        filterable=True,
         grouping_function=decade_grouper,
     ),
     FieldDef(
@@ -207,8 +208,8 @@ FIELDS: List[FieldDef] = [
         ui_header="BPM",
         db_column="S.TempoBPM",
         field_type=FieldType.INTEGER,
-        filterable=True,
         min_value=0,
+        filterable=True,
         filter_type="range",
     ),
     FieldDef(
@@ -217,8 +218,8 @@ FIELDS: List[FieldDef] = [
         db_column="S.IsDone",
         field_type=FieldType.BOOLEAN,
         filterable=True,
-        portable=False,
         filter_type="boolean",
+        portable=False,  # Local-only: station-specific status
     ),
     FieldDef(
         name="isrc",

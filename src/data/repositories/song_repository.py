@@ -82,11 +82,12 @@ class SongRepository(BaseRepository):
 
                 # 2. Update Songs (Extended info)
                 # Note: Created helper query to ensure record exists if it was manually messed with
+                groups_str = ",".join(song.groups) if song.groups else None
                 cursor.execute("""
                     UPDATE Songs
-                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?
+                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, Groups = ?, IsDone = ?
                     WHERE SourceID = ?
-                """, (song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, song.source_id))
+                """, (song.bpm, song.recording_year, song.isrc, groups_str, 1 if song.is_done else 0, song.source_id))
 
                 # 3. Clear existing contributor roles
                 cursor.execute(
@@ -216,7 +217,7 @@ class SongRepository(BaseRepository):
                 
                 # Fetch basic info from JOIN
                 cursor.execute("""
-                    SELECT MS.SourceID, MS.Name, MS.Duration, S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone
+                    SELECT MS.SourceID, MS.Name, MS.Duration, S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.Source = ?
@@ -226,7 +227,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int, groups_str = row
                 
                 # Fetch contributors
                 song = Song(
@@ -237,7 +238,8 @@ class SongRepository(BaseRepository):
                     bpm=bpm,
                     recording_year=recording_year,
                     isrc=isrc,
-                    is_done=bool(is_done_int)
+                    is_done=bool(is_done_int),
+                    groups=[g.strip() for g in groups_str.split(',')] if groups_str else []
                 )
                 
                 # Fetch roles

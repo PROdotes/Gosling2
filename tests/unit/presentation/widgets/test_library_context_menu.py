@@ -35,11 +35,14 @@ class TestLibraryContextMenu:
         """Helper to setup table with items having specific IsDone status"""
         widget.library_model.clear()
         
+        idx_id = widget.field_indices['file_id']
+        idx_done = widget.field_indices['is_done']
+        
         for i, is_done in enumerate(status_list):
             items = []
-            for col in range(13):
+            for col in range(14):
                 text = f"Item {col}"
-                if col == 0: # ID
+                if col == idx_id: # ID
                     text = str(i+100)
                 
                 item = QStandardItem(text)
@@ -47,12 +50,12 @@ class TestLibraryContextMenu:
                 item.setData(text, Qt.ItemDataRole.UserRole)
                 items.append(item)
             
-            # Setup IsDone (col 11) - Override CheckState
-            items[11].setCheckable(True)
+            # Setup IsDone - Override CheckState
+            items[idx_done].setCheckable(True)
             check_state = Qt.CheckState.Checked if is_done else Qt.CheckState.Unchecked
-            items[11].setCheckState(check_state)
+            items[idx_done].setCheckState(check_state)
             # Ensure IsDone UserRole matches boolean for completeness check if needed
-            items[11].setData(is_done, Qt.ItemDataRole.UserRole)
+            items[idx_done].setData(is_done, Qt.ItemDataRole.UserRole)
             
             widget.library_model.appendRow(items)
             

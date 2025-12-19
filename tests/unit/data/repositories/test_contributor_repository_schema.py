@@ -21,8 +21,8 @@ def test_get_by_role_schema_integrity(tmp_path):
             query = """
                 SELECT DISTINCT C.ContributorID, C.Name
                 FROM Contributors C
-                JOIN FileContributorRoles FCR ON C.ContributorID = FCR.ContributorID
-                JOIN Roles R ON FCR.RoleID = R.RoleID
+                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                JOIN Roles R ON MSCR.RoleID = R.RoleID
                 WHERE R.Name = ?
                 ORDER BY C.SortName ASC
             """

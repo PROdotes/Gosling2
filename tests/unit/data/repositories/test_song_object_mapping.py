@@ -21,29 +21,34 @@ def test_song_object_mapping_integrity(tmp_path):
     
     with repo.get_connection() as conn:
         cursor = conn.cursor()
-        # Insert File
+        
+        # 1. Insert into MediaSources
         cursor.execute(
-            "INSERT INTO Files (Path, Title, Duration, TempoBPM) VALUES (?, ?, ?, ?)",
-            (norm_path, "Full Title", 123.45, 140)
+            "INSERT INTO MediaSources (TypeID, Name, Source, Duration, IsActive) VALUES (?, ?, ?, ?, ?)",
+            (1, "Full Title", norm_path, 123.45, 1)
         )
-        file_id = cursor.lastrowid
+        source_id = cursor.lastrowid
+        
+        # 2. Insert into Songs
+        cursor.execute(
+            "INSERT INTO Songs (SourceID, TempoBPM) VALUES (?, ?)",
+            (source_id, 140)
+        )
         
         # Insert Contributors & Roles
-        # We need to ensure Performers, Composers, etc are mapped
         # Performer
-        cursor.execute("INSERT INTO Contributors (Name) VALUES (?)", ("Perf One",))
+        cursor.execute("INSERT INTO Contributors (Name, SortName) VALUES (?, ?)", ("Perf One", "Perf One"))
         perf_id = cursor.lastrowid
-        # Role 'Performer' already exists from BaseRepository setup
         cursor.execute("SELECT RoleID FROM Roles WHERE Name='Performer'")
         perf_role_id = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO FileContributorRoles VALUES (?, ?, ?)", (file_id, perf_id, perf_role_id))
+        cursor.execute("INSERT INTO MediaSourceContributorRoles VALUES (?, ?, ?)", (source_id, perf_id, perf_role_id))
         
         # Composer
-        cursor.execute("INSERT INTO Contributors (Name) VALUES (?)", ("Comp One",))
+        cursor.execute("INSERT INTO Contributors (Name, SortName) VALUES (?, ?)", ("Comp One", "Comp One"))
         comp_id = cursor.lastrowid
         cursor.execute("SELECT RoleID FROM Roles WHERE Name='Composer'")
         comp_role_id = cursor.fetchone()[0]
-        cursor.execute("INSERT INTO FileContributorRoles VALUES (?, ?, ?)", (file_id, comp_id, comp_role_id))
+        cursor.execute("INSERT INTO MediaSourceContributorRoles VALUES (?, ?, ?)", (source_id, comp_id, comp_role_id))
         
     # Act
     song = repo.get_by_path(test_path)
@@ -52,9 +57,9 @@ def test_song_object_mapping_integrity(tmp_path):
     assert song is not None
     
     # Explicit Field Checks (The "Mapping" Verification)
-    assert song.file_id == file_id, "file_id not mapped"
-    assert song.path == norm_path, "path not mapped"
-    assert song.title == "Full Title", "title not mapped"
+    assert song.source_id == source_id, "source_id not mapped"
+    assert song.source == norm_path, "source not mapped"
+    assert song.name == "Full Title", "name not mapped"
     assert song.duration == 123.45, "duration not mapped"
     assert song.bpm == 140, "bpm not mapped"
     assert "Perf One" in song.performers, "performers not mapped"

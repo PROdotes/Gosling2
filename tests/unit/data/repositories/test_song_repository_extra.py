@@ -11,8 +11,8 @@ class TestSongRepositoryExtra:
 
     def test_sync_contributor_role_defensive_check(self, repository):
         """Test the defensive check 'if not contributor_row' in sync_contributor_roles"""
-        file_id = 1
-        song = Song(file_id=file_id, title="Defensive", performers=["Ghost"])
+        source_id = 1
+        song = Song(source_id=source_id, name="Defensive", performers=["Ghost"])
         
         mock_cursor = MagicMock()
         mock_connection = MagicMock()
@@ -41,5 +41,5 @@ class TestSongRepositoryExtra:
             assert has_select
             
             # Check for INSERT INTO song_contributors (Link) - Should be FALSE
-            has_link = any("INSERT INTO FileContributorRoles" in c for c in input_calls)
+            has_link = any("INSERT INTO MediaSourceContributorRoles" in c for c in input_calls)
             assert not has_link
