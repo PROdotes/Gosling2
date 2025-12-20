@@ -4,7 +4,7 @@ Parser for extracting FieldDef entries from yellberus.py using AST.
 
 import ast
 from dataclasses import dataclass, field
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from pathlib import Path
 
 
@@ -29,6 +29,7 @@ class FieldSpec:
     min_length: Optional[int] = None
     filter_type: Optional[str] = None
     grouping_function: Optional[str] = None
+    extra_attributes: Dict[str, Any] = field(default_factory=dict)
 
 
 # Default values for FieldDef (fallback if parsing fails)
@@ -166,6 +167,9 @@ def _parse_fielddef_call(call_node: ast.Call) -> Optional[FieldSpec]:
             # Store function name as string
             if isinstance(keyword.value, ast.Name):
                 spec.grouping_function = keyword.value.id
+        else:
+            # Preserve unknown attributes (e.g. query_expression)
+            spec.extra_attributes[key] = value
     
     return spec if spec.name else None
 
@@ -371,8 +375,19 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
         if f.min_value is not None: new_code_lines.append(f'        min_value={f.min_value},')
         if f.max_value is not None: new_code_lines.append(f'        max_value={f.max_value},')
         if f.min_length is not None: new_code_lines.append(f'        min_length={f.min_length},')
+
         if f.filter_type: new_code_lines.append(f'        filter_type="{f.filter_type}",')
         if f.grouping_function: new_code_lines.append(f'        grouping_function={f.grouping_function},')
+        
+        # Write extra preserved attributes
+        for k, v in f.extra_attributes.items():
+            if isinstance(v, str):
+                # Use repr to handle quoting correctly, but maybe strip outer quotes if you want specific style?
+                # Actually, repr() adds quotes. Existing code adds quotes manually: name="{f.name}".
+                # For safety and ensuring valid python syntax for arbitrary strings:
+                new_code_lines.append(f'        {k}={repr(v)},')
+            else:
+                new_code_lines.append(f'        {k}={v},')
         
         new_code_lines.append("    ),")
         

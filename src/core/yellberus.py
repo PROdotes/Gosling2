@@ -46,36 +46,13 @@ class FieldDef:
     # Mapping
     model_attr: Optional[str] = None  # Song model property (defaults to name)
     portable: bool = True
+    
+    # Query generation
+    query_expression: Optional[str] = None  # Full SQL expression (for GROUP_CONCAT etc). If None, uses db_column.
 
 # ==================== THE REGISTRY ====================
 
-# Base Query Template
-# This acts as the canonical SELECT statement for retrieving these fields.
-# Repositories should append JOINs and WHERE clauses as needed, but try to use this structure.
-# ORDER MUST MATCH 'FIELDS' LIST EXACTLY!
-# Base Query Parts
-# Use these to construct queries with custom WHERE clauses while maintaining column consistency.
-
-QUERY_SELECT = """
-    SELECT 
-        MS.SourceID,
-        MS.TypeID,
-        MS.Name,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Lyricist' THEN C.Name END, ', ') AS Lyricists,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Producer' THEN C.Name END, ', ') AS Producers,
-        S.Groups,
-        MS.Duration,
-        MS.Source,
-        S.RecordingYear,
-        S.TempoBPM,
-        S.IsDone,
-        S.ISRC,
-        MS.Notes,
-        MS.IsActive
-    """
-
+# Query parts (FROM, WHERE, GROUP BY are static; SELECT is generated from FIELDS)
 QUERY_FROM = """
     FROM MediaSources MS
     JOIN Songs S ON MS.SourceID = S.SourceID
@@ -87,9 +64,6 @@ QUERY_FROM = """
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
 
 QUERY_GROUP_BY = "GROUP BY MS.SourceID"
-
-# The Canonical Query (Standard Access)
-BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
 
 # Helper to group years into decades
 def decade_grouper(year: Any) -> str:
@@ -183,6 +157,7 @@ FIELDS: List[FieldDef] = [
         searchable=True,
         required=False,
         portable=True,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Producer' THEN C.Name END, ', ') AS Producers",
     ),
     FieldDef(
         name="lyricists",
@@ -195,18 +170,7 @@ FIELDS: List[FieldDef] = [
         searchable=True,
         required=False,
         portable=True,
-    ),
-    FieldDef(
-        name="groups",
-        ui_header="Groups",
-        db_column="S.Groups",
-        field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=True,
-        required=False,
-        portable=True,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Lyricist' THEN C.Name END, ', ') AS Lyricists",
     ),
     FieldDef(
         name="duration",
@@ -285,7 +249,9 @@ FIELDS: List[FieldDef] = [
         required=True,
         portable=True,
         min_length=1,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers",
     ),
+
     FieldDef(
         name="composers",
         ui_header="Composer",
@@ -298,8 +264,31 @@ FIELDS: List[FieldDef] = [
         required=True,
         portable=True,
         min_length=1,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers",
     ),
 ]
+
+# ==================== QUERY GENERATION ====================
+
+def build_query_select() -> str:
+    """
+    Generate SELECT clause from FIELDS list.
+    Uses query_expression if defined, otherwise uses db_column.
+    This ensures QUERY_SELECT always matches FIELDS order.
+    """
+    columns = []
+    for f in FIELDS:
+        if f.query_expression:
+            columns.append(f.query_expression)
+        else:
+            columns.append(f.db_column)
+    return "SELECT \n        " + ",\n        ".join(columns)
+
+# Generate QUERY_SELECT from FIELDS (single source of truth)
+QUERY_SELECT = build_query_select()
+
+# The Canonical Query (Standard Access)
+BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
 
 # ==================== HELPERS ====================
 
@@ -330,8 +319,8 @@ def yell(message: str) -> None:
     Report a schema or mapping error.
     Called by Song when it can't map a value.
     """
-    # For now, just print. Could raise, log to file, etc.
-    print(f"🐕‍🦺 YELLBERUS: {message}")
+    from . import logger
+    logger.dev_warning(f"YELLBERUS: {message}")
 
 def validate_schema() -> None:
     """
@@ -457,3 +446,41 @@ def row_to_tagged_tuples(row: tuple) -> list:
             result.append((value, f"_{field.name}"))
     
     return result
+
+
+def check_db_integrity(cursor) -> None:
+    """
+    Runtime check: Compare DB schema against FIELDS registry.
+    Yells if there are orphan columns in the database.
+    """
+    # 1. Gather all expected columns from Yellberus
+    yellberus_cols = set()
+    for f in FIELDS:
+        # DB column might be 'MS.Name' or 'Producers' or 'S.BPM'
+        col = f.db_column
+        if '.' in col:
+            col = col.split('.')[1]
+        yellberus_cols.add(col)
+        
+    # 2. Check Tables
+    # Valid columns that are in DB but intentionally not in Yellberus yet
+    known_ignored = {
+        'Notes',  # Not yet fully implemented
+    }
+    
+    for table in ['MediaSources', 'Songs']:
+        try:
+            cursor.execute(f"PRAGMA table_info({table})")
+            rows = cursor.fetchall()
+            if not rows:
+                continue
+                
+            db_cols = {row[1] for row in rows}
+            orphans = db_cols - yellberus_cols - known_ignored
+            
+            if orphans:
+                for o in orphans:
+                    yell(f"Orphan column in {table} detected: '{o}' (Exists in DB but not in Registry)")
+                    
+        except Exception as e:
+            yell(f"Integrity check failed: {e}")

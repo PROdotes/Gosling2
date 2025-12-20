@@ -53,19 +53,8 @@ class TestSettingsManager:
         assert height == 800
 
     # ===== Library Settings Tests =====
-
-    def test_column_visibility_get_set(self, settings_manager):
-        """Test getting and setting column visibility"""
-        visibility = {"0": True, "1": False, "2": True}
-        
-        settings_manager.set_column_visibility(visibility)
-        retrieved = settings_manager.get_column_visibility()
-        
-        assert retrieved == visibility
-
-    def test_column_visibility_empty_when_not_set(self, settings_manager):
-        """Test that column visibility returns empty dict when not set"""
-        assert settings_manager.get_column_visibility() == {}
+    # Note: get/set_column_visibility was replaced by get/set_column_layout
+    # Those tests are in the "New Column Layout Tests" section below
 
     # ===== New Column Layout Tests =====
     

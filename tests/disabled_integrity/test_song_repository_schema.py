@@ -44,12 +44,18 @@ def test_get_all_schema_integrity(tmp_path):
             "Notes": "Notes",
             "ISRC": "ISRC",
             "IsDone": "IsDone",
-            "Groups": "Groups"
         }
         
+        # Columns intentionally excluded from Yellberus (pending implementation)
+        excluded_columns = {"Groups"}
+        
         # 4. Verify Coverage
-        # Every column in Files table MUST be represented in Repo Headers
+        # Every column in Files table MUST be represented in Repo Headers (unless excluded)
         for db_col in db_columns:
+            # Skip intentionally excluded columns
+            if db_col in excluded_columns:
+                continue
+                
             # Check direct match
             if db_col in repo_columns_set:
                 continue

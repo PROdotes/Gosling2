@@ -84,10 +84,11 @@ class TestDatabaseSchemaIntegrity:
                 col = field.db_column
             yellberus_columns.add(col)
         
-        # Columns that are intentionally not in Yellberus
+        # Columns that are intentionally not in Yellberus (yet)
         ignored_columns = {
-            'IsActive',  # Filter condition, not a field
+            'IsActive',  # Filter condition, not exposed as field
             'Notes',     # Future field
+            'Groups',    # Temporarily removed - deciding on implementation
         }
         
         # Check MediaSources

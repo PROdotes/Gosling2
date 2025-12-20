@@ -1,101 +1,103 @@
+
+---
+tags:
+  - type/index
+  - status/active
+links: []
+---
 # Gosling2 Task Registry
-
-> **Score** = Priority × (6 - Complexity) — Higher = better value
-
----
-
-## 🎯 What's Next
-
-> **T-01: Type Tabs** — Filter library by content type (Music/Jingles/Commercials)  
-> [Spec](design/issues/T-01_type_tabs.md) · Layer: UI · Score: 15
-
----
 
 ## 📍 Current State
 
 | Area | Status |
 |------|--------|
-| Schema Migration | ✅ MediaSources/Songs (MVP) |
-| Drag & Drop Import | ✅ Complete |
-| Settings Manager | ✅ Centralized |
-| Schema Integrity | ✅ 9 Layers active |
+| **Schema Awareness** | ⏸️ Paused (9-layer silenced for Migration) |
+| **Schema Migration** | ✅ MediaSources/Songs (MVP) |
+| **Drag & Drop Import** | ✅ Complete (Issue #8) |
+| **Metadata Write** | ✅ 28 tests passing |
+| **Settings Manager** | ✅ Centralized with DI |
+| **Logging System** | ✅ Centralized (T-07 Implemented) |
 
 ---
 
-## 🟢 Active Development
+## 🎯 Priority Matrix
 
-| ID | Task | Layer | Score | Status | Spec |
-|----|------|-------|-------|--------|------|
-| T-01 | Type Tabs | UI | 15 | ✅ Done | [spec](design/issues/T-01_type_tabs.md) |
-| T-02 | Field Registry | Core | 10 | ✅ Done | [spec](design/issues/T-02_field_registry.md) |
-| T-03 | Inline Edit | UI | 8 | 🟡 Planned | [spec](design/issues/T-03_inline_edit.md) |
-| T-04 | Test Audit | Core | 8 | 🟢 In Progress | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
-| T-05 | Log Core | Core | 8 | 🟡 Planned | [spec](design/issues/T-05_log_core.md) |
-| T-06 | Legacy Sync | Data | 12 | 🟢 Next | design/LEGACY_LOGIC.md |
+> **Score** = Priority × (6 - Complexity) — Higher = better value
 
----
+### Quick Wins (Score ≥10)
+| ID | Task | Pri | Cmplx | Score | Status | Spec |
+|----|------|-----|-------|-------|--------|------|
+| T-04 | **Test Audit** | 5 | 3 | 10 | 🚀 (Next) | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
+| T-06 | **Legacy Sync** | 5 | 1 | 20 | 🟢 | [design/LEGACY_LOGIC.md](design/LEGACY_LOGIC.md) |
+| T-01 | **Type Tabs** | 3 | 1 | 15 | ✅ | [spec](design/issues/T-01_type_tabs.md) |
+| — | **Completeness Check** | 3 | 1 | 15 | ✅ | — |
+| T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [spec](design/issues/T-02_field_registry.md) |
 
-## 🟡 Planned (Queued)
+### Foundation Work
+| ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
+|----|------|-----|-------|-------|--------|------------|------|
+| — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
+| T-05 | **Log Core** | 4 | 2 | 8 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
+| T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
+| T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [design/LOGGING.md](design/LOGGING.md) |
 
-| ID | Task | Layer | Score | Status | Blocked By | Spec |
-|----|------|-------|-------|--------|------------|------|
-| T-10 | Basic Chips | UI | 6 | 📋 | — | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
-| T-11 | View Modes | UI | 6 | 📋 | Type Tabs | [spec](design/proposals/PROPOSAL_LIBRARY_VIEWS.md) |
-| T-12 | Side Panel | UI | 8 | 📋 | Field Registry | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
-| T-13 | Undo Core | Core | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
-| T-14 | Smart Chips | UI | 6 | 📋 | Basic Chips | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
-| T-15 | Column Customization | UI | 8 | 📋 | — | [spec](design/issues/T-15_column_customization.md) |
-| T-16 | Advanced Search | UI | 9 | 📋 | — | GitHub #10 |
-| T-17 | Splashscreen | UI | 10 | 📋 | — | GitHub #11 |
-| T-18 | Smart Paste | UI | 7 | 📋 | T-12 Side Panel | design/LEGACY_LOGIC.md |
-| T-19 | Import Wizard | UI | 9 | 📋 | — | design/LEGACY_LOGIC.md |
+### Feature Work
+| ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
+|----|------|-----|-------|-------|--------|------------|------|
+| T-12 | **Side Panel** | 5 | 3 | 10 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
+| T-03 | **Inline Edit** | 4 | 2 | 8 | 📋 | — | [spec](design/issues/T-03_inline_edit.md) |
+| T-10 | **Basic Chips** | 3 | 2 | 6 | 📋 | — | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
+| T-11 | **View Modes** | 3 | 4 | 6 | 📋 | Type Tabs | [spec](design/proposals/PROPOSAL_LIBRARY_VIEWS.md) |
+| T-14 | **Smart Chips** | 3 | 3 | 6 | 📋 | Basic Chips | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
+| T-16 | **Advanced Search** | 3 | 3 | 9 | 📋 | — | GitHub #10 |
 
----
-
-## ⏸️ Deferred (Heavy Lift)
-
-| ID | Task | Layer | Score | Blocked By | Spec |
-|----|------|-------|-------|------------|------|
-| T-20 | Bulk Edit | UI | 8 | Side Panel | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
-| T-21 | Saved Playlists | Data | 8 | — | [spec](design/proposals/PROPOSAL_PLAYLISTS.md) |
-| T-22 | Albums | Data | 8 | — | [spec](design/proposals/PROPOSAL_ALBUMS.md) |
-| T-23 | Filter Trees | UI | 6 | — | [spec](design/proposals/PROPOSAL_FILTER_TREES.md) |
-| T-24 | Renaming Service | Core | 8 | Field Registry | [spec](design/proposals/PROPOSAL_RENAMING_SERVICE.md) |
-| T-25 | PlayHistory | Data | 9 | Log Core | DATABASE.md |
-| T-26 | Audit UI | UI | 6 | Relational Logging | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
-
----
-
-## 🔮 Future (Far Out)
-
-| ID | Task | Layer | Notes | Spec |
-|----|------|-------|-------|------|
-| T-30 | Broadcast Automation | Core | Needs everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
-| T-31 | On-Air UI | UI | After automation | [spec](design/proposals/PROPOSAL_ONAIR_UI.md) |
-| T-32 | More Ideas | — | — | [WISHLIST](design/WISHLIST.md) |
+### Heavy Lift (Defer)
+| ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
+|----|------|-----|-------|-------|--------|------------|------|
+| T-20 | **Bulk Edit** | 4 | 4 | 8 | ⏸️ | Side Panel | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
+| T-21 | **Saved Playlists** | 4 | 3 | 8 | 📋 | — | [spec](design/proposals/PROPOSAL_PLAYLISTS.md) |
+| — | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
+| T-26 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
+| T-22 | **Albums** | 4 | 4 | 8 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_ALBUMS.md) |
+| T-23 | **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_FILTER_TREES.md) |
+| T-24 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry | [spec](design/proposals/PROPOSAL_RENAMING_SERVICE.md) |
+| T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core | DATABASE.md |
+| T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
 
 ---
 
-## ✅ Completed
+## 🚀 The Golden Path (v2.2)
 
-- Field Registry (Yellberus)
-- Schema Migration (MVP)
-- Drag & Drop Import (Issue #8)
-- Settings Manager Centralization (Issue #9)
-- Main Window Elements (Issue #1)
-- Database Schema (Issue #4)
-- Type Tabs (Issue #12)
-
----
-
-## 🚀 The Golden Path
+> **Revised**: Tests must be hardened (dynamic) BEFORE schema expansion (Migration) to avoid breaking.
 
 ```
-TRACK A (UI):   Type Tabs ──► Inline Edit ──► Side Panel ──► Bulk Edit
-                    🏷️           ✏️              📋            📝
+ TRACK A (Data):   Item Cleaning ──► Legacy Sync ──► Log+Undo
+                       🧹             💾             📜
+                   [Immediate]       [Next]         [Soon]
 
-TRACK B (Core): Field Registry ──► Test Audit ──► Log+Undo
-                    🏗️               🧹             📜
+ TRACK B (UI):     Side Panel ──► Inline Edit ──► Bulk Edit
+                       📋              ✏️             📝
+                   [Blocked]       [Parallel]      [Later]
+
+                   ✅ Field Editor — DONE
 ```
 
-**Crossover:** Side Panel requires Field Registry (Track B step 1)
+### Track A: Data Integrity (Critical Path)
+1. **Item Cleaning** — Ensure all items are robust (Logging/Fields).
+2. **Legacy Sync** — Add Album, Genre, Publisher.
+3. **Log Core** — Add history tracking.
+
+### Track B: User Experience (UI)
+1. **Side Panel** — Requires Legacy Sync data.
+2. **Inline Edit** — Can proceed in parallel.
+3. **Bulk Edit** — Dependent on Side Panel logic.
+
+---
+
+## 📚 Reference Docs
+
+| Doc | Purpose |
+|-----|---------|
+| [DATABASE.md](design/DATABASE.md) | Schema governance |
+| [TESTING.md](TESTING.md) | 9-layer yelling |
+| [LOGGING.md](design/LOGGING.md) | Logging Architecture |

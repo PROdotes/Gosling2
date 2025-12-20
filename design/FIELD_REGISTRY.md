@@ -17,7 +17,6 @@
 | `is_active` | Active | MS.IsActive | BOOLEAN | Yes | Yes | No | No | No | — |
 | `producers` | Producer | Producers | LIST | Yes | Yes | Yes | No | Yes | TIPL |
 | `lyricists` | Lyricist | Lyricists | LIST | Yes | Yes | Yes | No | Yes | TEXT |
-| `groups` | Groups | S.Groups | LIST | Yes | Yes | Yes | No | Yes | TIT1 |
 | `duration` | Duration | MS.Duration | DURATION | Yes | No | No | Yes | No | TLEN |
 | `title` | Title | MS.Name | TEXT | Yes | No | Yes | Yes | Yes | TIT2 |
 | `is_done` | Status | S.IsDone | BOOLEAN | Yes | Yes | No | No | No | — |
@@ -26,7 +25,7 @@
 | `performers` | Artist | Performers | LIST | Yes | Yes | Yes | Yes | Yes | TPE1 |
 | `composers` | Composer | Composers | LIST | Yes | Yes | Yes | Yes | Yes | TCOM |
 
-**Total: 16 fields**
+**Total: 15 fields**
 
 ---
 

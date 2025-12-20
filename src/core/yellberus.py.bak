@@ -46,36 +46,13 @@ class FieldDef:
     # Mapping
     model_attr: Optional[str] = None  # Song model property (defaults to name)
     portable: bool = True
+    
+    # Query generation
+    query_expression: Optional[str] = None  # Full SQL expression (for GROUP_CONCAT etc). If None, uses db_column.
 
 # ==================== THE REGISTRY ====================
 
-# Base Query Template
-# This acts as the canonical SELECT statement for retrieving these fields.
-# Repositories should append JOINs and WHERE clauses as needed, but try to use this structure.
-# ORDER MUST MATCH 'FIELDS' LIST EXACTLY!
-# Base Query Parts
-# Use these to construct queries with custom WHERE clauses while maintaining column consistency.
-
-QUERY_SELECT = """
-    SELECT 
-        MS.SourceID,
-        MS.TypeID,
-        MS.Name,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Lyricist' THEN C.Name END, ', ') AS Lyricists,
-        GROUP_CONCAT(CASE WHEN R.Name = 'Producer' THEN C.Name END, ', ') AS Producers,
-        S.Groups,
-        MS.Duration,
-        MS.Source,
-        S.RecordingYear,
-        S.TempoBPM,
-        S.IsDone,
-        S.ISRC,
-        MS.Notes,
-        MS.IsActive
-    """
-
+# Query parts (FROM, WHERE, GROUP BY are static; SELECT is generated from FIELDS)
 QUERY_FROM = """
     FROM MediaSources MS
     JOIN Songs S ON MS.SourceID = S.SourceID
@@ -88,9 +65,6 @@ QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
 
 QUERY_GROUP_BY = "GROUP BY MS.SourceID"
 
-# The Canonical Query (Standard Access)
-BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
-
 # Helper to group years into decades
 def decade_grouper(year: Any) -> str:
     try:
@@ -102,68 +76,6 @@ def decade_grouper(year: Any) -> str:
 # NOTE: The order of this list MUST match the columns in BASE_QUERY!
 FIELDS: List[FieldDef] = [
     FieldDef(
-        name="type_id",
-        ui_header="Type",
-        db_column="MS.TypeID",
-        field_type=FieldType.INTEGER,
-        visible=False,
-        editable=False,
-        filterable=True,
-        searchable=False,
-        required=False,
-        portable=False,
-    ),
-    FieldDef(
-        name="title",
-        ui_header="Title",
-        db_column="MS.Name",
-        visible=True,
-        editable=True,
-        filterable=False,
-        searchable=True,
-        required=True,
-        portable=True,
-        min_length=1,
-    ),
-    FieldDef(
-        name="recording_year",
-        ui_header="Year",
-        db_column="S.RecordingYear",
-        field_type=FieldType.INTEGER,
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=True,
-        portable=True,
-        grouping_function=decade_grouper,
-    ),
-    FieldDef(
-        name="producers",
-        ui_header="Producer",
-        db_column="Producers",
-        field_type=FieldType.LIST,
-        visible=False,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=False,
-        portable=True,
-    ),
-    FieldDef(
-        name="performers",
-        ui_header="Artist",
-        db_column="Performers",
-        field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=True,
-        portable=True,
-        min_length=1,
-    ),
-    FieldDef(
         name="path",
         ui_header="Path",
         db_column="MS.Source",
@@ -174,77 +86,6 @@ FIELDS: List[FieldDef] = [
         required=True,
         portable=False,
         model_attr="source",
-    ),
-    FieldDef(
-        name="notes",
-        ui_header="Notes",
-        db_column="MS.Notes",
-        visible=False,
-        editable=True,
-        filterable=False,
-        searchable=False,
-        required=False,
-        portable=False,
-    ),
-    FieldDef(
-        name="lyricists",
-        ui_header="Lyricist",
-        db_column="Lyricists",
-        field_type=FieldType.LIST,
-        visible=False,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=False,
-        portable=True,
-    ),
-    FieldDef(
-        name="isrc",
-        ui_header="ISRC",
-        db_column="S.ISRC",
-        visible=False,
-        editable=True,
-        filterable=False,
-        searchable=False,
-        required=False,
-        portable=True,
-    ),
-    FieldDef(
-        name="is_done",
-        ui_header="Status",
-        db_column="S.IsDone",
-        field_type=FieldType.BOOLEAN,
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=False,
-        portable=False,
-        filter_type="boolean",
-    ),
-    FieldDef(
-        name="is_active",
-        ui_header="Active",
-        db_column="MS.IsActive",
-        field_type=FieldType.BOOLEAN,
-        visible=False,
-        editable=True,
-        filterable=False,
-        searchable=False,
-        required=False,
-        portable=False,
-    ),
-    FieldDef(
-        name="groups",
-        ui_header="Groups",
-        db_column="S.Groups",
-        field_type=FieldType.LIST,
-        visible=False,
-        editable=True,
-        filterable=True,
-        searchable=False,
-        required=False,
-        portable=True,
     ),
     FieldDef(
         name="file_id",
@@ -260,6 +101,78 @@ FIELDS: List[FieldDef] = [
         model_attr="source_id",
     ),
     FieldDef(
+        name="type_id",
+        ui_header="Type",
+        db_column="MS.TypeID",
+        field_type=FieldType.INTEGER,
+        visible=False,
+        editable=False,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=False,
+    ),
+    FieldDef(
+        name="notes",
+        ui_header="Notes",
+        db_column="MS.Notes",
+        visible=True,
+        editable=True,
+        filterable=False,
+        searchable=True,
+        required=False,
+        portable=False,
+    ),
+    FieldDef(
+        name="isrc",
+        ui_header="ISRC",
+        db_column="S.ISRC",
+        visible=True,
+        editable=True,
+        filterable=False,
+        searchable=True,
+        required=False,
+        portable=True,
+    ),
+    FieldDef(
+        name="is_active",
+        ui_header="Active",
+        db_column="MS.IsActive",
+        field_type=FieldType.BOOLEAN,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=False,
+        required=False,
+        portable=False,
+    ),
+    FieldDef(
+        name="producers",
+        ui_header="Producer",
+        db_column="Producers",
+        field_type=FieldType.LIST,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=False,
+        portable=True,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Producer' THEN C.Name END, ', ') AS Producers",
+    ),
+    FieldDef(
+        name="lyricists",
+        ui_header="Lyricist",
+        db_column="Lyricists",
+        field_type=FieldType.LIST,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=False,
+        portable=True,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Lyricist' THEN C.Name END, ', ') AS Lyricists",
+    ),
+    FieldDef(
         name="duration",
         ui_header="Duration",
         db_column="MS.Duration",
@@ -273,17 +186,29 @@ FIELDS: List[FieldDef] = [
         min_value=30,
     ),
     FieldDef(
-        name="composers",
-        ui_header="Composer",
-        db_column="Composers",
-        field_type=FieldType.LIST,
+        name="title",
+        ui_header="Title",
+        db_column="MS.Name",
+        visible=True,
+        editable=True,
+        filterable=False,
+        searchable=True,
+        required=True,
+        portable=True,
+        min_length=1,
+    ),
+    FieldDef(
+        name="is_done",
+        ui_header="Status",
+        db_column="S.IsDone",
+        field_type=FieldType.BOOLEAN,
         visible=True,
         editable=True,
         filterable=True,
         searchable=False,
-        required=True,
-        portable=True,
-        min_length=1,
+        required=False,
+        portable=False,
+        filter_type="boolean",
     ),
     FieldDef(
         name="bpm",
@@ -299,7 +224,70 @@ FIELDS: List[FieldDef] = [
         min_value=0,
         filter_type="range",
     ),
+    FieldDef(
+        name="recording_year",
+        ui_header="Year",
+        db_column="S.RecordingYear",
+        field_type=FieldType.INTEGER,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=True,
+        portable=True,
+        grouping_function=decade_grouper,
+    ),
+    FieldDef(
+        name="performers",
+        ui_header="Artist",
+        db_column="Performers",
+        field_type=FieldType.LIST,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=True,
+        portable=True,
+        min_length=1,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers",
+    ),
+    FieldDef(
+        name="composers",
+        ui_header="Composer",
+        db_column="Composers",
+        field_type=FieldType.LIST,
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=True,
+        portable=True,
+        min_length=1,
+        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers",
+    ),
 ]
+
+# ==================== QUERY GENERATION ====================
+
+def build_query_select() -> str:
+    """
+    Generate SELECT clause from FIELDS list.
+    Uses query_expression if defined, otherwise uses db_column.
+    This ensures QUERY_SELECT always matches FIELDS order.
+    """
+    columns = []
+    for f in FIELDS:
+        if f.query_expression:
+            columns.append(f.query_expression)
+        else:
+            columns.append(f.db_column)
+    return "SELECT \n        " + ",\n        ".join(columns)
+
+# Generate QUERY_SELECT from FIELDS (single source of truth)
+QUERY_SELECT = build_query_select()
+
+# The Canonical Query (Standard Access)
+BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
 
 # ==================== HELPERS ====================
 

@@ -168,47 +168,48 @@ class TestWriteYellberus:
         backup = tmp_path / "yellberus.py.bak"
         assert backup.exists()
 
-    def test_sparse_writing(self, tmp_path):
-        """Test that only non-default values are written (sparse output)."""
+    def test_explicit_writing(self, tmp_path):
+        """Test that all values are written explicitly (not sparse).
+        
+        Design decision: We write all boolean attributes explicitly to prevent
+        'doc drift' bugs where implicit defaults could cause confusion.
+        """
         real_yellberus = Path(__file__).parent.parent.parent.parent / "src" / "core" / "yellberus.py"
         test_yellberus = tmp_path / "yellberus.py"
         shutil.copy(real_yellberus, test_yellberus)
         
-        # Create a field with all defaults
+        # Create a field with values matching defaults
         fields = [
             FieldSpec(
                 name="test_field",
                 ui_header="Test",
                 db_column="T.Test",
                 field_type="TEXT",
-                visible=True,      # default
-                filterable=False,  # default
-                searchable=False,  # default
-                required=False,    # default
-                portable=True,     # default
+                visible=True,      # would be default
+                filterable=False,  # would be default
+                searchable=False,  # would be default
+                required=False,    # would be default
+                portable=True,     # would be default
             ),
         ]
         
-        # Use default defaults
         result = write_yellberus(test_yellberus, fields, defaults=FIELD_DEFAULTS)
         assert result is True
         
         content = test_yellberus.read_text(encoding="utf-8")
         
         # Find the test_field block
-        # Should NOT contain explicit visible=True, filterable=False, etc.
-        # since they match defaults
         import re
         field_block = re.search(r'FieldDef\(\s*name="test_field"[^)]+\)', content, re.DOTALL)
         assert field_block is not None
         block_text = field_block.group(0)
         
-        # These should NOT appear (they match defaults)
-        assert "visible=True" not in block_text
-        assert "filterable=False" not in block_text
-        assert "searchable=False" not in block_text
-        assert "required=False" not in block_text
-        assert "portable=True" not in block_text
+        # All boolean attributes SHOULD appear (explicit writing)
+        assert "visible=True" in block_text
+        assert "filterable=False" in block_text
+        assert "searchable=False" in block_text
+        assert "required=False" in block_text
+        assert "portable=True" in block_text
 
     def test_roundtrip(self, tmp_path):
         """Test 7.6: Load → Save → Load produces identical data."""
@@ -237,3 +238,36 @@ class TestWriteYellberus:
             assert orig.searchable == new.searchable
             assert orig.required == new.required
             assert orig.portable == new.portable
+
+    def test_preserve_extra_attributes(self, tmp_path):
+        """Test that unknown attributes (like query_expression) are preserved."""
+        real_yellberus = Path(__file__).parent.parent.parent.parent / "src" / "core" / "yellberus.py"
+        test_yellberus = tmp_path / "yellberus.py"
+        shutil.copy(real_yellberus, test_yellberus)
+        
+        # Create a field with an extra attribute
+        fields = [
+            FieldSpec(
+                name="complex_field",
+                ui_header="Complex",
+                db_column="C.Complex",
+                extra_attributes={"query_expression": "GROUP_CONCAT(Something)"}
+            )
+        ]
+        
+        # Write
+        write_yellberus(test_yellberus, fields)
+        
+        # Read back content to verify string representation
+        content = test_yellberus.read_text(encoding="utf-8")
+        # repr('...') might produce "..." or '...'
+        expected_repr = repr("GROUP_CONCAT(Something)") # "'GROUP_CONCAT(Something)'"
+        assert f'query_expression={expected_repr}' in content
+        
+        # Parse back to verify structure
+        reloaded = parse_yellberus(test_yellberus)
+        assert len(reloaded) == 1
+        assert reloaded[0].name == "complex_field"
+        # Since parse_yellberus uses _parse_fielddef_call which we updated to capture unknowns
+        assert "query_expression" in reloaded[0].extra_attributes
+        assert reloaded[0].extra_attributes["query_expression"] == "GROUP_CONCAT(Something)"

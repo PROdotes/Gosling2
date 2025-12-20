@@ -97,8 +97,9 @@ class TestSongRepository:
         headers, data = repository.get_all()
         assert len(data) == 1
         row = data[0]
-        # Check title (index 2 - Name/Title)
-        assert row[2] == "Test Song"
+        # Check title by looking up the Name column dynamically
+        name_idx = headers.index('Name')
+        assert row[name_idx] == "Test Song"
 
     def test_get_by_performer(self, repository):
         """Test getting songs by performer"""
@@ -116,7 +117,8 @@ class TestSongRepository:
         # Get by performer
         headers, data = repository.get_by_performer("Target performer")
         assert len(data) == 1
-        assert data[0][2] == "Test Song"
+        name_idx = headers.index('Name')
+        assert data[0][name_idx] == "Test Song"
 
         # Get by non-existent performer
         headers, data = repository.get_by_performer("Non-existent")

@@ -159,9 +159,20 @@ class TestValidation:
         # Check a known frame exists
         assert "TIT2" in editor_window._id3_frames
     
+    def _find_empty_row(self, editor_window):
+        """Helper to find the row with empty name (the newly added row)."""
+        for r in range(editor_window.fields_table.rowCount()):
+            item = editor_window.fields_table.item(r, 0)
+            if item and not item.text():
+                return r
+        return editor_window.fields_table.rowCount() - 1
+    
     def test_auto_populate_ui_header_from_name(self, editor_window):
         """8.3/8.4: Typing name auto-populates ui_header with Title Case."""
-        # Add a new row
+        # Disable sorting to get consistent row indices
+        editor_window.fields_table.setSortingEnabled(False)
+        
+        # Add a new row (it will be at the end since sorting is off)
         editor_window._on_add_field()
         new_row = editor_window.fields_table.rowCount() - 1
         
@@ -182,6 +193,9 @@ class TestValidation:
     
     def test_auto_populate_db_column_from_name(self, editor_window):
         """8.1/8.2: Typing name auto-populates db_column."""
+        # Disable sorting to get consistent row indices
+        editor_window.fields_table.setSortingEnabled(False)
+        
         # Add a new row
         editor_window._on_add_field()
         new_row = editor_window.fields_table.rowCount() - 1
@@ -203,6 +217,9 @@ class TestValidation:
     
     def test_auto_populate_unknown_field_fallback(self, editor_window):
         """Unknown field names get a fallback db_column guess."""
+        # Disable sorting to get consistent row indices
+        editor_window.fields_table.setSortingEnabled(False)
+        
         # Add a new row
         editor_window._on_add_field()
         new_row = editor_window.fields_table.rowCount() - 1
@@ -223,15 +240,18 @@ class TestValidation:
         assert db_text == "S.SomeUnknownField"
     
     def test_dirty_flag_on_edit(self, editor_window):
-        """8.7/8.8: Editing sets dirty flag."""
+        """8.7/8.8: Editing creates a diff which sets dirty flag."""
         # After load, should be clean
         assert editor_window._dirty is False
         
-        # Edit a cell
-        item = editor_window.fields_table.item(0, 0)
-        editor_window._on_item_changed(item)
+        # Make an actual change (add a new row with content)
+        editor_window._on_add_field()
+        new_row = self._find_empty_row(editor_window)
+        name_item = editor_window.fields_table.item(new_row, 0)
+        name_item.setText("new_test_field")
+        editor_window._on_item_changed(name_item)
         
-        # Should now be dirty
+        # Should now be dirty because we have a new field
         assert editor_window._dirty is True
     
     def test_dirty_flag_reset_after_load(self, editor_window):

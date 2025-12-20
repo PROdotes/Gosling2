@@ -81,13 +81,32 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching FIELDS order (14 columns)
-    row = (1, 1, "Title", "Artist", "Composer", None, None, "G1, G2", 180, "/path", 2024, 120, False, "ISRC")
+    # Create a mock row matching FIELDS order (15 columns):
+    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
+    # 6:producers, 7:lyricists, 8:duration, 9:title,
+    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
+    row = (
+        "/path",           # 0: path
+        1,                 # 1: file_id
+        1,                 # 2: type_id
+        None,              # 3: notes
+        "ISRC123",         # 4: isrc
+        True,              # 5: is_active
+        None,              # 6: producers
+        None,              # 7: lyricists
+        180,               # 8: duration
+        "Title",           # 9: title
+        False,             # 10: is_done
+        120,               # 11: bpm
+        2024,              # 12: recording_year
+        "Artist",          # 13: performers
+        "Composer",        # 14: composers
+    )
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 14 tuples
-    assert len(tagged) == 14
+    # Should have 15 tuples
+    assert len(tagged) == 15
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -101,7 +120,24 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    row = (1, 1, "Test Song", "Artist 1, Artist 2", "Bach", None, None, "Group A", 200, "/music/test.mp3", 2024, 128, True, "USMV123")
+    # Row matching current FIELDS order (15 columns)
+    row = (
+        "/music/test.mp3", # 0: path
+        1,                 # 1: file_id
+        1,                 # 2: type_id
+        None,              # 3: notes
+        "USMV123",         # 4: isrc
+        True,              # 5: is_active
+        None,              # 6: producers
+        None,              # 7: lyricists
+        200,               # 8: duration
+        "Test Song",       # 9: title
+        True,              # 10: is_done
+        128,               # 11: bpm
+        2024,              # 12: recording_year
+        "Artist 1, Artist 2",  # 13: performers
+        "Bach",            # 14: composers
+    )
     
     song = Song.from_row(row)
     

@@ -73,11 +73,12 @@ class FieldEditorWindow(QMainWindow):
         self._code_fields: dict = {}  # name -> FieldSpec from yellberus.py
         self._md_fields: dict = {}    # name -> FieldSpec from FIELD_REGISTRY.md
         self._loaded_defaults: dict = {} # attribute -> bool (from FieldDef class)
+        self._field_order: dict = {}  # name -> original index (for preserving BASE_QUERY order)
         self._dirty: bool = False  # Track unsaved changes
         self._test_mode: bool = False  # Skip dialogs in test mode
 
+        self._setup_central_widget()  # Must come first (creates save_btn)
         self._setup_toolbar()
-        self._setup_central_widget()
         self._setup_statusbar()
         
         # Load ID3 frames for validation
@@ -329,6 +330,9 @@ class FieldEditorWindow(QMainWindow):
         # Parse both sources
         code_fields = parse_yellberus(yellberus_path)
         self._code_fields = {f.name: f for f in code_fields}
+        
+        # Store original order (critical for BASE_QUERY alignment)
+        self._field_order = {f.name: idx for idx, f in enumerate(code_fields)}
         
         if md_path.exists():
             md_fields = parse_field_registry_md(md_path)
@@ -926,8 +930,8 @@ class FieldEditorWindow(QMainWindow):
         from tools.yellberus_parser import write_yellberus, write_field_registry_md
         from PyQt6.QtWidgets import QMessageBox
         
-        # 1. Gather all fields
-        fields_to_save = []
+        # 1. Gather all fields from UI
+        fields_by_name = {}
         for row in range(self.fields_table.rowCount()):
             # Get UI representation
             ui_spec = self._get_field_spec_from_row(row)
@@ -935,17 +939,10 @@ class FieldEditorWindow(QMainWindow):
                 continue
                 
             # Merge with original if exists (to preserve hidden attributes like min_value)
-            # We prioritize Code original, then MD original, then generic default
             original = self._code_fields.get(ui_spec.name) or self._md_fields.get(ui_spec.name)
             
             if original:
-                # Update original with UI values
-                # We do this carefully to create a NEW object (or modify a copy)
                 from dataclasses import replace
-                # Note: FieldSpec is mutable dataclass, but let's be safe
-                # We need to copy 'original' and update fields that are in UI
-                # But FieldSpec isn't frozen, so we can just update 'original' IF we don't mind mutating our cache?
-                # Actually, better to use 'replace' to get a fresh object
                 merged = replace(original,
                     name=ui_spec.name,
                     ui_header=ui_spec.ui_header,
@@ -958,10 +955,18 @@ class FieldEditorWindow(QMainWindow):
                     portable=ui_spec.portable,
                     id3_tag=ui_spec.id3_tag
                 )
-                fields_to_save.append(merged)
+                fields_by_name[ui_spec.name] = merged
             else:
-                # New field
-                fields_to_save.append(ui_spec)
+                # New field - assign next available order index
+                if ui_spec.name not in self._field_order:
+                    self._field_order[ui_spec.name] = max(self._field_order.values(), default=-1) + 1
+                fields_by_name[ui_spec.name] = ui_spec
+        
+        # 2. Sort fields by original order to maintain BASE_QUERY alignment
+        fields_to_save = sorted(
+            fields_by_name.values(),
+            key=lambda f: self._field_order.get(f.name, 9999)
+        )
         
         # Validate ID3 tags
         unknown_tags = []

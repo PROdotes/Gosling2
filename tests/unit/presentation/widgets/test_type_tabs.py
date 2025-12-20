@@ -24,15 +24,18 @@ def library_widget(qtbot, mock_dependencies):
     # Headers matching Yellberus
     headers = [f.db_column for f in yellberus.FIELDS]
     
-    # Data with different types
-    # 0:ID, 1:Type, 2:Title, 3:Artist ... 11:BPM, 12:Done
+    # Data matching current FIELDS order (15 columns):
+    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
+    # 6:producers, 7:lyricists, 8:duration, 9:title,
+    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
     data = [
-        [1, 1, "Music 1", "Artist 1", "", "", "", "", 180, "", 2020, 120, 1, ""], # Type 1 (Music)
-        [2, 2, "Jingle 1", "Artist 2", "", "", "", "", 30, "", 2021, 0, 1, ""],   # Type 2 (Jingle)
-        [3, 3, "Comm 1", "Artist 3", "", "", "", "", 60, "", 2022, 0, 1, ""],     # Type 3 (Commercial)
-        [4, 4, "Speech 1", "Artist 4", "", "", "", "", 300, "", 2023, 0, 1, ""],  # Type 4 (VoiceTrack)
-        [5, 5, "Speech 2", "Artist 5", "", "", "", "", 600, "", 2024, 0, 1, ""],  # Type 5 (Recording)
-        [6, 6, "Stream 1", "Artist 6", "", "", "", "", 0, "", 2025, 0, 1, ""],    # Type 6 (Stream)
+        # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, year, performers, composers
+        ["", 1, 1, "", "", 1, "", "", 180, "Music 1", 1, 120, 2020, "Artist 1", ""],   # Type 1 (Music)
+        ["", 2, 2, "", "", 1, "", "", 30, "Jingle 1", 1, 0, 2021, "Artist 2", ""],     # Type 2 (Jingle)
+        ["", 3, 3, "", "", 1, "", "", 60, "Comm 1", 1, 0, 2022, "Artist 3", ""],       # Type 3 (Commercial)
+        ["", 4, 4, "", "", 1, "", "", 300, "Speech 1", 1, 0, 2023, "Artist 4", ""],    # Type 4 (VoiceTrack)
+        ["", 5, 5, "", "", 1, "", "", 600, "Speech 2", 1, 0, 2024, "Artist 5", ""],    # Type 5 (Recording)
+        ["", 6, 6, "", "", 1, "", "", 0, "Stream 1", 1, 0, 2025, "Artist 6", ""],      # Type 6 (Stream)
     ]
     
     lib_service.get_all_songs.return_value = (headers, data)
@@ -137,9 +140,10 @@ def test_persistence_on_init(qtbot, mock_dependencies):
     # Save a specific index
     settings.get_type_filter.return_value = 3 # Commercials
     
-    # Mock some data
+    # Mock some data - matching current FIELDS order (15 columns)
+    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, year, performers, composers
     headers = [f.db_column for f in yellberus.FIELDS]
-    data = [[1, 3, "Comm 1", "P", "", "", "", "", 60, "", 2022, 0, 1, ""]]
+    data = [["", 1, 3, "", "", 1, "", "", 60, "Comm 1", 1, 0, 2022, "P", ""]]
     lib_service.get_all_songs.return_value = (headers, data)
     
     widget = LibraryWidget(lib_service, meta_service, settings)

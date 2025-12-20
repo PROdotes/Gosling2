@@ -30,14 +30,16 @@ def library_widget(qtbot, mock_dependencies):
     lib_service, meta_service, settings = mock_dependencies
     
     # Setup default return for get_all_songs so load_library works
-    # Must return 14 columns matching Yellberus schema
-    # Headers are somewhat irrelevant as Widget ignores them now, but good to likely match SQL names
+    # Must return 15 columns matching current Yellberus schema
     headers = [f.db_column for f in yellberus.FIELDS] 
     
-    # 0:ID, 1:Type, 2:Title, 3:Perf, 4:Comp, 5:Lyr, 6:Prod, 7:Groups, 8:Dur, 9:Path, 10:Yr, 11:BPM, 12:Done, 13:Isrc, 14:Notes, 15:Active
+    # Current FIELDS order (15 columns):
+    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
+    # 6:producers, 7:lyricists, 8:duration, 9:title,
+    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
     data = [
-        [1, 1, "Title A", "Performer A", "Comp A", "Lyr A", "Prod A", "G1", 180.0, "/path/a.mp3", 2020, 120, 1, "ISRC1", "N1", 1],
-        [2, 1, "Title B", "Performer B", "Comp B", "Lyr B", "Prod B", "G2", 240.0, "/path/b.mp3", 2021, 128, 0, "ISRC2", "N2", 1]
+        ["/path/a.mp3", 1, 1, "N1", "ISRC1", 1, "Prod A", "Lyr A", 180.0, "Title A", 1, 120, 2020, "Performer A", "Comp A"],
+        ["/path/b.mp3", 2, 1, "N2", "ISRC2", 1, "Prod B", "Lyr B", 240.0, "Title B", 0, 128, 2021, "Performer B", "Comp B"]
     ]
     
     lib_service.get_all_songs.return_value = (headers, data)
@@ -231,8 +233,9 @@ def test_filter_by_year(library_widget, mock_dependencies):
     """Test filtering by year requests data from service."""
     lib_service, _, _ = mock_dependencies
     
-    # Return 1 row
-    row = [1, 1, "T", "P", "C", "L", "Pr", "G", 1.0, "p", 2020, 100, 1, "I", "N", 1]
+    # Return 1 row matching current FIELDS order (15 columns)
+    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers
+    row = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 1, 100, 2020, "P", "C"]
     lib_service.get_songs_by_year.return_value = ([f.name for f in yellberus.FIELDS], [row])
     
     library_widget._filter_by_year(2020)
@@ -289,9 +292,9 @@ def test_show_column_context_menu(library_widget):
         
         library_widget._show_column_context_menu(QPoint(0,0))
         
-        # Schema has 16 columns
-        # Plus "Reset to Default" action = 17
-        expected_columns = 16
+        # Schema has 15 columns (Groups temporarily removed)
+        # Plus "Reset to Default" action = 16
+        expected_columns = 15
         expected_total = expected_columns + 1
         
         assert library_widget.library_model.columnCount() == expected_columns, \
@@ -324,10 +327,11 @@ def test_numeric_sorting(library_widget, mock_dependencies):
     from PyQt6.QtCore import Qt
     lib_service, _, _ = mock_dependencies
     
-    # Cols: 8=Duration, 11=BPM, 10=Year
-    rowA = [1,1,"A","P","C","L","Pr", "G", 10.0, "p", 2000, 10, 1, "I", "N", 1]
-    rowB = [2,1,"B","P","C","L","Pr", "G", 20.0, "p", 2010, 20, 1, "I", "N", 1]
-    rowC = [3,1,"C","P","C","L","Pr", "G", 30.0, "p", 2020, 30, 1, "I", "N", 1]
+    # Test data matching current FIELDS order (15 columns):
+    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers
+    rowA = ["p", 1, 1, "N", "I", 1, "Pr", "L", 10.0, "A", 1, 10, 2000, "P", "C"]
+    rowB = ["p", 2, 1, "N", "I", 1, "Pr", "L", 20.0, "B", 1, 20, 2010, "P", "C"]
+    rowC = ["p", 3, 1, "N", "I", 1, "Pr", "L", 30.0, "C", 1, 30, 2020, "P", "C"]
     
     # Shuffle for testing
     data = [rowC, rowA, rowB] 
