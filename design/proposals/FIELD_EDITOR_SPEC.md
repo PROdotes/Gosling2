@@ -29,27 +29,27 @@
 ### Main Window Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  Field Registry Editor                                          [×]    │
-├─────────────────────────────────────────────────────────────────────────┤
-│  [Load from Code]  [Save All]                                           │
-├─────────────────────────────────────────────────────────────────────────┤
-│ ┌─ Defaults (applied to new fields) ───────────────────────────────────┐│
-│ │ visible: [✓] │ editable: [✓] │ filterable: [ ] │ searchable: [ ] │...││
-│ └───────────────────────────────────────────────────────────────────────┘│
-├─────────────────────────────────────────────────────────────────────────┤
-│ ┌─ Fields Table ──────────────────────────────────────────────────────┐ │
-│ │ Name       │ Header  │ DB Column │ Type │ Vis │ Filt │ Search │ ... │ │
-│ ├────────────┼─────────┼───────────┼──────┼─────┼──────┼────────┼─────┤ │
-│ │ performers │ Perform │ Performers│ LIST │  ✓  │  ✓   │   ✓    │     │ │
-│ │ album ★    │ Album   │ S.Album   │ TEXT │  ✓  │  ✓   │   ☐    │     │ │
-│ │ ...        │         │           │      │     │      │        │     │ │
-│ └─────────────────────────────────────────────────────────────────────┘ │
-│                                                                         │
-│ [+ Add Field]  [Delete Selected]                     ★ = Modified/New   │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Status: 15 fields loaded. 1 modified. 1 new.                            │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│  Field Registry Editor                                                        [×]   │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│  [Load from Code]                                                                    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ┌─ Defaults (applied to new fields) ────────────────────────────────────────────────┐│
+│ │ [✓] visible  [✓] editable  [ ] filterable  [ ] searchable  [ ] required  [✓] port ││
+│ └────────────────────────────────────────────────────────────────────────────────────┘│
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ ┌─ Fields ───────────────────────────────────────────────────────────────────────────┐│
+│ │ Name       │ Header  │ DB Column │ Type │Vis│Edt│Flt│Src│Req│Prt│ ID3 Tag         ││
+│ ├────────────┼─────────┼───────────┼──────┼───┼───┼───┼───┼───┼───┼─────────────────┤│
+│ │ performers │ Perform │ Performers│ LIST │ ✓ │ ✓ │ ✓ │ ✓ │   │ ✓ │ TPE1            ││
+│ │ album      │ Album   │ S.Album   │ TEXT │ ✓ │ ✓ │ ✓ │   │   │ ✓ │ TALB            ││
+│ │ ...        │         │           │      │   │   │   │   │   │   │                 ││
+│ └────────────────────────────────────────────────────────────────────────────────────┘│
+│                                                                                      │
+│ [+ Add Field]  [Delete Selected]                                      [Save All]    │
+├──────────────────────────────────────────────────────────────────────────────────────┤
+│ Status: 17 fields. 1 changed from code, 2 differ from MD                            │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### PyQt6 Widgets Required
@@ -61,11 +61,9 @@
 | `QCheckBox` | Boolean properties (visible, filterable, etc). |
 | `QComboBox` | Type selector (TEXT, INTEGER, LIST, BOOLEAN, DURATION). |
 | `QLineEdit` | Text fields (name, header, db_column). |
-| `QPushButton` | Actions (Load, Save, Add, Delete, Edit Defaults). |
-| `QDialog` | Defaults Editor popup. |
+| `QPushButton` | Actions (Load, Save, Add, Delete). |
 | `QMessageBox` | Confirmation dialogs ("Are you sure?"). |
 | `QStatusBar` | Status messages (loaded count, pending changes). |
-| `QLabel` | Status indicators (★ for modified rows). |
 
 ### Cell Color Coding (Real-Time Diff)
 
@@ -76,7 +74,7 @@ Instead of a separate diff dialog, cells are color-coded based on their state:
 | **Matches both files** | Gray (default) | No changes needed. |
 | **Differs from `yellberus.py`** | Soft Red (#3a2020) | Code will be updated on save. |
 | **Differs from `FIELD_REGISTRY.md`** | Soft Blue (#20203a) | Docs will be updated on save. |
-| **Differs from both** | Soft Purple (#302030) | Both files will be updated. |
+| **Differs from both** | Soft Purple (#3a2040) | Both files will be updated. |
 | **New field (not in either)** | Soft Green (#203a20) | Adding to both. |
 | **Disabled/N/A** | Dark (#1a1a1a) | Cell is not applicable (e.g., ID3 Tag when `portable=False`). |
 
@@ -86,13 +84,15 @@ Instead of a separate diff dialog, cells are color-coded based on their state:
 - When `portable` is toggled **ON**, the editor auto-populates the ID3 Tag from JSON (if mapping exists).
 - If no mapping is found, the cell stays empty and will trigger a warning on Save.
 
-**On Save Confirmation:**
-> *"5 changes to yellberus.py, 3 changes to FIELD_REGISTRY.md. Proceed?"*
+**On Save Behavior:**
+- Saves directly to both `yellberus.py` and `FIELD_REGISTRY.md`.
+- Shows warning dialog only if there are ID3 tag issues (missing mapping for portable fields).
+- *(Note: A pre-save summary dialog was considered but omitted for cleaner UX.)*
 
 ### Window Behavior
 
-| Action | Behavior |
-|--------|----------|
+| Action                      | Behavior                                    |
+| :-------------------------- | :------------------------------------------ |
 | **Close with unsaved changes** | Prompt: "Save & Close", "Discard", "Cancel". |
 | **Delete with unsaved changes** | Allowed (deletion is its own operation). |
 | **Load from Code** | Warns if unsaved changes would be lost. |
@@ -121,12 +121,11 @@ class FieldSpec:
     field_type: str  # TEXT, INTEGER, LIST, BOOLEAN, DURATION
     id3_tag: Optional[str] = None
     visible: bool = True
+    editable: bool = True
     filterable: bool = False
     searchable: bool = False
     required: bool = False
     portable: bool = True
-    notes: str = ""
-    status: str = "current"  # current | planned | deprecated
 ```
 
 ---

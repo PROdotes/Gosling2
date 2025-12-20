@@ -28,9 +28,9 @@ class TestWriteFieldRegistryMd:
 
 ## Current Fields
 
-| Name | UI Header | DB Column | Type | Visible | Filterable | Searchable | Required | Portable | ID3 Tag |
-|------|-----------|-----------|------|---------|------------|------------|----------|----------|---------|
-| `old_field` | Old | O.Old | TEXT | Yes | No | No | No | Yes | — |
+| Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
+|------|-----------|-----------|------|---------|----------|------------|------------|----------|----------|---------|
+| `old_field` | Old | O.Old | TEXT | Yes | Yes | No | No | No | Yes | — |
 
 **Total: 1 fields**
 """
@@ -77,8 +77,8 @@ class TestWriteFieldRegistryMd:
         assert "|------|-----------|" in content
         
         # Check field rows
-        assert "| `title` | Title | MS.Name | TEXT | Yes | No | Yes | Yes | Yes | TIT2 |" in content
-        assert "| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | No | No | Yes | TBPM |" in content
+        assert "| `title` | Title | MS.Name | TEXT | Yes | Yes | No | Yes | Yes | Yes | TIT2 |" in content
+        assert "| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | Yes | No | No | Yes | TBPM |" in content
         
         # Check total updated
         assert "**Total: 2 fields**" in content
@@ -93,8 +93,8 @@ class TestWriteFieldRegistryMd:
 
 ## Current Fields
 
-| Name | UI Header | DB Column | Type | Visible | Filterable | Searchable | Required | Portable | ID3 Tag |
-|------|-----------|-----------|------|---------|------------|------------|----------|----------|---------|
+| Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
+|------|-----------|-----------|------|---------|----------|------------|------------|----------|----------|---------|
 
 **Total: 0 fields**
 """

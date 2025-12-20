@@ -107,7 +107,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         visible=False,
         editable=False,
-        filterable=True,
+        filterable=False,
         searchable=False,
         required=False,
         portable=False,
@@ -318,8 +318,8 @@ def yell(message: str) -> None:
     Report a schema or mapping error.
     Called by Song when it can't map a value.
     """
-    # For now, just print. Could raise, log to file, etc.
-    print(f"🐕‍🦺 YELLBERUS: {message}")
+    from . import logger
+    logger.dev_warning(f"YELLBERUS: {message}")
 
 def validate_schema() -> None:
     """
@@ -445,3 +445,41 @@ def row_to_tagged_tuples(row: tuple) -> list:
             result.append((value, f"_{field.name}"))
     
     return result
+
+
+def check_db_integrity(cursor) -> None:
+    """
+    Runtime check: Compare DB schema against FIELDS registry.
+    Yells if there are orphan columns in the database.
+    """
+    # 1. Gather all expected columns from Yellberus
+    yellberus_cols = set()
+    for f in FIELDS:
+        # DB column might be 'MS.Name' or 'Producers' or 'S.BPM'
+        col = f.db_column
+        if '.' in col:
+            col = col.split('.')[1]
+        yellberus_cols.add(col)
+        
+    # 2. Check Tables
+    # Valid columns that are in DB but intentionally not in Yellberus yet
+    known_ignored = {
+        'Notes',  # Not yet fully implemented
+    }
+    
+    for table in ['MediaSources', 'Songs']:
+        try:
+            cursor.execute(f"PRAGMA table_info({table})")
+            rows = cursor.fetchall()
+            if not rows:
+                continue
+                
+            db_cols = {row[1] for row in rows}
+            orphans = db_cols - yellberus_cols - known_ignored
+            
+            if orphans:
+                for o in orphans:
+                    yell(f"Orphan column in {table} detected: '{o}' (Exists in DB but not in Registry)")
+                    
+        except Exception as e:
+            yell(f"Integrity check failed: {e}")

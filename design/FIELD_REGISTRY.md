@@ -7,25 +7,26 @@
 
 ## 📋 Current Fields
 
-| Name | UI Header | DB Column | Type | Visible | Filterable | Searchable | Required | Portable | ID3 Tag |
-|------|-----------|-----------|------|---------|------------|------------|----------|----------|---------|
-| `path` | Path | MS.Source | TEXT | No | No | No | Yes | No | — |
-| `file_id` | ID | MS.SourceID | INTEGER | No | No | No | Yes | No | — |
-| `type_id` | Type | MS.TypeID | INTEGER | No | Yes | No | No | No | — |
-| `notes` | Notes | MS.Notes | TEXT | Yes | No | Yes | No | No | — |
-| `isrc` | ISRC | S.ISRC | TEXT | Yes | No | Yes | No | Yes | TSRC |
-| `is_active` | Active | MS.IsActive | BOOLEAN | Yes | Yes | No | No | No | — |
-| `producers` | Producer | Producers | LIST | Yes | Yes | Yes | No | Yes | TIPL |
-| `lyricists` | Lyricist | Lyricists | LIST | Yes | Yes | Yes | No | Yes | TEXT |
-| `duration` | Duration | MS.Duration | DURATION | Yes | No | No | Yes | No | TLEN |
-| `title` | Title | MS.Name | TEXT | Yes | No | Yes | Yes | Yes | TIT2 |
-| `is_done` | Status | S.IsDone | BOOLEAN | Yes | Yes | No | No | No | — |
-| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | No | No | Yes | TBPM |
-| `recording_year` | Year | S.RecordingYear | INTEGER | Yes | Yes | Yes | Yes | Yes | TDRC |
-| `performers` | Artist | Performers | LIST | Yes | Yes | Yes | Yes | Yes | TPE1 |
-| `composers` | Composer | Composers | LIST | Yes | Yes | Yes | Yes | Yes | TCOM |
+| Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
+|------|-----------|-----------|------|---------|----------|------------|------------|----------|----------|---------|
+| `path` | Path | MS.Source | TEXT | No | No | No | No | Yes | No | — |
+| `file_id` | ID | MS.SourceID | INTEGER | No | No | No | No | Yes | No | — |
+| `type_id` | Type | MS.TypeID | INTEGER | No | No | No | No | No | No | — |
+| `notes` | Notes | MS.Notes | TEXT | Yes | Yes | No | Yes | No | No | — |
+| `isrc` | ISRC | S.ISRC | TEXT | Yes | Yes | No | Yes | No | Yes | TSRC |
+| `is_active` | Active | MS.IsActive | BOOLEAN | Yes | Yes | Yes | No | No | No | — |
+| `producers` | Producer | Producers | LIST | Yes | Yes | Yes | Yes | No | Yes | TIPL |
+| `lyricists` | Lyricist | Lyricists | LIST | Yes | Yes | Yes | Yes | No | Yes | TEXT |
+| `duration` | Duration | MS.Duration | DURATION | Yes | Yes | No | No | Yes | No | TLEN |
+| `title` | Title | MS.Name | TEXT | Yes | Yes | No | Yes | Yes | Yes | TIT2 |
+| `is_done` | Status | S.IsDone | BOOLEAN | Yes | Yes | Yes | No | No | No | — |
+| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | Yes | No | No | Yes | TBPM |
+| `recording_year` | Year | S.RecordingYear | INTEGER | Yes | Yes | Yes | Yes | Yes | Yes | TDRC |
+| `performers` | Artist | Performers | LIST | Yes | Yes | Yes | Yes | Yes | Yes | TPE1 |
+| `composers` | Composer | Composers | LIST | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
+| `groups` | Groups | S.Groups | TEXT | Yes | Yes | Yes | Yes | No | Yes | TIT1 |
 
-**Total: 15 fields**
+**Total: 16 fields**
 
 ---
 

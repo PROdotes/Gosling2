@@ -92,13 +92,13 @@ erDiagram
 
     Contributors {
         INTEGER ContributorID PK
-        TEXT Name
+        TEXT ContributorName
         TEXT SortName
     }
 
     Roles {
         INTEGER RoleID PK
-        TEXT Name
+        TEXT RoleName
     }
 
     MediaSourceContributorRoles {
@@ -218,7 +218,7 @@ erDiagram
 
     Contributors {
         INTEGER ContributorID PK
-        TEXT Name
+        TEXT ContributorName
         TEXT SortName
         TEXT Type
     }
@@ -231,7 +231,7 @@ erDiagram
 
     Roles {
         INTEGER RoleID PK
-        TEXT Name
+        TEXT RoleName
     }
 
     Albums {
@@ -317,7 +317,7 @@ erDiagram
 
     Publishers {
         INTEGER PublisherID PK
-        TEXT Name
+        TEXT PublisherName
         INTEGER ParentPublisherID FK
     }
 
@@ -330,7 +330,7 @@ erDiagram
 
     Agencies {
         INTEGER AgencyID PK
-        TEXT Name
+        TEXT AgencyName
         TEXT ContactName
         TEXT ContactEmail
         TEXT ContactPhone
@@ -339,7 +339,7 @@ erDiagram
     Clients {
         INTEGER ClientID PK
         INTEGER AgencyID FK
-        TEXT Name
+        TEXT ClientName
         TEXT ContactName
         TEXT ContactEmail
         TEXT ContactPhone
@@ -506,7 +506,7 @@ Advertising agencies that represent clients.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `AgencyID` | INTEGER | PRIMARY KEY | Unique identifier |
-| `Name` | TEXT | NOT NULL UNIQUE | Agency name |
+| `AgencyName` | TEXT | NOT NULL UNIQUE | Agency name |
 | `ContactName` | TEXT | - | Primary contact person |
 | `ContactEmail` | TEXT | - | Contact email |
 | `ContactPhone` | TEXT | - | Contact phone |
@@ -519,7 +519,7 @@ Advertisers who commission commercials.
 |--------|------|-------------|-------------|
 | `ClientID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `AgencyID` | INTEGER | FK | Reference to `Agencies` |
-| `Name` | TEXT | NOT NULL UNIQUE | Client/brand name |
+| `ClientName` | TEXT | NOT NULL UNIQUE | Client/brand name |
 | `ContactName` | TEXT | - | Primary contact person |
 | `ContactEmail` | TEXT | - | Contact email |
 | `ContactPhone` | TEXT | - | Contact phone |
@@ -646,7 +646,7 @@ Saved playlists/queues.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `PlaylistID` | INTEGER | PRIMARY KEY | Unique identifier |
-| `Name` | TEXT | NOT NULL | Playlist name |
+| `PlaylistName` | TEXT | NOT NULL | Playlist name |
 | `Description` | TEXT | - | Optional description |
 | `CreatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Creation time |
 | `UpdatedAt` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Last modification |
@@ -793,7 +793,7 @@ Artists, composers, and other credited individuals or groups.
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier |
-| `Name` | TEXT | NOT NULL UNIQUE | Display name |
+| `ContributorName` | TEXT | NOT NULL UNIQUE | Display name |
 | `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
 | `Type` | TEXT | CHECK(Type IN ('person', 'group')) | ❌ Individual or band |
 
@@ -824,7 +824,7 @@ Types of participation (Performer, Composer, etc.).
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `RoleID` | INTEGER | PRIMARY KEY | Unique identifier |
-| `Name` | TEXT | NOT NULL UNIQUE | Role name |
+| `RoleName` | TEXT | NOT NULL UNIQUE | Role name |
 
 **Default Roles:**
 - Performer

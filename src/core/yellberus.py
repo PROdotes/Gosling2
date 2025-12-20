@@ -107,7 +107,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         visible=False,
         editable=False,
-        filterable=True,
+        filterable=False,
         searchable=False,
         required=False,
         portable=False,
@@ -251,7 +251,6 @@ FIELDS: List[FieldDef] = [
         min_length=1,
         query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers",
     ),
-
     FieldDef(
         name="composers",
         ui_header="Composer",
@@ -265,6 +264,17 @@ FIELDS: List[FieldDef] = [
         portable=True,
         min_length=1,
         query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers",
+    ),
+    FieldDef(
+        name="groups",
+        ui_header="Groups",
+        db_column="S.Groups",
+        visible=True,
+        editable=True,
+        filterable=True,
+        searchable=True,
+        required=False,
+        portable=True,
     ),
 ]
 

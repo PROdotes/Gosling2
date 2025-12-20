@@ -230,8 +230,8 @@ def parse_field_registry_md(file_path: Path) -> List[FieldSpec]:
         # Parse table row
         if in_table and line.startswith("|"):
             parts = [p.strip() for p in line.split("|")[1:-1]]  # Remove empty first/last
-            if len(parts) >= 10:
-                # | Name | UI Header | DB Column | Type | Visible | Filterable | Searchable | Required | Portable | ID3 Tag |
+            if len(parts) >= 11:
+                # | Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
                 name = parts[0].strip("`")
                 spec = FieldSpec(
                     name=name,
@@ -239,11 +239,12 @@ def parse_field_registry_md(file_path: Path) -> List[FieldSpec]:
                     db_column=parts[2],
                     field_type=parts[3],
                     visible=parts[4] == "Yes",
-                    filterable=parts[5] == "Yes",
-                    searchable=parts[6] == "Yes",
-                    required=parts[7] == "Yes",
-                    portable=parts[8] == "Yes",
-                    id3_tag=parts[9] if parts[9] != "—" else None,
+                    editable=parts[5] == "Yes",
+                    filterable=parts[6] == "Yes",
+                    searchable=parts[7] == "Yes",
+                    required=parts[8] == "Yes",
+                    portable=parts[9] == "Yes",
+                    id3_tag=parts[10] if parts[10] != "—" else None,
                 )
                 fields.append(spec)
     
@@ -460,7 +461,7 @@ def write_field_registry_md(file_path: Path, fields: List[FieldSpec]) -> bool:
     for f in fields:
         yes_no = lambda x: "Yes" if x else "No"
         id3 = f.id3_tag if f.id3_tag else "—"
-        row = f"| `{f.name}` | {f.ui_header} | {f.db_column} | {f.field_type} | {yes_no(f.visible)} | {yes_no(f.filterable)} | {yes_no(f.searchable)} | {yes_no(f.required)} | {yes_no(f.portable)} | {id3} |"
+        row = f"| `{f.name}` | {f.ui_header} | {f.db_column} | {f.field_type} | {yes_no(f.visible)} | {yes_no(f.editable)} | {yes_no(f.filterable)} | {yes_no(f.searchable)} | {yes_no(f.required)} | {yes_no(f.portable)} | {id3} |"
         new_rows.append(row + "\n")
         
     final_lines = lines[:table_start+2] + new_rows + lines[table_end:]

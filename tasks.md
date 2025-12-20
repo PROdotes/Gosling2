@@ -28,7 +28,8 @@ links: []
 | ID | Task | Pri | Cmplx | Score | Status | Spec |
 |----|------|-----|-------|-------|--------|------|
 | T-04 | **Test Audit** | 5 | 3 | 10 | 🚀 (Next) | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
-| T-06 | **Legacy Sync** | 5 | 1 | 20 | 🟢 | [design/LEGACY_LOGIC.md](design/LEGACY_LOGIC.md) |
+| T-17 | **Unified Artist View** | 5 | 3 | 15 | 🚀 (Top) | Combine Groups + Artists |
+| T-06 | **Legacy Sync** | 5 | 4 | 10 | � | [design/LEGACY_LOGIC.md](design/LEGACY_LOGIC.md) |
 | T-01 | **Type Tabs** | 3 | 1 | 15 | ✅ | [spec](design/issues/T-01_type_tabs.md) |
 | — | **Completeness Check** | 3 | 1 | 15 | ✅ | — |
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [spec](design/issues/T-02_field_registry.md) |
@@ -59,7 +60,7 @@ links: []
 | — | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-26 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-22 | **Albums** | 4 | 4 | 8 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_ALBUMS.md) |
-| T-23 | **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_FILTER_TREES.md) |
+| T-23 | **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_FILTER_TREES.md) <br>*(Note: Treat 'Groups' as meta-Artist for filtering)* |
 | T-24 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry | [spec](design/proposals/PROPOSAL_RENAMING_SERVICE.md) |
 | T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core | DATABASE.md |
 | T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
@@ -83,9 +84,10 @@ links: []
 ```
 
 ### Track A: Data Integrity (Critical Path)
-1. **Item Cleaning** — Ensure all items are robust (Logging/Fields).
-2. **Legacy Sync** — Add Album, Genre, Publisher.
-3. **Log Core** — Add history tracking.
+1. **Item Cleaning** — ✅ DONE (Field Editor Verified)
+2. **Unified Artist View** — 🚀 [Next] Combine Groups + Artists. (Score: 15, Est: 2 hrs)
+3. **Legacy Sync** — Add Album, Genre, Publisher. (Score: 10, Est: 4-6 hrs)
+4. **Log Core** — Add history tracking.
 
 ### Track B: User Experience (UI)
 1. **Side Panel** — Requires Legacy Sync data.
