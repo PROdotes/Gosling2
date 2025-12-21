@@ -11,12 +11,16 @@ links: []
 
 | Area | Status |
 |------|--------|
-| **Schema Awareness** | ⏸️ Paused (9-layer silenced for Migration) |
+| **Schema Awareness** | ✅ Active (10-layer Enforcement) |
 | **Schema Migration** | ✅ MediaSources/Songs (MVP) |
 | **Drag & Drop Import** | ✅ Complete (Issue #8) |
 | **Metadata Write** | ✅ 28 tests passing |
 | **Settings Manager** | ✅ Centralized with DI |
-| **Logging System** | ✅ Centralized (T-07 Implemented) |
+| **Logging System** | 🏗️ Created but not adopted (T-07 Pending) |
+| **Unified Artist** | ✅ Complete (Backend + UI) |
+| **Column Persistence** | ✅ Named-Identity (T-18) |
+| **Registry Strategies** | ✅ Filter Logic (T-27) |
+| **Field Editor** | ✅ Hardened (T-19) |
 
 ---
 
@@ -28,15 +32,20 @@ links: []
 | ID | Task | Pri | Cmplx | Score | Status | Spec |
 |----|------|-----|-------|-------|--------|------|
 | T-04 | **Test Audit** | 5 | 3 | 10 | 🚀 (Next) | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
-| T-17 | **Unified Artist View** | 5 | 3 | 15 | 🚀 (Top) | Combine Groups + Artists |
-| T-06 | **Legacy Sync** | 5 | 4 | 10 | � | [design/LEGACY_LOGIC.md](design/LEGACY_LOGIC.md) |
-| T-01 | **Type Tabs** | 3 | 1 | 15 | ✅ | [spec](design/issues/T-01_type_tabs.md) |
+| T-17 | **Unified Artist View** | 5 | 3 | 15 | ✅ | [spec](design/issues/T-17_unified_artist_view.md) <br> ([Groups Logic Status](design/state/GROUPS_LOGIC_STATUS.md)) |
+| T-18 | **Column Resilience** | 5 | 2 | 20 | ✅ | [docs](design/issues/T-18_column_persistence.md) |
+| T-19 | **Field Editor Hardening** | 5 | 3 | 15 | ✅ | [prop](design/proposals/PROPOSAL_TOOLING_CONSOLIDATION.md) |
+| T-27 | **Registry Strategies** | 5 | 3 | 15 | ✅ | [prop](design/proposals/PROPOSAL_TOOLING_CONSOLIDATION.md) |
+| T-06 | **Legacy Sync** | 5 | 4 | 10 | 🚀 (Next) | [design/reference/LEGACY_LOGIC.md](design/reference/LEGACY_LOGIC.md) |
+| T-01 | **Type Tabs** | 3 | 1 | 15 | ✅ | [done/T-01_type_tabs.md](design/done/T-01_type_tabs.md) |
 | — | **Completeness Check** | 3 | 1 | 15 | ✅ | — |
-| T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [spec](design/issues/T-02_field_registry.md) |
+| T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](design/done/T-02_field_registry.md) |
+| T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
+| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor |
 | — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
 | T-05 | **Log Core** | 4 | 2 | 8 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
@@ -50,7 +59,7 @@ links: []
 | T-10 | **Basic Chips** | 3 | 2 | 6 | 📋 | — | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
 | T-11 | **View Modes** | 3 | 4 | 6 | 📋 | Type Tabs | [spec](design/proposals/PROPOSAL_LIBRARY_VIEWS.md) |
 | T-14 | **Smart Chips** | 3 | 3 | 6 | 📋 | Basic Chips | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
-| T-16 | **Advanced Search** | 3 | 3 | 9 | 📋 | — | GitHub #10 |
+| T-16 | **Advanced Search** | 3 | 3 | 9 | 📋 | — | [spec](design/issues/T-16_advanced_search.md) |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -85,8 +94,8 @@ links: []
 
 ### Track A: Data Integrity (Critical Path)
 1. **Item Cleaning** — ✅ DONE (Field Editor Verified)
-2. **Unified Artist View** — 🚀 [Next] Combine Groups + Artists. (Score: 15, Est: 2 hrs)
-3. **Legacy Sync** — Add Album, Genre, Publisher. (Score: 10, Est: 4-6 hrs)
+2. **Unified Artist View** — ✅ DONE (Combined Groups + Artists)
+3. **Legacy Sync** — 🚀 [Next] Add Album, Genre, Publisher. (Score: 10, Est: 4-6 hrs)
 4. **Log Core** — Add history tracking.
 
 ### Track B: User Experience (UI)
@@ -101,5 +110,5 @@ links: []
 | Doc | Purpose |
 |-----|---------|
 | [DATABASE.md](design/DATABASE.md) | Schema governance |
-| [TESTING.md](TESTING.md) | 9-layer yelling |
+| [TESTING.md](TESTING.md) | 10-layer yelling |
 | [LOGGING.md](design/LOGGING.md) | Logging Architecture |

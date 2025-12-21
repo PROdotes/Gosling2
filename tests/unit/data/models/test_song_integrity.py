@@ -25,7 +25,8 @@ def test_song_model_schema_stability():
         "composers",
         "lyricists",
         "producers",
-        "groups"
+        "groups",
+        "unified_artist"
     }
     
     actual_fields = {f.name for f in dataclasses.fields(Song)}
@@ -43,7 +44,7 @@ def test_strict_column_mapping():
     Song data model (or is explicitly ignored with a reason).
     """
     import sqlite3
-    from src.data.repositories.base_repository import BaseRepository
+    from src.data.database import BaseRepository
     
     # 1. Spin up a temporary DB to get the TRUE schema
     # We use :memory: and the actual BaseRepository caching logic might interfere if not handled,

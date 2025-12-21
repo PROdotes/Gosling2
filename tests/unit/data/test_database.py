@@ -1,13 +1,13 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 import sqlite3
 
 class TestBaseRepository:
     """Tests for BaseRepository logic"""
 
-    @patch('src.data.repositories.base_repository.sqlite3')
+    @patch('src.data.database.sqlite3')
     def test_get_connection_rollback_on_error(self, mock_sqlite):
         """Test that transaction is rolled back when exception occurs"""
         mock_conn = MagicMock()
@@ -27,7 +27,7 @@ class TestBaseRepository:
         mock_conn.rollback.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    @patch('src.data.repositories.base_repository.sqlite3')
+    @patch('src.data.database.sqlite3')
     def test_get_connection_commit_on_success(self, mock_sqlite):
         """Test that transaction is committed on success"""
         mock_conn = MagicMock()

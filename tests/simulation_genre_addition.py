@@ -1,6 +1,6 @@
 import pytest
 import sqlite3
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 from src.data.repositories.song_repository import SongRepository
 
 # SIMULATION:

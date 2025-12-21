@@ -2,7 +2,7 @@
 import sqlite3
 from typing import Optional
 from contextlib import contextmanager
-from ..database_config import DatabaseConfig
+from .database_config import DatabaseConfig
 
 
 class BaseRepository:
@@ -78,8 +78,9 @@ class BaseRepository:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Contributors (
                     ContributorID INTEGER PRIMARY KEY,
-                    Name TEXT NOT NULL UNIQUE,
-                    SortName TEXT
+                    ContributorName TEXT NOT NULL UNIQUE,
+                    SortName TEXT,
+                    Type TEXT CHECK(Type IN ('person', 'group'))
                 )
             """)
 
@@ -87,14 +88,14 @@ class BaseRepository:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Roles (
                     RoleID INTEGER PRIMARY KEY,
-                    Name TEXT NOT NULL UNIQUE
+                    RoleName TEXT NOT NULL UNIQUE
                 )
             """)
 
             # Insert default roles
             default_roles = ["Performer", "Composer", "Lyricist", "Producer"]
             cursor.executemany(
-                "INSERT OR IGNORE INTO Roles (Name) VALUES (?)",
+                "INSERT OR IGNORE INTO Roles (RoleName) VALUES (?)",
                 [(r,) for r in default_roles]
             )
 
@@ -119,6 +120,16 @@ class BaseRepository:
                     PRIMARY KEY (GroupID, MemberID),
                     FOREIGN KEY (GroupID) REFERENCES Contributors(ContributorID),
                     FOREIGN KEY (MemberID) REFERENCES Contributors(ContributorID)
+                )
+            """)
+
+            # 8. ContributorAliases
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ContributorAliases (
+                    AliasID INTEGER PRIMARY KEY,
+                    ContributorID INTEGER NOT NULL,
+                    AliasName TEXT NOT NULL,
+                    FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID) ON DELETE CASCADE
                 )
             """)
 

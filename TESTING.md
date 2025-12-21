@@ -8,7 +8,7 @@ Gosling2 employs a rigorous, multi-layered testing strategy to ensure reliabilit
 |------|-------|---------|----------|
 | **Unit Tests** | 260+ | Test individual components in isolation | `tests/unit/` |
 | **Integration** | ~10 | Test component interactions (UI/Services) | `tests/integration/` |
-| **Schema Integrity** | ~50 | Prevent "Silent Data Loss" & DB drift | `tests/unit/` (various) |
+| **Schema Awareness** | ✅ Active (10-layer Enforcement) | Prevent "Silent Data Loss" & DB drift | `tests/unit/` (various) |
 | **Mutation** | ~10 | Verify test quality (kill bugs) | `tests/unit/**/*_mutation.py` |
 
 ---
@@ -17,16 +17,17 @@ Gosling2 employs a rigorous, multi-layered testing strategy to ensure reliabilit
 
 We have a specialized, multi-layered suite of tests designed to enforce a **1:1 Strict Mapping** between the Database Schema and every application layer.
 
-**The "9 Layers of Yell" Verification:**
+**The "10 Layers of Yell" Verification:**
 1.  **Repository**: `SongRepository` checks `sqlite_master` to ensure NO unknown tables exist.
-2.  **Domain**: `Song` model MUST have a field for every `MediaSources`/`Songs` table column.
+2.  **Domain**: `Song` model MUST have a field for every table column.
 3.  **Service**: `LibraryService` MUST expose every DB column as a header.
 4.  **UI (Table)**: `LibraryWidget` columns MUST match Service headers.
 5.  **UI (Viewer)**: `MetadataViewer` MUST map every ID3 tag to a DB column.
 6.  **Search**: Search logic MUST cover all exposed columns.
-7.  **Filter**: `FilterWidget` MUST either filter by a column or explicitly ignore it.
-8.  **Metadata (Read)**: `MetadataService.extract_from_mp3()` MUST attempt extraction for all DB columns.
-9.  **Metadata (Write)**: `MetadataService.write_tags()` MUST handle all Song fields (or explicitly skip).
+7.  **Filter**: `FilterWidget` MUST use Yellberus strategies for all categories.
+8.  **Metadata (Read)**: `MetadataService.extract_from_mp3()` MUST handle all columns.
+9.  **Metadata (Write)**: `MetadataService.write_tags()` MUST handle all portable fields.
+10. **Persistence**: `SettingsManager` MUST save/load layout based on **Field Identity (Names)**, not indices, to survive registry shifts.
 
 **Value**: If you add a column to the Database but forget to update ANY layer, **the system yells immediately**. Silent schema drift is impossible.
 
@@ -34,7 +35,7 @@ We have a specialized, multi-layered suite of tests designed to enforce a **1:1 
 - Layer 2 fails: "Song model missing 'genre' field"
 - Layer 3 fails: "LibraryService not exposing 'genre' header"
 - Layer 9 fails: "write_tags() doesn't handle 'genre' field"
-- All 9 layers must be updated before tests pass ✅
+- All 10 layers must be updated before tests pass ✅
 
 ## 🧬 Layer 2: Mutation Testing
 
@@ -96,17 +97,16 @@ The "Yelling Mechanism" is a living system. As we add features that consume or e
 ---
 
 ## 🏗️ The Field Registry (Yellberus) — LIVE
-
 The "9 Layers of Yell" have been **consolidated** into a centralized **Field Registry (Yellberus)**. This is now the single source of truth for:
 *   **Database Columns**: Dynamic mapping via `yellberus.BASE_QUERY`.
 *   **UI Headers**: Automatically derived from field definitions.
 *   **Validation Rules**: "Requiredness" and min-lengths are defined once.
 *   **Metadata Mapping**: Connection between ID3 frames and Song attributes.
 
-## 🧹 2025-12-19: Consolidation Plan (In Progress)
+## 🧹 2025-12-21: Consolidation Status (COMPLETE)
 
-After the major schema migration, the test suite is currently efficient but fragmented (60+ files). We are in the process of:
-1.  **Merging Fragments**: Folding `add_..._tests.py` and `append_tests.py` snippets back into their core functional counterparts.
-2.  **Shared Fixtures**: Moving repetitive service mocks into a global `conftest.py`.
-3.  **Integrity Folder**: Moving all "Strict Coverage" and "Cross-Ref" tests into a dedicated `tests/unit/integrity/` folder to separate "Infrastructure Tests" from "Logic Tests".
+The "10 Layers of Yell" have been successfully consolidated into the **Yellberus Registry**.
+1.  **Shared Fixtures**: Core functional counterparts now use a global `conftest.py` where appropriate.
+2.  **Integrity Folder**: Infrastructure tests are now sequestered in `tests/unit/integrity/` or specifically named `_integrity.py`.
+3.  **Tool-Assisted Docs**: `FIELD_REGISTRY.md` is now automatically synchronized via `field_editor.py` to prevent "Doc Drift."
 

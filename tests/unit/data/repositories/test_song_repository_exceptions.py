@@ -6,7 +6,7 @@ from src.data.repositories.song_repository import SongRepository
 class TestSongRepositoryExceptions:
     """Test exception handling in SongRepository"""
 
-    @patch('src.data.repositories.base_repository.sqlite3')
+    @patch('src.data.database.sqlite3')
     def test_get_all_songs_error(self, mock_sqlite):
         """Test get_all_songs handles DB error gracefully"""
         mock_conn = MagicMock()
@@ -22,7 +22,7 @@ class TestSongRepositoryExceptions:
         assert headers == []
         assert data == []
 
-    @patch('src.data.repositories.base_repository.sqlite3')
+    @patch('src.data.database.sqlite3')
     def test_delete_song_error(self, mock_sqlite):
         """Test delete_song handles DB error gracefully"""
         mock_conn = MagicMock()

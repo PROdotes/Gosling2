@@ -37,16 +37,16 @@ def test_song_object_mapping_integrity(tmp_path):
         
         # Insert Contributors & Roles
         # Performer
-        cursor.execute("INSERT INTO Contributors (Name, SortName) VALUES (?, ?)", ("Perf One", "Perf One"))
+        cursor.execute("INSERT INTO Contributors (ContributorName, SortName) VALUES (?, ?)", ("Perf One", "Perf One"))
         perf_id = cursor.lastrowid
-        cursor.execute("SELECT RoleID FROM Roles WHERE Name='Performer'")
+        cursor.execute("SELECT RoleID FROM Roles WHERE RoleName='Performer'")
         perf_role_id = cursor.fetchone()[0]
         cursor.execute("INSERT INTO MediaSourceContributorRoles VALUES (?, ?, ?)", (source_id, perf_id, perf_role_id))
         
         # Composer
-        cursor.execute("INSERT INTO Contributors (Name, SortName) VALUES (?, ?)", ("Comp One", "Comp One"))
+        cursor.execute("INSERT INTO Contributors (ContributorName, SortName) VALUES (?, ?)", ("Comp One", "Comp One"))
         comp_id = cursor.lastrowid
-        cursor.execute("SELECT RoleID FROM Roles WHERE Name='Composer'")
+        cursor.execute("SELECT RoleID FROM Roles WHERE RoleName='Composer'")
         comp_role_id = cursor.fetchone()[0]
         cursor.execute("INSERT INTO MediaSourceContributorRoles VALUES (?, ?, ?)", (source_id, comp_id, comp_role_id))
         

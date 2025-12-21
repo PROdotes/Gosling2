@@ -64,3 +64,19 @@ logger.subscribe_to_user_warnings(on_user_warning)
 The Field Registry (`yellberus.py`) automatically checks database integrity at startup. It uses `dev_warning` to report any **Orphan Columns** (columns in DB but not in Registry) or mismatches.
 
 This ensures that while the test suite (Layer 1) catches drift in CI, the Runtime Logger catches drift during development sessions.
+
+## 📝 Implementation Plan (T-07)
+
+### Phase 1: Core Implementation
+- [x] Create `src/core/logger.py` with singleton pattern
+- [x] Implement `dev_warning` and `user_warning` methods
+- [x] Implement `subscribe_to_user_warnings` observer
+- [x] Setup FileHandler and StreamHandler
+
+### Phase 2: Migration (Adoption)
+- [ ] **Infrastructure**: Replace `print()` and `logging.getLogger()` in `app.py`
+- [ ] **Yellberus**: Update `yellberus.py` to use `logger.dev_warning` for integrity checks
+- [ ] **Data Layer**: Inject logger into Repositories for SQL error tracking
+- [ ] **Services**: Update Services to use `logger.user_warning` for business logic failures
+- [ ] **UI**: Connect `MainWindow` to `subscribe_to_user_warnings` (Status Bar)
+

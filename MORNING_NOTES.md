@@ -43,11 +43,6 @@ Listen up—be a competent collaborator, not a cheerleader. Keep the "fangirl" e
 
 ---
 
-### 🔔 End of Day Reminder:
-~~Copy AI notes to NAS for home access:~~ ✅ **DONE** (copied to `\\barbaradio\Niko\`)
-
----
-
 ### 📍 Current Work (Dec 19, Afternoon):
 Building **Field Registry Editor** (`tools/field_editor.py`)
 - See: `design/proposals/FIELD_EDITOR_SPEC.md`

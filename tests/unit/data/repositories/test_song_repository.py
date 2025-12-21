@@ -192,7 +192,7 @@ class TestSongRepository:
         # but roles are hardcoded on init. 
         # We can delete "Performer" role from DB temporarily
         with repository.get_connection() as conn:
-            conn.execute("DELETE FROM Roles WHERE Name='Performer'")
+            conn.execute("DELETE FROM Roles WHERE RoleName='Performer'")
             
         song_missing_role = Song(source_id=file_id, name="Missing Role", performers=["performer"])
         repository.update(song_missing_role)

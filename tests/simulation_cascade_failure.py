@@ -1,7 +1,7 @@
 import pytest
 import sqlite3
 import dataclasses
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 from src.data.repositories.song_repository import SongRepository
 from src.data.models.song import Song
 

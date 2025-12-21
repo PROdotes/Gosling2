@@ -109,11 +109,11 @@ class TestMainWindowEdgeCases:
         
         with patch.object(window.library_widget, 'sender', return_value=mock_action):
             # Check unhide (checked=True -> hidden=False)
-            window.library_widget._toggle_column_visibility(True)
+            window.library_widget._toggle_column_visibility(1, True)
             assert window.library_widget.table_view.isColumnHidden(1) is False
             
             # Check hide (checked=False -> hidden=True)
-            window.library_widget._toggle_column_visibility(False)
+            window.library_widget._toggle_column_visibility(1, False)
             assert window.library_widget.table_view.isColumnHidden(1) is True
 
     def test_play_next_empty_playlist(self, window):

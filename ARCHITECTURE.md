@@ -39,6 +39,9 @@ The application follows a 3-tier architecture pattern:
 Gosling2/
 ├── src/                          # Source code
 │   ├── data/                     # Data Access Layer
+│   │   ├── __init__.py
+│   │   ├── database.py           # Database connection & schema
+│   │   ├── database_config.py    # Database configuration
 │   │   ├── models/               # Data models
 │   │   │   ├── __init__.py
 │   │   │   ├── song.py           # Song entity
@@ -46,11 +49,9 @@ Gosling2/
 │   │   │   └── role.py           # Role entity
 │   │   ├── repositories/         # Data repositories
 │   │   │   ├── __init__.py
-│   │   │   ├── base_repository.py      # Base repository with DB operations
 │   │   │   ├── song_repository.py      # Song data access
 │   │   │   └── contributor_repository.py # Contributor data access
 │   │   ├── __init__.py
-│   │   └── database_config.py    # Database configuration
 │   │
 │   ├── business/                 # Business Logic Layer
 │   │   ├── services/             # Business services
@@ -83,17 +84,12 @@ Gosling2/
 │
 ├── tests/                        # Test suite
 │   ├── unit/                     # Unit tests
-│   │   ├── __init__.py
-│   │   ├── test_song_model.py
-│   │   ├── test_contributor_model.py
-│   │   ├── test_role_model.py
-│   │   ├── test_song_repository.py
-│   │   ├── test_library_service.py
-│   │   └── test_playback_service.py
+│   │   ├── business/             # Service tests
+│   │   ├── core/                 # Registry tests
+│   │   ├── data/                 # Repository & Model tests
+│   │   ├── presentation/         # UI Widget tests
+│   │   └── tools/                # Field Editor & Parser tests
 │   ├── integration/              # Integration tests
-│   │   ├── __init__.py
-│   │   └── test_main_window_integration.py
-│   ├── __init__.py
 │   └── conftest.py               # Test configuration
 │
 ├── sqldb/                        # Database directory (auto-created)
@@ -121,7 +117,7 @@ Gosling2/
   - `Role`: Represents contributor roles (Performer, Composer, etc.)
 
 - **Repositories**: Handle database CRUD operations
-  - `BaseRepository`: Provides database connection management
+  - `BaseRepository` (in `src/data/database.py`): Provides database connection management
   - `SongRepository`: Song-specific database operations
   - `ContributorRepository`: Contributor-specific operations
 
@@ -158,7 +154,7 @@ Gosling2/
 - **SettingsManager**:
   - Centralized application settings
   - Window geometry persistence
-  - Library view preferences
+  - Library view preferences (Name-based; robust against registry changes)
   - Volume and playback state persistence
 
 **Key Features**:
@@ -216,11 +212,12 @@ Gosling2/
 
 ```sql
 Tables:
-- Files: Stores file information
+- MediaSources: Stores common file/track information
+- Songs: Stores music-specific metadata (BPM, Year, etc.)
 - Contributors: Stores artist/composer information
 - Roles: Defines contributor roles
-- FileContributorRoles: Links files, contributors, and roles
-- GroupMembers: Defines group memberships
+- MediaSourceContributorRoles: Junction table linking tracks to contributors
+- GroupMembers: Defines group memberships (Legacy/Future)
 ```
 
 ## Testing Strategy
@@ -232,9 +229,9 @@ Tables:
 - High coverage of business logic
 
 ### Schema Integrity Tests
-- **Prevention of Silent Data Loss**: Ensures Code and Database never drift
-- **Checks**: Table existence, Column presence, Persistence method completeness
-- **Location**: `tests/unit/test_*_schema.py`
+- **Prevention of Silent Data Loss**: Ensures Code and Database never drift.
+- **The "10 Layers of Yell"**: Verifies everything from SQL query to UI Column persistence.
+- **Location**: `tests/unit/**/*_integrity.py` or specifically named integrity tests.
 
 ### Integration Tests
 - Test interaction between components

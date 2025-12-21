@@ -39,6 +39,12 @@ class LibraryService:
         """Get all songs by a specific performer"""
         return self.song_repository.get_by_performer(performer_name)
 
+    def get_songs_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific artist (T-17: Identity Graph aware)"""
+        # Resolve Bob -> [Robert, The Bobs, etc.]
+        related_names = self.contributor_repository.resolve_identity_graph(artist_name)
+        return self.song_repository.get_by_unified_artists(related_names)
+
     def get_songs_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific composer"""
         return self.song_repository.get_by_composer(composer_name)
@@ -52,6 +58,10 @@ class LibraryService:
     def get_all_years(self) -> List[int]:
         """Get all distinct recording years"""
         return self.song_repository.get_all_years()
+
+    def get_all_groups(self) -> List[str]:
+        """Get all distinct group names (T-17: for unified artist filter)"""
+        return self.song_repository.get_all_groups()
 
     def get_songs_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific year"""

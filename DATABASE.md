@@ -21,7 +21,7 @@ Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompa
 **Do not manually modify the schema** without running `pytest` to identify all layers of broken dependencies. The system is designed to "yell" at you if you simply `ALTER TABLE` without updating the code.
 
 > [!IMPORTANT]
-> **Priority Rule:** The "9 Layers of Yell" validation steps (enforced by Yellberus) take priority over everything. You are strictly forbidden from adding columns to the database if they are not actively used by the application logic. **Dead schema elements are treated as bugs.**
+> **Priority Rule:** The "10 Layers of Yell" validation steps (enforced by Yellberus) take priority over everything. You are strictly forbidden from adding columns to the database if they are not actively used by the application logic. **Dead schema elements are treated as bugs.**
 
 ## ✅ Completeness Criteria (IsDone Flag)
 
@@ -65,6 +65,7 @@ erDiagram
     Roles ||--|{ MediaSourceContributorRoles : "defines role"
     Contributors ||--|{ GroupMembers : "is group"
     Contributors ||--|{ GroupMembers : "is member"
+    Contributors ||--|{ ContributorAliases : "has"
 
     Types {
         INTEGER TypeID PK
@@ -110,6 +111,12 @@ erDiagram
     GroupMembers {
         INTEGER GroupID PK
         INTEGER MemberID PK
+    }
+
+    ContributorAliases {
+        INTEGER AliasID PK
+        INTEGER ContributorID FK
+        TEXT AliasName
     }
 ```
 
@@ -387,8 +394,8 @@ erDiagram
 ```
 
 > **Implementation Status Overview:**
-> - ✅ **Implemented (7 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers
-> - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, ContributorAliases, Albums, SongAlbums, AlbumPublishers, Publishers, Agencies, Clients, Campaigns
+> - ✅ **Implemented (8 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases
+> - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, Albums, SongAlbums, AlbumPublishers, Publishers, Agencies, Clients, Campaigns
 > - ⏸️ **Planned (Audit):** ChangeLog, DeletedRecords, PlayHistory, ActionLog
 > - 🔮 **Future (Broadcast):** Timeslots, ContentRules
 
@@ -812,7 +819,12 @@ Alternative names for contributors (for search).
 ContributorID=42, Name="P!nk"
 Aliases: "Pink", "Alecia Moore", "Alecia Beth Moore"
 ```
-Searching for "Moore" finds all P!nk songs.
+
+**Search Strategy (Identity Resolution):**
+1.  **Resolve**: Search for "Moore" → Finds ContributorID=42.
+2.  **Expand**: Retrieve all identities for ID 42: `['P!nk', 'Pink', 'Alecia Moore', 'Alecia Beth Moore']`.
+3.  **Query**: Select songs where `Performer` IN (list of identities).
+    *   *Note: This avoids multiple self-joins in the main library query.*
 
 **Constraints:**
 - `ON DELETE CASCADE` from `Contributors`

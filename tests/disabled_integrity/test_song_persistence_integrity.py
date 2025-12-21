@@ -2,7 +2,7 @@ import pytest
 import sqlite3
 from unittest.mock import MagicMock, patch
 from src.data.repositories.song_repository import SongRepository
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 from src.data.models.song import Song
 
 def test_repository_update_fields_coverage(tmp_path):

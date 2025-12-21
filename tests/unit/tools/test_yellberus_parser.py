@@ -76,9 +76,9 @@ class TestWriteFieldRegistryMd:
         assert "| Name | UI Header |" in content
         assert "|------|-----------|" in content
         
-        # Check field rows
-        assert "| `title` | Title | MS.Name | TEXT | Yes | Yes | No | Yes | Yes | Yes | TIT2 |" in content
-        assert "| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | Yes | No | No | Yes | TBPM |" in content
+        # Check field rows (now includes empty Strategy column)
+        assert "| `title` | Title | MS.Name | TEXT |  | Yes | Yes | No | Yes | Yes | Yes | TIT2 |" in content
+        assert "| `bpm` | BPM | S.TempoBPM | INTEGER |  | Yes | Yes | Yes | No | No | Yes | TBPM |" in content
         
         # Check total updated
         assert "**Total: 2 fields**" in content
@@ -168,11 +168,11 @@ class TestWriteYellberus:
         backup = tmp_path / "yellberus.py.bak"
         assert backup.exists()
 
-    def test_explicit_writing(self, tmp_path):
-        """Test that all values are written explicitly (not sparse).
+    def test_sparse_writing(self, tmp_path):
+        """Test that values matching defaults are NOT written (sparse writing).
         
-        Design decision: We write all boolean attributes explicitly to prevent
-        'doc drift' bugs where implicit defaults could cause confusion.
+        Design decision: We write only non-default values to keep field definitions
+        clean and minimal.
         """
         real_yellberus = Path(__file__).parent.parent.parent.parent / "src" / "core" / "yellberus.py"
         test_yellberus = tmp_path / "yellberus.py"
@@ -185,11 +185,11 @@ class TestWriteYellberus:
                 ui_header="Test",
                 db_column="T.Test",
                 field_type="TEXT",
-                visible=True,      # would be default
-                filterable=False,  # would be default
-                searchable=False,  # would be default
-                required=False,    # would be default
-                portable=True,     # would be default
+                visible=True,      # matches default - NOT written
+                filterable=False,  # matches default - NOT written
+                searchable=True,   # matches default - NOT written
+                required=False,    # matches default - NOT written
+                portable=True,     # matches default - NOT written
             ),
         ]
         
@@ -204,12 +204,12 @@ class TestWriteYellberus:
         assert field_block is not None
         block_text = field_block.group(0)
         
-        # All boolean attributes SHOULD appear (explicit writing)
-        assert "visible=True" in block_text
-        assert "filterable=False" in block_text
-        assert "searchable=False" in block_text
-        assert "required=False" in block_text
-        assert "portable=True" in block_text
+        # Sparse: values matching defaults should NOT appear
+        assert "visible=" not in block_text  # True is default
+        assert "filterable=" not in block_text  # False is default
+        assert "searchable=" not in block_text  # True is default
+        assert "required=" not in block_text  # False is default
+        assert "portable=" not in block_text  # True is default
 
     def test_roundtrip(self, tmp_path):
         """Test 7.6: Load → Save → Load produces identical data."""

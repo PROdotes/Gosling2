@@ -6,7 +6,7 @@ links: []
 ---
 # Gosling2 - Project Summary
 
-## ✅ Project Status: ACTIVE DEVELOPMENT
+## ✅ Project Status: ACTIVE FEATURE DEVELOPMENT
 
 The Gosling2 music library is currently under active feature development, following a successful 3-tier architecture refactoring.
 
@@ -16,8 +16,9 @@ The Gosling2 music library is currently under active feature development, follow
 
 ### 1. **Complete Architecture Refactoring**
 - ✅ Separated the monolithic ~1000-line `main.py` into a clean 3-tier architecture
-- ✅ Created proper separation of concerns across Data, Business, and Presentation layers
-- ✅ Implemented industry-standard design patterns (Repository, Service Layer, MVC)
+- ✅ Implemented Repository, Service Layer, and MVC patterns
+- ✅ **Infrastructure**: Established Yellberus Field Registry as the Single Source of Truth
+- ✅ **Tools**: Built Field Editor for safe, tool-assisted registry management
 
 ### 2. **Project Structure**
 ```
@@ -132,9 +133,10 @@ python setup.py
 | Data Models | ~20 | ✅ Passed |
 | Repositories | ~30 | ✅ Passed |
 | Services | ~40 | ✅ Passed |
-| Widgets | ~110 | ✅ Passed |
-| Schema Strictness | ~50 | ✅ Passed |
-| **Total** | **274** | **✅ All Passing** |
+| Widgets / UI | ~160 | ✅ Passed |
+| Schema / Registry | ~100 | ✅ Passed |
+| Tools & Parsers | ~7 | ✅ Passed |
+| **Total** | **357** | **✅ All Passing** |
 
 ---
 
@@ -203,6 +205,8 @@ python setup.py
 - ✅ Context managers for resources
 - ✅ Service layer abstraction
 - ✅ Repository pattern for data access
+- ✅ **Dynamic Filtering**: Strategy-based tree view in FilterWidget
+- ✅ **Column Persistence**: Resilient named-based layout state
 
 ---
 
@@ -212,7 +216,7 @@ python setup.py
 |--------|--------|-------|-------------|
 | Main file size | 1006 lines | ~450 lines | 55% reduction |
 | Files | 3 | 30+ | Modular structure |
-| Test coverage | 0% | 35 tests | Full test suite |
+| Test coverage | 0% | 357 tests | Full test suite |
 | Type hints | Minimal | Complete | 100% |
 | Documentation | Basic | Comprehensive | 3 doc files |
 
@@ -240,7 +244,7 @@ See `MIGRATION.md` for complete migration guide.
 ### Unit Tests (`tests/unit/`)
 - Test individual components in isolation
 - Mock external dependencies
-- Fast execution (~0.5s for 35 tests)
+- Fast execution (~11s for 357 tests)
 - High coverage of business logic
 
 ### Integration Tests (`tests/integration/`)
@@ -321,7 +325,7 @@ See `MIGRATION.md` for complete migration guide.
 | PyQt6 desktop app | ✅ Working |
 | Standard project structure | ✅ Implemented |
 | Separated resources | ✅ In `src/resources/` |
-| Unit tests | ✅ 35 tests passing |
+| Unit tests | ✅ 357 tests passing |
 | Best practices | ✅ Followed |
 | Documentation | ✅ Comprehensive |
 | Database compatibility | ✅ Preserved |
@@ -358,7 +362,7 @@ pytest
 
 ---
 
-**Project Status: ✅ COMPLETE AND READY FOR USE**
+**Project Status: 👷 ACTIVE FEATURE ENHANCEMENT**
 
-All requirements met, all tests passing, fully documented!
+All core architectural goals met; currently expanding legacy metadata support and polishing UX.
 

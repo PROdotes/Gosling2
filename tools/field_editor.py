@@ -18,7 +18,7 @@ if str(_project_root) not in sys.path:
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidget, QTableWidgetItem, QHeaderView, QPushButton, QLabel,
-    QGroupBox, QCheckBox, QComboBox
+    QGroupBox, QCheckBox, QComboBox, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
@@ -28,13 +28,16 @@ from tools.yellberus_parser import parse_yellberus, FieldSpec, FIELD_DEFAULTS
 # Field type options for dropdown
 FIELD_TYPES = ["TEXT", "INTEGER", "REAL", "BOOLEAN", "LIST", "DURATION", "DATETIME"]
 
+# Strategy options (Filter or Grouping)
+STRATEGY_OPTIONS = ["", "Range Filter", "Boolean Toggle", "Decade Grouping", "First Letter"]
+
 # Column definitions for the Defaults table
 DEFAULTS_COLUMNS = ["visible", "editable", "filterable", "searchable", "required", "portable"]
 
 # Column definitions for the Fields table
 FIELDS_COLUMNS = [
-    "Name", "UI Header", "DB Column", "Type",
-    "Vis", "Edit", "Filt", "Search", "Req", "Port", "ID3 Tag"
+    "Name", "UI Header", "DB Column", "Type", "Strategy",
+    "Vis", "Edit", "Filt", "Search", "Req", "Port", "ID3 Tag", "Validation"
 ]
 
 # Tooltips for column headers (for Grandma)
@@ -43,13 +46,15 @@ COLUMN_TOOLTIPS = {
     1: "UI Header - Display name shown in the application",
     2: "DB Column - Database table.column reference",
     3: "Type - Data type (TEXT, INTEGER, LIST, etc.)",
-    4: "Visible - Show this field in the main table",
-    5: "Editable - Allow user to edit this field",
-    6: "Filterable - Can filter by this field in the sidebar",
-    7: "Searchable - Include in global search",
-    8: "Required - Must be filled for 'Done' status",
-    9: "Portable - Sync to ID3 tags in audio files",
-    10: "ID3 Tag - The ID3 frame code (e.g., TIT2 for title)",
+    4: "Strategy - Filter or Grouping logic (Range, Decade, First Letter)",
+    5: "Visible - Show this field in the main table",
+    6: "Editable - Allow user to edit this field",
+    7: "Filterable - Can filter by this field in the sidebar",
+    8: "Searchable - Include in global search",
+    9: "Required - Must be filled for 'Done' status",
+    10: "Portable - Sync to ID3 tags in audio files",
+    11: "ID3 Tag - The ID3 frame code (e.g., TIT2 for title)",
+    12: "Validation - Cross-field validation rules (e.g. One-or-Other)",
 }
 
 class FieldEditorWindow(QMainWindow):
@@ -175,10 +180,16 @@ class FieldEditorWindow(QMainWindow):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)   # DB Column
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)     # Type
         self.fields_table.setColumnWidth(3, 100)  # Wide enough for "DURATION"
-        for col in range(4, 10):  # Boolean columns (Vis, Edit, Filt, Search, Req, Port)
+        # Filter (4) & Group (5)
+        self.fields_table.setColumnWidth(4, 100)
+        self.fields_table.setColumnWidth(5, 120)
+
+        for col in range(6, 12):  # Boolean columns (Vis, Edit, Filt, Search, Req, Port)
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             self.fields_table.setColumnWidth(col, 50)
-        header.setSectionResizeMode(10, QHeaderView.ResizeMode.Stretch)   # ID3 Tag
+        
+        header.setSectionResizeMode(12, QHeaderView.ResizeMode.Stretch)   # ID3 Tag
+        header.setSectionResizeMode(13, QHeaderView.ResizeMode.Stretch)   # Validation
 
         # Add tooltips to abbreviated column headers (for Grandma)
         for col, tooltip in COLUMN_TOOLTIPS.items():
@@ -209,7 +220,6 @@ class FieldEditorWindow(QMainWindow):
 
         layout.addWidget(fields_group)
 
-        # Legend Row
         legend_layout = QHBoxLayout()
         legend_layout.setContentsMargins(4, 0, 4, 0)
         legend_layout.setSpacing(12)
@@ -311,6 +321,9 @@ class FieldEditorWindow(QMainWindow):
         else:
             self._md_fields = {}
 
+        # T-19: Load Validation Groups
+        self._validation_map = self._parse_validation_info(yellberus_path)
+
         # Populate table
         self._populate_fields_table(code_fields)
 
@@ -325,31 +338,64 @@ class FieldEditorWindow(QMainWindow):
     def _populate_fields_table(self, fields: list):
         """Populate the Fields table with FieldSpec objects."""
         # CRITICAL: Disable sorting while populating to prevent rows from jumping
-        # mid-write (the "Data Gobling" bug).
         sorting_was_enabled = self.fields_table.isSortingEnabled()
         self.fields_table.setSortingEnabled(False)
 
         self.fields_table.setRowCount(len(fields))
+        
+        # T-19: Get validation info map if available
+        validation_map = getattr(self, "_validation_map", {})
 
         for row, field in enumerate(fields):
-            # Name
-            self.fields_table.setItem(row, 0, QTableWidgetItem(field.name))
-            # UI Header
+            # Name (with Query Tooltip if has custom SQL)
+            name_item = QTableWidgetItem(field.name)
+            if hasattr(field, 'extra_attributes') and 'query_expression' in field.extra_attributes:
+                sql = field.extra_attributes['query_expression']
+                name_item.setToolTip(f"Custom SQL:\n{sql}")
+                # Bold + italic to indicate custom query
+                font = name_item.font()
+                font.setBold(True)
+                font.setItalic(True)
+                name_item.setFont(font)
+            self.fields_table.setItem(row, 0, name_item)
+            
+            # UI Header & DB Column
             self.fields_table.setItem(row, 1, QTableWidgetItem(field.ui_header))
-            # DB Column
             self.fields_table.setItem(row, 2, QTableWidgetItem(field.db_column))
+            
             # Type (dropdown)
             self._set_type_dropdown(row, 3, field.field_type)
-            # Boolean columns: Vis, Edit, Filt, Search, Req, Port (columns 4-9)
-            self._set_checkbox_cell(row, 4, field.visible)
-            self._set_checkbox_cell(row, 5, field.editable)
-            self._set_checkbox_cell(row, 6, field.filterable)
-            self._set_checkbox_cell(row, 7, field.searchable)
-            self._set_checkbox_cell(row, 8, field.required)
-            self._set_checkbox_cell(row, 9, field.portable)
-            # ID3 Tag - lookup from id3_frames.json
+            
+            # Strategy (4) - Now a single field
+            strategy = getattr(field, 'strategy', 'list')
+            strategy_display = {
+                "range": "Range Filter",
+                "boolean": "Boolean Toggle", 
+                "decade_grouper": "Decade Grouping",
+                "first_letter_grouper": "First Letter",
+            }.get(strategy, "")
+            
+            self._set_editable_combo(row, 4, strategy_display, STRATEGY_OPTIONS)
+            
+            # Boolean columns: Vis, Edit, Filt, Search, Req, Port (columns 5-10)
+            self._set_checkbox_cell(row, 5, field.visible)
+            self._set_checkbox_cell(row, 6, field.editable)
+            self._set_checkbox_cell(row, 7, field.filterable)
+            self._set_checkbox_cell(row, 8, field.searchable)
+            self._set_checkbox_cell(row, 9, field.required)
+            self._set_checkbox_cell(row, 10, field.portable)
+            
+            # ID3 Tag (11)
             id3_tag = self._lookup_id3_tag(field.name)
-            self.fields_table.setItem(row, 10, QTableWidgetItem(id3_tag or ""))
+            self.fields_table.setItem(row, 11, QTableWidgetItem(id3_tag or ""))
+            
+            # Validation (12) - Read Only
+            val_info = validation_map.get(field.name, "")
+            val_item = QTableWidgetItem(val_info)
+            val_item.setFlags(val_item.flags() & ~Qt.ItemFlag.ItemIsEditable) # Read only
+            if val_info:
+                val_item.setToolTip("From VALIDATION_GROUPS")
+            self.fields_table.setItem(row, 12, val_item)
 
         # Restore sorting state
         self.fields_table.setSortingEnabled(sorting_was_enabled)
@@ -471,8 +517,8 @@ class FieldEditorWindow(QMainWindow):
         checkbox = QCheckBox()
         checkbox.setChecked(checked)
 
-        # Special handling for portable column (col 8)
-        if col == 8:
+        # Special handling for portable column (col 10)
+        if col == 10:
             checkbox.toggled.connect(lambda chk: self._handle_checkbox_toggle(checkbox, is_portable=True))
         else:
             checkbox.toggled.connect(lambda chk: self._handle_checkbox_toggle(checkbox))
@@ -525,7 +571,7 @@ class FieldEditorWindow(QMainWindow):
         # We need to find which column triggered this.
         # Since we bound the lambda only with 'row', we have to infer or check all checkbox cols?
         # Better: iterate checkable columns for this row and update their sort items.
-        for col in range(4, 9): # Boolean columns
+        for col in range(5, 11): # Boolean columns (Vis=5 -> Port=10)
             widget = self.fields_table.cellWidget(row, col)
             if widget:
                 cb = widget.findChild(QCheckBox)
@@ -544,12 +590,12 @@ class FieldEditorWindow(QMainWindow):
             if name_item:
                 field_name = name_item.text()
                 id3_tag = self._lookup_id3_tag(field_name)
-                # Update ID3 Tag cell (column 9)
-                id3_item = self.fields_table.item(row, 9)
+                # Update ID3 Tag cell (column 11)
+                id3_item = self.fields_table.item(row, 11)
                 if id3_item:
                     id3_item.setText(id3_tag)
                 else:
-                    self.fields_table.setItem(row, 9, QTableWidgetItem(id3_tag))
+                    self.fields_table.setItem(row, 11, QTableWidgetItem(id3_tag))
 
         self._mark_row_dirty(row)
 
@@ -573,6 +619,15 @@ class FieldEditorWindow(QMainWindow):
 
         combo.currentIndexChanged.connect(lambda idx: self._on_dropdown_changed(row))
 
+        self.fields_table.setCellWidget(row, col, combo)
+
+    def _set_editable_combo(self, row: int, col: int, current_val: str, options: list):
+        """Create an editable combo box for Filter/Group columns."""
+        combo = QComboBox()
+        combo.setEditable(True)
+        combo.addItems(options)
+        combo.setCurrentText(current_val)
+        combo.currentTextChanged.connect(lambda t: self._on_dropdown_changed(row))
         self.fields_table.setCellWidget(row, col, combo)
 
     def _set_cell_bg(self, row: int, col: int, color_hex: str):
@@ -626,13 +681,23 @@ class FieldEditorWindow(QMainWindow):
         def get_default(name):
             return self.default_checkboxes[name].isChecked() if name in self.default_checkboxes else False
 
-        self._set_checkbox_cell(row, 4, get_default("visible"))
-        self._set_checkbox_cell(row, 5, get_default("editable"))
-        self._set_checkbox_cell(row, 6, get_default("filterable"))
-        self._set_checkbox_cell(row, 7, get_default("searchable"))
-        self._set_checkbox_cell(row, 8, get_default("required"))
-        self._set_checkbox_cell(row, 9, get_default("portable"))
-        self.fields_table.setItem(row, 10, QTableWidgetItem(""))  # ID3 Tag
+        # Strategy (4) - Default empty
+        self._set_editable_combo(row, 4, "", STRATEGY_OPTIONS)
+
+        self._set_checkbox_cell(row, 5, get_default("visible"))
+        self._set_checkbox_cell(row, 6, get_default("editable"))
+        self._set_checkbox_cell(row, 7, get_default("filterable"))
+        self._set_checkbox_cell(row, 8, get_default("searchable"))
+        self._set_checkbox_cell(row, 9, get_default("required"))
+        self._set_checkbox_cell(row, 10, get_default("portable"))
+        
+        # ID3 Tag (11)
+        self.fields_table.setItem(row, 11, QTableWidgetItem(""))
+        
+        # Validation (12)
+        val_item = QTableWidgetItem("")
+        val_item.setFlags(val_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.fields_table.setItem(row, 12, val_item)
 
         # Restore sorting and focus
         self.fields_table.setSortingEnabled(sorting_was_enabled)
@@ -692,10 +757,11 @@ class FieldEditorWindow(QMainWindow):
         new_fields = 0
 
         col_map = {
-            0: 'name', 1: 'ui_header', 2: 'db_column', 3: 'field_type',
-            4: 'visible', 5: 'editable', 6: 'filterable', 7: 'searchable', 8: 'required', 9: 'portable',
-            10: 'id3_tag'
-        }
+        0: 'name', 1: 'ui_header', 2: 'db_column', 3: 'field_type',
+        4: 'strategy',
+        5: 'visible', 6: 'editable', 7: 'filterable', 8: 'searchable', 9: 'required', 10: 'portable',
+        11: 'id3_tag'
+    }
 
         for row in range(count):
             spec = self._get_field_spec_from_row(row)
@@ -792,18 +858,28 @@ class FieldEditorWindow(QMainWindow):
                 return cb.isChecked() if cb else False
             return False
 
+        # Parse Strategy (Column 4)
+        strategy_display = combo(4)
+        strategy = {
+            "Range Filter": "range",
+            "Boolean Toggle": "boolean",
+            "Decade Grouping": "decade_grouper",
+            "First Letter": "first_letter_grouper",
+        }.get(strategy_display, "list")
+
         return FieldSpec(
             name=txt(0),
             ui_header=txt(1),
             db_column=txt(2),
             field_type=combo(3),
-            visible=check(4),
-            editable=check(5),
-            filterable=check(6),
-            searchable=check(7),
-            required=check(8),
-            portable=check(9),
-            id3_tag=txt(10) or None
+            strategy=strategy,
+            visible=check(5),
+            editable=check(6),
+            filterable=check(7),
+            searchable=check(8),
+            required=check(9),
+            portable=check(10),
+            id3_tag=txt(11) or None
         )
 
     def _apply_row_colors(self, row: int):
@@ -819,13 +895,54 @@ class FieldEditorWindow(QMainWindow):
         # Map cols back to attribute names for source checking
         col_map = {
             0: 'name', 1: 'ui_header', 2: 'db_column', 3: 'field_type',
-            4: 'visible', 5: 'editable', 6: 'filterable', 7: 'searchable', 8: 'required', 9: 'portable',
-            10: 'id3_tag'
+            # 4 is Strategy (Special handling)
+            5: 'visible', 6: 'editable', 7: 'filterable', 8: 'searchable', 9: 'required', 10: 'portable',
+            11: 'id3_tag', 12: 'validation'
         }
         for col in range(self.fields_table.columnCount()):
+            # Name column (0) - never show blue (doc drift), star indicates query_expression
+            if col == 0:
+                # Only show red (code diff) or green (new), never blue
+                final_color = None
+                if not code_orig and not md_orig:
+                    final_color = self.COLOR_NEW_FIELD
+                self._set_cell_bg(row, col, final_color)
+                continue
+            
+            # Handle Strategy (Column 4)
+            if col == 4:
+                cell_code_diff = False
+                cell_md_diff = False
+                
+                # Check Code
+                if code_orig:
+                    c_strat = current_spec.strategy or "list"
+                    o_strat = code_orig.strategy or "list"
+                    if c_strat != o_strat:
+                        cell_code_diff = True
+                elif not code_orig:
+                    cell_code_diff = True
+
+                # Check MD (MD doesn't have strategy, skip blue)
+                # cell_md_diff stays False
+                
+                # Apply Color Logic (Reuse standard logic block? No, easier to set explicit)
+                final_color = None
+                if cell_code_diff and cell_md_diff: final_color = self.COLOR_DIFFERS_BOTH
+                elif cell_code_diff: final_color = self.COLOR_DIFFERS_CODE
+                elif cell_md_diff: final_color = self.COLOR_DIFFERS_MD
+                elif not code_orig and not md_orig: final_color = self.COLOR_NEW_FIELD
+                
+                self._set_cell_bg(row, col, final_color)
+                continue
+
             attr = col_map.get(col)
             if not attr:
-                continue # specific buttons or spacers? (Columns are fixed 0-9)
+                continue # specific buttons or spacers?
+
+            # T-19 Check: Validation is not part of FieldSpec
+            if attr == 'validation':
+                continue
 
             final_color = None
 
@@ -869,8 +986,8 @@ class FieldEditorWindow(QMainWindow):
                 cell_md_diff = True
 
             # C. Determine Priority
-            # Special case: ID3 Tag column (10) when portable=False -> disabled/black
-            if col == 10:
+            # Special case: ID3 Tag column (11) when portable=False -> disabled/black
+            if col == 11:
                 portable_val = current_spec.portable
                 if not portable_val:
                     final_color = self.COLOR_DISABLED
@@ -918,6 +1035,7 @@ class FieldEditorWindow(QMainWindow):
                     ui_header=ui_spec.ui_header,
                     db_column=ui_spec.db_column,
                     field_type=ui_spec.field_type,
+                    strategy=ui_spec.strategy,
                     visible=ui_spec.visible,
                     editable=ui_spec.editable,
                     filterable=ui_spec.filterable,
@@ -1053,6 +1171,49 @@ class FieldEditorWindow(QMainWindow):
                 event.ignore()
         else:
             event.accept()
+
+    def _parse_validation_info(self, path: Path) -> dict:
+        """Parse VALIDATION_GROUPS from yellberus.py to map fields to rules."""
+        import ast
+        try:
+            if not path.exists():
+                return {}
+
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+                try:
+                    tree = ast.parse(content)
+                except SyntaxError:
+                    return {}
+            
+            # Find VALIDATION_GROUPS assignment
+            for node in tree.body:
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name) and target.id == "VALIDATION_GROUPS":
+                            
+                            try:
+                                # Use unparse to strip comments, then literal_eval
+                                clean_source = ast.unparse(node.value)
+                                val_list = ast.literal_eval(clean_source)
+                            except (ValueError, TypeError):
+                                continue
+
+                            result = {}
+                            if isinstance(val_list, list):
+                                for group in val_list:
+                                    if not isinstance(group, dict): continue
+                                    
+                                    name = group.get('name', '')
+                                    fields = group.get('fields', [])
+                                    
+                                    if name and isinstance(fields, list):
+                                        f_str = ", ".join(str(f) for f in fields)
+                                        result[name] = f_str
+                            return result
+            return {}
+        except Exception:
+            return {}
 
 def main():
     """Entry point for the Field Registry Editor."""

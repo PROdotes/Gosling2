@@ -4,7 +4,7 @@ from src.business.services.metadata_service import MetadataService
 import sqlite3
 import tempfile
 import os
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 
 def test_strict_extraction_coverage():
     """

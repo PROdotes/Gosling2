@@ -37,11 +37,13 @@ def test_filterable_fields():
     
     # Check filterable fields
     assert any(f.name == "recording_year" for f in filterable)
-    assert any(f.name == "performers" for f in filterable)
+    assert any(f.name == "unified_artist" for f in filterable)  # T-17: unified_artist replaces performers/groups
     
-    # Check non-filterable fields
+    # Check non-filterable fields (including now-hidden performers/groups)
     assert not any(f.name == "title" for f in filterable)
     assert not any(f.name == "duration" for f in filterable)
+    assert not any(f.name == "performers" for f in filterable)  # Hidden, use unified_artist
+    assert not any(f.name == "groups" for f in filterable)  # Hidden, use unified_artist
 
 def test_decade_grouper():
     """Test the decade grouping logic."""
@@ -56,7 +58,6 @@ def test_decade_grouper():
 def test_field_properties():
     """Test specific properties of a complex field."""
     field = yellberus.get_field("performers")
-    assert field.required is True
     assert field.min_length == 1
     assert field.field_type == FieldType.LIST
     assert field.db_column == "Performers"
@@ -81,10 +82,10 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching FIELDS order (15 columns):
+    # Create a mock row matching FIELDS order (17 columns):
     # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
     # 6:producers, 7:lyricists, 8:duration, 9:title,
-    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
+    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers, 15:groups, 16:unified_artist
     row = (
         "/path",           # 0: path
         1,                 # 1: file_id
@@ -101,12 +102,14 @@ def test_row_to_tagged_tuples():
         2024,              # 12: recording_year
         "Artist",          # 13: performers
         "Composer",        # 14: composers
+        "Group",           # 15: groups
+        "Unified",         # 16: unified_artist
     )
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 15 tuples
-    assert len(tagged) == 15
+    # Should have 17 tuples
+    assert len(tagged) == 17
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -120,7 +123,7 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    # Row matching current FIELDS order (15 columns)
+    # Row matching current FIELDS order (17 columns)
     row = (
         "/music/test.mp3", # 0: path
         1,                 # 1: file_id
@@ -137,6 +140,8 @@ def test_song_from_row():
         2024,              # 12: recording_year
         "Artist 1, Artist 2",  # 13: performers
         "Bach",            # 14: composers
+        "Test Group",      # 15: groups
+        "Unified Artist",  # 16: unified_artist
     )
     
     song = Song.from_row(row)

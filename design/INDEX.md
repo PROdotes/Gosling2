@@ -10,11 +10,12 @@ Master list of all features, proposals, and tasks. Open in Obsidian "Graph View"
 
 ## Active Tasks
 
-- [[T-01_type_tabs]] — Type Tabs (🟢 Next)
-- [[T-02_field_registry]] — Field Registry (🟡 Planned)
+- [[T-01_type_tabs]] — Type Tabs (✅ Done)
+- [[T-02_field_registry]] — Field Registry (✅ Done)
 - [[T-03_inline_edit]] — Inline Edit (🟡 Planned)
 - [[T-05_log_core]] — Log Core (🟡 Planned)
 - [[T-15_column_customization]] — Column Customization (✅ Done)
+- [[T-18_column_persistence]] — Column Persistence (✅ Done)
 
 ---
 

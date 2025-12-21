@@ -13,6 +13,7 @@ class Song(MediaSource):
     bpm: Optional[int] = None
 
     recording_year: Optional[int] = None
+    unified_artist: Optional[str] = None
     
     # Relationships
     performers: List[str] = field(default_factory=list)

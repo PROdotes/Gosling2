@@ -61,7 +61,7 @@ def test_metadata_extraction_coverage():
     
     # 6. Compare
     ignored_fields = {
-        'type_id', 'notes', 'is_active'
+        'type_id', 'notes', 'is_active', 'unified_artist'
     }
     missing_fields = model_fields - extracted_fields - ignored_fields
     

@@ -260,7 +260,7 @@ FieldDef(
 - [ ] **7.2** UNIT TEST: `test_generate_python_block()` produces valid Python.
 - [ ] **7.3** Implement AST-based replacement of FIELDS list in yellberus.py.
 - [ ] **7.4** TEST: Save, verify yellberus.py updated correctly.
-- [ ] **7.5** Run `pytest` after save → all 330 tests pass.
+- [ ] **7.5** Run `pytest` after save → all 357 tests pass.
 - [ ] **7.6** TEST: Load again after save → roundtrip produces identical data.
 
 ### Phase 8: Validation & Polish
@@ -294,7 +294,7 @@ Before this tool touches production files:
    - `test_roundtrip()` — Parse → Edit → Save → Parse again = identical data.
 
 2. **Integration Tests**
-   - Load real `yellberus.py`, modify one field, save, run `pytest` → all 330 tests pass.
+   - Load real `yellberus.py`, modify one field, save, run `pytest` → all 357 tests pass.
    - Add a new field via UI, save, verify it appears in both MD and PY.
 
 3. **Safety Tests**

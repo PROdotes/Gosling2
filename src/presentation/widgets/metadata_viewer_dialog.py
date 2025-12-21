@@ -37,11 +37,12 @@ class MetadataViewerDialog(QDialog):
         layout.addWidget(QLabel(f"<b>File:</b> {file_name}"))
         layout.addWidget(QLabel(f"<b>Path:</b> {self.file_song.path}"))
 
-        # Table
+        # Table (read-only comparison view)
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Field", "File (Source)", "Library (Database)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Read-only
         layout.addWidget(self.table)
 
         # Buttons

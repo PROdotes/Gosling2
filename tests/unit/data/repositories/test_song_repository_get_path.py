@@ -19,7 +19,7 @@ def temp_db():
     
     # Initialize DB (create tables)
     # Initialize DB using the application's actual schema logic
-    from src.data.repositories.base_repository import BaseRepository
+    from src.data.database import BaseRepository
     BaseRepository(db_path)
     
     # Verify tables exist (sanity check)

@@ -1,2 +1,0 @@
-DB Columns: set()
-Mapped Attributes: {'recording_year', 'performers', 'producers', 'composers', 'is_done', 'album_artists', 'formatted_duration', 'title', 'bpm', 'isrc'}

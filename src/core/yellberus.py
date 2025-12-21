@@ -40,8 +40,7 @@ class FieldDef:
     
     # Filter behavior
     filterable: bool = False
-    filter_type: str = "list"         # "list", "range", "boolean"
-    grouping_function: Optional[Callable[[Any], str]] = None # Logic for branches (e.g. 1984 -> "1980s")
+    strategy: str = "list"  # "list", "range", "boolean", "decade_grouper", "first_letter_grouper"
     
     # Mapping
     model_attr: Optional[str] = None  # Song model property (defaults to name)
@@ -73,6 +72,22 @@ def decade_grouper(year: Any) -> str:
     except (ValueError, TypeError):
         return "Unknown"
 
+# Helper to group by first letter
+def first_letter_grouper(value: Any) -> str:
+    if not value:
+        return "#"
+    s = str(value).strip().upper()
+    if not s:
+        return "#"
+    first = s[0]
+    return first if first.isalpha() else "#"
+
+# Lookup for grouping functions by strategy name
+GROUPERS = {
+    "decade_grouper": decade_grouper,
+    "first_letter_grouper": first_letter_grouper,
+}
+
 # NOTE: The order of this list MUST match the columns in BASE_QUERY!
 FIELDS: List[FieldDef] = [
     FieldDef(
@@ -81,7 +96,6 @@ FIELDS: List[FieldDef] = [
         db_column="MS.Source",
         visible=False,
         editable=False,
-        filterable=False,
         searchable=False,
         required=True,
         portable=False,
@@ -94,7 +108,6 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         visible=False,
         editable=False,
-        filterable=False,
         searchable=False,
         required=True,
         portable=False,
@@ -107,43 +120,29 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         visible=False,
         editable=False,
-        filterable=False,
         searchable=False,
-        required=False,
         portable=False,
     ),
     FieldDef(
         name="notes",
         ui_header="Notes",
         db_column="MS.Notes",
-        visible=True,
-        editable=True,
-        filterable=False,
-        searchable=True,
-        required=False,
+        searchable=False,
         portable=False,
     ),
     FieldDef(
         name="isrc",
         ui_header="ISRC",
         db_column="S.ISRC",
-        visible=True,
-        editable=True,
-        filterable=False,
-        searchable=True,
-        required=False,
-        portable=True,
+        searchable=False,
     ),
     FieldDef(
         name="is_active",
         ui_header="Active",
         db_column="MS.IsActive",
         field_type=FieldType.BOOLEAN,
-        visible=True,
-        editable=True,
         filterable=True,
         searchable=False,
-        required=False,
         portable=False,
     ),
     FieldDef(
@@ -151,35 +150,24 @@ FIELDS: List[FieldDef] = [
         ui_header="Producer",
         db_column="Producers",
         field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
         filterable=True,
-        searchable=True,
-        required=False,
-        portable=True,
-        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Producer' THEN C.Name END, ', ') AS Producers",
+        strategy="first_letter_grouper",
+        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Producer' THEN C.ContributorName END, ', ') AS Producers",
     ),
     FieldDef(
         name="lyricists",
         ui_header="Lyricist",
         db_column="Lyricists",
         field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
         filterable=True,
-        searchable=True,
-        required=False,
-        portable=True,
-        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Lyricist' THEN C.Name END, ', ') AS Lyricists",
+        strategy="first_letter_grouper",
+        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Lyricist' THEN C.ContributorName END, ', ') AS Lyricists",
     ),
     FieldDef(
         name="duration",
         ui_header="Duration",
         db_column="MS.Duration",
         field_type=FieldType.DURATION,
-        visible=True,
-        editable=True,
-        filterable=False,
         searchable=False,
         required=True,
         portable=False,
@@ -189,12 +177,7 @@ FIELDS: List[FieldDef] = [
         name="title",
         ui_header="Title",
         db_column="MS.Name",
-        visible=True,
-        editable=True,
-        filterable=False,
-        searchable=True,
         required=True,
-        portable=True,
         min_length=1,
     ),
     FieldDef(
@@ -202,80 +185,81 @@ FIELDS: List[FieldDef] = [
         ui_header="Status",
         db_column="S.IsDone",
         field_type=FieldType.BOOLEAN,
-        visible=True,
-        editable=True,
         filterable=True,
         searchable=False,
-        required=False,
         portable=False,
-        filter_type="boolean",
+        strategy="boolean",
     ),
     FieldDef(
         name="bpm",
         ui_header="BPM",
         db_column="S.TempoBPM",
         field_type=FieldType.INTEGER,
-        visible=True,
-        editable=True,
         filterable=True,
         searchable=False,
-        required=False,
-        portable=True,
         min_value=0,
-        filter_type="range",
+        strategy="range",
     ),
     FieldDef(
         name="recording_year",
         ui_header="Year",
         db_column="S.RecordingYear",
         field_type=FieldType.INTEGER,
-        visible=True,
-        editable=True,
         filterable=True,
-        searchable=True,
         required=True,
-        portable=True,
-        grouping_function=decade_grouper,
+        strategy="decade_grouper",
     ),
     FieldDef(
         name="performers",
-        ui_header="Artist",
+        ui_header="Performers",
         db_column="Performers",
         field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=True,
-        required=True,
-        portable=True,
+        visible=False,
+        searchable=False,
         min_length=1,
-        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Performer' THEN C.Name END, ', ') AS Performers",
+        strategy="first_letter_grouper",
+        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ') AS Performers",
     ),
     FieldDef(
         name="composers",
         ui_header="Composer",
         db_column="Composers",
         field_type=FieldType.LIST,
-        visible=True,
-        editable=True,
         filterable=True,
-        searchable=True,
         required=True,
-        portable=True,
         min_length=1,
-        query_expression="GROUP_CONCAT(CASE WHEN R.Name = 'Composer' THEN C.Name END, ', ') AS Composers",
+        strategy="first_letter_grouper",
+        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Composer' THEN C.ContributorName END, ', ') AS Composers",
     ),
     FieldDef(
         name="groups",
         ui_header="Groups",
         db_column="S.Groups",
-        visible=True,
-        editable=True,
-        filterable=True,
-        searchable=True,
-        required=False,
-        portable=True,
+        visible=False,
+        searchable=False,
     ),
+    FieldDef(
+        name="unified_artist",
+        ui_header="Artist",
+        db_column="UnifiedArtist",
+        editable=False,
+        filterable=True,
+        portable=False,
+        strategy="first_letter_grouper",
+        query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
+    ),
+]
+
+# ==================== CROSS-FIELD VALIDATION RULES ====================
+# Rules that span multiple fields (can't be expressed per-field)
+
+VALIDATION_GROUPS = [
+    {
+        "name": "unified_artist",
+        "rule": "at_least_one",  # At least one of these fields must be populated
+        "fields": ["performers", "groups"],
+        "message": "Song must have at least one performer or group"
+    },
 ]
 
 # ==================== QUERY GENERATION ====================
@@ -317,6 +301,82 @@ def get_filterable_fields() -> List[FieldDef]:
 def get_required_fields() -> List[FieldDef]:
     """Get fields marked as required for validation."""
     return [f for f in FIELDS if f.required]
+
+def validate_row(row_data: list) -> set:
+    """
+    Validate a row of data against Yellberus field definitions.
+    Returns a set of field names that failed validation.
+    
+    Checks:
+    1. Per-field: required, min_length, min_value
+    2. Cross-field: rules defined in VALIDATION_GROUPS
+    """
+    failed_fields = set()
+    field_indices = {f.name: i for i, f in enumerate(FIELDS)}
+    
+    # Per-field validation
+    for col_idx, cell_value in enumerate(row_data):
+        if col_idx >= len(FIELDS):
+            break
+            
+        field_def = FIELDS[col_idx]
+        is_valid = True
+        
+        # Check required
+        if field_def.required:
+            if cell_value is None or (isinstance(cell_value, str) and not cell_value.strip()):
+                is_valid = False
+        
+        # Check list min_length
+        if is_valid and field_def.field_type == FieldType.LIST:
+            if field_def.required and not cell_value:
+                is_valid = False
+            elif cell_value and field_def.min_length is not None:
+                items = [x.strip() for x in str(cell_value).split(',') if x.strip()]
+                if len(items) < field_def.min_length:
+                    is_valid = False
+        
+        # Check text min_length
+        elif is_valid and field_def.field_type == FieldType.TEXT:
+            if cell_value and field_def.min_length is not None:
+                if len(str(cell_value).strip()) < field_def.min_length:
+                    is_valid = False
+        
+        # Check numeric min_value
+        elif is_valid and field_def.field_type in (FieldType.INTEGER, FieldType.REAL, FieldType.DURATION):
+            if cell_value is not None and field_def.min_value is not None:
+                try:
+                    if float(cell_value) < field_def.min_value:
+                        is_valid = False
+                except (ValueError, TypeError):
+                    pass
+        
+        if not is_valid:
+            failed_fields.add(field_def.name)
+    
+    # Cross-field validation from VALIDATION_GROUPS
+    for group in VALIDATION_GROUPS:
+        rule = group.get("rule")
+        fields = group.get("fields", [])
+        
+        if rule == "at_least_one":
+            # Check if at least one of the fields has a value
+            has_any = False
+            for field_name in fields:
+                idx = field_indices.get(field_name)
+                if idx is not None and idx < len(row_data):
+                    val = row_data[idx]
+                    if val and str(val).strip():
+                        has_any = True
+                        break
+            
+            if not has_any:
+                # Mark all fields in the group as failing
+                for field_name in fields:
+                    failed_fields.add(field_name)
+    
+    return failed_fields
+
 
 # ==================== SCHEMA VALIDATION ====================
 

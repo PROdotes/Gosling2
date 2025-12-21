@@ -39,10 +39,11 @@ db_manager.py
 ```
 app.py ← Entry point
 src/
+  ├── core/         ← Registry & Logic
   ├── data/         ← Database layer
   ├── business/     ← Business logic  
   └── presentation/ ← UI layer
-tests/              ← 230+ tests!
+tests/              ← 350+ tests!
 ```
 
 ---
@@ -59,7 +60,7 @@ tests/              ← 230+ tests!
 ## 🆕 What's New?
 
 ✨ **Clean Architecture** - Easy to maintain and extend  
-✨ **35 Unit Tests** - All passing!  
+✨ **357 Unit Tests** - All passing!  
 ✨ **Type Hints** - Better code quality  
 ✨ **Documentation** - Comprehensive guides  
 ✨ **Best Practices** - Industry-standard patterns
@@ -87,7 +88,7 @@ pytest tests/unit/test_song_model.py
 
 ### Setup & Verify
 ```bash
-python setup.py
+python app.py
 ```
 
 ---
@@ -129,18 +130,19 @@ python setup.py
 
 ## 🧪 Testing
 
-**35 tests, all passing!**
+**357 tests, all passing!**
 
 ```bash
 $ pytest
-===== 35 passed in 0.52s =====
+===== 357 passed in 11.48s =====
 ```
 
 Tests cover:
 - ✅ Data models
 - ✅ Repositories  
 - ✅ Services
-- ✅ Integration
+- ✅ 10-Layer Integrity
+- ✅ UI & Widgets
 
 ---
 
@@ -167,9 +169,9 @@ Tests cover:
 
 ### Database
 - SQLite storage
-- Metadata extraction
+- Yellberus Registry extraction
 - Artist/composer tracking
-- Full-text search
+- Full-text search and Strategy-based filtering
 
 ---
 
@@ -260,8 +262,8 @@ pytest -v
 
 | Aspect | Before | After |
 |--------|--------|-------|
-| Files | 3 | 30+ modular files |
-| Tests | 0 | 35 passing |
+| Files | 3 | 40+ modular files |
+| Tests | 0 | 357 passing |
 | Architecture | Monolithic | 3-tier |
 | Type hints | Partial | Complete |
 | Documentation | Basic | Comprehensive |
@@ -306,7 +308,7 @@ pytest -v
 
 The application is ready to use with:
 - ✅ Core features working (see `MIGRATION_GAPS.md`)
-- ✅ 35 tests passing
+- ✅ 357 tests passing
 - ✅ Clean architecture
 - ✅ Full documentation
 

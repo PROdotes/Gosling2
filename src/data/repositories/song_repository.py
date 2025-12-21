@@ -1,7 +1,7 @@
 """Song Repository for database operations"""
 import os
 from typing import List, Optional, Tuple
-from .base_repository import BaseRepository
+from src.data.database import BaseRepository
 from ..models.song import Song
 from ...core import yellberus
 
@@ -142,7 +142,7 @@ class SongRepository(BaseRepository):
                 continue
 
             # Get RoleID
-            cursor.execute("SELECT RoleID FROM Roles WHERE Name = ?", (role_name,))
+            cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
             role_row = cursor.fetchone()
             if not role_row:
                 continue
@@ -155,11 +155,11 @@ class SongRepository(BaseRepository):
 
                 # Insert or get contributor
                 cursor.execute(
-                    "INSERT OR IGNORE INTO Contributors (Name, SortName) VALUES (?, ?)",
+                    "INSERT OR IGNORE INTO Contributors (ContributorName, SortName) VALUES (?, ?)",
                     (contributor_name, contributor_name)
                 )
                 cursor.execute(
-                    "SELECT ContributorID FROM Contributors WHERE Name = ?",
+                    "SELECT ContributorID FROM Contributors WHERE ContributorName = ?",
                     (contributor_name,)
                 )
                 contributor_row = cursor.fetchone()
@@ -182,7 +182,7 @@ class SongRepository(BaseRepository):
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE C.Name = ? AND R.Name = 'Performer' AND MS.IsActive = 1
+                    WHERE C.ContributorName = ? AND R.RoleName = 'Performer' AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
@@ -203,7 +203,7 @@ class SongRepository(BaseRepository):
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE C.Name = ? AND R.Name = 'Composer' AND MS.IsActive = 1
+                    WHERE C.ContributorName = ? AND R.RoleName = 'Composer' AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
@@ -213,6 +213,39 @@ class SongRepository(BaseRepository):
                 return headers, data
         except Exception as e:
             print(f"Error fetching songs by composer: {e}")
+            return [], []
+
+    def get_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Legacy wrapper - resolves to get_by_unified_artists with single name"""
+        return self.get_by_unified_artists([artist_name])
+
+    def get_by_unified_artists(self, names: List[str]) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a list of related artists (T-17: Identity Graph)"""
+        if not names:
+            return [], []
+            
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Create dynamic placeholders for IN clause
+                placeholders = ",".join(["?"] * len(names))
+                # We need to provide names twice: once for Groups, once for Performers
+                params = names + names
+                
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
+                    WHERE (S.Groups IN ({placeholders}) OR (C.ContributorName IN ({placeholders}) AND R.RoleName = 'Performer')) 
+                      AND MS.IsActive = 1
+                    {yellberus.QUERY_GROUP_BY}
+                    ORDER BY MS.SourceID DESC
+                """
+                cursor.execute(query, params)
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            print(f"Error fetching songs by unified artists: {e}")
             return [], []
 
     def get_by_path(self, path: str) -> Optional[Song]:
@@ -254,7 +287,7 @@ class SongRepository(BaseRepository):
                 
                 # Fetch roles
                 cursor.execute("""
-                    SELECT R.Name, C.Name
+                    SELECT R.RoleName, C.ContributorName
                     FROM MediaSourceContributorRoles MSCR
                     JOIN Roles R ON MSCR.RoleID = R.RoleID
                     JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
@@ -285,6 +318,34 @@ class SongRepository(BaseRepository):
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
             print(f"Error getting all years: {e}")
+            return []
+
+    def get_all_groups(self) -> List[str]:
+        """Get list of all unified artists (Groups + Performers) for the filter tree"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT DISTINCT Groups FROM Songs WHERE Groups IS NOT NULL AND Groups != ''
+                    UNION
+                    SELECT DISTINCT C.ContributorName 
+                    FROM Contributors C
+                    JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                    JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE R.RoleName = 'Performer'
+                    UNION
+                    SELECT DISTINCT M.ContributorName
+                    FROM Contributors M
+                    JOIN GroupMembers GM ON M.ContributorID = GM.MemberID
+                    JOIN MediaSourceContributorRoles MSCR ON GM.GroupID = MSCR.ContributorID
+                    JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    WHERE R.RoleName = 'Performer'
+                    ORDER BY 1
+                """
+                cursor.execute(query)
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error getting all unified artists: {e}")
             return []
 
     def get_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:

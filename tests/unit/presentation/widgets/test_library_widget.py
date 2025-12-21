@@ -33,13 +33,13 @@ def library_widget(qtbot, mock_dependencies):
     # Must return 15 columns matching current Yellberus schema
     headers = [f.db_column for f in yellberus.FIELDS] 
     
-    # Current FIELDS order (15 columns):
+    # Current FIELDS order (17 columns):
     # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
     # 6:producers, 7:lyricists, 8:duration, 9:title,
-    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
+    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers, 15:groups, 16:unified_artist
     data = [
-        ["/path/a.mp3", 1, 1, "N1", "ISRC1", 1, "Prod A", "Lyr A", 180.0, "Title A", 1, 120, 2020, "Performer A", "Comp A"],
-        ["/path/b.mp3", 2, 1, "N2", "ISRC2", 1, "Prod B", "Lyr B", 240.0, "Title B", 0, 128, 2021, "Performer B", "Comp B"]
+        ["/path/a.mp3", 1, 1, "N1", "ISRC1", 1, "Prod A", "Lyr A", 180.0, "Title A", 1, 120, 2020, "Performer A", "Comp A", "Group A", "Unified A"],
+        ["/path/b.mp3", 2, 1, "N2", "ISRC2", 1, "Prod B", "Lyr B", 240.0, "Title B", 0, 128, 2021, "Performer B", "Comp B", "Group B", "Unified B"]
     ]
     
     lib_service.get_all_songs.return_value = (headers, data)
@@ -233,9 +233,9 @@ def test_filter_by_year(library_widget, mock_dependencies):
     """Test filtering by year requests data from service."""
     lib_service, _, _ = mock_dependencies
     
-    # Return 1 row matching current FIELDS order (15 columns)
-    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers
-    row = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 1, 100, 2020, "P", "C"]
+    # Return 1 row matching current FIELDS order (17 columns)
+    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
+    row = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 1, 100, 2020, "P", "C", "G", "U"]
     lib_service.get_songs_by_year.return_value = ([f.name for f in yellberus.FIELDS], [row])
     
     library_widget._filter_by_year(2020)
@@ -250,27 +250,31 @@ def test_column_visibility_toggle(library_widget, mock_dependencies):
     """Test toggling columns updates view and saves settings."""
     _, _, settings = mock_dependencies
     
-    action = MagicMock()
-    action.data.return_value = 0 # Column 0
+    # Toggle column 0 (path) to be shown (checked=True)
+    # The signature is now (column_index, checked)
+    library_widget._toggle_column_visibility(0, True) 
     
-    with patch.object(library_widget, 'sender', return_value=action):
-        library_widget._toggle_column_visibility(False) 
-    
-    assert library_widget.table_view.isColumnHidden(0)
-    # Replaced logic: calls set_column_layout now
+    # Column 0 should NOT be hidden now
+    assert not library_widget.table_view.isColumnHidden(0)
     settings.set_column_layout.assert_called()
 
 def test_load_column_visibility(library_widget, mock_dependencies):
-    """Test that visibility settings are applied on load."""
+    """Test that visibility settings are applied on load (only for Yellberus-visible columns)."""
     _, _, settings = mock_dependencies
     
-    # Hide col 1, Show col 2
-    settings.get_column_visibility.return_value = {"1": False, "2": True}
+    # settings now uses get_column_layout which returns a dict
+    settings.get_column_layout.return_value = {
+        "order": ["title", "performers"],
+        "hidden": {"notes": True, "title": False}, # notes is col 3, title is col 9
+        "widths": {}
+    }
     
     library_widget._load_column_visibility_states()
     
-    assert library_widget.table_view.isColumnHidden(1)
-    assert not library_widget.table_view.isColumnHidden(2)
+    # Column 3 should be hidden (user preference to hide a visible column)
+    assert library_widget.table_view.isColumnHidden(3)
+    # Column 9 should be visible (user preference to keep visible)
+    assert not library_widget.table_view.isColumnHidden(9)
 
 def test_show_table_context_menu(library_widget, mock_dependencies):
     """Test context menu shows correct actions and triggers them."""
@@ -292,15 +296,12 @@ def test_show_column_context_menu(library_widget):
         
         library_widget._show_column_context_menu(QPoint(0,0))
         
-        # Schema has 15 columns (Groups temporarily removed)
-        # Plus "Reset to Default" action = 16
-        expected_columns = 15
-        expected_total = expected_columns + 1
-        
-        assert library_widget.library_model.columnCount() == expected_columns, \
-            "Model column count mismatch!"
-            
-        assert mock_menu_instance.addAction.call_count == expected_total
+    # Only visible fields should be in the menu now (Hard Ban)
+    from src.core import yellberus
+    visible_count = len([f for f in yellberus.FIELDS if f.visible])
+    expected_total = visible_count + 1  # Fields + Reset to Default
+    
+    assert mock_menu_instance.addAction.call_count == expected_total
 
 def test_show_id3_tags_dialog(library_widget, mock_dependencies):
     """Test interaction with MetadataViewerDialog."""
@@ -327,11 +328,11 @@ def test_numeric_sorting(library_widget, mock_dependencies):
     from PyQt6.QtCore import Qt
     lib_service, _, _ = mock_dependencies
     
-    # Test data matching current FIELDS order (15 columns):
-    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers
-    rowA = ["p", 1, 1, "N", "I", 1, "Pr", "L", 10.0, "A", 1, 10, 2000, "P", "C"]
-    rowB = ["p", 2, 1, "N", "I", 1, "Pr", "L", 20.0, "B", 1, 20, 2010, "P", "C"]
-    rowC = ["p", 3, 1, "N", "I", 1, "Pr", "L", 30.0, "C", 1, 30, 2020, "P", "C"]
+    # Test data matching current FIELDS order (17 columns):
+    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
+    rowA = ["p", 1, 1, "N", "I", 1, "Pr", "L", 10.0, "A", 1, 10, 2000, "P", "C", "G", "U"]
+    rowB = ["p", 2, 1, "N", "I", 1, "Pr", "L", 20.0, "B", 1, 20, 2010, "P", "C", "G", "U"]
+    rowC = ["p", 3, 1, "N", "I", 1, "Pr", "L", 30.0, "C", 1, 30, 2020, "P", "C", "G", "U"]
     
     # Shuffle for testing
     data = [rowC, rowA, rowB] 
@@ -376,3 +377,89 @@ def test_table_schema_integrity(library_widget, mock_dependencies):
     for i, f in enumerate(yellberus.FIELDS):
         ui_header = model.headerData(i, Qt.Orientation.Horizontal)
         assert ui_header == f.ui_header
+
+def test_unified_artist_validation(library_widget):
+    """
+    Cross-field validation: a song needs performers OR groups, not both.
+    Tests yellberus.validate_row which is called by the widget.
+    """
+    # Build a row with neither performers nor groups
+    # 17 columns: path, file_id, type_id, notes, isrc, is_active, producers, lyricists,
+    #             duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
+    row_no_artist = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "", "C", "", ""]
+    
+    failed = yellberus.validate_row(row_no_artist)
+    assert "performers" in failed, "Missing performers should fail when groups also empty"
+    assert "groups" in failed, "Missing groups should fail when performers also empty"
+    
+    # Row with performers but no groups - should pass
+    row_with_performer = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "Artist", "C", "", ""]
+    failed = yellberus.validate_row(row_with_performer)
+    assert "performers" not in failed
+    assert "groups" not in failed
+    
+    # Row with groups but no performers - should also pass
+    row_with_group = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "", "C", "Band", ""]
+    failed = yellberus.validate_row(row_with_group)
+    assert "performers" not in failed
+    assert "groups" not in failed
+
+def test_persistence_uses_names_not_indices(library_widget, mock_dependencies):
+    """T-18: Verify that moving a column saves field NAMES, not indices."""
+    _, _, settings = mock_dependencies
+    header = library_widget.table_view.horizontalHeader()
+    
+    # Use a real title column
+    idx_title = get_idx("title")
+    
+    # 1. Simulate moving column "title" to visual index 0
+    header.moveSection(idx_title, 0)
+    
+    # 2. Extract the call arguments from set_column_layout
+    assert settings.set_column_layout.called
+    args, kwargs = settings.set_column_layout.call_args
+    
+    order = args[0]
+    # The first element in the saved order should be the NAME "title"
+    assert "title" in order
+    assert order[0] == "title"
+    
+    # Also verify widths are captured
+    widths = kwargs.get("widths", {})
+    assert "title" in widths
+
+def test_atomic_lifecycle_preserves_widths_on_filter(library_widget, mock_dependencies):
+    """T-18: Verify that manual widths survive a table rebuild (Atomic Lifecycle)."""
+    lib_service, _, settings = mock_dependencies
+    
+    # 1. Setup Mock State: Make the mock "remember" what it was told
+    stored_layout = {"order": [], "hidden": {}, "widths": {}}
+    
+    def mock_set_layout(order, hidden, name="default", widths=None):
+        stored_layout["order"] = order
+        stored_layout["hidden"] = hidden
+        stored_layout["widths"] = widths or {}
+        
+    def mock_get_layout(name="default"):
+        return stored_layout if stored_layout["order"] else None
+
+    settings.set_column_layout.side_effect = mock_set_layout
+    settings.get_column_layout.side_effect = mock_get_layout
+    
+    # 2. Set a custom width for 'Title' (Logical 9)
+    idx_title = get_idx("title")
+    library_widget.table_view.setColumnWidth(idx_title, 555)
+    
+    # 3. Mock the service to return new data on filter
+    lib_service.get_songs_by_performer.return_value = (
+        [f.db_column for f in yellberus.FIELDS], 
+        [["filtered_path", 1, 1, "", "", 1, "", "", 120.0, "Filtered Title", 1, 120, 2020, "Artist", "", "", ""]]
+    )
+    
+    # 4. Trigger a filter (which calls _populate_table)
+    library_widget._filter_by_performer("Artist")
+    
+    # 5. Verify 'Title' still has the custom width
+    # The atomic lifecycle snapshots the 555px and restores it after the rebuild
+    assert library_widget.table_view.columnWidth(idx_title) == 555
+

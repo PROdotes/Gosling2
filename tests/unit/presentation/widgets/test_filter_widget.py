@@ -25,37 +25,36 @@ class TestFilterWidget:
         return FilterWidget(mock_library)
 
     def test_reset_filter_signal(self, widget):
-        """Test that clicking a category header emits reset_filter"""
+        """Test that double-clicking a category header emits reset_filter (T-17 UX Refinement)"""
         mock_slot = MagicMock()
         widget.reset_filter.connect(mock_slot)
         
         # Find first root item (any category header)
         root_index = widget.tree_model.index(0, 0)
-        item = widget.tree_model.itemFromIndex(root_index)
         
-        # Simulate click on category header
-        widget._on_tree_clicked(root_index)
+        # Simulate double-click on category header
+        widget._on_tree_double_clicked(root_index)
         
         mock_slot.assert_called_once()
 
     def test_filter_by_performer_signal(self, widget):
-        """Test that clicking a performer emits filter_by_performer"""
+        """Test that clicking an artist emits filter_by_unified_artist (T-17: unified_artist)"""
         mock_slot = MagicMock()
-        widget.filter_by_performer.connect(mock_slot)
+        widget.filter_by_unified_artist.connect(mock_slot)
         
-        # Add a fake performer item using the new field name
+        # Add a fake artist item using unified_artist field
         from PyQt6.QtGui import QStandardItem
-        performer_item = QStandardItem("Test Performer")
-        performer_item.setData("Test Performer", Qt.ItemDataRole.UserRole)
-        performer_item.setData("performers", Qt.ItemDataRole.UserRole + 1)  # New: field name
-        widget.tree_model.appendRow(performer_item)
+        artist_item = QStandardItem("Test Artist")
+        artist_item.setData("Test Artist", Qt.ItemDataRole.UserRole)
+        artist_item.setData("unified_artist", Qt.ItemDataRole.UserRole + 1)
+        widget.tree_model.appendRow(artist_item)
         
-        index = widget.tree_model.indexFromItem(performer_item)
+        index = widget.tree_model.indexFromItem(artist_item)
         
         # Simulate click
         widget._on_tree_clicked(index)
         
-        mock_slot.assert_called_with("Test Performer")
+        mock_slot.assert_called_with("Test Artist")
 
     def test_filter_by_composer_signal(self, widget):
         """Test that clicking a composer emits filter_by_composer"""
@@ -130,7 +129,7 @@ class TestFilterWidget:
         """
         # Get expected categories from Yellberus
         expected = {field.ui_header for field in yellberus.get_filterable_fields() 
-                   if field.filter_type != "range"}  # Range filters not yet implemented
+                   if field.strategy != "range"}  # Range filters not yet implemented
         
         # Get actual roots from tree
         actual = set()

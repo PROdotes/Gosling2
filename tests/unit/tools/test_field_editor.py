@@ -88,7 +88,7 @@ class TestEditing:
     
     def test_checkbox_widgets_exist(self, editor_window):
         """4.3/4.4: Boolean columns have checkbox widgets."""
-        widget = editor_window.fields_table.cellWidget(0, 4)  # visible column
+        widget = editor_window.fields_table.cellWidget(0, 5)  # visible column (after Strategy)
         assert widget is not None
         cb = widget.findChild(QCheckBox)
         assert cb is not None
@@ -146,8 +146,8 @@ class TestValidation:
         # Find a row that's currently not portable (e.g., file_id is portable=False)
         # Toggle portable ON and check if ID3 tag cell updates
         
-        # file_id should be row 0, portable column is 8, ID3 tag is column 9
-        portable_widget = editor_window.fields_table.cellWidget(0, 8)
+        # file_id should be row 0, portable column is 10, ID3 tag is column 11
+        portable_widget = editor_window.fields_table.cellWidget(0, 10)
         cb = portable_widget.findChild(QCheckBox)
         
         # Toggle ON
@@ -155,7 +155,7 @@ class TestValidation:
         cb.setChecked(True)
         
         # Check ID3 tag cell (should be empty since file_id has no ID3 mapping)
-        id3_item = editor_window.fields_table.item(0, 9)
+        id3_item = editor_window.fields_table.item(0, 11)
         # file_id has no JSON mapping, so should stay empty
         # But the lookup should have been attempted
         
@@ -392,8 +392,8 @@ class TestFieldSpecExtraction:
         
         spec = editor_window._get_field_spec_from_row(0)
         
-        # Get actual checkbox state for visible (col 4)
-        widget = editor_window.fields_table.cellWidget(0, 4)
+        # Get actual checkbox state for visible (col 5 after Strategy)
+        widget = editor_window.fields_table.cellWidget(0, 5)
         cb = widget.findChild(QCheckBox)
         expected_visible = cb.isChecked()
         

@@ -7,26 +7,27 @@
 
 ## 📋 Current Fields
 
-| Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
-|------|-----------|-----------|------|---------|----------|------------|------------|----------|----------|---------|
-| `path` | Path | MS.Source | TEXT | No | No | No | No | Yes | No | — |
-| `file_id` | ID | MS.SourceID | INTEGER | No | No | No | No | Yes | No | — |
-| `type_id` | Type | MS.TypeID | INTEGER | No | No | No | No | No | No | — |
-| `notes` | Notes | MS.Notes | TEXT | Yes | Yes | No | Yes | No | No | — |
-| `isrc` | ISRC | S.ISRC | TEXT | Yes | Yes | No | Yes | No | Yes | TSRC |
-| `is_active` | Active | MS.IsActive | BOOLEAN | Yes | Yes | Yes | No | No | No | — |
-| `producers` | Producer | Producers | LIST | Yes | Yes | Yes | Yes | No | Yes | TIPL |
-| `lyricists` | Lyricist | Lyricists | LIST | Yes | Yes | Yes | Yes | No | Yes | TEXT |
-| `duration` | Duration | MS.Duration | DURATION | Yes | Yes | No | No | Yes | No | TLEN |
-| `title` | Title | MS.Name | TEXT | Yes | Yes | No | Yes | Yes | Yes | TIT2 |
-| `is_done` | Status | S.IsDone | BOOLEAN | Yes | Yes | Yes | No | No | No | — |
-| `bpm` | BPM | S.TempoBPM | INTEGER | Yes | Yes | Yes | No | No | Yes | TBPM |
-| `recording_year` | Year | S.RecordingYear | INTEGER | Yes | Yes | Yes | Yes | Yes | Yes | TDRC |
-| `performers` | Artist | Performers | LIST | Yes | Yes | Yes | Yes | Yes | Yes | TPE1 |
-| `composers` | Composer | Composers | LIST | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
-| `groups` | Groups | S.Groups | TEXT | Yes | Yes | Yes | Yes | No | Yes | TIT1 |
+| Name | UI Header | DB Column | Type | Strategy | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag | Validation |
+|------|-----------|-----------|------|----------|---------|----------|------------|------------|----------|----------|---------|------------|
+| `path` | Path | MS.Source | TEXT |  | No | No | No | No | Yes | No | — |
+| `file_id` | ID | MS.SourceID | INTEGER |  | No | No | No | No | Yes | No | — |
+| `type_id` | Type | MS.TypeID | INTEGER |  | No | No | No | No | No | No | — |
+| `notes` | Notes | MS.Notes | TEXT |  | Yes | Yes | No | No | No | No | — |
+| `isrc` | ISRC | S.ISRC | TEXT |  | Yes | Yes | No | No | No | Yes | TSRC |
+| `is_active` | Active | MS.IsActive | BOOLEAN |  | Yes | Yes | Yes | No | No | No | — |
+| `producers` | Producer | Producers | LIST | First Letter | Yes | Yes | Yes | Yes | No | Yes | TIPL |
+| `lyricists` | Lyricist | Lyricists | LIST | First Letter | Yes | Yes | Yes | Yes | No | Yes | TEXT |
+| `duration` | Duration | MS.Duration | DURATION |  | Yes | Yes | No | No | Yes | No | TLEN |
+| `title` | Title | MS.Name | TEXT |  | Yes | Yes | No | Yes | Yes | Yes | TIT2 |
+| `is_done` | Status | S.IsDone | BOOLEAN | Boolean Toggle | Yes | Yes | Yes | No | No | No | — |
+| `bpm` | BPM | S.TempoBPM | INTEGER | Range Filter | Yes | Yes | Yes | No | No | Yes | TBPM |
+| `recording_year` | Year | S.RecordingYear | INTEGER | Decade Grouping | Yes | Yes | Yes | Yes | Yes | Yes | TDRC |
+| `performers` | Performers | Performers | LIST | First Letter | No | Yes | No | No | No | Yes | TPE1 |
+| `composers` | Composer | Composers | LIST | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
+| `groups` | Groups | S.Groups | TEXT |  | No | Yes | No | No | No | Yes | TIT1 |
+| `unified_artist` | Artist | UnifiedArtist | TEXT | First Letter | Yes | No | Yes | Yes | No | No | — |
 
-**Total: 16 fields**
+**Total: 17 fields**
 
 ---
 
@@ -43,12 +44,17 @@
 ## 📖 Field Property Definitions
 
 | Property | Meaning |
-|----------|---------|
-| **Visible** | Shown in the Library table by default. |
-| **Filterable** | Can be used in the Filter Tree sidebar. |
-| **Searchable** | Included in the global search box query. |
-| **Required** | Must have a value for "Done" status. |
-| **Portable** | Written to ID3 tags (travels with the file). |
+| :--- | :--- |
+| **Name** | Internal field identifier (used in code). |
+| **UI Header** | Label shown in the column header and metadata editors. |
+| **DB Column** | SQL expression (Column name or joined field). |
+| **Type** | Data type of the field (`string`, `integer`, `boolean`, `list`). |
+| **Visible** | **Hard Constraint**: Shown in table by default; hidden fields are banned from UI toggle menus and resets. |
+| **Editable** | Determines if the field can be modified by the user in editors. |
+| **Filterable** | Can be used as a branch in the side-panel Filter Tree. |
+| **Searchable** | Field is included in global search box queries. |
+| **Required** | Must have a value for the song to be marked as "Done". |
+| **Portable** | Written back to MP3 ID3 tags during export. |
 
 ---
 
@@ -62,4 +68,8 @@
    - `src/resources/id3_frames.json` (if portable)
    - Database schema (migration or DDL)
    - `MetadataService` (read/write logic)
+
+5. **Advanced Logic (Manual)**:
+   - The `query_expression` (SQL) property is currently managed manually in `src/core/yellberus.py`.
+   - **Safety**: The Field Editor preserves this value but cannot display or edit it.
    - Model (`Song.py` or `MediaSource.py`)

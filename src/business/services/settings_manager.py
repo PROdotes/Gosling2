@@ -14,7 +14,7 @@ class SettingsManager:
     
     # Library settings
 
-    KEY_LIBRARY_LAYOUTS = "library/layouts"  # New: loadout-ready structure
+    KEY_LIBRARY_LAYOUTS = "library/column_layouts"  # Robust structure (Named visibility + order)
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
     KEY_TYPE_FILTER = "library/typeFilter"
     
@@ -89,7 +89,7 @@ class SettingsManager:
         """
         Get column layout (order and hidden) for a named layout.
         
-        Returns dict with 'order' (list of all column indices) and 'hidden' (list of hidden column indices).
+        Returns dict with 'order' (list of field names) and 'hidden' (map of name -> bool).
         Returns empty dict if no layout saved.
         """
         layouts = self._settings.value(self.KEY_LIBRARY_LAYOUTS, {})
@@ -98,14 +98,18 @@ class SettingsManager:
         layout = layouts.get(layout_name, {})
         return layout.get("columns", {})
     
-    def set_column_layout(self, order: list, hidden: list, layout_name: str = "default") -> None:
+    def set_column_layout(self, order: list, hidden: list, layout_name: str = "default", widths: dict = None) -> None:
         """
-        Save column layout (order and hidden) for a named layout.
+        Save column layout (order, hidden, widths) for a named layout.
         
         Args:
-            order: List of ALL column indices in visual order
-            hidden: List of column indices that are hidden
+            order: List of field names in visual order
+            hidden: Map of hidden columns (name -> bool)
             layout_name: Name of the layout (default: "default")
+            widths: Map of column widths (name -> int)
+            
+        Note: This is critical for persisting user resizing. LibraryWidget should call this
+        BEFORE repopulating the table (e.g. on filter change) to prevent layout reset.
         """
         layouts = self._settings.value(self.KEY_LIBRARY_LAYOUTS, {})
         if not isinstance(layouts, dict):
@@ -114,13 +118,18 @@ class SettingsManager:
         if layout_name not in layouts:
             layouts[layout_name] = {}
         
-        layouts[layout_name]["columns"] = {
+        layout_data = {
             "order": order,
             "hidden": hidden
         }
+        if widths:
+            layout_data["widths"] = widths
+            
+        layouts[layout_name]["columns"] = layout_data
         layouts["_active"] = layout_name
         
         self._settings.setValue(self.KEY_LIBRARY_LAYOUTS, layouts)
+        self._settings.sync()
     
     # ===== Playback Settings =====
     

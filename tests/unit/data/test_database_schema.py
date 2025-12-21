@@ -1,5 +1,5 @@
 import pytest
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 
 def test_database_schema_integrity(tmp_path):
     """
@@ -21,7 +21,8 @@ def test_database_schema_integrity(tmp_path):
         "Contributors",
         "Roles",
         "MediaSourceContributorRoles",
-        "GroupMembers"
+        "GroupMembers",
+        "ContributorAliases"
     }
     
     # Expected Columns per table
@@ -29,9 +30,10 @@ def test_database_schema_integrity(tmp_path):
         "Types": {"TypeID", "TypeName"},
         "MediaSources": {"SourceID", "TypeID", "Name", "Notes", "Source", "Duration", "IsActive"},
         "Songs": {"SourceID", "TempoBPM", "RecordingYear", "ISRC", "IsDone", "Groups"},
-        "Contributors": {"ContributorID", "Name", "SortName"},
-        "Roles": {"RoleID", "Name"},
+        "Contributors": {"ContributorID", "ContributorName", "SortName", "Type"},
+        "Roles": {"RoleID", "RoleName"},
         "MediaSourceContributorRoles": {"SourceID", "ContributorID", "RoleID"},
+        "ContributorAliases": {"AliasID", "ContributorID", "AliasName"},
     }
     
     with repo.get_connection() as conn:

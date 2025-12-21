@@ -11,7 +11,7 @@ import sqlite3
 import tempfile
 import os
 from src.core import yellberus
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 
 
 class TestDatabaseSchemaIntegrity:

@@ -12,6 +12,7 @@ class FilterWidget(QWidget):
     
     # Legacy signals for backward compatibility
     filter_by_performer = pyqtSignal(str)
+    filter_by_unified_artist = pyqtSignal(str)  # T-17
     filter_by_composer = pyqtSignal(str)
     filter_by_year = pyqtSignal(int)
     filter_by_status = pyqtSignal(bool)
@@ -31,6 +32,8 @@ class FilterWidget(QWidget):
         self.tree_view.setModel(self.tree_model)
         self.tree_view.setHeaderHidden(True)
         self.tree_view.clicked.connect(self._on_tree_clicked)
+        self.tree_view.setExpandsOnDoubleClick(False)
+        self.tree_view.doubleClicked.connect(self._on_tree_double_clicked)
         
         layout.addWidget(self.tree_view)
 
@@ -39,12 +42,17 @@ class FilterWidget(QWidget):
         self.tree_model.clear()
         
         # Get filterable fields from Yellberus
-        for field in yellberus.get_filterable_fields():
-            if field.filter_type == "list":
+        filterable_fields = yellberus.get_filterable_fields()
+        
+        # T-17 Refinement: Sort categories alphabetically by UI Header
+        sorted_fields = sorted(filterable_fields, key=lambda f: f.ui_header.lower())
+        
+        for field in sorted_fields:
+            if field.strategy in ("list", "decade_grouper", "first_letter_grouper"):
                 self._add_list_filter(field)
-            elif field.filter_type == "boolean":
+            elif field.strategy == "boolean":
                 self._add_boolean_filter(field)
-            elif field.filter_type == "range":
+            elif field.strategy == "range":
                 self._add_range_filter(field)
 
     def _add_list_filter(self, field: yellberus.FieldDef) -> None:
@@ -58,12 +66,10 @@ class FilterWidget(QWidget):
         root_item.setFlags(root_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
         
-        # Check if field has a grouping function
-        if field.grouping_function:
-            self._add_grouped_items(root_item, field, values)
-        elif field.field_type == yellberus.FieldType.LIST:
-            # Text list (performers, composers) - group by first letter
-            self._add_alpha_grouped_items(root_item, field, values)
+        # Check if field has a grouping strategy
+        grouper_fn = yellberus.GROUPERS.get(field.strategy)
+        if grouper_fn:
+            self._add_grouped_items(root_item, field, values, grouper_fn)
         else:
             # Simple list (no grouping)
             for value in values:
@@ -75,11 +81,11 @@ class FilterWidget(QWidget):
         
         self.tree_model.appendRow(root_item)
         
-    def _add_grouped_items(self, root_item, field, values):
-        """Add items grouped by field's grouping_function (e.g., decade)."""
+    def _add_grouped_items(self, root_item, field, values, grouper_fn):
+        """Add items grouped by grouper function (e.g., decade)."""
         groups = {}
         for value in values:
-            group_name = field.grouping_function(value)
+            group_name = grouper_fn(value)
             if group_name not in groups:
                 groups[group_name] = []
             groups[group_name].append(value)
@@ -166,6 +172,18 @@ class FilterWidget(QWidget):
             return [name for _, name in self.library_service.get_contributors_by_role("Lyricist")]
         elif field.name == "producers":
             return [name for _, name in self.library_service.get_contributors_by_role("Producer")]
+        elif field.name == "unified_artist":
+            # T-17: Combine performers and groups into a unified artist list
+            artists = set()
+            # Get performers
+            for _, name in self.library_service.get_contributors_by_role("Performer"):
+                if name:
+                    artists.add(name)
+            # Get groups
+            for group in self.library_service.get_all_groups():
+                if group:
+                    artists.add(group)
+            return sorted(list(artists))
         elif field.name == "recording_year":
             return self.library_service.get_all_years()
         elif field.name == "type_id":
@@ -184,16 +202,36 @@ class FilterWidget(QWidget):
             # Emit generic signal
             self.filter_changed.emit(field_name, value)
             
-            # Also emit legacy signals for backward compatibility
+            # Emit legacy signals for backward compatibility
             if field_name == "performers":
                 self.filter_by_performer.emit(value)
+            elif field_name == "unified_artist":
+                # T-17: unified_artist uses unified filter
+                self.filter_by_unified_artist.emit(value)
             elif field_name == "composers":
                 self.filter_by_composer.emit(value)
             elif field_name == "recording_year":
                 self.filter_by_year.emit(value)
             elif field_name == "is_done":
                 self.filter_by_status.emit(value)
+        # T-17 Refinement: Removed single-click reset on root nodes to prevent accidental resets
+    
+    def _on_tree_double_clicked(self, index) -> None:
+        """Handle double-click in the filter tree."""
+        if not index.isValid():
+            return
+            
+        item = self.tree_model.itemFromIndex(index)
+        if not item:
+            return
+
+        # 1. Root-only: Reset Filter
+        if item.parent() is None:
+            self.reset_filter.emit()
+            
+        # 2. Universal: Toggle expansion (Fixes T-17 expansion bug)
+        # Works for both root categories and branches (future-proofing)
+        if self.tree_view.isExpanded(index):
+            self.tree_view.collapse(index)
         else:
-            # Clicked on a category header - reset filter
-            if item.parent() is None:
-                self.reset_filter.emit()
+            self.tree_view.expand(index)

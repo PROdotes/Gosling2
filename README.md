@@ -21,9 +21,11 @@ python app.py
 - **Drag & Drop Import** — Import MP3s or ZIP archives directly into the library
 - **Smart Metadata** — Automatic ID3 tag extraction with discrepancy highlighting
 - **Crossfade Playback** — Seamless transitions between tracks
-- **Filter & Search** — Browse by Artist, Decade, Genre, or Status
+- **Filter & Search** — Strategy-based tree view and global search
+- **Type Tabs** — Dedicated views for Music, Jingles, Commercials, and more
 - **Playlist Queue** — Drag and drop songs to build playlists
-- **Strict Schema Integrity** — 9-layer validation prevents silent data drift
+- **Strict Schema Integrity** — 10-layer verification prevents silent data drift
+- **Column Persistence** — Resilient layout mapping by field name identity
 
 ---
 
@@ -94,26 +96,22 @@ Gosling2/
 
 ## 🧪 Testing
 
-**260+ tests**, all passing:
+**357 tests**, all passing:
 
 ```bash
 # Run all tests
 pytest
-
-# Run with coverage
-pytest --cov=src tests/
-
-# Run specific test file
-pytest tests/unit/data/test_database_schema.py
 ```
 
 | Category | Tests | Status |
 |----------|-------|--------|
 | Data Models | ~20 | ✅ |
 | Repositories | ~30 | ✅ |
-| Services | ~120 | ✅ |
-| Schema Strictness | ~50 | ✅ |
-| Integration | ~40 | ✅ |
+| Services | ~100 | ✅ |
+| UI & Widgets | ~160 | ✅ |
+| Schema / Registry | ~100 | ✅ |
+| Tools & Parsers | ~7 | ✅ |
+| **Total** | **357** | **✅ All Passing** |
 
 ---
 
@@ -163,7 +161,7 @@ pytest -v
 | File | Purpose |
 |------|---------|
 | [DATABASE.md](DATABASE.md) | Schema specification & governance |
-| [TESTING.md](TESTING.md) | Test strategy & "9 layers of yell" |
+| [TESTING.md](TESTING.md) | Test strategy & "10 layers of yell" |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed architecture guide |
 | [tasks.md](tasks.md) | Development roadmap |
 
@@ -172,10 +170,10 @@ pytest -v
 ## 🔮 Roadmap
 
 See [tasks.md](tasks.md) for the current development roadmap, including:
-- Type Tabs (filter by content type)
-- Field Registry (centralized field definitions)
-- Transaction Logging (undo/audit)
-- Broadcast Automation (future)
+- **Legacy Sync** — Synchronizing remaining G1 metadata (Album, Genre, Publisher)
+- **Inline Editing** — Direct table-text modification
+- **Transaction Logging** — Global undo/audit system
+- **Broadcast Automation** — Full scheduling and studio automation
 
 ---
 

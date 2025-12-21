@@ -1,6 +1,6 @@
 import pytest
 import dataclasses
-from src.data.repositories.base_repository import BaseRepository
+from src.data.database import BaseRepository
 from src.data.models.song import Song
 
 def test_cross_reference_integrity(tmp_path):
@@ -72,7 +72,10 @@ def test_cross_reference_integrity(tmp_path):
         "composers": "RELATIONSHIP (Contributors via Composer)",
         "lyricists": "RELATIONSHIP (Contributors via Lyricist)",
         "producers": "RELATIONSHIP (Contributors via Producer)",
-        "groups": "Groups"
+        "groups": "Groups",
+        
+        # Computed Fields (not stored in DB)
+        "unified_artist": "COMPUTED (derived from Groups/Performers)"
     }
     
     # 4. Verify DB Coverage

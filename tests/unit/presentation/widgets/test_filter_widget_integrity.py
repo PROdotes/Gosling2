@@ -18,22 +18,23 @@ def test_strict_filter_coverage():
     assert len(filterable_fields) > 0, "No filterable fields defined in Yellberus"
     
     for field in filterable_fields:
-        # Each filterable field must have a filter_type
-        assert field.filter_type in ["list", "range", "boolean"], \
-            f"Field '{field.name}' has invalid filter_type: {field.filter_type}"
+        # Each filterable field must have a valid strategy
+        assert field.strategy in ["list", "range", "boolean", "decade_grouper", "first_letter_grouper"], \
+            f"Field '{field.name}' has invalid strategy: {field.strategy}"
         
-        # Fields with grouping must have a callable grouping_function
-        if field.grouping_function is not None:
-            assert callable(field.grouping_function), \
-                f"Field '{field.name}' has non-callable grouping_function"
+        # Check if field has a grouping function
+        grouper_fn = yellberus.GROUPERS.get(field.strategy)
+        if grouper_fn:
+            assert callable(grouper_fn), \
+                f"Strategy '{field.strategy}' for field '{field.name}' has non-callable grouper"
             
             # Test the grouping function doesn't crash
             try:
-                result = field.grouping_function(2024)
+                result = grouper_fn(2024)
                 assert isinstance(result, str), \
-                    f"Field '{field.name}' grouping_function should return string"
+                    f"Field '{field.name}' strategy '{field.strategy}' should return string"
             except Exception as e:
-                pytest.fail(f"Field '{field.name}' grouping_function raised: {e}")
+                pytest.fail(f"Field '{field.name}' strategy '{field.strategy}' raised: {e}")
 
 def test_filterable_fields_have_ui_headers():
     """Ensure all filterable fields have proper UI headers for display."""

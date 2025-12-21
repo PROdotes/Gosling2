@@ -123,6 +123,9 @@ class LibraryWidget(QWidget):
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
         
+        # Flag to suppress auto-save during programmatic resize
+        self._suppress_layout_save = False
+        
         
         self._init_ui()
         self._setup_connections()
@@ -218,6 +221,11 @@ class LibraryWidget(QWidget):
         header.setSectionsMovable(True)
         header.setHighlightSections(True)  # Highlight section being dragged
         header.setSectionsClickable(True)  # Required for highlight to work
+        
+        # T-18: Auto-save layout on move/resize
+        # We use proper methods to handle signals with suppression support
+        header.sectionMoved.connect(self._on_column_moved)
+        header.sectionResized.connect(self._on_column_resized)
         
         # Style the header with visual feedback
         header.setStyleSheet("""
@@ -459,18 +467,17 @@ class LibraryWidget(QWidget):
         self.type_tab_bar.currentChanged.connect(self._on_type_tab_changed)
         
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
+        self.filter_widget.filter_by_unified_artist.connect(self._filter_by_unified_artist)
         self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
         self.filter_widget.filter_by_year.connect(self._filter_by_year)
         self.filter_widget.filter_by_status.connect(self._filter_by_status)
-        self.filter_widget.reset_filter.connect(self.load_library)
+        self.filter_widget.reset_filter.connect(lambda: self.load_library(refresh_filters=False))
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table_view.doubleClicked.connect(self._on_table_double_click)
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
-        self.table_view.horizontalHeader().sectionMoved.connect(self._on_column_moved)
-
-    def load_library(self) -> None:
+    def load_library(self, refresh_filters=True) -> None:
         """Load library from database"""
         headers, data = self.library_service.get_all_songs()
         
@@ -482,14 +489,10 @@ class LibraryWidget(QWidget):
             
         self._populate_table(headers, data)
 
-        if self.chk_show_incomplete.isChecked():
-            self._apply_incomplete_view_columns()
-        else:
-            self._load_column_visibility_states()
-
-        self.filter_widget.populate()
+        if refresh_filters:
+            self.filter_widget.populate()
+        
         self._update_tab_counts()
-        self.table_view.resizeColumnsToContents()
 
     def _apply_incomplete_view_columns(self) -> None:
         """Show only columns that are required by the criteria."""
@@ -540,75 +543,107 @@ class LibraryWidget(QWidget):
             self.type_tab_bar.setTabText(i, f"{label} ({count})")
 
     def _populate_table(self, headers, data) -> None:
-        self.library_model.clear()
+        """Populate the table with data, preserving layout state."""
+        # 1. Suppress all auto-saves during the rebuild process
+        self._suppress_layout_save = True
         
-        # Update Empty State
-        if not data:
-            self.empty_label.show()
-            self._update_empty_label_position()
-        else:
-            self.empty_label.hide()
+        try:
+            # 2. Save current layout before clearing (if table is not empty)
+            if self.library_model.columnCount() > 0:
+                 self._save_column_layout()
+
+            # 3. Rebuild the model
+            self.library_model.clear()
             
-        if headers:
-            # IGNORE SQL headers! Use Yellberus headers for consistency.
-            # This ensures "Title" instead of "MS.Name" without aliasing every SQL column.
-            ui_headers = [f.ui_header for f in yellberus.FIELDS]
-            self.library_model.setHorizontalHeaderLabels(ui_headers)
-        
-        show_incomplete = self.chk_show_incomplete.isChecked()
+            if not data:
+                self.empty_label.show()
+                self._update_empty_label_position()
+            else:
+                self.empty_label.hide()
+            
+            if headers:
+                ui_headers = [f.ui_header for f in yellberus.FIELDS]
+                self.library_model.setHorizontalHeaderLabels(ui_headers)
+            
+            show_incomplete = self.chk_show_incomplete.isChecked()
 
-        for row_data in data:
-            # Always calculate completeness for validation
-            failing_fields = self._get_incomplete_fields(row_data)
+            for row_data in data:
+                # Always calculate completeness for validation
+                failing_fields = self._get_incomplete_fields(row_data)
 
-            items = []
-            for col_idx, cell in enumerate(row_data):
-                display_text = str(cell) if cell is not None else ""
-                sort_value = cell
-                
-                # Special handling for specific columns
-                if col_idx == self.field_indices['duration'] and isinstance(cell, (int, float)):
-                    display_text = self._format_duration(cell)
-                    sort_value = float(cell)
-                elif col_idx in (self.field_indices['bpm'], self.field_indices['file_id'], self.field_indices['recording_year']) and isinstance(cell, (int, float)):
-                    # Display as string, sort as number
-                    sort_value = float(cell)
-                else:
-                    sort_value = display_text
-                
-                item = QStandardItem(display_text)
-                item.setData(sort_value, Qt.ItemDataRole.UserRole)
-                item.setEditable(False) # Ensure items are not editable by default
-                
-                # Checkbox for IsDone
-                if col_idx == self.field_indices['is_done']:
-                    item.setCheckable(True)
-                    item.setEditable(False) 
+                items = []
+                for col_idx, cell in enumerate(row_data):
+                    display_text = str(cell) if cell is not None else ""
+                    sort_value = cell
                     
-                    # Determine Flags: Selectable always, Enabled only if complete
-                    flags = Qt.ItemFlag.ItemIsSelectable
-                    if not failing_fields:
-                        flags |= Qt.ItemFlag.ItemIsEnabled
-                    item.setFlags(flags)
+                    # Special handling for specific columns
+                    if col_idx == self.field_indices['duration'] and isinstance(cell, (int, float)):
+                        display_text = self._format_duration(cell)
+                        sort_value = float(cell)
+                    elif col_idx in (self.field_indices['bpm'], self.field_indices['file_id'], self.field_indices['recording_year']) and isinstance(cell, (int, float)):
+                        # Display as string, sort as number
+                        sort_value = float(cell)
+                    else:
+                        sort_value = display_text
                     
-                    # Set State
-                    is_done_bool = bool(cell) if cell is not None else False
-                    item.setCheckState(Qt.CheckState.Checked if is_done_bool else Qt.CheckState.Unchecked)
-                    item.setText("")
-                
-                # Visual Indicator for Incomplete Fields
-                if show_incomplete:
-                    if col_idx < len(yellberus.FIELDS):
-                        field_name = yellberus.FIELDS[col_idx].name
-                        if field_name and field_name in failing_fields:
-                            # Light Red Background
-                            item.setBackground(QColor("#FFCDD2"))
-                            item.setToolTip(f"{field_name} is incomplete")
+                    item = QStandardItem(display_text)
+                    item.setData(sort_value, Qt.ItemDataRole.UserRole)
+                    item.setEditable(False) # Ensure items are not editable by default
+                    
+                    # Checkbox for IsActive
+                    if col_idx == self.field_indices.get('is_active'):
+                        item.setCheckable(True)
+                        item.setEditable(False)
+                        item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+                        
+                        is_active_bool = bool(cell) if cell is not None else False
+                        item.setCheckState(Qt.CheckState.Checked if is_active_bool else Qt.CheckState.Unchecked)
+                        item.setText("")
 
-                items.append(item)
-            
-            self.library_model.appendRow(items)
-            
+                    # Checkbox for IsDone
+                    if col_idx == self.field_indices['is_done']:
+                        item.setCheckable(True)
+                        item.setEditable(False) 
+                        
+                        # Determine Flags: Selectable always, Enabled only if complete
+                        flags = Qt.ItemFlag.ItemIsSelectable
+                        if not failing_fields:
+                            flags |= Qt.ItemFlag.ItemIsEnabled
+                        item.setFlags(flags)
+                        
+                        # Set State
+                        is_done_bool = bool(cell) if cell is not None else False
+                        item.setCheckState(Qt.CheckState.Checked if is_done_bool else Qt.CheckState.Unchecked)
+                        item.setText("")
+                    
+                    # Visual Indicator for Incomplete Fields
+                    if show_incomplete:
+                        if col_idx < len(yellberus.FIELDS):
+                            field_name = yellberus.FIELDS[col_idx].name
+                            if field_name and field_name in failing_fields:
+                                # Light Red Background
+                                item.setBackground(QColor("#FFCDD2"))
+                                item.setToolTip(f"{field_name} is incomplete")
+
+                    items.append(item)
+                
+                self.library_model.appendRow(items)
+                
+            # 4. Restore layout (visibility, widths, order)
+            # We only auto-resize if there's no layout saved yet
+            layout = self.settings_manager.get_column_layout("default")
+            if not layout:
+                self.table_view.resizeColumnsToContents()
+
+            if self.chk_show_incomplete.isChecked():
+                self._apply_incomplete_view_columns()
+            else:
+                self._load_column_layout()
+
+        finally:
+            # 5. Re-enable layout saving
+            self._suppress_layout_save = False
+
     def _format_duration(self, seconds: float) -> str:
         """Format seconds into mm:ss"""
         try:
@@ -620,6 +655,10 @@ class LibraryWidget(QWidget):
 
     def _filter_by_performer(self, performer_name) -> None:
         headers, data = self.library_service.get_songs_by_performer(performer_name)
+        self._populate_table(headers, data)
+
+    def _filter_by_unified_artist(self, artist_name) -> None:
+        headers, data = self.library_service.get_songs_by_unified_artist(artist_name)
         self._populate_table(headers, data)
 
     def _filter_by_composer(self, composer_name) -> None:
@@ -813,12 +852,21 @@ class LibraryWidget(QWidget):
         # Iterate by visual order so menu matches displayed column order
         for visual_idx in range(header.count()):
             logical_idx = header.logicalIndex(visual_idx)
+            
+            # T-17: Hard-ban columns that Yellberus says are not visible
+            if logical_idx < len(yellberus.FIELDS):
+                if not yellberus.FIELDS[logical_idx].visible:
+                    continue
+            else:
+                # Any column beyond Yellberus fields (like ID/Path if added manually) should be hidden
+                continue
+
             header_text = self.library_model.headerData(logical_idx, Qt.Orientation.Horizontal)
             action = QAction(str(header_text), self)
             action.setCheckable(True)
             action.setChecked(not self.table_view.isColumnHidden(logical_idx))
-            action.setData(logical_idx)
-            action.toggled.connect(self._toggle_column_visibility)
+            # Use lambda to capture specific column index (safer than sender().data())
+            action.toggled.connect(lambda checked, col=logical_idx: self._toggle_column_visibility(col, checked))
             menu.addAction(action)
         
         menu.addSeparator()
@@ -828,12 +876,9 @@ class LibraryWidget(QWidget):
         
         menu.exec(header.mapToGlobal(position))
 
-    def _toggle_column_visibility(self, checked) -> None:
-        action = self.sender()
-        if action:
-            column = action.data()
-            self.table_view.setColumnHidden(column, not checked)
-            self._save_column_layout()
+    def _toggle_column_visibility(self, column: int, checked: bool) -> None:
+        self.table_view.setColumnHidden(column, not checked)
+        self._save_column_layout()
 
     def _reset_column_layout(self) -> None:
         """Reset columns to default order and visibility."""
@@ -846,69 +891,128 @@ class LibraryWidget(QWidget):
             if current_visual != logical_idx:
                 header.moveSection(current_visual, logical_idx)
         
-        # Reset visibility: show all columns
+        # Reset visibility: respect Yellberus defaults
         for col in range(col_count):
-            self.table_view.setColumnHidden(col, False)
+            if col < len(yellberus.FIELDS):
+                self.table_view.setColumnHidden(col, not yellberus.FIELDS[col].visible)
+            else:
+                self.table_view.setColumnHidden(col, True)
         
         # Clear saved layout
         self.settings_manager.remove_setting("library/layouts")
 
     def _on_column_moved(self, logical_index: int, old_visual: int, new_visual: int) -> None:
         """Save column layout when user drags a column."""
-        self._save_column_layout()
+        if not self._suppress_layout_save:
+            self._save_column_layout()
+
+    def _on_column_resized(self, logical_index: int, old_size: int, new_size: int) -> None:
+        """Save column layout when user resizes a column."""
+        if not self._suppress_layout_save:
+            self._save_column_layout()
 
     def _load_column_layout(self) -> None:
-        """Load and apply column layout (order + visibility) from settings."""
+        """Load and apply column layout (order, visibility, widths) from settings."""
         layout = self.settings_manager.get_column_layout("default")
         if not layout:
+            # Fallback: strictly enforce Yellberus baseline if no layout saved
+            self._load_column_visibility_states()
             return
         
         header = self.table_view.horizontalHeader()
         order = layout.get("order", [])
-        hidden = layout.get("hidden", [])
-        
-        # Restore order: move each column to its saved visual position
+        hidden_map = layout.get("hidden", {})
+        widths_map = layout.get("widths", {})
+
+        # 1. Restore order (Name-based)
         if order:
-            for visual_idx, logical_idx in enumerate(order):
-                if logical_idx < header.count():
+            for visual_idx, name in enumerate(order):
+                if name in self.field_indices:
+                    logical_idx = self.field_indices[name]
                     current_visual = header.visualIndex(logical_idx)
                     if current_visual != visual_idx:
                         header.moveSection(current_visual, visual_idx)
+
+        # 2. Restore visibility and widths (Name-based)
+        # We iterate through the actual fields defined in Yellberus
+        for field_def in yellberus.FIELDS:
+            if field_def.name not in self.field_indices:
+                continue
+                
+            logical_idx = self.field_indices[field_def.name]
+            
+            # Hard-Ban Protection: Registry visibility takes absolute priority
+            if not field_def.visible:
+                self.table_view.setColumnHidden(logical_idx, True)
+                continue
+
+            # User Preference for visibility
+            if field_def.name in hidden_map:
+                user_hidden = hidden_map[field_def.name]
+                self.table_view.setColumnHidden(logical_idx, user_hidden)
+            else:
+                # Default to visible if no preference stored
+                self.table_view.setColumnHidden(logical_idx, False)
+
+            # User Preference for widths
+            if field_def.name in widths_map:
+                width = widths_map[field_def.name]
+                if width > 0:
+                    self.table_view.setColumnWidth(logical_idx, width)
         
-        # Restore visibility
-        for col in range(header.count()):
-            self.table_view.setColumnHidden(col, col in hidden)
+        # Hide any columns beyond Yellberus fields
+        for col in range(len(yellberus.FIELDS), header.count()):
+            self.table_view.setColumnHidden(col, True)
 
     def _save_column_layout(self) -> None:
-        """Save column layout (order + visibility) to settings."""
+        """Save column layout (order, visibility, widths) to settings."""
         # Do not save if we are in "Incomplete View" mode
         if self.chk_show_incomplete.isChecked():
             return
-        
+            
         header = self.table_view.horizontalHeader()
         col_count = header.count()
+        if col_count == 0:
+            return
+            
+        # 1. Save Order by Field Name
+        order = []
+        for visual_idx in range(col_count):
+            logical_idx = header.logicalIndex(visual_idx)
+            # Find the field name for this logical index
+            for name, l_idx in self.field_indices.items():
+                if l_idx == logical_idx:
+                    order.append(name)
+                    break
         
-        # Order: list of logical indices in visual order (includes ALL columns)
-        order = [header.logicalIndex(visual_idx) for visual_idx in range(col_count)]
+        # 2. Save Hidden Map and Widths Map by Field Name
+        hidden_map = {}
+        widths_map = {}
         
-        # Hidden: list of logical indices that are hidden
-        hidden = [col for col in range(col_count) if self.table_view.isColumnHidden(col)]
-        
-        self.settings_manager.set_column_layout(order, hidden, "default")
+        for field_def in yellberus.FIELDS:
+            if field_def.name in self.field_indices:
+                logical_idx = self.field_indices[field_def.name]
+                hidden_map[field_def.name] = self.table_view.isColumnHidden(logical_idx)
+                widths_map[field_def.name] = self.table_view.columnWidth(logical_idx)
+
+        self.settings_manager.set_column_layout(order, hidden_map, "default", widths=widths_map)
 
     # Legacy method for backward compatibility
     def _load_column_visibility_states(self) -> None:
-        """Load column layout. Uses new format, falls back to legacy if needed."""
+        """Load column layout. Always respects Yellberus visibility as baseline."""
+        # Step 1: Apply Yellberus visibility defaults FIRST
+        for col in range(self.library_model.columnCount()):
+            if col < len(yellberus.FIELDS):
+                field_def = yellberus.FIELDS[col]
+                # Hide columns that Yellberus marks as not visible
+                self.table_view.setColumnHidden(col, not field_def.visible)
+            else:
+                self.table_view.setColumnHidden(col, True)
+        
+        # Step 2: Load saved layout (order + additional visibility preferences)
         layout = self.settings_manager.get_column_layout("default")
         if layout:
             self._load_column_layout()
-        else:
-            # Fallback to legacy format
-            visibility_states = self.settings_manager.get_column_visibility()
-            if isinstance(visibility_states, dict):
-                for col_str, visible in visibility_states.items():
-                    if isinstance(col_str, str) and col_str.isdigit():
-                        self.table_view.setColumnHidden(int(col_str), not visible)
 
     def _save_column_visibility_states(self) -> None:
         """Save column layout (wraps new method for compatibility)."""
@@ -1090,48 +1194,5 @@ class LibraryWidget(QWidget):
         """Identify which fields are incomplete based on Yellberus registry.
         Returns a set of field names that failed validation.
         """
-        failed_fields = set()
-        
-        for col_idx, cell_value in enumerate(row_data):
-            if col_idx >= len(yellberus.FIELDS):
-                break
-                
-            field_def = yellberus.FIELDS[col_idx]
-            is_valid = True
-            
-            # 1. Check Required
-            if field_def.required:
-                if cell_value is None or (isinstance(cell_value, str) and not cell_value.strip()):
-                    is_valid = False
-            
-            # 2. Check List Type
-            if is_valid and field_def.field_type == yellberus.FieldType.LIST:
-                if field_def.required and not cell_value:
-                    is_valid = False
-                elif cell_value and field_def.min_length is not None:
-                    # cell_value from DB for LIST is GROUP_CONCAT string
-                    items = [x.strip() for x in str(cell_value).split(',') if x.strip()]
-                    if len(items) < field_def.min_length:
-                        is_valid = False
-            
-            # 3. Check Text Min Length
-            elif is_valid and field_def.field_type == yellberus.FieldType.TEXT:
-                if cell_value and field_def.min_length is not None:
-                    if len(str(cell_value).strip()) < field_def.min_length:
-                        is_valid = False
-            
-            # 4. Check Numeric/Duration Min Value
-            elif is_valid and field_def.field_type in (yellberus.FieldType.INTEGER, yellberus.FieldType.REAL, yellberus.FieldType.DURATION):
-                if cell_value is not None and field_def.min_value is not None:
-                    try:
-                        num_val = float(cell_value)
-                        if num_val < field_def.min_value:
-                            is_valid = False
-                    except (ValueError, TypeError):
-                        # Non-numeric value in numeric field is caught by integrity tests or 'required'
-                        pass 
-            
-            if not is_valid:
-                failed_fields.add(field_def.name)
-                
-        return failed_fields
+        return yellberus.validate_row(row_data)
+

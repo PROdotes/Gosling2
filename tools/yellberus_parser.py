@@ -19,7 +19,7 @@ class FieldSpec:
     visible: bool = True
     editable: bool = True
     filterable: bool = False
-    searchable: bool = False
+    searchable: bool = True
     required: bool = False
     portable: bool = True
     # Extra properties we track but don't edit in UI
@@ -27,8 +27,7 @@ class FieldSpec:
     min_value: Optional[int] = None
     max_value: Optional[int] = None
     min_length: Optional[int] = None
-    filter_type: Optional[str] = None
-    grouping_function: Optional[str] = None
+    strategy: str = "list"
     extra_attributes: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -37,7 +36,7 @@ FIELD_DEFAULTS = {
     "visible": True,
     "editable": True,
     "filterable": False,
-    "searchable": False,
+    "searchable": True,  # Match yellberus.py default
     "required": False,
     "portable": True,
     "field_type": "TEXT",
@@ -161,12 +160,8 @@ def _parse_fielddef_call(call_node: ast.Call) -> Optional[FieldSpec]:
             spec.max_value = value
         elif key == "min_length":
             spec.min_length = value
-        elif key == "filter_type":
-            spec.filter_type = value
-        elif key == "grouping_function":
-            # Store function name as string
-            if isinstance(keyword.value, ast.Name):
-                spec.grouping_function = keyword.value.id
+        elif key == "strategy":
+            spec.strategy = value
         else:
             # Preserve unknown attributes (e.g. query_expression)
             spec.extra_attributes[key] = value
@@ -230,21 +225,31 @@ def parse_field_registry_md(file_path: Path) -> List[FieldSpec]:
         # Parse table row
         if in_table and line.startswith("|"):
             parts = [p.strip() for p in line.split("|")[1:-1]]  # Remove empty first/last
-            if len(parts) >= 11:
-                # | Name | UI Header | DB Column | Type | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
+            if len(parts) >= 12:
+                # | Name | UI Header | DB Column | Type | Strategy | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag |
                 name = parts[0].strip("`")
+                
+                # Parse strategy from MD (basic mapping)
+                strategy_str = parts[4].strip()
+                strategy = "list"
+                if "Range" in strategy_str: strategy = "range"
+                elif "Boolean" in strategy_str: strategy = "boolean"
+                elif "Decade" in strategy_str: strategy = "decade_grouper"
+                elif "First" in strategy_str or "Letter" in strategy_str: strategy = "first_letter_grouper"
+                
                 spec = FieldSpec(
                     name=name,
                     ui_header=parts[1],
                     db_column=parts[2],
                     field_type=parts[3],
-                    visible=parts[4] == "Yes",
-                    editable=parts[5] == "Yes",
-                    filterable=parts[6] == "Yes",
-                    searchable=parts[7] == "Yes",
-                    required=parts[8] == "Yes",
-                    portable=parts[9] == "Yes",
-                    id3_tag=parts[10] if parts[10] != "—" else None,
+                    strategy=strategy,
+                    visible=parts[5] == "Yes",
+                    editable=parts[6] == "Yes",
+                    filterable=parts[7] == "Yes",
+                    searchable=parts[8] == "Yes",
+                    required=parts[9] == "Yes",
+                    portable=parts[10] == "Yes",
+                    id3_tag=parts[11] if len(parts) > 11 and parts[11] != "—" else None,
                 )
                 fields.append(spec)
     
@@ -364,12 +369,19 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
         else:
             new_code_lines.append(f'        field_type=FieldType.{f.field_type},')
             
-        new_code_lines.append(f'        visible={f.visible},')
-        new_code_lines.append(f'        editable={f.editable},')
-        new_code_lines.append(f'        filterable={f.filterable},')
-        new_code_lines.append(f'        searchable={f.searchable},')
-        new_code_lines.append(f'        required={f.required},')
-        new_code_lines.append(f'        portable={f.portable},')
+        # Boolean fields - only write if different from default
+        if f.visible != active_defaults['visible']:
+            new_code_lines.append(f'        visible={f.visible},')
+        if f.editable != active_defaults['editable']:
+            new_code_lines.append(f'        editable={f.editable},')
+        if f.filterable != active_defaults['filterable']:
+            new_code_lines.append(f'        filterable={f.filterable},')
+        if f.searchable != active_defaults['searchable']:
+            new_code_lines.append(f'        searchable={f.searchable},')
+        if f.required != active_defaults['required']:
+            new_code_lines.append(f'        required={f.required},')
+        if f.portable != active_defaults['portable']:
+            new_code_lines.append(f'        portable={f.portable},')
         
         # Preserved fields (that aren't in UI)
         if f.model_attr: new_code_lines.append(f'        model_attr="{f.model_attr}",')
@@ -377,15 +389,17 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
         if f.max_value is not None: new_code_lines.append(f'        max_value={f.max_value},')
         if f.min_length is not None: new_code_lines.append(f'        min_length={f.min_length},')
 
-        if f.filter_type: new_code_lines.append(f'        filter_type="{f.filter_type}",')
-        if f.grouping_function: new_code_lines.append(f'        grouping_function={f.grouping_function},')
+        # Strategy (only write if not default "list")
+        if f.strategy and f.strategy != "list":
+            new_code_lines.append(f'        strategy="{f.strategy}",')
         
+        # Explicit property support for query_expression
+        if hasattr(f, "extra_attributes") and "query_expression" in f.extra_attributes:
+             new_code_lines.append(f'        query_expression={repr(f.extra_attributes.pop("query_expression"))},')
+
         # Write extra preserved attributes
         for k, v in f.extra_attributes.items():
             if isinstance(v, str):
-                # Use repr to handle quoting correctly, but maybe strip outer quotes if you want specific style?
-                # Actually, repr() adds quotes. Existing code adds quotes manually: name="{f.name}".
-                # For safety and ensuring valid python syntax for arbitrary strings:
                 new_code_lines.append(f'        {k}={repr(v)},')
             else:
                 new_code_lines.append(f'        {k}={v},')
@@ -393,31 +407,53 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
         new_code_lines.append("    ),")
         
     new_code_lines.append("]")
+
+    # 3. Update VALIDATION_GROUPS block (if it exists)
+    # We look for the block starting with "VALIDATION_GROUPS = ["
+    validation_start = -1
+    validation_end = -1
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+             target = node.targets[0] if isinstance(node, ast.Assign) else node.target
+             if isinstance(target, ast.Name) and target.id == "VALIDATION_GROUPS":
+                 validation_start = node.lineno
+                 validation_end = node.end_lineno
+                 break
     
-    # Construct new file content
-    # We rely on 'lines' having potentially Updated Defaults from Step 1
+    # Construct final file content
+    content_parts = []
     
-    final_lines = lines[:start_lineno-1] + [l + "\n" for l in new_code_lines] + lines[end_lineno:]
+    # Part A: Before FIELDS
+    content_parts.append("".join(lines[:start_lineno-1]))
+    
+    # Part B: The New FIELDS list
+    content_parts.append("\n".join(new_code_lines) + "\n")
+    
+    # Part C: Between FIELDS and VALIDATION_GROUPS (or end of file)
+    if validation_start != -1:
+        # Before validation groups
+        content_parts.append("".join(lines[end_lineno:validation_start-1]))
+        
+        # Part D: (Internal) We just preserve the existing VALIDATION_GROUPS for now
+        # until we add full dict-to-AST writing. For today, we just ensure it's not deleted.
+        content_parts.append("".join(lines[validation_start-1:validation_end]))
+        
+        # Part E: After validation groups
+        content_parts.append("".join(lines[validation_end:]))
+    else:
+        # Just the rest of the file if no validation groups
+        content_parts.append("".join(lines[end_lineno:]))
+
+    final_content = "".join(content_parts)
     
     # Write backup
     bak_path = file_path.with_suffix(".py.bak")
-    with open(bak_path, "w", encoding="utf-8") as f:
-        f.writelines(lines) # Writes the version BEFORE list update (but AFTER in-memory class update? No, readlines was original)
-                            # Wait, lines[i] was modified in-place in Step 1.
-                            # So 'lines' contains updated class defaults.
-                            # So backup will contain updated class defaults but OLD list?
-                            # Ideally backup is PURE original.
-                            
-                            # Let's re-read original for backup? Or just accept backup is "Pre-Overwrite".
-                            # Since we haven't written to disk yet, 'file_path' still has original.
-                            # We should copy 'file_path' to 'bak_path' directly before overwriting.
-    
     import shutil
     shutil.copy2(file_path, bak_path)
 
     # Write new file
     with open(file_path, "w", encoding="utf-8") as f:
-        f.writelines(final_lines)
+        f.write(final_content)
     return True
         
 def write_field_registry_md(file_path: Path, fields: List[FieldSpec]) -> bool:
@@ -461,7 +497,14 @@ def write_field_registry_md(file_path: Path, fields: List[FieldSpec]) -> bool:
     for f in fields:
         yes_no = lambda x: "Yes" if x else "No"
         id3 = f.id3_tag if f.id3_tag else "—"
-        row = f"| `{f.name}` | {f.ui_header} | {f.db_column} | {f.field_type} | {yes_no(f.visible)} | {yes_no(f.editable)} | {yes_no(f.filterable)} | {yes_no(f.searchable)} | {yes_no(f.required)} | {yes_no(f.portable)} | {id3} |"
+        # Map strategy to display name
+        strategy_display = {
+            "range": "Range Filter",
+            "boolean": "Boolean Toggle",
+            "decade_grouper": "Decade Grouping",
+            "first_letter_grouper": "First Letter",
+        }.get(f.strategy, "")
+        row = f"| `{f.name}` | {f.ui_header} | {f.db_column} | {f.field_type} | {strategy_display} | {yes_no(f.visible)} | {yes_no(f.editable)} | {yes_no(f.filterable)} | {yes_no(f.searchable)} | {yes_no(f.required)} | {yes_no(f.portable)} | {id3} |"
         new_rows.append(row + "\n")
         
     final_lines = lines[:table_start+2] + new_rows + lines[table_end:]
