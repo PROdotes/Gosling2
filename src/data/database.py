@@ -133,5 +133,27 @@ class BaseRepository:
                 )
             """)
 
+            # 23. Albums
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Albums (
+                    AlbumID INTEGER PRIMARY KEY,
+                    Title TEXT NOT NULL,
+                    AlbumType TEXT,
+                    ReleaseYear INTEGER
+                )
+            """)
+
+            # 24. SongAlbums (Junction)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS SongAlbums (
+                    SourceID INTEGER NOT NULL,
+                    AlbumID INTEGER NOT NULL,
+                    TrackNumber INTEGER,
+                    PRIMARY KEY (SourceID, AlbumID),
+                    FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
+                    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE
+                )
+            """)
+
 
 

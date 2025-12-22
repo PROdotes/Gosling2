@@ -1,5 +1,13 @@
 # T-06 Legacy Sync (Briefing)
 
+## ⚠️ Critical Architecture Note: Album Uniqueness
+*   **The Issue**: The current schema defines `Albums` by `Title` only. This causes a "Greatest Hits Paradox":
+    *   If Queen and ABBA both have albums named "Greatest Hits", `AlbumRepository.get_or_create("Greatest Hits")` will merge them into a single Album entity.
+*   **Current Behavior**: "Blind Merge" by Title.
+*   **Proposed Fix (Deferred)**: Add `AlbumArtist` column to `Albums` table to allow `get_or_create(Title, Artist)`.
+*   **Impact**: UI Dropdowns currently cannot distinguish between duplicates.
+*   **Action**: Discuss with Team (Siblings) whether to prioritize Schema Change (T-06 Phase 1 Revision) or accept Merge behavior.
+
 ## 🎯 Objective
 Implement the missing metadata structures to match Gosling 1 features (`Album`, `Genre`, `Publisher`).
 
@@ -50,12 +58,32 @@ This is not a batch job. Implement and Verify one by one:
 *   **Multi-Album Logic**: Ensure a single SourceID can be linked to multiple Albums. Verification involves checking Filters (does it show up in both contexts?) and Database integrity (Junction table rows).
 *   **Publisher Hierarchy**: Verify that selecting a Parent Publisher in a future filter includes the Child Publisher's albums.
 
-## 🛠️ Execution Plan (Suggested)
-1.  **Schema**: Create the tables in `src/data/database.py`.
-2.  **Models**: Create `Album.py`, `Publisher.py`, `Tag.py` in `src/data/models/`.
-3.  **Repos**: Implement `AlbumRepository`, `TagRepository`.
-4.  **Service**: Expose methods in `LibraryService` (handling the "Find or Create" logic).
-5.  **User Action**: User runs `python tools/field_editor.py` to register the new fields.
+## 🛠️ Execution Plan (Concrete)
+1.  **[x] Phase 1: Albums Infrastructure**
+    *   **Schema**: Add `Albums` and `SongAlbums` to `src/data/database.py`.
+    *   **Models**: Create `src/data/models/album.py` (Dataclass).
+    *   **Repos**: Create `src/data/repositories/album_repository.py` (Find/Create logic).
+    *   **Service**: Update `LibraryService` to handle album binding.
+    *   **Tooling**: Update `yellberus.py` via manual edit (Completed).
+    *   **Integration**: Wired `SongRepository` to sync albums on update. Verified via `tests/integration/test_t06_albums.py`.
+
+2.  **[ ] Phase 2: Publishers Infrastructure**
+    *   **Schema**: Add `Publishers` and `AlbumPublishers` to `src/data/database.py`.
+    *   **Models**: Create `src/data/models/publisher.py`.
+    *   **Repos**: Create `src/data/repositories/publisher_repository.py`.
+
+3.  **[ ] Phase 3: Genres (Tags)**
+    *   **Schema**: Add `Tags` and `MediaSourceTags` to `src/data/database.py`.
+    *   **Models**: Create `src/data/models/tag.py`.
+    *   **Repos**: `TagRepository` implementation.
+
+
+## 🎨 UX Specifications
+*   **Album Type Implementation**:
+    *   **Backend**: Stored as `TEXT` in `Albums` table (free-form allowed for imports).
+    *   **Frontend**: Must use a **ComboBox** (Dropdown) to encourage consistency.
+    *   **Standard Values**: `['Album', 'Single', 'EP', 'Compilation', 'Live', 'Soundtrack']`.
+    *   **Validation**: Warn but allow new values (Soft Constraint).
 
 ## 🔮 Deferred Decisions (Future Task)
 *   **ID3 Import Strategy**: How to handle Album/Publisher creation during bulk import to a clean DB vs. existing DB.

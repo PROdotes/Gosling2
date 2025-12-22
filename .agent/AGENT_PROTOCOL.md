@@ -11,7 +11,7 @@
     *   **Override**: User must type `PROTOCOL_OVERRIDE: [reason]`. Log all overrides in `TASKS.md`.
     *   **Drift**: If User changes topic/task mid-stream -> **STOP**. Log new idea in `TASKS.md`. Resume original task.
 *   **[INITIATIVE]**: **ZERO**.
-    *   **Startup**: Read strict context only. **DO NOT** scan files/dirs. **DO NOT** fix unrequested bugs.
+    *   **Startup**: **CONTEXT ISOLATION**. Read attached files ONLY. "Looking ahead" (scanning task lists) corrupts context and is **FORBIDDEN**.
 *   **[SCOPE_LOCK]**: Execute ONLY the requested task. Ignore unrelated broken code.
 *   **[TOTALITY]**: "ALL" means 100% of target files. No sampling. No batch-and-quit.
 *   **[CONTEXT]**: Usage > 80% -> **WARN USER**. "Restart recommended."

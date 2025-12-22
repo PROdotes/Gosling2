@@ -18,13 +18,18 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         # Initialize Data Access Layer
-        from ...data.repositories import SongRepository, ContributorRepository
+        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
         self.song_repository = SongRepository()
         self.contributor_repository = ContributorRepository()
+        self.album_repository = AlbumRepository()
 
         # Initialize Services
         self.settings_manager = SettingsManager()
-        self.library_service = LibraryService(self.song_repository, self.contributor_repository)
+        self.library_service = LibraryService(
+            self.song_repository, 
+            self.contributor_repository, 
+            self.album_repository
+        )
         self.metadata_service = MetadataService()
         self.playback_service = PlaybackService(self.settings_manager)
 

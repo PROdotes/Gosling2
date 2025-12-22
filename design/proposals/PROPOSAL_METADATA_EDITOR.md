@@ -105,6 +105,17 @@ Per `plan_database.md`, the editor must handle:
 
 *These are added to the Registry and appear in the panel automatically.*
 
+## Relational Fields UX
+
+### Album Type
+*   **Widget**: Combobox (Dropdown)
+*   **Source**: `Albums.AlbumType` column (TEXT)
+*   **Values**: `['Album', 'Single', 'EP', 'Compilation', 'Live', 'Soundtrack']`
+*   **Behavior**:
+    *   Dropdown shows standard list.
+    *   User can type a custom value (Soft Constraint).
+    *   On Save: Updates the linked `Album` record (via `AlbumRepository`).
+
 ---
 
 ## Design Notes

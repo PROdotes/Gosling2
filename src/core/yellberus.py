@@ -58,6 +58,8 @@ QUERY_FROM = """
     LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
     LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
     LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
+    LEFT JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
+    LEFT JOIN Albums A ON SA.AlbumID = A.AlbumID
 """
 
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
@@ -248,6 +250,15 @@ FIELDS: List[FieldDef] = [
         portable=False,
         strategy="first_letter_grouper",
         query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
+    ),
+    FieldDef(
+        name="album",
+        ui_header="Album",
+        db_column="AlbumTitle",
+        required=True,
+        filterable=True,
+        strategy="first_letter_grouper",
+        query_expression="GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle",
     ),
 ]
 

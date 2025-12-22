@@ -1,0 +1,44 @@
+[
+    {
+        "path": "C:\\Music\\Nirvana\\Lithium.mp3",
+        "title": "Lithium",
+        "artist": "Nirvana",
+        "album": "Nevermind",
+        "year": 1991
+    },
+    {
+        "path": "C:\\Music\\Nirvana\\Polly.mp3",
+        "title": "Polly",
+        "artist": "Nirvana",
+        "album": "Nevermind",
+        "year": 1991
+    },
+    {
+        "path": "C:\\Music\\Nirvana\\In Bloom.mp3",
+        "title": "In Bloom",
+        "artist": "Nirvana",
+        "album": "Nevermind",
+        "year": 1991
+    },
+    {
+        "path": "C:\\Music\\ABBA\\Dancing Queen.mp3",
+        "title": "Dancing Queen",
+        "artist": "ABBA",
+        "album": "Greatest Hits",
+        "year": 1992
+    },
+    {
+        "path": "C:\\Music\\Queen\\Bohemian Rhapsody.mp3",
+        "title": "Bohemian Rhapsody",
+        "artist": "Queen",
+        "album": "Greatest Hits",
+        "year": 1981
+    },
+    {
+        "path": "C:\\Music\\Queen\\Another One Bites The Dust.mp3",
+        "title": "Another One Bites The Dust",
+        "artist": "Queen",
+        "album": "Greatest Hits",
+        "year": 1981
+    }
+]

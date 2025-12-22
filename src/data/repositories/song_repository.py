@@ -4,6 +4,7 @@ from typing import List, Optional, Tuple
 from src.data.database import BaseRepository
 from ..models.song import Song
 from ...core import yellberus
+from .album_repository import AlbumRepository
 
 
 class SongRepository(BaseRepository):
@@ -11,6 +12,7 @@ class SongRepository(BaseRepository):
 
     def __init__(self, db_path: Optional[str] = None):
         super().__init__(db_path)
+        self.album_repository = AlbumRepository(db_path)
         # Check for orphan columns in DB (runtime yell)
         try:
             with self.get_connection() as conn:
@@ -107,6 +109,10 @@ class SongRepository(BaseRepository):
                 # 4. Sync new contributor roles
                 self._sync_contributor_roles(song, conn)
 
+                # 5. Sync Album
+                if song.album is not None:
+                     self._sync_album(song, conn)
+
                 return True
         except Exception as e:
             print(f"Error updating song: {e}")
@@ -172,6 +178,37 @@ class SongRepository(BaseRepository):
                     INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID)
                     VALUES (?, ?, ?)
                 """, (song.source_id, contributor_id, role_id))
+
+    def _sync_album(self, song: Song, conn) -> None:
+        """Sync album relationship (Find or Create)"""
+        if not song.album or not song.album.strip():
+            return
+
+        # 1. Get/Create Album (using Repo logic but reusing connection/transaction)
+        # Since AlbumRepo uses its own connection context usually, we might need to duplicate logic 
+        # OR use the repo instance but we are inside a transaction here.
+        # SQLite supports nested transactions or we just assume auto-commit behavior of Repo methods isn't ideal inside a transaction.
+        # SAFE APPROACH: Use raw SQL here to ensure we stay in `conn` transaction.
+        
+        album_title = song.album.strip()
+        cursor = conn.cursor()
+        
+        # Check existence
+        cursor.execute("SELECT AlbumID FROM Albums WHERE Title = ?", (album_title,))
+        row = cursor.fetchone()
+        
+        if row:
+            album_id = row[0]
+        else:
+            cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Album')", (album_title,))
+            album_id = cursor.lastrowid
+            
+        # Link (Clear old links? Strategy: Songs belong to 1 primary album usually, but schema allows N)
+        # For 'Sync', we probably want to wipe and replace? 
+        # T-06 says 'Relational Mode'. ID3 'TALB' is usually 1 album. 
+        # Let's Wipe and Set for now to match 'update' semantics.
+        cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+        cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific performer"""
@@ -260,7 +297,15 @@ class SongRepository(BaseRepository):
                 # Fetch basic info from JOIN
                 # Note: Groups column temporarily omitted - pending schema decision
                 cursor.execute("""
-                    SELECT MS.SourceID, MS.Name, MS.Duration, S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone
+                    SELECT 
+                        MS.SourceID, MS.Name, MS.Duration, 
+                        S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone,
+                        (
+                            SELECT GROUP_CONCAT(A.Title, ', ')
+                            FROM SongAlbums SA 
+                            JOIN Albums A ON SA.AlbumID = A.AlbumID 
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as AlbumTitle
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.Source = ?
@@ -270,7 +315,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int, album_title = row
                 
                 # Fetch contributors
                 song = Song(
@@ -282,6 +327,7 @@ class SongRepository(BaseRepository):
                     recording_year=recording_year,
                     isrc=isrc,
                     is_done=bool(is_done_int),
+                    album=row[7], # AlbumTitle
                     groups=[]  # TODO: Re-enable when Groups column is added
                 )
                 

@@ -14,6 +14,7 @@ class Song(MediaSource):
 
     recording_year: Optional[int] = None
     unified_artist: Optional[str] = None
+    album: Optional[str] = None
     
     # Relationships
     performers: List[str] = field(default_factory=list)

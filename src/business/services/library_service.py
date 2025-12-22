@@ -1,15 +1,19 @@
 """Library management service"""
 from typing import List, Optional, Tuple
-from ...data.repositories import SongRepository, ContributorRepository
+from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
 from ...data.models.song import Song
+from ...data.models.album import Album
 
 
 class LibraryService:
     """Service for managing the music library"""
 
-    def __init__(self, song_repository: SongRepository, contributor_repository: ContributorRepository):
+    def __init__(self, song_repository: SongRepository, contributor_repository: ContributorRepository, album_repository: Optional[AlbumRepository] = None):
         self.song_repository = song_repository
         self.contributor_repository = contributor_repository
+        # Optional for now to avoid breaking existing instantiations not yet updated, 
+        # but internal logic will assume it exists if needed.
+        self.album_repository = album_repository or AlbumRepository()
 
     def add_file(self, file_path: str) -> Optional[int]:
         """Add a file to the library"""
@@ -72,3 +76,24 @@ class LibraryService:
     def get_songs_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by status"""
         return self.song_repository.get_by_status(is_done)
+
+    # ==================== ALBUMS (T-06) ====================
+
+    def get_item_albums(self, source_id: int) -> List[Album]:
+        """Get albums linked to a source item."""
+        return self.album_repository.get_albums_for_song(source_id)
+
+    def assign_album(self, source_id: int, album_title: str) -> Album:
+        """
+        Link a song to an album by title (Find or Create).
+        If the song is already linked to this album, does nothing.
+        """
+        if not album_title or not album_title.strip():
+            return None
+            
+        album = self.album_repository.get_or_create(album_title.strip())
+        
+        # Check if already linked? (Repository uses INSERT OR IGNORE, safe to call)
+        self.album_repository.add_song_to_album(source_id, album.album_id)
+        
+        return album
