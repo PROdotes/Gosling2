@@ -26,9 +26,11 @@
 | `composers` | Composer | Composers | LIST | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
 | `groups` | Groups | S.Groups | TEXT |  | No | Yes | No | No | No | Yes | TIT1 |
 | `unified_artist` | Artist | UnifiedArtist | TEXT | First Letter | Yes | No | Yes | Yes | No | No | — |
-| `album` | Album | AlbumTitle | TEXT |  | Yes | Yes | No | Yes | Yes | Yes | TALB |
+| `album` | Album | AlbumTitle | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TALB |
+| `publisher` | Publisher | Publisher | TEXT | First Letter | No | Yes | Yes | Yes | Yes | Yes | TPUB |
+| `genre` | Genre | Genre | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCON |
 
-**Total: 18 fields**
+**Total: 20 fields**
 
 ---
 

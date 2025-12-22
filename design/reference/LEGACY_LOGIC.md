@@ -170,7 +170,7 @@ Based on the audit and user feedback, Gosling 2 will transition away from "Monol
 ## 5. 🚀 Implementation Checklist for Gosling 2
 To achieve Task **T-06 (Legacy Sync)**:
 
-1.  [ ] **Schema Update**: Add `album`, `publisher`, `genre` to `Yellberus` and Database.
+1.  [x] **Schema Update**: Add `album`, `publisher`, `genre` to `Yellberus` and Database.
     *   *Prerequisite*: Finish T-04 (Test Consolidation).
 2.  [x] **Legacy Writer**: `TKEY` logic ("True" / " ") is **Implemented** in `MetadataService`.
 3.  [ ] **Auto-Renamer**: Port the `generateNewFilename` logic to Python (including the Genre/Year folder rules).

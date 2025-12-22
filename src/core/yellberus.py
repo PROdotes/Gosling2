@@ -60,6 +60,10 @@ QUERY_FROM = """
     LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
     LEFT JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
     LEFT JOIN Albums A ON SA.AlbumID = A.AlbumID
+    LEFT JOIN AlbumPublishers AP ON A.AlbumID = AP.AlbumID
+    LEFT JOIN Publishers P ON AP.PublisherID = P.PublisherID
+    LEFT JOIN MediaSourceTags MST ON MS.SourceID = MST.SourceID
+    LEFT JOIN Tags TG ON MST.TagID = TG.TagID AND TG.Category = 'Genre'
 """
 
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
@@ -255,10 +259,29 @@ FIELDS: List[FieldDef] = [
         name="album",
         ui_header="Album",
         db_column="AlbumTitle",
-        required=True,
         filterable=True,
+        required=True,
         strategy="first_letter_grouper",
-        query_expression="GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle",
+        query_expression='GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle',
+    ),
+    FieldDef(
+        name="publisher",
+        ui_header="Publisher",
+        db_column="Publisher",
+        visible=False,
+        filterable=True,
+        required=True,
+        strategy="first_letter_grouper",
+        query_expression='GROUP_CONCAT(DISTINCT P.PublisherName) AS Publisher',
+    ),
+    FieldDef(
+        name="genre",
+        ui_header="Genre",
+        db_column="Genre",
+        filterable=True,
+        required=True,
+        strategy="first_letter_grouper",
+        query_expression='GROUP_CONCAT(DISTINCT TG.TagName) AS Genre',
     ),
 ]
 

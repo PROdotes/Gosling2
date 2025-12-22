@@ -67,12 +67,12 @@ This is not a batch job. Implement and Verify one by one:
     *   **Tooling**: Update `yellberus.py` via manual edit (Completed).
     *   **Integration**: Wired `SongRepository` to sync albums on update. Verified via `tests/integration/test_t06_albums.py`.
 
-2.  **[ ] Phase 2: Publishers Infrastructure**
+2.  **[x] Phase 2: Publishers Infrastructure**
     *   **Schema**: Add `Publishers` and `AlbumPublishers` to `src/data/database.py`.
     *   **Models**: Create `src/data/models/publisher.py`.
     *   **Repos**: Create `src/data/repositories/publisher_repository.py`.
 
-3.  **[ ] Phase 3: Genres (Tags)**
+3.  **[x] Phase 3: Genres (Tags)**
     *   **Schema**: Add `Tags` and `MediaSourceTags` to `src/data/database.py`.
     *   **Models**: Create `src/data/models/tag.py`.
     *   **Repos**: `TagRepository` implementation.

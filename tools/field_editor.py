@@ -1172,7 +1172,7 @@ class FieldEditorWindow(QMainWindow):
 
         field_names = [f.name for f in missing_cols]
         field_list = ", ".join(field_names)
-        example_cols = ", ".join(f"S.{name}" for name in field_names[:3])
+        example_cols = ", ".join(f"{name}" for name in field_names[:3])
         if len(field_names) > 3:
             example_cols += ", ..."
 
@@ -1182,7 +1182,7 @@ class FieldEditorWindow(QMainWindow):
         msg.setText(f"The following fields have no Database Column defined:\n{field_list}")
         msg.setInformativeText(
             f"Should the editor generate default column names?\n\n"
-            f"• Yes: Sets columns to S.{{field_name}} (e.g., {example_cols})\n"
+            f"• Yes: Sets columns to {{field_name}} (e.g., {example_cols})\n"
             f"• No: Cancels save. You'll need to enter columns manually."
         )
         msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -1191,7 +1191,7 @@ class FieldEditorWindow(QMainWindow):
         if msg.exec() == QMessageBox.StandardButton.Yes:
             # Auto-fill the DB column cells in the table
             for f in missing_cols:
-                default_col = f"S.{f.name}"
+                default_col = f"{f.name}"
                 # Find the row for this field and update column 2 (DB Column)
                 for row in range(self.fields_table.rowCount()):
                     name_item = self.fields_table.item(row, 0)

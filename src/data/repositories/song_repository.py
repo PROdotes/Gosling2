@@ -113,6 +113,14 @@ class SongRepository(BaseRepository):
                 if song.album is not None:
                      self._sync_album(song, conn)
 
+                # 6. Sync Publisher
+                if song.publisher is not None:
+                     self._sync_publisher(song, conn)
+
+                # 7. Sync Genre (Tags)
+                if song.genre is not None:
+                     self._sync_genre(song, conn)
+
                 return True
         except Exception as e:
             print(f"Error updating song: {e}")
@@ -203,12 +211,118 @@ class SongRepository(BaseRepository):
             cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Album')", (album_title,))
             album_id = cursor.lastrowid
             
-        # Link (Clear old links? Strategy: Songs belong to 1 primary album usually, but schema allows N)
-        # For 'Sync', we probably want to wipe and replace? 
-        # T-06 says 'Relational Mode'. ID3 'TALB' is usually 1 album. 
-        # Let's Wipe and Set for now to match 'update' semantics.
-        cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
-        cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
+        # Link: M2M - Add to album without removing existing links.
+        # Use INSERT OR IGNORE to avoid duplicates.
+        # To REMOVE a song from an album, use album_repo.remove_song_from_album() explicitly.
+        cursor.execute("INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
+
+    def _sync_publisher(self, song: Song, conn) -> None:
+        """Sync publisher relationship (Find or Create)"""
+        # If publisher string is empty, we don't clear existing ones (partial update safety),
+        # unless explicit cleared (not supported by simple current logic yet).
+        # We assume if it's passed, it's valid.
+        if not song.publisher or not song.publisher.strip():
+            return
+
+        publisher_name = song.publisher.strip()
+        cursor = conn.cursor()
+
+        # 1. Find or Create Publisher
+        cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (publisher_name,))
+        row = cursor.fetchone()
+        
+        if row:
+            publisher_id = row[0]
+        else:
+            cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (publisher_name,))
+            publisher_id = cursor.lastrowid
+
+        # 2. Identify Target Albums
+        # Logic: Publisher links to ALBUM, not Song.
+        # So we must find which albums this song belongs to.
+        cursor.execute("SELECT AlbumID FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+        rows = cursor.fetchall()
+        album_ids = [r[0] for r in rows]
+
+        if not album_ids:
+            # Brief Strategy: If TPUB present but no Album, create 'Single' album
+            # Use Song Name as Album Title
+            # But wait, if _sync_album ran first, there SHOULD be an album if song.album was set.
+            # This branch hits only if song.album was None/Empty but song.publisher was Set.
+            
+            # Use safe title (fallback to 'Unknown' if name missing, though unlikely)
+            single_title = song.name or "Unknown Single"
+            
+            # Check if this "Single" album already exists (by title + type?) 
+            # Simplified: Just create/find generic album with this title.
+            cursor.execute("SELECT AlbumID FROM Albums WHERE Title = ?", (single_title,))
+            alb_row = cursor.fetchone()
+            
+            if alb_row:
+                album_id = alb_row[0]
+            else:
+                cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Single')", (single_title,))
+                album_id = cursor.lastrowid
+            
+            # Link Song -> Album
+            cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
+            album_ids = [album_id]
+
+        # 3. Link Publisher -> Album(s)
+        # Note: This applies the publisher to the entire album. 
+        # CAUTION: If "Greatest Hits" has tracks from diff publishers, this blindly adds a publisher to the album.
+        # But 'AlbumPublishers' is Many-to-Many, so an Album CAN have multiple publishers.
+        # We DO NOT delete existing publishers here (additive logic), unless we want strict sync?
+        # Brief didn't specify strict wipe. Let's assume ADDITIVE for safety in M2M.
+        # But wait, if I correct a typo? "Universal" -> "Universal".
+        # If I don't wipe, I keep "Universal".
+        # Let's Wipe and Set for the albums involved?
+        # No, that affects other songs on the album. Too dangerous for a scoped update.
+        # Relational Paradox: Editing a Song's publisher edits the Album's publisher which affects ALL songs on that album.
+        # For now, we just INSERT OR IGNORE.
+        
+        for alb_id in album_ids:
+            cursor.execute("""
+                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
+                VALUES (?, ?)
+            """, (alb_id, publisher_id))
+
+    def _sync_genre(self, song: Song, conn) -> None:
+        """Sync genre (Tag) relationship"""
+        # Strategy: Valid genre string = Replacement.
+        if song.genre is None: 
+            return
+
+        cursor = conn.cursor()
+        
+        # 1. Clear existing GENRE tags for this song (Replacement logic)
+        cursor.execute("""
+            DELETE FROM MediaSourceTags 
+            WHERE SourceID = ? 
+            AND TagID IN (SELECT TagID FROM Tags WHERE Category = 'Genre')
+        """, (song.source_id,))
+        
+        # If empty string, we're done (cleared).
+        if not song.genre.strip():
+            return
+            
+        # 2. Parse Genres (Comma-separated support)
+        genres = [g.strip() for g in song.genre.split(',') if g.strip()]
+        
+        for g_name in genres:
+            # 3. Find or Create Tag (Category='Genre')
+            # Fix case sensitivity: COLLATE NOCASE must apply to TagName comparison
+            cursor.execute("SELECT TagID FROM Tags WHERE TagName = ? COLLATE NOCASE AND Category='Genre'", (g_name,))
+            row = cursor.fetchone()
+            
+            if row:
+                tag_id = row[0]
+            else:
+                cursor.execute("INSERT INTO Tags (TagName, Category) VALUES (?, 'Genre')", (g_name,))
+                tag_id = cursor.lastrowid
+            
+            # 4. Link
+            cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (song.source_id, tag_id))
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific performer"""
@@ -305,7 +419,14 @@ class SongRepository(BaseRepository):
                             FROM SongAlbums SA 
                             JOIN Albums A ON SA.AlbumID = A.AlbumID 
                             WHERE SA.SourceID = MS.SourceID
-                        ) as AlbumTitle
+                        ) as AlbumTitle,
+                        (
+                            SELECT GROUP_CONCAT(P.PublisherName, ', ')
+                            FROM SongAlbums SA 
+                            JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
+                            JOIN Publishers P ON AP.PublisherID = P.PublisherID
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as PublisherName
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.Source = ?
@@ -315,7 +436,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int, album_title = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int, album_title, publisher_name = row
                 
                 # Fetch contributors
                 song = Song(
@@ -327,7 +448,8 @@ class SongRepository(BaseRepository):
                     recording_year=recording_year,
                     isrc=isrc,
                     is_done=bool(is_done_int),
-                    album=row[7], # AlbumTitle
+                    album=album_title, # AlbumTitle
+                    publisher=publisher_name, # PublisherName
                     groups=[]  # TODO: Re-enable when Groups column is added
                 )
                 

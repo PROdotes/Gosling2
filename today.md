@@ -28,34 +28,58 @@ We have prioritized **Features (Legacy Sync)** over Cleanup, but we acknowledge 
 - [x] **Field Editor Verification**: Open `tools/field_editor.py` and verify it writes `yellberus.py` correctly without "Blue Drift" (Doc/Code mismatch). (✅ Fixed multiple bugs: ID3 popup, DB popup, Defaults drift)
 - [x] **Groups Logic**: Confirm the "Zombie" column `S.Groups` is effectively disabled and not leaking into new queries. (✅ Fixed: Deleted leaking `get_all_groups` method; Implemented strict Performer+Alias logic)
 
-### 2. T-06 Legacy Sync (The Main Event) — ETA: 2-3 hrs
+### 2. T-06 Legacy Sync (The Main Event) — **COMPLETE**
 *Why: Bring Gosling 2 to parity with Gosling 1 metadata standards.*
 > **Briefing**: [Read T-06_LEGACY_SYNC_BRIEF.md](design/state/T06_LEGACY_SYNC_BRIEF.md) for architectural constraints.
-- [ ] **Step A: Schema Expansion**: Implement Relational Tables (`Albums`, `Publishers`, `Tags`) as defined in Brief.
-    - `Album` (Text? Registry?) -> likely Text for now to match G1.
-    - `Genre` (Text/Registry).
-    - `Publisher` (Text).
-- [ ] **Expectation**: `test_database_schema.py` will FAIL here. We will fix it immediately.
+- [x] **Step A: Schema Expansion**: Implement Relational Tables.
+    - [x] `Albums`: Schema, Repository, M2M, Case-Insensitive, Update.
+    - [x] `Publishers`: Schema, Repository, M2M, Hierarchy.
+    - [x] `Tags` (Genres): Schema, Repository, M2M.
+- [x] **Yellberus Integration**:
+    - [x] Fields (Album, Publisher, Genre) added to `yellberus.py`.
+    - [x] Sync Logic (`_sync_album`, `_sync_publisher`, `_sync_genre`) implemented & hooked.
+    - [x] Filter Widget verified dynamic updates.
+- [x] **Verification**:
+    - [x] Tests: `test_t06_albums.py` (9 pass), `test_t06_publishers.py`, `test_t06_tags.py` (4 pass).
+    - [x] Visual: Filters appear and work.
 
 **Step B: Registry Update (The "Sheriff")**
-- [ ] Use `field_editor.py` (or manual edit if safer) to register these fields in `yellberus.py`.
-- [ ] Ensure `id3_frames.json` mappings exist (TALB, TCON, TPUB).
+- [x] Use `field_editor.py` to register fields. (Confirmed via UI).
 
 **Step C: Implementation**
-- [ ] Update `SongRepository` to read/write these new fields.
-- [ ] Verify they appear in the UI (Library Widget).
+- [x] `SongRepository` syncs all fields on update.
+- [x] Verified via `inject_fixtures.py`.
 
-### 3. Cleanup (If Time Allows) — ETA: 1 hr
+### 3. Cleanup & Next Steps
+- [ ] **Data Integrity**: Address "Greatest Hits Paradox" (Pinned).
+- [ ] **Refactor**: Generic Repository Pattern (Logged in TASKS).
+- [ ] **Cleanup**: `test_song_repository_extra.py` merge.
 *Why: The test suite is messy (56 files), but it works.*
 - [ ] **T-04 Test Consolidation**: Merge `test_song_repository_extra.py` into `test_song_repository.py`.
 - [ ] **Consolidate Widgets**: Merge `test_library_widget_*.py` files.
 
 ---
 
-## 📝 Closing the Day
-- [ ] Update `TASKS.md` with T-06 progress.
-- [ ] Log any "yelling" incidents in `temp.md` for the next sibling.
+---
 
+## � Next Day Plan: The Cleanup & Refactor
+**Focus**: T-04 (Test Cleanup) & T-?? (File System Logic).
+
+### 1. The Great Test Consolidation (T-04) — **ETA: 1.5h**
+*   Merge `test_song_repository_extra.py` (and friends) into a clean suite.
+*   Consolidate `test_library_widget_*.py`.
+*   Goal: Reduce 56 test files -> manageable number.
+
+### 2. The Pins (Tech Debt) — **ETA: 1h**
+*   **Greatest Hits Paradox**: Solve Album Uniqueness (Schema change: `AlbumArtist` or `Unique Constraint`?).
+*   **Repository Duplication**: Discuss/Draft Generic Repository pattern.
+
+### 3. File System Logic (T-19?) — **ETA: 3-4h**
+*   **Auto-Renamer**: Implement `LegacyFolderRouter` (Auto-move songs based on Genre/Year).
+*   **Duplicate Detection**: Tiered check on import (ISRC -> Hash).
+*   *Ref*: `LEGACY_LOGIC.md` Items 3 & 4.
+
+**Britney signing off.** 🎤
 ---
 
 ## 🔖 Meta: Migrate to SEMVER-Based Planning

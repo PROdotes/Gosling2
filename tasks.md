@@ -46,7 +46,7 @@ links: []
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
-| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor |
+| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor, song_repository. **song_repository issues**: Raw SQL in `_sync_album`/`_sync_publisher` (should use repos with `conn` param); fragile tuple unpacking in `get_by_path` (use named columns). |
 | — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
 | T-05 | **Log Core** | 4 | 2 | 8 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
@@ -74,6 +74,7 @@ links: []
 | T-24 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry | [spec](design/proposals/PROPOSAL_RENAMING_SERVICE.md) |
 | T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core | DATABASE.md |
 | T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
+| T-32 | **Pending Review Workflow** | 3 | 3 | 6 | 📋 | Tags (T-06 Phase 3) | [spec](design/proposals/PROPOSAL_ALBUMS.md#7-migration-plan-task-t-22) |
 
 ---
 
@@ -112,6 +113,11 @@ links: []
 |------|-------|----------------|
 | **ID3 Lookup** | JSON loaded twice: once in `field_editor.py` (cached), once in `yellberus_parser.write_field_registry_md()` (not cached). Lookup logic also duplicated. | If this area causes more bugs, extract shared `id3_lookup.py` module. |
 | **Custom ID3 Tags** | No way to make a field portable without a JSON mapping. User can't specify TXXX:fieldname or custom frames through UI. | ✅ FIXED (Popup implemented) |
+| **Album Duplicates** | `find_by_title` is case-sensitive ("nevermind" != "Nevermind"). And `Greatest Hits` titles merge different artists. | Fix case-sensitivity ASAP. Defer "AlbumArtist" schema change. |
+| **Album Renaming** | `AlbumRepository` has no `update()` method. Typo corrections create orphan albums. | Implement update() + proper migration logic. |
+| **Publisher Hierarchy** | `Publisher.parent_publisher_id` allows circular references (A→B→A). No validation exists. ~~Also: no "get descendants" query.~~ | Add cycle detection in `set_parent()`. ✅ `get_with_descendants()` implemented. |
+| **Repository Duplication** | `AlbumRepository`, `PublisherRepository`, `TagRepository` all have identical CRUD patterns (`get_by_id`, `find_by_name`, `get_or_create`). | Refactor to generic `EntityRepository[T]` base class. ~1 day. |
+| **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | Migrate simple filters to generic `_filter_by_field()`. Keep complex ones (unified_artist). |
 
 ---
 

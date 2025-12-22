@@ -35,20 +35,30 @@ def inject():
     print(f"Loaded {len(songs_data)} songs from fixture.")
     
     count = 0
+    seen_paths = set()  # Track processed songs for M2M support
+    
     for data in songs_data:
         # Normalize path
         raw_path = data['path']
         path = os.path.normcase(os.path.abspath(raw_path))
         
-        # 1. Clean old
-        with repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = ?", (path,))
-        
-        # 2. Insert
-        source_id = repo.insert(path)
-        if not source_id:
-            print(f"Failed to insert {path}")
-            continue
+        # 1. Clean old (only on first encounter of this path)
+        if path not in seen_paths:
+            with repo.get_connection() as conn:
+                conn.execute("DELETE FROM MediaSources WHERE Source = ?", (path,))
+            
+            # 2. Insert
+            source_id = repo.insert(path)
+            if not source_id:
+                print(f"Failed to insert {path}")
+                continue
+            seen_paths.add(path)
+        else:
+            # Already exists, just get it
+            song = repo.get_by_path(path)
+            if not song:
+                print(f"Failed to find existing {path}")
+                continue
             
         # 3. Update Metadata
         song = repo.get_by_path(path)
@@ -56,11 +66,14 @@ def inject():
         song.unified_artist = data['artist'] # Note: Logic uses Contributors, this helps simple display
         song.recording_year = data['year']
         song.album = data['album']
+        song.publisher = data.get('publisher')  # Optional
+        song.genre = data.get('genre') # Optional
         
-        # 4. Save (Triggers _sync_album)
+        # 4. Save (Triggers _sync_album and _sync_publisher)
         success = repo.update(song)
         if success:
-            print(f"[OK] Injected: {song.title} -> Album: {song.album}")
+            pub_str = f" | Publisher: {song.publisher}" if song.publisher else ""
+            print(f"[OK] Injected: {song.title} -> Album: {song.album}{pub_str}")
             count += 1
         else:
             print(f"[FAIL] Failed to update: {song.title}")

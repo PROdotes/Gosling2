@@ -155,5 +155,49 @@ class BaseRepository:
                 )
             """)
 
+            # 22. Publishers
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Publishers (
+                    PublisherID INTEGER PRIMARY KEY,
+                    PublisherName TEXT NOT NULL UNIQUE,
+                    ParentPublisherID INTEGER,
+                    FOREIGN KEY (ParentPublisherID) REFERENCES Publishers(PublisherID)
+                )
+            """)
+
+            # 25. AlbumPublishers
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS AlbumPublishers (
+                    AlbumID INTEGER NOT NULL,
+                    PublisherID INTEGER NOT NULL,
+                    PRIMARY KEY (AlbumID, PublisherID),
+                    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE,
+                    FOREIGN KEY (PublisherID) REFERENCES Publishers(PublisherID) ON DELETE CASCADE
+                )
+            """)
+
+            # 9. Tags
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Tags (
+                    TagID INTEGER PRIMARY KEY,
+                    TagName TEXT NOT NULL,
+                    Category TEXT,
+                    UNIQUE(TagName, Category)
+                )
+            """)
+
+            # 10. MediaSourceTags
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS MediaSourceTags (
+                    SourceID INTEGER NOT NULL,
+                    TagID INTEGER NOT NULL,
+                    PRIMARY KEY (SourceID, TagID),
+                    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
+                    FOREIGN KEY (TagID) REFERENCES Tags(TagID) ON DELETE CASCADE
+                )
+            """)
+
+
+
 
 

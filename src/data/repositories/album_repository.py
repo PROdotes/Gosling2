@@ -17,7 +17,7 @@ class AlbumRepository(BaseRepository):
 
     def find_by_title(self, title: str) -> Optional[Album]:
         """Retrieve album by exact title match (case-insensitive usually depends on DB collation)."""
-        query = "SELECT AlbumID, Title, AlbumType, ReleaseYear FROM Albums WHERE Title = ?"
+        query = "SELECT AlbumID, Title, AlbumType, ReleaseYear FROM Albums WHERE Title = ? COLLATE NOCASE"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (title,))
             row = cursor.fetchone()
@@ -47,6 +47,23 @@ class AlbumRepository(BaseRepository):
             return existing, False
         
         return self.create(title), True
+
+    def update(self, album: Album) -> bool:
+        """Update an existing album's metadata (Title, Type, Year)."""
+        if album.album_id is None:
+            return False
+        query = """
+            UPDATE Albums
+            SET Title = ?, AlbumType = ?, ReleaseYear = ?
+            WHERE AlbumID = ?
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query, (album.title, album.album_type, album.release_year, album.album_id))
+                return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Error updating album: {e}")
+            return False
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:
         """Link a song to an album."""

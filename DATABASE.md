@@ -394,8 +394,8 @@ erDiagram
 ```
 
 > **Implementation Status Overview:**
-> - ✅ **Implemented (8 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases
-> - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, Albums, SongAlbums, AlbumPublishers, Publishers, Agencies, Clients, Campaigns
+> - ✅ **Implemented (12 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases, Albums, SongAlbums, Publishers, AlbumPublishers
+> - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, Agencies, Clients, Campaigns
 > - ⏸️ **Planned (Audit):** ChangeLog, DeletedRecords, PlayHistory, ActionLog
 > - 🔮 **Future (Broadcast):** Timeslots, ContentRules
 
@@ -476,7 +476,22 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 **Constraints:**
 - `ON DELETE CASCADE` from `MediaSources`
 
-### 4. `Streams` (Remote Audio) ❌ Not Implemented
+### 4. `Albums` ✅ Implemented
+
+Groups songs into collections.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `AlbumID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `Title` | TEXT | NOT NULL | Album title |
+| `AlbumType` | TEXT | - | 'Album', 'Single', 'EP', 'Compilation' |
+| `ReleaseYear` | INTEGER | - | Release year |
+
+**Lifecycle Rules:**
+- **Orphan Policy:** Empty albums (0 songs) are **NOT** automatically deleted. They persist to preserve metadata.
+- **Cleanup:** User must be prompted to delete empty albums via the UI.
+
+### 5. `Streams` (Remote Audio) ❌ Not Implemented
 
 Extends `MediaSources` for live audio streams.
 
@@ -923,7 +938,7 @@ Album/release information.
 - Albums must have at least 1 song in SongAlbums
 - When removing last song: Ask "Delete album or keep empty?"
 
-### 24. `SongAlbums` (Junction) ❌ Not Implemented
+### 24. `SongAlbums` (Junction) ✅ Implemented
 
 Links songs to albums.
 
@@ -937,7 +952,7 @@ Links songs to albums.
 - Primary Key: `(SourceID, AlbumID)`
 - `ON DELETE CASCADE` for both FKs
 
-### 25. `AlbumPublishers` (Junction) ❌ Not Implemented
+### 25. `AlbumPublishers` (Junction) ✅ Implemented
 
 Links albums to publishers.
 

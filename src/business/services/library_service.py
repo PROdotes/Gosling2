@@ -97,3 +97,44 @@ class LibraryService:
         self.album_repository.add_song_to_album(source_id, album.album_id)
         
         return album
+
+    def get_distinct_filter_values(self, field_expression: str) -> List:
+        """
+        Get distinct values for a filterable field using dynamic SQL.
+        Uses Yellberus QUERY_FROM for the FROM clause.
+        
+        Args:
+            field_expression: The SQL expression or column name (e.g., "S.RecordingYear" or "GROUP_CONCAT(...)")
+        
+        Returns:
+            List of unique values for that field.
+        """
+        from src.core import yellberus
+        
+        # Strip "AS Alias" if present in query_expression
+        expr = field_expression
+        if " AS " in expr.upper():
+            expr = expr.split(" AS ")[0].strip()
+        
+        query = f"""
+            SELECT DISTINCT {expr}
+            {yellberus.QUERY_FROM}
+            {yellberus.QUERY_BASE_WHERE}
+        """
+        
+        with self.song_repository.get_connection() as conn:
+            cursor = conn.execute(query)
+            results = []
+            for row in cursor.fetchall():
+                val = row[0]
+                if val is not None and str(val).strip():
+                    # Handle comma-separated lists (from GROUP_CONCAT)
+                    if ',' in str(val):
+                        for item in str(val).split(','):
+                            item = item.strip()
+                            if item and item not in results:
+                                results.append(item)
+                    else:
+                        if val not in results:
+                            results.append(val)
+            return sorted(results, key=lambda x: str(x).lower() if isinstance(x, str) else x)

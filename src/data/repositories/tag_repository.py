@@ -1,0 +1,122 @@
+from typing import Optional, List, Tuple
+from src.data.database import BaseRepository
+from src.data.models.tag import Tag
+
+class TagRepository(BaseRepository):
+    """Repository for Tag (Genre/Category) management."""
+
+    def get_by_id(self, tag_id: int) -> Optional[Tag]:
+        """Retrieve tag by ID."""
+        query = "SELECT TagID, TagName, Category FROM Tags WHERE TagID = ?"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (tag_id,))
+            row = cursor.fetchone()
+            if row:
+                return Tag.from_row(row)
+        return None
+
+    def find_by_name(self, name: str, category: Optional[str] = None) -> Optional[Tag]:
+        """
+        Retrieve tag by exact name and category.
+        If category is None, it matches where Category IS NULL.
+        """
+        if category:
+            query = "SELECT TagID, TagName, Category FROM Tags WHERE TagName = ? COLLATE NOCASE AND Category = ?"
+            params = (name, category)
+        else:
+            query = "SELECT TagID, TagName, Category FROM Tags WHERE TagName = ? COLLATE NOCASE AND Category IS NULL"
+            params = (name,)
+            
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            row = cursor.fetchone()
+            if row:
+                return Tag.from_row(row)
+        return None
+
+    def create(self, name: str, category: Optional[str] = None) -> Tag:
+        """Create a new tag."""
+        query = "INSERT INTO Tags (TagName, Category) VALUES (?, ?)"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (name, category))
+            tag_id = cursor.lastrowid
+            
+        return Tag(tag_id=tag_id, tag_name=name, category=category)
+
+    def get_or_create(self, name: str, category: Optional[str] = None) -> Tuple[Tag, bool]:
+        """
+        Find existing tag or create new one.
+        Returns (Tag, created).
+        """
+        existing = self.find_by_name(name, category)
+        if existing:
+            return existing, False
+        
+        return self.create(name, category), True
+
+    def add_tag_to_source(self, source_id: int, tag_id: int) -> None:
+        """Link a tag to a source item (song)."""
+        query = "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)"
+        with self.get_connection() as conn:
+            conn.execute(query, (source_id, tag_id))
+
+    def remove_tag_from_source(self, source_id: int, tag_id: int) -> None:
+        """Unlink a tag from a source item."""
+        query = "DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?"
+        with self.get_connection() as conn:
+            conn.execute(query, (source_id, tag_id))
+            
+    def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None) -> None:
+        """
+        Unlink all tags from a source.
+        Optionally filter by category (e.g., clear only Genres).
+        """
+        if category:
+            query = """
+                DELETE FROM MediaSourceTags 
+                WHERE SourceID = ? 
+                AND TagID IN (SELECT TagID FROM Tags WHERE Category = ?)
+            """
+            params = (source_id, category)
+        else:
+            query = "DELETE FROM MediaSourceTags WHERE SourceID = ?"
+            params = (source_id,)
+            
+        with self.get_connection() as conn:
+            conn.execute(query, params)
+
+    def get_tags_for_source(self, source_id: int, category: Optional[str] = None) -> List[Tag]:
+        """Get all tags associated with a source item."""
+        if category:
+            query = """
+                SELECT t.TagID, t.TagName, t.Category
+                FROM Tags t
+                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                WHERE mst.SourceID = ? AND t.Category = ?
+            """
+            params = (source_id, category)
+        else:
+            query = """
+                SELECT t.TagID, t.TagName, t.Category
+                FROM Tags t
+                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                WHERE mst.SourceID = ?
+            """
+            params = (source_id,)
+            
+        tags = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, params)
+            for row in cursor.fetchall():
+                tags.append(Tag.from_row(row))
+        return tags
+    
+    def get_all_by_category(self, category: str) -> List[Tag]:
+        """Get all distinct tags of a certain category."""
+        query = "SELECT TagID, TagName, Category FROM Tags WHERE Category = ? ORDER BY TagName"
+        tags = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (category,))
+            for row in cursor.fetchall():
+                tags.append(Tag.from_row(row))
+        return tags

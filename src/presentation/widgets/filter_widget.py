@@ -162,35 +162,31 @@ class FilterWidget(QWidget):
         pass
 
     def _get_field_values(self, field: yellberus.FieldDef):
-        """Get unique values for a field from the library service."""
-        # Map field names to library service methods
-        if field.name == "performers":
-            return [name for _, name in self.library_service.get_contributors_by_role("Performer")]
-        elif field.name == "composers":
-            return [name for _, name in self.library_service.get_contributors_by_role("Composer")]
-        elif field.name == "lyricists":
-            return [name for _, name in self.library_service.get_contributors_by_role("Lyricist")]
-        elif field.name == "producers":
-            return [name for _, name in self.library_service.get_contributors_by_role("Producer")]
-        elif field.name == "unified_artist":
-            # T-17: Combine performers, groups, and ALIASES into a unified artist list
+        """Get unique values for a field - dynamically from Yellberus."""
+        
+        # Special case: unified_artist needs alias handling (Identity Graph)
+        if field.name == "unified_artist":
             artists = set()
             # Get performers
             for _, name in self.library_service.get_contributors_by_role("Performer"):
                 if name:
                     artists.add(name)
-            # Groups removed: If they have songs, they are performers. If not, they shouldn't be here.
             # Get aliases (Fix for "No Nixon in list")
             for alias in self.library_service.get_all_aliases():
                 if alias:
                     artists.add(alias)
             return sorted(list(artists))
-        elif field.name == "recording_year":
-            return self.library_service.get_all_years()
-        elif field.name == "type_id":
-            # TODO: Get types from service
+        
+        # Dynamic: Use field's query_expression or db_column
+        expression = field.query_expression or field.db_column
+        if not expression:
             return []
-        else:
+        
+        try:
+            return self.library_service.get_distinct_filter_values(expression)
+        except Exception as e:
+            # Log but don't crash - filter just won't show
+            print(f"[FilterWidget] Failed to get values for {field.name}: {e}")
             return []
 
     def _on_tree_clicked(self, index) -> None:

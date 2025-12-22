@@ -471,6 +471,7 @@ class LibraryWidget(QWidget):
         self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
         self.filter_widget.filter_by_year.connect(self._filter_by_year)
         self.filter_widget.filter_by_status.connect(self._filter_by_status)
+        self.filter_widget.filter_changed.connect(self._filter_by_field)  # Generic handler
         self.filter_widget.reset_filter.connect(lambda: self.load_library(refresh_filters=False))
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
@@ -671,6 +672,50 @@ class LibraryWidget(QWidget):
 
     def _filter_by_status(self, is_done: bool) -> None:
         headers, data = self.library_service.get_songs_by_status(is_done)
+        self._populate_table(headers, data)
+
+    def _filter_by_field(self, field_name: str, value) -> None:
+        """
+        Generic filter handler for any Yellberus field.
+        Builds dynamic SQL WHERE clause based on field definition.
+        """
+        # Skip if handled by legacy signals (they fire too)
+        if field_name in ('performers', 'unified_artist', 'composers', 'recording_year', 'is_done'):
+            return
+        
+        field = yellberus.get_field(field_name)
+        if not field:
+            print(f"[Filter] Unknown field: {field_name}")
+            return
+        
+        # Get the expression to filter on
+        expression = field.query_expression or field.db_column
+        if not expression:
+            print(f"[Filter] No expression for field: {field_name}")
+            return
+        
+        # Build WHERE clause
+        # For GROUP_CONCAT fields, we need to use LIKE
+        if 'GROUP_CONCAT' in expression.upper():
+            # Extract alias if present
+            if ' AS ' in expression.upper():
+                alias = expression.upper().split(' AS ')[1].strip()
+                # Can't use alias in WHERE, use HAVING instead
+                # For now, use a subquery approach or just filter client-side
+                # Actually, let's use a simpler approach: re-query with WHERE on the base table
+                # This is a TODO: For now, use client-side filtering
+                headers, all_data = self.library_service.get_all_songs()
+                col_idx = self.field_indices.get(field_name, -1)
+                if col_idx >= 0:
+                    filtered_data = [
+                        row for row in all_data
+                        if row[col_idx] and str(value) in str(row[col_idx])
+                    ]
+                    self._populate_table(headers, filtered_data)
+                return
+        
+        # Simple column filter
+        headers, data = self.library_service.get_songs_by_field(field_name, value)
         self._populate_table(headers, data)
 
     def _import_file(self, file_path: str) -> bool:
