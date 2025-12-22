@@ -209,10 +209,5 @@
     "RVRB": "Reverb",
     "TDRL": "Release time",
     "TSOC": "Composer sort order",
-    "TKWD": "Podcast keywords",
-    "TXXX:pikachu": {
-        "description": "Custom field: pikachu",
-        "field": "pikachu",
-        "type": "text"
-    }
+    "TKWD": "Podcast keywords"
 }

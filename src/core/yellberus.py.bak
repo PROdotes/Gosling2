@@ -249,6 +249,12 @@ FIELDS: List[FieldDef] = [
         strategy="first_letter_grouper",
         query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
     ),
+    FieldDef(
+        name="pikachu",
+        ui_header="Pikachu",
+        db_column="S.pikachu",
+        searchable=False,
+    ),
 ]
 
 # ==================== CROSS-FIELD VALIDATION RULES ====================

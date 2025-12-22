@@ -403,6 +403,25 @@ After each merge:
 - Prioritize readability over file count
 - When in doubt, keep the test (disk space is cheap, bugs are expensive)
 
+## 💭 Test Readability Note (2025-12-22)
+
+**Observation:** AI-generated test code tends to be verbose and comment-heavy. This can make tests harder to scan, not easier.
+
+**The Paradox:**
+- **Clean code approach**: Extract helpers like `has_txxx()`, `json_with()` → Reads like prose
+- **But**: Now you need to trust the helpers, which means... testing them? Turtles all the way down.
+
+**The Counter-Insight:**
+Tests are *intentionally* ugly and primitive. You use raw dicts, raw file ops, raw asserts — because those are the bedrock you trust without proof. The ugliness is the point.
+
+**Consideration for this audit:**
+- Resist over-abstracting test helpers
+- Test helpers should be *trivially correct* (1-2 lines)
+- If a helper needs testing, it's probably production code
+- A boring, obvious test is better than a clever, readable test that hides bugs
+- AI-generated code may need a "human readability pass"
+
+
 ## Quick Reference: Files That Are Sacred
 
 **DO NOT TOUCH (Schema Validation):**

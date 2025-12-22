@@ -39,11 +39,10 @@
 │ └────────────────────────────────────────────────────────────────────────────────────┘│
 ├──────────────────────────────────────────────────────────────────────────────────────┤
 │ ┌─ Fields ───────────────────────────────────────────────────────────────────────────┐│
-│ │ Name       │ Header  │ DB Column │ Type │Vis│Edt│Flt│Src│Req│Prt│ ID3 Tag         ││
-│ ├────────────┼─────────┼───────────┼──────┼───┼───┼───┼───┼───┼───┼─────────────────┤│
-│ │ performers │ Perform │ Performers│ LIST │ ✓ │ ✓ │ ✓ │ ✓ │   │ ✓ │ TPE1            ││
-│ │ album      │ Album   │ S.Album   │ TEXT │ ✓ │ ✓ │ ✓ │   │   │ ✓ │ TALB            ││
-│ │ ...        │         │           │      │   │   │   │   │   │   │                 ││
+│ │ Name (Expand) │ Header | DB | Type | Boolean (Fixed 50px) | ID3 Tag (150px) | Valid ││
+│ ├───────────────┼────────┼────┼──────┼──────────────────────┼─────────────────┼───────┤│
+│ │ performers    │ Perf.. │ .. │ LIST │ ✓  ✓  ✓  ✓     ✓    │ TXXX:performer  │       ││
+│ │ pikachu       │ Pikac..│ .. │ TEXT │ ✓  ✓  ✓  ✓     ✓    │ TXXX:pikachu    │       ││
 │ └────────────────────────────────────────────────────────────────────────────────────┘│
 │                                                                                      │
 │ [+ Add Field]  [Delete Selected]                                      [Save All]    │
@@ -79,14 +78,53 @@ Instead of a separate diff dialog, cells are color-coded based on their state:
 | **Disabled/N/A** | Dark (#1a1a1a) | Cell is not applicable (e.g., ID3 Tag when `portable=False`). |
 
 **ID3 Tag Column Behavior:**
-- The ID3 Tag is looked up from `id3_frames.json` using the field name.
-- When `portable=False`, the ID3 Tag cell shows **black/disabled** (N/A).
-- When `portable` is toggled **ON**, the editor auto-populates the ID3 Tag from JSON (if mapping exists).
-- If no mapping is found, the cell stays empty and will trigger a warning on Save.
+- **Read-Only**: The cell is non-editable. Value is always derived from `id3_frames.json`.
+- **Lookup**: On load (or when `portable` is toggled ON), the editor looks up the ID3 frame code by matching `field` property in the JSON.
+- **Persistence**: The tag value remains visible even when `portable=False`. This indicates to the user that a mapping exists in JSON.
+- **Styling**: When `portable=False`, the cell is styled as **disabled** (dark background) but still shows the tag.
+- **Missing Mapping Popup**: If `portable=True` but no mapping is found in JSON, on Save a popup appears:
+  
+  ```
+  Title: Missing ID3 Mapping
+  
+  Field "{field_name}" is portable but has no ID3 mapping.
+  
+  Should the editor add TXXX:{field_name} for you?
+  
+  • Yes: Adds the entry to id3_frames.json and continues save.
+  • No: Cancels save. You'll need to edit the JSON manually.
+  
+  [Yes]  [No]
+  ```
+  
+  - **Yes**: Editor adds `"TXXX:{field_name}": {"field": "{field_name}", "type": "text"}` to JSON, then continues save.
+  - **No**: Save is aborted. User must edit `id3_frames.json` manually before retrying.
+
+- **Source of Truth**: `id3_frames.json` is authoritative. The popup provides a convenient way to add TXXX entries without manual editing.
+
+**Missing DB Column Popup**: If a field has no `db_column` defined, on Save a popup appears:
+
+  ```
+  Title: Missing Database Columns
+  
+  The following fields have no Database Column defined:
+  {field_names}
+  
+  Should the editor generate default column names?
+  
+  • Yes: Sets columns to S.{field_name} (e.g., S.pikachu)
+  • No: Cancels save. You'll need to enter columns manually.
+  
+  [Yes]  [No]
+  ```
+  
+  - **Yes**: Editor sets `db_column` to `S.{field_name}` for each missing field, then continues save.
+  - **No**: Save is aborted. User must enter column names manually.
 
 **On Save Behavior:**
+- Validates DB columns first (blocking or auto-generate)
+- Validates ID3 tags next (blocking or auto-add TXXX)
 - Saves directly to both `yellberus.py` and `FIELD_REGISTRY.md`.
-- Shows warning dialog only if there are ID3 tag issues (missing mapping for portable fields).
 - *(Note: A pre-save summary dialog was considered but omitted for cleaner UX.)*
 
 ### Window Behavior
@@ -96,6 +134,23 @@ Instead of a separate diff dialog, cells are color-coded based on their state:
 | **Close with unsaved changes** | Prompt: "Save & Close", "Discard", "Cancel". |
 | **Delete with unsaved changes** | Allowed (deletion is its own operation). |
 | **Load from Code** | Warns if unsaved changes would be lost. |
+
+### Defaults Behavior
+
+The "Defaults" row represents the `FieldDef` class attributes in `yellberus.py`.
+
+1. **Source of Truth**: 
+   - Parsed dynamically from `class FieldDef` in `yellberus.py`.
+   - NOT hardcoded.
+
+2. **Usage**:
+   - **New Fields**: Initialized with these values.
+   - **Sparse Writing**: Attributes matching defaults are OMITTED from `yellberus.py` to keep it clean.
+
+3. **Changing Defaults**:
+   - Updates `class FieldDef` definition on Save.
+   - Does NOT change values of existing fields in memory/UI.
+   - Affects how fields are parsed on next reload (omitted values inherit new defaults).
 
 ---
 

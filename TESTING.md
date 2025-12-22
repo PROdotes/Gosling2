@@ -110,3 +110,25 @@ The "10 Layers of Yell" have been successfully consolidated into the **Yellberus
 2.  **Integrity Folder**: Infrastructure tests are now sequestered in `tests/unit/integrity/` or specifically named `_integrity.py`.
 3.  **Tool-Assisted Docs**: `FIELD_REGISTRY.md` is now automatically synchronized via `field_editor.py` to prevent "Doc Drift."
 
+---
+
+## 💭 Test Readability: A Philosophical Note
+
+**Observation (2025-12-22):** AI-generated test code tends to be verbose and comment-heavy. This makes tests harder to scan, not easier.
+
+**The Paradox:**
+- **Clean code approach**: Extract helpers like `has_txxx()`, `json_with()` → Reads like prose
+- **But**: Now you need to trust the helpers, which means... testing them? Turtles all the way down.
+
+**The Counter-Insight:**
+Tests are *intentionally* ugly and primitive. You use raw dicts, raw file ops, raw asserts — because those are the bedrock you trust without proof. The ugliness is the point.
+
+**The Rule:**
+- Test helpers should be *trivially correct* (e.g., `return f"TXXX:{name}" in data`)
+- If a helper needs testing, it's probably production code, not test code
+- At some point, you just trust: `assert`, `==`, the language itself
+
+**Future Consideration:**
+When refactoring tests, resist the urge to over-abstract. A boring, obvious test that you don't enjoy reading is better than a clever, readable test that hides bugs.
+
+**Related:** AI-generated code in general may need a "human readability pass" — something to consider for the whole codebase, not just tests.

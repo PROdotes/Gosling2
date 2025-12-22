@@ -21,7 +21,7 @@ class FieldSpec:
     filterable: bool = False
     searchable: bool = True
     required: bool = False
-    portable: bool = True
+    portable: bool = False
     # Extra properties we track but don't edit in UI
     model_attr: Optional[str] = None
     min_value: Optional[int] = None
@@ -38,7 +38,7 @@ FIELD_DEFAULTS = {
     "filterable": False,
     "searchable": True,  # Match yellberus.py default
     "required": False,
-    "portable": True,
+    "portable": False,
     "field_type": "TEXT",
 }
 
@@ -87,6 +87,9 @@ def parse_yellberus(file_path: Path) -> List[FieldSpec]:
     Returns:
         List of FieldSpec objects representing each field definition.
     """
+    # Extract defaults from class definition
+    dynamic_defaults = extract_class_defaults(file_path)
+    
     with open(file_path, "r", encoding="utf-8") as f:
         source = f.read()
     
@@ -112,7 +115,7 @@ def parse_yellberus(file_path: Path) -> List[FieldSpec]:
         if target_name == "FIELDS" and isinstance(value_node, ast.List):
             for elem in value_node.elts:
                 if isinstance(elem, ast.Call):
-                    field_spec = _parse_fielddef_call(elem)
+                    field_spec = _parse_fielddef_call(elem, defaults=dynamic_defaults)
                     if field_spec:
                         fields.append(field_spec)
             break  # Found FIELDS, no need to continue
@@ -120,9 +123,20 @@ def parse_yellberus(file_path: Path) -> List[FieldSpec]:
     return fields
 
 
-def _parse_fielddef_call(call_node: ast.Call) -> Optional[FieldSpec]:
-    """Parse a single FieldDef(...) call into a FieldSpec."""
-    spec = FieldSpec()
+def _parse_fielddef_call(call_node: ast.Call, defaults: Dict[str, Any] = None) -> Optional[FieldSpec]:
+    """
+    Parse a single FieldDef(...) call into a FieldSpec.
+    
+    Args:
+        call_node: AST Call node
+        defaults: Optional dict of default values extracted from FieldDef class
+    """
+    # Use dynamic defaults if available, otherwise rely on dataclass defaults (which should ideally match)
+    # Note: FieldSpec dataclass defaults are static, so we override them here.
+    if defaults:
+        spec = FieldSpec(**{k: v for k, v in defaults.items() if hasattr(FieldSpec, k)})
+    else:
+        spec = FieldSpec()
     
     for keyword in call_node.keywords:
         key = keyword.arg
@@ -459,7 +473,26 @@ def write_yellberus(file_path: Path, fields: List[FieldSpec], defaults: dict = N
 def write_field_registry_md(file_path: Path, fields: List[FieldSpec]) -> bool:
     """
     Update the 'Current Fields' table in FIELD_REGISTRY.md.
+    ID3 Tag column is derived from id3_frames.json (source of truth), not from FieldSpec.
     """
+    import json
+    
+    # Load id3_frames.json for canonical ID3 tag lookup
+    id3_frames = {}
+    try:
+        json_path = file_path.parent.parent / "src" / "resources" / "id3_frames.json"
+        if json_path.exists():
+            with open(json_path, "r", encoding="utf-8") as jf:
+                id3_frames = json.load(jf)
+    except Exception as e:
+        print(f"Warning: Could not load id3_frames.json: {e}")
+    
+    # Build reverse lookup: field_name -> frame_code
+    field_to_frame = {}
+    for frame_code, info in id3_frames.items():
+        if isinstance(info, dict) and "field" in info:
+            field_to_frame[info["field"]] = frame_code
+    
     with open(file_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
         
@@ -496,7 +529,8 @@ def write_field_registry_md(file_path: Path, fields: List[FieldSpec]) -> bool:
     new_rows = []
     for f in fields:
         yes_no = lambda x: "Yes" if x else "No"
-        id3 = f.id3_tag if f.id3_tag else "—"
+        # ID3 tag from JSON lookup (source of truth), NOT from f.id3_tag
+        id3 = field_to_frame.get(f.name, "—")
         # Map strategy to display name
         strategy_display = {
             "range": "Range Filter",

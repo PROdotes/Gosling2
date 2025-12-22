@@ -106,6 +106,15 @@ links: []
 
 ---
 
+## ⚠️ Known Tech Debt
+
+| Area | Issue | Trigger to Fix |
+|------|-------|----------------|
+| **ID3 Lookup** | JSON loaded twice: once in `field_editor.py` (cached), once in `yellberus_parser.write_field_registry_md()` (not cached). Lookup logic also duplicated. | If this area causes more bugs, extract shared `id3_lookup.py` module. |
+| **Custom ID3 Tags** | No way to make a field portable without a JSON mapping. User can't specify TXXX:fieldname or custom frames through UI. | ✅ FIXED (Popup implemented) |
+
+---
+
 ## 📚 Reference Docs
 
 | Doc | Purpose |

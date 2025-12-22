@@ -71,7 +71,7 @@ class FieldEditorWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("Field Registry Editor")
         self.setMinimumSize(1000, 600)
-        self.resize(1200, 700)
+        self.resize(1400, 800)
 
         # Storage for original values (for color comparison)
         self._code_fields: dict = {}  # name -> FieldSpec from yellberus.py
@@ -180,16 +180,20 @@ class FieldEditorWindow(QMainWindow):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)   # DB Column
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)     # Type
         self.fields_table.setColumnWidth(3, 100)  # Wide enough for "DURATION"
-        # Filter (4) & Group (5)
+        # Strategy (4)
         self.fields_table.setColumnWidth(4, 100)
-        self.fields_table.setColumnWidth(5, 120)
 
-        for col in range(6, 12):  # Boolean columns (Vis, Edit, Filt, Search, Req, Port)
+        # Boolean columns: Vis(5), Edit(6), Filt(7), Search(8), Req(9), Port(10)
+        for col in range(5, 11):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.Fixed)
             self.fields_table.setColumnWidth(col, 50)
         
-        header.setSectionResizeMode(12, QHeaderView.ResizeMode.Stretch)   # ID3 Tag
-        header.setSectionResizeMode(13, QHeaderView.ResizeMode.Stretch)   # Validation
+        # ID3 Tag (11) - Give it space, make it resizeable
+        header.setSectionResizeMode(11, QHeaderView.ResizeMode.Interactive)
+        self.fields_table.setColumnWidth(11, 150)
+        
+        # Validation (12) - Stretch remaining space
+        header.setSectionResizeMode(12, QHeaderView.ResizeMode.Stretch)
 
         # Add tooltips to abbreviated column headers (for Grandma)
         for col, tooltip in COLUMN_TOOLTIPS.items():
@@ -385,9 +389,12 @@ class FieldEditorWindow(QMainWindow):
             self._set_checkbox_cell(row, 9, field.required)
             self._set_checkbox_cell(row, 10, field.portable)
             
-            # ID3 Tag (11)
+            # ID3 Tag (11) - Read Only (derived from id3_frames.json)
             id3_tag = self._lookup_id3_tag(field.name)
-            self.fields_table.setItem(row, 11, QTableWidgetItem(id3_tag or ""))
+            id3_item = QTableWidgetItem(id3_tag or "")
+            id3_item.setFlags(id3_item.flags() & ~Qt.ItemFlag.ItemIsEditable)  # Read only
+            id3_item.setToolTip("Derived from id3_frames.json. Edit JSON to change mapping.")
+            self.fields_table.setItem(row, 11, id3_item)
             
             # Validation (12) - Read Only
             val_info = validation_map.get(field.name, "")
@@ -691,8 +698,12 @@ class FieldEditorWindow(QMainWindow):
         self._set_checkbox_cell(row, 9, get_default("required"))
         self._set_checkbox_cell(row, 10, get_default("portable"))
         
-        # ID3 Tag (11)
-        self.fields_table.setItem(row, 11, QTableWidgetItem(""))
+        
+        # ID3 Tag (11) - Read Only (will auto-populate when name is set)
+        id3_item = QTableWidgetItem("")
+        id3_item.setFlags(id3_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        id3_item.setToolTip("Derived from id3_frames.json. Edit JSON to change mapping.")
+        self.fields_table.setItem(row, 11, id3_item)
         
         # Validation (12)
         val_item = QTableWidgetItem("")
@@ -1055,49 +1066,143 @@ class FieldEditorWindow(QMainWindow):
     def _validate_id3_tags(self, fields: list) -> bool:
         """Check ID3 tags and prompt user if issues found. Returns True to proceed."""
         from PyQt6.QtWidgets import QMessageBox
+        import json
 
-        missing_tags = [f.name for f in fields if f.portable and not f.id3_tag]
+        # Find portable fields without ID3 mapping
+        missing_tags = [f.name for f in fields if f.portable and not self._lookup_id3_tag(f.name)]
         unknown_tags = [f"{f.name} ('{f.id3_tag}')" for f in fields
                         if f.portable and f.id3_tag and f.id3_tag not in self._id3_frames]
 
-        if not missing_tags and not unknown_tags:
-            return True
-
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setWindowTitle("ID3 Tag Issues")
-
-        issues = []
-        if missing_tags:
-            issues.append("Missing ID3 mapping:\n" + "\n".join(f"  - {t}" for t in missing_tags))
+        # Handle unknown tags (separate warning)
         if unknown_tags:
-            issues.append("Unknown ID3 tags:\n" + "\n".join(f"  - {t}" for t in unknown_tags))
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle("Unknown ID3 Tags")
+            msg.setText("Unknown ID3 tags found:")
+            msg.setInformativeText("\n".join(f"  - {t}" for t in unknown_tags) + "\n\nSave anyway?")
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+            msg.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            if msg.exec() != QMessageBox.StandardButton.Yes:
+                return False
 
-        msg.setText("ID3 tag issues found:")
-        msg.setInformativeText("\n\n".join(issues) + "\n\nSave anyway?")
-        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
-        msg.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        # Handle missing mappings with auto-add popup
+        if missing_tags:
+            if self._test_mode:
+                # In test mode, auto-add without popup
+                self._add_txxx_entries(missing_tags)
+                return True
+            
+            field_list = ", ".join(missing_tags)
+            txxx_entries = ", ".join(f"TXXX:{name}" for name in missing_tags)
+            
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Question)
+            msg.setWindowTitle("Missing ID3 Mapping")
+            msg.setText(f"The following portable fields have no ID3 mapping:\n{field_list}")
+            msg.setInformativeText(
+                f"Should the editor add TXXX entries for you?\n\n"
+                f"• Yes: Adds {txxx_entries} to id3_frames.json and continues save.\n"
+                f"• No: Cancels save. You'll need to edit the JSON manually."
+            )
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+            
+            if msg.exec() == QMessageBox.StandardButton.Yes:
+                if self._add_txxx_entries(missing_tags):
+                    # Reload ID3 frames so lookup works for the rest of save
+                    self._load_id3_defs()
+                    return True
+                else:
+                    QMessageBox.critical(self, "Error", "Failed to update id3_frames.json")
+                    return False
+            else:
+                self.status_bar.showMessage("Save cancelled - edit id3_frames.json manually")
+                return False
 
-        return msg.exec() == QMessageBox.StandardButton.Yes
+        return True
+
+    def _add_txxx_entries(self, field_names: list) -> bool:
+        """Add TXXX entries to id3_frames.json for the given field names."""
+        import json
+        
+        json_path = Path(__file__).parent.parent / "src" / "resources" / "id3_frames.json"
+        
+        try:
+            # Create backup
+            backup_path = json_path.with_suffix(".json.bak")
+            if json_path.exists():
+                import shutil
+                shutil.copy2(json_path, backup_path)
+            
+            # Load current JSON
+            if json_path.exists():
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = {}
+            
+            # Add TXXX entries
+            for name in field_names:
+                key = f"TXXX:{name}"
+                if key not in data:
+                    data[key] = {
+                        "description": f"Custom field: {name}",
+                        "field": name,
+                        "type": "text"
+                    }
+            
+            # Write back
+            with open(json_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error adding TXXX entries: {e}")
+            return False
 
     def _validate_db_columns(self, fields: list) -> bool:
-        """Check for missing DB columns and prompt user."""
+        """Check for missing DB columns and prompt user with auto-generate option."""
         from PyQt6.QtWidgets import QMessageBox
 
-        missing_cols = [f.name for f in fields if not f.db_column]
+        missing_cols = [f for f in fields if not f.db_column]
 
         if not missing_cols:
             return True
 
+        field_names = [f.name for f in missing_cols]
+        field_list = ", ".join(field_names)
+        example_cols = ", ".join(f"S.{name}" for name in field_names[:3])
+        if len(field_names) > 3:
+            example_cols += ", ..."
+
         msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Critical) # Valid DB column is critical for Yellberus
+        msg.setIcon(QMessageBox.Icon.Question)
         msg.setWindowTitle("Missing Database Columns")
-        msg.setText("The following fields have no Database Column defined:")
-        msg.setInformativeText("\n".join(f"  - {name}" for name in missing_cols) + 
-                               "\n\nYou must define a DB Column (e.g. 'S.Title') to save.")
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
-        return False
+        msg.setText(f"The following fields have no Database Column defined:\n{field_list}")
+        msg.setInformativeText(
+            f"Should the editor generate default column names?\n\n"
+            f"• Yes: Sets columns to S.{{field_name}} (e.g., {example_cols})\n"
+            f"• No: Cancels save. You'll need to enter columns manually."
+        )
+        msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        msg.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+        if msg.exec() == QMessageBox.StandardButton.Yes:
+            # Auto-fill the DB column cells in the table
+            for f in missing_cols:
+                default_col = f"S.{f.name}"
+                # Find the row for this field and update column 2 (DB Column)
+                for row in range(self.fields_table.rowCount()):
+                    name_item = self.fields_table.item(row, 0)
+                    if name_item and name_item.text() == f.name:
+                        self.fields_table.item(row, 2).setText(default_col)
+                        break
+            self.status_bar.showMessage(f"Auto-generated DB columns for {len(missing_cols)} field(s)")
+            return True  # Continue with save (fields list will be re-gathered)
+        else:
+            self.status_bar.showMessage("Save cancelled - enter DB columns manually")
+            return False
 
     def _on_save_clicked(self):
         """Save changes to yellberus.py and FIELD_REGISTRY.md."""
@@ -1108,11 +1213,13 @@ class FieldEditorWindow(QMainWindow):
         if not fields_to_save:
             return
 
-        # Validate DB Columns (Critical - Blocking)
+        # Validate DB Columns (may auto-fill UI cells)
         if not self._validate_db_columns(fields_to_save):
             return
+        # Re-gather in case UI was modified by auto-fill
+        fields_to_save = self._gather_fields_for_save()
 
-        # Validate ID3 Tags (Warning - Non-blocking)
+        # Validate ID3 Tags (may add TXXX entries to JSON)
         if not self._validate_id3_tags(fields_to_save):
             return
 
