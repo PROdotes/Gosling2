@@ -804,6 +804,16 @@ Artists, composers, and other credited individuals or groups.
 | `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
 | `Type` | TEXT | CHECK(Type IN ('person', 'group')) | ❌ Individual or band |
 
+**Type Definitions:**
+- `'person'`: An individual human being (e.g., "Dave Grohl").
+- `'group'`: A collective entity (e.g., "Nirvana").
+- *Note:* This distinction governs the `GroupMembers` logic. A 'group' has members; a 'person' does not.
+
+**UI Implementation Requirements:**
+- When creating a new Contributor (e.g., during "Add Artist"), the UI MUST provide a selector for Type.
+- Default should be `'person'` for single names, or heuristics can suggest `'group'` if plural/known.
+- **Strictness**: The database will reject `unknown` types. `field_editor.py` or importers must handle defaulting to `person` if unsure.
+
 ### 18. `ContributorAliases` ❌ Not Implemented
 
 Alternative names for contributors (for search).
@@ -871,6 +881,10 @@ Band membership relationships.
 - Primary Key: `(GroupID, MemberID)`
 - `GroupID` must reference Type='group'
 - `MemberID` must reference Type='person'
+
+> **Logic Rule (Strict Mode):**
+> The application layer MUST enforce that you cannot add a `MemberID` that points to a Group (preventing Group-in-Group cycles unless explicitly desired) and you cannot add a `GroupID` that points to a Person.
+> Since SQLite `CHECK` constraints involving cross-row lookups are complex, this is enforced by `ContributorRepository`.
 
 ---
 

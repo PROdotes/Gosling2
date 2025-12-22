@@ -173,16 +173,17 @@ class FilterWidget(QWidget):
         elif field.name == "producers":
             return [name for _, name in self.library_service.get_contributors_by_role("Producer")]
         elif field.name == "unified_artist":
-            # T-17: Combine performers and groups into a unified artist list
+            # T-17: Combine performers, groups, and ALIASES into a unified artist list
             artists = set()
             # Get performers
             for _, name in self.library_service.get_contributors_by_role("Performer"):
                 if name:
                     artists.add(name)
-            # Get groups
-            for group in self.library_service.get_all_groups():
-                if group:
-                    artists.add(group)
+            # Groups removed: If they have songs, they are performers. If not, they shouldn't be here.
+            # Get aliases (Fix for "No Nixon in list")
+            for alias in self.library_service.get_all_aliases():
+                if alias:
+                    artists.add(alias)
             return sorted(list(artists))
         elif field.name == "recording_year":
             return self.library_service.get_all_years()

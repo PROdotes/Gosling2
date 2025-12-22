@@ -59,9 +59,11 @@ class LibraryService:
         """Get all distinct recording years"""
         return self.song_repository.get_all_years()
 
-    def get_all_groups(self) -> List[str]:
-        """Get all distinct group names (T-17: for unified artist filter)"""
-        return self.song_repository.get_all_groups()
+    # get_all_groups removed (redundant/0-result risk)
+
+    def get_all_aliases(self) -> List[str]:
+        """Get all distinct alias names"""
+        return self.contributor_repository.get_all_aliases()
 
     def get_songs_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific year"""

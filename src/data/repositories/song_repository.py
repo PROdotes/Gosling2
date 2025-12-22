@@ -320,33 +320,7 @@ class SongRepository(BaseRepository):
             print(f"Error getting all years: {e}")
             return []
 
-    def get_all_groups(self) -> List[str]:
-        """Get list of all unified artists (Groups + Performers) for the filter tree"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                query = """
-                    SELECT DISTINCT Groups FROM Songs WHERE Groups IS NOT NULL AND Groups != ''
-                    UNION
-                    SELECT DISTINCT C.ContributorName 
-                    FROM Contributors C
-                    JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
-                    JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    WHERE R.RoleName = 'Performer'
-                    UNION
-                    SELECT DISTINCT M.ContributorName
-                    FROM Contributors M
-                    JOIN GroupMembers GM ON M.ContributorID = GM.MemberID
-                    JOIN MediaSourceContributorRoles MSCR ON GM.GroupID = MSCR.ContributorID
-                    JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    WHERE R.RoleName = 'Performer'
-                    ORDER BY 1
-                """
-                cursor.execute(query)
-                return [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            print(f"Error getting all unified artists: {e}")
-            return []
+    # get_all_groups removed (Legacy zombie logic)
 
     def get_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific recording year"""

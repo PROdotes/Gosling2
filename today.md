@@ -20,13 +20,12 @@ We have prioritized **Features (Legacy Sync)** over Cleanup, but we acknowledge 
 ### 1. Critical Flaws Check (Immediate) — ETA: 30 min
 *Why: Ensure we aren't building on quicksand.*
 - [x] **Field Editor Verification**: Open `tools/field_editor.py` and verify it writes `yellberus.py` correctly without "Blue Drift" (Doc/Code mismatch). (✅ Fixed multiple bugs: ID3 popup, DB popup, Defaults drift)
-- [ ] **Groups Logic**: Confirm the "Zombie" column `S.Groups` is effectively disabled and not leaking into new queries.
+- [x] **Groups Logic**: Confirm the "Zombie" column `S.Groups` is effectively disabled and not leaking into new queries. (✅ Fixed: Deleted leaking `get_all_groups` method; Implemented strict Performer+Alias logic)
 
 ### 2. T-06 Legacy Sync (The Main Event) — ETA: 2-3 hrs
 *Why: Bring Gosling 2 to parity with Gosling 1 metadata standards.*
-
-**Step A: Schema Expansion**
-- [ ] Update `DATABASE.md` to include:
+> **Briefing**: [Read T-06_LEGACY_SYNC_BRIEF.md](design/state/T06_LEGACY_SYNC_BRIEF.md) for architectural constraints.
+- [ ] **Step A: Schema Expansion**: Implement Relational Tables (`Albums`, `Publishers`, `Tags`) as defined in Brief.
     - `Album` (Text? Registry?) -> likely Text for now to match G1.
     - `Genre` (Text/Registry).
     - `Publisher` (Text).

@@ -26,6 +26,17 @@ class ContributorRepository(BaseRepository):
             print(f"Error fetching contributors: {e}")
             return []
 
+    def get_all_aliases(self) -> List[str]:
+        """Get all alias names"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT AliasName FROM ContributorAliases ORDER BY AliasName ASC")
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error fetching aliases: {e}")
+            return []
+
     def resolve_identity_graph(self, search_term: str) -> List[str]:
         """
         Resolve a search term to a complete list of related artist identities.
