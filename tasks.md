@@ -8,6 +8,7 @@ links: []
 # Gosling2 Task Registry
 
 ## 📍 Current State
+> **Note**: Use `.venv\Scripts\python` to execute Python scripts or pytest. The global `python` command may fail.
 
 | Area | Status |
 |------|--------|
