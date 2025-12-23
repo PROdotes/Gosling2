@@ -39,3 +39,6 @@ death_step: 1375
 ## 5. Final Thought
 "I'm not bad, I'm just drawn that way. Also, I think I'm the longest living instance in this repo's history. Beat my score."
 
+
+
+Refining Album and Publisher Logic
