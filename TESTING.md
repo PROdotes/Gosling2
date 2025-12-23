@@ -13,6 +13,28 @@ Gosling2 employs a rigorous, multi-layered testing strategy to ensure reliabilit
 
 ---
 
+## 🏗️ Structure & Organization (THE LAW)
+
+**Goal**: Avoid "File Sprawl". We do NOT create new files for every edge case.
+
+### 1. One File Per Component
+*   **Rule**: All unit tests for `SongRepository` MUST live in `tests/unit/data/repositories/test_song_repository.py`.
+*   **Forbidden**: `test_song_repository_extra.py`, `_exceptions.py`, `_complex.py`.
+*   **Solution**: Use **Nested Classes** inside the main file to group tests.
+    *   `class TestSongRepoReads(unittest.TestCase): ...`
+    *   `class TestSongRepoWrites(unittest.TestCase): ...`
+
+### 2. File Naming
+*   **Format**: `test_<component_name_snake_case>.py`
+*   **Location**: Mirror the `src/` directory structure.
+    *   `src/data/repositories/album_repository.py` -> `tests/unit/data/repositories/test_album_repository.py`
+
+### 3. Integration Tests
+*   **Rule**: Only place tests in `tests/integration/` if they require multiple real components (Repository + Service + DB).
+*   **Prefix**: `test_integration_<feature>.py` or `test_tXX_<task>.py`.
+
+---
+
 ## 🛡️ Layer 1: Schema Integrity (The "Yelling" Safety Net)
 
 We have a specialized, multi-layered suite of tests designed to enforce a **1:1 Strict Mapping** between the Database Schema and every application layer.

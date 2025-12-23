@@ -47,6 +47,11 @@ To comply with **Windows Filesystem Restrictions**, illegal characters must be r
     *   `/` replaced with `_`
 *   **General Rule**: Any character that breaks the filesystem (e.g., `?`, `*`, `|`, `<`, `>`, `"`, `\`) should inherently be treated similarly if encountered.
 
+### 1.5 Deletion Safety
+*   **Protocol**: Changes that remove files (e.g., Delete Song, Rename/Move) MUST NOT permanently destroy data.
+*   **Requirement**: Use `send2trash` (or equivalent) to move files to the OS Recycle Bin.
+*   **Forbidden**: `os.remove()` or `shutil.rmtree()` on user content.
+
 ---
 
 ## 2. 📝 Metadata & ID3 Logic
@@ -136,6 +141,16 @@ The application enforces strict character replacement to ensure file system comp
     *   **Future Feature**: When pasting text into the "Composers" input field in the Metadata Editor, the UI should offer to parse/split the string and suggest matching Contributors.
     *   **Action**: Deferred. See **Task T-18 (Smart Paste)** in `tasks.md`.
 
+### 3.4 Legacy Keyboard Shortcuts (Critical Parity)
+The legacy workflow relied heavily on keyboard speed. Gosling 2 MUST support:
+
+| Shortcut | Context | Legacy Behavior | Gosling 2 Requirement |
+| :--- | :--- | :--- | :--- |
+| **Ctrl + S** | Editor | Save changes to Database & ID3. | Trigger `LibraryWidget.save_current_selection()`. |
+| **Ctrl + D** | Editor | Toggle "Done" status (`is_done=True`). | Toggle `Done` checkbox + Optional Auto-Save. |
+| **Space** | List | Play/Pause. | Standard Media Control. |
+| **Enter** | List | Start Playing / Edit (Context dependent). | Consistent "Activate" action. |
+
 ---
 
 ## 4. 🛠️ Clean Path vs. Legacy Debt (The Gosling 2 Strategy)
@@ -171,8 +186,13 @@ Based on the audit and user feedback, Gosling 2 will transition away from "Monol
 To achieve Task **T-06 (Legacy Sync)**:
 
 1.  [x] **Schema Update**: Add `album`, `publisher`, `genre` to `Yellberus` and Database.
-    *   *Prerequisite*: Finish T-04 (Test Consolidation).
 2.  [x] **Legacy Writer**: `TKEY` logic ("True" / " ") is **Implemented** in `MetadataService`.
 3.  [ ] **Auto-Renamer**: Port the `generateNewFilename` logic to Python (including the Genre/Year folder rules).
 4.  [ ] **Duplicate Detection**: Implement tiered check (ISRC → Hash → Metadata) on Import.
 5.  [ ] **Smart Input (Future)**: Implement "Spotify De-Mangler" in the Metadata Editor UI (Post-MVP).
+
+### 🚨 Known Issues / Implementation Gaps
+*   **The "Greatest Hits" Paradox**:
+    *   **Problem**: Albums are currently keyed by `Title` only. "Greatest Hits" (Queen) and "Greatest Hits" (ABBA) are merging into a single Album entity.
+    *   **Required Fix**: Add `AlbumArtist` column to `Albums` table or enforce a Compound Unique Constraint (`Title` + `AlbumArtist`).
+    *   **Status**: 📌 PINNED (Needs Resolution).
