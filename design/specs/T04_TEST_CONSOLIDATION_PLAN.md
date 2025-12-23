@@ -1,111 +1,137 @@
 ---
 tags:
   - plan/refactor
-  - type/spec
-  - status/draft
+  - type/runbook
+  - status/approved
 ---
 
-# T-04: The Great Test Consolidation Plan
+# T-04: The Great Test Consolidation Runbook
 
-**Objective**: Reduce the 68 scattered test files in `tests/` to a manageable, logical structure (~20 files).
-**Driver**: Any
-**Safety**: High (Test only)
+**Objective**: Reduce the fragmented test suite (~68 files) to a clean, component-based structure (~25 files).
+**Driver**: Next Available Agent
+**Estimated Time**: ~3 Hours
 
 ---
 
 ## 🏗️ The Problem
-The current test suite suffers from "Scenario Fragmentation". Instead of organizing by **Component**, we organized by **Ad-Hoc Scenario** (e.g., `test_song_repository_extra.py`).
+The test suite suffers from "Scenario Fragmentation". Tests were added as new files for every edge case (e.g., `test_playback_service_mutation.py`) rather than extending the component's main test file. This increases maintenance overhead and slows down TDD.
 
-**Current Count**: ~68 Files
-**Target Count**: ~20-25 Files
+**Rule of Law**: 
+> **One Test File Per Component.** 
+> Use `class TestComponentFeature(unittest.TestCase):` to separate concerns within the file.
 
 ---
 
-## 🗺️ The New Map
+## 🎯 The Kill List (Consolidation Targets)
 
-### Rule #1: One Test File Per Component
-If you are testing `SongRepository`, all tests go in `test_song_repository.py`. 
-Use **Classes** to separate concerns within the file.
+Execute these merges in order.
 
-### Kill List & Targets
+### 0. Prerequisites (CRITICAL)
+Before running any tests, ensure dependencies are installed. The Service Layer imports `PyQt6`.
+```bash
+pip install -r requirements.txt
+```
+*Note: If `pytest` fails with `ModuleNotFoundError: No module named 'PyQt6'`, this is why.*
 
-#### 1. Song Repository (The Big One)
-**Target**: `tests/unit/data/repositories/test_song_repository.py`
-**Merge Source(s)**:
-- `test_song_repository_extra.py`
-- `test_song_repository_get_path.py`
-- `test_song_repository_exceptions.py`
-- `test_song_repository_mutation.py`
-- `test_song_integrity.py` (Move logic here if it's repo-centric)
-- `test_song_object_mapping.py`
-- `test_security_injection.py`
+### 1. Song Repository (Data Layer)
+**Primary File**: `tests/unit/data/repositories/test_song_repository.py`
 
-**Internal Structure**:
+**Merge These Files Into Primary**:
+*   [ ] `test_song_repository_exceptions.py`
+*   [ ] `test_song_repository_extra.py`
+*   [ ] `test_song_repository_get_path.py`
+*   [ ] `test_song_repository_mutation.py`
+*   [ ] `test_song_object_mapping.py`
+*   [ ] `test_security_injection.py`
+
+**Desired Structure**:
 ```python
-class TestSongRepository(unittest.TestCase):
-    # Setup/Teardown
-    ...
+class TestSongRepositoryBase(unittest.TestCase): ...
 
-class TestSongReads(TestSongRepository):
-    # get_by_path, get_all, etc.
+class TestSongReads(TestSongRepositoryBase):
+    # test_get_all, test_get_by_path...
 
-class TestSongWrites(TestSongRepository):
-    # insert, update, etc.
+class TestSongWrites(TestSongRepositoryBase):
+    # test_insert, test_update...
 
-class TestSongEdgeCases(TestSongRepository):
-    # injection, long paths, etc.
+class TestSongEdgeCases(TestSongRepositoryBase):
+    # test_injection, test_long_paths, test_exceptions...
 ```
 
-#### 2. Metadata Service
-**Target**: `tests/unit/business/services/test_metadata_service.py`
-**Merge Source(s)**:
-- `test_metadata_service_comprehensive.py`
-- `test_metadata_service_coverage.py`
-- `test_metadata_service_mutation.py`
-- `test_metadata_additional.py`
-- `test_metadata_defensive.py`
-- `test_metadata_done_flag.py`
-- `test_metadata_fixtures.py`
-- `test_metadata_write.py`
+---
 
-#### 3. Playback Service
-**Target**: `tests/unit/business/services/test_playback_service.py`
-**Merge Source(s)**:
-- `test_playback_service_cleanup.py`
-- `test_playback_service_mutation.py`
-- `test_playback_crossfade.py`
+### 2. Metadata Service (Business Layer)
+**Primary File**: `tests/unit/business/services/test_metadata_service.py`
 
-#### 4. Library Widget (UI)
+**Merge These Files Into Primary**:
+*   [ ] `test_metadata_service_comprehensive.py`
+*   [ ] `test_metadata_service_coverage.py`
+*   [ ] `test_metadata_service_mutation.py`
+*   [ ] `test_metadata_write.py`
+*   [ ] `test_metadata_write_dynamic.py` (Contains T-38 logic)
+*   [ ] `test_metadata_additional.py`
+*   [ ] `test_metadata_defensive.py`
+*   [ ] `test_metadata_done_flag.py`
+*   [ ] `test_metadata_fixtures.py`
+
+**Note**: This is the largest merge. Be careful with `setUp` methods. Ensure `MetadataService` is mocked/initialized consistently.
+
+---
+
+### 3. Playback Service (Business Layer)
+**Primary File**: `tests/unit/business/services/test_playback_service.py`
+
+**Merge These Files Into Primary**:
+*   [ ] `test_playback_service_cleanup.py`
+*   [ ] `test_playback_service_mutation.py`
+*   [ ] `test_playback_crossfade.py`
+
+---
+
+### 4. UI Widgets (Presentation Layer)
+**Small cleanups to reduce noise.**
+
 **Target**: `tests/unit/presentation/widgets/test_library_widget.py`
-**Merge Source(s)**:
-- `test_library_widget_filtering.py`
-- `test_library_widget_selection.py`
-- `test_library_widget_signals.py`
-- `test_library_widget_sorting.py`
+*   [ ] Merge `test_library_widget_filtering.py`
+*   *Keep `drag_drop` and `context_menu` separate for now if they are large (>200 lines).*
+
+**Target**: `tests/unit/presentation/widgets/test_playback_control_widget.py`
+*   [ ] Merge `test_playback_control_widget_mutation.py`
+
+**Target**: `tests/unit/presentation/widgets/test_playlist_widget.py`
+*   [ ] Merge `test_playlist_widget_extra.py`
 
 ---
 
-## 🔨 Execution Protocol
+## 🔨 Execution Protocol (The "How-To")
 
-1.  **Backup**: Ensure git is clean.
-2.  **Create Wrapper**: Rename `test_song_repository.py` -> `test_song_repository_OLD.py`.
-3.  **Scaffold**: Create new empty `test_song_repository.py` with standard imports.
-4.  **Migrate Chunk**:
-    *   Copy ONE source file's tests into the new file.
-    *   **Run Pytest**: `pytest tests/unit/data/repositories/test_song_repository.py`.
-    *   **Pass?**: Delete the source file.
-5.  **Repeat**: Until all source files are consumed.
+For each Target Group above:
+
+1.  **Safety Check**: Run the specific group first to ensure green state.
+    ```bash
+    pytest tests/unit/data/repositories/test_song_repository*.py
+    ```
+2.  **Backup**: specific file backup.
+    ```bash
+    cp tests/unit/data/repositories/test_song_repository.py tests/unit/data/repositories/test_song_repository.BAK
+    ```
+3.  **Merge**:
+    *   Open `Primary File`.
+    *   Open `Source File` (e.g., `test_song_repository_exceptions.py`).
+    *   Copy the `test_...` methods (or whole class) from Source to Primary.
+    *   Wrap them in a logical class if needed (e.g., `class TestExceptions:`).
+4.  **Verify**:
+    ```bash
+    # Run ONLY the Primary File
+    pytest tests/unit/data/repositories/test_song_repository.py
+    ```
+5.  **Delete**:
+    *   If Green, delete the `Source File`.
+6.  **Commit**: `git commit -am "refactor: merged [Source] into [Primary]"`
 
 ---
 
-## 🚫 What NOT to Merge
-*   **Disabled Integrity Tests**: Leave `tests/disabled_integrity/` alone. They are disabled for a reason.
-*   **Integration Tests**: Leave `tests/integration/` alone.
-*   **One-off Repos**: `test_contributor_repository.py` is fine as is (unless there are 5 of them).
-
----
-
-## ✅ Definition of Done
-1.  file count in `tests/unit` reduced by > 50%.
-2.  `pytest` runs green on the merged files.
-3.  No loss of coverage (all test methods migrated).
+## 🚫 Exclusions (Do Not Merge)
+*   `tests/disabled_integrity/` -> Leave them rotting.
+*   `tests/integration/` -> Keep separate.
+*   `test_contributor_repository.py` -> Standalone is fine.

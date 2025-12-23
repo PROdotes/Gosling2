@@ -55,12 +55,13 @@
 
 ---
 
-### Phase 3: The "Clean Sweep" (T-04) — **DEFERRED** ⏸️
+### Phase 3: The "Clean Sweep" (T-04) — **DOCUMENTATION COMPLETE** ✅
 *   **Goal**: De-fragment the Test Suite (68 files → ~20 files).
-*   **Why**: The current sprawl makes TDD painful. Strict "One Test File per Component" rule.
+*   **Status**: Documentation & Plan Prepped. Ready for Execution.
 *   **Action**:
-    - Execute `T04_TEST_CONSOLIDATION_PLAN.md`.
-    - Targets: `SongRepository`, `MetadataService`, `PlaybackService`, `LibraryWidget`.
+    - [x] Create detailed Runbook (`design/specs/T04_TEST_CONSOLIDATION_PLAN.md`).
+    - [x] Create `tests/README.md`.
+    - [ ] Execute Consolidation (Next Agent).
 *   **Exit Criteria**:
     - [ ] Test file count reduced to target (~20).
     - [ ] All tests pass (`pytest` green).
