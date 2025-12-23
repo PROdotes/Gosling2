@@ -24,10 +24,13 @@ tags:
 *   [x] **Unified Artist**: M2M Logic.
 
 ### 🔧 Milestone 1: Schema Fix (Critical)
-*Status: TODAY*
-*   [ ] **Greatest Hits Fix** (~2.0 h)
+*Status: COMPLETED (Dec 23)*
+*   [x] **Greatest Hits Fix** (~2.0 h)
     *   *Task*: Schema Change (AlbumArtist) + Logic Update.
     *   *Criticality*: High (Data Corruption). Must fix before test consolidation.
+*   [x] **Dynamic ID3 Write (T-38)** (~3.0 h)
+    *   *Task*: Logic Refactor (JSON-driven writing).
+    *   *Criticality*: Blocker (Regression found & fixed).
 
 ### 🧹 Milestone 2: The Cleanup
 *Status: After Schema Fix*

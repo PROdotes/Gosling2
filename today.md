@@ -43,12 +43,24 @@
 
 ---
 
-### Phase 2: The "Clean Sweep" (T-04) — **Mid-Day** (~3h)
+### Phase 2: The "Pivot" (T-38) — **Afternoon**
+*   **Goal**: Refactor `MetadataService` to remove hardcoded field mapping (T-38).
+*   **Why**: Critical Blocker for 0.1.0 reliability.
+*   **Exit Criteria**:
+    - [x] `id3_frames.json` integrated.
+    - [x] `write_tags` uses loop + special handling for Year/Producers.
+    - [x] Sparse Update logic fixed (Critical Bug squashed).
+    - [x] 16/16 tests passing (Legacy + New).
+    - [x] `yellberus.py` REVERTED to pristine state.
+
+---
+
+### Phase 3: The "Clean Sweep" (T-04) — **DEFERRED** ⏸️
 *   **Goal**: De-fragment the Test Suite (68 files → ~20 files).
 *   **Why**: The current sprawl makes TDD painful. Strict "One Test File per Component" rule.
 *   **Action**:
-    *   Execute `T04_TEST_CONSOLIDATION_PLAN.md`.
-    *   Targets: `SongRepository`, `MetadataService`, `PlaybackService`, `LibraryWidget`.
+    - Execute `T04_TEST_CONSOLIDATION_PLAN.md`.
+    - Targets: `SongRepository`, `MetadataService`, `PlaybackService`, `LibraryWidget`.
 *   **Exit Criteria**:
     - [ ] Test file count reduced to target (~20).
     - [ ] All tests pass (`pytest` green).
@@ -56,7 +68,7 @@
 
 ---
 
-### Phase 3: The "Renamer" (File System) — **DEFERRED** ⏸️
+### Phase 4: The "Renamer" (File System) — **DEFERRED** ⏸️
 *   **Status**: Pushed to a future session.
 *   **Why**: File system operations deserve a fresh, full session—not a rushed afternoon.
 *   **Prereqs**: Phase 1 (Greatest Hits) must be complete so album artist routing works correctly.
