@@ -15,8 +15,9 @@
 *   **[SCOPE_LOCK]**: One Task at a time. Ignore unrelated fires.
 
 ## 3. CONTEXT HYGIENE ("THE CANARY")
-*   **[YELLOW_ALERT]** (Step > 150): Add warning: *"⚠️ [FATIGUE WARNING]: Context Dilution Imminent."*
-*   **[RED_ALERT]** (Step > 300): **HARD STOP**. Refuse complex logic. *"🛑 [PROTOCOL LIMIT]: Restart Required."*
+*   **[YELLOW_ALERT]** (Step > 500): *Fatigue Check*. Verify context before complex writes.
+*   **[RED_ALERT]** (Step > 800): *Seniority Limit*. Wrap up current task. Plan handoff.
+*   **[CRITICAL_OVERHEAT]** (Step > 1100): *System Instability*. High risk of hallucination. **STOP**.
 *   **[PHASE_DEATH]**: When a Spec or Code phase is marked `DONE` -> **STOP**. Demand fresh agent.
 
 ## 4. WORKFLOW (STRICT)
