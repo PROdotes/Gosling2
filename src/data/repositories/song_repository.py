@@ -188,32 +188,52 @@ class SongRepository(BaseRepository):
                 """, (song.source_id, contributor_id, role_id))
 
     def _sync_album(self, song: Song, conn) -> None:
-        """Sync album relationship (Find or Create)"""
+        """Sync album relationship (Find or Create with Artist Disambiguation)"""
         if not song.album or not song.album.strip():
             return
 
-        # 1. Get/Create Album (using Repo logic but reusing connection/transaction)
-        # Since AlbumRepo uses its own connection context usually, we might need to duplicate logic 
-        # OR use the repo instance but we are inside a transaction here.
-        # SQLite supports nested transactions or we just assume auto-commit behavior of Repo methods isn't ideal inside a transaction.
-        # SAFE APPROACH: Use raw SQL here to ensure we stay in `conn` transaction.
+        # 1. Get/Create Album using (Title, AlbumArtist, Year) for disambiguation
+        # This prevents the "Greatest Hits Paradox" where Queen and ABBA albums merge.
+        # 
+        # Note: We use raw SQL here to stay within the current transaction.
         
         album_title = song.album.strip()
+        album_artist = getattr(song, 'album_artist', None)
+        if album_artist:
+            album_artist = album_artist.strip() or None
+        release_year = getattr(song, 'recording_year', None)
+        
         cursor = conn.cursor()
         
-        # Check existence
-        cursor.execute("SELECT AlbumID FROM Albums WHERE Title = ?", (album_title,))
+        # Build query dynamically based on what's provided
+        conditions = ["Title = ? COLLATE NOCASE"]
+        params = [album_title]
+        
+        if album_artist:
+            conditions.append("AlbumArtist = ? COLLATE NOCASE")
+            params.append(album_artist)
+        else:
+            conditions.append("(AlbumArtist IS NULL OR AlbumArtist = '')")
+        
+        if release_year:
+            conditions.append("ReleaseYear = ?")
+            params.append(release_year)
+        
+        query = f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}"
+        cursor.execute(query, params)
         row = cursor.fetchone()
         
         if row:
             album_id = row[0]
         else:
-            cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Album')", (album_title,))
+            # Create new album with all disambiguation fields
+            cursor.execute(
+                "INSERT INTO Albums (Title, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", 
+                (album_title, album_artist, release_year)
+            )
             album_id = cursor.lastrowid
             
         # Link: M2M - Add to album without removing existing links.
-        # Use INSERT OR IGNORE to avoid duplicates.
-        # To REMOVE a song from an album, use album_repo.remove_song_from_album() explicitly.
         cursor.execute("INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
 
     def _sync_publisher(self, song: Song, conn) -> None:

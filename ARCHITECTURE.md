@@ -4,6 +4,10 @@ Project Structure Documentation
 Gosling2 - Music Library and Player Application
 ================================================
 
+> ⚠️ **STATUS: OUTDATED** — This document was created during early refactor and has drifted.  
+> Missing: `src/core/` (Yellberus), `tools/`, `album.py`, `tag.py`, `publisher.py`, new repos.  
+> See [T-36 in tasks.md](tasks.md) for update task. — *Vesper, 2025-12-23*
+
 This document describes the architecture and structure of the Gosling2 application.
 
 ## Architecture Overview

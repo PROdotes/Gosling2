@@ -68,5 +68,15 @@
         "album": "Help!",
         "year": 1965,
         "publisher": "Capitol Records"
+    },
+    {
+        "path": "C:\\Music\\Compilations\\Summer Vibes.mp3",
+        "title": "Summer Vibes Mix",
+        "artist": "DJ Someone",
+        "album": "Summer Hits 2024",
+        "album_artist": "Various Artists",
+        "year": 2024,
+        "publisher": "Compilation Records",
+        "genre": "Pop, Dance"
     }
 ]

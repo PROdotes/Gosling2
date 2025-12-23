@@ -35,6 +35,7 @@
 1.  **Implement** to satisfy tests.
 2.  **Style**: Premium/Modern Aesthetics only. Zero-context readable.
 3.  **Safety**: Loud failures (Exceptions/Alerts) > Silent failures.
+4.  **Cleanup**: Remove "thought-process" comments. Code must be pristine.
 
 ### PHASE 4: VERIFY
 1.  **Execute** full spec + regression suite.

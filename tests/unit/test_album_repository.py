@@ -183,6 +183,174 @@ class TestAlbumRepository(unittest.TestCase):
             conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Remove.mp3'")
 
 
+    # ==================== GREATEST HITS FIX TESTS ====================
+    # Tests for album artist disambiguation (T-06 / 2025-12-23)
+
+    def test_greatest_hits_different_artists(self):
+        """
+        THE GREATEST HITS PARADOX: 
+        'Greatest Hits' by Queen and 'Greatest Hits' by ABBA must be SEPARATE albums.
+        """
+        # Create ABBA's Greatest Hits
+        abba, created1 = self.repo.get_or_create("Case_Greatest_Hits", album_artist="ABBA", release_year=1992)
+        self.assertTrue(created1, "ABBA album should be created")
+        
+        # Create Queen's Greatest Hits (same title, different artist)
+        queen, created2 = self.repo.get_or_create("Case_Greatest_Hits", album_artist="Queen", release_year=1981)
+        self.assertTrue(created2, "Queen album should be created (NOT reuse ABBA's)")
+        
+        # They should have DIFFERENT IDs
+        self.assertNotEqual(abba.album_id, queen.album_id, 
+            "CRITICAL: Queen and ABBA albums merged! Greatest Hits fix failed.")
+        
+        # Verify we can retrieve each independently
+        found_abba = self.repo.find_by_key("Case_Greatest_Hits", album_artist="ABBA", release_year=1992)
+        found_queen = self.repo.find_by_key("Case_Greatest_Hits", album_artist="Queen", release_year=1981)
+        
+        self.assertIsNotNone(found_abba)
+        self.assertIsNotNone(found_queen)
+        self.assertEqual(found_abba.album_id, abba.album_id)
+        self.assertEqual(found_queen.album_id, queen.album_id)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Greatest_Hits'")
+
+    def test_same_artist_different_years(self):
+        """
+        Same artist, same title, different years = different albums.
+        E.g., 'Greatest Hits 1981' vs 'Greatest Hits 2011 Remaster'
+        """
+        album_1981, created1 = self.repo.get_or_create("Case_Same_Artist", album_artist="Queen", release_year=1981)
+        album_2011, created2 = self.repo.get_or_create("Case_Same_Artist", album_artist="Queen", release_year=2011)
+        
+        self.assertTrue(created1)
+        self.assertTrue(created2, "Different year should create new album")
+        self.assertNotEqual(album_1981.album_id, album_2011.album_id)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Same_Artist'")
+
+    def test_same_artist_same_year_reuses(self):
+        """
+        Same artist, same title, same year = same album (reuse).
+        """
+        album1, created1 = self.repo.get_or_create("Case_Reuse_Test", album_artist="Nirvana", release_year=1991)
+        album2, created2 = self.repo.get_or_create("Case_Reuse_Test", album_artist="Nirvana", release_year=1991)
+        
+        self.assertTrue(created1)
+        self.assertFalse(created2, "Should reuse existing album")
+        self.assertEqual(album1.album_id, album2.album_id)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Reuse_Test'")
+
+    def test_null_artist_handling(self):
+        """
+        Albums with NULL artist should be distinguishable from each other by year.
+        Two compilations with no artist but different years = separate.
+        """
+        comp_2020, created1 = self.repo.get_or_create("Case_Compilation", album_artist=None, release_year=2020)
+        comp_2021, created2 = self.repo.get_or_create("Case_Compilation", album_artist=None, release_year=2021)
+        
+        self.assertTrue(created1)
+        self.assertTrue(created2, "Different year compilations should be separate")
+        self.assertNotEqual(comp_2020.album_id, comp_2021.album_id)
+        
+        # Same title, same year, both NULL artist = same album
+        comp_2020_again, created3 = self.repo.get_or_create("Case_Compilation", album_artist=None, release_year=2020)
+        self.assertFalse(created3, "Should reuse existing NULL artist album")
+        self.assertEqual(comp_2020.album_id, comp_2020_again.album_id)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Compilation'")
+
+    def test_artist_case_insensitive(self):
+        """
+        Artist matching should be case-insensitive.
+        'queen' should match 'Queen'.
+        """
+        album1, created1 = self.repo.get_or_create("Case_Artist_Case", album_artist="Queen", release_year=1981)
+        album2, created2 = self.repo.get_or_create("Case_Artist_Case", album_artist="queen", release_year=1981)
+        
+        self.assertTrue(created1)
+        self.assertFalse(created2, "Case difference should not create new album")
+        self.assertEqual(album1.album_id, album2.album_id)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Artist_Case'")
+
+    def test_create_with_album_artist(self):
+        """
+        Verify create() stores album_artist correctly.
+        """
+        album = self.repo.create("Case_Create_Artist_Test", album_artist="The Beatles", release_year=1965)
+        
+        self.assertIsNotNone(album.album_id)
+        self.assertEqual(album.album_artist, "The Beatles")
+        self.assertEqual(album.release_year, 1965)
+        
+        # Retrieve and verify
+        found = self.repo.get_by_id(album.album_id)
+        self.assertEqual(found.album_artist, "The Beatles")
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Create_Artist_Test'")
+
+    def test_find_by_key_with_all_fields(self):
+        """
+        Verify find_by_key works with all three disambiguation fields.
+        """
+        # Create album
+        self.repo.create("Case_FindKey_Test", album_artist="Pink Floyd", album_type="Album", release_year=1973)
+        
+        # Find with all fields
+        found = self.repo.find_by_key("Case_FindKey_Test", album_artist="Pink Floyd", release_year=1973)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.album_artist, "Pink Floyd")
+        
+        # Wrong artist should not find
+        not_found = self.repo.find_by_key("Case_FindKey_Test", album_artist="Led Zeppelin", release_year=1973)
+        self.assertIsNone(not_found)
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_FindKey_Test'")
+
+    def test_bobby_tables_album_artist(self):
+        """
+        Bobby Tables won't burn down the bar.
+        SQL injection in album_artist should be safely escaped.
+        """
+        # Classic Bobby Tables attack via album artist
+        malicious_artist = "ABBA'; DROP TABLE Albums;--"
+        
+        # This should NOT drop any tables
+        album, created = self.repo.get_or_create(
+            "Case_Bobby_Tables", 
+            album_artist=malicious_artist, 
+            release_year=2024
+        )
+        
+        self.assertTrue(created, "Album should be created despite malicious input")
+        self.assertIsNotNone(album.album_id)
+        
+        # Verify Albums table still exists
+        found = self.repo.get_by_id(album.album_id)
+        self.assertIsNotNone(found, "Albums table should still exist")
+        self.assertEqual(found.album_artist, malicious_artist, "Malicious string should be stored as-is")
+        
+        # Cleanup
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Bobby_Tables'")
+
 
 if __name__ == "__main__":
     unittest.main()
+
+

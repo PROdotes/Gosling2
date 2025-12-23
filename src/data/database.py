@@ -138,6 +138,7 @@ class BaseRepository:
                 CREATE TABLE IF NOT EXISTS Albums (
                     AlbumID INTEGER PRIMARY KEY,
                     Title TEXT NOT NULL,
+                    AlbumArtist TEXT,
                     AlbumType TEXT,
                     ReleaseYear INTEGER
                 )

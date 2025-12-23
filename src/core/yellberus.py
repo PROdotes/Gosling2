@@ -280,8 +280,16 @@ FIELDS: List[FieldDef] = [
         db_column="Genre",
         filterable=True,
         required=True,
-        strategy="first_letter_grouper",
+        strategy="decade_grouper",
         query_expression='GROUP_CONCAT(DISTINCT TG.TagName) AS Genre',
+    ),
+    FieldDef(
+        name="album_artist",
+        ui_header="Album Artist",
+        db_column="AlbumArtist",
+        visible=False,
+        strategy="first_letter_grouper",
+        query_expression='GROUP_CONCAT(DISTINCT A.AlbumArtist) AS AlbumArtist',
     ),
 ]
 

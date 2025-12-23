@@ -15,6 +15,7 @@ class Song(MediaSource):
     recording_year: Optional[int] = None
     unified_artist: Optional[str] = None
     album: Optional[str] = None
+    album_artist: Optional[str] = None  # From TPE2 (Album Artist)
     publisher: Optional[str] = None
     genre: Optional[str] = None
     

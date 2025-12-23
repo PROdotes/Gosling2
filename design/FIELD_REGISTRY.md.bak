@@ -28,8 +28,10 @@
 | `unified_artist` | Artist | UnifiedArtist | TEXT | First Letter | Yes | No | Yes | Yes | No | No | — |
 | `album` | Album | AlbumTitle | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TALB |
 | `publisher` | Publisher | Publisher | TEXT | First Letter | No | Yes | Yes | Yes | Yes | Yes | TPUB |
+| `genre` | Genre | Genre | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCON |
+| `album_artist` | Album Artist | AlbumArtist | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TPE2 |
 
-**Total: 19 fields**
+**Total: 21 fields**
 
 ---
 

@@ -22,7 +22,13 @@ def test_database_schema_integrity(tmp_path):
         "Roles",
         "MediaSourceContributorRoles",
         "GroupMembers",
-        "ContributorAliases"
+        "ContributorAliases",
+        "Albums",
+        "Publishers",
+        "SongAlbums",
+        "AlbumPublishers",
+        "Tags",
+        "MediaSourceTags"
     }
     
     # Expected Columns per table

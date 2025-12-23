@@ -42,15 +42,18 @@ links: []
 | — | **Completeness Check** | 3 | 1 | 15 | ✅ | — |
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](design/done/T-02_field_registry.md) |
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
+| T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — **0.1 BLOCKER**. `write_tags()` must use `id3_frames.json`. *Logged by Vesper.* |
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
-| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor, song_repository. **song_repository issues**: Raw SQL in `_sync_album`/`_sync_publisher` (should use repos with `conn` param); fragile tuple unpacking in `get_by_path` (use named columns). |
+| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor, song_repository. **song_repository issues**: Raw SQL in `_sync_album`/`_sync_publisher` (should use repos with `conn` param); fragile tuple unpacking in `get_by_path` (use named columns). **Audit**: Remove useless 1-line wrapper methods (pointless indirection). |
 | — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
 | T-05 | **Log Core** | 4 | 2 | 8 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [design/LOGGING.md](design/LOGGING.md) |
+| T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
+| T-36 | **Architecture Map Update** | 3 | 2 | 6 | 📋 | Post-0.1 | Update [ARCHITECTURE.md](ARCHITECTURE.md) — Missing: `src/core/`, `tools/`, `album.py`, `tag.py`, new repos. Schema section outdated. *Logged by Vesper.* |
 
 ### Feature Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -71,11 +74,15 @@ links: []
 | — | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-26 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-22 | **Albums** | 4 | 4 | 8 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_ALBUMS.md) |
+| T-37 | **Album Filter Disambiguation** | 2 | 2 | 4 | 📋 | T-22 | Show "(Artist)" in album filter to distinguish "Greatest Hits (ABBA)" from "Greatest Hits (Queen)". *Logged by Vesper.* |
 | T-23 | **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_FILTER_TREES.md) <br>*(Note: Treat 'Groups' as meta-Artist for filtering)* |
 | T-24 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry | [spec](design/proposals/PROPOSAL_RENAMING_SERVICE.md) |
 | T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core | DATABASE.md |
 | T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
 | T-32 | **Pending Review Workflow** | 3 | 3 | 6 | 📋 | Tags (T-06 Phase 3) | [spec](design/proposals/PROPOSAL_ALBUMS.md#7-migration-plan-task-t-22) |
+| T-33 | **AI Playlist Generation** | 2 | 5 | 2 | 💡 | Post-1.0 | [spec](design/ideas/T-33_AI_PLAYLIST.md) |
+| T-35 | **Music API Lookup** | 3 | 4 | 6 | 💡 | Post-1.0 | [spec](design/ideas/IDEA_music_api_lookup.md) — MusicBrainz/Discogs/Spotify. Background worker pattern. *Logged by Vesper.* |
+| T-39 | **MediaItem Composition** | 2 | 3 | 4 | 💡 | Post-1.0 | [idea](design/ideas/IDEA_media_item_composition.md) — Wrapper for Song/Jingle/VoiceTrack for radio automation. Option 3. *Logged by Vesper.* |
 
 ---
 

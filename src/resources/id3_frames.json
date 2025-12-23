@@ -70,7 +70,11 @@
         "field": "performers",
         "type": "list"
     },
-    "TPE2": "Band/orchestra/accompaniment",
+    "TPE2": {
+        "description": "Band/orchestra/accompaniment (Album Artist)",
+        "field": "album_artist",
+        "type": "text"
+    },
     "TPE3": "Conductor/performer refinement",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
     "TPOS": "Part of a set",

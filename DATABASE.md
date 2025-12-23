@@ -244,6 +244,7 @@ erDiagram
     Albums {
         INTEGER AlbumID PK
         TEXT Title
+        TEXT AlbumArtist
         TEXT AlbumType
         INTEGER ReleaseYear
     }
@@ -484,8 +485,18 @@ Groups songs into collections.
 |--------|------|-------------|-------------|
 | `AlbumID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `Title` | TEXT | NOT NULL | Album title |
+| `AlbumArtist` | TEXT | - | Album artist (from ID3 `TPE2`, fallback `TPE1`). Used for disambiguation. |
 | `AlbumType` | TEXT | - | 'Album', 'Single', 'EP', 'Compilation' |
 | `ReleaseYear` | INTEGER | - | Release year |
+
+**Uniqueness Constraint:**
+- `UNIQUE(Title, AlbumArtist, ReleaseYear)` — Prevents "Greatest Hits" paradox where Queen and ABBA albums merge.
+- If `AlbumArtist` is NULL (e.g., compilations), uniqueness falls back to `(Title, ReleaseYear)`.
+
+**ID3 Mapping:**
+- `AlbumArtist` ← `TPE2` (Album Artist frame)
+- Fallback: `TPE1` (Lead artist) if `TPE2` is empty
+- For compilations: "Various Artists" or similar
 
 **Lifecycle Rules:**
 - **Orphan Policy:** Empty albums (0 songs) are **NOT** automatically deleted. They persist to preserve metadata.

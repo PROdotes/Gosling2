@@ -73,6 +73,10 @@ def test_cross_reference_integrity(tmp_path):
         "lyricists": "RELATIONSHIP (Contributors via Lyricist)",
         "producers": "RELATIONSHIP (Contributors via Producer)",
         "groups": "Groups",
+        "album_artist": "RELATIONSHIP (Albums.AlbumArtist)",
+        "album": "RELATIONSHIP (Albums.Title)",
+        "publisher": "RELATIONSHIP (Publishers.PublisherName)",
+        "genre": "RELATIONSHIP (Tags.TagName)",
         
         # Computed Fields (not stored in DB)
         "unified_artist": "COMPUTED (derived from Groups/Performers)"

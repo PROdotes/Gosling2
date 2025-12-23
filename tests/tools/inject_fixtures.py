@@ -66,6 +66,7 @@ def inject():
         song.unified_artist = data['artist'] # Note: Logic uses Contributors, this helps simple display
         song.recording_year = data['year']
         song.album = data['album']
+        song.album_artist = data.get('album_artist', data['artist'])  # Default to artist if not specified
         song.publisher = data.get('publisher')  # Optional
         song.genre = data.get('genre') # Optional
         
@@ -82,14 +83,15 @@ def inject():
     
     # Report on Albums
     with repo.get_connection() as conn:
-        cursor = conn.execute("SELECT AlbumID, Title, ReleaseYear FROM Albums")
+        cursor = conn.execute("SELECT AlbumID, Title, AlbumArtist, ReleaseYear FROM Albums")
         albums = cursor.fetchall()
         print(f"\nCreated {len(albums)} Albums in DB:")
         for alb in albums:
             # Count songs
             c2 = conn.execute("SELECT COUNT(*) FROM SongAlbums WHERE AlbumID=?", (alb[0],))
             song_count = c2.fetchone()[0]
-            print(f"[ALBUM] ID {alb[0]}: '{alb[1]}' ({alb[2]}) - {song_count} Songs")
+            artist_str = f" by {alb[2]}" if alb[2] else ""
+            print(f"[ALBUM] ID {alb[0]}: '{alb[1]}'{artist_str} ({alb[3]}) - {song_count} Songs")
 
 if __name__ == "__main__":
     inject()

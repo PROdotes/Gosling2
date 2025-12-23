@@ -23,28 +23,40 @@ tags:
 *   [x] **Field Editor**: UI & Persistence.
 *   [x] **Unified Artist**: M2M Logic.
 
-### 🧹 Milestone 1: The Cleanup (Pre-Reqs)
-*Status: Ready to Start*
+### 🔧 Milestone 1: Schema Fix (Critical)
+*Status: TODAY*
+*   [ ] **Greatest Hits Fix** (~2.0 h)
+    *   *Task*: Schema Change (AlbumArtist) + Logic Update.
+    *   *Criticality*: High (Data Corruption). Must fix before test consolidation.
+
+### 🧹 Milestone 2: The Cleanup
+*Status: After Schema Fix*
 *   [ ] **T-04 Test Consolidation** (~3.0 h)
     *   *Why*: Merging 56 files makes future features faster/safer.
     *   *Risk*: Low (Boring work).
 
-### 🚧 Milestone 2: Legacy Sync Core (The Logic)
-*Status: Blocked by Cleanup (Recommended)*
-*   [ ] **Greatest Hits Fix** (~2.0 h)
-    *   *Task*: Schema Change (AlbumArtist) + Logic Update.
-    *   *Criticality*: High (Data Corruption).
+### �️ Milestone 3: Usable UI (Backlog Enabler)
+*Status: Required for processing 400-song backlog*
+*   [ ] **Side Panel Alpha** (~3.0 h)
+    *   *Task*: Basic metadata editor panel (Genre, Artist, Album, Done).
+    *   *Why*: Can't efficiently edit songs without it.
 *   [ ] **Auto-Renamer** (~3.5 h)
     *   *Task*: Port Genre/Year rules + `shutil.move` logic.
-    *   *Complexity*: High (File System Risk).
-*   [ ] **Duplicate Detection** (~2.5 h)
-    *   *Task*: Tiered Import Check (ISRC -> Hash -> Meta).
-    *   *Complexity*: Medium.
+    *   *Complexity*: High (File System Risk). Rules documented in `LEGACY_LOGIC.md`.
 *   [ ] **Legacy Shortcuts** (~1.0 h)
     *   *Task*: `Ctrl+D` (Done) and `Ctrl+S` (Save).
     *   *Ref*: T-31.
+*   [ ] **UX Polish** (~2.0 h)
+    *   *Task*: Dark theme, consistent button styling.
+    *   *Note*: Keep default PyQt6 components. Custom tag picker DEFERRED to 1.0.
 
-### 🔮 Milestone 3: Safety & Trust (The "0.1.0" Gate)
+### 🚧 Milestone 4: Data Integrity
+*Status: Queue*
+*   [ ] **Duplicate Detection** (~2.5 h)
+    *   *Task*: Tiered Import Check (ISRC -> Hash -> Meta).
+    *   *Complexity*: Medium.
+
+### 🔮 Milestone 5: Safety & Trust (The "0.1.0" Gate)
 *Status: Queue*
 *   [ ] **Audit Log (History)** (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
