@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         self._load_window_geometry()
         self._load_splitter_states()
         self._setup_connections()
+        self._setup_shortcuts()
         
         self._restore_volume()
         self._restore_playlist()
@@ -106,6 +107,26 @@ class MainWindow(QMainWindow):
         model = self.playlist_widget.model()
         model.rowsInserted.connect(self._on_playlist_changed)
         model.rowsRemoved.connect(self._on_playlist_changed)
+
+    def _setup_shortcuts(self) -> None:
+        """Setup global keyboard shortcuts (T-31 legacy shortcuts)."""
+        # Ctrl+S – Save selected rows (DB + ID3; renamer later)
+        self.action_save_selected = QAction(self)
+        self.action_save_selected.setShortcut("Ctrl+S")
+        self.action_save_selected.triggered.connect(self.library_widget.save_selected_songs)
+        self.addAction(self.action_save_selected)
+
+        # Ctrl+D – Mark selection as Done (Yellberus-gated)
+        self.action_mark_done = QAction(self)
+        self.action_mark_done.setShortcut("Ctrl+D")
+        self.action_mark_done.triggered.connect(self.library_widget.mark_selection_done)
+        self.addAction(self.action_mark_done)
+
+        # Ctrl+F – Focus search/filter box
+        self.action_focus_search = QAction(self)
+        self.action_focus_search.setShortcut("Ctrl+F")
+        self.action_focus_search.triggered.connect(self.library_widget.focus_search)
+        self.addAction(self.action_focus_search)
 
     def _on_playlist_changed(self, parent, start, end):
         # Update widget with new count

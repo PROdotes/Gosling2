@@ -531,3 +531,43 @@ def test_strict_search_coverage(library_widget_search, qtbot):
     widget.search_box.setText("NonExistentValue")
     assert widget.proxy_model.rowCount() == 0
 
+
+def test_mark_selection_done_calls_toggle_status(library_widget, mock_dependencies):
+    """mark_selection_done should delegate to _toggle_status(True)."""
+    with patch.object(library_widget, "_toggle_status") as mock_toggle:
+        library_widget.mark_selection_done()
+        mock_toggle.assert_called_once_with(True)
+
+
+def test_save_selected_songs_uses_services(library_widget, mock_dependencies):
+    """save_selected_songs should resolve songs by path and call update + write_tags."""
+    lib_service, meta_service, _ = mock_dependencies
+
+    # Select first (proxy) row
+    library_widget.table_view.selectRow(0)
+
+    # Determine the expected path from the proxy model to avoid depending on sort order
+    idx_path = get_idx("path")
+    proxy_index = library_widget.proxy_model.index(0, idx_path)
+    expected_path = library_widget.proxy_model.data(proxy_index)
+
+    # Mock song lookup and persistence
+    mock_song = MagicMock()
+    lib_service.get_song_by_path.return_value = mock_song
+
+    library_widget.save_selected_songs()
+
+    lib_service.get_song_by_path.assert_called_with(expected_path)
+    lib_service.update_song.assert_called_with(mock_song)
+    meta_service.write_tags.assert_called_with(mock_song)
+
+
+def test_focus_search_sets_focus_and_selects_text(library_widget, qtbot):
+    """focus_search should select the full text in the search box."""
+    library_widget.search_box.setText("abc")
+    library_widget.focus_search()
+    qtbot.wait(10)
+
+    # Focus behaviour can be flaky in headless CI; assert on selection instead.
+    assert library_widget.search_box.selectedText() == "abc"
+

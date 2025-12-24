@@ -93,12 +93,13 @@ class SongRepository(BaseRepository):
                 """, (song.name, song.duration, song.source_id))
 
                 # 2. Update Songs (Extended info)
-                # Note: Groups column temporarily disabled - pending schema decision
+                # Note: Groups is TIT1 (Content Group Description)
                 cursor.execute("""
                     UPDATE Songs
-                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?
+                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, IsDone = ?, Groups = ?
                     WHERE SourceID = ?
-                """, (song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, song.source_id))
+                """, (song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, 
+                      ", ".join(song.groups) if song.groups else None, song.source_id))
 
                 # 3. Clear existing contributor roles
                 cursor.execute(
@@ -429,11 +430,10 @@ class SongRepository(BaseRepository):
                 cursor = conn.cursor()
                 
                 # Fetch basic info from JOIN
-                # Note: Groups column temporarily omitted - pending schema decision
                 cursor.execute("""
                     SELECT 
                         MS.SourceID, MS.Name, MS.Duration, 
-                        S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone,
+                        S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
                         (
                             SELECT GROUP_CONCAT(A.Title, ', ')
                             FROM SongAlbums SA 
@@ -456,8 +456,10 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int, album_title, publisher_name = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, album_title, publisher_name = row
                 
+                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+
                 # Fetch contributors
                 song = Song(
                     source_id=source_id,
@@ -470,7 +472,7 @@ class SongRepository(BaseRepository):
                     is_done=bool(is_done_int),
                     album=album_title, # AlbumTitle
                     publisher=publisher_name, # PublisherName
-                    groups=[]  # TODO: Re-enable when Groups column is added
+                    groups=groups
                 )
                 
                 # Fetch roles

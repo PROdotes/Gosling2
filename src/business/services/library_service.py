@@ -91,7 +91,7 @@ class LibraryService:
         if not album_title or not album_title.strip():
             return None
             
-        album = self.album_repository.get_or_create(album_title.strip())
+        album, created = self.album_repository.get_or_create(album_title.strip())
         
         # Check if already linked? (Repository uses INSERT OR IGNORE, safe to call)
         self.album_repository.add_song_to_album(source_id, album.album_id)

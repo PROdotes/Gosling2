@@ -1063,6 +1063,70 @@ class LibraryWidget(QWidget):
         """Save column layout (wraps new method for compatibility)."""
         self._save_column_layout()
 
+    # === Public helpers for shortcuts ===
+
+    def mark_selection_done(self) -> None:
+        """Mark the current selection as Done using existing validation.
+
+        This reuses _toggle_status(True), which already enforces Yellberus
+        completeness rules and shows a warning if some rows are incomplete.
+        """
+        self._toggle_status(True)
+
+    def save_selected_songs(self) -> None:
+        """Save selected songs: DB + ID3.
+
+        For each selected row in the library table:
+        - Resolve the song via LibraryService (by path).
+        - Persist metadata to the database.
+        - Persist metadata to ID3 via MetadataService.write_tags.
+
+        Renaming/moves for Done items will be hooked in later via a
+        dedicated RenamingService.
+        """
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        saved = 0
+        errors = []
+
+        for index in indexes:
+            source_index = self.proxy_model.mapToSource(index)
+            row = source_index.row()
+
+            path_item = self.library_model.item(row, self.field_indices['path'])
+            if not path_item:
+                continue
+
+            path = path_item.text()
+            try:
+                song = self.library_service.get_song_by_path(path)
+                if not song:
+                    continue
+
+                # 1) Persist to DB
+                self.library_service.update_song(song)
+
+                # 2) Persist to ID3
+                self.metadata_service.write_tags(song)
+
+                # 3) TODO: When RenamingService exists, rename if song.is_done is True
+                saved += 1
+            except Exception as e:
+                errors.append((path, str(e)))
+
+        # Basic feedback via console for now; UI can be wired to status bar later.
+        if saved == 0 and errors:
+            print(f"[Save] Failed to save {len(errors)} song(s)")
+        elif saved > 0:
+            print(f"[Save] Saved {saved} song(s); {len(errors)} failures")
+
+    def focus_search(self) -> None:
+        """Focus the search box and select its contents (Ctrl+F)."""
+        self.search_box.setFocus()
+        self.search_box.selectAll()
+
     def _toggle_status(self, new_status: bool) -> None:
         """Bulk update status for selected rows with validation"""
         indexes = self.table_view.selectionModel().selectedRows()

@@ -124,6 +124,10 @@ class MetadataService:
         # Extract producers
         producers = get_producers()
 
+        # Extract Album
+        album_list = get_text_list("TALB")
+        album = album_list[0] if album_list else None
+
         # Extract Album Artist
         album_artist_list = get_text_list("TPE2")
         album_artist = album_artist_list[0] if album_artist_list else None
@@ -142,6 +146,7 @@ class MetadataService:
             lyricists=deduplicate(lyricists),
             producers=deduplicate(producers),
             groups=deduplicate(groups),
+            album=album,
             album_artist=album_artist,
         )
 

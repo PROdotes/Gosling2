@@ -14,26 +14,27 @@ links:
 ## Requirements
 
 ### 1. The "Done" Toggle (`Ctrl + D`)
-*   **Context**: Active in `LibraryWidget`, `MetadataViewer`, or main window.
-*   **Action**: 
-    1.  Toggle the `is_done` status of the **currently selected song(s)**.
-    2.  Update the UI (Checkbox/Color).
-    3.  **Optional**: Auto-save immediately? (Legacy behavior: No, user hit Ctrl+S after).
-*   **Visual Feedback**: Row should likely turn green or show a checkmark immediately.
+*   **Context**: Active in the main library view (rows selected in `LibraryWidget`).
+*   **Action**:
+*   1.  Attempt to mark the **currently selected song(s)** as Done.
+*   2.  Use existing Yellberus/validation logic to refuse Done for rows that are incomplete (missing mandatory fields/tags).
+*   3.  For valid rows, update `is_done` in the database and refresh the table.
+*   **Visual Feedback**: Done column updates immediately (checkbox/colour). If some rows could not be marked Done, show a short warning listing missing fields.
 
 ### 2. The "Save" Trigger (`Ctrl + S`)
-*   **Context**: Global (Main Window).
-*   **Action**: 
-    1.  Trigger `MetadataService.write_tags()`.
-    2.  Trigger `SongRepository.update()`.
-    3.  If `RenamingService` is active, trigger file move.
-*   **Feedback**: "Saved X songs" status bar message.
+*   **Context**: Global (Main Window), acts on the currently selected rows in the library table.
+*   **Action**:
+*   1.  For each selected song, persist current metadata to the database (`LibraryService.update_song`).
+*   2.  Persist the same metadata to ID3 tags (`MetadataService.write_tags`).
+*   3.  If a renamer is present and the song is marked Done, trigger a file move according to `LEGACY_LOGIC.md` (0.1 hook, implementation may land later).
+*   **Rule**: Save **always works**—it does not decide or re-check Done, it simply persists whatever Done state exists.
+*   **Feedback**: "Saved X songs" status bar message, with simple error reporting if some rows fail.
 
-### 3. Navigation (`Space` / `Enter`)
-*   **Space**: Play/Pause current track (Global).
-*   **Enter**: 
-    *   If cell selected: Edit.
-    *   If row selected: Play? (Needs decision).
+### 3. Navigation / Focus (`Ctrl + F`, `Space` / `Enter`)
+*   **Ctrl + F**: Focus the search/filter bar and select its contents.
+*   **Space**: Play/Pause current track (Global). *(Existing Playback widget behaviour; shortcut wiring TBD.)*
+*   **Enter**:
+*   *   If row selected in library: Add to playlist/play (follow current double-click semantics).
 
 ## Implementation Tips
 *   Use `QAction` with `setShortcut()` attached to the Main Window to ensure global capture.

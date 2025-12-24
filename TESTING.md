@@ -56,6 +56,15 @@ The `tests/` directory **MUST** mirror the `src/` directory exactly.
 ### 5. The Law of Coverage (When to Test)
 **Test what could break.** Not everything requires a test, but every *decision* does.
 
+|| Layer | Filename | Purpose | Speed |
+||-------|----------|---------|-------|
+|| **1. Logic** | `test_{component}.py` | Does the feature work? (Happy Path & Basic Errors) | ⚡ Fast |
+|| **2. Robustness** | `test_{component}_mutation.py` | Does it crash with garbage inputs? (Fuzzing, Injection) | 🐢 Slow |
+|| **3. Integrity** | `tests/unit/integrity/` | Does the Code match the Database & Specs? | ⚡ Fast |
+
+Mutation testing (including any use of `scripts/mutation_test.py`) must stay in **Robustness** tests and never be mixed into normal Logic tests. Keep mutation assertions and scenarios in their own dedicated files so they can be run and tuned independently.
+
+
 | Must Test | May Skip |
 |---|---|
 | Methods with logic (`if`, `try`, loops, calculations) | Trivial accessors (one-line getters/setters) |

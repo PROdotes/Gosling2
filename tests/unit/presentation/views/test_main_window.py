@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch, call
 from PyQt6.QtCore import Qt, QPoint
 from PyQt6.QtWidgets import QMessageBox
 from src.presentation.views.main_window import MainWindow
+from src.presentation.widgets.library_widget import LibraryWidget
 
 class TestMainWindow:
     @pytest.fixture
@@ -348,3 +349,25 @@ class TestMainWindow:
         # Check labels
         assert main_window.playback_widget.lbl_time_passed.text() == "00:05"
         assert main_window.playback_widget.lbl_time_remaining.text() == "- 00:05"
+
+    def test_shortcuts_call_library_widget_helpers(self, qtbot, mock_services):
+        """Verify Ctrl+S / Ctrl+D / Ctrl+F actions call into LibraryWidget helpers.
+
+        We patch the methods on the class *before* constructing MainWindow so that
+        the QAction signal connections bind to the mocked methods.
+        """
+        with patch.object(LibraryWidget, "save_selected_songs") as mock_save, \
+             patch.object(LibraryWidget, "mark_selection_done") as mock_done, \
+             patch.object(LibraryWidget, "focus_search") as mock_focus:
+
+            window = MainWindow()
+            qtbot.addWidget(window)
+
+            # Trigger the bound actions directly
+            window.action_save_selected.trigger()
+            window.action_mark_done.trigger()
+            window.action_focus_search.trigger()
+
+            mock_save.assert_called_once()
+            mock_done.assert_called_once()
+            mock_focus.assert_called_once()
