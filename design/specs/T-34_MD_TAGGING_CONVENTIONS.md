@@ -1,19 +1,23 @@
 ---
 tags:
   - type/spec
-  - status/draft
+  - status/approved
   - scope/documentation
+  - domain/metadata
+  - target/v0.1
+links:
+  - "[[TAGS]]"
 ---
 
 # T-34: Markdown Tagging Conventions
 
-**Status**: Draft (For future formalization)  
-**Logged by**: Vesper (2025-12-23)  
-**Purpose**: Establish consistent YAML frontmatter vocabulary so agents stop guessing.
+**Status**: Approved
+**Logged by**: Vesper (2025-12-23) | **Ratified by**: Antigravity (2025-12-24)
+**Purpose**: Establish consistent YAML frontmatter vocabulary so agents stop guessing. This document supersedes `TAGS.md`.
 
 ---
 
-## 📋 Tag Categories (Observed Patterns)
+## 📋 Tag Categories
 
 ### Type Tags (`type/`)
 What kind of document is this?
@@ -27,6 +31,7 @@ What kind of document is this?
 | `type/index` | Index/registry file |
 | `type/strategy` | High-level planning |
 | `type/reference` | Reference documentation |
+| `type/runbook` | Execution guide (e.g. T-04) |
 
 ### Status Tags (`status/`)
 What's the current state?
@@ -34,12 +39,49 @@ What's the current state?
 | Tag | Meaning |
 |-----|---------|
 | `status/active` | Currently being worked on |
-| `status/planned` | Approved, not started |
+| `status/planned` | Approved, ready to start |
 | `status/draft` | Work in progress, not final |
 | `status/future` | Someday/maybe |
 | `status/approved` | Reviewed and approved |
 | `status/done` | Completed |
 | `status/blocked` | Waiting on dependency |
+| `status/deprecated` | Obsolete / Replaced |
+
+### Target Tags (`target/`)
+When does this ship? (SemVer)
+
+| Tag | Meaning |
+|-----|---------|
+| `target/v0.1` | **Legacy Parity**. Must be done for Alpha release. |
+| `target/v0.2` | **Refactor/Clean**. Post-parity cleanup & debt payment. |
+| `target/v1.0` | **MVP**. The 1.0 General Release feature set. |
+| `target/post-1.0` | **Future**. Wishlist items and advanced features. |
+
+### Component Tags (`component/`)
+Where in the app does this live? (UI Areas)
+
+| Tag | Meaning |
+|-----|---------|
+| `component/library` | The Main Table / Grid View. |
+| `component/playlist` | The Side/Bottom Playlist Queue. |
+| `component/player` | Controls (Play/Pause, Seek, Volume). |
+| `component/editor` | Metadata Editor (Panel or Dialog). |
+| `component/filter` | Sidebar Filter Tree / Search. |
+| `component/settings` | Preferences / Settings Dialog. |
+| `component/main` | Main Window shell / Global Layout. |
+
+### Domain Tags (`domain/`)
+What functional area?
+
+| Tag | Meaning |
+|-----|---------|
+| `domain/audio` | **Playback only**. Waveforms, crossfader, volume, audio engine. |
+| `domain/metadata` | **Data/Content**. ID3 tags, library strings, database records. |
+| `domain/database` | DB schema, migrations (Infrastructure) |
+| `domain/import` | File import workflow |
+| `domain/contributors` | Artists, groups, aliases |
+| `domain/albums` | Album management |
+| `domain/audit` | Logging, undo, history |
 
 ### Layer Tags (`layer/`)
 Which architectural layer?
@@ -50,18 +92,6 @@ Which architectural layer?
 | `layer/business` | Services, business logic |
 | `layer/presentation` | UI, views, widgets |
 | `layer/core` | Core utilities, shared code |
-
-### Domain Tags (`domain/`)
-What functional area?
-
-| Tag | Meaning |
-|-----|---------|
-| `domain/audio` | Audio playback, metadata |
-| `domain/database` | DB schema, migrations |
-| `domain/import` | File import workflow |
-| `domain/tags` | Tagging system |
-| `domain/contributors` | Artists, groups, aliases |
-| `domain/albums` | Album management |
 
 ### Scope Tags (`scope/`)
 Size/reach of the change?
@@ -87,12 +117,20 @@ External dependencies?
 ### Size/Risk Tags
 | Tag | Meaning |
 |-----|---------|
-| `size/small` | ~1h work |
-| `size/medium` | ~3-5h work |
-| `size/large` | ~1 day+ |
+| `size/small` | ~1-4h work |
+| `size/medium` | ~1-2 days |
+| `size/large` | ~1 week+ |
 | `risk/low` | Safe change |
 | `risk/medium` | Some risk |
 | `risk/high` | Dangerous, needs review |
+
+### Value Tags (`value/`)
+Business/User Impact.
+| Tag | Meaning |
+|-----|---------|
+| `value/high` | Major user benefit |
+| `value/medium` | Good to have |
+| `value/low` | Minor polish |
 
 ---
 
@@ -101,7 +139,8 @@ External dependencies?
 Every MD should have at least:
 1. **One `type/` tag** — What is this?
 2. **One `status/` tag** — What state is it in?
-3. **Relevant `domain/` tags** — What does it affect?
+3. **One `target/` tag** — What release is this for?
+4. **Relevant `component/` tags** — Where is it?
 
 ---
 
@@ -112,6 +151,8 @@ Every MD should have at least:
 tags:
   - type/proposal
   - status/planned
+  - target/v0.2
+  - component/library
   - domain/albums
   - layer/data
   - size/medium
@@ -121,12 +162,3 @@ links:
   - "[[T-22 Albums]]"
 ---
 ```
-
----
-
-## ⚠️ Notes for Agents
-
-- **Don't invent new tags** without adding them to this document first.
-- **Be consistent** — use `domain/audio` not `audio/domain`.
-- **When in doubt**, use existing tags from this list.
-- **T-34 is Post-0.1** — formalize this fully after legacy parity.
