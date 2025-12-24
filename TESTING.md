@@ -1,116 +1,144 @@
-# Testing Strategy & Blueprint
+# Testing Strategy & Blueprint (The Constitution)
 
-> **"If it isn't tested, it's broken."**
+> **"If it isn't tested, it's broken. If the tests are a mess, the project is a tomb."**
 
-This document is the **Single Source of Truth** for testing in Gosling2. Whether you are a senior architect or "Bob from Accounting" learning to code, follow these rules to ensure the codebase remains robust and maintainable.
+This document is the **Single Source of Truth** for testing in Gosling2. Whether you are a senior architect, an LLM specialist, or a "Bob from 2150," these laws are your binding contract.
 
 ---
 
-## 📜 The Constitution of Testing
+## 🏛️ The Hierarchy of Laws
 
-We adhere to four immutable laws to prevent "Test Sprawl":
+When rules conflict, the **Rule of Priority** dictates the path. Laws are listed in order of supreme authority.
 
-### 1. The Law of Mirroring
+### 1. The Law of Separation (The Supreme Law)
+**Intent Trumps Structure.** 
+Tests must be separated by their **Intent**. Never mix "Feature Logic" with "Robustness Logic" for the sake of convenience or file-count reduction.
+
+| Category | Suffix | Purpose | Speed |
+| :--- | :--- | :--- | :--- |
+| **Logic (Level 1)** | `test_{comp}.py` | Does the feature work as intended? (Happy Path) | ⚡ Fast |
+| **Robustness (Level 2)** | `test_{comp}_mutation.py` | Does it crash with garbage, long strings, or null bytes? | 🐢 Slow |
+| **Integrity (Level 3)** | `integrity/test_{x}.py` | Does the code match the database and specs? | ⚡ Fast |
+
+*   **Conflict Resolution**: If Law 2 (Containment) says "Put it in one file" but Law 1 (Separation) says "They have different intents," **Law 1 Wins.** You create two files (e.g., `test_song.py` and `test_song_mutation.py`).
+
+### 🛠️ The Anatomy of Intent (What to test where)
+
+To ensure "Duck-Proofing," you must categorize your tests based on "The Persona of the Input."
+
+#### Level 1: The Logical Developer (Logic)
+Tests for the **Happy Path** and **Polite Failures**.
+*   **Edge Cases**: Empty fields, properly typed but missing IDs, "Expected" business errors (e.g., trying to play a non-existent file).
+*   **Goal**: Ensure the feature works as documented in the Specs.
+
+#### Level 2: The Chaos Monkey (Robustness)
+Tests for the **Malicious Actor** and **Hardware Nightmares**.
+*   **Security**: SQL Injection (Bobby Tables) in search fields; Null-byte injection in file paths.
+*   **Corruption**: Partially written files, corrupt ID3 headers, "Zero-byte" MP3s.
+*   **Exhaustion**: 100,000-character titles, deeply nested JSON, memory-leak triggers.
+*   **Environment**: Disk Full errors, Permission Denied (OS level), Network timeouts.
+*   **Goal**: Ensure the application **DOES NOT CRASH**. It can fail, but it must fail without a Segfault or data corruption.
+
+### 2. The Law of Mirroring
 The `tests/` directory **MUST** mirror the `src/` directory exactly.
 *   **Source**: `src/data/repositories/song_repository.py`
 *   **Test**: `tests/unit/data/repositories/test_song_repository.py`
 
-### 2. The Law of Containment
-**One Component = One Test File.**
-*   Do NOT create new files for bugs or edge cases (e.g., `test_playback_bug_123.py` is **forbidden**).
-*   All functional logic for `PlaybackService` goes into `test_playback_service.py`.
-*   **Solution**: Use **Nested Classes** to organize large files.
-    ```python
-    class TestPlaybackControls(unittest.TestCase): ...
-    class TestPlaybackPlaylist(unittest.TestCase): ...
-    class TestPlaybackErrors(unittest.TestCase): ...
-    ```
+### 3. The Law of Containment
+**One Component = One Logic File.**
+*   All functional logic for `MetadataService` goes into `test_metadata_service.py`.
+*   Do NOT create new files for individual bugs (e.g., `test_bug_fix_1.py` is **forbidden**). Use **Nested Classes** within the main file to organize edge cases.
 
-### 3. The Law of Separation
-Tests are categorized by their **Intent**. Do not mix them.
+### 4. The Law of Unity (Fixtures)
+*   **Global**: Use `tests/conftest.py` for shared mocks (DB, Mutagen fixtures, Headless Qt).
+*   **Local**: Use `setUp(self)` for class-specific mocks. Never copy-paste `setUp` logic.
 
-| Layer | Filename | Purpose | Speed |
-|-------|----------|---------|-------|
-| **1. Logic** | `test_{component}.py` | Does the feature work? (Happy Path & Basic Errors) | ⚡ Fast |
-| **2. Robustness** | `test_{component}_mutation.py` | Does it crash with garbage inputs? (Fuzzing, Injection) | 🐢 Slow |
-| **3. Integrity** | `tests/unit/integrity/` | Does the Code match the Database & Specs? | ⚡ Fast |
+### 5. The Law of Coverage (When to Test)
+**Test what could break.** Not everything requires a test, but every *decision* does.
 
-### 4. The Law of Unity
-**Unify your Fixtures.**
-*   Do not copy-paste `setUp` logic across 50 files.
-*   Use `conftest.py` for global needs (e.g., Mock Database, Headless Qt App).
-*   Use `setUp(self)` for class-specific needs.
+| Must Test | May Skip |
+|---|---|
+| Methods with logic (`if`, `try`, loops, calculations) | Trivial accessors (one-line getters/setters) |
+| New public methods with behavior | Pass-through orchestration (if upstream/downstream are tested) |
+| — | Simple data mappers (row-to-object, object-to-dict) if transitively tested through caller tests |
+
+**The Boundary Rule:** Test at the point of responsibility. If `Repository.get()` sanitizes data, `Service.move()` does not re-test sanitization. If `get()` breaks, the failure shows in `test_repository.py`, not `test_service.py`.
 
 ---
 
-## 🚀 Quick Start: How to Add a New Test
+### 6. The Law of Derivation (Where Tests Come From)
+Tests are derived from **two sources**:
 
-So you wrote a new function `calculate_bpm()` in `src/audio/analyzer.py`. Here is how you test it:
+| Source | Produces | Examples |
+|---|---|---|
+| **Feature Spec** | Logic Tests | "Year must be 1900–current" → test 1899, 1900, current, current+1 |
+| **This Testing Bible** | Robustness Tests | Standard garbage: `""`, `null`, `-1990`, `"abc"`, injection strings |
 
-### Step 1: Find the Home
-*   Go to `tests/unit/audio/`.
-*   Is there a `test_analyzer.py`?
-    *   **Yes**: Open it.
-    *   **No**: Create it.
+**The Line:** If the Spec documents a constraint, testing at its boundary is **Logic**. Testing garbage the Spec doesn't mention is **Robustness**.
 
-### Step 2: Choose Your Section
-*   Inside `test_analyzer.py`, find the relevant Class.
-*   If testing a new feature, add a new class:
-    ```python
-    class TestBpmCalculation(unittest.TestCase):
-        def test_calculate_bpm_techno(self):
-            # ...
-    ```
+---
 
-### Step 3: Run It
+### 7. The Law of Trust Boundaries (When to Create `_mutation.py`)
+Not every component needs robustness tests. Only those at **trust boundaries**:
+
+| Input Source | Trust Level | Needs `_mutation.py`? |
+|---|---|---|
+| External files (ID3 tags, downloads) | 🔴 Untrusted | **Yes** |
+| User input (search, forms) | 🔴 Untrusted | **Yes** |
+| Own database (sanitized on write) | 🟢 Trusted | **No** (unless testing corruption) |
+| Internal function calls | 🟢 Trusted | **No** |
+
+**Robustness Categories** (apply only what's relevant):
+- Corrupt/malformed input (file parsers)
+- Injection (SQL, null-byte, path traversal)
+- Exhaustion (huge strings, deep nesting)
+- Environment failure (disk full, permission denied)
+- Wrong types (`null`, empty, negative, wrong data type)
+
+---
+
+## 📂 Physical Cleanup (The "No Litter" Rule)
+A task is not **Done** when the code passes; it is Done when the directory is clean.
+1.  **Consolidate**: Move logic to the Target File.
+2.  **Verify**: Run `pytest`.
+3.  **Flush**: Delete the source/orphaned files immediately. Orphaned files are "liabilities" that confuse future developers (and AI).
+
+---
+
+### 8. The Law of Inventory (The Enforcer)
+**"Trust, but Verify."**
+*   **The Rule**: Every file in `src/` (excluding `__init__.py` and simple constants) **MUST** have a corresponding validation file in `tests/`.
+*   **The Check**: Use `python tools/audit_test_coverage.py` to enforce this.
+*   **The Standard**:
+    *   **Logic Tests**: Required for ALL files.
+    *   **Mutation Tests**: Required for Trust Boundaries (Law 7).
+    *   **Coverage**: Minimum 80% per file.
+*   **The Exemption** (Aligning with Law 5):
+    *   Files that meet Law 5's "May Skip" criteria (e.g., pure constants, abstract interfaces) must be explicitly added to `tools/test_audit.ignore`.
+    *   **Rule**: Silent skipping is forbidden. You either Test it or Ignore it explicitly.
+
+---
+
+## 🛡️ The "Yelling" Safety Net (Integrity)
+Gosling2 uses **Yellberus** (in `tests/unit/integrity/`).
+*   It ensures the Database Schema and Song Model are in sync.
+*   **Rule**: Never disable an Integrity test to "pass" a build. If it yells, the code is incomplete.
+
+---
+
+## 🤖 Specialist/LLM Protocol (The Duck Test)
+Before you (The Agent) commit any test changes, you must answer these three questions:
+1.  **Is this a Logic test or a Mutation test?** (If it's both, split the file).
+2.  **Does the file path mirror `src`?**
+3.  **Are there orphaned 'Litter' files still in the directory?**
+
+---
+
+## 🚀 Quick Run Commands
 ```bash
-# Run ONLY your file (Fast)
-pytest tests/unit/audio/test_analyzer.py
+# Run Logic only
+pytest tests/unit/ -k "not mutation"
 
-# Run everything (Sanity Check)
+# Run everything
 pytest
-```
-
----
-
-## 🛡️ The "Yelling" Safety Net (Integrity Tests)
-
-Gosling2 uses a specialized system called **Yellberus** (located in `tests/unit/integrity/`).
-
-**What it does**:
-It ensures the Database, the Code, and the UI are 100% synchronized.
-*   If you add a column `Genre` to the Database...
-*   But forget to add it to the `Song` model...
-*   **The System Yells**: `IntegrityError: Column 'Genre' found in DB but missing in Song model.`
-
-**Rule**: Never disable an Integrity test. If it yells, **you** are wrong (or the code is incomplete). Fix the code to match the schema.
-
----
-
-## 🧪 Best Practices (The "Do's and Don'ts")
-
-### ✅ DO
-*   **Use Fixtures**: If you need a database, request `temp_db` (if available via conftest).
-*   **Test the "Why"**: `test_play_pauses_when_empty` is better than `test_play_2`.
-*   **Mock External interactions**: Don't actually call the filesystem if you can mock it (unless testing the Repository).
-
-### ❌ DON'T
-*   **Don't Sleep**: Never use `time.sleep(1)`. Use `qtbot.wait()` or polling.
-*   **Don't touch `src` from `tests`**: Import properly, don't modify source files during tests.
-*   **Don't catch `Exception`**: Be specific. `except ValueError:` is better than `except Exception:`.
-
----
-
-## 📂 Test Suite Structure
-
-```text
-tests/
-├── integration/        # Real interactions (Repo + Service + DB)
-├── unit/
-│   ├── business/       # Service Logic
-│   ├── data/           # Repositories & Models
-│   ├── integrity/      # Schema & Contract Managers (Yellberus)
-│   ├── presentation/   # UI Widgets
-│   └── conftest.py     # Global Fixtures
-└── requirements-test.txt
 ```

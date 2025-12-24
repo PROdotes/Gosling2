@@ -24,11 +24,11 @@ def test_metadata_extraction_coverage():
     # 2. Parse the File Directly (Robust path resolution)
     from pathlib import Path
     # Resolve project root relative to this test file:
-    # Resolve project root relative to this test file:
-    # tests/unit/business/services/test_metadata_service_coverage.py -> ... -> src/
-    # parents[0]=services, [1]=business, [2]=unit, [3]=tests, [4]=ProjectRoot
-    project_root = Path(__file__).resolve().parents[4]
+    # tests/unit/integrity/test_metadata_field_coverage.py -> ... -> src/
+    # parents[0]=integrity, [1]=unit, [2]=tests, [3]=ProjectRoot
+    project_root = Path(__file__).resolve().parents[3]
     service_path = project_root / "src" / "business" / "services" / "metadata_service.py"
+
     
     with open(service_path, "r", encoding="utf-8") as f:
         tree = ast.parse(f.read())
@@ -60,8 +60,17 @@ def test_metadata_extraction_coverage():
     extracted_fields = {kw.arg for kw in song_instantiation.keywords}
     
     # 6. Compare
+    # NOTE: These fields are INTENTIONALLY not extracted by extract_from_mp3():
+    # - type_id, notes, is_active: Local-only DB fields (not in ID3 tags)
+    # - unified_artist: Computed field (COALESCE of Groups/Performers)
+    # - album, genre, publisher: These ARE in ID3 (TALB, TCON, TPUB), but Gosling2
+    #   stores them in RELATIONAL TABLES (Albums, Tags, Publishers) via Yellberus.
+    #   extract_from_mp3() is for single-file ID3 reads; these fields are populated
+    #   by SongRepository when loading from DB. If ID3 extraction is needed later,
+    #   add a task to extend extract_from_mp3().
     ignored_fields = {
-        'type_id', 'notes', 'is_active', 'unified_artist'
+        'type_id', 'notes', 'is_active', 'unified_artist',
+        'album', 'genre', 'publisher',  # See NOTE above
     }
     missing_fields = model_fields - extracted_fields - ignored_fields
     

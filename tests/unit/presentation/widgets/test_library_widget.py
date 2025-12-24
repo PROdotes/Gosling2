@@ -123,7 +123,7 @@ def test_delete_selected_cancel(library_widget, mock_dependencies):
     # Select first row
     library_widget.table_view.selectRow(0)
     
-    with patch("PyQt6.QtWidgets.QMessageBox.question", return_value=QMessageBox.StandardButton.No):
+    with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.No):
         library_widget._delete_selected()
         
     lib_service.delete_song.assert_not_called()
@@ -141,7 +141,7 @@ def test_delete_selected_confirm(library_widget, mock_dependencies):
     idx = library_widget.proxy_model.index(0, idx_col_id) 
     expected_id = int(library_widget.proxy_model.data(idx))
     
-    with patch("PyQt6.QtWidgets.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+    with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
         library_widget._delete_selected()
         
     lib_service.delete_song.assert_called_with(expected_id)
@@ -462,4 +462,72 @@ def test_atomic_lifecycle_preserves_widths_on_filter(library_widget, mock_depend
     # 5. Verify 'Title' still has the custom width
     # The atomic lifecycle snapshots the 555px and restores it after the rebuild
     assert library_widget.table_view.columnWidth(idx_title) == 555
+
+
+# ============================================================================
+# SEARCH COVERAGE (from test_library_widget_filtering.py)
+# ============================================================================
+@pytest.fixture
+def library_widget_search(qtbot):
+    """Fixture with unique values in every column for search testing."""
+    lib_service = MagicMock()
+    meta_service = MagicMock()
+    settings = MagicMock()
+    settings.get_column_visibility.return_value = {}
+    settings.get_column_layout.return_value = None
+    settings.get_type_filter.return_value = 0
+    
+    # Setup data with unique values in every column to test search isolation
+    # Must match FIELDS count (20 columns as of now)
+    row_data = [
+        "/unique/path", 1, 1, "UniqueNote", "UniqueISRC", 1,
+        "UniqueProd", "UniqueLyr", 180.0, "UniqueTitle", 1, 999,
+        1888, "UniquePerf", "UniqueComp", "UniqueGroup", "UniqueArtist",
+        "UniqueAlbum", "UniquePub", "UniqueGenre"
+    ]
+    
+    # Pad with None if fewer columns than FIELDS
+    while len(row_data) < len(yellberus.FIELDS):
+        row_data.append(None)
+    
+    lib_service.get_all_songs.return_value = ([], [row_data])
+    
+    widget = LibraryWidget(lib_service, meta_service, settings)
+    qtbot.addWidget(widget)
+    return widget
+
+def test_strict_search_coverage(library_widget_search, qtbot):
+    """
+    STRICT Search Coverage:
+    Ensures that EVERY column displayed in the Library is searchable.
+    
+    If a developer adds a column but creates a custom filter that forgets to include it,
+    this test will fail (by finding 0 rows for a content known to be present).
+    """
+    widget = library_widget_search
+    model = widget.library_model
+    col_count = model.columnCount()
+    
+    row = 0
+    for col in range(col_count):
+        index = model.index(row, col)
+        val_text = str(model.data(index, 0))  # DisplayRole
+        
+        # Skip empty/None values
+        if not val_text or val_text == "None":
+            continue
+        
+        # Perform Search
+        widget.search_box.setText(val_text)
+        
+        # Assert Row Visible
+        assert widget.proxy_model.rowCount() == 1, \
+            f"Search failed for Column {col} ('{model.headerData(col, 1)}'). Value '{val_text}' not found."
+            
+        # Clear search for next iteration
+        widget.search_box.clear()
+        
+    # Verify Negative Case
+    widget.search_box.setText("NonExistentValue")
+    assert widget.proxy_model.rowCount() == 0
 

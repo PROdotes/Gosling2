@@ -42,3 +42,21 @@ class TestContributorRepository:
         with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
             result = repo.get_by_role("Performer")
             assert result == []
+
+    def test_aliases_visibility(self, repo):
+        """Integration-like verification that Aliases (like 'Dale Nixon') are retrievable."""
+        # This replaces the old 'tests/test_library_service_aliases.py'
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        
+        # Mock DB returning 'Dale Nixon'
+        mock_cursor.fetchall.return_value = [("Dale Nixon",)]
+        
+        @contextmanager
+        def mock_get_conn():
+            yield mock_conn
+
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
+            aliases = repo.get_all_aliases()
+            assert "Dale Nixon" in aliases

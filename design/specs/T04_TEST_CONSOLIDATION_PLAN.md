@@ -2,7 +2,7 @@
 tags:
   - plan/refactor
   - type/runbook
-  - status/active
+  - status/completed
 ---
 
 # T-04: The Great Test Consolidation Runbook
@@ -15,7 +15,7 @@ tags:
 
 ## 📜 The Constitution of Testing
 
-All future tests must adhere to these **Four Laws**:
+All future tests must adhere to the laws defined in **`TESTING.md`** (The Constitution). Below is a summary; when in doubt, **TESTING.md wins**.
 
 ### 1. The Law of Mirroring
 The test directory **MUST** mirror the source directory structure exactly.
@@ -50,52 +50,52 @@ Execute these merges in order.
 ### 1. Song Repository (Data Layer)
 **Target**: `tests/unit/data/repositories/test_song_repository.py`
 **Action**: MERGE & DELETE content from:
-*   [ ] `test_song_repository_exceptions.py` (Move to `class TestSongRepoEdgeCases`)
-*   [ ] `test_song_repository_extra.py`
-*   [ ] `test_song_repository_get_path.py` (Move to `class TestSongRepoReads`)
-*   [ ] `test_song_object_mapping.py`
-*   [ ] `test_security_injection.py` (Move to `class TestSongRepoSecurity`)
-
+*   [x] `test_song_repository_exceptions.py` (Move to `class TestSongRepoEdgeCases`)
+*   [x] `test_song_repository_extra.py`
+*   [x] `test_song_repository_get_path.py` (Move to `class TestSongRepoReads`)
+*   [x] `test_song_object_mapping.py`
 **Keep Separate**: `test_song_repository_mutation.py` (Renamed if needed to match `_mutation.py` suffix).
+**Merge into `_mutation.py`**:
+*   [x] `test_security_injection.py` (Move to `class TestSongRepoSecurity` in the **mutation** file — injection tests are Robustness per TESTING.md Law 7)
 
 ### 2. Metadata Service (Business Layer)
-**Target**: `tests/unit/business/services/test_metadata_service.py`
+**Target**: `tests/unit/business/services/test_metadata_service.py` (Logic)
+**Target**: `tests/unit/business/services/test_metadata_service_mutation.py` (Robustness)
 **Action**: MERGE & DELETE content from:
-*   [ ] `test_metadata_service_comprehensive.py`
-*   [ ] `test_metadata_service_coverage.py`
-*   [ ] `test_metadata_write.py` (Move to `class TestMetadataWrites`)
-*   [ ] `test_metadata_write_dynamic.py`
-*   [ ] `test_metadata_additional.py`
-*   [ ] `test_metadata_defensive.py` (Move to `class TestMetadataResilience`)
-*   [ ] `test_metadata_done_flag.py`
-*   [ ] `test_metadata_fixtures.py` (Refactor into `conftest.py` or local `setUp`)
-
-**Keep Separate**: `test_metadata_service_mutation.py`.
+*   [x] `test_metadata_service_comprehensive.py` (Logic -> main / Robustness -> _mutation)
+*   [x] `test_metadata_service_coverage.py` (Logic -> main)
+*   [x] `test_metadata_write.py` (Logic -> main)
+*   [x] `test_metadata_write_dynamic.py` (Logic -> main)
+*   [x] `test_metadata_additional.py` (Logic -> main)
+*   [x] `test_metadata_defensive.py` (Robustness -> _mutation)
+*   [x] `test_metadata_done_flag.py` (Logic -> main)
+*   [x] `test_metadata_fixtures.py` (Moved to global conftest.py)
 
 ### 3. Playback Service (Business Layer)
-**Target**: `tests/unit/business/services/test_playback_service.py`
+**Target**: `tests/unit/business/services/test_playback_service.py` (Logic)
+**Target**: `tests/unit/business/services/test_playback_service_mutation.py` (Robustness)
 **Action**: MERGE & DELETE content from:
-*   [ ] `test_playback_service_cleanup.py`
-*   [ ] `test_playback_crossfade.py`
+*   [x] `test_playback_service_cleanup.py` (Logic) ✅
+*   [x] `test_playback_crossfade.py` (Logic) ✅
 
-**Keep Separate**: `test_playback_service_mutation.py`.
+**Keep Separate**: `test_playback_service_mutation.py`.✅
 
 ### 4. UI Widgets (Presentation Layer)
 **Target**: `tests/unit/presentation/widgets/test_library_widget.py`
-**Merge**: `test_library_widget_filtering.py`
+**Merge**: [x] `test_library_widget_filtering.py` ✅
 
 **Target**: `tests/unit/presentation/widgets/test_playback_control_widget.py`
-**Keep Separate**: `test_playback_control_widget_mutation.py`.
+**Keep Separate**: `test_playback_control_widget_mutation.py`. ✅
 
 **Target**: `tests/unit/presentation/widgets/test_playlist_widget.py`
-**Merge**: `test_playlist_widget_extra.py`
+**Merge**: [x] `test_playlist_widget_extra.py` ✅
 
 ### 5. Integrity & Orphans (The Cleanup)
 **Action**: Create/Ensure `tests/unit/integrity/` exists.
-1.  **Move** `test_song_integrity.py` -> `tests/unit/integrity/test_song_model_integrity.py`.
-2.  **Move** `test_column_name_alignment.py` -> `tests/unit/integrity/test_column_alignment.py`.
-3.  **Merge** `test_library_service_aliases.py` (root) -> `tests/unit/business/services/test_library_service.py`.
-4.  **Delete** `tests/disabled_integrity/` (Investigate contents first, but default to DELETE if duplicated).
+1.  [x] **Move** `test_song_integrity.py` -> `tests/unit/integrity/test_song_model_integrity.py`. ✅ (Already done)
+2.  [x] **Move** `test_column_name_alignment.py` -> `tests/unit/integrity/test_column_alignment.py`. ✅ (Already done)
+3.  [x] **Keep** `test_library_service_aliases.py` (root) - Integration test, not unit test.
+4.  [x] **Delete** `tests/disabled_integrity/` ✅ - Contained outdated schema tests, now replaced by `tests/unit/integrity/`.
 
 ---
 
@@ -123,5 +123,15 @@ For each Target Group:
 
 ## 🚫 Exclusions
 *   `tests/integration/` -> Keep separate.
-*   `test_duplicate_reproduction.py` -> Keep separate (Specialized script).
 *   `test_library_widget_drag_drop.py` -> Keep separate (Too large).
+
+---
+
+## ⚠️ Post-Consolidation Verification (Required)
+After all consolidation is complete, run:
+```bash
+pytest tests/unit/business/services/ --cov=src.business.services --cov-report=term-missing
+```
+Verify coverage does not DROP below baseline (76% for MetadataService as of Dec 24).
+If coverage drops, audit the deleted files' history to recover missed tests.
+

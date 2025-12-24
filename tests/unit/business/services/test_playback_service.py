@@ -152,3 +152,129 @@ class TestPlaybackService:
             mock_load.assert_not_called()
 
 
+# ============================================================================
+# RESOURCE CLEANUP (from test_playback_service_cleanup.py)
+# ============================================================================
+class TestPlaybackServiceCleanup:
+    """Test resource management in PlaybackService"""
+
+    @pytest.fixture(autouse=True)
+    def mock_dependencies(self):
+        with patch('src.business.services.settings_manager.SettingsManager'), \
+             patch('src.business.services.playback_service.QMediaPlayer', side_effect=lambda: MagicMock()) as MockPlayer, \
+             patch('src.business.services.playback_service.QAudioOutput', side_effect=lambda: MagicMock()) as MockAudio, \
+             patch('src.business.services.settings_manager.SettingsManager') as MockSettings:
+            yield MockSettings.return_value
+
+    def test_cleanup_stops_playback(self, qtbot, mock_dependencies):
+        """Test that cleanup stops playback on all players"""
+        from unittest.mock import Mock
+        service = PlaybackService(mock_dependencies)
+        
+        # Mock stop on all players
+        for player in service._players:
+            player.stop = Mock()
+            
+        service.cleanup()
+        
+        for player in service._players:
+            player.stop.assert_called_once()
+
+    def test_cleanup_clears_media_source(self, qtbot, mock_dependencies):
+        """Test that cleanup clears the media source on all players"""
+        from unittest.mock import Mock
+        service = PlaybackService(mock_dependencies)
+        
+        # Mock setSource
+        for player in service._players:
+            player.setSource = Mock()
+            
+        service.cleanup()
+        
+        for player in service._players:
+            # Should look for empty QUrl calls
+            call_args = player.setSource.call_args[0][0]
+            assert call_args.isEmpty()
+
+    def test_cleanup_deletes_resources(self, qtbot, mock_dependencies):
+        """Test that cleanup schedules resources for deletion"""
+        from unittest.mock import Mock
+        service = PlaybackService(mock_dependencies)
+        
+        # Spy on deleteLater
+        for player in service._players:
+            player.deleteLater = Mock()
+        for audio in service._audio_outputs:
+            audio.deleteLater = Mock()
+            
+        service.cleanup()
+        
+        # Verify calls
+        for player in service._players:
+            player.deleteLater.assert_called_once()
+        for audio in service._audio_outputs:
+            audio.deleteLater.assert_called_once()
+            
+        # Verify lists cleared
+        assert len(service._players) == 0
+        assert len(service._audio_outputs) == 0
+
+    def test_cleanup_can_be_called_multiple_times(self, qtbot, mock_dependencies):
+        """Test that cleanup can be safely called multiple times"""
+        service = PlaybackService(mock_dependencies)
+        
+        service.cleanup()
+        service.cleanup()  # Second call
+        
+        assert len(service._players) == 0
+        assert len(service._audio_outputs) == 0
+
+
+# ============================================================================
+# CROSSFADE (from test_playback_crossfade.py)
+# ============================================================================
+@pytest.fixture
+def playback_service_mocked():
+    """Fixture to create PlaybackService with mocked Players"""
+    
+    with patch("src.business.services.playback_service.QMediaPlayer") as MockPlayer, \
+         patch("src.business.services.playback_service.QAudioOutput") as MockAudioOutput, \
+         patch("src.business.services.playback_service.QTimer") as MockTimer, \
+         patch("src.business.services.settings_manager.SettingsManager") as MockSettings:
+        
+        # Setup mocks
+        mock_player_instance = MockPlayer.return_value
+        mock_audio_instance = MockAudioOutput.return_value
+        mock_timer_instance = MockTimer.return_value
+        
+        # Configure Mock Settings
+        mock_settings_instance = MockSettings.return_value
+        mock_settings_instance.get_crossfade_duration.return_value = 3000
+        mock_settings_instance.get_crossfade_enabled.return_value = True
+
+        MockPlayer.side_effect = lambda: MagicMock()
+        MockAudioOutput.side_effect = lambda: MagicMock()
+
+        service = PlaybackService(mock_settings_instance)
+        
+        yield service, MockPlayer, MockTimer
+        
+        service.cleanup()
+
+# NOTE: Full logic verification is handled by verify_crossfade_behavior.py integration script
+# due to complex mocking requirements of QMediaPlayer/QTimer in this test environment.
+
+def test_dual_player_initialization(playback_service_mocked):
+    """Verify service creates two players"""
+    service, MockPlayer, _ = playback_service_mocked
+    
+    assert hasattr(service, "_players"), "Service should have _players list"
+    assert len(service._players) == 2, "Should have 2 players"
+    assert service._players[0] != service._players[1], "Players should be distinct instances"
+
+def test_properties_exist(playback_service_mocked):
+    """Verify property accessors exist"""
+    service, _, _ = playback_service_mocked
+    assert hasattr(service, 'crossfade_duration')
+    assert hasattr(service, 'crossfade_enabled')
+

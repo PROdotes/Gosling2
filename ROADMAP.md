@@ -33,8 +33,9 @@ tags:
     *   *Criticality*: Blocker (Regression found & fixed).
 
 ### 🧹 Milestone 2: The Cleanup
-*Status: After Schema Fix*
-*   [ ] **T-04 Test Consolidation** (~3.0 h)
+*Status: COMPLETED (Dec 24)*
+*   [x] **T-04 Test Consolidation** (~3.0 h)
+    *   *Status*: **Done** — All layers consolidated (Data, Business, Presentation). Test count: 363.
     *   *Why*: Merging 56 files makes future features faster/safer.
     *   *Risk*: Low (Boring work).
 

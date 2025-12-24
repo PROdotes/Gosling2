@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 
-from tools.yellberus_parser import parse_yellberus, FieldSpec, FIELD_DEFAULTS
+from tools.yellberus_parser import parse_yellberus, DynamicFieldSpec, extract_class_defaults
 
 # Field type options for dropdown
 FIELD_TYPES = ["TEXT", "INTEGER", "REAL", "BOOLEAN", "LIST", "DURATION", "DATETIME"]
@@ -151,9 +151,10 @@ class FieldEditorWindow(QMainWindow):
         defaults_row.setSpacing(16)
 
         self.default_checkboxes = {}
+        # Defaults will be populated in _on_load_clicked, but specific columns are mandated by UI
         for col_name in DEFAULTS_COLUMNS:
             cb = QCheckBox(col_name)
-            cb.setChecked(FIELD_DEFAULTS.get(col_name, False))
+            cb.setChecked(False) # Will be updated in load
             # Pass column name to handler for bulk updates
             cb.toggled.connect(lambda checked, name=col_name: self._on_defaults_changed(name, checked))
             self.default_checkboxes[col_name] = cb
@@ -278,7 +279,7 @@ class FieldEditorWindow(QMainWindow):
 
     def _on_load_clicked(self):
         """Load field definitions from yellberus.py and FIELD_REGISTRY.md."""
-        from tools.yellberus_parser import parse_field_registry_md, extract_class_defaults
+        from tools.yellberus_parser import parse_field_registry_md
         from PyQt6.QtWidgets import QMessageBox
 
         # Warn about unsaved changes (skip in test mode or on initial load)
@@ -340,10 +341,13 @@ class FieldEditorWindow(QMainWindow):
         )
 
     def _populate_fields_table(self, fields: list):
-        """Populate the Fields table with FieldSpec objects."""
+        """Populate the FieldSpec objects."""
         # CRITICAL: Disable sorting while populating to prevent rows from jumping
         sorting_was_enabled = self.fields_table.isSortingEnabled()
         self.fields_table.setSortingEnabled(False)
+        
+        # CRITICAL: Block signals to prevent itemChanged overhead during bulk load
+        self.fields_table.blockSignals(True)
 
         self.fields_table.setRowCount(len(fields))
         
@@ -404,6 +408,9 @@ class FieldEditorWindow(QMainWindow):
                 val_item.setToolTip("From VALIDATION_GROUPS")
             self.fields_table.setItem(row, 12, val_item)
 
+        # Restore signals
+        self.fields_table.blockSignals(False)
+        
         # Restore sorting state
         self.fields_table.setSortingEnabled(sorting_was_enabled)
 
@@ -682,7 +689,7 @@ class FieldEditorWindow(QMainWindow):
         self.fields_table.setItem(row, 0, QTableWidgetItem(""))  # Name (empty, needs input)
         self.fields_table.setItem(row, 1, QTableWidgetItem(""))  # UI Header
         self.fields_table.setItem(row, 2, QTableWidgetItem(""))  # DB Column
-        self._set_type_dropdown(row, 3, FIELD_DEFAULTS.get("field_type", "TEXT"))
+        self._set_type_dropdown(row, 3, self._loaded_defaults.get("field_type", "TEXT"))
 
         # Read bool defaults from UI checkboxes
         def get_default(name):
@@ -846,11 +853,10 @@ class FieldEditorWindow(QMainWindow):
         # that's a pre-existing condition, not a user change to save.
         self._dirty = (code_diffs + conflicts + new_fields) > 0
 
-    def _get_field_spec_from_row(self, row: int) -> FieldSpec:
-        """Construct a FieldSpec object from the current UI state of a row."""
-        from tools.yellberus_parser import FieldSpec
-
-        # safely get text
+    def _get_field_spec_from_row(self, row: int) -> DynamicFieldSpec:
+        """Create a DynamicFieldSpec object from a table row's contents."""
+        if row < 0 or row >= self.fields_table.rowCount():
+            return None
         def txt(col):
             item = self.fields_table.item(row, col)
             return item.text().strip() if item else ""
@@ -878,20 +884,48 @@ class FieldEditorWindow(QMainWindow):
             "First Letter": "first_letter_grouper",
         }.get(strategy_display, "list")
 
-        return FieldSpec(
-            name=txt(0),
-            ui_header=txt(1),
-            db_column=txt(2),
-            field_type=combo(3),
-            strategy=strategy,
-            visible=check(5),
-            editable=check(6),
-            filterable=check(7),
-            searchable=check(8),
-            required=check(9),
-            portable=check(10),
-            id3_tag=txt(11) or None
+        # Extract all values first
+        name = txt(0)
+        ui_header = txt(1)
+        db_column = txt(2)
+        field_type = combo(3)
+        visible = check(5)
+        editable = check(6)
+        filterable = check(7)
+        searchable = check(8)
+        required = check(9)
+        portable = check(10)
+        id3_tag = txt(11) or None
+
+        # Create Spec
+        spec = DynamicFieldSpec(
+            name=name,
+            ui_header=ui_header,
+            db_column=db_column,
         )
+        spec.field_type = field_type
+        spec.strategy = strategy
+        spec.visible = visible
+        spec.editable = editable
+        spec.filterable = filterable
+        spec.searchable = searchable
+        spec.required = required
+        spec.portable = portable
+        spec.id3_tag = id3_tag # Field editor tracks this
+
+        # Helper storage for extra attribs if we edited an existing one
+        if name in self._code_fields:
+            original = self._code_fields[name]
+            # Preserve extra attributes that aren't in the UI
+            if hasattr(original, "extra_attributes"):
+                spec._attributes.update(original.extra_attributes)
+            if hasattr(original, "_attributes"):
+                 # Also merge anything from _attributes that we don't track in UI
+                 for k, v in original._attributes.items():
+                     if k not in ["field_type", "strategy", "visible", "editable", "filterable", "searchable", "required", "portable", "id3_tag"]:
+                         spec._attributes[k] = v
+
+        return spec
 
     def _apply_row_colors(self, row: int):
         """Re-evaluate and apply colors for a specific row based on values."""
@@ -1041,20 +1075,31 @@ class FieldEditorWindow(QMainWindow):
             original = self._code_fields.get(ui_spec.name) or self._md_fields.get(ui_spec.name)
 
             if original:
-                merged = replace(original,
+                # DynamicFieldSpec doesn't work with dataclasses.replace because it uses __getattr__ logic 
+                # instead of defined fields for most attributes. We must manually construct and merge.
+                from tools.yellberus_parser import DynamicFieldSpec
+                
+                merged = DynamicFieldSpec(
                     name=ui_spec.name,
                     ui_header=ui_spec.ui_header,
-                    db_column=ui_spec.db_column,
-                    field_type=ui_spec.field_type,
-                    strategy=ui_spec.strategy,
-                    visible=ui_spec.visible,
-                    editable=ui_spec.editable,
-                    filterable=ui_spec.filterable,
-                    searchable=ui_spec.searchable,
-                    required=ui_spec.required,
-                    portable=ui_spec.portable,
-                    id3_tag=ui_spec.id3_tag
+                    db_column=ui_spec.db_column
                 )
+                
+                # Copy stored attributes from original first (preserve unknowns)
+                if hasattr(original, "_attributes"):
+                    merged._attributes.update(original._attributes)
+                
+                # Update with UI values
+                merged.field_type=ui_spec.field_type
+                merged.strategy=ui_spec.strategy
+                merged.visible=ui_spec.visible
+                merged.editable=ui_spec.editable
+                merged.filterable=ui_spec.filterable
+                merged.searchable=ui_spec.searchable
+                merged.required=ui_spec.required
+                merged.portable=ui_spec.portable
+                # id3_tag not in yellberus attributes usually, but we track for completeness here
+                if hasattr(ui_spec, "id3_tag"): merged.id3_tag = ui_spec.id3_tag
                 fields_by_name[ui_spec.name] = merged
             else:
                 if ui_spec.name not in self._field_order:
