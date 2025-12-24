@@ -125,7 +125,7 @@ class LibraryWidget(QWidget):
         
         # Flag to suppress auto-save during programmatic resize
         self._suppress_layout_save = False
-        
+        self._dirty_ids = set() # Store IDs with unsaved changes
         
         self._init_ui()
         self._setup_connections()
@@ -478,7 +478,7 @@ class LibraryWidget(QWidget):
         self.table_view.doubleClicked.connect(self._on_table_double_click)
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
-    def load_library(self, refresh_filters=True) -> None:
+    def load_library(self, refresh_filters=True):
         """Load library from database"""
         headers, data = self.library_service.get_all_songs()
         
@@ -492,8 +492,33 @@ class LibraryWidget(QWidget):
 
         if refresh_filters:
             self.filter_widget.populate()
+                # After population, apply dirty highlighting if list is not empty
+            if self._dirty_ids:
+                self.update_dirty_rows(list(self._dirty_ids))
+
+    def update_dirty_rows(self, dirty_ids: list):
+        """Highlight rows that have unsaved changes in the side panel."""
+        self._dirty_ids = set(dirty_ids)
         
-        self._update_tab_counts()
+        # We need to find the column index for file_id to identify rows
+        id_col = self.field_indices.get('file_id', -1)
+        if id_col == -1: return
+
+        # Iterate through the model once
+        for row in range(self.library_model.rowCount()):
+            item = self.library_model.item(row, id_col)
+            if not item: continue
+            
+            song_id = str(item.data(Qt.ItemDataRole.UserRole))
+            is_dirty = song_id in self._dirty_ids
+            
+            # Application style: Light Orange/Amber for dirty
+            bg_color = QColor(255, 165, 0, 40) if is_dirty else None 
+            
+            for col in range(self.library_model.columnCount()):
+                cell = self.library_model.item(row, col)
+                if cell:
+                    cell.setBackground(bg_color if bg_color else QColor(Qt.GlobalColor.transparent))
 
     def _apply_incomplete_view_columns(self) -> None:
         """Show only columns that are required by the criteria."""

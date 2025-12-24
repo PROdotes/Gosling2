@@ -19,7 +19,8 @@ python app.py
 ## ✨ Key Features
 
 - **Drag & Drop Import** — Import MP3s or ZIP archives directly into the library
-- **Smart Metadata** — Automatic ID3 tag extraction with discrepancy highlighting
+- **Side Panel Editor** — Bulk edit metadata with staging and validation
+- **Smart Metadata** — Dynamic ID3 tag extraction (Portable/Local awareness)
 - **Crossfade Playback** — Seamless transitions between tracks
 - **Filter & Search** — Strategy-based tree view and global search
 - **Type Tabs** — Dedicated views for Music, Jingles, Commercials, and more
@@ -111,7 +112,7 @@ pytest
 | UI & Widgets | ~160 | ✅ |
 | Schema / Registry | ~100 | ✅ |
 | Tools & Parsers | ~7 | ✅ |
-| **Total** | **357** | **✅ All Passing** |
+| **Total** | **397** | **✅ All Passing** |
 
 ---
 

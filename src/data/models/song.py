@@ -18,6 +18,8 @@ class Song(MediaSource):
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
     publisher: Optional[str] = None
     genre: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
     
     # Relationships
     performers: List[str] = field(default_factory=list)

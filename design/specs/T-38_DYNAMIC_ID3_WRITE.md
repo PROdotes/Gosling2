@@ -1,4 +1,10 @@
 # T-38: Dynamic ID3 Write
+> **IMPLEMENTATION NOTE (2025-12-24)**: The requirement to use `id3_frames.json` as the runtime driver was PIVOTED.
+> We determined that `src/core/yellberus.py` (Field definitions) is the authoritative Source of Truth.
+> Therefore, `MetadataService` now reads `FieldDef.id3_tag` directly from Python code, bypassing the JSON file to prevent sync drift.
+> The JSON file remains as a reference artifact but is not used for writing tags.
+---***pending review***---
+
 
 > **Status**: 📋 Draft Spec  
 > **Priority**: 5 (0.1 BLOCKER)  

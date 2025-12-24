@@ -132,6 +132,14 @@ class MetadataService:
         album_artist_list = get_text_list("TPE2")
         album_artist = album_artist_list[0] if album_artist_list else None
 
+        # Extract Genre
+        genre_list = get_text_list("TCON")
+        genre = genre_list[0] if genre_list else None
+
+        # Extract Publisher
+        publisher_list = get_text_list("TPUB")
+        publisher = publisher_list[0] if publisher_list else None
+
         return Song(
             source_id=source_id,
             source=path,
@@ -148,6 +156,8 @@ class MetadataService:
             groups=deduplicate(groups),
             album=album,
             album_artist=album_artist,
+            genre=genre,
+            publisher=publisher,
         )
 
     @staticmethod
@@ -271,16 +281,23 @@ class MetadataService:
                 if val is None:
                     continue
 
-                # Determine Frame ID from JSON Map
-                frame_id = field_to_frame.get(field.name)
+                # Determine Frame ID
+                # 1. Try Yellberus definition (Source of Truth)
+                frame_id = field.id3_tag
                 
-                # Fallback check (e.g. isrc -> TSRC)
+                # 2. Fallback to JSON map if Yellberus is None (Legacy compatibility)
                 if not frame_id:
-                     # Some fields might not be in JSON yet?
+                     frame_id = field_to_frame.get(field.name)
+                
+                # 3. If still no frame, skip
+                if not frame_id:
                      continue
                 
                 # Delete existing tags for this frame
-                audio.tags.delall(frame_id)
+                try:
+                    audio.tags.delall(frame_id)
+                except KeyError:
+                    pass
                 
                 # If empty (empty string/list), we leave it deleted
                 if not val:
@@ -292,7 +309,7 @@ class MetadataService:
                 # Handle TXXX generic
                 if not FrameClass and frame_id.startswith("TXXX:"):
                     desc = frame_id.split(":", 1)[1]
-                    audio.tags.add(TXXX(encoding=3, desc=desc, text=str(val)))
+                    audio.tags.add(TXXX(encoding=1, desc=desc, text=str(val)))
                     continue
                 
                 if not FrameClass:
@@ -301,9 +318,9 @@ class MetadataService:
                 
                 # Write
                 if isinstance(val, list):
-                    audio.tags.add(FrameClass(encoding=3, text=val))
+                    audio.tags.add(FrameClass(encoding=1, text=val))
                 else:
-                    audio.tags.add(FrameClass(encoding=3, text=str(val)))
+                    audio.tags.add(FrameClass(encoding=1, text=str(val)))
 
             # --- COMPLEX FIELDS (Dual Mode / Legacy) ---
 
@@ -313,8 +330,8 @@ class MetadataService:
                 audio.tags.delall('TYER')
                 from mutagen.id3 import TDRC, TYER
                 s_year = str(song.recording_year)
-                audio.tags.add(TDRC(encoding=3, text=s_year))
-                audio.tags.add(TYER(encoding=3, text=s_year))
+                audio.tags.add(TDRC(encoding=1, text=s_year))
+                audio.tags.add(TYER(encoding=1, text=s_year))
 
             # 2. Producers (Dual: TIPL + TXXX:PRODUCER)
             if song.producers:
@@ -323,10 +340,10 @@ class MetadataService:
                 
                 # TIPL
                 people_list = [(role, name) for name in song.producers for role in ['producer']]
-                audio.tags.add(TIPL(encoding=3, people=people_list))
+                audio.tags.add(TIPL(encoding=1, people=people_list))
                 
                 # TXXX
-                audio.tags.add(TXXX(encoding=3, desc='PRODUCER', text=song.producers))
+                audio.tags.add(TXXX(encoding=1, desc='PRODUCER', text=song.producers))
             else:
                  audio.tags.delall('TIPL')
                  audio.tags.delall('TXXX:PRODUCER')
@@ -335,8 +352,8 @@ class MetadataService:
             audio.tags.delall('TKEY')
             audio.tags.delall('TXXX:GOSLING_DONE')
             from mutagen.id3 import TKEY
-            audio.tags.add(TKEY(encoding=3, text='true' if song.is_done else ' '))
-            audio.tags.add(TXXX(encoding=3, desc='GOSLING_DONE', text='1' if song.is_done else '0'))
+            audio.tags.add(TKEY(encoding=1, text='true' if song.is_done else ' '))
+            audio.tags.add(TXXX(encoding=1, desc='GOSLING_DONE', text='1' if song.is_done else '0'))
 
             # 4. Author Union (Legacy: TCOM = Composers + Lyricists)
             audio.tags.delall('TCOM')
@@ -346,8 +363,8 @@ class MetadataService:
             # Write Modern Lyricists
             if song.lyricists:
                 from mutagen.id3 import TCOM, TEXT, TOLY
-                audio.tags.add(TEXT(encoding=3, text=song.lyricists))
-                audio.tags.add(TOLY(encoding=3, text=song.lyricists))
+                audio.tags.add(TEXT(encoding=1, text=song.lyricists))
+                audio.tags.add(TOLY(encoding=1, text=song.lyricists))
 
             # Write TCOM Union (Jazler Hack)
             union_list = []
@@ -363,13 +380,15 @@ class MetadataService:
             
             if union_list:
                 from mutagen.id3 import TCOM
-                audio.tags.add(TCOM(encoding=3, text=union_list))
+                audio.tags.add(TCOM(encoding=1, text=union_list))
+            else:
+                 pass # TCOM cleared.
 
             # Save
-            audio.save(v1=1)
+            # Force ID3v2.3 for maximum compatibility (Windows Explorer, etc.)
+            audio.save(v1=1, v2_version=3)
             return True
 
         except Exception as e:
             print(f"Error writing tags to {song.path}: {e}")
             return False
-

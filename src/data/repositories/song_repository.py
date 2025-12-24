@@ -88,9 +88,9 @@ class SongRepository(BaseRepository):
                 # 1. Update MediaSources (Base info)
                 cursor.execute("""
                     UPDATE MediaSources
-                    SET Name = ?, Duration = ?
+                    SET Name = ?, Duration = ?, Notes = ?, IsActive = ?
                     WHERE SourceID = ?
-                """, (song.name, song.duration, song.source_id))
+                """, (song.name, song.duration, song.notes, 1 if song.is_active else 0, song.source_id))
 
                 # 2. Update Songs (Extended info)
                 # Note: Groups is TIT1 (Content Group Description)
@@ -189,22 +189,23 @@ class SongRepository(BaseRepository):
                 """, (song.source_id, contributor_id, role_id))
 
     def _sync_album(self, song: Song, conn) -> None:
-        """Sync album relationship (Find or Create with Artist Disambiguation)"""
+        """Sync album relationship (Find or Create with Artist Disambiguation) - Replacement Logic"""
+        cursor = conn.cursor()
+        
+        # 1. Clear existing links (Fixes the "Append" bug)
+        cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+
         if not song.album or not song.album.strip():
             return
 
-        # 1. Get/Create Album using (Title, AlbumArtist, Year) for disambiguation
+        # 2. Get/Create Album using (Title, AlbumArtist, Year) for disambiguation
         # This prevents the "Greatest Hits Paradox" where Queen and ABBA albums merge.
-        # 
-        # Note: We use raw SQL here to stay within the current transaction.
         
         album_title = song.album.strip()
         album_artist = getattr(song, 'album_artist', None)
         if album_artist:
             album_artist = album_artist.strip() or None
         release_year = getattr(song, 'recording_year', None)
-        
-        cursor = conn.cursor()
         
         # Build query dynamically based on what's provided
         conditions = ["Title = ? COLLATE NOCASE"]
@@ -234,79 +235,73 @@ class SongRepository(BaseRepository):
             )
             album_id = cursor.lastrowid
             
-        # Link: M2M - Add to album without removing existing links.
+        # Link: Since we cleared above, this is the only link.
         cursor.execute("INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
 
     def _sync_publisher(self, song: Song, conn) -> None:
-        """Sync publisher relationship (Find or Create)"""
-        # If publisher string is empty, we don't clear existing ones (partial update safety),
-        # unless explicit cleared (not supported by simple current logic yet).
-        # We assume if it's passed, it's valid.
-        if not song.publisher or not song.publisher.strip():
-            return
+        """Sync publisher relationship (Find or Create) - Replacement Logic"""
+        # Unlike previous additive logic, we now CLEAR existing publishers for the album
+        # and replace them with the new set. This matches user expectation of "Editing".
 
-        publisher_name = song.publisher.strip()
         cursor = conn.cursor()
 
-        # 1. Find or Create Publisher
-        cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (publisher_name,))
-        row = cursor.fetchone()
-        
-        if row:
-            publisher_id = row[0]
-        else:
-            cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (publisher_name,))
-            publisher_id = cursor.lastrowid
-
-        # 2. Identify Target Albums
+        # 1. Identify Target Albums
         # Logic: Publisher links to ALBUM, not Song.
-        # So we must find which albums this song belongs to.
         cursor.execute("SELECT AlbumID FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
         rows = cursor.fetchall()
         album_ids = [r[0] for r in rows]
 
         if not album_ids:
-            # Brief Strategy: If TPUB present but no Album, create 'Single' album
-            # Use Song Name as Album Title
-            # But wait, if _sync_album ran first, there SHOULD be an album if song.album was set.
-            # This branch hits only if song.album was None/Empty but song.publisher was Set.
-            
-            # Use safe title (fallback to 'Unknown' if name missing, though unlikely)
-            single_title = song.name or "Unknown Single"
-            
-            # Check if this "Single" album already exists (by title + type?) 
-            # Simplified: Just create/find generic album with this title.
-            cursor.execute("SELECT AlbumID FROM Albums WHERE Title = ?", (single_title,))
-            alb_row = cursor.fetchone()
-            
-            if alb_row:
-                album_id = alb_row[0]
+            # If TPUB present but no Album, create 'Single' album?
+            # Or simplified: if no album, we can't link publisher in this schema.
+            # But earlier _sync_album should have ensured an album exists if song.album is set.
+            # If song.album was None, we might legally skip publisher linking or create a dummy album.
+            # Consistent with previous logic: try to create one if publisher exists.
+            if song.publisher and song.publisher.strip():
+                 single_title = song.name or "Unknown Single"
+                 # Check/Create generic album
+                 cursor.execute("SELECT AlbumID FROM Albums WHERE Title = ?", (single_title,))
+                 alb_row = cursor.fetchone()
+                 if alb_row:
+                     album_id = alb_row[0]
+                 else:
+                     cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Single')", (single_title,))
+                     album_id = cursor.lastrowid
+                 
+                 # Link Song -> Album
+                 cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
+                 album_ids = [album_id]
             else:
-                cursor.execute("INSERT INTO Albums (Title, AlbumType) VALUES (?, 'Single')", (single_title,))
-                album_id = cursor.lastrowid
-            
-            # Link Song -> Album
-            cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, album_id))
-            album_ids = [album_id]
+                return
 
-        # 3. Link Publisher -> Album(s)
-        # Note: This applies the publisher to the entire album. 
-        # CAUTION: If "Greatest Hits" has tracks from diff publishers, this blindly adds a publisher to the album.
-        # But 'AlbumPublishers' is Many-to-Many, so an Album CAN have multiple publishers.
-        # We DO NOT delete existing publishers here (additive logic), unless we want strict sync?
-        # Brief didn't specify strict wipe. Let's assume ADDITIVE for safety in M2M.
-        # But wait, if I correct a typo? "Universal" -> "Universal".
-        # If I don't wipe, I keep "Universal".
-        # Let's Wipe and Set for the albums involved?
-        # No, that affects other songs on the album. Too dangerous for a scoped update.
-        # Relational Paradox: Editing a Song's publisher edits the Album's publisher which affects ALL songs on that album.
-        # For now, we just INSERT OR IGNORE.
-        
-        for alb_id in album_ids:
-            cursor.execute("""
-                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
-                VALUES (?, ?)
-            """, (alb_id, publisher_id))
+        # 2. Parse Publishers (Comma separated)
+        # If song.publisher is None/Empty, we treated it as "Clear Publishers"
+        raw_val = song.publisher or ""
+        publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
+
+        # 3. Clear Existing Links for these Albums
+        # This fixes the "Append" bug.
+        placeholders = ",".join(["?"] * len(album_ids))
+        cursor.execute(f"DELETE FROM AlbumPublishers WHERE AlbumID IN ({placeholders})", album_ids)
+
+        # 4. Insert New Links
+        for pub_name in publisher_names:
+            # Find or Create Publisher
+            cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
+            row = cursor.fetchone()
+            
+            if row:
+                publisher_id = row[0]
+            else:
+                cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
+                publisher_id = cursor.lastrowid
+
+            # Link to all albums involved (usually just one)
+            for alb_id in album_ids:
+                cursor.execute("""
+                    INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
+                    VALUES (?, ?)
+                """, (alb_id, publisher_id))
 
     def _sync_genre(self, song: Song, conn) -> None:
         """Sync genre (Tag) relationship"""
@@ -420,6 +415,90 @@ class SongRepository(BaseRepository):
             print(f"Error fetching songs by unified artists: {e}")
             return [], []
 
+    def get_by_id(self, source_id: int) -> Optional[Song]:
+        """Get full song object by ID"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+
+                # Fetch basic info from JOIN
+                cursor.execute("""
+                    SELECT
+                        MS.SourceID, MS.Name, MS.Source, MS.Duration,
+                        S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
+                        MS.Notes, MS.IsActive,
+                        (
+                            SELECT Title FROM Albums A
+                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as AlbumTitle,
+                        (
+                            SELECT GROUP_CONCAT(P.PublisherName, ', ')
+                            FROM SongAlbums SA
+                            JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
+                            JOIN Publishers P ON AP.PublisherID = P.PublisherID
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as PublisherName,
+                        (
+                            SELECT GROUP_CONCAT(TG.TagName, ', ')
+                            FROM MediaSourceTags MST
+                            JOIN Tags TG ON MST.TagID = TG.TagID
+                            WHERE MST.SourceID = MS.SourceID AND TG.Category = 'Genre'
+                        ) as Genre
+                    FROM MediaSources MS
+                    JOIN Songs S ON MS.SourceID = S.SourceID
+                    WHERE MS.SourceID = ?
+                """, (source_id,))
+
+                row = cursor.fetchone()
+                if not row:
+                    return None
+
+                source_id, name, path, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
+
+                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+
+                # Fetch contributors
+                song = Song(
+                    source_id=source_id,
+                    source=path,
+                    name=name,
+                    duration=duration,
+                    bpm=bpm,
+                    recording_year=recording_year,
+                    isrc=isrc,
+                    is_done=bool(is_done_int),
+                    notes=notes,
+                    is_active=bool(is_active_int),
+                    album=album_title, # AlbumTitle
+                    publisher=publisher_name, # PublisherName
+                    genre=genre_str, # Genre
+                    groups=groups
+                )
+                cursor.execute("""
+                    SELECT R.RoleName, C.ContributorName
+                    FROM MediaSourceContributorRoles MSCR
+                    JOIN Roles R ON MSCR.RoleID = R.RoleID
+                    JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                    WHERE MSCR.SourceID = ?
+                """, (source_id,))
+                
+                for role_name, contributor_name in cursor.fetchall():
+                    if role_name == 'Performer':
+                        song.performers.append(contributor_name)
+                    elif role_name == 'Composer':
+                        song.composers.append(contributor_name)
+                    elif role_name == 'Lyricist':
+                        song.lyricists.append(contributor_name)
+                    elif role_name == 'Producer':
+                        song.producers.append(contributor_name)
+                
+                return song
+        except Exception as e:
+            print(f"Error getting song by id: {e}")
+            return None
+
     def get_by_path(self, path: str) -> Optional[Song]:
         """Get full song object by path"""
         try:
@@ -434,10 +513,10 @@ class SongRepository(BaseRepository):
                     SELECT 
                         MS.SourceID, MS.Name, MS.Duration, 
                         S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
+                        MS.Notes, MS.IsActive,
                         (
-                            SELECT GROUP_CONCAT(A.Title, ', ')
-                            FROM SongAlbums SA 
-                            JOIN Albums A ON SA.AlbumID = A.AlbumID 
+                            SELECT Title FROM Albums A 
+                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
                             WHERE SA.SourceID = MS.SourceID
                         ) as AlbumTitle,
                         (
@@ -446,7 +525,13 @@ class SongRepository(BaseRepository):
                             JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
                             JOIN Publishers P ON AP.PublisherID = P.PublisherID
                             WHERE SA.SourceID = MS.SourceID
-                        ) as PublisherName
+                        ) as PublisherName,
+                        (
+                            SELECT GROUP_CONCAT(TG.TagName, ', ')
+                            FROM MediaSourceTags MST
+                            JOIN Tags TG ON MST.TagID = TG.TagID
+                            WHERE MST.SourceID = MS.SourceID AND TG.Category = 'Genre'
+                        ) as Genre
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.Source = ?
@@ -456,7 +541,7 @@ class SongRepository(BaseRepository):
                 if not row:
                     return None
                 
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, album_title, publisher_name = row
+                source_id, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
                 
                 groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
 
@@ -470,8 +555,11 @@ class SongRepository(BaseRepository):
                     recording_year=recording_year,
                     isrc=isrc,
                     is_done=bool(is_done_int),
+                    notes=notes,
+                    is_active=bool(is_active_int),
                     album=album_title, # AlbumTitle
                     publisher=publisher_name, # PublisherName
+                    genre=genre_str, # Genre
                     groups=groups
                 )
                 

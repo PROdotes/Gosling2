@@ -9,27 +9,27 @@
 
 | Name | UI Header | DB Column | Type | Strategy | Visible | Editable | Filterable | Searchable | Required | Portable | ID3 Tag | Validation |
 |------|-----------|-----------|------|----------|---------|----------|------------|------------|----------|----------|---------|------------|
+| `performers` | Performers | Performers | LIST | First Letter | Yes | Yes | No | No | No | Yes | TPE1 |
+| `groups` | Groups | S.Groups | TEXT |  | No | Yes | No | No | No | Yes | TIT1 |
+| `unified_artist` | Artist | UnifiedArtist | TEXT | First Letter | Yes | No | Yes | Yes | No | No | — |
+| `title` | Title | MS.Name | TEXT |  | Yes | Yes | No | Yes | Yes | Yes | TIT2 |
+| `album` | Album | AlbumTitle | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TALB |
+| `recording_year` | Year | S.RecordingYear | INTEGER | Decade Grouping | Yes | Yes | Yes | Yes | Yes | Yes | TDRC |
+| `publisher` | Publisher | Publisher | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TPUB |
+| `genre` | Genre | Genre | TEXT | Decade Grouping | Yes | Yes | Yes | Yes | Yes | Yes | TCON |
+| `composers` | Composer | Composers | LIST | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
+| `duration` | Duration | MS.Duration | DURATION |  | Yes | No | No | No | Yes | No | TLEN |
+| `bpm` | BPM | S.TempoBPM | INTEGER | Range Filter | Yes | Yes | Yes | No | No | Yes | TBPM |
+| `producers` | Producer | Producers | LIST | First Letter | Yes | Yes | Yes | Yes | No | Yes | TIPL |
+| `lyricists` | Lyricist | Lyricists | LIST | First Letter | Yes | Yes | Yes | Yes | No | No | TEXT |
+| `album_artist` | Album Artist | AlbumArtist | TEXT | First Letter | No | Yes | No | Yes | No | Yes | TPE2 |
+| `isrc` | ISRC | S.ISRC | TEXT |  | Yes | Yes | No | No | No | Yes | TSRC |
+| `notes` | Notes | MS.Notes | TEXT |  | Yes | Yes | No | No | No | No | — |
+| `is_done` | Status | S.IsDone | BOOLEAN | Boolean Toggle | Yes | Yes | Yes | No | No | No | — |
 | `path` | Path | MS.Source | TEXT |  | No | No | No | No | Yes | No | — |
 | `file_id` | ID | MS.SourceID | INTEGER |  | No | No | No | No | Yes | No | — |
 | `type_id` | Type | MS.TypeID | INTEGER |  | No | No | No | No | No | No | — |
-| `notes` | Notes | MS.Notes | TEXT |  | Yes | Yes | No | No | No | No | — |
-| `isrc` | ISRC | S.ISRC | TEXT |  | Yes | Yes | No | No | No | Yes | TSRC |
 | `is_active` | Active | MS.IsActive | BOOLEAN |  | Yes | Yes | Yes | No | No | No | — |
-| `producers` | Producer | Producers | LIST | First Letter | Yes | Yes | Yes | Yes | No | Yes | TIPL |
-| `lyricists` | Lyricist | Lyricists | LIST | First Letter | Yes | Yes | Yes | Yes | No | No | TEXT |
-| `duration` | Duration | MS.Duration | DURATION |  | Yes | Yes | No | No | Yes | No | TLEN |
-| `title` | Title | MS.Name | TEXT |  | Yes | Yes | No | Yes | Yes | Yes | TIT2 |
-| `is_done` | Status | S.IsDone | BOOLEAN | Boolean Toggle | Yes | Yes | Yes | No | No | No | — |
-| `bpm` | BPM | S.TempoBPM | INTEGER | Range Filter | Yes | Yes | Yes | No | No | Yes | TBPM |
-| `recording_year` | Year | S.RecordingYear | INTEGER | Decade Grouping | Yes | Yes | Yes | Yes | Yes | Yes | TDRC |
-| `performers` | Performers | Performers | LIST | First Letter | No | Yes | No | No | No | Yes | TPE1 |
-| `composers` | Composer | Composers | LIST | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TCOM |
-| `groups` | Groups | S.Groups | TEXT |  | No | Yes | No | No | No | Yes | TIT1 |
-| `unified_artist` | Artist | UnifiedArtist | TEXT | First Letter | Yes | No | Yes | Yes | No | No | — |
-| `album` | Album | AlbumTitle | TEXT | First Letter | Yes | Yes | Yes | Yes | Yes | Yes | TALB |
-| `publisher` | Publisher | Publisher | TEXT | First Letter | No | Yes | Yes | Yes | Yes | Yes | TPUB |
-| `genre` | Genre | Genre | TEXT | Decade Grouping | Yes | Yes | Yes | Yes | Yes | Yes | TCON |
-| `album_artist` | Album Artist | AlbumArtist | TEXT | First Letter | No | Yes | No | Yes | No | Yes | TPE2 |
 
 **Total: 21 fields**
 

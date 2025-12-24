@@ -32,6 +32,7 @@ links: []
 ### Quick Wins (Score ≥10)
 | ID | Task | Pri | Cmplx | Score | Status | Spec |
 |----|------|-----|-------|-------|--------|------|
+| T-44 | **Refactor: Dynamic ID3 Read** | 5 | 2 | 20 | 🚀 (Next) | Use `id3_frames.json` mapping in `extract_from_mp3` instead of hardcoded `get_text_list` calls. CRITICAL PRIORITY. |
 | T-04 | **Test Audit** | 5 | 3 | 10 | 🚀 (Next) | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
 | T-17 | **Unified Artist View** | 5 | 3 | 15 | ✅ | [spec](design/issues/T-17_unified_artist_view.md) <br> ([Groups Logic Status](design/state/GROUPS_LOGIC_STATUS.md)) |
 | T-18 | **Column Resilience** | 5 | 2 | 20 | ✅ | [docs](design/issues/T-18_column_persistence.md) |
@@ -42,7 +43,7 @@ links: []
 | — | **Completeness Check** | 3 | 1 | 15 | ✅ | — |
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](design/done/T-02_field_registry.md) |
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
-| T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — **0.1 BLOCKER**. `write_tags()` must use `id3_frames.json`. *Logged by Vesper.* |
+| T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -58,18 +59,22 @@ links: []
 ### Feature Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
-| T-12 | **Side Panel** | 5 | 3 | 10 | 📋 | Legacy Sync | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
+| T-12 | **Side Panel** | 5 | 3 | 10 | ✅ | — | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) <br> (Includes: Validation, Editing, Ctrl+S) |
 | T-03 | **Inline Edit** | 4 | 2 | 8 | 📋 | — | [spec](design/issues/T-03_inline_edit.md) |
 | T-10 | **Basic Chips** | 3 | 2 | 6 | 📋 | — | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
 | T-11 | **View Modes** | 3 | 4 | 6 | 📋 | Type Tabs | [spec](design/proposals/PROPOSAL_LIBRARY_VIEWS.md) |
 | T-14 | **Smart Chips** | 3 | 3 | 6 | 📋 | Basic Chips | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
 | T-16 | **Advanced Search** | 3 | 3 | 9 | 📋 | — | [spec](design/issues/T-16_advanced_search.md) |
-| T-31 | **Legacy Shortcuts** | 4 | 2 | 8 | 📋 | — | [spec](design/issues/T-31_legacy_shortcuts.md) |
+| T-31 | **Legacy Shortcuts** | 4 | 2 | 8 | ✅ | — | [spec](design/issues/T-31_legacy_shortcuts.md) |
+| T-40 | **Bulk Set Operations** | 3 | 4 | 6 | 📋 | Side Panel | (+/-) Additive/Subtractive tagging for genres/performers in bulk mode. |
+| T-41 | **Portable/Required Audit** | 4 | 2 | 8 | 📋 | — | Ensure all `required=True` fields are also `portable=True` to prevent 'Ghost Metadata' that only exists in DB. |
+| T-42 | **Field Reordering** | 4 | 3 | 12 | 📋 | Field Editor | Allow valid drag-and-drop reordering in Field Editor to control UI flow. |
+| T-43 | **Custom Field Groups** | 3 | 2 | 12 | 📋 | Field Editor | Allow users to define custom groups in Field Editor instead of hardcoded 'Core/Advanced'. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
-| T-20 | **Bulk Edit** | 4 | 4 | 8 | ⏸️ | Side Panel | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
+| T-20 | **Bulk Edit** | 4 | 4 | 8 | 🚀 | Side Panel | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) |
 | T-21 | **Saved Playlists** | 4 | 3 | 8 | 📋 | — | [spec](design/proposals/PROPOSAL_PLAYLISTS.md) |
 | — | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-26 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
@@ -96,8 +101,8 @@ links: []
                    [Immediate]       [Next]         [Soon]
 
  TRACK B (UI):     Side Panel ──► Inline Edit ──► Bulk Edit
-                       📋              ✏️             📝
-                   [Blocked]       [Parallel]      [Later]
+                       ✅              ✏️             📝
+                   [Complete]      [Parallel]      [Next]
 
                    ✅ Field Editor — DONE
 ```
@@ -109,9 +114,9 @@ links: []
 4. **Log Core** — Add history tracking. (T-05)
 
 ### Track B: User Experience (UI)
-1. **Side Panel** — Requires Legacy Sync data.
+1. **Side Panel** — ✅ DONE (Validation, Editing, Shortcuts).
 2. **Inline Edit** — Can proceed in parallel.
-3. **Bulk Edit** — Dependent on Side Panel logic.
+3. **Bulk Edit** — Next Logic Step.
 
 ---
 
@@ -119,6 +124,7 @@ links: []
 
 | Area | Issue | Trigger to Fix |
 |------|-------|----------------|
+| **Hardcoded ID3 Read** | `metadata_service.py` manually calls `get_text_list("TCON")` etc. MUST use `id3_frames.json` mapping. | TOMORROW (T-44). |
 | **ID3 Lookup** | JSON loaded twice: once in `field_editor.py` (cached), once in `yellberus_parser.write_field_registry_md()` (not cached). Lookup logic also duplicated. | If this area causes more bugs, extract shared `id3_lookup.py` module. |
 | **Custom ID3 Tags** | No way to make a field portable without a JSON mapping. User can't specify TXXX:fieldname or custom frames through UI. | ✅ FIXED (Popup implemented) |
 | **Album Duplicates** | `find_by_title` is case-sensitive ("nevermind" != "Nevermind"). And `Greatest Hits` titles merge different artists. | Fix case-sensitivity ASAP. Defer "AlbumArtist" schema change. |

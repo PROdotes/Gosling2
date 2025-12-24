@@ -2,13 +2,14 @@
 import os
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QSplitter, QLabel, QMenu, QMessageBox
+    QMainWindow, QWidget, QVBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
+    QStackedWidget, QTabBar
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
-from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget
+from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget, SidePanelWidget
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager
 
 class MainWindow(QMainWindow):
@@ -42,6 +43,7 @@ class MainWindow(QMainWindow):
         
         self._restore_volume()
         self._restore_playlist()
+        self._restore_right_panel_tab()
 
     def _init_ui(self) -> None:
         """Initialize the user interface"""
@@ -65,17 +67,33 @@ class MainWindow(QMainWindow):
             self.settings_manager
         )
         
-        # Playlist Widget (Right)
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        playlist_label = QLabel("Playlist")
+        # Right Panel Container (Stacked: Playlist | Editor)
+        right_panel = QWidget()
+        right_panel_layout = QVBoxLayout(right_panel)
+        right_panel_layout.setContentsMargins(0, 0, 0, 0)
+        right_panel_layout.setSpacing(0)
+        
+        # Mode Selector (Tabs)
+        self.right_tabs = QTabBar()
+        self.right_tabs.addTab("Playlist")
+        self.right_tabs.addTab("Editor")
+        self.right_tabs.setExpanding(True)
+        self.right_tabs.currentChanged.connect(self._on_right_tab_changed)
+        
+        self.right_stack = QStackedWidget()
+        
+        # Content Widgets
         self.playlist_widget = PlaylistWidget()
-        right_layout.addWidget(playlist_label)
-        right_layout.addWidget(self.playlist_widget)
+        self.side_panel = SidePanelWidget(self.library_service, self.metadata_service)
+        
+        self.right_stack.addWidget(self.playlist_widget)
+        self.right_stack.addWidget(self.side_panel)
+        
+        right_panel_layout.addWidget(self.right_tabs)
+        right_panel_layout.addWidget(self.right_stack)
 
         self.splitter.addWidget(self.library_widget)
-        self.splitter.addWidget(right_widget)
+        self.splitter.addWidget(right_panel)
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 1)
         
@@ -103,17 +121,20 @@ class MainWindow(QMainWindow):
         self.playback_widget.next_clicked.connect(self._play_next)
         self.playback_widget.volume_changed.connect(self._on_volume_changed)
         
-        # Monitor playlist count
-        model = self.playlist_widget.model()
-        model.rowsInserted.connect(self._on_playlist_changed)
-        model.rowsRemoved.connect(self._on_playlist_changed)
+        # Connect Library Selection to Side Panel
+        # Connect Library Selection to Side Panel (Phase 2 Link)
+        self.library_widget.table_view.selectionModel().selectionChanged.connect(self._on_library_selection_changed)
+        
+        # Connect Side Panel Signals
+        self.side_panel.save_requested.connect(self._on_side_panel_save_requested)
+        self.side_panel.staging_changed.connect(self.library_widget.update_dirty_rows)
 
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts (T-31 legacy shortcuts)."""
-        # Ctrl+S – Save selected rows (DB + ID3; renamer later)
+        # Ctrl+S – Save staged changes (Side Panel)
         self.action_save_selected = QAction(self)
         self.action_save_selected.setShortcut("Ctrl+S")
-        self.action_save_selected.triggered.connect(self.library_widget.save_selected_songs)
+        self.action_save_selected.triggered.connect(self.side_panel.trigger_save)
         self.addAction(self.action_save_selected)
 
         # Ctrl+D – Mark selection as Done (Yellberus-gated)
@@ -281,3 +302,165 @@ class MainWindow(QMainWindow):
             if data and "path" in data:
                 playlist.append(data["path"])
         self.settings_manager.set_last_playlist(playlist)
+
+    def _restore_right_panel_tab(self) -> None:
+        """Restore last selected right panel tab"""
+        index = self.settings_manager.get_right_panel_tab()
+        self.right_tabs.setCurrentIndex(index)
+        self.right_stack.setCurrentIndex(index)
+
+    def _on_right_tab_changed(self, index: int) -> None:
+        """Switch between Playlist and Editor."""
+        self.right_stack.setCurrentIndex(index)
+        self.settings_manager.set_right_panel_tab(index)
+
+    def _on_library_selection_changed(self, selected, deselected) -> None:
+        """Load selected song(s) into the Side Panel."""
+        # Get selected songs from the model
+        selection_model = self.library_widget.table_view.selectionModel()
+        indexes = selection_model.selectedRows()
+        
+        if not indexes:
+            self.side_panel.set_songs([])
+            return
+            
+        songs = []
+        for idx in indexes:
+            song = self._get_selected_song_object(idx)
+            if song:
+                songs.append(song)
+            
+        self.side_panel.set_songs(songs)
+
+    def _get_selected_song_object(self, proxy_index):
+        """Helper to get a real Song object from a table selection."""
+        # Get path from column (standard Yellberus index)
+        path_idx = self.library_widget.field_indices.get('path', -1)
+        if path_idx == -1: return None
+        
+        # Get the row from the proxy index
+        source_index = self.library_widget.proxy_model.mapToSource(proxy_index)
+        
+        # We need the path to fetch the real model from the repo/service
+        # (Assuming the model stores the path string in the 'path' column)
+        path_column_index = self.library_widget.field_indices.get('path')
+        path_item = self.library_widget.library_model.item(source_index.row(), path_column_index)
+        
+        if not path_item: return None
+        
+        path = path_item.text()
+        return self.library_service.get_song_by_path(path)
+    def _on_side_panel_save_requested(self, staged_changes: dict) -> None:
+        """Commit all staged changes to DB and ID3 tags."""
+        successful_ids = []
+        
+        for song_id, changes in staged_changes.items():
+            # 1. Fetch current song model
+            song = self.library_service.song_repository.get_by_id(song_id)
+            if not song: continue
+            
+            # 2. Apply changes to the model with type coercion
+            for field_name, value in changes.items():
+                field_def = self._get_yellberus_field(field_name)
+                if not field_def: continue
+                
+                # Coerce types based on Yellberus definition
+                from ...core import yellberus
+                value = yellberus.cast_from_string(field_def, value)
+                
+                # Map field name to model attribute
+                attr = field_def.model_attr or field_def.name
+                
+                if hasattr(song, attr):
+                    setattr(song, attr, value)
+                else:
+                    from ...core import yellberus
+                    yellberus.yell(f"SidePanel save: Song model missing attribute '{attr}' for field '{field_name}'")
+            
+            
+            # 3. Save to ID3 First (Pessimistic: Ensure file is writable)
+            id3_success = self.metadata_service.write_tags(song)
+            
+            # 4. If ID3 succeeds (or is skipped/non-fatal), Save to DB
+            # Note: We consider ID3 failure fatal for consistency in this "Editor" context.
+            if id3_success:
+                if self.library_service.update_song(song):
+                    successful_ids.append(song_id)
+            else:
+                QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}\n\nCheck if file is read-only or in use.")
+                
+        # Cleanup
+        if successful_ids:
+            # 1. Capture current selection (Source IDs) to preserve across reload
+            selected_ids = set()
+            id_col = self.library_widget.field_indices.get('file_id', -1)
+            
+            # We need QItemSelectionModel for flags
+            from PyQt6.QtCore import QItemSelectionModel
+            
+            if id_col != -1:
+                selection_model = self.library_widget.table_view.selectionModel()
+                # Get selected rows from proxy
+                for proxy_idx in selection_model.selectedRows():
+                     # Map to source
+                     source_idx = self.library_widget.proxy_model.mapToSource(proxy_idx)
+                     # Get ID from source model
+                     item = self.library_widget.library_model.item(source_idx.row(), id_col)
+                     if item:
+                         # Store as string for easy comparison
+                         selected_ids.add(str(item.data(Qt.ItemDataRole.UserRole)))
+            
+            # 2. Clear staged for successful saves
+            self.side_panel.clear_staged(successful_ids)
+            
+            # 3. Reload Library (This clears the model and selection)
+            self.library_widget.load_library(refresh_filters=False)
+            
+            # 4. Restore Selection
+            if selected_ids and id_col != -1:
+                new_selection_model = self.library_widget.table_view.selectionModel()
+                source_model = self.library_widget.library_model
+                proxy_model = self.library_widget.proxy_model
+                
+                # Iterate rows to find matches
+                for row in range(source_model.rowCount()):
+                    item = source_model.item(row, id_col)
+                    if item and str(item.data(Qt.ItemDataRole.UserRole)) in selected_ids:
+                        # Map source row back to proxy index (column 0 for full row selection)
+                        source_idx = source_model.index(row, 0)
+                        proxy_idx = proxy_model.mapFromSource(source_idx)
+                        if proxy_idx.isValid():
+                            new_selection_model.select(
+                                proxy_idx, 
+                                QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+                            )
+            
+            # 5. Refresh Side Panel manually (ensure it shows clean data)
+            self._on_library_selection_changed(None, None)
+            
+            # Removed Auto-Advance per user request
+            
+            self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
+
+    def _auto_advance_selection(self):
+        """Move selection to the next row in the library table."""
+        view = self.library_widget.table_view
+        selection_model = view.selectionModel()
+        current_indexes = selection_model.selectedRows()
+        
+        if not current_indexes:
+            return
+            
+        last_index = current_indexes[-1]
+        next_row = last_index.row() + 1
+        
+        if next_row < self.library_widget.proxy_model.rowCount():
+            next_index = self.library_widget.proxy_model.index(next_row, 0)
+            selection_model.clearSelection()
+            selection_model.select(next_index, selection_model.SelectionFlag.Select | selection_model.SelectionFlag.Rows)
+            view.scrollTo(next_index)
+
+    def _get_yellberus_field(self, name: str):
+        """Helper to find a field definition by name."""
+        from ...core import yellberus
+        return next((f for f in yellberus.FIELDS if f.name == name), None)

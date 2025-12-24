@@ -39,17 +39,22 @@ tags:
     *   *Why*: Merging 56 files makes future features faster/safer.
     *   *Risk*: Low (Boring work).
 
-### �️ Milestone 3: Usable UI (Backlog Enabler)
+### 🛠️ Milestone 3: Usable UI (Backlog Enabler)
 *Status: Required for processing 400-song backlog*
-*   [ ] **Side Panel Alpha** (~3.0 h)
+*   [x] **Side Panel Alpha** (~3.0 h)
     *   *Task*: Basic metadata editor panel (Genre, Artist, Album, Done).
-    *   *Why*: Can't efficiently edit songs without it.
+    *   *Status*: **Done** (Validation + Edit + Staging).
+    *   *Ref*: T-12.
+*   [x] **Legacy Shortcuts** (~1.0 h)
+    *   *Task*: `Ctrl+D` (Done) and `Ctrl+S` (Save).
+    *   *Status*: **Done**.
+    *   *Ref*: T-31.
+*   [ ] **Dynamic ID3 Read (T-44)** (~1.5 h) - **CRITICAL**
+    *   *Task*: Fix hardcoded `get_text_list` in `metadata_service.py` (read path).
+    *   *Why*: Currently inconsistent with `write_tags` (dynamic).
 *   [ ] **Auto-Renamer** (~3.5 h)
     *   *Task*: Port Genre/Year rules + `shutil.move` logic.
     *   *Complexity*: High (File System Risk). Rules documented in `LEGACY_LOGIC.md`.
-*   [ ] **Legacy Shortcuts** (~1.0 h)
-    *   *Task*: `Ctrl+D` (Done) and `Ctrl+S` (Save).
-    *   *Ref*: T-31.
 *   [ ] **UX Polish** (~2.0 h)
     *   *Task*: Dark theme, consistent button styling.
     *   *Note*: Keep default PyQt6 components. Custom tag picker DEFERRED to 1.0.

@@ -1272,23 +1272,27 @@ class FieldEditorWindow(QMainWindow):
         md_path = Path(__file__).parent.parent / "design" / "FIELD_REGISTRY.md"
 
         current_defaults = {name: cb.isChecked() for name, cb in self.default_checkboxes.items()}
-
-        success_code = write_yellberus(yellberus_path, fields_to_save, defaults=current_defaults)
-        success_md = write_field_registry_md(md_path, fields_to_save)
-
-        if success_code and success_md:
-            self.status_bar.showMessage("Saved successfully to both files!")
-            self._dirty = False
-            self._on_load_clicked()
-        elif success_code:
-            self.status_bar.showMessage("Saved to Code but MD failed!")
-            QMessageBox.warning(self, "Save Warning", "Saved to yellberus.py but failed to write FIELD_REGISTRY.md")
-        elif success_md:
-            self.status_bar.showMessage("Saved to MD but Code failed!")
-            QMessageBox.warning(self, "Save Warning", "Saved to FIELD_REGISTRY.md but failed to write yellberus.py")
-        else:
-            self.status_bar.showMessage("Save Failed!")
-            QMessageBox.critical(self, "Save Error", "Failed to write to both files.")
+        
+        try:
+            success_code = write_yellberus(yellberus_path, fields_to_save, defaults=current_defaults)
+            success_md = write_field_registry_md(md_path, fields_to_save)
+            
+            if success_code and success_md:
+                self.status_bar.showMessage("Saved successfully to both files!")
+                self._dirty = False
+                self._on_load_clicked()
+            elif success_code:
+                self.status_bar.showMessage("Saved to Code but MD failed!")
+                QMessageBox.warning(self, "Save Warning", "Saved to yellberus.py but failed to write FIELD_REGISTRY.md")
+            elif success_md:
+                self.status_bar.showMessage("Saved to MD but Code failed!")
+                QMessageBox.warning(self, "Save Warning", "Saved to FIELD_REGISTRY.md but failed to write yellberus.py")
+            else:
+                self.status_bar.showMessage("Save Failed!")
+                QMessageBox.critical(self, "Save Error", "Failed to write to both files.")
+        except Exception as e:
+            self.status_bar.showMessage(f"Critical Save Error: {e}")
+            QMessageBox.critical(self, "Critical Save Error", f"An unexpected error occurred during save:\n\n{e}")
 
     def closeEvent(self, event):
         """Warn about unsaved changes on close."""

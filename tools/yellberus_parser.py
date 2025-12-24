@@ -273,9 +273,9 @@ def write_yellberus(file_path: Path, fields: List[DynamicFieldSpec], defaults: d
     
     for f in fields:
         new_code_lines.append("    FieldDef(")
-        new_code_lines.append(f'        name="{f.name}",')
-        new_code_lines.append(f'        ui_header="{f.ui_header}",')
-        new_code_lines.append(f'        db_column="{f.db_column}",')
+        new_code_lines.append(f"        name={repr(f.name)},")
+        new_code_lines.append(f"        ui_header={repr(f.ui_header)},")
+        new_code_lines.append(f"        db_column={repr(f.db_column)},")
         
         # Determine all attributes to write
         # We iterate over the object's stored attributes
@@ -299,20 +299,24 @@ def write_yellberus(file_path: Path, fields: List[DynamicFieldSpec], defaults: d
                 if isinstance(val, str):
                     # Check if it looks like an expression or simple string
                     if key == "query_expression":
-                         new_code_lines.append(f'        {key}={repr(val)},')
+                         new_code_lines.append(f"        {key}={repr(val)},")
                     elif key == "strategy" and val == "list":
                         continue # Skip default strategy
                     else:
-                        new_code_lines.append(f'        {key}="{val}",')
+                        new_code_lines.append(f"        {key}={repr(val)},")
                 else:
-                    new_code_lines.append(f'        {key}={val},')
+                    new_code_lines.append(f"        {key}={val},")
         
         new_code_lines.append("    ),")
     new_code_lines.append("]")
     
     # Locate FIELDS assignment in original file
     source = "".join(lines)
-    tree = ast.parse(source)
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return False
+        
     start_lineno = -1
     end_lineno = -1
     
@@ -356,13 +360,7 @@ def write_field_registry_md(file_path: Path, fields: List[DynamicFieldSpec]) -> 
     import json
     
     # Load canonical ID3 frames
-    id3_frames = {}
-    try:
-        json_path = file_path.parent.parent / "src" / "resources" / "id3_frames.json"
-        if json_path.exists():
-            with open(json_path, "r", encoding="utf-8") as jf:
-                id3_frames = json.load(jf)
-    except Exception: pass
+    id3_frames = _load_id3_frames(file_path)
     
     field_to_frame = {}
     for frame_code, info in id3_frames.items():
@@ -416,3 +414,15 @@ def write_field_registry_md(file_path: Path, fields: List[DynamicFieldSpec]) -> 
         f.writelines(final_lines)
         
     return True
+
+def _load_id3_frames(md_file_path: Path) -> Dict[str, Any]:
+    """Internal helper to load ID3 frames relative to the MD file."""
+    import json
+    try:
+        json_path = md_file_path.parent.parent / "src" / "resources" / "id3_frames.json"
+        if json_path.exists():
+            with open(json_path, "r", encoding="utf-8") as jf:
+                return json.load(jf)
+    except Exception:
+        pass
+    return {}
