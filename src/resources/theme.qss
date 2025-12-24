@@ -1,0 +1,126 @@
+/* Gosling2 "Cyber-Goth" Theme - Base Stylesheet */
+/* Carbon & Neon Palette */
+
+/* --- GLOBAL WIDGETS --- */
+QWidget {
+    background-color: #121212;
+    color: #E0E0E0;
+    font-family: "Segoe UI", sans-serif;
+    font-size: 10pt;
+}
+
+QFrame, QDialog {
+    background-color: #181818;
+    border: none;
+}
+
+/* --- SCROLL BARS (Modern & Slim) --- */
+QScrollBar:vertical {
+    border: none;
+    background: #121212;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:vertical {
+    background: #444;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+QScrollBar::handle:vertical:hover { background: #666; }
+
+
+/* --- INPUT FIELDS --- */
+QLineEdit, QComboBox, QPlainTextEdit {
+    background-color: #252525;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 6px;
+    color: #FFF;
+    selection-background-color: #D81B60; /* Pink Accent Selection */
+}
+QLineEdit:focus, QComboBox:focus {
+    border: 1px solid #D81B60; /* Pink Accent Focus */
+}
+QLineEdit:disabled {
+    background-color: #1a1a1a;
+    color: #555;
+    border: 1px solid #222;
+}
+
+/* --- BUTTONS --- */
+QPushButton {
+    background-color: #333;
+    color: #DDD;
+    border: 1px solid #444;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: #444;
+    border-color: #777;
+}
+QPushButton:pressed {
+    background-color: #222;
+}
+/* Primary Action Button (Blue/Pink override usually applied via ID) */
+QPushButton#PrimaryButton {
+    background-color: #D81B60; /* Pink Accent */
+    color: white;
+    border: none;
+}
+QPushButton#PrimaryButton:hover {
+    background-color: #C2185B;
+}
+
+/* --- TABLE VIEW (Library) --- */
+QTableView {
+    background-color: #1E1E1E;
+    alternate-background-color: #252525;
+    gridline-color: #333;
+    selection-background-color: #D81B60; /* Pink Accent */
+    selection-color: white;
+    border: none;
+}
+QHeaderView::section {
+    background-color: #2C2C2C;
+    padding: 6px;
+    border: none;
+    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
+    font-weight: bold;
+    color: #BBB;
+}
+QTableView QTableCornerButton::section {
+    background-color: #2C2C2C;
+    border: none;
+}
+
+/* --- SIDE PANEL SPECIFIC --- */
+QLabel { color: #BBB; }
+QLabel#HeaderLabel {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #FFF;
+}
+QScrollArea { border: none; }
+
+/* --- SLIDERS --- */
+QSlider::groove:horizontal {
+    border: 1px solid #333;
+    height: 8px;
+    background: #222;
+    margin: 2px 0;
+    border-radius: 4px;
+}
+QSlider::handle:horizontal {
+    background: #D81B60;
+    border: 1px solid #D81B60;
+    width: 14px;
+    height: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+}

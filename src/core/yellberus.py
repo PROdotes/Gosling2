@@ -631,6 +631,8 @@ def check_db_integrity(cursor) -> None:
                     yell(f"Orphan column in {table} detected: '{o}' (Exists in DB but not in Registry)")
                     
         except Exception as e:
+            yell(f"Integrity check failed: {e}")
+
 def cast_from_string(field_def: FieldDef, value: Any) -> Any:
     """
     Cast a string value (from UI) to the correct Python type for the model.

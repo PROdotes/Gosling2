@@ -19,6 +19,15 @@ def main() -> None:
     icon_path = os.path.join(os.path.dirname(__file__), "resources", "app_icon.png")
     app.setWindowIcon(QIcon(icon_path))
     
+    # Apply Theme
+    try:
+        theme_path = os.path.join(os.path.dirname(__file__), "src", "resources", "theme.qss")
+        if os.path.exists(theme_path):
+            with open(theme_path, "r") as f:
+                app.setStyleSheet(f.read())
+    except Exception as e:
+        print(f"Failed to load theme: {e}")
+
     window = MainWindow()
     window.show()
     
