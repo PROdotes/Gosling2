@@ -31,11 +31,11 @@ class FieldDef:
     required: bool = False
     min_value: Optional[float] = None
     min_length: Optional[int] = None
+    validation_pattern: Optional[str] = None  # Regex pattern for format validation (e.g., ISRC)
     
     # UI behavior
     visible: bool = True
     editable: bool = True
-    sortable: bool = True
     searchable: bool = True
     
     # Filter behavior
@@ -106,7 +106,6 @@ FIELDS: List[FieldDef] = [
         min_length=1,
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ') AS Performers",
         searchable=False,
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -115,7 +114,6 @@ FIELDS: List[FieldDef] = [
         db_column='S.Groups',
         id3_tag='TIT1',
         searchable=False,
-        sortable=True,
         visible=False,
     ),
     FieldDef(
@@ -126,7 +124,6 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         portable=False,
         query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -136,7 +133,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TIT2',
         min_length=1,
         required=True,
-        sortable=True,
     ),
     FieldDef(
         name='album',
@@ -146,7 +142,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TALB',
         query_expression='GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle',
         required=True,
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -159,7 +154,6 @@ FIELDS: List[FieldDef] = [
         min_length=1,
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Composer' THEN C.ContributorName END, ', ') AS Composers",
         required=True,
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -170,7 +164,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TPUB',
         query_expression='GROUP_CONCAT(DISTINCT P.PublisherName) AS Publisher',
         required=True,
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -181,7 +174,6 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TDRC',
         required=True,
-        sortable=True,
         strategy='decade_grouper',
     ),
     FieldDef(
@@ -192,7 +184,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TCON',
         query_expression='GROUP_CONCAT(DISTINCT TG.TagName) AS Genre',
         required=True,
-        sortable=True,
         strategy='decade_grouper',
     ),
     FieldDef(
@@ -201,7 +192,7 @@ FIELDS: List[FieldDef] = [
         db_column='S.ISRC',
         id3_tag='TSRC',
         searchable=False,
-        sortable=True,
+        validation_pattern='^[A-Z]{2}[A-Z0-9]{3}\\d{2}\\d{5}$',
     ),
     FieldDef(
         name='duration',
@@ -214,7 +205,6 @@ FIELDS: List[FieldDef] = [
         portable=False,
         required=True,
         searchable=False,
-        sortable=True,
     ),
     FieldDef(
         name='producers',
@@ -224,7 +214,6 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TIPL',
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Producer' THEN C.ContributorName END, ', ') AS Producers",
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -236,7 +225,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TEXT',
         portable=False,
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Lyricist' THEN C.ContributorName END, ', ') AS Lyricists",
-        sortable=True,
         strategy='first_letter_grouper',
     ),
     FieldDef(
@@ -245,7 +233,6 @@ FIELDS: List[FieldDef] = [
         db_column='AlbumArtist',
         id3_tag='TPE2',
         query_expression='GROUP_CONCAT(DISTINCT A.AlbumArtist) AS AlbumArtist',
-        sortable=True,
         strategy='first_letter_grouper',
         visible=False,
     ),
@@ -255,7 +242,6 @@ FIELDS: List[FieldDef] = [
         db_column='MS.Notes',
         portable=False,
         searchable=False,
-        sortable=True,
     ),
     FieldDef(
         name='is_done',
@@ -265,7 +251,6 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         portable=False,
         searchable=False,
-        sortable=True,
         strategy='boolean',
     ),
     FieldDef(
@@ -277,7 +262,7 @@ FIELDS: List[FieldDef] = [
         portable=False,
         required=True,
         searchable=False,
-        sortable=True,
+        strategy='decade_grouper',
         visible=False,
     ),
     FieldDef(
@@ -290,7 +275,6 @@ FIELDS: List[FieldDef] = [
         portable=False,
         required=True,
         searchable=False,
-        sortable=True,
         visible=False,
     ),
     FieldDef(
@@ -301,7 +285,6 @@ FIELDS: List[FieldDef] = [
         editable=False,
         portable=False,
         searchable=False,
-        sortable=True,
         visible=False,
     ),
     FieldDef(
@@ -313,7 +296,6 @@ FIELDS: List[FieldDef] = [
         id3_tag='TBPM',
         min_value=0,
         searchable=False,
-        sortable=True,
         strategy='range',
     ),
     FieldDef(
@@ -324,7 +306,16 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         portable=False,
         searchable=False,
-        sortable=True,
+        strategy='first_letter_grouper',
+    ),
+    FieldDef(
+        name='audio_hash',
+        ui_header='Audio Hash',
+        db_column='MS.AudioHash',
+        editable=False,
+        portable=False,
+        searchable=False,
+        visible=False,
     ),
 ]
 

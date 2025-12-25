@@ -61,7 +61,11 @@
     "TMED": "Media type",
     "TOAL": "Original album/movie/show title",
     "TOFN": "Original filename",
-    "TOLY": "Original lyricist(s)/text writer(s)",
+    "TOLY": {
+        "description": "Original lyricist(s)/text writer(s)",
+        "field": "lyricists",
+        "type": "list"
+    },
     "TOPE": "Original artist(s)/performer(s)",
     "TORY": "Original release year",
     "TOWN": "File owner/licensee",

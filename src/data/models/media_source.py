@@ -12,5 +12,6 @@ class MediaSource:
     name: Optional[str] = None
     source: Optional[str] = None
     duration: Optional[float] = None
+    audio_hash: Optional[str] = None  # Hash of MP3 audio frames (excludes ID3 tags)
     notes: Optional[str] = None
     is_active: bool = True

@@ -5,42 +5,55 @@ from src.presentation.widgets.library_widget import LibraryWidget
 from src.core import yellberus
 
 @pytest.fixture
-def mock_dependencies():
-    library_service = MagicMock()
-    metadata_service = MagicMock()
-    settings_manager = MagicMock()
-    
-    # Default settings
-    settings_manager.get_last_import_directory.return_value = ""
-    settings_manager.get_column_layout.return_value = None
-    settings_manager.get_type_filter.return_value = 0 # "All"
-    
-    return library_service, metadata_service, settings_manager
-
-@pytest.fixture
-def library_widget(qtbot, mock_dependencies):
-    lib_service, meta_service, settings = mock_dependencies
+def library_widget(qtbot, mock_widget_deps):
+    """Unified LibraryWidget fixture for type tab testing"""
+    deps = mock_widget_deps
     
     # Headers matching Yellberus
     headers = [f.db_column for f in yellberus.FIELDS]
     
-    # Data matching current FIELDS order (15 columns):
-    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
-    # 6:producers, 7:lyricists, 8:duration, 9:title,
-    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers
+    def get_idx(name):
+        for i, f in enumerate(yellberus.FIELDS):
+            if f.name == name: return i
+        return -1
+
+    idx_path = get_idx("path")
+    idx_id = get_idx("file_id")
+    idx_type = get_idx("type_id")
+    idx_title = get_idx("title")
+    idx_dur = get_idx("duration")
+    idx_done = get_idx("is_done")
+    idx_active = get_idx("is_active")
+
+    def r(fid, tid, title):
+        row = [None] * len(yellberus.FIELDS)
+        row[idx_path] = f"/path/{fid}.mp3"
+        row[idx_id] = fid
+        row[idx_type] = tid
+        row[idx_title] = title
+        row[idx_dur] = 120
+        row[idx_done] = 1
+        row[idx_active] = 1
+        return row
+
     data = [
-        # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, year, performers, composers
-        ["", 1, 1, "", "", 1, "", "", 180, "Music 1", 1, 120, 2020, "Artist 1", ""],   # Type 1 (Music)
-        ["", 2, 2, "", "", 1, "", "", 30, "Jingle 1", 1, 0, 2021, "Artist 2", ""],     # Type 2 (Jingle)
-        ["", 3, 3, "", "", 1, "", "", 60, "Comm 1", 1, 0, 2022, "Artist 3", ""],       # Type 3 (Commercial)
-        ["", 4, 4, "", "", 1, "", "", 300, "Speech 1", 1, 0, 2023, "Artist 4", ""],    # Type 4 (VoiceTrack)
-        ["", 5, 5, "", "", 1, "", "", 600, "Speech 2", 1, 0, 2024, "Artist 5", ""],    # Type 5 (Recording)
-        ["", 6, 6, "", "", 1, "", "", 0, "Stream 1", 1, 0, 2025, "Artist 6", ""],      # Type 6 (Stream)
+        r(1, 1, "Music 1"),
+        r(2, 2, "Jingle 1"),
+        r(3, 3, "Comm 1"),
+        r(4, 4, "Speech 1"),
+        r(5, 5, "Speech 2"),
+        r(6, 6, "Stream 1"),
     ]
     
-    lib_service.get_all_songs.return_value = (headers, data)
+    deps['library_service'].get_all_songs.return_value = (headers, data)
     
-    widget = LibraryWidget(lib_service, meta_service, settings)
+    widget = LibraryWidget(
+        deps['library_service'], 
+        deps['metadata_service'], 
+        deps['settings_manager'],
+        deps['renaming_service'],
+        deps['duplicate_scanner']
+    )
     qtbot.addWidget(widget)
     return widget
 
@@ -59,6 +72,10 @@ def test_tab_counts(library_widget):
     """Verify that tab labels include correct item counts."""
     tab_bar = library_widget.type_tab_bar
     # Data: 6 total, 1 Music, 1 Jingle, 1 Comm, 2 Speech (IDs 4,5), 1 Stream
+    print(f"DEBUG: Row count: {library_widget.library_model.rowCount()}")
+    for i in range(tab_bar.count()):
+        print(f"DEBUG: Tab {i} text: '{tab_bar.tabText(i)}'")
+    
     assert "6" in tab_bar.tabText(0) # All
     assert "1" in tab_bar.tabText(1) # Music
     assert "1" in tab_bar.tabText(2) # Jingles
@@ -68,28 +85,20 @@ def test_tab_counts(library_widget):
 
 def test_music_tab_filtering(library_widget, qtbot):
     """Verify clicking the 'Music' tab filters the table."""
-    # Music is tab index 1
     with qtbot.waitSignal(library_widget.type_tab_bar.currentChanged):
         library_widget.type_tab_bar.setCurrentIndex(1)
         
-    # Proxy model should now only show 1 row (Music 1)
     assert library_widget.proxy_model.rowCount() == 1
-    
-    # Check content
-    idx_title = library_widget.field_indices['title']
+    idx_title = {f.name: i for i, f in enumerate(yellberus.FIELDS)}['title']
     title = library_widget.proxy_model.data(library_widget.proxy_model.index(0, idx_title))
     assert title == "Music 1"
 
 def test_speech_tab_grouping_filter(library_widget, qtbot):
     """Verify 'Speech' tab correctly filters both TypeID 4 and 5."""
-    # Speech is tab index 4
     library_widget.type_tab_bar.setCurrentIndex(4)
-    
-    # Proxy model should show 2 rows (Speech 1 and Speech 2)
     assert library_widget.proxy_model.rowCount() == 2
     
-    # Verify titles
-    idx_title = library_widget.field_indices['title']
+    idx_title = {f.name: i for i, f in enumerate(yellberus.FIELDS)}['title']
     titles = [
         library_widget.proxy_model.data(library_widget.proxy_model.index(0, idx_title)),
         library_widget.proxy_model.data(library_widget.proxy_model.index(1, idx_title))
@@ -99,57 +108,57 @@ def test_speech_tab_grouping_filter(library_widget, qtbot):
 
 def test_all_tab_reset(library_widget, qtbot):
     """Verify 'All' tab resets the type filter."""
-    # First filter to Music
     library_widget.type_tab_bar.setCurrentIndex(1)
     assert library_widget.proxy_model.rowCount() == 1
-    
-    # Back to All
     library_widget.type_tab_bar.setCurrentIndex(0)
     assert library_widget.proxy_model.rowCount() == 6
 
 def test_combined_search_and_tab_filter(library_widget, qtbot):
     """Verify that search text and type tabs work together (AND logic)."""
-    # 1. Set tab to Speech (2 items)
     library_widget.type_tab_bar.setCurrentIndex(4)
     assert library_widget.proxy_model.rowCount() == 2
-    
-    # 2. Add search filter for "Speech 2"
     library_widget.search_box.setText("Speech 2")
     assert library_widget.proxy_model.rowCount() == 1
-    
-    # 3. Change search to "Music" (should be 0 because tab is still Speech)
     library_widget.search_box.setText("Music")
     assert library_widget.proxy_model.rowCount() == 0
-    
-    # 4. Clear search, return to 2
     library_widget.search_box.clear()
     assert library_widget.proxy_model.rowCount() == 2
 
-def test_persistence_on_change(library_widget, mock_dependencies, qtbot):
+def test_persistence_on_change(library_widget, mock_widget_deps, qtbot):
     """Verify that changing a tab saves the setting."""
-    _, _, settings = mock_dependencies
-    
+    deps = mock_widget_deps
     library_widget.type_tab_bar.setCurrentIndex(2) # Jingles
-    
-    settings.set_type_filter.assert_called_with(2)
+    deps['settings_manager'].set_type_filter.assert_called_with(2)
 
-def test_persistence_on_init(qtbot, mock_dependencies):
+def test_persistence_on_init(qtbot, mock_widget_deps):
     """Verify that LibraryWidget restores the saved tab index on init."""
-    lib_service, meta_service, settings = mock_dependencies
+    deps = mock_widget_deps
+    deps['settings_manager'].get_type_filter.return_value = 3 # Commercials
     
-    # Save a specific index
-    settings.get_type_filter.return_value = 3 # Commercials
-    
-    # Mock some data - matching current FIELDS order (15 columns)
-    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, year, performers, composers
     headers = [f.db_column for f in yellberus.FIELDS]
-    data = [["", 1, 3, "", "", 1, "", "", 60, "Comm 1", 1, 0, 2022, "P", ""]]
-    lib_service.get_all_songs.return_value = (headers, data)
     
-    widget = LibraryWidget(lib_service, meta_service, settings)
+    def get_idx(name):
+        for i, f in enumerate(yellberus.FIELDS):
+            if f.name == name: return i
+        return -1
+
+    row = [None] * len(yellberus.FIELDS)
+    row[get_idx("type_id")] = 3
+    row[get_idx("is_active")] = 1
+    row[get_idx("is_done")] = 1
+    row[get_idx("duration")] = 120
+    row[get_idx("title")] = "Comm 1"
+    
+    deps['library_service'].get_all_songs.return_value = (headers, [row])
+    
+    widget = LibraryWidget(
+        deps['library_service'], 
+        deps['metadata_service'], 
+        deps['settings_manager'],
+        deps['renaming_service'],
+        deps['duplicate_scanner']
+    )
     qtbot.addWidget(widget)
     
-    # Verify tab is set
     assert widget.type_tab_bar.currentIndex() == 3
-    # Verify filter is active
     assert widget.proxy_model.rowCount() == 1

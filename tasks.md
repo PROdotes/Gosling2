@@ -32,8 +32,8 @@ links: []
 ### Quick Wins (Score ≥10)
 | ID | Task | Pri | Cmplx | Score | Status | Spec |
 |----|------|-----|-------|-------|--------|------|
-| T-44 | **Refactor: Dynamic ID3 Read** | 5 | 2 | 20 | 🚀 (Next) | Use `id3_frames.json` mapping in `extract_from_mp3` instead of hardcoded `get_text_list` calls. CRITICAL PRIORITY. |
-| T-04 | **Test Audit** | 5 | 3 | 10 | 🚀 (Next) | [spec](design/proposals/TEST_AUDIT_PLAN.md) |
+| T-44 | **Refactor: Dynamic ID3 Read** | 5 | 2 | 20 | ✅ | Dynamic extraction from `id3_frames.json` fully implemented. All 45 tests passing. |
+| T-46 | **Proper Album Editor** | 5 | 3 | 15 | 🚀 (Next) | [spec](design/specs/T-46_PROPER_ALBUM_EDITOR.md) |
 | T-17 | **Unified Artist View** | 5 | 3 | 15 | ✅ | [spec](design/issues/T-17_unified_artist_view.md) <br> ([Groups Logic Status](design/state/GROUPS_LOGIC_STATUS.md)) |
 | T-18 | **Column Resilience** | 5 | 2 | 20 | ✅ | [docs](design/issues/T-18_column_persistence.md) |
 | T-19 | **Field Editor Hardening** | 5 | 3 | 15 | ✅ | [prop](design/proposals/PROPOSAL_TOOLING_CONSOLIDATION.md) |
@@ -44,13 +44,16 @@ links: []
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](design/done/T-02_field_registry.md) |
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
 | T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
+| T-49 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
+| T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | 📋 | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
+| T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` and ID3 writes. |
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
 | T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor, song_repository. **song_repository issues**: Raw SQL in `_sync_album`/`_sync_publisher` (should use repos with `conn` param); fragile tuple unpacking in `get_by_path` (use named columns). **Audit**: Remove useless 1-line wrapper methods (pointless indirection). |
 | — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
-| T-05 | **Log Core** | 4 | 2 | 8 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
+| T-05 | **Audit Log (History)** | 5 | 2 | 20 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [design/LOGGING.md](design/LOGGING.md) |
 | T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
@@ -70,6 +73,9 @@ links: []
 | T-41 | **Portable/Required Audit** | 4 | 2 | 8 | 📋 | — | Ensure all `required=True` fields are also `portable=True` to prevent 'Ghost Metadata' that only exists in DB. |
 | T-42 | **Field Reordering** | 4 | 3 | 12 | 📋 | Field Editor | Allow valid drag-and-drop reordering in Field Editor to control UI flow. |
 | T-43 | **Custom Field Groups** | 3 | 2 | 12 | 📋 | Field Editor | Allow users to define custom groups in Field Editor instead of hardcoded 'Core/Advanced'. |
+| T-45 | **Compilation Paradox** | 3 | 4 | 6 | 📋 | Renaming Service | Investigate/Solve handling of re-releases ("Best of") vs Original Year in folder structure to avoid duplicates/fragmentation. |
+| T-48 | **Duplicate Detection** | 5 | 3 | 12 | ✅ | [proposal](design/proposals/PROPOSAL_DUPLICATE_DETECTION.md) |
+| T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -132,6 +138,8 @@ links: []
 | **Publisher Hierarchy** | `Publisher.parent_publisher_id` allows circular references (A→B→A). No validation exists. ~~Also: no "get descendants" query.~~ | Add cycle detection in `set_parent()`. ✅ `get_with_descendants()` implemented. |
 | **Repository Duplication** | `AlbumRepository`, `PublisherRepository`, `TagRepository` all have identical CRUD patterns (`get_by_id`, `find_by_name`, `get_or_create`). | Refactor to generic `EntityRepository[T]` base class. ~1 day. |
 | **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | Migrate simple filters to generic `_filter_by_field()`. Keep complex ones (unified_artist). |
+| **Hardcoded Year Autofill** | `SidePanel` hardcodes "Set current year if empty". Should be configurable in Settings. | One Day (Settings UI). |
+| **Hardcoded Composer Splitter** | `SidePanel` auto-splits CamelCase composers if ending in comma. | One Day (Settings UI). |
 
 ---
 

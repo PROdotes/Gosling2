@@ -30,7 +30,8 @@ def test_song_model_schema_stability():
         "album_artist",
         "album",
         "publisher",
-        "genre"
+        "genre",
+        "audio_hash"
     }
     
     actual_fields = {f.name for f in dataclasses.fields(Song)}
@@ -98,7 +99,8 @@ def test_strict_column_mapping():
             "ISRC": "isrc",
             "IsDone": "is_done",
             "Groups": "groups",
-            "AlbumArtist": "album_artist"
+            "AlbumArtist": "album_artist",
+            "AudioHash": "audio_hash"
         }
         
         # 4. Strict Check

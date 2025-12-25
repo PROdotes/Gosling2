@@ -199,6 +199,17 @@ class BaseRepository:
             """)
 
 
+            # Schema Migrations (Add columns that might not exist in older databases)
+            # Add AudioHash column to MediaSources if it doesn't exist
+            cursor.execute("PRAGMA table_info(MediaSources)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'AudioHash' not in columns:
+                cursor.execute("ALTER TABLE MediaSources ADD COLUMN AudioHash TEXT")
+            
+            # Create indexes for duplicate detection
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_audiohash ON MediaSources(AudioHash)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_songs_isrc ON Songs(ISRC)")
+
 
 
 

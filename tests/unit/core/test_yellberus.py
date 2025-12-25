@@ -82,34 +82,35 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching FIELDS order (17 columns):
-    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
-    # 6:producers, 7:lyricists, 8:duration, 9:title,
-    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers, 15:groups, 16:unified_artist
+    # Create a mock row matching current FIELDS order (21 columns):
     row = (
-        "/path",           # 0: path
-        1,                 # 1: file_id
-        1,                 # 2: type_id
-        None,              # 3: notes
-        "ISRC123",         # 4: isrc
-        True,              # 5: is_active
-        None,              # 6: producers
-        None,              # 7: lyricists
-        180,               # 8: duration
-        "Title",           # 9: title
-        False,             # 10: is_done
-        120,               # 11: bpm
-        2024,              # 12: recording_year
-        "Artist",          # 13: performers
-        "Composer",        # 14: composers
-        "Group",           # 15: groups
-        "Unified",         # 16: unified_artist
+        "Artist",          # 0: performers
+        "Group",           # 1: groups
+        "Unified",         # 2: unified_artist
+        "Title",           # 3: title
+        "Album",           # 4: album
+        "Composer",        # 5: composers
+        "Publisher",       # 6: publisher
+        2024,              # 7: recording_year
+        "Genre",           # 8: genre
+        "ISRC123",         # 9: isrc
+        180,               # 10: duration
+        "Producer",        # 11: producers
+        "Lyricist",        # 12: lyricists
+        "Album Artist",    # 13: album_artist
+        "Notes",           # 14: notes
+        False,             # 15: is_done
+        "/path",           # 16: path
+        1,                 # 17: file_id
+        1,                 # 18: type_id
+        120,               # 19: bpm
+        True,              # 20: is_active
     )
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 17 tuples
-    assert len(tagged) == 17
+    # Should have 21 tuples
+    assert len(tagged) == 21
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -123,25 +124,29 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    # Row matching current FIELDS order (17 columns)
+    # Row matching current FIELDS order (21 columns)
     row = (
-        "/music/test.mp3", # 0: path
-        1,                 # 1: file_id
-        1,                 # 2: type_id
-        None,              # 3: notes
-        "USMV123",         # 4: isrc
-        True,              # 5: is_active
-        None,              # 6: producers
-        None,              # 7: lyricists
-        200,               # 8: duration
-        "Test Song",       # 9: title
-        True,              # 10: is_done
-        128,               # 11: bpm
-        2024,              # 12: recording_year
-        "Artist 1, Artist 2",  # 13: performers
-        "Bach",            # 14: composers
-        "Test Group",      # 15: groups
-        "Unified Artist",  # 16: unified_artist
+        "Artist 1, Artist 2", # 0: performers
+        "Test Group",      # 1: groups
+        "Unified Artist",  # 2: unified_artist
+        "Test Song",       # 3: title
+        "Test Album",      # 4: album
+        "Bach",            # 5: composers
+        "Test Publisher",  # 6: publisher
+        2024,              # 7: recording_year
+        "Test Genre",      # 8: genre
+        "USMV123",         # 9: isrc
+        200,               # 10: duration
+        "Test Producer",   # 11: producers
+        "Test Lyricist",   # 12: lyricists
+        "Test Album Artist", # 13: album_artist
+        None,              # 14: notes
+        True,              # 15: is_done
+        "/music/test.mp3", # 16: path
+        1,                 # 17: file_id
+        1,                 # 18: type_id
+        128,               # 19: bpm
+        True,              # 20: is_active
     )
     
     song = Song.from_row(row)

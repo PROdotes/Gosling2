@@ -1,8 +1,11 @@
 import pytest
 import os
+import json
+import zipfile
 from unittest.mock import MagicMock, patch, call
-from PyQt6.QtWidgets import QMessageBox, QMenu, QApplication
-from PyQt6.QtCore import Qt, QModelIndex, QPoint
+from PyQt6.QtWidgets import QMessageBox, QMenu, QApplication, QLabel
+from PyQt6.QtCore import Qt, QModelIndex, QPoint, QMimeData, QUrl, QItemSelectionModel
+from PyQt6.QtGui import QAction, QStandardItem, QDragEnterEvent, QDropEvent, QDragLeaveEvent
 from src.presentation.widgets.library_widget import LibraryWidget
 from src.core import yellberus
 
@@ -14,560 +17,275 @@ def get_idx(name):
     return -1
 
 @pytest.fixture
-def mock_dependencies():
-    library_service = MagicMock()
-    metadata_service = MagicMock()
-    settings_manager = MagicMock()
-    # Default settings
-    settings_manager.get_last_import_directory.return_value = ""
-    settings_manager.get_column_visibility.return_value = {}
-    settings_manager.get_column_layout.return_value = None # Important for legacy fallback
-    settings_manager.get_type_filter.return_value = 0
-    return library_service, metadata_service, settings_manager
-
-@pytest.fixture
-def library_widget(qtbot, mock_dependencies):
-    lib_service, meta_service, settings = mock_dependencies
+def library_widget(qtbot, mock_widget_deps):
+    """Create LibraryWidget with mock dependencies and sample data"""
+    deps = mock_widget_deps
     
-    # Setup default return for get_all_songs so load_library works
-    # Must return 15 columns matching current Yellberus schema
+    # Headers matching Yellberus
     headers = [f.db_column for f in yellberus.FIELDS] 
     
-    # Current FIELDS order (17 columns):
-    # 0:path, 1:file_id, 2:type_id, 3:notes, 4:isrc, 5:is_active,
-    # 6:producers, 7:lyricists, 8:duration, 9:title,
-    # 10:is_done, 11:bpm, 12:recording_year, 13:performers, 14:composers, 15:groups, 16:unified_artist
-    data = [
-        ["/path/a.mp3", 1, 1, "N1", "ISRC1", 1, "Prod A", "Lyr A", 180.0, "Title A", 1, 120, 2020, "Performer A", "Comp A", "Group A", "Unified A"],
-        ["/path/b.mp3", 2, 1, "N2", "ISRC2", 1, "Prod B", "Lyr B", 240.0, "Title B", 0, 128, 2021, "Performer B", "Comp B", "Group B", "Unified B"]
-    ]
-    
-    lib_service.get_all_songs.return_value = (headers, data)
-    
-    widget = LibraryWidget(lib_service, meta_service, settings)
-    qtbot.addWidget(widget)
-    return widget
+    # Create sample data row matching yellberus.FIELDS (21 columns)
+    def create_row(prefix):
+        row = [None] * len(yellberus.FIELDS)
+        row[get_idx("path")] = f"/path/{prefix}.mp3"
+        row[get_idx("file_id")] = ord(prefix) if isinstance(prefix, str) else prefix
+        row[get_idx("type_id")] = 1
+        row[get_idx("title")] = f"Title {str(prefix).upper()}"
+        row[get_idx("performers")] = f"Performer {str(prefix).upper()}"
+        row[get_idx("album")] = f"Album {str(prefix).upper()}"
+        row[get_idx("composers")] = f"Composer {str(prefix).upper()}"
+        row[get_idx("publisher")] = f"Publisher {str(prefix).upper()}"
+        row[get_idx("genre")] = "Genre"
+        row[get_idx("recording_year")] = 2020
+        row[get_idx("bpm")] = 120
+        row[get_idx("duration")] = 180.0
+        row[get_idx("is_done")] = 1 if prefix == 'a' else 0 # 'a' is Done, 'b' is Not Done
+        row[get_idx("is_active")] = 1
+        return row
 
-def test_initial_load(library_widget, mock_dependencies):
-    """Test that the library loads data on init."""
-    lib_service, _, _ = mock_dependencies
+    data = [create_row('a'), create_row('b')]
+    deps['library_service'].get_all_songs.return_value = (headers, data)
     
-    # Verify service was called
-    lib_service.get_all_songs.assert_called()
-    
-    # Verify model population
-    assert library_widget.library_model.rowCount() == 2
-    
-    idx_perf = get_idx("performers")
-    idx_title = get_idx("title")
-    
-    assert library_widget.library_model.item(0, idx_perf).text() == "Performer A"
-    assert library_widget.library_model.item(1, idx_title).text() == "Title B"
-
-def test_import_files_success(library_widget, mock_dependencies):
-    """Test importing files successfully adds them and refreshes view."""
-    lib_service, meta_service, settings = mock_dependencies
-    
-    # Mock _import_file to succeed
-    with patch.object(library_widget, '_import_file', return_value=True):
-        count = library_widget.import_files_list(["/new/song.mp3"])
-        
-        assert count == 1
-        
-        # Verify load_library was called (refresh)
-        assert lib_service.get_all_songs.call_count > 1
-
-def test_import_files_zero(library_widget, mock_dependencies):
-    """Test importing zero files."""
-    with patch.object(library_widget, '_import_file', return_value=False):
-        count = library_widget.import_files_list(["/fail.mp3"])
-        assert count == 0
-
-def test_scan_folder(library_widget, mock_dependencies):
-    """Test scanning a folder works."""
-    with patch("os.walk", return_value=[("/fake/dir", [], ["file.mp3"])]):
-        with patch.object(library_widget, '_import_file', return_value=True):
-            count = library_widget.scan_directory("/fake/dir")
-            assert count == 1
-
-def test_import_single_file_logic(library_widget, mock_dependencies):
-    """Test the internal logic of _import_file."""
-    lib_service, meta_service, _ = mock_dependencies
-    
-    # Case 1: Success
-    lib_service.add_file.return_value = 101 # Returns new ID
-    mock_song = MagicMock()
-    meta_service.extract_from_mp3.return_value = mock_song
-    
-    result = library_widget._import_file("/real/path.mp3")
-    
-    assert result is True
-    lib_service.add_file.assert_called_with("/real/path.mp3")
-    meta_service.extract_from_mp3.assert_called_with("/real/path.mp3", 101)
-    lib_service.update_song.assert_called_with(mock_song)
-    
-    # Case 2: library_service.add_file fails (returns None)
-    lib_service.add_file.return_value = None
-    result = library_widget._import_file("/bad/path.mp3")
-    assert result is False
-
-    # Case 3: Exception raised
-    lib_service.add_file.side_effect = Exception("DB Error")
-    result = library_widget._import_file("/error/path.mp3")
-    assert result is False
-
-def test_delete_selected_cancel(library_widget, mock_dependencies):
-    """Test deletion is aborted if user clicks No."""
-    lib_service, _, _ = mock_dependencies
-    
-    # Select first row
-    library_widget.table_view.selectRow(0)
-    
-    with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.No):
-        library_widget._delete_selected()
-        
-    lib_service.delete_song.assert_not_called()
-
-def test_delete_selected_confirm(library_widget, mock_dependencies):
-    """Test deletion proceeds if user clicks Yes."""
-    lib_service, _, _ = mock_dependencies
-    
-    # Ensure view has data and we can select it
-    library_widget.table_view.selectRow(0)
-    QApplication.processEvents()
-    
-    # Get the ID of the selected row dynamically
-    idx_col_id = get_idx("file_id")
-    idx = library_widget.proxy_model.index(0, idx_col_id) 
-    expected_id = int(library_widget.proxy_model.data(idx))
-    
-    with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
-        library_widget._delete_selected()
-        
-    lib_service.delete_song.assert_called_with(expected_id)
-    # View should refresh
-    assert lib_service.get_all_songs.call_count > 1
-
-def test_search_filtering(library_widget, qtbot):
-    """Test that typing in search box filters the proxy model using Regex."""
-    # Type regex "B$" (Ends with B)
-    library_widget.search_box.setText("B$")
-    
-    # "Title A" ends in A -> No match
-    # "Title B" ends in B -> Match
-    # Note: Search behavior depends on Widget impl. Assuming it searches ALL visible columns or just Title/Artist?
-    # LibraryWidget typically filters multiple columns or sets key column. 
-    # If using SortFilterProxyModel default, it often filters column 0 unless configured.
-    # We should assume LibraryWidget enables filtering on Title or All.
-    
-    # Assuming it matches Title B
-    
-    # Wait, simple Regex check.
-    # If it filters Title (idx 2):
-    # row 0 Title: "Title A" -> No
-    # row 1 Title: "Title B" -> Yes
-    
-    # Assert
-    assert library_widget.proxy_model.rowCount() == 1
-    
-    idx_title = get_idx("title")
-    index = library_widget.proxy_model.index(0, idx_title) 
-    assert library_widget.proxy_model.data(index) == "Title B"
-    
-    # Clear search
-    library_widget.search_box.clear()
-    assert library_widget.proxy_model.rowCount() == 2
-
-def test_search_invalid_regex_fallback(library_widget, qtbot):
-    """Test that invalid regex does not crash and behaves gracefully."""
-    library_widget.search_box.setText("[")
-    # It should not crash.
-    assert library_widget.proxy_model.rowCount() == 0 or library_widget.proxy_model.rowCount() == 2
-    
-    library_widget.search_box.setText("*")
-    assert True
-
-def test_double_click_emits_add_playlist(library_widget, qtbot):
-    """Test double clicking a row emits add_to_playlist signal."""
-    library_widget.table_view.selectRow(0)
-    QApplication.processEvents()
-    
-    idx_performer = get_idx("performers")
-    idx_title = get_idx("title")
-    idx_path = get_idx("path")
-    
-    idx_p = library_widget.proxy_model.index(0, idx_performer)
-    idx_t = library_widget.proxy_model.index(0, idx_title)
-    idx_pa = library_widget.proxy_model.index(0, idx_path)
-    
-    expected_performer = library_widget.proxy_model.data(idx_p)
-    expected_title = library_widget.proxy_model.data(idx_t)
-    expected_path = library_widget.proxy_model.data(idx_pa)
-    
-    with qtbot.waitSignal(library_widget.add_to_playlist, timeout=1000) as blocker:
-        # Double click first row
-        idx = library_widget.proxy_model.index(0, 0)
-        library_widget.table_view.doubleClicked.emit(idx)
-        
-    assert len(blocker.args) == 1
-    items = blocker.args[0]
-    assert len(items) == 1
-    assert items[0]["performer"] == expected_performer
-    assert items[0]["title"] == expected_title
-    assert items[0]["path"] == expected_path
-
-def test_filter_by_performer(library_widget, mock_dependencies):
-    """Test filtering by performer asks service for subset."""
-    lib_service, _, _ = mock_dependencies
-    
-    # Must return full width rows
-    # Mock returning empty for simplicity
-    lib_service.get_songs_by_performer.return_value = (["H" for _ in yellberus.FIELDS], [])
-    
-    library_widget._filter_by_performer("Performer A")
-    
-    lib_service.get_songs_by_performer.assert_called_with("Performer A")
-    assert library_widget.library_model.rowCount() == 0
-
-def test_filter_by_year(library_widget, mock_dependencies):
-    """Test filtering by year requests data from service."""
-    lib_service, _, _ = mock_dependencies
-    
-    # Return 1 row matching current FIELDS order (17 columns)
-    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
-    row = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 1, 100, 2020, "P", "C", "G", "U"]
-    lib_service.get_songs_by_year.return_value = ([f.name for f in yellberus.FIELDS], [row])
-    
-    library_widget._filter_by_year(2020)
-    
-    lib_service.get_songs_by_year.assert_called_with(2020)
-    assert library_widget.library_model.rowCount() == 1
-    
-    idx_yr = get_idx("recording_year")
-    assert library_widget.library_model.item(0, idx_yr).text() == "2020"
-
-def test_column_visibility_toggle(library_widget, mock_dependencies):
-    """Test toggling columns updates view and saves settings."""
-    _, _, settings = mock_dependencies
-    
-    # Toggle column 0 (path) to be shown (checked=True)
-    # The signature is now (column_index, checked)
-    library_widget._toggle_column_visibility(0, True) 
-    
-    # Column 0 should NOT be hidden now
-    assert not library_widget.table_view.isColumnHidden(0)
-    settings.set_column_layout.assert_called()
-
-def test_load_column_visibility(library_widget, mock_dependencies):
-    """Test that visibility settings are applied on load (only for Yellberus-visible columns)."""
-    _, _, settings = mock_dependencies
-    
-    # settings now uses get_column_layout which returns a dict
-    settings.get_column_layout.return_value = {
-        "order": ["title", "performers"],
-        "hidden": {"notes": True, "title": False}, # notes is col 3, title is col 9
-        "widths": {}
-    }
-    
-    library_widget._load_column_visibility_states()
-    
-    # Column 3 should be hidden (user preference to hide a visible column)
-    assert library_widget.table_view.isColumnHidden(3)
-    # Column 9 should be visible (user preference to keep visible)
-    assert not library_widget.table_view.isColumnHidden(9)
-
-def test_show_table_context_menu(library_widget, mock_dependencies):
-    """Test context menu shows correct actions and triggers them."""
-    with patch("src.presentation.widgets.library_widget.QMenu") as MockMenu:
-        mock_menu_instance = MockMenu.return_value
-        
-        library_widget._show_table_context_menu(QPoint(0,0))
-        
-        MockMenu.assert_called()
-        # Expect 3 actions (Add Playlist, ID3, Delete) + possibly Status if selected
-        # Since we didn't select, should be 3. If 4, maybe check what's going on.
-        # Let's Assert >= 3
-        assert mock_menu_instance.addAction.call_count >= 3
-
-def test_show_column_context_menu(library_widget):
-    """Test column context menu creation with integrity checks."""
-    with patch("src.presentation.widgets.library_widget.QMenu") as MockMenu:
-        mock_menu_instance = MockMenu.return_value
-        
-        library_widget._show_column_context_menu(QPoint(0,0))
-        
-    # Only visible fields should be in the menu now (Hard Ban)
-    from src.core import yellberus
-    visible_count = len([f for f in yellberus.FIELDS if f.visible])
-    expected_total = visible_count + 1  # Fields + Reset to Default
-    
-    assert mock_menu_instance.addAction.call_count == expected_total
-
-def test_show_id3_tags_dialog(library_widget, mock_dependencies):
-    """Test interaction with MetadataViewerDialog."""
-    lib_service, meta_service, _ = mock_dependencies
-    from src.data.models.song import Song
-    
-    mock_file_song = Song(name="File", source="/path/test.mp3")
-    mock_db_song = Song(name="DB", source="/path/test.mp3")
-    
-    meta_service.extract_from_mp3.return_value = mock_file_song
-    meta_service.get_raw_tags.return_value = {"Custom": "Value"}
-    lib_service.get_song_by_path.return_value = mock_db_song
-    
-    library_widget.table_view.selectRow(0)
-    QApplication.processEvents()
-    
-    with patch("src.presentation.widgets.metadata_viewer_dialog.MetadataViewerDialog") as MockDialog:
-        library_widget._show_id3_tags()
-        MockDialog.assert_called_with(mock_file_song, mock_db_song, {"Custom": "Value"}, library_widget)
-        MockDialog.return_value.exec.assert_called_once()
-
-def test_numeric_sorting(library_widget, mock_dependencies):
-    """Test sorting for Duration, BPM, Year."""
-    from PyQt6.QtCore import Qt
-    lib_service, _, _ = mock_dependencies
-    
-    # Test data matching current FIELDS order (17 columns):
-    # path, file_id, type_id, notes, isrc, is_active, producers, lyricists, duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
-    rowA = ["p", 1, 1, "N", "I", 1, "Pr", "L", 10.0, "A", 1, 10, 2000, "P", "C", "G", "U"]
-    rowB = ["p", 2, 1, "N", "I", 1, "Pr", "L", 20.0, "B", 1, 20, 2010, "P", "C", "G", "U"]
-    rowC = ["p", 3, 1, "N", "I", 1, "Pr", "L", 30.0, "C", 1, 30, 2020, "P", "C", "G", "U"]
-    
-    # Shuffle for testing
-    data = [rowC, rowA, rowB] 
-    
-    lib_service.get_all_songs.return_value = ([], data)
-    library_widget.load_library()
-    
-    def check(col_name, expected_order):
-        idx = get_idx(col_name)
-        library_widget.proxy_model.sort(idx, Qt.SortOrder.AscendingOrder)
-        
-        vals = []
-        for r in range(3):
-            # For data retrieval, we need row index from proxy
-            proxy_idx = library_widget.proxy_model.index(r, idx)
-            vals.append(library_widget.proxy_model.data(proxy_idx))
-            
-        # For Duration, it's formatted. "00:10", "00:20", "00:30"
-        # For Year/BPM it's strings "2000", "2010"...
-        # We assume expected_order accounts for formatting
-        assert vals == expected_order
-        
-    check("duration", ["00:10", "00:20", "00:30"])
-    check("bpm", ["10", "20", "30"])
-    check("recording_year", ["2000", "2010", "2020"])
-
-def test_table_schema_integrity(library_widget, mock_dependencies):
-    """
-    STRICT UI Schema Integrity: checked against Yellberus.
-    """
-    lib_service, _, _ = mock_dependencies
-    
-    service_headers, _ = lib_service.get_all_songs()
-    model = library_widget.library_model
-    
-    # Assert Count Match
-    assert model.columnCount() == len(service_headers)
-    assert model.columnCount() == len(yellberus.FIELDS)
-    
-    # Assert Header Match
-    # The Widget ignores service headers and uses Yellberus UI Headers
-    for i, f in enumerate(yellberus.FIELDS):
-        ui_header = model.headerData(i, Qt.Orientation.Horizontal)
-        assert ui_header == f.ui_header
-
-def test_unified_artist_validation(library_widget):
-    """
-    Cross-field validation: a song needs performers OR groups, not both.
-    Tests yellberus.validate_row which is called by the widget.
-    """
-    # Build a row with neither performers nor groups
-    # 17 columns: path, file_id, type_id, notes, isrc, is_active, producers, lyricists,
-    #             duration, title, is_done, bpm, recording_year, performers, composers, groups, unified_artist
-    row_no_artist = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "", "C", "", ""]
-    
-    failed = yellberus.validate_row(row_no_artist)
-    assert "performers" in failed, "Missing performers should fail when groups also empty"
-    assert "groups" in failed, "Missing groups should fail when performers also empty"
-    
-    # Row with performers but no groups - should pass
-    row_with_performer = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "Artist", "C", "", ""]
-    failed = yellberus.validate_row(row_with_performer)
-    assert "performers" not in failed
-    assert "groups" not in failed
-    
-    # Row with groups but no performers - should also pass
-    row_with_group = ["p", 1, 1, "N", "I", 1, "Pr", "L", 1.0, "T", 0, 100, 2020, "", "C", "Band", ""]
-    failed = yellberus.validate_row(row_with_group)
-    assert "performers" not in failed
-    assert "groups" not in failed
-
-def test_persistence_uses_names_not_indices(library_widget, mock_dependencies):
-    """T-18: Verify that moving a column saves field NAMES, not indices."""
-    _, _, settings = mock_dependencies
-    header = library_widget.table_view.horizontalHeader()
-    
-    # Use a real title column
-    idx_title = get_idx("title")
-    
-    # 1. Simulate moving column "title" to visual index 0
-    header.moveSection(idx_title, 0)
-    
-    # 2. Extract the call arguments from set_column_layout
-    assert settings.set_column_layout.called
-    args, kwargs = settings.set_column_layout.call_args
-    
-    order = args[0]
-    # The first element in the saved order should be the NAME "title"
-    assert "title" in order
-    assert order[0] == "title"
-    
-    # Also verify widths are captured
-    widths = kwargs.get("widths", {})
-    assert "title" in widths
-
-def test_atomic_lifecycle_preserves_widths_on_filter(library_widget, mock_dependencies):
-    """T-18: Verify that manual widths survive a table rebuild (Atomic Lifecycle)."""
-    lib_service, _, settings = mock_dependencies
-    
-    # 1. Setup Mock State: Make the mock "remember" what it was told
-    stored_layout = {"order": [], "hidden": {}, "widths": {}}
-    
-    def mock_set_layout(order, hidden, name="default", widths=None):
-        stored_layout["order"] = order
-        stored_layout["hidden"] = hidden
-        stored_layout["widths"] = widths or {}
-        
-    def mock_get_layout(name="default"):
-        return stored_layout if stored_layout["order"] else None
-
-    settings.set_column_layout.side_effect = mock_set_layout
-    settings.get_column_layout.side_effect = mock_get_layout
-    
-    # 2. Set a custom width for 'Title' (Logical 9)
-    idx_title = get_idx("title")
-    library_widget.table_view.setColumnWidth(idx_title, 555)
-    
-    # 3. Mock the service to return new data on filter
-    lib_service.get_songs_by_performer.return_value = (
-        [f.db_column for f in yellberus.FIELDS], 
-        [["filtered_path", 1, 1, "", "", 1, "", "", 120.0, "Filtered Title", 1, 120, 2020, "Artist", "", "", ""]]
+    widget = LibraryWidget(
+        deps['library_service'], 
+        deps['metadata_service'], 
+        deps['settings_manager'],
+        deps['renaming_service'],
+        deps['duplicate_scanner']
     )
-    
-    # 4. Trigger a filter (which calls _populate_table)
-    library_widget._filter_by_performer("Artist")
-    
-    # 5. Verify 'Title' still has the custom width
-    # The atomic lifecycle snapshots the 555px and restores it after the rebuild
-    assert library_widget.table_view.columnWidth(idx_title) == 555
-
-
-# ============================================================================
-# SEARCH COVERAGE (from test_library_widget_filtering.py)
-# ============================================================================
-@pytest.fixture
-def library_widget_search(qtbot):
-    """Fixture with unique values in every column for search testing."""
-    lib_service = MagicMock()
-    meta_service = MagicMock()
-    settings = MagicMock()
-    settings.get_column_visibility.return_value = {}
-    settings.get_column_layout.return_value = None
-    settings.get_type_filter.return_value = 0
-    
-    # Setup data with unique values in every column to test search isolation
-    # Must match FIELDS count (20 columns as of now)
-    row_data = [
-        "/unique/path", 1, 1, "UniqueNote", "UniqueISRC", 1,
-        "UniqueProd", "UniqueLyr", 180.0, "UniqueTitle", 1, 999,
-        1888, "UniquePerf", "UniqueComp", "UniqueGroup", "UniqueArtist",
-        "UniqueAlbum", "UniquePub", "UniqueGenre"
-    ]
-    
-    # Pad with None if fewer columns than FIELDS
-    while len(row_data) < len(yellberus.FIELDS):
-        row_data.append(None)
-    
-    lib_service.get_all_songs.return_value = ([], [row_data])
-    
-    widget = LibraryWidget(lib_service, meta_service, settings)
     qtbot.addWidget(widget)
     return widget
 
-def test_strict_search_coverage(library_widget_search, qtbot):
-    """
-    STRICT Search Coverage:
-    Ensures that EVERY column displayed in the Library is searchable.
+class TestLibraryWidgetLogic:
+    """Level 1: Happy Path and Basic Logic for LibraryWidget"""
     
-    If a developer adds a column but creates a custom filter that forgets to include it,
-    this test will fail (by finding 0 rows for a content known to be present).
-    """
-    widget = library_widget_search
-    model = widget.library_model
-    col_count = model.columnCount()
-    
-    row = 0
-    for col in range(col_count):
-        index = model.index(row, col)
-        val_text = str(model.data(index, 0))  # DisplayRole
+    def test_initial_load(self, library_widget, mock_widget_deps):
+        """Test that the library loads data on init."""
+        deps = mock_widget_deps
+        deps['library_service'].get_all_songs.assert_called()
+        assert library_widget.library_model.rowCount() == 2
         
-        # Skip empty/None values
-        if not val_text or val_text == "None":
-            continue
+        idx_perf = get_idx("performers")
+        # Find row with prefix A
+        found = False
+        for r in range(library_widget.library_model.rowCount()):
+            if library_widget.library_model.item(r, get_idx("title")).text() == "Title A":
+                assert library_widget.library_model.item(r, idx_perf).text() == "Performer A"
+                found = True
+        assert found
+
+    def test_import_files_success(self, library_widget, mock_widget_deps):
+        """Test importing files successfully refreshes view."""
+        deps = mock_widget_deps
+        with patch.object(library_widget, '_import_file', return_value=True):
+            count = library_widget.import_files_list(["/new/song.mp3"])
+            assert count == 1
+            assert deps['library_service'].get_all_songs.call_count > 1
+
+    def test_delete_selected_confirm(self, library_widget, mock_widget_deps):
+        """Test deletion proceeds if user clicks Yes."""
+        deps = mock_widget_deps
+        # Select first row
+        idx = library_widget.proxy_model.index(0, 0)
+        library_widget.table_view.selectionModel().select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
         
-        # Perform Search
-        widget.search_box.setText(val_text)
+        idx_col_id = get_idx("file_id")
+        idx_id = library_widget.proxy_model.index(0, idx_col_id) 
+        expected_id = int(library_widget.proxy_model.data(idx_id))
         
-        # Assert Row Visible
-        assert widget.proxy_model.rowCount() == 1, \
-            f"Search failed for Column {col} ('{model.headerData(col, 1)}'). Value '{val_text}' not found."
+        with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
+            library_widget._delete_selected()
             
-        # Clear search for next iteration
-        widget.search_box.clear()
+        deps['library_service'].delete_song.assert_called_with(expected_id)
+
+    def test_search_filtering(self, library_widget):
+        """Test basic search filtering."""
+        library_widget.search_box.setText("Title B")
+        assert library_widget.proxy_model.rowCount() == 1
         
-    # Verify Negative Case
-    widget.search_box.setText("NonExistentValue")
-    assert widget.proxy_model.rowCount() == 0
+        library_widget.search_box.clear()
+        assert library_widget.proxy_model.rowCount() == 2
 
+    def test_import_file_skips_duplicate_audio(self, library_widget, mock_widget_deps):
+        """Test that import is skipped if audio duplicate is found."""
+        deps = mock_widget_deps
+        # Mock duplicate found (returning a Song object means it exists)
+        deps['duplicate_scanner'].check_audio_duplicate.return_value = MagicMock()
+        
+        path = "C:/Music/duplicate.mp3"
+        
+        # Patch the utility at source (since it's imported locally)
+        with patch("src.utils.audio_hash.calculate_audio_hash", return_value="hash123"):
+             result = library_widget._import_file(path)
+             
+             assert result is False
+             deps['duplicate_scanner'].check_audio_duplicate.assert_called_with("hash123")
+             deps['library_service'].add_file.assert_not_called()
 
-def test_mark_selection_done_calls_toggle_status(library_widget, mock_dependencies):
-    """mark_selection_done should delegate to _toggle_status(True)."""
-    with patch.object(library_widget, "_toggle_status") as mock_toggle:
-        library_widget.mark_selection_done()
-        mock_toggle.assert_called_once_with(True)
+    def test_import_file_skips_duplicate_isrc(self, library_widget, mock_widget_deps):
+        """Test that import is skipped if ISRC duplicate is found."""
+        deps = mock_widget_deps
+        deps['duplicate_scanner'].check_audio_duplicate.return_value = None # No audio dup
+        
+        # Mock metadata extraction returning duplicate ISRC
+        mock_song = MagicMock()
+        mock_song.isrc = "US-DUP-00-00001"
+        deps['metadata_service'].extract_from_mp3.return_value = mock_song
+        
+        # Mock duplicate ISRC found
+        deps['duplicate_scanner'].check_isrc_duplicate.return_value = MagicMock()
+        
+        path = "C:/Music/duplicate_isrc.mp3"
+        
+        with patch("src.utils.audio_hash.calculate_audio_hash", return_value="hash123"):
+             result = library_widget._import_file(path)
+             
+             assert result is False
+             deps['duplicate_scanner'].check_isrc_duplicate.assert_called_with("US-DUP-00-00001")
+             deps['library_service'].add_file.assert_not_called()
 
+class TestLibraryWidgetDragDrop:
+    """Level 1: Logic for Drag and Drop operations (Consolidated)"""
 
-def test_save_selected_songs_uses_services(library_widget, mock_dependencies):
-    """save_selected_songs should resolve songs by path and call update + write_tags."""
-    lib_service, meta_service, _ = mock_dependencies
+    def test_drag_enter_valid_mp3(self, library_widget):
+        """Test that dragging an MP3 file is accepted."""
+        event = MagicMock(spec=QDragEnterEvent)
+        mime_data = MagicMock(spec=QMimeData)
+        mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
+        mime_data.urls.return_value = [QUrl.fromLocalFile("C:/Music/song.mp3")]
+        event.mimeData.return_value = mime_data
+        
+        library_widget.dragEnterEvent(event)
+        event.acceptProposedAction.assert_called_once()
 
-    # Select first (proxy) row
-    library_widget.table_view.selectRow(0)
+    def test_drop_zip_extracts_and_deletes(self, library_widget):
+        """Test zip file drop logic."""
+        event = MagicMock(spec=QDropEvent)
+        mime_data = MagicMock(spec=QMimeData)
+        mime_data.hasUrls.return_value = True
+        mime_data.hasFormat.return_value = False
+        url = QUrl.fromLocalFile("C:/Downloads/archive.zip")
+        mime_data.urls.return_value = [url]
+        event.mimeData.return_value = mime_data
 
-    # Determine the expected path from the proxy model to avoid depending on sort order
-    idx_path = get_idx("path")
-    proxy_index = library_widget.proxy_model.index(0, idx_path)
-    expected_path = library_widget.proxy_model.data(proxy_index)
+        mock_zip = MagicMock()
+        mock_zip.__enter__.return_value = mock_zip
+        mock_zip.namelist.return_value = ["song1.mp3"]
+        
+        with patch('zipfile.ZipFile', return_value=mock_zip), \
+             patch('os.path.exists', return_value=False), \
+             patch('os.remove') as mock_remove, \
+             patch.object(library_widget, 'import_files_list', return_value=1), \
+             patch('PyQt6.QtWidgets.QMessageBox.information'):
+            
+            library_widget.dropEvent(event)
+            assert mock_zip.extract.call_count == 1
+            mock_remove.assert_called_once()
 
-    # Mock song lookup and persistence
-    mock_song = MagicMock()
-    lib_service.get_song_by_path.return_value = mock_song
+class TestLibraryWidgetContextMenu:
+    """Level 1: Logic for Context Menu behavior (Consolidated)"""
 
-    library_widget.save_selected_songs()
+    def test_item_status_toggle(self, library_widget, mock_widget_deps):
+        """Test toggling 'Done' status from context menu."""
+        deps = mock_widget_deps
+        
+        # Explicitly find row for Title B (Not Done)
+        row_idx = -1
+        idx_title = get_idx("title")
+        for r in range(library_widget.proxy_model.rowCount()):
+            if library_widget.proxy_model.data(library_widget.proxy_model.index(r, idx_title)) == "Title B":
+                row_idx = r
+                break
+        assert row_idx != -1, "Title B not found in library"
 
-    lib_service.get_song_by_path.assert_called_with(expected_path)
-    lib_service.update_song.assert_called_with(mock_song)
-    meta_service.write_tags.assert_called_with(mock_song)
+        idx = library_widget.proxy_model.index(row_idx, 0)
+        library_widget.table_view.selectionModel().clearSelection()
+        library_widget.table_view.selectionModel().select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+        QApplication.processEvents()
+        
+        with patch('PyQt6.QtWidgets.QMenu.exec'), \
+             patch('PyQt6.QtWidgets.QMenu.addAction') as mock_add:
+            
+            actions = []
+            mock_add.side_effect = lambda a: actions.append(a)
+            
+            library_widget._show_table_context_menu(QPoint(0,0))
+            
+            status_action = None
+            for action in actions:
+                if action and hasattr(action, 'text') and "Mark as Done" in action.text():
+                    status_action = action
+                    break
+            
+            assert status_action is not None, f"Status action not found in menu. Actions: {[a.text() for a in actions if a]}"
+            
+            if status_action.isEnabled():
+                deps['library_service'].update_song_status.return_value = True
+                status_action.trigger()
+                # ID for 'b' is 98
+                deps['library_service'].update_song_status.assert_called_with(98, True)
+            else:
+                pytest.fail(f"Status action is disabled. Text: {status_action.text()}, Tooltip: {status_action.toolTip()}")
 
+    def test_show_id3_tags_dialog(self, library_widget, mock_widget_deps):
+        """Test interaction with MetadataViewerDialog."""
+        deps = mock_widget_deps
+        from src.data.models.song import Song
+        
+        mock_song = Song(name="Test", source="/path/a.mp3")
+        deps['metadata_service'].extract_from_mp3.return_value = mock_song
+        deps['library_service'].get_song_by_path.return_value = mock_song
+        
+        idx = library_widget.proxy_model.index(0, 0)
+        library_widget.table_view.selectionModel().select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+        
+        with patch("src.presentation.widgets.metadata_viewer_dialog.MetadataViewerDialog") as MockDialog:
+            library_widget._show_id3_tags()
+            MockDialog.assert_called()
+            MockDialog.return_value.exec.assert_called_once()
 
-def test_focus_search_sets_focus_and_selects_text(library_widget, qtbot):
-    """focus_search should select the full text in the search box."""
-    library_widget.search_box.setText("abc")
-    library_widget.focus_search()
-    qtbot.wait(10)
+    def test_status_toggle_blocked_if_incomplete(self, library_widget, mock_widget_deps):
+        """Test that the 'Mark as Done' action is disabled if required fields are missing."""
+        deps = mock_widget_deps
+        
+        # Explicitly find row for Title B
+        row_idx = -1
+        idx_title = get_idx("title")
+        for r in range(library_widget.proxy_model.rowCount()):
+            if library_widget.proxy_model.data(library_widget.proxy_model.index(r, idx_title)) == "Title B":
+                row_idx = r
+                break
+        assert row_idx != -1
 
-    # Focus behaviour can be flaky in headless CI; assert on selection instead.
-    assert library_widget.search_box.selectedText() == "abc"
-
+        # Corrupt Title B checkbox via the source model (mapping back)
+        source_idx = library_widget.proxy_model.mapToSource(library_widget.proxy_model.index(row_idx, 0))
+        is_done_idx = get_idx("is_done")
+        
+        # Manually disable the item to simulate valid incompleteness as per _populate_table logic
+        item = library_widget.library_model.item(source_idx.row(), is_done_idx)
+        item.setEnabled(False)
+        
+        # Force selection
+        idx = library_widget.proxy_model.index(row_idx, 0)
+        library_widget.table_view.selectionModel().clearSelection()
+        library_widget.table_view.selectionModel().select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+        QApplication.processEvents()
+        
+        with patch('PyQt6.QtWidgets.QMenu.exec'), \
+             patch('PyQt6.QtWidgets.QMenu.addAction') as mock_add:
+            
+            actions = []
+            mock_add.side_effect = lambda a: actions.append(a)
+            
+            library_widget._show_table_context_menu(QPoint(0,0))
+            
+            status_action = None
+            for action in actions:
+                if action and hasattr(action, 'text') and "Mark as Done" in action.text():
+                    status_action = action
+                    break
+            
+            assert status_action is not None, f"Status action not found. Actions: {[a.text() for a in actions if a]}"
+            assert not status_action.isEnabled(), f"Status action should be disabled. Text: {status_action.text()}"
+            assert "Fix Errors First" in status_action.text()

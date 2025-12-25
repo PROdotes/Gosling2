@@ -43,35 +43,42 @@ tags:
 *Status: Required for processing 400-song backlog*
 *   [x] **Side Panel Alpha** (~3.0 h)
     *   *Task*: Basic metadata editor panel (Genre, Artist, Album, Done).
-    *   *Status*: **Done** (Validation + Edit + Staging).
+    *   *Status*: **Done** (Validation + Edit + Staging + Dirty Row Highlight).
     *   *Ref*: T-12.
 *   [x] **Legacy Shortcuts** (~1.0 h)
-    *   *Task*: `Ctrl+D` (Done) and `Ctrl+S` (Save).
+    *   *Task*: `Ctrl+D` (Done), `Ctrl+S` (Save), `Ctrl+R` (Rename Placeholder).
     *   *Status*: **Done**.
     *   *Ref*: T-31.
-*   [ ] **Dynamic ID3 Read (T-44)** (~1.5 h) - **CRITICAL**
+*   [x] **Dynamic ID3 Read (T-44)** (~1.5 h) - **CRITICAL**
     *   *Task*: Fix hardcoded `get_text_list` in `metadata_service.py` (read path).
     *   *Why*: Currently inconsistent with `write_tags` (dynamic).
-*   [ ] **Auto-Renamer** (~3.5 h)
+    *   *Status*: **Done** (Completed by noir detective → Sheila → Seraphim).
+*   [x] **Auto-Renamer** (~3.5 h)
     *   *Task*: Port Genre/Year rules + `shutil.move` logic.
     *   *Complexity*: High (File System Risk). Rules documented in `LEGACY_LOGIC.md`.
+    *   *Status*: **Done** (Service + UI Gates implemented).
 *   [ ] **UX Polish** (~2.0 h)
     *   *Task*: Dark theme, consistent button styling.
     *   *Note*: Keep default PyQt6 components. Custom tag picker DEFERRED to 1.0.
 
 ### 🚧 Milestone 4: Data Integrity
-*Status: Queue*
-*   [ ] **Duplicate Detection** (~2.5 h)
+*Status: COMPLETED (Dec 25)*
+*   [x] **Duplicate Detection** (~2.5 h)
     *   *Task*: Tiered Import Check (ISRC -> Hash -> Meta).
     *   *Complexity*: Medium.
 
-### 🔮 Milestone 5: Safety & Trust (The "0.1.0" Gate)
-*Status: Queue*
-*   [ ] **Audit Log (History)** (~1.0 h)
+### 🔮 Milestone 5: The Final Sprint (0.1.0)
+*Status: Queue (Prioritized)*
+*   [ ] **Proper Album Editor** (T-46) (~3.0 h)
+    *   *Task*: Replace text field with Album Manager (Search/Assign/Cover Art).
+    *   *Why*: Essential for fixing "Greatest Hits" fragmentation.
+*   [ ] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
-*   [ ] **Settings UI** (~1.5 h)
+*   [ ] **Settings UI** (T-49) (~1.5 h)
     *   *Task*: UI for Root Directory & Rules.
-*   [ ] **Tag Verification** (~1.0 h)
+*   [ ] **Dynamic Renaming Rules** (T-50) (~2.0 h)
+    *   *Task*: Externalize hardcoded 'Patriotic/Cro' logic to config file.
+*   [ ] **Tag Verification** (T-51) (~1.0 h)
     *   *Task*: Verify `TXXX:GOSLING_DONE` and ID3 writes.
 
 ---

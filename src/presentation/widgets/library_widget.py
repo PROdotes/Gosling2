@@ -1,5 +1,6 @@
 import os
 import zipfile
+import weakref
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
@@ -8,9 +9,9 @@ from PyQt6.QtWidgets import (
 import json
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
-    QPainter, QColor, QPixmap, QIcon, QImage, QDragEnterEvent, QDropEvent, QPen
+    QPainter, QColor, QPixmap, QIcon, QImage, QPen
 )
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QPoint
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject
 
 from .filter_widget import FilterWidget
 from ...core import yellberus
@@ -107,6 +108,19 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
         return super().filterAcceptsRow(source_row, source_parent)
 
 
+class EventFilterProxy(QObject):
+    """Proxy to break reference cycles in event filtering."""
+    def __init__(self, target):
+        super().__init__()
+        self._target = weakref.ref(target)
+
+    def eventFilter(self, source, event):
+        target = self._target()
+        if target:
+            return target.handle_filtered_event(source, event)
+        return False
+
+
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
 
@@ -114,11 +128,13 @@ class LibraryWidget(QWidget):
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
     remove_from_playlist = pyqtSignal(list) # List of paths to remove from playlist
 
-    def __init__(self, library_service, metadata_service, settings_manager, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
         self.settings_manager = settings_manager
+        self.renaming_service = renaming_service
+        self.duplicate_scanner = duplicate_scanner
         
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
@@ -126,6 +142,9 @@ class LibraryWidget(QWidget):
         # Flag to suppress auto-save during programmatic resize
         self._suppress_layout_save = False
         self._dirty_ids = set() # Store IDs with unsaved changes
+        
+        # Proxy for event filtering to avoid reference cycles
+        self._event_filter_proxy = EventFilterProxy(self)
         
         self._init_ui()
         self._setup_connections()
@@ -243,7 +262,6 @@ class LibraryWidget(QWidget):
         
         # Enable Drag & Drop
         self.table_view.setAcceptDrops(True)
-        self.table_view.installEventFilter(self)
         self.setAcceptDrops(True) # Allow dropping on the widget itself
         
         # Empty State Label
@@ -265,47 +283,56 @@ class LibraryWidget(QWidget):
         main_layout.addWidget(self.splitter)
 
         # Install event filters for global drag/drop handling on child widgets
+        # Note: empty_label is transparent to mouse events, so no filter needed
         widgets_to_watch = [
             self.table_view.viewport(), 
             self.search_box, 
-            self.filter_widget, 
-            self.empty_label
+            self.filter_widget
         ]
         if hasattr(self.filter_widget, 'tree_view'):
             widgets_to_watch.append(self.filter_widget.tree_view)
             widgets_to_watch.append(self.filter_widget.tree_view.viewport())
             
+            
         for widget in widgets_to_watch:
-            widget.installEventFilter(self)
+            widget.installEventFilter(self._event_filter_proxy)
 
-    def eventFilter(self, source, event):
-        """Handle events for the table view and children (Drag & Drop + Resize)"""
-        # Handle Resize for Empty Label Position
-        if source == self.table_view.viewport() and event.type() == QEvent.Type.Resize:
-            self._update_empty_label_position()
+    def handle_filtered_event(self, source, event):
+        """
+        Handle events delegating from EventFilterProxy.
+        Replaces standard eventFilter to avoid reference cycles.
+        """
+        try:
+            # Handle Resize for Empty Label Position
+            if source == self.table_view.viewport() and event.type() == QEvent.Type.Resize:
+                self._update_empty_label_position()
 
-        # Handle Drag & Drop for ALL watched widgets
-        if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.DragLeave, QEvent.Type.Drop):
-            if event.type() == QEvent.Type.DragEnter:
-                self.dragEnterEvent(event)
-                if event.isAccepted():
-                    return True
-            elif event.type() == QEvent.Type.DragMove:
-                # Accept if matches our formats
-                mime = event.mimeData()
-                if mime.hasFormat("application/x-gosling-playlist-rows") or \
-                   (mime.hasUrls() and any(u.isLocalFile() for u in mime.urls())):
-                    event.acceptProposedAction()
-                    return True
-            elif event.type() == QEvent.Type.DragLeave:
-                self.dragLeaveEvent(event)
-                # Allow propagation for cleanup
-            elif event.type() == QEvent.Type.Drop:
-                self.dropEvent(event)
-                if event.isAccepted():
-                    return True
+            # Handle Drag & Drop for ALL watched widgets
+            if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.DragLeave, QEvent.Type.Drop):
+                if event.type() == QEvent.Type.DragEnter:
+                    self.dragEnterEvent(event)
+                    if event.isAccepted():
+                        return True
+                elif event.type() == QEvent.Type.DragMove:
+                    # Accept if matches our formats
+                    mime = event.mimeData()
+                    if mime.hasFormat("application/x-gosling-playlist-rows") or \
+                       (mime.hasUrls() and any(u.isLocalFile() for u in mime.urls())):
+                        event.acceptProposedAction()
+                        return True
+                elif event.type() == QEvent.Type.DragLeave:
+                    self.dragLeaveEvent(event)
+                    # Allow propagation for cleanup
+                elif event.type() == QEvent.Type.Drop:
+                    self.dropEvent(event)
+                    if event.isAccepted():
+                        return True
+                        
+        except RuntimeError:
+            # Handle case where C++ objects (like table_view) are already deleted during shutdown
+            return False
 
-        return super().eventFilter(source, event)
+        return False
 
     def _update_empty_label_position(self):
         """Center the empty label in the table view"""
@@ -479,7 +506,25 @@ class LibraryWidget(QWidget):
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
     def load_library(self, refresh_filters=True):
-        """Load library from database"""
+        """Load library from database, preserving selection if possible."""
+        # 1. Capture current selection (IDs)
+        selected_ids = set()
+        id_col = self.field_indices.get('file_id', -1)
+        if id_col != -1:
+            selection_model = self.table_view.selectionModel()
+            for index in selection_model.selectedRows():
+                source_index = self.proxy_model.mapToSource(index)
+                item = self.library_model.item(source_index.row(), id_col)
+                if item:
+                    # Retrieve ID safely
+                    raw_val = item.data(Qt.ItemDataRole.UserRole)
+                    try:
+                         val = str(int(float(raw_val))) if raw_val is not None else ""
+                         if val: selected_ids.add(val)
+                    except ValueError:
+                        pass
+
+        # 2. Load Data
         headers, data = self.library_service.get_all_songs()
         
         if self.chk_show_incomplete.isChecked():
@@ -492,13 +537,43 @@ class LibraryWidget(QWidget):
 
         if refresh_filters:
             self.filter_widget.populate()
-                # After population, apply dirty highlighting if list is not empty
-            if self._dirty_ids:
-                self.update_dirty_rows(list(self._dirty_ids))
+        
+        # 3. Apply Dirty Highlights
+        if self._dirty_ids:
+            self.update_dirty_rows(list(self._dirty_ids))
+
+        # 4. Restore Selection
+        if selected_ids and id_col != -1:
+            from PyQt6.QtCore import QItemSelectionModel
+            selection_model = self.table_view.selectionModel()
+            selection_model.clearSelection() # Clean start
+            
+            # Iterate rows to find matches
+            # Optimization: could build a map, but for <10k rows linear scan is usually acceptable for UI refresh
+            for row in range(self.library_model.rowCount()):
+                item = self.library_model.item(row, id_col)
+                if not item: continue
+                
+                raw_val = item.data(Qt.ItemDataRole.UserRole)
+                try:
+                    # Same safe extraction
+                    current_id = str(int(float(raw_val))) if raw_val is not None else ""
+                except ValueError:
+                    current_id = ""
+                
+                if current_id in selected_ids:
+                    # Map to Proxy
+                    source_idx = self.library_model.index(row, 0)
+                    proxy_idx = self.proxy_model.mapFromSource(source_idx)
+                    if proxy_idx.isValid():
+                        selection_model.select(
+                            proxy_idx, 
+                            QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+                        )
 
     def update_dirty_rows(self, dirty_ids: list):
         """Highlight rows that have unsaved changes in the side panel."""
-        self._dirty_ids = set(dirty_ids)
+        self._dirty_ids = set(str(id) for id in dirty_ids)
         
         # We need to find the column index for file_id to identify rows
         id_col = self.field_indices.get('file_id', -1)
@@ -509,7 +584,13 @@ class LibraryWidget(QWidget):
             item = self.library_model.item(row, id_col)
             if not item: continue
             
-            song_id = str(item.data(Qt.ItemDataRole.UserRole))
+            # Normalize ID: Handle float (9.0) -> int (9) -> str ("9")
+            raw_val = item.data(Qt.ItemDataRole.UserRole)
+            try:
+                song_id = str(int(float(raw_val))) if raw_val is not None else ""
+            except (ValueError, TypeError):
+                song_id = str(raw_val)
+
             is_dirty = song_id in self._dirty_ids
             
             # Application style: Light Orange/Amber for dirty
@@ -666,6 +747,8 @@ class LibraryWidget(QWidget):
             else:
                 self._load_column_layout()
 
+            self._update_tab_counts()
+
         finally:
             # 5. Re-enable layout saving
             self._suppress_layout_save = False
@@ -746,13 +829,37 @@ class LibraryWidget(QWidget):
     def _import_file(self, file_path: str) -> bool:
         """Import a single file, return True on success"""
         try:
+            # 1. Calculate Hash & Check Duplicates (Phase 2 Link)
+            from ...utils.audio_hash import calculate_audio_hash
+            from ...core import logger
+
+            audio_hash = calculate_audio_hash(file_path)
+            
+            if self.duplicate_scanner.check_audio_duplicate(audio_hash):
+                logger.info(f"Skipping import: Duplicate audio found for {file_path}")
+                return False
+
+            # 2. Extract Metadata & Check ISRC
+            # Extract without ID first to check metadata
+            temp_song = self.metadata_service.extract_from_mp3(file_path, source_id=0)
+            
+            if self.duplicate_scanner.check_isrc_duplicate(temp_song.isrc):
+                logger.info(f"Skipping import: Duplicate ISRC found for {file_path}")
+                return False
+
+            # 3. Create Database Record
             file_id = self.library_service.add_file(file_path)
             if file_id:
-                song = self.metadata_service.extract_from_mp3(file_path, file_id)
-                self.library_service.update_song(song)
+                # Update ID and Hash on the song object
+                temp_song.source_id = file_id
+                temp_song.audio_hash = audio_hash
+                
+                # Save full metadata
+                self.library_service.update_song(temp_song)
                 return True
         except Exception as e:
-            print(f"Error importing {file_path}: {e}")
+            from ...core import logger
+            logger.error(f"Error importing {file_path}: {e}", exc_info=True)
         return False
 
     def import_files_list(self, files: list) -> int:
@@ -908,6 +1015,86 @@ class LibraryWidget(QWidget):
         menu.addSeparator()
         
         # 3. Destructive Actions
+        rename_action = QAction("Rename File(s)", self)
+        rename_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
+        
+        # Safety Check: Rename requires DONE and CLEAN state
+        can_rename = True
+        rename_reason = ""
+        
+        if indexes:
+            # 1. Check Completeness (Must be Done)
+            if 'all_done' in locals() and not all_done:
+                can_rename = False
+                rename_reason = "Files must be marked DONE"
+            
+            # 2. Check Cleanliness (No Unsaved Changes)
+            if can_rename:
+                id_col = self.field_indices.get('file_id', -1)
+                for idx in indexes:
+                    source_idx = self.proxy_model.mapToSource(idx)
+                    item = self.library_model.item(source_idx.row(), id_col)
+                    if item:
+                        raw_val = item.data(Qt.ItemDataRole.UserRole)
+                        try:
+                            sid = str(int(float(raw_val))) if raw_val is not None else ""
+                        except ValueError:
+                            sid = str(raw_val)
+                        
+                            if sid in self._dirty_ids:
+                                can_rename = False
+                                rename_reason = "Unsaved changes pending"
+                                break
+
+            # 3. Check Uniqueness (File System Conflict)
+            if can_rename:
+                # We need to check if target paths exist
+                # This requires fetching the Song objects to perform precise calculation
+                id_col = self.field_indices.get('file_id', -1)
+                
+                # Limit check to first 50 items to prevent UI freeze on massive selection
+                # (Renaming 1000 items via context menu is an edge case we accept lag for, or we just check first few)
+                check_limit = 50
+                checked_count = 0
+                
+                for idx in indexes:
+                    if checked_count >= check_limit:
+                        break
+                        
+                    source_idx = self.proxy_model.mapToSource(idx)
+                    item = self.library_model.item(source_idx.row(), id_col)
+                    if item:
+                         raw_val = item.data(Qt.ItemDataRole.UserRole)
+                         try:
+                            sid = int(float(raw_val)) if raw_val is not None else None
+                            if sid is not None:
+                                song = self.library_service.get_song_by_id(sid)
+                                if song:
+                                    target = self.renaming_service.calculate_target_path(song)
+                                    # Skip if target is same as current (already renamed)
+                                    # Normalize paths for comparison
+                                    if song.path and os.path.normpath(song.path) == os.path.normpath(target):
+                                        continue
+                                        
+                                    if self.renaming_service.check_conflict(target):
+                                        can_rename = False
+                                        rename_reason = f"Target exists: {os.path.basename(target)}"
+                                        break
+                                        
+                            checked_count += 1
+                         except Exception:
+                            # If we can't fetch or calculate, assume safe? Or fail safe?
+                            # Fail safe -> Don't rename what you can't verify
+                            pass
+
+        if not can_rename:
+            rename_action.setEnabled(False)
+            rename_action.setText(f"Rename File(s) ({rename_reason})")
+            rename_action.setToolTip(f"Disabled: {rename_reason}")
+
+        rename_action.triggered.connect(self.rename_selection)
+        menu.addAction(rename_action)
+
         delete_action = QAction("Delete from Library", self)
         delete_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_TrashIcon))
         delete_action.triggered.connect(self._delete_selected)
@@ -1196,6 +1383,22 @@ class LibraryWidget(QWidget):
         if count > 0:
             self.load_library()
 
+    def rename_selection(self) -> None:
+        """
+        Placeholder for Rename functionality.
+        Logic to be implemented tomorrow per specs.
+        """
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+            
+        count = len(indexes)
+        QMessageBox.information(
+            self, 
+            "Rename File(s)", 
+            f"Renaming {count} file(s) according to specs...\n(Feature coming tomorrow)"
+        )
+
     def _delete_selected(self) -> None:
         indexes = self.table_view.selectionModel().selectedRows()
         if not indexes:
@@ -1323,6 +1526,88 @@ class LibraryWidget(QWidget):
                QMessageBox.warning(self, "Failure", "Failed to triggered write logic.")
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to write tags:\n{e}")
+
+    def rename_selection(self) -> None:
+        """
+        Renames selected files based on metadata using RenamingService.
+        Triggers strictly if gates (Done/Clean/Unique) are passed.
+        """
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        # Double-check Gate 2 (Cleanliness) - Prevent Ctrl+R bypass
+        if self._dirty_ids:
+             QMessageBox.warning(self, "Unsaved Changes", "Please save all changes before renaming.")
+             return
+
+        confirm = QMessageBox.question(
+            self, 
+            "Rename Files", 
+            f"Are you sure you want to rename {len(indexes)} file(s) and move them to their library folders?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        success_count = 0
+        error_count = 0
+        errors = []
+
+        id_col = self.field_indices.get('file_id', -1)
+
+        for idx in indexes:
+            source_idx = self.proxy_model.mapToSource(idx)
+            item = self.library_model.item(source_idx.row(), id_col)
+            if not item: continue
+            
+            raw_val = item.data(Qt.ItemDataRole.UserRole)
+            try:
+                sid = int(float(raw_val)) if raw_val is not None else None
+                if sid is not None:
+                    song = self.library_service.get_song_by_id(sid)
+                    if not song: continue
+
+                    # Gate 1: Completeness
+                    if not song.is_done: 
+                        errors.append(f"{song.title}: Not marked as Done")
+                        error_count += 1
+                        continue
+
+                    # Gate 3: Conflict (Calculated live)
+                    target = self.renaming_service.calculate_target_path(song)
+                    
+                    # Optimization: If path matches target, skip
+                    if song.path:
+                        current = os.path.normcase(os.path.normpath(song.path))
+                        new_target = os.path.normcase(os.path.normpath(target))
+                        if current == new_target:
+                            continue
+
+                    if self.renaming_service.rename_song(song, target_path=target):
+                        # Success! Persist new path to DB
+                        self.library_service.update_song(song)
+                        success_count += 1
+                    else:
+                        errors.append(f"{song.title}: Rename failed (Conflict or Access Denied)")
+                        error_count += 1
+
+            except Exception as e:
+                errors.append(f"Error processing item: {e}")
+                error_count += 1
+
+        # Summary Report
+        if error_count > 0:
+            error_msg = "\n".join(errors[:10])
+            if len(errors) > 10: error_msg += "\n...and more."
+            QMessageBox.warning(self, "Rename Results", f"Renamed {success_count} files.\n\nErrors:\n{error_msg}")
+        elif success_count > 0:
+             QMessageBox.information(self, "Success", f"Successfully renamed and moved {success_count} files.")
+        
+        # Refresh to show new paths
+        if success_count > 0:
+            self.load_library()
 
     def _get_incomplete_fields(self, row_data: list) -> set:
         """Identify which fields are incomplete based on Yellberus registry.

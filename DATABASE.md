@@ -79,6 +79,7 @@ erDiagram
         TEXT Notes
         TEXT Source
         REAL Duration
+        TEXT AudioHash
         BOOLEAN IsActive
     }
 
@@ -165,6 +166,7 @@ erDiagram
         TEXT Name
         TEXT Source
         REAL Duration
+        TEXT AudioHash
         TEXT Notes
         BOOLEAN IsActive
     }
@@ -435,12 +437,14 @@ The base table for all playable content. Every audio item starts here.
 | `Notes` | TEXT | - | Searchable description |
 | `Source` | TEXT | NOT NULL | File path (C:\...) or URL (https://...) |
 | `Duration` | REAL | - | Duration in seconds (NULL for streams) |
+| `AudioHash` | TEXT | INDEXED | Hash of MP3 audio frames only (excludes ID3 tags) for duplicate detection |
 | `IsActive` | BOOLEAN | DEFAULT 1 | Show in library (0 = hidden/inactive) |
 
 **Notes:**
 - `Source` field holds either a local file path or stream URL
 - `IsActive = 0` hides the item from library without deleting
 - Use for seasonal content, expired ads, or soft-delete
+- `AudioHash` is calculated from MP3 audio data only (ID3v2 header and ID3v1 footer are excluded) to detect duplicates even when metadata differs
 
 ### 3. `Songs` (Music-Specific) ✅ Implemented
 

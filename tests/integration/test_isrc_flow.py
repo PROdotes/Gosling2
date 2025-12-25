@@ -20,29 +20,24 @@ class TestISRCImplementation:
     @patch("src.business.services.metadata_service.ID3")
     def test_metadata_service_extracts_isrc(self, mock_id3, mock_mp3):
         """Verify MetadataService reads TSRC frame"""
-        # Setup mock tags
-        mock_tags = MagicMock()
-        mock_id3.return_value = mock_tags
-        
-        # Mock the TSRC (ISRC) frame
-        # Mutagen access is usually tags["TSRC"] or tags.get("TSRC")
-        # MetadataService uses a helper that likely assumes list of strings for text frames
-        mock_frame = MagicMock()
-        mock_frame.text = ["GB-AYE-65-00001"]
-        
-        # Setup getall behavior for the service's internal helper
-        def side_effect(key):
-            if key == "TSRC":
-                return [mock_frame]
-            return []
-            
-        mock_tags.getall.side_effect = side_effect
-        mock_tags.__contains__.side_effect = lambda k: k == "TSRC"
-
-        # Mock MP3 info for duration
+        # 1. Mock MP3 and its tags
         mock_audio = MagicMock()
         mock_audio.info.length = 120
         mock_mp3.return_value = mock_audio
+        
+        mock_tags = MagicMock()
+        mock_audio.tags = mock_tags
+        mock_id3.return_value = mock_tags
+        
+        # 2. Mock the TSRC (ISRC) frame
+        mock_frame = MagicMock()
+        mock_frame.text = ["GB-AYE-65-00001"]
+        
+        # 3. Setup dictionary behavior for the service's dynamic loop
+        mock_tags.keys.return_value = ["TSRC"]
+        mock_tags.__getitem__.side_effect = lambda k: mock_frame if k == "TSRC" else None
+        mock_tags.get.side_effect = lambda k, default=None: mock_frame if k == "TSRC" else default
+        mock_tags.__contains__.side_effect = lambda k: k == "TSRC"
 
         song = MetadataService.extract_from_mp3("dummy.mp3")
         assert song.isrc == "GB-AYE-65-00001"

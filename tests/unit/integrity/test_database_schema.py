@@ -34,7 +34,7 @@ def test_database_schema_integrity(tmp_path):
     # Expected Columns per table
     expected_columns = {
         "Types": {"TypeID", "TypeName"},
-        "MediaSources": {"SourceID", "TypeID", "Name", "Notes", "Source", "Duration", "IsActive"},
+        "MediaSources": {"SourceID", "TypeID", "Name", "Notes", "Source", "Duration", "IsActive", "AudioHash"},
         "Songs": {"SourceID", "TempoBPM", "RecordingYear", "ISRC", "IsDone", "Groups"},
         "Contributors": {"ContributorID", "ContributorName", "SortName", "Type"},
         "Roles": {"RoleID", "RoleName"},

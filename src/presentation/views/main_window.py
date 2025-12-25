@@ -10,7 +10,7 @@ from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
 from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget, SidePanelWidget
-from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager
+from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -33,6 +33,8 @@ class MainWindow(QMainWindow):
         )
         self.metadata_service = MetadataService()
         self.playback_service = PlaybackService(self.settings_manager)
+        self.renaming_service = RenamingService(self.settings_manager)
+        self.duplicate_scanner = DuplicateScannerService(self.library_service)
 
         # Initialize UI
         self._init_ui()
@@ -64,7 +66,9 @@ class MainWindow(QMainWindow):
         self.library_widget = LibraryWidget(
             self.library_service, 
             self.metadata_service,
-            self.settings_manager
+            self.settings_manager,
+            self.renaming_service,
+            self.duplicate_scanner
         )
         
         # Right Panel Container (Stacked: Playlist | Editor)
@@ -84,7 +88,12 @@ class MainWindow(QMainWindow):
         
         # Content Widgets
         self.playlist_widget = PlaylistWidget()
-        self.side_panel = SidePanelWidget(self.library_service, self.metadata_service)
+        self.side_panel = SidePanelWidget(
+            self.library_service, 
+            self.metadata_service, 
+            self.renaming_service,
+            self.duplicate_scanner
+        )
         
         self.right_stack.addWidget(self.playlist_widget)
         self.right_stack.addWidget(self.side_panel)
@@ -148,6 +157,12 @@ class MainWindow(QMainWindow):
         self.action_focus_search.setShortcut("Ctrl+F")
         self.action_focus_search.triggered.connect(self.library_widget.focus_search)
         self.addAction(self.action_focus_search)
+
+        # Ctrl+R – Rename File(s)
+        self.action_rename = QAction(self)
+        self.action_rename.setShortcut("Ctrl+R")
+        self.action_rename.triggered.connect(self.library_widget.rename_selection)
+        self.addAction(self.action_rename)
 
     def _on_playlist_changed(self, parent, start, end):
         # Update widget with new count
@@ -353,6 +368,7 @@ class MainWindow(QMainWindow):
     def _on_side_panel_save_requested(self, staged_changes: dict) -> None:
         """Commit all staged changes to DB and ID3 tags."""
         successful_ids = []
+        songs_to_check = []
         
         for song_id, changes in staged_changes.items():
             # 1. Fetch current song model
@@ -386,6 +402,7 @@ class MainWindow(QMainWindow):
             if id3_success:
                 if self.library_service.update_song(song):
                     successful_ids.append(song_id)
+                    songs_to_check.append(song)
             else:
                 QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}\n\nCheck if file is read-only or in use.")
                 
@@ -441,6 +458,24 @@ class MainWindow(QMainWindow):
             # Removed Auto-Advance per user request
             
             self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
+
+            # 6. Check for Auto-Rename Candidates (Rule: Done + Path Changed)
+            rename_needed = False
+            for song in songs_to_check:
+                if song.is_done:
+                    try:
+                        target = self.renaming_service.calculate_target_path(song)
+                        if song.path:
+                             current_norm = os.path.normcase(os.path.normpath(song.path))
+                             target_norm = os.path.normcase(os.path.normpath(target))
+                             if current_norm != target_norm:
+                                 rename_needed = True
+                                 break
+                    except Exception:
+                        continue
+            
+            if rename_needed:
+                self.library_widget.rename_selection()
 
     def _auto_advance_selection(self):
         """Move selection to the next row in the library table."""

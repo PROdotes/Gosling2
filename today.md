@@ -81,10 +81,14 @@
 
 ---
 
-### Phase 4: The "Renamer" (File System) — **DEFERRED** ⏸️
-*   **Status**: Pushed to a future session.
+### Phase 4: The "Renamer" (File System) — **COMPLETE** ✅
+*   **Status**: Done. Service + UI Integration complete.
 *   **Why**: File system operations deserve a fresh, full session—not a rushed afternoon.
-*   **Prereqs**: Phase 1 (Greatest Hits) must be complete so album artist routing works correctly.
+*   **Executed**:
+    - [x] `RenamingService` Logic (Move Only, Strict Fail).
+    - [x] UI: Context Menu (Safety Gates).
+    - [x] UI: Side Panel (Projected Path, Red Button).
+    - [x] Tests: 100% Pass (Mocked).
 
 ---
 
@@ -102,28 +106,31 @@ See [ROADMAP.md](ROADMAP.md) for the full journey to Feature Completion.
 
 ---
 
-## 🔄 Handoff Note (Dec 24, 15:40)
+## 🔄 Handoff Note (Dec 25, 09:15)
 
-**Session completed:** T-04 Test Consolidation (COMPLETE) ✅
+**Session completed:** Renaming Service Blueprint & Implementation (COMPLETE) ✅
 
 ### What Was Done This Session:
-1.  **Test Suite Consolidated**:
-    *   Files reduced from **68 → 46**.
-    *   Full suite passing: `pytest` (397 tests passed).
-    *   Orphans cleared, Integrity tests moved to correct folder.
+1.  **Renaming Service Implemented**:
+    *   `src/business/services/renaming_service.py` created.
+    *   Strict conflict resolution (Fail if exists).
+    *   Sanitization and Path Calculation logic.
 
-2.  **Performance Optimization (Field Editor)**:
-    *   Identified huge bottleneck in `test_field_editor.py` (~20s -> ~1.5s).
-    *   Implemented `blockSignals` in `_populate_table` for UI speedup.
-    *   Removed redundant teardown reloads.
+2.  **UI Integration**:
+    *   **Side Panel**: Added "Projected Path" label and Red Button conflict warning.
+    *   **Library Context Menu**: "Rename File(s)" action added with 3-Layer Safety Gates (Done/Clean/Unique).
 
-3.  **Coverage Check**:
-    *   `MetadataService`: 92% (Excellent).
-    *   `FieldEditor` (UI): 75% (Logic covered, Persistence logic pending Mutations).
+3.  **Critical Fixes**:
+    *   **Import Hell Solved**: Fixed `ImportError` in tests (was pointing to non-existent `core.entities`).
+    *   **MainWindow Recovery**: Restored accidentally deleted class definition.
+    *   **Protocol Update**: Added `[NO_SILENT_PIVOTS]` rule.
 
 ### Next Session TODO:
-1.  **Create Mutation Tests**: `tests/unit/tools/test_field_editor_mutation.py` to cover `write_yellberus` (File System/Persistence).
-2.  **Start Milestone 3**: Begin work on **Task 1: Side Panel Editor** (Backlog Processing).
+1.  **Manual Verification**: Run the app and test renaming flow on a dummy file.
+2.  **Externalize Rules (Important)**: Move the hardcoded routing rules (Cro/Patriotic) from `renaming_service.py` to `settings.ini` or a JSON config so the user can edit them without touching code.
+3.  **Final Polish**: Check for any remaining layout glitches in Side Panel.
+4.  **Extract CSS & Field Config (P0)**: Refactor ENTIRE APP (not just Side Panel) to remove hardcoded styles. Move everything to `theme.qss` using ObjectNames. (User: "All of the window elements").
+    *   *Note*: Attempted partial refactor of SidePanel in this session but REVERTED it to ensure stability. Next agent starts fresh on this.
 
 ### Key References:
 - `TESTING.md`: Laws 1-7 (The Constitution).

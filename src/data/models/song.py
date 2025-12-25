@@ -139,6 +139,15 @@ class Song(MediaSource):
         return self.name or 'Unknown Title'
 
     @property
+    def year(self) -> Optional[int]:
+        """Alias for recording_year"""
+        return self.recording_year
+
+    @year.setter
+    def year(self, value: Optional[int]):
+        self.recording_year = value
+
+    @property
     def formatted_duration(self) -> str:
         """Get duration formatted as mm:ss"""
         return self.get_formatted_duration()

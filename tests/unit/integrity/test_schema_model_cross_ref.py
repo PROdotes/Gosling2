@@ -41,6 +41,7 @@ def test_cross_reference_integrity(tmp_path):
         "Source": "source",
         "Duration": "duration",
         "IsActive": "is_active",
+        "AudioHash": "audio_hash",
         
         # Songs table
         "TempoBPM": "bpm",
@@ -60,6 +61,7 @@ def test_cross_reference_integrity(tmp_path):
         "duration": "Duration",
         "notes": "Notes",
         "is_active": "IsActive",
+        "audio_hash": "AudioHash",
         
         # From Song
         "bpm": "TempoBPM",

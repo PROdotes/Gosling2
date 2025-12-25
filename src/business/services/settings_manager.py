@@ -18,6 +18,7 @@ class SettingsManager:
     KEY_LIBRARY_LAYOUTS = "library/column_layouts"  # Robust structure (Named visibility + order)
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
     KEY_TYPE_FILTER = "library/typeFilter"
+    KEY_ROOT_DIRECTORY = "library/rootDirectory"
     
     # Playback settings
     KEY_VOLUME = "playback/volume"
@@ -33,16 +34,17 @@ class SettingsManager:
     DEFAULT_WINDOW_HEIGHT = 800
     DEFAULT_CROSSFADE_ENABLED = True
     DEFAULT_CROSSFADE_DURATION = 3000
+    DEFAULT_ROOT_DIRECTORY = "C:/Music"
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
-        Initialize settings manager
-        
-        Args:
-            organization: Organization name for settings storage
-            application: Application name for settings storage
+        Initialize settings manager.
+        Uses INI format for easy manual editing.
         """
-        self._settings = QSettings(organization, application)
+        self._settings = QSettings(QSettings.Format.IniFormat, QSettings.Scope.UserScope, organization, application)
+        # Fallback to local file if needed? UserScope puts it in AppData.
+        # If user wants it next to exe, we might need absolute path.
+        # For now, standard User location is safer than Program Files.
     
     # ===== Window Settings =====
     
@@ -93,6 +95,14 @@ class SettingsManager:
     def set_type_filter(self, index: int) -> None:
         """Save selected type tab index"""
         self._settings.setValue(self.KEY_TYPE_FILTER, index)
+
+    def get_root_directory(self) -> str:
+        """Get the root directory for file organization"""
+        return self._settings.value(self.KEY_ROOT_DIRECTORY, self.DEFAULT_ROOT_DIRECTORY, type=str)
+        
+    def set_root_directory(self, path: str) -> None:
+        """Set the root directory for file organization"""
+        self._settings.setValue(self.KEY_ROOT_DIRECTORY, path)
     
     def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:
         """

@@ -76,7 +76,6 @@ class FieldDef:
     # UI behavior
     visible: bool = True           # Show in table by default
     editable: bool = True          # Allow inline editing (future)
-    sortable: bool = True
     searchable: bool = True
     
     # Filter behavior (NEW)
@@ -495,7 +494,6 @@ class FieldDef:
     # UI - Table
     visible: bool = True
     editable: bool = True
-    sortable: bool = True
     
     # Filter behavior
     filterable: bool = False          # Show in filter sidebar?

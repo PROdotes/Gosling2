@@ -17,7 +17,8 @@ class MetadataService:
     def extract_from_mp3(path: str, source_id: Optional[int] = None) -> Song:
         """
         Extract metadata from an MP3 file and return a Song object.
-        Handles missing tags gracefully.
+        Dynamically maps frames using id3_frames.json (Source of Truth).
+        Handles ID3v2.3 '/' separator splitting for lists.
         """
         try:
             audio = MP3(path)
@@ -25,139 +26,165 @@ class MetadataService:
             raise ValueError(f"Unable to read MP3 file: {path}") from e
 
         duration = audio.info.length if audio.info else None
+        
+        # Load ID3 Mapping
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
+        
+        id3_map = {}
+        if os.path.exists(json_path):
+            with open(json_path, 'r', encoding='utf-8') as f:
+                id3_map = json.load(f)
 
-        # Try reading existing ID3 tags
-        try:
-            tags = ID3(path)
-        except ID3NoHeaderError:
-            tags = {}
-
-        # Helper to read text frames as list[str]
-        def get_text_list(frame_id: str) -> List[str]:
-            if frame_id not in tags:
+        # Helper to safely get list values, handling ID3v2.3 '/' splitting
+        def get_values(frame_val, field_type="text") -> List[str]:
+            if frame_val is None:
                 return []
-            frame = tags.getall(frame_id)
+                
             values = []
-            for f in frame:
-                if hasattr(f, "text"):
-                    for item in f.text:
-                        if item:
-                            values.append(str(item).strip())
+            if hasattr(frame_val, "text"):
+                raw_items = frame_val.text
+            elif hasattr(frame_val, "people"): # TIPL
+                 # Flatten (role, name) to name for simple list integration
+                 raw_items = [p[1] for p in frame_val.people if len(p) > 1]
+            else:
+                # If it doesn't have text/people, and it's a mutagen-like object,
+                # we don't know how to read it into a text field.
+                if hasattr(frame_val, "__dict__") or "mutagen" in str(type(frame_val)):
+                    raw_items = []
+                else:
+                    raw_items = [frame_val]
+
+            if not isinstance(raw_items, (list, tuple)):
+                raw_items = [raw_items]
+
+            for item in raw_items:
+                if item is None:
+                    continue
+                s_item = str(item).strip()
+                if not s_item: continue
+                
+                # ID3v2.3 Splitter Fix: Mutagen may return "A/B" as one item for v2.3
+                if field_type == "list" and "/" in s_item:
+                    split_items = [x.strip() for x in s_item.split("/") if x.strip()]
+                    values.extend(split_items)
+                else:
+                    values.append(s_item)
             return values
 
-        # Helper to deduplicate lists while preserving order
-        def deduplicate(items: List[str]) -> List[str]:
-            return list(dict.fromkeys(items))
-
-        # Helper to extract producers from TIPL and TXXX tags
-        def get_producers() -> List[str]:
-            producers = []
-            
-            # Extract from TIPL (Involved People List)
-            if "TIPL" in tags:
-                for p in tags.getall("TIPL"):
-                    if hasattr(p, "people"):
-                        for role, name in p.people:
-                            if role.lower() == "producer":
-                                producers.append(name.strip())
-            
-            # Extract from TXXX:PRODUCER
-            if "TXXX:PRODUCER" in tags:
-                producers.extend(get_text_list("TXXX:PRODUCER"))
-            
-            return producers
-
-        # Helper to extract Done flag (Dual Mode)
-        def get_is_done() -> bool:
-            # 1. Check TXXX:GOSLING_DONE (New Standard)
-            if "TXXX:GOSLING_DONE" in tags:
-                raw_list = get_text_list("TXXX:GOSLING_DONE")
-                if raw_list:
-                    val = raw_list[0].strip().lower()
-                    return val in ["1", "true"]
-            
-            # 2. Fallback to TKEY (Legacy)
-            if "TKEY" in tags:
-                raw_list = get_text_list("TKEY")
-                if raw_list:
-                    val = raw_list[0] # Do not strip! " " is meant to be false.
-                    if val == "true":
-                        return True
-                    # If val is a real key (e.g. "Am", "12B"), we do NOT consider it Done.
-                    # Legacy logic only wrote "true" or " ".
-            
-            return False
-
-        # Extract title (use get_text_list for consistency)
-        title_list = get_text_list("TIT2")
-        title = title_list[0] if title_list else None
-
-        # Extract contributors
-        performers = get_text_list("TPE1")
-        composers = get_text_list("TCOM")
-        lyricists = get_text_list("TOLY") or get_text_list("TEXT")
-        groups = get_text_list("TIT1")
+        # 1. Generic Extraction Logic
+        song_data = {}
+        tags = audio.tags or {}
         
-        # Extract ISRC
-        isrc_list = get_text_list("TSRC")
-        isrc = isrc_list[0] if isrc_list else None
+        # Map of "Special" fields that we calculate manually later
+        # We exclude them from the generic loop to avoid overwriting with raw data
+        COMPLEX_FIELDS = {'recording_year', 'is_done', 'producers'} 
 
-        # Extract IsDone
-        is_done = get_is_done()
+        for frame_key in tags.keys():
+            # Handle generic frames (TIT2) and TXXX (TXXX:Description)
+            lookup_key = frame_key
+            
+            frame_def = id3_map.get(lookup_key)
+            
+            if not frame_def:
+                continue
+                
+            # If string definition (legacy simple map), convert to dict
+            if isinstance(frame_def, str):
+                continue
+                
+            field_name = frame_def.get('field')
+            field_type = frame_def.get('type', 'text')
+            
+            if not field_name or field_name in COMPLEX_FIELDS:
+                continue
+                
+            val_list = get_values(tags[frame_key], field_type)
+            
+            if not val_list:
+                continue
+                
+            if field_type == 'list':
+                # MERGE POLICY: Extend existing list, deduplicate later
+                # This handles cases like TOLY+TEXT both mapping to 'lyricists'
+                current_list = song_data.get(field_name, [])
+                if not isinstance(current_list, list):
+                    current_list = [str(current_list)] if current_list else []
+                current_list.extend(val_list)
+                song_data[field_name] = current_list 
+                
+            elif field_type == 'integer':
+                try:
+                    song_data[field_name] = int(val_list[0])
+                except (ValueError, IndexError):
+                    pass
+            else:
+                song_data[field_name] = val_list[0]
 
-        # Extract BPM
-        bpm_list = get_text_list("TBPM")
-        bpm = int(bpm_list[0]) if bpm_list else None
+        # Deduplicate all list fields
+        for key, val in song_data.items():
+            if isinstance(val, list):
+                song_data[key] = list(dict.fromkeys(val))
 
-        # Extract Year
-        year_list = get_text_list("TDRC") or get_text_list("TYER")
-        recording_year = None
+        # 2. Complex Logic / Overrides
+        
+        # --- TITLE (Aliasing) ---
+        # JSON maps TIT2 -> 'title', Song uses 'name'.
+        if 'title' in song_data:
+            song_data['name'] = song_data.pop('title')
+
+        # --- YEAR (Dual Mode: TDRC / TYER) ---
+        # Try TDRC first, then TYER
+        year_list = get_values(tags.get('TDRC')) or get_values(tags.get('TYER'))
         if year_list:
             try:
-                # TDRC might be "2023-01-01", TYER "2023"
                 s = str(year_list[0]).strip()
-                # Take first 4 digits
-                recording_year = int(s[:4])
+                song_data['recording_year'] = int(s[:4])
             except (ValueError, IndexError):
                 pass
 
-        # Extract producers
-        producers = get_producers()
+        # --- PRODUCERS (Merge TIPL + TXXX:PRODUCER) ---
+        producers = []
+        # TIPL
+        if 'TIPL' in tags:
+            p_frame = tags['TIPL']
+            if hasattr(p_frame, 'people'):
+                for role, name in p_frame.people:
+                    if role.lower() == 'producer':
+                        producers.append(name.strip())
+        # TXXX:PRODUCER
+        if 'TXXX:PRODUCER' in tags:
+            producers.extend(get_values(tags['TXXX:PRODUCER'], 'list'))
+            
+        song_data['producers'] = list(dict.fromkeys(producers)) # Dedupe
 
-        # Extract Album
-        album_list = get_text_list("TALB")
-        album = album_list[0] if album_list else None
+        # --- IS DONE (Legacy TKEY / New TXXX) ---
+        is_done = False
+        # 1. Check TXXX:GOSLING_DONE
+        if "TXXX:GOSLING_DONE" in tags:
+            raw = get_values(tags["TXXX:GOSLING_DONE"])
+            if raw and raw[0].lower() in ["1", "true"]:
+                is_done = True
+        # 2. Fallback TKEY
+        elif "TKEY" in tags:
+            raw = get_values(tags["TKEY"])
+            if raw and raw[0] == "true": # strict "true", not "Am"
+                is_done = True
+                
+        song_data['is_done'] = is_done
+        song_data['duration'] = duration
 
-        # Extract Album Artist
-        album_artist_list = get_text_list("TPE2")
-        album_artist = album_artist_list[0] if album_artist_list else None
-
-        # Extract Genre
-        genre_list = get_text_list("TCON")
-        genre = genre_list[0] if genre_list else None
-
-        # Extract Publisher
-        publisher_list = get_text_list("TPUB")
-        publisher = publisher_list[0] if publisher_list else None
-
+        # --- FALLBACK: COMPOSERS / LYRICISTS (Union Logic for TCOM) ---
+        # If composers/lyricists are empty, check if TCOM contains them?
+        # Legacy logic: TCOM was treated as union. 
+        # Modern: TCOM -> composers, TEXT/TOLY -> lyricists.
+        # We rely on generic extraction for TCOM -> composers.
+        
+        # 3. Construct Song
         return Song(
             source_id=source_id,
             source=path,
-            name=title,
-            isrc=isrc,
-            duration=duration,
-            bpm=bpm,
-            recording_year=recording_year,
-            is_done=is_done,
-            performers=deduplicate(performers),
-            composers=deduplicate(composers),
-            lyricists=deduplicate(lyricists),
-            producers=deduplicate(producers),
-            groups=deduplicate(groups),
-            album=album,
-            album_artist=album_artist,
-            genre=genre,
-            publisher=publisher,
+            **song_data
         )
 
     @staticmethod
@@ -208,10 +235,14 @@ class MetadataService:
 
         # Validate ISRC
         if song.isrc:
-            import re
-            isrc_pattern = r'^[A-Z]{2}-?[A-Z0-9]{3}-?\d{2}-?\d{5}$'
-            if not re.match(isrc_pattern, song.isrc.replace('-', '')):
-                print(f"Warning: Invalid ISRC format {song.isrc}, skipping ISRC write")
+            from ...utils.validation import validate_isrc, sanitize_isrc
+            from ...core import logger
+            
+            if validate_isrc(song.isrc):
+                song.isrc = sanitize_isrc(song.isrc)  # Store sanitized version
+            else:
+                logger.dev_warning(f"Invalid ISRC format: {song.isrc}, skipping ID3 write")
+                # Keep DB value, just don't write to ID3
                 song.isrc = None
 
         # Validate BPM
@@ -385,8 +416,9 @@ class MetadataService:
                  pass # TCOM cleared.
 
             # Save
-            # Force ID3v2.3 for maximum compatibility (Windows Explorer, etc.)
-            audio.save(v1=1, v2_version=3)
+            # Save
+            # User Directive: Output MUST be ID3v2.4
+            audio.save(v1=1, v2_version=4)
             return True
 
         except Exception as e:

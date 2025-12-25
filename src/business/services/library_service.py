@@ -57,6 +57,18 @@ class LibraryService:
         """Get full song object by path"""
         return self.song_repository.get_by_path(path)
 
+    def get_song_by_id(self, song_id: int) -> Optional[Song]:
+        """Get full song object by DB ID"""
+        return self.song_repository.get_by_id(song_id)
+
+    def find_by_isrc(self, isrc: str) -> Optional[Song]:
+        """Find a song by ISRC for duplicate detection"""
+        return self.song_repository.get_by_isrc(isrc)
+
+    def find_by_audio_hash(self, audio_hash: str) -> Optional[Song]:
+        """Find a song by audio hash for duplicate detection"""
+        return self.song_repository.get_by_audio_hash(audio_hash)
+
 
 
     def get_all_years(self) -> List[int]:

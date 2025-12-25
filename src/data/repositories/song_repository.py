@@ -85,12 +85,14 @@ class SongRepository(BaseRepository):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
 
-                # 1. Update MediaSources (Base info)
+                # 1. Update MediaSources (Base info) including Path (Source)
+                # Note: Normalize path before saving
+                normalized_path = os.path.normcase(os.path.abspath(song.path))
                 cursor.execute("""
                     UPDATE MediaSources
-                    SET Name = ?, Duration = ?, Notes = ?, IsActive = ?
+                    SET Name = ?, Source = ?, Duration = ?, Notes = ?, IsActive = ?, AudioHash = ?
                     WHERE SourceID = ?
-                """, (song.name, song.duration, song.notes, 1 if song.is_active else 0, song.source_id))
+                """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, song.audio_hash, song.source_id))
 
                 # 2. Update Songs (Extended info)
                 # Note: Groups is TIT1 (Content Group Description)
@@ -641,3 +643,38 @@ class SongRepository(BaseRepository):
         except Exception as e:
             print(f"Error fetching songs by status: {e}")
             return [], []
+
+    def get_by_isrc(self, isrc: str) -> Optional[Song]:
+        """Get song by ISRC code (for duplicate detection)"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT SourceID FROM Songs WHERE ISRC = ?",
+                    (isrc,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return self.get_by_id(row[0])
+                return None
+        except Exception as e:
+            print(f"Error getting song by ISRC: {e}")
+            return None
+    
+    def get_by_audio_hash(self, audio_hash: str) -> Optional[Song]:
+        """Get song by audio hash (for duplicate detection)"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT SourceID FROM MediaSources WHERE AudioHash = ?",
+                    (audio_hash,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return self.get_by_id(row[0])
+                return None
+        except Exception as e:
+            print(f"Error getting song by audio hash: {e}")
+            return None
+            

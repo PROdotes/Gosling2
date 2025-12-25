@@ -4,6 +4,8 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+import copy
+import os
 from ...core import yellberus
 
 class SidePanelWidget(QWidget):
@@ -17,14 +19,18 @@ class SidePanelWidget(QWidget):
     save_requested = pyqtSignal(dict) # _staged_changes
     staging_changed = pyqtSignal(list) # list of song_ids in staging
     
-    def __init__(self, library_service, metadata_service, parent=None):
+    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
+        self.renaming_service = renaming_service
+        self.duplicate_scanner = duplicate_scanner
+        
+        self.isrc_collision = False
         
         self.current_songs = [] # List of Song objects
         self._staged_changes = {} # {song_id: {field_name: value}}
-        self._widgets = {} # {field_name: QWidget}
+        self._field_widgets = {} # {field_name: QWidget} - Public for testing
         
         self._init_ui()
         
@@ -37,6 +43,13 @@ class SidePanelWidget(QWidget):
         self.header_label.setStyleSheet("font-size: 13pt; font-weight: bold; color: #E0E0E0;")
         self.header_label.setWordWrap(True)
         layout.addWidget(self.header_label)
+
+        # 1b. Projected Path Feedback
+        self.lbl_projected_path = QLabel("")
+        self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #888; font-size: 9pt;")
+        self.lbl_projected_path.setWordWrap(True)
+        self.lbl_projected_path.setVisible(False)
+        layout.addWidget(self.lbl_projected_path)
         
         # 2. Workflow State (MARK DONE)
         self.btn_done = QPushButton("✅ MARK DONE")
@@ -78,6 +91,7 @@ class SidePanelWidget(QWidget):
         footer_frame = QFrame()
         footer_frame.setObjectName("Footer")
         footer_frame.setStyleSheet("QFrame#Footer { border-top: 1px solid #333; }")
+        
         footer_layout = QHBoxLayout(footer_frame)
         footer_layout.setContentsMargins(0, 10, 0, 0)
         
@@ -175,7 +189,7 @@ class SidePanelWidget(QWidget):
                 
                 # Create Widget
                 edit_widget = self._create_field_widget(field, effective_val, is_multiple)
-                self._widgets[field.name] = edit_widget
+                self._field_widgets[field.name] = edit_widget
                 
                 row.addWidget(label)
                 row.addWidget(edit_widget)
@@ -218,10 +232,70 @@ class SidePanelWidget(QWidget):
             
         edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, text))
         
+        # Add ISRC validation (real-time text color feedback)
+        if field_def.name == 'isrc':
+            edit.textChanged.connect(lambda text: self._validate_isrc_field(edit, text))
+        
         # Escape to revert
         edit.installEventFilter(self)
         return edit
 
+    def _validate_isrc_field(self, widget, text):
+        """
+        Validate ISRC field and update text color in real-time.
+        Checks for both format validity and duplicates.
+        """
+        from ...utils.validation import validate_isrc
+        
+        # Base Properties
+        base_props = "font-size: 10pt; padding: 3px;"
+        
+        # Helper to format full sheet
+        def make_style(extra=""):
+            return f"QLineEdit {{ {base_props} {extra} }}"
+
+        # Reset State
+        self.isrc_collision = False
+
+        # Empty is valid (ISRC is optional)
+        if not text or not text.strip():
+            widget.setStyleSheet(make_style())
+            widget.setToolTip("")
+            self._update_save_state()
+            return
+        
+        # 1. Validate Format
+        if not validate_isrc(text):
+            widget.setStyleSheet(make_style("color: #DC3232;"))
+            widget.setToolTip("Invalid ISRC Format")
+            self._update_save_state()
+            return
+        
+        # 2. Check Duplicates (Phase 3)
+        duplicate = self.duplicate_scanner.check_isrc_duplicate(text)
+        if duplicate:
+            # Check if self-match (ignore if editing the song that owns this ISRC)
+            is_self_match = False
+            if self.current_songs and len(self.current_songs) == 1:
+                if str(self.current_songs[0].source_id) == str(duplicate.source_id):
+                    is_self_match = True
+            
+            if not is_self_match:
+                self.isrc_collision = True
+                # Amber/Orange for Warning
+                widget.setStyleSheet(make_style("color: #FF9800; font-weight: bold;"))
+                widget.setToolTip(f"Duplicate ISRC found: {duplicate.name}")
+            else:
+                # Valid (Self)
+                widget.setStyleSheet(make_style())
+                widget.setToolTip("")
+        else:
+            # Valid (New)
+            widget.setStyleSheet(make_style())
+            widget.setToolTip("")
+
+        self._update_save_state()
+    
     def _calculate_bulk_value(self, field_def):
         """Determine what to show when 1 or many songs are selected."""
         attr = field_def.model_attr or field_def.name
@@ -309,9 +383,61 @@ class SidePanelWidget(QWidget):
     def _update_save_state(self):
         has_staged = len(self._staged_changes) > 0
         self.btn_save.setEnabled(has_staged)
+        
+        # Check Collision (Phase 3)
+        if self.isrc_collision:
+            self.btn_save.setText("Save (Duplicate ISRC)")
+            self.btn_save.setStyleSheet("background-color: #F44336; color: white; font-weight: bold;")
+        else:
+            self.btn_save.setText("Save Changes")
+            self.btn_save.setStyleSheet("") # Default
+
+        self._update_projected_path()
 
     def _on_save_clicked(self):
         """Emit the entire staged buffer for the MainWindow to commit."""
+        # Auto-fill Year logic (User Request)
+        from datetime import datetime
+        import re
+        current_year = datetime.now().year
+        
+        for song_id in list(self._staged_changes.keys()):
+            changes = self._staged_changes[song_id]
+            
+            # Check if year is valid
+            has_year_change = 'recording_year' in changes
+            effective_year = None
+            
+            if has_year_change:
+                val = changes['recording_year']
+                # Treating 0, "", None as empty
+                if val:
+                    try:
+                        effective_year = int(val)
+                    except:
+                        effective_year = 0
+            else:
+                # Check DB value
+                # This incurs a DB hit per saved song, which is acceptable for manual saves
+                song = self.library_service.get_song_by_id(song_id)
+                if song:
+                     effective_year = song.recording_year
+            
+            # If effectively empty, force it
+            if not effective_year:
+                changes['recording_year'] = current_year
+
+            # --- Composer Logic (Hardcoded Splitter) ---
+            if 'composers' in changes:
+                val = changes['composers']
+                if val and isinstance(val, str) and val.endswith(','):
+                    # 1. Strip trailing comma
+                    clean_val = val[:-1]
+                    # 2. Inject ", " between lower and UPPER
+                    # Regex: Look for [a-z] followed by [A-Z]
+                    formatted = re.sub(r'([a-z])([A-Z])', r'\1, \2', clean_val)
+                    changes['composers'] = formatted
+
         self.save_requested.emit(self._staged_changes)
         # Note: MainWindow will call self.clear_staged() after successful DB write.
 
@@ -323,6 +449,7 @@ class SidePanelWidget(QWidget):
     def _on_discard_clicked(self):
         self._staged_changes = {}
         self.set_songs(self.current_songs)
+        self.staging_changed.emit([]) # Clear highlights in library
 
     def clear_staged(self, song_ids=None):
         """Remove IDs from staging (post-save cleanup)."""
@@ -333,9 +460,10 @@ class SidePanelWidget(QWidget):
                 if sid in self._staged_changes:
                     del self._staged_changes[sid]
         self._update_save_state()
+        self.staging_changed.emit(list(self._staged_changes.keys()))
 
     def _clear_fields(self):
-        self._widgets = {}
+        self._field_widgets = {}
         while self.field_layout.count():
             item = self.field_layout.takeAt(0)
             if item.widget():
@@ -344,3 +472,77 @@ class SidePanelWidget(QWidget):
     def eventFilter(self, source, event):
         # Escape key handling for revert coming in Phase 4
         return super().eventFilter(source, event)
+
+    def _get_staged_song(self, original_song):
+        """Return a copy of the song with staged changes applied."""
+        song = copy.copy(original_song)
+        sid = original_song.source_id
+        
+        if sid in self._staged_changes:
+            staged = self._staged_changes[sid]
+            # Apply known attributes logic
+            for field_name, value in staged.items():
+                field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
+                if field_def:
+                    attr = field_def.model_attr or field_def.name
+                    # Direct attribute set (assuming data matches type)
+                    setattr(song, attr, value)
+        return song
+
+    def _update_projected_path(self):
+        """Calculate and display where the file will move if saved."""
+        if not self.current_songs or len(self.current_songs) != 1:
+            self.lbl_projected_path.setVisible(False)
+            self.lbl_projected_path.setText("")
+            return
+
+        original = self.current_songs[0]
+        staged_song = self._get_staged_song(original)
+        
+        try:
+            target = self.renaming_service.calculate_target_path(staged_song)
+            self.lbl_projected_path.setText(f"Projected: {target}")
+            self.lbl_projected_path.setVisible(True)
+            
+            # Conflict Check
+            is_self = False
+            if staged_song.path and os.path.normpath(staged_song.path) == os.path.normpath(target):
+                 is_self = True
+            
+            if not is_self and self.renaming_service.check_conflict(target):
+                self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #ff5252; font-size: 9pt;") # Red
+                # Also turn Save button Red as a warning
+                current_style = self.btn_save.styleSheet()
+                if "background-color: #D32F2F" not in current_style:
+                     self.btn_save.setStyleSheet("""
+                        QPushButton { 
+                            font-weight: bold; 
+                            padding: 8px 16px; 
+                            background-color: #D32F2F;
+                            color: white;
+                            border-radius: 4px;
+                        }
+                        QPushButton:hover { background-color: #B71C1C; }
+                        QPushButton:disabled { background-color: #222; color: #666; }
+                     """)
+            else:
+                self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #888; font-size: 9pt;") # Grey
+                # Restore Default Blue (if it was Red)
+                current_style = self.btn_save.styleSheet()
+                if "background-color: #D32F2F" in current_style:
+                    self.btn_save.setStyleSheet("""
+                        QPushButton { 
+                            font-weight: bold; 
+                            padding: 8px 16px; 
+                            background-color: #1976D2;
+                            color: white;
+                            border-radius: 4px;
+                        }
+                        QPushButton:hover { background-color: #1E88E5; }
+                        QPushButton:disabled { background-color: #222; color: #666; }
+                    """)
+
+        except Exception as e:
+            self.lbl_projected_path.setText(f"Path Error: {e}")
+            self.lbl_projected_path.setVisible(True)
+            self.lbl_projected_path.setStyleSheet("color: red")

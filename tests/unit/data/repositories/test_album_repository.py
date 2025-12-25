@@ -103,42 +103,43 @@ class TestAlbumRepository(unittest.TestCase):
         with self.repo.get_connection() as conn:
             conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Multi.mp3'")
 
-    def test_sync_album_additive(self):
+    def test_sync_album_replacement(self):
         """
-        Verify that SongRepository.update() with song.album adds to existing links,
-        not replaces them (M2M compliance).
+        Verify that SongRepository.update() with song.album replaces existing links,
+        supporting the "Snapshot" sync strategy (Fixes the Append bug).
         """
         from src.data.repositories.song_repository import SongRepository
         import os
 
         # Setup
         song_repo = SongRepository()
-        test_path = os.path.normcase(os.path.abspath("C:\\\\Music\\\\Additive_Test.mp3"))
+        test_path = os.path.normcase(os.path.abspath("C:\\\\Music\\\\Replacement_Test.mp3"))
 
         # Cleanup old
         with song_repo.get_connection() as conn:
             conn.execute("DELETE FROM MediaSources WHERE Source = ?", (test_path,))
-            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Additive_Album%'")
+            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Replacement_Album%'")
 
         # 1. Insert song
         source_id = song_repo.insert(test_path)
 
         # 2. Add to Album1 via update
         song = song_repo.get_by_path(test_path)
-        song.album = "Additive_Album1"
+        song.album = "Replacement_Album1"
         song_repo.update(song)
 
-        # 3. Add to Album2 via update (should NOT remove Album1)
+        # 3. Add to Album2 via update (should REPLACE Album1)
         song = song_repo.get_by_path(test_path)
-        song.album = "Additive_Album2"
+        song.album = "Replacement_Album2"
         song_repo.update(song)
 
-        # 4. Verify: Song should be on BOTH albums
+        # 4. Verify: Song should be on Album2 ONLY
         albums = self.repo.get_albums_for_song(source_id)
         album_titles = [a.title for a in albums]
 
-        self.assertIn("Additive_Album1", album_titles, "Song should still be on Album1 after adding Album2")
-        self.assertIn("Additive_Album2", album_titles, "Song should be on Album2")
+        self.assertNotIn("Replacement_Album1", album_titles, "Album1 should have been replaced")
+        self.assertIn("Replacement_Album2", album_titles, "Song should be on Album2")
+        self.assertEqual(len(albums), 1, "Song should be on exactly 1 album (Snapshot strategy)")
 
         # Cleanup
         with song_repo.get_connection() as conn:
