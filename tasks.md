@@ -137,7 +137,7 @@ links: []
 | **Album Renaming** | `AlbumRepository` has no `update()` method. Typo corrections create orphan albums. | Implement update() + proper migration logic. |
 | **Publisher Hierarchy** | `Publisher.parent_publisher_id` allows circular references (A→B→A). No validation exists. ~~Also: no "get descendants" query.~~ | Add cycle detection in `set_parent()`. ✅ `get_with_descendants()` implemented. |
 | **Repository Duplication** | `AlbumRepository`, `PublisherRepository`, `TagRepository` all have identical CRUD patterns (`get_by_id`, `find_by_name`, `get_or_create`). | Refactor to generic `EntityRepository[T]` base class. ~1 day. |
-| **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | Migrate simple filters to generic `_filter_by_field()`. Keep complex ones (unified_artist). |
+| **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | 🏗️ PARTIAL: Moved Incomplete checkbox and cleaned up top layout (Dec 25). |
 | **Hardcoded Year Autofill** | `SidePanel` hardcodes "Set current year if empty". Should be configurable in Settings. | One Day (Settings UI). |
 | **Hardcoded Composer Splitter** | `SidePanel` auto-splits CamelCase composers if ending in comma. | One Day (Settings UI). |
 
@@ -150,3 +150,5 @@ links: []
 | [DATABASE.md](design/DATABASE.md) | Schema governance |
 | [TESTING.md](TESTING.md) | 10-layer yelling |
 | [LOGGING.md](design/LOGGING.md) | Logging Architecture |
+| [UX_UI_CONSTITUTION.md](design/UX_UI_CONSTITUTION.md) | Radio Automation Design Philosophy |
+| [METADATA_CONSTITUTION.md](METADATA_CONSTITUTION.md) | The Law of Data Relationships |
