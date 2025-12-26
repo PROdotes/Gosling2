@@ -4,3 +4,4 @@ from .filter_widget import FilterWidget
 from .playback_control_widget import PlaybackControlWidget
 from .library_widget import LibraryWidget
 from .side_panel_widget import SidePanelWidget
+from .custom_title_bar import CustomTitleBar

@@ -4,17 +4,19 @@ import weakref
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
-    QCheckBox, QHeaderView, QTabBar
+    QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget
 )
 import json
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QPen
 )
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject
-
 from .filter_widget import FilterWidget
 from ...core import yellberus
+from .library_delegate import WorkstationDelegate
+from .history_drawer import HistoryDrawer
+from .jingle_curtain import JingleCurtain
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup
 
 
 class DropIndicatorHeaderView(QHeaderView):
@@ -127,6 +129,7 @@ class LibraryWidget(QWidget):
     # Signals
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
     remove_from_playlist = pyqtSignal(list) # List of paths to remove from playlist
+    focus_search_requested = pyqtSignal()
 
     def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, parent=None) -> None:
         super().__init__(parent)
@@ -138,6 +141,9 @@ class LibraryWidget(QWidget):
         
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
+        
+        # Flags
+        self._show_incomplete = False
         
         # Flag to suppress auto-save during programmatic resize
         self._suppress_layout_save = False
@@ -151,8 +157,9 @@ class LibraryWidget(QWidget):
         
         # Restore saved type filter
         saved_index = self.settings_manager.get_type_filter()
-        if 0 <= saved_index < self.type_tab_bar.count():
-            self.type_tab_bar.setCurrentIndex(saved_index)
+        btn = self.pill_group.button(saved_index)
+        if btn:
+            btn.setChecked(True)
             self._on_type_tab_changed(saved_index)
             
         self.load_library()
@@ -164,59 +171,136 @@ class LibraryWidget(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Top Controls
-        self._setup_top_controls(main_layout)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Splitter for Filter + Table
+        # Splitter for Sidebar + Table Area
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setObjectName("MainSplitter")
         
-        # Filter Widget
+        # --- SIDEBAR AREA (Mechanical Console) ---
+        sidebar_container = QWidget()
+        sidebar_layout = QHBoxLayout(sidebar_container)
+        sidebar_layout.setContentsMargins(0, 0, 0, 0)
+        sidebar_layout.setSpacing(0)
+        
+        # 1. THE FRONT DECK (Filters - Disappears on pull)
         self.filter_widget = FilterWidget(self.library_service)
+        self.filter_widget.setObjectName("SidebarFilter")
+        self.filter_widget.setMinimumWidth(0)
+        sidebar_layout.addWidget(self.filter_widget)
         
-        # Center Panel (Search + Table)
+        # 2. THE RAIL (The Physical Handle - Pull this LEFT)
+        self.history_btn = QPushButton("L\nO\nG")
+        self.history_btn.setFixedWidth(26)
+        self.history_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        self.history_btn.setObjectName("HistoryToggle")
+        self.history_btn.setStyleSheet("""
+            #HistoryToggle {
+                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+                                                 stop:0 #080808, stop:1 #222222);
+                color: #888;
+                font-family: 'Agency FB', 'Bahnschrift Condensed';
+                font-weight: bold;
+                font-size: 14pt;
+                border: none;
+                border-left: 3px solid #D81B60;
+                border-top-left-radius: 11px;
+                border-bottom-left-radius: 11px;
+                padding-top: 40px; 
+            }
+            #HistoryToggle:hover {
+                color: #FFF;
+                background-color: #1A1A1A;
+                border-left: 5px solid #FF1B7B; /* Bolder, brighter spine */
+            }
+            #HistoryToggle:pressed {
+                background-color: #000;
+                border-left: 7px solid #D81B60; /* Deep industrial compression */
+            }
+        """)
+        self.history_btn.clicked.connect(self.toggle_history_drawer)
+        sidebar_layout.addWidget(self.history_btn)
+
+        # 3. THE REAR DECK (History Log - Revealed on pull)
+        self.history_drawer = HistoryDrawer(self.field_indices, self)
+        self.history_drawer.setFixedWidth(0) # Starts tucked behind handle
+        self.history_drawer.setMinimumWidth(0)
+        self.history_drawer.setObjectName("SidebarHistory")
+        sidebar_layout.addWidget(self.history_drawer)
+        
+        self.splitter.addWidget(sidebar_container)
+        
+        # Animation Target Constants
+        self._filter_base_width = 250
+        self._history_target_width = 350
+        self._rail_width = 26
+        
+        # --- CENTER AREA (The Mission Deck) ---
         center_widget = QWidget()
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(0)
         
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search library...")
+        # Jingle Curtain (Zero height initially)
+        self.jingle_curtain = JingleCurtain(self)
+        center_layout.addWidget(self.jingle_curtain)
         
-        # Type Tabs
-        self.type_tab_bar = QTabBar()
-        self.type_tab_bar.setExpanding(False)
-        self.type_tab_bar.setDrawBase(False)
-        self.type_tab_bar.setStyleSheet("""
-            QTabBar::tab {
-                padding: 8px 16px;
-                background: #2b2b2b;
-                border: 1px solid #333;
-                border-bottom: none;
-                margin-right: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
+        # Header Strip (Pills)
+        header_container = QWidget()
+        header_layout = QHBoxLayout(header_container)
+        header_layout.setContentsMargins(6, 4, 10, 6)
+        header_layout.setSpacing(6)
+        
+        # Category Pills
+        self.pill_group = QButtonGroup(self)
+        self.pill_group.setExclusive(True)
+        self.pill_group.idClicked.connect(self._on_pill_clicked)
+
+        shorthand = {"All": "ALL", "Music": "MUS", "Jingles": "JIN", "Commercials": "COM", "Speech": "SP", "Streams": "STR"}
+        self.type_tabs = [("All", []), ("Music", [1]), ("Jingles", [2]), ("Commercials", [3]), ("Speech", [4, 5]), ("Streams", [6])]
+
+        for i, (label, _) in enumerate(self.type_tabs):
+            btn = QPushButton(shorthand.get(label, label))
+            btn.setCheckable(True)
+            btn.setObjectName("CategoryPill")
+            if i == 0: btn.setChecked(True)
+            self.pill_group.addButton(btn, i)
+            header_layout.addWidget(btn)
+
+        header_layout.addStretch()
+        
+        # Jingle Toggle
+        self.jingle_toggle = QPushButton("JINGLES")
+        self.jingle_toggle.setCheckable(True)
+        self.jingle_toggle.setObjectName("JingleToggle")
+        self.jingle_toggle.setStyleSheet("""
+            QPushButton#JingleToggle {
+                background-color: transparent;
+                border: 2px solid #333;
+                border-radius: 4px;
+                padding: 4px 18px;
+                color: #D81B60;
+                font-family: 'Agency FB';
+                font-weight: bold;
+                font-size: 10pt;
+                letter-spacing: 1px;
             }
-            QTabBar::tab:selected {
-                background: #3c3c3c;
-                border-color: #444;
+            QPushButton#JingleToggle:hover {
+                border-color: #D81B60;
+                color: white;
             }
-            QTabBar::tab:hover {
-                background: #333;
+            QPushButton#JingleToggle:checked {
+                background-color: #D81B60;
+                border-color: #D81B60;
+                color: white;
             }
         """)
+        self.jingle_toggle.clicked.connect(self.toggle_jingle_curtain)
+        header_layout.addWidget(self.jingle_toggle)
         
-        # Define Tab Data: (Label, [TypeIDs])
-        self.type_tabs = [
-            ("All", []),
-            ("Music", [1]),
-            ("Jingles", [2]),
-            ("Commercials", [3]),
-            ("Speech", [4, 5]),
-            ("Streams", [6]),
-        ]
+        center_layout.addWidget(header_container)
         
-        for label, _ in self.type_tabs:
-            self.type_tab_bar.addTab(label)
-        
+        # The Library Table
         self.library_model = QStandardItemModel()
         self.proxy_model = LibraryFilterProxyModel()
         self.proxy_model.setSourceModel(self.library_model)
@@ -230,10 +314,25 @@ class LibraryWidget(QWidget):
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.setSortingEnabled(True)
         self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        self.table_view.setMouseTracking(True) # Enable hover effects in delegate
+        self.table_view.setShowGrid(False)  # Blade-Edge: No vertical lines
+        self.table_view.verticalHeader().setVisible(False)
+        self.table_view.setAlternatingRowColors(True)
         
         # Use custom header with drop indicator
         custom_header = DropIndicatorHeaderView(Qt.Orientation.Horizontal, self.table_view)
         self.table_view.setHorizontalHeader(custom_header)
+
+        # Workstation Delegate (Visual Life)
+        self.delegate = WorkstationDelegate(self.field_indices, self.table_view, self)
+        self.table_view.setItemDelegate(self.delegate)
+        self._hovered_row = -1
+        
+        # Connect Hover Tracking
+        self.table_view.setMouseTracking(True)
+        self.table_view.entered.connect(self._on_item_entered)
+        # Clear hover when leaving viewport
+        self.table_view.viewport().installEventFilter(self)
         
         # Enable column reordering with visual feedback
         header = self.table_view.horizontalHeader()
@@ -242,23 +341,11 @@ class LibraryWidget(QWidget):
         header.setSectionsClickable(True)  # Required for highlight to work
         
         # T-18: Auto-save layout on move/resize
-        # We use proper methods to handle signals with suppression support
         header.sectionMoved.connect(self._on_column_moved)
         header.sectionResized.connect(self._on_column_resized)
         
-        # Style the header with visual feedback
-        header.setStyleSheet("""
-            QHeaderView::section {
-                padding: 4px;
-            }
-            QHeaderView::section:hover {
-                background-color: #3a3a3a;
-            }
-            QHeaderView::section:pressed {
-                background-color: rgba(74, 144, 217, 0.5);
-                color: white;
-            }
-        """)
+        # Style the header via objectName
+        header.setObjectName("LibraryHeader")
         
         # Enable Drag & Drop
         self.table_view.setAcceptDrops(True)
@@ -266,19 +353,31 @@ class LibraryWidget(QWidget):
         
         # Empty State Label
         self.empty_label = QLabel("Drag audio files here to import", self.table_view.viewport())
+        self.empty_label.setObjectName("LibraryEmptyLabel")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet("QLabel { color: gray; font-size: 14pt; font-weight: bold; }")
         self.empty_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.empty_label.hide()
         
-        center_layout.addWidget(self.search_box)
-        center_layout.addWidget(self.type_tab_bar)
+        # Assemble Center Layout
         center_layout.addWidget(self.table_view)
         
-        self.splitter.addWidget(self.filter_widget)
+        # Finalize Splitter (Sidebar Container [1] | Center Widget [2])
         self.splitter.addWidget(center_widget)
-        self.splitter.setStretchFactor(0, 1)
-        self.splitter.setStretchFactor(1, 3)
+        
+        # State Tracking & Constants
+        self._history_open = False
+        self._sidebar_base_width = 250
+        self._sidebar_expanded_width = 450
+        
+        # Set Initial Proportions
+        self.splitter.setStretchFactor(0, 0) # Sidebar stays fixed-ish
+        self.splitter.setStretchFactor(1, 1) # Table takes expansion
+        self.splitter.setSizes([self._sidebar_base_width + self._rail_width, 900])
+        
+        # Jingle Animation State
+        self.jingle_anim = QPropertyAnimation(self.jingle_curtain, b"curtainHeight")
+        self.jingle_anim.setDuration(450)
+        self.jingle_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
         
         main_layout.addWidget(self.splitter)
 
@@ -286,7 +385,6 @@ class LibraryWidget(QWidget):
         # Note: empty_label is transparent to mouse events, so no filter needed
         widgets_to_watch = [
             self.table_view.viewport(), 
-            self.search_box, 
             self.filter_widget
         ]
         if hasattr(self.filter_widget, 'tree_view'):
@@ -347,7 +445,9 @@ class LibraryWidget(QWidget):
         # 1. Custom Playlist Drag (Remove from Playlist)
         if mime.hasFormat("application/x-gosling-playlist-rows"):
             event.acceptProposedAction()
-            self.table_view.setStyleSheet("QTableView { border: 2px solid #F44336; }") # Red border for removal
+            self.table_view.setProperty("drag_status", "reject")
+            self.table_view.style().unpolish(self.table_view)
+            self.table_view.style().polish(self.table_view)
             return
 
         # 2. File Import
@@ -358,20 +458,25 @@ class LibraryWidget(QWidget):
                     ext = path.lower().split('.')[-1]
                     if ext in ['mp3', 'zip']:
                         event.acceptProposedAction()
-                        # Visual Feedback: Highlight Border (Green)
-                        self.table_view.setStyleSheet("QTableView { border: 2px solid #4CAF50; }")
+                        self.table_view.setProperty("drag_status", "accept")
+                        self.table_view.style().unpolish(self.table_view)
+                        self.table_view.style().polish(self.table_view)
                         return
         event.ignore()
 
     def dragLeaveEvent(self, event):
         """Reset visual feedback"""
-        self.table_view.setStyleSheet("")
+        self.table_view.setProperty("drag_status", "")
+        self.table_view.style().unpolish(self.table_view)
+        self.table_view.style().polish(self.table_view)
         event.accept()
 
     def dropEvent(self, event):
         """Handle dropped files or playlist items"""
         # Reset visual feedback immediately
-        self.table_view.setStyleSheet("")
+        self.table_view.setProperty("drag_status", "")
+        self.table_view.style().unpolish(self.table_view)
+        self.table_view.style().polish(self.table_view)
         
         mime = event.mimeData()
 
@@ -469,29 +574,11 @@ class LibraryWidget(QWidget):
         return extracted_paths
 
     def _setup_top_controls(self, parent_layout) -> None:
-        layout = QHBoxLayout()
-        self.btn_import = QPushButton("Import File(s)")
-        self.btn_scan_folder = QPushButton("Scan Folder")
-        self.btn_refresh = QPushButton("Refresh Library")
-        
-        self.chk_show_incomplete = QCheckBox("Show Incomplete Only")
-        
-        layout.addWidget(self.btn_import)
-        layout.addWidget(self.btn_scan_folder)
-        layout.addWidget(self.btn_refresh)
-        layout.addSpacing(20)
-        layout.addWidget(self.chk_show_incomplete)
-        layout.addStretch()
-        
-        parent_layout.addLayout(layout)
+        pass
 
     def _setup_connections(self) -> None:
-        self.btn_import.clicked.connect(self._import_files)
-        self.btn_scan_folder.clicked.connect(self._scan_folder)
-        self.btn_refresh.clicked.connect(self.load_library)
-        self.chk_show_incomplete.toggled.connect(self.load_library)
-        self.search_box.textChanged.connect(self._on_search)
-        self.type_tab_bar.currentChanged.connect(self._on_type_tab_changed)
+        """Setup internal signal/slot connections"""
+        # (Internal model signals, etc.)
         
         self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
         self.filter_widget.filter_by_unified_artist.connect(self._filter_by_unified_artist)
@@ -500,6 +587,7 @@ class LibraryWidget(QWidget):
         self.filter_widget.filter_by_status.connect(self._filter_by_status)
         self.filter_widget.filter_changed.connect(self._filter_by_field)  # Generic handler
         self.filter_widget.reset_filter.connect(lambda: self.load_library(refresh_filters=False))
+        self.filter_widget.incomplete_filter_toggled.connect(self._on_incomplete_toggled)
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table_view.doubleClicked.connect(self._on_table_double_click)
@@ -527,7 +615,7 @@ class LibraryWidget(QWidget):
         # 2. Load Data
         headers, data = self.library_service.get_all_songs()
         
-        if self.chk_show_incomplete.isChecked():
+        if self._show_incomplete:
             data = [
                 row for row in data 
                 if self._get_incomplete_fields(row)
@@ -574,32 +662,8 @@ class LibraryWidget(QWidget):
     def update_dirty_rows(self, dirty_ids: list):
         """Highlight rows that have unsaved changes in the side panel."""
         self._dirty_ids = set(str(id) for id in dirty_ids)
-        
-        # We need to find the column index for file_id to identify rows
-        id_col = self.field_indices.get('file_id', -1)
-        if id_col == -1: return
-
-        # Iterate through the model once
-        for row in range(self.library_model.rowCount()):
-            item = self.library_model.item(row, id_col)
-            if not item: continue
-            
-            # Normalize ID: Handle float (9.0) -> int (9) -> str ("9")
-            raw_val = item.data(Qt.ItemDataRole.UserRole)
-            try:
-                song_id = str(int(float(raw_val))) if raw_val is not None else ""
-            except (ValueError, TypeError):
-                song_id = str(raw_val)
-
-            is_dirty = song_id in self._dirty_ids
-            
-            # Application style: Light Orange/Amber for dirty
-            bg_color = QColor(255, 165, 0, 40) if is_dirty else None 
-            
-            for col in range(self.library_model.columnCount()):
-                cell = self.library_model.item(row, col)
-                if cell:
-                    cell.setBackground(bg_color if bg_color else QColor(Qt.GlobalColor.transparent))
+        # Notify the view to repaint
+        self.table_view.viewport().update()
 
     def _apply_incomplete_view_columns(self) -> None:
         """Show only columns that are required by the criteria."""
@@ -643,11 +707,23 @@ class LibraryWidget(QWidget):
                     if type_id in type_ids:
                         counts[i] += 1
         
-        # 2. Update Tab Labels
+        # 2. Update Pill Labels
+        shorthand = {
+            "All": "ALL",
+            "Music": "MUS",
+            "Jingles": "JIN",
+            "Commercials": "COM",
+            "Speech": "SP",
+            "Streams": "STR"
+        }
+
         for i in range(len(self.type_tabs)):
             label, _ = self.type_tabs[i]
             count = counts[i]
-            self.type_tab_bar.setTabText(i, f"{label} ({count})")
+            btn = self.pill_group.button(i)
+            if btn:
+                short = shorthand.get(label, label)
+                btn.setText(f"{short} ({count})")
 
     def _populate_table(self, headers, data) -> None:
         """Populate the table with data, preserving layout state."""
@@ -672,7 +748,7 @@ class LibraryWidget(QWidget):
                 ui_headers = [f.ui_header for f in yellberus.FIELDS]
                 self.library_model.setHorizontalHeaderLabels(ui_headers)
             
-            show_incomplete = self.chk_show_incomplete.isChecked()
+            show_incomplete = self._show_incomplete
 
             for row_data in data:
                 # Always calculate completeness for validation
@@ -728,8 +804,6 @@ class LibraryWidget(QWidget):
                         if col_idx < len(yellberus.FIELDS):
                             field_name = yellberus.FIELDS[col_idx].name
                             if field_name and field_name in failing_fields:
-                                # Light Red Background
-                                item.setBackground(QColor("#FFCDD2"))
                                 item.setToolTip(f"{field_name} is incomplete")
 
                     items.append(item)
@@ -742,7 +816,7 @@ class LibraryWidget(QWidget):
             if not layout:
                 self.table_view.resizeColumnsToContents()
 
-            if self.chk_show_incomplete.isChecked():
+            if self._show_incomplete:
                 self._apply_incomplete_view_columns()
             else:
                 self._load_column_layout()
@@ -923,8 +997,14 @@ class LibraryWidget(QWidget):
             f"Imported {imported_count} file(s)"
         )
 
-    def _on_search(self, text) -> None:
-        self.proxy_model.setFilterRegularExpression(text)
+    def _on_pill_clicked(self, index: int) -> None:
+        """Handle pill button click"""
+        self._on_type_tab_changed(index)
+
+    def _on_incomplete_toggled(self, checked: bool) -> None:
+        """Handle incomplete filter toggle"""
+        self._show_incomplete = checked
+        self.load_library(refresh_filters=False)
 
     def _get_colored_icon(self, standard_pixmap) -> QIcon:
         """Helper to invert icon colors for visibility on dark backgrounds"""
@@ -956,7 +1036,25 @@ class LibraryWidget(QWidget):
     def _show_table_context_menu(self, position) -> None:
         menu = QMenu()
         
-        # 1. Playback / Primary Actions
+        # 1. Global / Library Actions
+        import_action = QAction("Import File(s)", self)
+        import_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
+        import_action.triggered.connect(self._import_files)
+        menu.addAction(import_action)
+
+        scan_action = QAction("Scan Folder", self)
+        scan_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_DirIcon))
+        scan_action.triggered.connect(self._scan_folder)
+        menu.addAction(scan_action)
+
+        refresh_action = QAction("Refresh Library", self)
+        refresh_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_BrowserReload))
+        refresh_action.triggered.connect(lambda: self.load_library())
+        menu.addAction(refresh_action)
+
+        menu.addSeparator()
+
+        # 2. Playback / Primary Actions
         add_to_playlist_action = QAction("Add to Playlist", self)
         add_to_playlist_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay))
         add_to_playlist_action.triggered.connect(self._emit_add_to_playlist)
@@ -1224,7 +1322,7 @@ class LibraryWidget(QWidget):
     def _save_column_layout(self) -> None:
         """Save column layout (order, visibility, widths) to settings."""
         # Do not save if we are in "Incomplete View" mode
-        if self.chk_show_incomplete.isChecked():
+        if self._show_incomplete:
             return
             
         header = self.table_view.horizontalHeader()
@@ -1334,10 +1432,104 @@ class LibraryWidget(QWidget):
         elif saved > 0:
             print(f"[Save] Saved {saved} song(s); {len(errors)} failures")
 
+    def toggle_jingle_curtain(self):
+        """Triggers the drop-down animation for the Jingle Bay."""
+        if self.jingle_toggle.isChecked():
+            self.jingle_anim.setStartValue(0)
+            self.jingle_anim.setEndValue(260) # Full Bay height
+        else:
+            self.jingle_anim.setStartValue(self.jingle_curtain.height())
+            self.jingle_anim.setEndValue(0)
+            
+        self.jingle_anim.start()
+
+    # Mechanical Sidebar Swap Properties
+    @pyqtProperty(int)
+    def filterWidth(self):
+        return self.filter_widget.width()
+
+    @filterWidth.setter
+    def filterWidth(self, width):
+        self.filter_widget.setFixedWidth(width)
+
+    @pyqtProperty(int)
+    def totalSidebarWidth(self):
+        return self.splitter.sizes()[0]
+
+    @totalSidebarWidth.setter
+    def totalSidebarWidth(self, width):
+        # Update the splitter to track the handle during flight
+        self.splitter.setSizes([width, self.width() - width])
+
+    def toggle_history_drawer(self):
+        """Synchronized Mechanical Swap: Handle pulls Log left, pushing Filter away."""
+        if not hasattr(self, "_swap_group"):
+            self._swap_group = QParallelAnimationGroup(self)
+            
+            # Anim A: History Log growth (drawerWidth is a property of HistoryDrawer)
+            self._history_anim = QPropertyAnimation(self.history_drawer, b"drawerWidth")
+            self._history_anim.setDuration(500)
+            self._history_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
+            
+            # Anim B: Filter Tree shrink (filterWidth is a property of self)
+            self._filter_anim = QPropertyAnimation(self, b"filterWidth")
+            self._filter_anim.setDuration(500)
+            self._filter_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
+            
+            # Anim C: Total Sidebar Width Adjustment (totalSidebarWidth is a property of self)
+            self._splitter_anim = QPropertyAnimation(self, b"totalSidebarWidth")
+            self._splitter_anim.setDuration(500)
+            self._splitter_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
+            
+            self._swap_group.addAnimation(self._history_anim)
+            self._swap_group.addAnimation(self._filter_anim)
+            self._swap_group.addAnimation(self._splitter_anim)
+
+        if self._history_open:
+            # Back to Filters (Move handle RIGHT)
+            self._history_anim.setStartValue(self._history_target_width)
+            self._history_anim.setEndValue(0)
+            self._filter_anim.setStartValue(0)
+            self._filter_anim.setEndValue(self._filter_base_width)
+            self._splitter_anim.setStartValue(self._history_target_width + self._rail_width)
+            self._splitter_anim.setEndValue(self._filter_base_width + self._rail_width)
+        else:
+            # Pull Log Out (Move handle LEFT)
+            self._history_anim.setStartValue(0)
+            self._history_anim.setEndValue(self._history_target_width)
+            self._filter_anim.setStartValue(self._filter_base_width)
+            self._filter_anim.setEndValue(0)
+            self._splitter_anim.setStartValue(self._filter_base_width + self._rail_width)
+            self._splitter_anim.setEndValue(self._history_target_width + self._rail_width)
+            
+        self._swap_group.start()
+        self._history_open = not self._history_open
+
+    def _on_item_entered(self, index) -> None:
+        """Track the hovered row for row-wide highlighting."""
+        if index.isValid():
+            self._hovered_row = index.row()
+            self.table_view.viewport().update()
+
+    def eventFilter(self, source, event) -> bool:
+        """Clear hovered row when mouse leaves the table viewport."""
+        try:
+            from PyQt6.QtCore import QEvent
+            if source is self.table_view.viewport() and event.type() == QEvent.Type.Leave:
+                self._hovered_row = -1
+                self.table_view.viewport().update()
+        except RuntimeError:
+            pass # Object already deleted during shutdown
+        return super().eventFilter(source, event)
+
+    def set_search_text(self, text: str) -> None:
+        """Public slot for global search box."""
+        self.proxy_model.setFilterFixedString(text)
+
     def focus_search(self) -> None:
-        """Focus the search box and select its contents (Ctrl+F)."""
-        self.search_box.setFocus()
-        self.search_box.selectAll()
+        """Request focus for the global search box."""
+        # We emit a signal so MainWindow can focus the correct widget
+        self.focus_search_requested.emit()
 
     def _toggle_status(self, new_status: bool) -> None:
         """Bulk update status for selected rows with validation"""

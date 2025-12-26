@@ -9,6 +9,7 @@ class FilterWidget(QWidget):
     # Signals - one generic signal with (field_name, value)
     filter_changed = pyqtSignal(str, object)  # (field_name, value)
     reset_filter = pyqtSignal()
+    incomplete_filter_toggled = pyqtSignal(bool)
     
     # Legacy signals for backward compatibility
     filter_by_performer = pyqtSignal(str)
@@ -25,14 +26,22 @@ class FilterWidget(QWidget):
 
     def _init_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        from PyQt6.QtWidgets import QCheckBox
+        self.chk_show_incomplete = QCheckBox("Show Incomplete Only")
+        self.chk_show_incomplete.setObjectName("FilterCheckbox")
+        self.chk_show_incomplete.toggled.connect(self.incomplete_filter_toggled.emit)
+        layout.addWidget(self.chk_show_incomplete)
 
         self.tree_model = QStandardItemModel()
         self.tree_view = QTreeView()
+        self.tree_view.setObjectName("FilterTree")
         self.tree_view.setModel(self.tree_model)
         self.tree_view.setHeaderHidden(True)
         self.tree_view.clicked.connect(self._on_tree_clicked)
         self.tree_view.setExpandsOnDoubleClick(False)
+        self.tree_view.setIndentation(12) # Tighter grouping
         self.tree_view.doubleClicked.connect(self._on_tree_double_clicked)
         
         layout.addWidget(self.tree_view)

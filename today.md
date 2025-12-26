@@ -24,6 +24,7 @@
 2.  **Deploy the Inspector (The Album Manager T-46)**: 
     *   Songs need to be linked to Album *Entities*, not just text strings.
     *   This is the prerequisite for the "Relational View" in the sidebar.
+
 3.  **The Master Deck (The Player)**: 
     *   Move from the minimalist line to a "Production Deck" with large countdowns.
 
@@ -42,6 +43,13 @@
 1.  **T-46 Proper Album Editor (P0)**: This is the next target. It needs to be less of a text box and more of a "Manager" (Search existing albums, add covers).
 2.  **Grid Styling (Blade-Edge)**: [DONE] stripped vertical lines, high-density row heights, and workstation colors in `theme.qss`.
 3.  **Status Visuals**: Replace the "Done" checkbox with a "Ready/AIR" badge or colored pill.
+4.  **Shell Mandate (T-49)**: [DONE] Implemented a custom frameless window shell.
+    *   **Custom Title Bar**: Draggable logo strip with global search.
+    *   **Standard Feature Re-implementations**: 
+        *   Double-click to Maximize/Restore.
+        *   Bottom-Right QSizeGrip with diagonal triangle styling.
+        *   System controls (Min/Max/Close) with 'Emergency Red' exit.
+    *   **CSS Extraction**: Scrubbed 100+ lines of hardcoded styling. Everything is now in `theme.qss`.
 
 ### Key References:
 - `design/UX_UI_CONSTITUTION.md`: The new North Star for UI.

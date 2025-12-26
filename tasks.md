@@ -44,9 +44,11 @@ links: []
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](design/done/T-02_field_registry.md) |
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
 | T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
-| T-49 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
+| T-49 | **Layout Conversion** | 5 | 4 | 20 | ✅ | [spec](design/specs/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) — Transformation to Frameless Workstation. |
+| T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | 🚀 | [handover](design/handover/HANDOVER_SURGICAL_REFIT.md) — Split view for Editor/Playlist. |
 | T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | 📋 | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
 | T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` and ID3 writes. |
+| T-52 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -56,6 +58,7 @@ links: []
 | T-05 | **Audit Log (History)** | 5 | 2 | 20 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [design/LOGGING.md](design/LOGGING.md) |
+| T-53 | **UI Polish (Cyber)** | 4 | 2 | 8 | 📋 | — | Recolor App Icon to Pink; Evaluate Intensity; Library Grid Tinting. |
 | T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
 | T-36 | **Architecture Map Update** | 3 | 2 | 6 | 📋 | Post-0.1 | Update [ARCHITECTURE.md](ARCHITECTURE.md) — Missing: `src/core/`, `tools/`, `album.py`, `tag.py`, new repos. Schema section outdated. *Logged by Vesper.* |
 

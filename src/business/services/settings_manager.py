@@ -11,6 +11,7 @@ class SettingsManager:
     KEY_WINDOW_GEOMETRY = "window/geometry"
     KEY_WINDOW_SIZE = "window/size"
     KEY_MAIN_SPLITTER_STATE = "window/mainSplitterState"
+    KEY_V_SPLITTER_STATE = "window/vSplitterState"
     KEY_RIGHT_PANEL_TAB = "window/rightPanelTab"
     
     # Library settings
@@ -63,6 +64,14 @@ class SettingsManager:
     def set_main_splitter_state(self, state: QByteArray) -> None:
         """Save main splitter state"""
         self._settings.setValue(self.KEY_MAIN_SPLITTER_STATE, state)
+    
+    def get_v_splitter_state(self) -> Optional[QByteArray]:
+        """Get saved vertical splitter state"""
+        return self._settings.value(self.KEY_V_SPLITTER_STATE)
+    
+    def set_v_splitter_state(self, state: QByteArray) -> None:
+        """Save vertical splitter state"""
+        self._settings.setValue(self.KEY_V_SPLITTER_STATE, state)
     
     def get_right_panel_tab(self) -> int:
         """Get last selected right panel tab (0 = Playlist, 1 = Editor)"""

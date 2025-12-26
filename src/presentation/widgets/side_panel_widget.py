@@ -36,41 +36,25 @@ class SidePanelWidget(QWidget):
         
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 10, 10, 0)
         
         # 1. Header Area
         self.header_label = QLabel("No Selection")
-        self.header_label.setStyleSheet("font-size: 13pt; font-weight: bold; color: #E0E0E0;")
+        self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
         layout.addWidget(self.header_label)
 
         # 1b. Projected Path Feedback
         self.lbl_projected_path = QLabel("")
-        self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #888; font-size: 9pt;")
+        self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
         self.lbl_projected_path.setWordWrap(True)
         self.lbl_projected_path.setVisible(False)
         layout.addWidget(self.lbl_projected_path)
         
         # 2. Workflow State (MARK DONE)
         self.btn_done = QPushButton("✅ MARK DONE")
+        self.btn_done.setObjectName("MarkDoneButton")
         self.btn_done.setCheckable(True)
-        self.btn_done.setStyleSheet("""
-            QPushButton { 
-                background-color: #333; 
-                color: #888; 
-                font-weight: bold; 
-                padding: 12px; 
-                border: 1px solid #444;
-                border-radius: 4px;
-            }
-            QPushButton:checked { 
-                background-color: #2E7D32; 
-                color: white; 
-                border: 1px solid #4CAF50;
-            }
-            QPushButton:hover:!checked { background-color: #444; }
-            QPushButton:disabled { background-color: #1a1a1a; color: #555; }
-        """)
         self.btn_done.clicked.connect(self._on_done_toggled)
         self.btn_done.setEnabled(False) # Default to disabled (No selection)
         layout.addWidget(self.btn_done)
@@ -90,26 +74,16 @@ class SidePanelWidget(QWidget):
         # 4. Footer Actions (Save / Discard)
         footer_frame = QFrame()
         footer_frame.setObjectName("Footer")
-        footer_frame.setStyleSheet("QFrame#Footer { border-top: 1px solid #333; }")
         
         footer_layout = QHBoxLayout(footer_frame)
         footer_layout.setContentsMargins(0, 10, 0, 0)
         
         self.btn_discard = QPushButton("Discard")
+        self.btn_discard.setObjectName("DiscardButton")
         self.btn_discard.clicked.connect(self._on_discard_clicked)
         
         self.btn_save = QPushButton("SAVE ALL")
-        self.btn_save.setStyleSheet("""
-            QPushButton { 
-                font-weight: bold; 
-                padding: 8px 16px; 
-                background-color: #1976D2;
-                color: white;
-                border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #1E88E5; }
-            QPushButton:disabled { background-color: #222; color: #666; }
-        """)
+        self.btn_save.setObjectName("SaveAllButton")
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
         
@@ -161,7 +135,7 @@ class SidePanelWidget(QWidget):
             if not fields: return
             
             group_label = QLabel(title.upper())
-            group_label.setStyleSheet("color: #555; font-size: 8pt; font-weight: bold; margin-top: 10px; border-bottom: 1px solid #222;")
+            group_label.setObjectName("FieldGroupLabel")
             self.field_layout.addWidget(group_label)
             
             for field in fields:
@@ -182,7 +156,7 @@ class SidePanelWidget(QWidget):
                 if field.required:
                     label_text += " *"
                 label = QLabel(label_text)
-                label.setStyleSheet("color: #999; font-size: 8.5pt; font-weight: bold;")
+                label.setObjectName("FieldLabel")
                 
                 # Determine Current Effective Value
                 effective_val, is_multiple = self._calculate_bulk_value(field)
@@ -205,7 +179,6 @@ class SidePanelWidget(QWidget):
 
         if is_bool:
             cb = QCheckBox()
-            cb.setStyleSheet("QCheckBox { font-size: 10pt; spacing: 5px; }")
             # Handle string 'True'/'False' from some legacy paths just in case
             val_bool = str(value).lower() in ("true", "1", "yes") if isinstance(value, str) else bool(value)
             
@@ -216,7 +189,6 @@ class SidePanelWidget(QWidget):
             
         # Default: Line Edit for Alpha
         edit = QLineEdit()
-        edit.setStyleSheet("QLineEdit { font-size: 10pt; padding: 3px; }")
         if is_multiple:
             edit.setPlaceholderText("(Multiple Values)")
         else:
@@ -247,53 +219,41 @@ class SidePanelWidget(QWidget):
         """
         from ...utils.validation import validate_isrc
         
-        # Base Properties
-        base_props = "font-size: 10pt; padding: 3px;"
-        
-        # Helper to format full sheet
-        def make_style(extra=""):
-            return f"QLineEdit {{ {base_props} {extra} }}"
-
-        # Reset State
-        self.isrc_collision = False
-
         # Empty is valid (ISRC is optional)
         if not text or not text.strip():
-            widget.setStyleSheet(make_style())
+            widget.setProperty("invalid", False)
             widget.setToolTip("")
-            self._update_save_state()
-            return
         
         # 1. Validate Format
-        if not validate_isrc(text):
-            widget.setStyleSheet(make_style("color: #DC3232;"))
+        elif not validate_isrc(text):
+            widget.setProperty("invalid", True)
             widget.setToolTip("Invalid ISRC Format")
-            self._update_save_state()
-            return
         
         # 2. Check Duplicates (Phase 3)
-        duplicate = self.duplicate_scanner.check_isrc_duplicate(text)
-        if duplicate:
-            # Check if self-match (ignore if editing the song that owns this ISRC)
-            is_self_match = False
-            if self.current_songs and len(self.current_songs) == 1:
-                if str(self.current_songs[0].source_id) == str(duplicate.source_id):
-                    is_self_match = True
-            
-            if not is_self_match:
-                self.isrc_collision = True
-                # Amber/Orange for Warning
-                widget.setStyleSheet(make_style("color: #FF9800; font-weight: bold;"))
-                widget.setToolTip(f"Duplicate ISRC found: {duplicate.name}")
-            else:
-                # Valid (Self)
-                widget.setStyleSheet(make_style())
-                widget.setToolTip("")
         else:
-            # Valid (New)
-            widget.setStyleSheet(make_style())
-            widget.setToolTip("")
+            duplicate = self.duplicate_scanner.check_isrc_duplicate(text)
+            if duplicate:
+                # Check if self-match
+                is_self_match = False
+                if self.current_songs and len(self.current_songs) == 1:
+                    if str(self.current_songs[0].source_id) == str(duplicate.source_id):
+                        is_self_match = True
+                
+                if not is_self_match:
+                    self.isrc_collision = True
+                    widget.setProperty("warning", True)
+                    widget.setToolTip(f"Duplicate ISRC found: {duplicate.name}")
+                else:
+                    widget.setProperty("invalid", False)
+                    widget.setProperty("warning", False)
+                    widget.setToolTip("")
+            else:
+                widget.setProperty("invalid", False)
+                widget.setProperty("warning", False)
+                widget.setToolTip("")
 
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
         self._update_save_state()
     
     def _calculate_bulk_value(self, field_def):
@@ -387,10 +347,13 @@ class SidePanelWidget(QWidget):
         # Check Collision (Phase 3)
         if self.isrc_collision:
             self.btn_save.setText("Save (Duplicate ISRC)")
-            self.btn_save.setStyleSheet("background-color: #F44336; color: white; font-weight: bold;")
+            self.btn_save.setProperty("alert", True)
         else:
             self.btn_save.setText("Save Changes")
-            self.btn_save.setStyleSheet("") # Default
+            self.btn_save.setProperty("alert", False)
+
+        self.btn_save.style().unpolish(self.btn_save)
+        self.btn_save.style().polish(self.btn_save)
 
         self._update_projected_path()
 
@@ -509,40 +472,18 @@ class SidePanelWidget(QWidget):
             if staged_song.path and os.path.normpath(staged_song.path) == os.path.normpath(target):
                  is_self = True
             
-            if not is_self and self.renaming_service.check_conflict(target):
-                self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #ff5252; font-size: 9pt;") # Red
-                # Also turn Save button Red as a warning
-                current_style = self.btn_save.styleSheet()
-                if "background-color: #D32F2F" not in current_style:
-                     self.btn_save.setStyleSheet("""
-                        QPushButton { 
-                            font-weight: bold; 
-                            padding: 8px 16px; 
-                            background-color: #D32F2F;
-                            color: white;
-                            border-radius: 4px;
-                        }
-                        QPushButton:hover { background-color: #B71C1C; }
-                        QPushButton:disabled { background-color: #222; color: #666; }
-                     """)
-            else:
-                self.lbl_projected_path.setStyleSheet("font-family: Consolas; color: #888; font-size: 9pt;") # Grey
-                # Restore Default Blue (if it was Red)
-                current_style = self.btn_save.styleSheet()
-                if "background-color: #D32F2F" in current_style:
-                    self.btn_save.setStyleSheet("""
-                        QPushButton { 
-                            font-weight: bold; 
-                            padding: 8px 16px; 
-                            background-color: #1976D2;
-                            color: white;
-                            border-radius: 4px;
-                        }
-                        QPushButton:hover { background-color: #1E88E5; }
-                        QPushButton:disabled { background-color: #222; color: #666; }
-                    """)
+            has_conflict = not is_self and self.renaming_service.check_conflict(target)
+            self.lbl_projected_path.setProperty("conflict", has_conflict)
+            self.btn_save.setProperty("alert", has_conflict)
+            
+            self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
+            self.lbl_projected_path.style().polish(self.lbl_projected_path)
+            self.btn_save.style().unpolish(self.btn_save)
+            self.btn_save.style().polish(self.btn_save)
 
         except Exception as e:
             self.lbl_projected_path.setText(f"Path Error: {e}")
             self.lbl_projected_path.setVisible(True)
-            self.lbl_projected_path.setStyleSheet("color: red")
+            self.lbl_projected_path.setProperty("conflict", True)
+            self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
+            self.lbl_projected_path.style().polish(self.lbl_projected_path)

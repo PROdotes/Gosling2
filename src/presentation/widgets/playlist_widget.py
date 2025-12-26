@@ -11,8 +11,8 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.performer_font = QFont("Arial", 12, QFont.Weight.Bold)
-        self.title_font = QFont("Arial", 10)
+        self.performer_font = QFont("Bahnschrift Condensed", 12, QFont.Weight.Bold)
+        self.title_font = QFont("Bahnschrift Condensed", 10)
 
     ITEM_SPACING = 4 # Gap between items in pixels
 
@@ -30,9 +30,13 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 
         # Background
         if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(visual_rect, QColor("#1E5096"))
+            painter.fillRect(visual_rect, QColor("#D81B60")) # Theme Pink Selection
         else:
-            painter.fillRect(visual_rect, QColor("#444444"))
+            painter.fillRect(visual_rect, QColor("#111111")) # Machined Black 
+            # Add subtle bottom line
+            painter.setPen(QColor("#000"))
+            painter.drawLine(visual_rect.bottomLeft(), visual_rect.bottomRight())
+        
 
         # Circle (right side)
         circle_diameter = int(visual_rect.height() * 0.75)

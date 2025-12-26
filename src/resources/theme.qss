@@ -3,51 +3,244 @@
 
 /* --- GLOBAL WIDGETS --- */
 QWidget {
-    background-color: #121212;
+    background-color: #0A0A0A; /* Deeper Workstation Floor */
     color: #E0E0E0;
     font-family: "Segoe UI", sans-serif;
     font-size: 10pt;
 }
 
+/* Machine-Printed Chassis Labels */
+QLabel {
+    color: #CCCCCC; /* Technical Silver (Crisp) */
+    font-weight: bold;
+    font-family: "Agency FB", "Bahnschrift Condensed", "Segoe UI Semibold", sans-serif;
+    font-size: 10pt; /* Slightly clearer */
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    /* Crisp Edge Shadow */
+    qproperty-alignment: 'AlignVCenter';
+}
+QLabel:disabled {
+    color: #555;
+}
+
 QFrame, QDialog {
-    background-color: #181818;
+    background-color: #080808;
     border: none;
 }
 
-/* --- SCROLL BARS (Modern & Slim) --- */
+QSplitter::handle {
+    background-color: #000;
+}
+
+QSplitter::handle:horizontal {
+    width: 2px;
+    border-right: 1px solid #1A1A1A;
+}
+
+QSplitter::handle:vertical {
+    height: 2px;
+    border-bottom: 1px solid #1A1A1A;
+}
+
+QSplitter::handle:hover {
+    background-color: #D81B60; /* Neon highlight on hover */
+}
+
+/* --- SCROLL BARS (Hydraulic Sliders) --- */
 QScrollBar:vertical {
     border: none;
-    background: #121212;
-    width: 10px;
-    margin: 0px 0px 0px 0px;
+    background: #080808; /* Deep Track */
+    width: 12px;
+    margin: 0px;
 }
 QScrollBar::handle:vertical {
-    background: #444;
+    /* Machined Cylinder Look */
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                               stop:0 #222, 
+                               stop:0.5 #444,
+                               stop:1 #222);
     min-height: 20px;
-    border-radius: 5px;
+    border-radius: 6px;
+    margin: 2px;
+    border: 1px solid #111;
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
 }
-QScrollBar::handle:vertical:hover { background: #666; }
+QScrollBar::handle:vertical:hover { 
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                               stop:0 #333, 
+                               stop:0.5 #555,
+                               stop:1 #333);
+}
 
+/* --- INPUT FIELDS (Recessed Data Terminals) --- */
+QLineEdit, QPlainTextEdit {
+    background-color: #050505; /* Deep Void */
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
+    border-right: 1px solid #1A1A1A;
+    border-bottom: 1px solid #222;
+    border-radius: 3px;
+    padding: 5px 8px;
+    color: #E0E0E0;
+    font-family: 'Consolas', 'Segoe UI', monospace;
+    font-size: 10pt;
+    selection-background-color: #D81B60;
+}
 
-/* --- INPUT FIELDS --- */
-QLineEdit, QComboBox, QPlainTextEdit {
-    background-color: #252525;
+/* Glass Data Selector (ComboBox) */
+QComboBox {
+    background-color: #080808;
     border: 1px solid #333;
     border-radius: 4px;
-    padding: 6px;
-    color: #FFF;
-    selection-background-color: #D81B60; /* Pink Accent Selection */
+    padding: 5px 8px; /* Increased vertical padding to match buttons */
+    min-height: 20px; /* Ensure optical height matches adjacent controls */
+    color: #BBB;
+    font-family: "Agency FB", "Bahnschrift Condensed";
+    font-size: 11pt;
+    font-weight: bold;
+    letter-spacing: 1px;
 }
-QLineEdit:focus, QComboBox:focus {
-    border: 1px solid #D81B60; /* Pink Accent Focus */
+QComboBox:hover {
+    border: 1px solid #D81B60; /* Neon Edge */
+    color: white;
+}
+QComboBox:on { /* When expanded */
+    border-bottom: 1px solid #D81B60;
+}
+
+/* Kill the dropdown button, let Fusion handle the arrow */
+QComboBox::drop-down {
+    border: none;
+    background: transparent;
+}
+
+QComboBox::down-arrow {
+    image: url(Gosling2/src/resources/arrow_down.svg);
+    width: 8px;
+    height: 6px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #121212;
+    border: 1px solid #333;
+    selection-background-color: #D81B60;
+    color: #CCC;
+    outline: none;
+}
+
+/* Machine-Printed Chassis Labels (Stealth Mode) */
+QLabel {
+    background: transparent; /* KEY FIX: Kill the box */
+    background-color: transparent;
+    color: #555555; /* Deep Titanium - Recessed */
+    font-weight: bold;
+    font-family: "Agency FB", "Bahnschrift Condensed", "Segoe UI Semibold", sans-serif;
+    font-size: 10pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    qproperty-alignment: 'AlignVCenter';
+}
+QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {
+    border: 1px solid #D81B60; /* Neon Activation */
+    background-color: #080808;
+    color: white;
+}
+QLineEdit[invalid="true"] {
+    border: 1px solid #D32F2F;
+    color: #FF5252;
 }
 QLineEdit:disabled {
-    background-color: #1a1a1a;
-    color: #555;
-    border: 1px solid #222;
+    background-color: #121212;
+    color: #444;
+    border: 1px solid #1A1A1A;
+}
+
+/* --- TREE VIEW (Filter Deck) --- */
+/* --- FILTER DECK (Left Channel) --- */
+QTreeView#FilterTree {
+    background-color: #0A0A0A;
+    alternate-background-color: #0F0F0F;
+    border: none;
+    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
+    font-size: 11pt; /* Slightly bigger for the condensed font */
+    outline: none;
+    padding-top: 8px;
+    show-decoration-selected: 1; /* Highlight full row */
+}
+
+QTreeView#FilterTree::item {
+    padding: 3px 4px;
+    border: none;
+    border-bottom: 1px solid #111; /* Add structure */
+    color: #AAA;
+}
+
+QTreeView#FilterTree::item:selected {
+    background-color: #2D0313; /* Deep Pink Wash */
+    color: white;
+}
+
+QTreeView#FilterTree::item:hover {
+    background-color: transparent; /* No blocky background */
+    color: #FFF; /* Brighten text on hover */
+}
+
+/* Branch Styling */
+QTreeView#FilterTree::branch {
+    background: transparent;
+}
+QTreeView#FilterTree::branch:hover {
+    background: transparent;
+}
+QTreeView#FilterTree::branch:selected {
+    background-color: #2D0313; /* Kill the Orange */
+}
+QTreeView#FilterTree::branch:selected:hover {
+    background-color: #2D0313;
+}
+
+QTreeView#FilterTree::branch:has-children:!has-siblings:closed,
+QTreeView#FilterTree::branch:closed:has-children:has-siblings {
+    border-image: none;
+    image: url(Gosling2/src/resources/chevron_right.svg);
+}
+QTreeView#FilterTree::branch:open:has-children:!has-siblings,
+QTreeView#FilterTree::branch:open:has-children:has-siblings {
+    border-image: none;
+    image: url(Gosling2/src/resources/chevron_down.svg);
+}
+
+/* System Toggles (Filter Checkbox) */
+QCheckBox#FilterCheckbox {
+    spacing: 8px;
+    color: #BBB; /* Fixed: High Contrast */
+    font-family: "Agency FB", "Bahnschrift Condensed";
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    padding: 8px;
+    border-bottom: 1px solid #222;
+}
+QCheckBox#FilterCheckbox:hover {
+    color: white;
+    background-color: #111;
+}
+QCheckBox#FilterCheckbox:checked {
+    color: #D81B60; /* Neon Pink Text */
+}
+QCheckBox#FilterCheckbox::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #444;
+    background: #111;
+    border-radius: 2px;
+}
+QCheckBox#FilterCheckbox::indicator:checked {
+    background: #D81B60;
+    border-color: #FF4081;
 }
 
 /* --- BUTTONS --- */
@@ -59,12 +252,41 @@ QPushButton {
     border-radius: 4px;
     font-weight: bold;
 }
-QPushButton:hover {
-    background-color: #444;
-    border-color: #777;
-}
 QPushButton:pressed {
     background-color: #222;
+}
+
+/* Category Pills (LCARS Workstation Style) */
+QPushButton#CategoryPill {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                     stop:0 #2A2A2A,    /* Top edge glint */
+                                     stop:0.1 #1A1A1A,  /* Main surface */
+                                     stop:0.9 #1A1A1A, 
+                                     stop:1.0 #080808); /* Bottom shadow edge */
+    border: 1px solid #050505;
+    border-radius: 6px;
+    padding: 6px 16px;
+    min-width: 80px; /* Wider physical footprint */
+    font-size: 8.5pt;
+    font-family: "Tw Cen MT Condensed Bold", "Bahnschrift Condensed", sans-serif;
+    font-weight: bold;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+QPushButton#CategoryPill:hover {
+    border-color: #D81B60; /* Neon highlight on proximity */
+    color: #BBB;
+}
+QPushButton#CategoryPill:checked {
+    /* Backlit Neon Glow */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                     stop:0 #FF4081,    /* High-vibrancy top */
+                                     stop:0.4 #D81B60,  /* Core color */
+                                     stop:0.95 #880E4F, /* Deep shadow */
+                                     stop:1.0 #450626); 
+    border-color: #000;
+    color: white;
 }
 /* Primary Action Button (Blue/Pink override usually applied via ID) */
 QPushButton#PrimaryButton {
@@ -76,51 +298,416 @@ QPushButton#PrimaryButton:hover {
     background-color: #C2185B;
 }
 
-/* --- TABLE VIEW (Library) --- */
+/* --- TABLE VIEW (Library / Blade-Edge) --- */
 QTableView {
-    background-color: #1E1E1E;
-    alternate-background-color: #252525;
-    gridline-color: #333;
-    selection-background-color: #D81B60; /* Pink Accent */
-    selection-color: white;
+    background-color: #0F0F0F; /* Deeper Black */
+    alternate-background-color: #141414; /* Very subtle scanline */
+    selection-background-color: transparent; 
+    selection-color: transparent;            
+    outline: none;
+    gridline-color: transparent;
     border: none;
-}
-QHeaderView::section {
-    background-color: #2C2C2C;
-    padding: 6px;
-    border: none;
-    border-right: 1px solid #333;
-    border-bottom: 1px solid #333;
-    font-weight: bold;
-    color: #BBB;
-}
-QTableView QTableCornerButton::section {
-    background-color: #2C2C2C;
-    border: none;
+    font-size: 11pt;
 }
 
-/* --- SIDE PANEL SPECIFIC --- */
-QLabel { color: #BBB; }
-QLabel#HeaderLabel {
-    font-size: 14pt;
+/* --- MAIN SECTIONS (TABS - Cyber Pills) --- */
+QTabBar::tab {
+    background: #1A1A1A;
+    border: 1px solid #333;
+    padding: 6px 20px;
+    margin-right: 6px;
+    margin-bottom: 2px; /* Detach */
+    color: #888;
     font-weight: bold;
+    border-radius: 4px; /* All-round */
+    text-transform: uppercase;
+    min-width: 80px;
+}
+
+QTabBar::tab:selected {
+    background: #D81B60;
+    color: white;
+    border: 1px solid #FF4081;
+}
+
+QTabBar::tab:hover:!selected {
+    background: #252525;
+    color: #BBB;
+    border-color: #555;
+}
+
+QTabWidget::pane {
+    border: 1px solid #333;
+    border-top: 1px solid #D81B60; /* Neon Header Line */
+    background: #0A0A0A;
+    border-radius: 4px;
+}
+
+QTableView {
+    background-color: #0A0A0A;
+    gridline-color: #151515;
+    border: none;
+    selection-background-color: #D81B60;
+    alternate-background-color: #080808;
+}
+
+QTableView[drag_status="accept"] {
+    border: 1px solid #4CAF50;
+}
+QTableView[drag_status="reject"] {
+    border: 1px solid #F44336;
+}
+
+#LibraryHeader::section {
+    padding: 10px 12px;
+    /* Deep-Etch Bevel: Pronounced edge for a 'Heavy Plastic' feel */
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                     stop:0 #3A3A3A,    /* Highlight glint */
+                                     stop:0.04 #1E1E1E, /* Solid face color */
+                                     stop:0.75 #1E1E1E, /* Face end */
+                                     stop:1.0 #000000); /* Deep etched shadow */
+    border: none;
+    border-right: 1px solid #050505; 
+    border-bottom: 2px solid #D81B60; 
+    
+    /* Simulate 'Taller & Narrower' via negative tracking and increased size */
+    font-family: "Tw Cen MT Condensed Bold", "Bahnschrift Condensed", sans-serif;
+    font-weight: 800;
+    color: #BBB; /* Backlit readout vibrance */
+    text-transform: uppercase;
+    font-size: 14pt; /* Much bigger/taller */
+    letter-spacing: -0.2px; /* Negative tracking makes it look 'narrower' */
+}
+
+#LibraryHeader::section:hover {
+    background-color: #1E1E1E;
     color: #FFF;
 }
-QScrollArea { border: none; }
 
-/* --- SLIDERS --- */
-QSlider::groove:horizontal {
+#LibraryHeader::section:pressed {
+    background-color: #D81B60;
+    color: white;
+}
+
+/* Horizontal Grid Only hack via background/alternate */
+QTableView::item {
+    padding: 0px;
+    border: none; /* Kill the spreadsheet grid */
+}
+
+QHeaderView::section {
+    background-color: #1E1E1E;
+    padding: 10px;
+    border: none;
+    border-bottom: 2px solid #222;
+    font-weight: bold;
+    color: #BBB;
+    text-transform: uppercase;
+    font-size: 9pt;
+}
+
+QTableView QTableCornerButton::section {
+    background-color: #1E1E1E;
+    border: none;
+}
+
+
+/* --- SIDEBAR COMPONENTS (Filter/History) --- */
+#SidebarFilter, #SidebarHistory {
+    background-color: #080808;
+    border-right: 1px solid #1A1A1A;
+}
+
+/* --- WORKSTATION SURGICAL CHANNEL (Right Panel) --- */
+#RightSurgicalPanel {
+    background-color: #050505; /* Deep surgical black */
+    border-left: 1px solid #121212;
+}
+
+#SidePanelHeader {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #FFF;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+}
+
+#SidePanelProjectedPath {
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: #666;
+    font-size: 8pt;
+}
+
+#SidePanelProjectedPath[conflict="true"] {
+    color: #FF5252;
+}
+
+/* Metadata Labels */
+#FieldGroupLabel {
+    color: #555;
+    font-size: 8pt;
+    font-weight: bold;
+    margin-top: 10px;
+    border-bottom: 1px solid #1A1A1A;
+}
+
+#FieldLabel {
+    color: #888;
+    font-size: 8.5pt;
+    font-weight: bold;
+}
+
+/* Control Buttons (Machined Style) */
+#MarkDoneButton, #DiscardButton {
+    background-color: #1A1A1A;
+    color: #AAA;
+    font-weight: bold;
+    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
+    padding: 8px 16px;
     border: 1px solid #333;
+    border-radius: 2px;
+}
+
+#MarkDoneButton:hover, #DiscardButton:hover {
+    background-color: #222;
+    color: #FFF;
+    border: 1px solid #444;
+}
+
+#MarkDoneButton:checked {
+    background-color: #1B5E20; /* Deep industrial green */
+    color: #A5D6A7;
+    border: 1px solid #2E7D32;
+}
+
+#SaveAllButton {
+    font-weight: bold;
+    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
+    padding: 8px 24px;
+    background-color: #D81B60; /* Theme Pink */
+    color: white;
+    border: 1px solid #C2185B;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#SaveAllButton:hover {
+    background-color: #E91E63;
+    border: 1px solid #FF4081;
+}
+
+#SaveAllButton:disabled {
+    background-color: #1A1A1A;
+    color: #444;
+    border: 1px solid #222;
+}
+
+#SaveAllButton[alert="true"] {
+    background-color: #B71C1C;
+}
+
+/* --- PLAYER DECK (Docked Module) --- */
+#PlaybackDeck {
+    background-color: #050505; /* Full sync with Surgical Panel */
+    border-top: 1px solid #D81B60; /* Neon top border for 'docked' look */
+}
+
+QLabel#LargeSongLabel {
+    color: #FFF;
+    font-family: "Agency FB", "Bahnschrift Condensed", sans-serif;
+    font-size: 16pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    background: transparent;
+}
+
+QLabel#PlaybackTimer {
+    color: #D81B60; /* Neon Pink */
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11pt;
+    font-weight: bold;
+}
+
+#CoverBay {
+    background-color: #050505;
+    border: 2px solid #1A1A1A;
+    border-radius: 40px; /* Circular for the 'Disc' look */
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                stop:0 #121212, stop:0.8 #000, stop:1 #D81B60);
+}
+
+#WaveformDeck {
+    background-color: #050505;
+    border: 1px solid #1A1A1A;
+    border-radius: 2px;
+    /* Placeholder Metering look */
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                                stop:0 #1B5E20, 
+                                stop:0.6 #2E7D32,
+                                stop:0.8 #FBC02D,
+                                stop:1 #B71C1C);
+    opacity: 0.3;
+}
+
+#VolumeIcon {
+    color: #D81B60;
+    font-size: 12pt;
+}
+
+QSlider#VolumeSlider::groove:horizontal {
+    border: none;
+    height: 3px;
+    background: #1A1A1A;
+}
+QSlider#VolumeSlider::handle:horizontal {
+    background: #FFF;
+    width: 8px;
     height: 8px;
-    background: #222;
+    margin: -3px 0;
+    border-radius: 4px;
+}
+
+/* Machined Media Buttons */
+QPushButton#MediaButton {
+    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                     stop:0 #2A2A2A, stop:1 #080808);
+    border: 1px solid #333;
+    color: #BBB;
+    min-width: 40px;
+    min-height: 24px;
+}
+
+QPushButton#BigPlayButton {
+    background-color: #D81B60;
+    color: #FFF;
+    font-family: "Agency FB", "Bahnschrift Condensed";
+    font-weight: bold;
+    font-size: 14pt;
+    border: 1px solid #FF4081;
+    border-radius: 4px;
+    min-width: 120px;
+}
+
+QPushButton#BigPlayButton:hover {
+    background-color: #E91E63;
+    border-color: #FFF;
+}
+
+QPushButton#MediaButton:hover {
+    background-color: #333;
+    border: 1px solid #D81B60; /* Neon Edge */
+    color: white;
+}
+QPushButton#MediaButton:pressed {
+    background-color: #080808;
+    border: 1px solid #050505;
+    color: #888;
+    padding-top: 10px; /* Physical squish */
+}
+
+/* Glass Track Slider (Custom SeekSlider) */
+QSlider#PlaybackSeekSlider::groove:horizontal {
+    border: 1px solid #050505;
+    height: 8px; /* Thicker track */
+    background: #080808;
     margin: 2px 0;
     border-radius: 4px;
+}
+QSlider#PlaybackSeekSlider::handle:horizontal {
+    background: #D81B60; /* Neon Pink Handle */
+    border: 1px solid #FF4081; /* Hot Center */
+    width: 14px;
+    height: 14px;
+    margin: -4px 0; /* Align center */
+    border-radius: 7px;
+}
+QSlider#PlaybackSeekSlider::sub-page:horizontal {
+    /* The 'Lit' part of the track */
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                               stop:0 #880E4F, 
+                               stop:1 #D81B60);
+    border-radius: 4px;
+}
+
+/* --- EMPTY STATES & OVERLAYS --- */
+/* --- FRAMELESS TITLE BAR --- */
+#TitleBar {
+    background-color: #0A0A0A;
+    border-bottom: 1px solid #333;
+    min-height: 32px;
+}
+
+#AppLogo {
+    color: #D81B60;
+    font-weight: bold;
+    padding-left: 10px;
+    font-size: 11pt;
+}
+
+#MinimizeButton, #MaximizeButton, #CloseButton {
+    background-color: transparent;
+    border: none;
+    color: #888;
+    font-size: 10pt;
+    width: 45px;
+    height: 32px;
+}
+
+#MinimizeButton:hover, #MaximizeButton:hover {
+    background-color: #333;
+    color: #FFF;
+}
+
+#CloseButton:hover {
+    background-color: #E81123;
+    color: white;
+}
+
+#SystemDraggableArea {
+    background-color: transparent;
+}
+
+/* --- RESIZE GRIP --- */
+QSizeGrip {
+    width: 20px;
+    height: 20px;
+    background-color: transparent;
+    border: none;
+    /* Drawing three slanted neon lines for the grip */
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                                stop:0.6 transparent, 
+                                stop:0.65 #D81B60,
+                                stop:0.75 transparent,
+                                stop:0.8 #D81B60,
+                                stop:0.9 transparent,
+                                stop:0.95 #D81B60);
+}
+
+QSizeGrip:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                                stop:0.6 transparent, 
+                                stop:0.65 #FF4081,
+                                stop:0.75 transparent,
+                                stop:0.8 #FF4081,
+                                stop:0.9 transparent,
+                                stop:0.95 #FF4081);
+}
+
+/* --- DEFAULT SLIDERS (VOLUME ETC) --- */
+QSlider::groove:horizontal {
+    border: 1px solid #333;
+    height: 6px;
+    background: #222;
+    margin: 2px 0;
+    border-radius: 3px;
 }
 QSlider::handle:horizontal {
     background: #D81B60;
     border: 1px solid #D81B60;
-    width: 14px;
-    height: 14px;
-    margin: -4px 0;
-    border-radius: 7px;
+    width: 12px;
+    height: 12px;
+    margin: -3px 0;
+    border-radius: 6px;
 }

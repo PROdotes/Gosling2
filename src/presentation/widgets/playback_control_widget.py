@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QComboBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QSlider, QComboBox, QFrame
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
@@ -10,6 +10,7 @@ class PlaybackControlWidget(QWidget):
     # User Actions
     play_pause_clicked = pyqtSignal()
     next_clicked = pyqtSignal()
+    prev_clicked = pyqtSignal()
     volume_changed = pyqtSignal(int)
     seek_request = pyqtSignal(int) # Emitted when slider is dragged
 
@@ -26,104 +27,116 @@ class PlaybackControlWidget(QWidget):
         self._setup_connections()
 
     def _init_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(15)
         
-        # Song info label
-        self.song_label = QLabel("No song loaded")
-        self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        song_font = self.song_label.font()
-        song_font.setPointSize(22)
-        song_font.setBold(True)
-        self.song_label.setFont(song_font)
+        # --- LEFT: THE IDENT (Cover & Detail) ---
+        self.cover_bay = QFrame()
+        self.cover_bay.setFixedSize(80, 80)
+        self.cover_bay.setObjectName("CoverBay") # Neon Bordered Frame
+        
+        ident_layout = QVBoxLayout()
+        ident_layout.addWidget(self.cover_bay, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addLayout(ident_layout)
 
-        # Slider layout
-        slider_layout = QHBoxLayout()
+        # --- CENTER: THE ENGINE (Title & Transport) ---
+        engine_layout = QVBoxLayout()
+        engine_layout.setSpacing(4)
         
-        self.lbl_time_passed = QLabel("00:00")
-        self.lbl_time_passed.setMinimumWidth(40)
-        self.lbl_time_passed.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        time_font = self.lbl_time_passed.font()
-        time_font.setPointSize(16)
-        self.lbl_time_passed.setFont(time_font)
+        # Large Readout
+        self.song_label = QLabel("NO MEDIA ARMED")
+        self.song_label.setObjectName("LargeSongLabel")
+        self.song_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        engine_layout.addWidget(self.song_label)
         
+        # Transport Keys
+        transport_layout = QHBoxLayout()
+        transport_layout.setSpacing(10)
+        
+        # Placeholder for 'Previous' button
+        self.btn_prev = QPushButton("<<")
+        self.btn_prev.setObjectName("MediaButton")
+        self.btn_prev.setFixedWidth(50)
+        
+        self.btn_play_pause = QPushButton("PLAY")
+        self.btn_play_pause.setObjectName("BigPlayButton")
+        self.btn_play_pause.setFixedWidth(120)
+        
+        self.btn_next = QPushButton(">>")
+        self.btn_next.setObjectName("MediaButton")
+        self.btn_next.setFixedWidth(50)
+        
+        transport_layout.addStretch()
+        transport_layout.addWidget(self.btn_prev)
+        transport_layout.addWidget(self.btn_play_pause)
+        transport_layout.addWidget(self.btn_next)
+        transport_layout.addStretch()
+        engine_layout.addLayout(transport_layout)
+        
+        # Seek Strip
         self.playback_slider = SeekSlider()
-        # Slider is now passive view
-        playback_slider_style = """
-            QSlider::groove:horizontal {
-                height: 30px; 
-                background: #404040; 
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                width: 3px; 
-                height: 5px;
-                border-radius: 6px; 
-                background: #5f8a53; 
-                margin: -4px 0; 
-            }
-        """
-        self.playback_slider.setStyleSheet(playback_slider_style)
+        self.playback_slider.setObjectName("PlaybackSeekSlider")
+        engine_layout.addWidget(self.playback_slider)
+        
+        layout.addLayout(engine_layout, 1)
+
+        # --- RIGHT: THE MONITOR (Timers & Metering) ---
+        monitor_layout = QVBoxLayout()
+        monitor_layout.setSpacing(6)
+        
+        # Timers (Horizontal Row)
+        timers_row = QHBoxLayout()
+        self.lbl_time_passed = QLabel("00:00")
+        self.lbl_time_passed.setObjectName("PlaybackTimer")
         
         self.lbl_time_remaining = QLabel("- 00:00")
-        self.lbl_time_remaining.setMinimumWidth(40)
-        self.lbl_time_remaining.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
-        self.lbl_time_remaining.setFont(time_font)
+        self.lbl_time_remaining.setObjectName("PlaybackTimer")
         
-        slider_layout.addWidget(self.lbl_time_passed)
-        slider_layout.addWidget(self.playback_slider)
-        slider_layout.addWidget(self.lbl_time_remaining)
+        timers_row.addWidget(self.lbl_time_passed)
+        timers_row.addStretch()
+        timers_row.addWidget(self.lbl_time_remaining)
+        monitor_layout.addLayout(timers_row)
         
-        # Controls layout
-        controls_layout = QHBoxLayout()
+        # Waveform Placeholder (Sleek Frame)
+        self.waveform_deck = QFrame()
+        self.waveform_deck.setFixedHeight(25)
+        self.waveform_deck.setObjectName("WaveformDeck") # Neon Pulse Placeholder
+        monitor_layout.addWidget(self.waveform_deck)
         
-        self.btn_play_pause = QPushButton("▶ Play")
-        self.btn_next = QPushButton(">> Skip")
-        media_button_style = """
-            QPushButton {
-                min-height: 40px; 
-                min-width: 80px;
-                font-size: 20pt; 
-                padding: 5px; 
-            }
-        """
-        self.btn_play_pause.setStyleSheet(media_button_style)
-        self.btn_next.setStyleSheet(media_button_style)
+        # Control Cluster (Volume & Crossfade)
+        controls_row = QHBoxLayout()
+        controls_row.setSpacing(8)
         
+        # Youtube-style Volume (Icon + Slider)
+        self.vol_icon = QLabel("🔈")
+        self.vol_icon.setObjectName("VolumeIcon")
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
         self.volume_slider.setRange(0, 100)
-        # Don't set default value here - will be set by MainWindow from settings
-        self.volume_slider.setMaximumWidth(100)
+        self.volume_slider.setFixedWidth(70)
+        self.volume_slider.setObjectName("VolumeSlider")
         
-        controls_layout.addStretch()
-        controls_layout.addWidget(QLabel("Volume:"))
-        controls_layout.addWidget(self.volume_slider)
+        controls_row.addWidget(self.vol_icon)
+        controls_row.addWidget(self.volume_slider)
+        controls_row.addSpacing(10)
         
-        # Crossfade Controls
-        controls_layout.addWidget(QLabel("Crossfade:"))
+        # Crossfade Selector
         self.combo_crossfade = QComboBox()
-        # Options: Text, UserData (Duration in ms)
-        self.combo_crossfade.addItem("0s (Off)", 0)
+        self._setup_crossfade_options()
+        self.combo_crossfade.setFixedWidth(80)
+        self.combo_crossfade.setObjectName("DeckCombo")
+        controls_row.addWidget(self.combo_crossfade)
+        
+        monitor_layout.addLayout(controls_row)
+        layout.addLayout(monitor_layout)
+
+    def _setup_crossfade_options(self):
+        self.combo_crossfade.addItem("CUT", 0)
         self.combo_crossfade.addItem("1s", 1000)
         self.combo_crossfade.addItem("2s", 2000)
         self.combo_crossfade.addItem("3s", 3000)
-        self.combo_crossfade.addItem("4s", 4000)
         self.combo_crossfade.addItem("5s", 5000)
-        self.combo_crossfade.addItem("10s", 10000)
-        
-        # Initialize state from service
         self._sync_crossfade_combo()
-        
-        self.combo_crossfade.setFixedWidth(80) # Fixed width for neatness
-        controls_layout.addWidget(self.combo_crossfade)
-        
-        controls_layout.addWidget(self.btn_play_pause)
-        controls_layout.addWidget(self.btn_next)
-        controls_layout.addStretch()
-        
-        layout.addWidget(self.song_label)
-        layout.addLayout(slider_layout)
-        layout.addLayout(controls_layout)
 
     def _sync_crossfade_combo(self):
         """Sync combo box state with service settings"""
@@ -161,6 +174,7 @@ class PlaybackControlWidget(QWidget):
     def _setup_connections(self) -> None:
         # UI -> Signals
         self.btn_play_pause.clicked.connect(self.play_pause_clicked.emit)
+        self.btn_prev.clicked.connect(self.prev_clicked.emit)
         self.btn_next.clicked.connect(self.next_clicked.emit)
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
         self.playback_slider.seekRequested.connect(self.playback_service.seek)
@@ -199,9 +213,9 @@ class PlaybackControlWidget(QWidget):
 
     def update_play_button_state(self, state) -> None:
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.btn_play_pause.setText("|| Pause")
+            self.btn_play_pause.setText("PAUSE")
         else:
-            self.btn_play_pause.setText("▶ Play")
+            self.btn_play_pause.setText("PLAY")
 
     def update_duration(self, duration) -> None:
         self.playback_slider.updateDuration(duration)

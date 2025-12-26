@@ -57,9 +57,12 @@ tags:
     *   *Task*: Port Genre/Year rules + `shutil.move` logic.
     *   *Complexity*: High (File System Risk). Rules documented in `LEGACY_LOGIC.md`.
     *   *Status*: **Done** (Service + UI Gates implemented).
-*   [ ] **UX Polish** (~2.0 h)
-    *   *Task*: Dark theme, consistent button styling.
-    *   *Note*: Keep default PyQt6 components. Custom tag picker DEFERRED to 1.0.
+*   [x] **Radio Automation Layout (T-49)** (~4.0 h)
+    *   *Task*: Pivot to Frameless Workstation (Master Deck, Dual Splitters, Hist Sidebar).
+    *   *Status*: **Done** (Industrial Chassis + Masters Console).
+*   [ ] **Surgical Right-Channel (T-54)** (~2.0 h)
+    *   *Task*: Split-view focus for Editor/Playlist combo.
+    *   *Note*: Shift from " Spotify Tabs" to "Workstation Dashboard" focus.
 
 ### 🚧 Milestone 4: Data Integrity
 *Status: COMPLETED (Dec 25)*

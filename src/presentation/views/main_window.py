@@ -2,14 +2,14 @@
 import os
 from typing import Optional
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
-    QStackedWidget, QTabBar
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
+    QStackedWidget, QTabBar, QSizeGrip
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
-from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget, SidePanelWidget
+from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget, SidePanelWidget, CustomTitleBar
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
 
 class MainWindow(QMainWindow):
@@ -38,6 +38,8 @@ class MainWindow(QMainWindow):
 
         # Initialize UI
         self._init_ui()
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        
         self._load_window_geometry()
         self._load_splitter_states()
         self._setup_connections()
@@ -57,10 +59,32 @@ class MainWindow(QMainWindow):
 
         # Main layout
         main_layout = QVBoxLayout(main_widget)
-        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # 0. Integrated Title Bar
+        self.title_bar = CustomTitleBar(self)
+        self.title_bar.minimize_requested.connect(self.showMinimized)
+        self.title_bar.maximize_requested.connect(self._toggle_maximize)
+        self.title_bar.close_requested.connect(self.close)
+        main_layout.addWidget(self.title_bar)
+
+        # Content Container (where margins apply)
+        content_container = QWidget()
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(5, 5, 0, 5)
+        main_layout.addWidget(content_container, 1)
 
         # Splitter: Library | Playlist
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # LEFT WORKSPACE (Vertical Splitter: Library | Playback)
+        left_workspace = QWidget()
+        left_workspace_layout = QVBoxLayout(left_workspace)
+        left_workspace_layout.setContentsMargins(0, 0, 0, 0)
+        left_workspace_layout.setSpacing(0)
+        
+        self.v_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.v_splitter.setObjectName("LeftVerticalSplitter")
         
         # Library Widget (Left/Center)
         self.library_widget = LibraryWidget(
@@ -70,10 +94,28 @@ class MainWindow(QMainWindow):
             self.renaming_service,
             self.duplicate_scanner
         )
+        # Add Library
+        self.v_splitter.addWidget(self.library_widget)
         
-        # Right Panel Container (Stacked: Playlist | Editor)
+        # Add Playback
+        self.playback_widget = PlaybackControlWidget(
+            self.playback_service,
+            self.settings_manager
+        )
+        self.playback_widget.setObjectName("PlaybackDeck")
+        self.v_splitter.addWidget(self.playback_widget)
+        
+        # Set default proportions for vertical (Library 4 : Playback 1)
+        self.v_splitter.setStretchFactor(0, 4)
+        self.v_splitter.setStretchFactor(1, 1)
+        
+        left_workspace_layout.addWidget(self.v_splitter)
+
+        # RIGHT PANEL (Playlist / Editor)
         right_panel = QWidget()
-        right_panel_layout = QVBoxLayout(right_panel)
+        right_panel.setObjectName("RightSurgicalPanel")
+        from PyQt6.QtWidgets import QGridLayout
+        right_panel_layout = QGridLayout(right_panel)
         right_panel_layout.setContentsMargins(0, 0, 0, 0)
         right_panel_layout.setSpacing(0)
         
@@ -98,22 +140,24 @@ class MainWindow(QMainWindow):
         self.right_stack.addWidget(self.playlist_widget)
         self.right_stack.addWidget(self.side_panel)
         
-        right_panel_layout.addWidget(self.right_tabs)
-        right_panel_layout.addWidget(self.right_stack)
+        # Row 0: Tabs
+        right_panel_layout.addWidget(self.right_tabs, 0, 0)
+        # Row 1: Stack + Overlaid Grip
+        right_panel_layout.addWidget(self.right_stack, 1, 0)
+        
+        # Overlay the Grip in the same cell as the stack, but aligned to corner
+        self.size_grip = QSizeGrip(self)
+        right_panel_layout.addWidget(self.size_grip, 1, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
 
-        self.splitter.addWidget(self.library_widget)
+        # Main Horizontal Splitter
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.addWidget(left_workspace)
         self.splitter.addWidget(right_panel)
+        
         self.splitter.setStretchFactor(0, 3)
         self.splitter.setStretchFactor(1, 1)
         
-        main_layout.addWidget(self.splitter, 1)
-
-        # Bottom bar
-        self.playback_widget = PlaybackControlWidget(
-            self.playback_service,
-            self.settings_manager
-        )
-        main_layout.addWidget(self.playback_widget)
+        content_layout.addWidget(self.splitter, 1)
 
     def _setup_connections(self) -> None:
         """Setup signal/slot connections"""
@@ -127,8 +171,12 @@ class MainWindow(QMainWindow):
 
         # Playback Controls
         self.playback_widget.play_pause_clicked.connect(self._toggle_play_pause)
+        self.playback_widget.prev_clicked.connect(self._play_prev)
         self.playback_widget.next_clicked.connect(self._play_next)
         self.playback_widget.volume_changed.connect(self._on_volume_changed)
+        
+        # Media Status (auto-advance)
+        self.playback_service.media_status_changed.connect(self._on_media_status_changed)
         
         # Connect Library Selection to Side Panel
         # Connect Library Selection to Side Panel (Phase 2 Link)
@@ -137,6 +185,10 @@ class MainWindow(QMainWindow):
         # Connect Side Panel Signals
         self.side_panel.save_requested.connect(self._on_side_panel_save_requested)
         self.side_panel.staging_changed.connect(self.library_widget.update_dirty_rows)
+        
+        # Global Search Wiring
+        self.title_bar.search_text_changed.connect(self.library_widget.set_search_text)
+        self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())
 
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts (T-31 legacy shortcuts)."""
@@ -167,9 +219,6 @@ class MainWindow(QMainWindow):
     def _on_playlist_changed(self, parent, start, end):
         # Update widget with new count
         self.playback_widget.set_playlist_count(self.playlist_widget.count())
-
-        # Media Status (auto-advance)
-        self.playback_service.media_status_changed.connect(self._on_media_status_changed)
 
     def _add_to_playlist(self, items) -> None:
         """Add items from library to playlist"""
@@ -230,7 +279,12 @@ class MainWindow(QMainWindow):
                 item_to_delete = self.playlist_widget.takeItem(0)
                 del item_to_delete
 
-    def _on_volume_changed(self, value) -> None:
+    def _play_prev(self) -> None:
+        """Play previous (Placeholder/Simple: Re-play current or top)"""
+        # For now, just seek to start or re-trigger current
+        self.playback_service.seek(0)
+
+    def _on_volume_changed(self, value):
         self.playback_service.set_volume(value / 100.0)
 
     def _on_media_status_changed(self, status) -> None:
@@ -273,10 +327,18 @@ class MainWindow(QMainWindow):
     def _load_splitter_states(self) -> None:
         splitter_state = self.settings_manager.get_main_splitter_state()
         if splitter_state:
+            # Main Horizontal
             self.splitter.restoreState(splitter_state)
+        
+        # Vertical Splitter (Left Pane)
+        v_state = self.settings_manager.get_v_splitter_state()
+        if v_state:
+            self.v_splitter.restoreState(v_state)
 
     def _save_splitter_states(self) -> None:
         self.settings_manager.set_main_splitter_state(self.splitter.saveState())
+        # Vertical Splitter
+        self.settings_manager.set_v_splitter_state(self.v_splitter.saveState())
     
     def _restore_volume(self) -> None:
         """Restore saved volume level"""
@@ -499,3 +561,9 @@ class MainWindow(QMainWindow):
         """Helper to find a field definition by name."""
         from ...core import yellberus
         return next((f for f in yellberus.FIELDS if f.name == name), None)
+
+    def _toggle_maximize(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()

@@ -16,12 +16,17 @@ Spotify uses a "Side-Rail / Main / Utility" layout. Radio automation (Selector/W
 > **"The Now and the Next govern the screen."**
 > Search must deliver results in under 60 seconds (Sub-Minute Search). The player must show Cues and Hooks as first-class visual data.
 
+### THE SHELL MANDATE:
+> **"The Frame is part of the Tool."**
+> To maximize immersion and space, the app moves to a Frameless Window. Custom controls for Minimize/Close and custom Title Bar dragging are required.
+
 ---
 
 ### A. Layout Rearrangement (The Wireframe)
-*   **The Problem**: Vertical space is at a premium. The current header/tab/table stack is too deep.
-*   **The Shift**: We are moving to an **Integrated Workspace** with a dynamic "Curtain" soundboard and sliding drawers.
+*   **The Problem**: Vertical space is at a premium. Standard OS title bars are wasted space.
+*   **The Shift**: We are moving to an **Integrated Workspace** with a dynamic "Curtain" soundboard, sliding drawers, and a Frameless Shell.
 *   **Historical Log (Slide-out)**: A secondary left-side drawer that can slide out to show recently played songs (The "As Played" Log) for quick verification of what played 20+ minutes ago.
+
 
 ```text
 +-------------------------------------------------------------+
@@ -84,6 +89,18 @@ Spotify uses a "Side-Rail / Main / Utility" layout. Radio automation (Selector/W
 *   **Content**: 24-slot "QuickCart" Grid (6x4).
 *   **Overlay Logic**: Uses a slight transparency/shadow to distinguish from the library rows below.
 
+### G. The Frameless Shell (WORKSTATION MANDATE)
+To achieve maximum immersion and pixel-perfect layouts, Gosling2 uses a `FramelessWindowHint` shell. This requires re-implementing standard OS behaviors:
+
+1.  **Draggable Region**: The entire `CustomTitleBar` (GOSLING // WORKSTATION logo + search background) acts as the drag handle.
+2.  **Custom System Controls**: 
+    *   `MinimizeButton`: (`showMinimized`)
+    *   `MaximizeButton`: (`showMaximized`/`showNormal` toggle)
+    *   `CloseButton`: Emergeny red hover effect; triggers full app cleanup.
+3.  **Double-Click to Toggle**: The Title Bar captures `mouseDoubleClickEvent` to toggle Maximize/Restore states.
+4.  **Manual Resize Grip**: A custom `QSizeGrip` is positioned in the bottom-right corner of the content area, styled as a diagonal triangle handle.
+5.  **Global Search Strip**: The search box is hosted in the Title Bar to satisfy the "Vertical Rescue" protocol, communicating with the `LibraryWidget` via signals.
+
 ---
 
 ## 3. The "Staged" Documentation Protocol
@@ -95,7 +112,10 @@ To ensure continuity across sessions:
 ---
 
 ## 4. Work Order (UI Refinement)
-1.  [ ] **ID3 Logic Extraction (Tech Debt)**: Move the hardcoded extraction logic to a shared module so UI doesn't lag.
-2.  [ ] **Gridless Stylesheet**: Update `theme.qss` with the "Floating Row" specifications.
-3.  [ ] **Tab-to-Pill Conversion**: Refactor `LibraryWidget` to use a layout of buttons instead of a `QTabBar`.
-4.  [ ] **Column Identity Hardening**: Ensure user-hidden columns stay hidden even after a "Pro" layout update.
+- [x] **Gridless Stylesheet**: `theme.qss` updated with Blade-Edge variables. (DONE)
+- [x] **Frameless Prototype**: Custom title bar + logo/search strip. (DONE)
+- [x] **Tab-to-Pill Conversion**: Refactor `LibraryWidget` tabs. (DONE)
+- [x] **Vertical Rescue**: Consolidate header elements and move search to Title Bar. (DONE)
+- [x] **Historical Log (Slide-Out)**: Implement left-hand drawer for session history. (DONE)
+- [x] **Jingle Bay (The Curtain)**: Implement top-down sliding grid panel. (DONE)
+- [x] **Transport Polish**: Fusion styling, ghost-busting, and layout logic. (DONE)
