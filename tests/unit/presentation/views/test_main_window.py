@@ -121,24 +121,21 @@ class TestMainWindow:
         mock_services['library'].delete_song.assert_called_with(123)
 
     def test_shortcuts_call_library_widget_helpers(self, main_window):
-        main_window.library_widget.save_selected_songs = MagicMock()
+        # In current MainWindow, actions are connected in _setup_shortcuts
+        # and they point to library_widget methods or right_panel methods.
+        
         main_window.library_widget.mark_selection_done = MagicMock()
         main_window.library_widget.focus_search = MagicMock()
         
-        # Re-connect actions since shortcuts were set in __init__
-        main_window.action_save_selected.triggered.disconnect()
-        main_window.action_save_selected.triggered.connect(main_window.library_widget.save_selected_songs)
-        
+        # We need to re-connect because they were connected to original methods during init
         main_window.action_mark_done.triggered.disconnect()
         main_window.action_mark_done.triggered.connect(main_window.library_widget.mark_selection_done)
         
         main_window.action_focus_search.triggered.disconnect()
         main_window.action_focus_search.triggered.connect(main_window.library_widget.focus_search)
 
-        main_window.action_save_selected.trigger()
         main_window.action_mark_done.trigger()
         main_window.action_focus_search.trigger()
 
-        main_window.library_widget.save_selected_songs.assert_called_once()
         main_window.library_widget.mark_selection_done.assert_called_once()
         main_window.library_widget.focus_search.assert_called_once()

@@ -226,6 +226,7 @@ class MainWindow(QMainWindow):
         self._load_splitter_states()
         # Setup Connections
         self._setup_connections()
+        self._setup_shortcuts()
         
         self._restore_volume()
         self._restore_playlist()

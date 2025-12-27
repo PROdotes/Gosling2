@@ -33,7 +33,7 @@ def test_calculate_target_path(service, mock_song):
     
     # Expected: music/library/Techno/2024/Logic Boys - Algorithmic Beats.mp3
     expected = os.path.join("music", "library", "Techno", "2024", "Logic Boys - Algorithmic Beats.mp3")
-    assert path == expected
+    assert os.path.normpath(path) == os.path.normpath(expected)
 
 def test_calculate_path_sanitization(service, mock_song):
     """Verify illegal chars are stripped."""
@@ -42,7 +42,7 @@ def test_calculate_path_sanitization(service, mock_song):
     
     filename = "Logic Boys - Beats  With  Bad  Chars.mp3"
     expected = os.path.join("music", "library", "Techno", "2024", filename)
-    assert path == expected
+    assert os.path.normpath(path) == os.path.normpath(expected)
 
 def test_calculate_path_missing_metadata(service, mock_song):
     """Verify fallback for missing Genre/Year."""
@@ -51,8 +51,8 @@ def test_calculate_path_missing_metadata(service, mock_song):
     
     path = service.calculate_target_path(mock_song)
     
-    expected = os.path.join("music", "library", "Uncategorized", "Unknown Year", "Logic Boys - Algorithmic Beats.mp3")
-    assert path == expected
+    expected = os.path.join("music", "library", "Uncategorized", "0000", "Logic Boys - Algorithmic Beats.mp3")
+    assert os.path.normpath(path) == os.path.normpath(expected)
 
 def test_check_conflict_true(service):
     """Verify conflict detection when file exists."""

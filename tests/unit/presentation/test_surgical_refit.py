@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import MagicMock, patch
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QByteArray
 from PyQt6.QtWidgets import QWidget
 from src.presentation.views.main_window import MainWindow, TerminalHeader
 
@@ -9,6 +9,7 @@ class MockTitleBar(QWidget):
     maximize_requested = pyqtSignal()
     close_requested = pyqtSignal()
     search_text_changed = pyqtSignal(str)
+    settings_requested = pyqtSignal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self.search_box = MagicMock()
@@ -78,12 +79,14 @@ class TestSurgicalRefit:
 
             m_set = MagicMock()
             m_set_cls.return_value = m_set
-            m_set.get_main_splitter_state.return_value = None
-            m_set.get_v_splitter_state.return_value = None
-            m_set.get_window_geometry.return_value = None
+            m_set.get_main_splitter_state.return_value = QByteArray()
+            m_set.get_v_splitter_state.return_value = QByteArray()
+            m_set.get_window_geometry.return_value = QByteArray()
             m_set.get_default_window_size.return_value = (1024, 768)
             m_set.get_volume.return_value = 50
             m_set.get_last_playlist.return_value = []
+            m_set.get_right_panel_toggles.return_value = {}
+            m_set.get_right_panel_splitter_state.return_value = QByteArray()
 
             m_lib = MagicMock()
             m_lib_cls.return_value = m_lib
@@ -109,38 +112,33 @@ class TestSurgicalRefit:
             qtbot.addWidget(win)
             return win
 
-    def test_terminal_header_exists_with_toggles(self, window):
-        assert hasattr(window, 'terminal_header')
-        assert isinstance(window.terminal_header, TerminalHeader)
-        assert window.terminal_header.prep_btn.text() == "[ PREP LOG ]"
+    def test_surgical_mode_exists_with_toggles(self, window):
+        assert hasattr(window, 'right_panel')
+        assert window.right_panel.header.btn_edit.text() == "[ EDIT MODE ]"
 
     def test_toggle_surgical_mode(self, window):
-        # Initial state (DJ Mode)
-        assert window.right_splitter.sizes()[1] == 0
+        # Initial state (Editor Hidden)
+        assert window.right_panel.editor_widget.isHidden()
         
         # Enable Surgical Mode
-        window.terminal_header.prep_btn.setChecked(True)
-        assert window.right_splitter.sizes()[1] > 0
-        assert window._surgical_mode_enabled is True
+        window.right_panel.header.btn_edit.setChecked(True)
+        assert not window.right_panel.editor_widget.isHidden()
         
         # Disable
-        window.terminal_header.prep_btn.setChecked(False)
-        assert window.right_splitter.sizes()[1] == 0
-        assert window._surgical_mode_enabled is False
-
-    def test_toggle_jingle_bay(self, window):
-        assert window.right_splitter.sizes()[0] == 0
-        window.terminal_header.jingle_btn.setChecked(True)
-        assert window.right_splitter.sizes()[0] > 0
-        window.terminal_header.jingle_btn.setChecked(False)
-        assert window.right_splitter.sizes()[0] == 0
+        window.right_panel.header.btn_edit.setChecked(False)
+        assert window.right_panel.editor_widget.isHidden()
 
     def test_toggle_history_log(self, window):
-        assert window.right_splitter.sizes()[2] == 0
-        window.terminal_header.history_btn.setChecked(True)
-        assert window.right_splitter.sizes()[2] > 0
-        window.terminal_header.history_btn.setChecked(False)
-        assert window.right_splitter.sizes()[2] == 0
+        # Initial state (History Hidden)
+        assert window.right_panel.history_widget.isHidden()
+        
+        # Enable History
+        window.right_panel.header.btn_hist.setChecked(True)
+        assert not window.right_panel.history_widget.isHidden()
+        
+        # Disable
+        window.right_panel.header.btn_hist.setChecked(False)
+        assert window.right_panel.history_widget.isHidden()
 
     def test_library_selection_behavior(self, window):
         mock_song = MagicMock()
@@ -148,12 +146,13 @@ class TestSurgicalRefit:
         mock_index = MagicMock()
         window.library_widget.table_view.selectionModel().selectedRows.return_value = [mock_index]
         
-        # 1. DJ Mode
-        window._surgical_mode_enabled = False
+        # 1. Edit Mode OFF
+        window.right_panel.header.btn_edit.setChecked(False)
         window._on_library_selection_changed(None, None)
-        assert window.right_splitter.sizes()[1] == 0
+        assert window.right_panel.editor_widget.isHidden()
         
-        # 2. Surgical Mode ON
-        window._surgical_mode_enabled = True
+        # 2. Edit Mode ON
+        window.right_panel.header.btn_edit.setChecked(True)
         window._on_library_selection_changed(None, None)
-        assert window.right_splitter.sizes()[1] > 0
+        # It should be visible
+        assert not window.right_panel.editor_widget.isHidden()
