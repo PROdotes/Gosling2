@@ -15,6 +15,11 @@ class LibraryService:
         # but internal logic will assume it exists if needed.
         self.album_repository = album_repository or AlbumRepository()
 
+    @property
+    def album_repo(self):
+        """Bridge accessor for UI components expecting 'album_repo'"""
+        return self.album_repository
+
     def add_file(self, file_path: str) -> Optional[int]:
         """Add a file to the library"""
         return self.song_repository.insert(file_path)

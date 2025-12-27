@@ -62,6 +62,49 @@ class AlbumRepository(BaseRepository):
                 return Album.from_row(row)
         return None
 
+    def search(self, query: str, limit: int = 100) -> List[Album]:
+        """Fuzzy search for albums by title or artist."""
+        sql_query = """
+            SELECT AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear 
+            FROM Albums 
+            WHERE Title LIKE ? OR AlbumArtist LIKE ?
+            ORDER BY CASE WHEN Title LIKE ? THEN 1 ELSE 2 END, Title
+            LIMIT ?
+        """
+        wildcard = f"%{query}%"
+        starts_with = f"{query}%"
+        
+        results = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql_query, (wildcard, wildcard, starts_with, limit))
+            for row in cursor.fetchall():
+                results.append(Album.from_row(row))
+        return results
+
+    def set_publisher(self, album_id: int, publisher_name: str) -> None:
+        """
+        Link an album to a publisher (creating publisher if needed).
+        Note: Currently assumes 1 publisher per album (clears previous).
+        """
+        if not publisher_name:
+            return
+
+        with self.get_connection() as conn:
+            # 1. Get/Create Publisher ID
+            cur = conn.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (publisher_name,))
+            row = cur.fetchone()
+            if row:
+                pub_id = row[0]
+            else:
+                cur = conn.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (publisher_name,))
+                pub_id = cur.lastrowid
+            
+            # 2. Clear existing (M2M table but treated as 1-to-Maybe for now)
+            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+            
+            # 3. Link
+            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
+
     def create(
         self, 
         title: str, 

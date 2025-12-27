@@ -1,57 +1,49 @@
-# 📅 Daily Plan: Duplicate Detection & UI Refinement
+# 📅 Daily Plan: Synchronization & Next Steps
 
-**Date**: December 25, 2024  
-**Driver**: Antigravity (The Pair Programmer)  
-**Focus**: **Duplicate Detection (T-48)** & **UX Cleanup**
-
----
-
-## 🌅 Morning Startup
-- [x] **Context Sync**: Verified all previous consolidation work was stable.
-- [x] **Verification**: Ran the app and imported files to verify basic CRUD.
+**Date**: December 27, 2025  
+**Driver**: Antigravity  
+**Focus**: **State Discovery & Documentation Recovery**
 
 ---
 
-## 🏗️ The "Pro-Radio" Shift: Staging the Next Move
-
-**Where was I?**: We just moved the utility buttons (Import/Scan) to context menus to kill the "Spotify Home Page" vibe. We are now preparing to convert the UI from a Consumer Player to a **Professional Broadcast Workstation**.
-
-### Staged Deployment Plan (The Next Agent's Job):
-1.  **Refine the Stage (The Grid)**: 
-    - [x] **Blade-Edge Styling**: Transitioned `QTableView` to no vertical lines and alternating row grey.
-    - [x] **Density**: Set fixed `26px` height via `LibraryWidget.py`.
-    - [ ] **Type-Based Tinting**: Implement Purple for Jingles, Blue for Music via `QStyledItemDelegate`.
-2.  **Deploy the Inspector (The Album Manager T-46)**: 
-    *   Songs need to be linked to Album *Entities*, not just text strings.
-    *   This is the prerequisite for the "Relational View" in the sidebar.
-
-3.  **The Master Deck (The Player)**: 
-    *   Move from the minimalist line to a "Production Deck" with large countdowns.
+## 🌅 Current Status (Recovered)
+*   **Context**: Working from the "Evening Commit" (Dec 26). The "Morning Session" (Dec 27) was lost/discarded.
+*   **Codebase State**:
+    *   **Right Panel**: Implemented (`RightPanelWidget`), acts as the container.
+    *   **Editor**: `SidePanelWidget` exists and is integrated. It handles staging, validation, and "Done" workflow.
+    *   **Delegate**: `WorkstationDelegate` (Blade-Edge visuals) appears active.
 
 ---
 
-## 🛠️ The Work Archive
+## 🧭 The Plan
 
-## 🔄 Handoff Note (Dec 25, 17:45)
+### Phase 1: Documentation Repair
+*   [x] **Update `today.md`**: Reset to accurate state (Dec 27).
+*   [x] **Review `SidePanelWidget`**: Confirm its current capabilities to identify what lays ahead.
 
-### What Was Done Today:
-1.  **Duplicate Detection Fully Hardened**: The app now reliably skips duplicates based on bit-perfect audio data and sanitized ISRC.
-2.  **UI Foundation Cleaned**: The app looks less like a "Generic PyQt Tutorial" and more like a tool. The bulky top buttons are gone.
-3.  **New Constitution Created**: `design/UX_UI_CONSTITUTION.md` defines the "Radio Pro" aesthetic vs. the "Spotify" mockup to prevent further "Spotify-drift."
+### Phase 2: Feature Work (Executed)
+*   [x] **Status Visuals (Editor)**:
+    *   Replaced "Done" Checkbox with **Status Pill** (Green "AIR" / Gray "PENDING").
+*   [x] **Proper Album Editor (T-46)**:
+    *   **Repository**: Added `search()` method to `AlbumRepository`.
+    *   **Dialog**: Created `AlbumManagerDialog` (Search/Create/Select).
+    *   **Integration**: Connected to `SidePanelWidget`.
+*   [x] **Renaming Service Refactor**:
+    *   Switched from hardcoded `rules.json` to `SettingsManager` patterns.
+    *   Implemented proper token replacement (`{Artist}`, `{Album}`, `{Title}`, etc.).
 
-### Next Session TODO:
-1.  **T-46 Proper Album Editor (P0)**: This is the next target. It needs to be less of a text box and more of a "Manager" (Search existing albums, add covers).
-2.  **Grid Styling (Blade-Edge)**: [DONE] stripped vertical lines, high-density row heights, and workstation colors in `theme.qss`.
-3.  **Status Visuals**: Replace the "Done" checkbox with a "Ready/AIR" badge or colored pill.
-4.  **Shell Mandate (T-49)**: [DONE] Implemented a custom frameless window shell.
-    *   **Custom Title Bar**: Draggable logo strip with global search.
-    *   **Standard Feature Re-implementations**: 
-        *   Double-click to Maximize/Restore.
-        *   Bottom-Right QSizeGrip with diagonal triangle styling.
-        *   System controls (Min/Max/Close) with 'Emergency Red' exit.
-    *   **CSS Extraction**: Scrubbed 100+ lines of hardcoded styling. Everything is now in `theme.qss`.
+### Phase 3: Verification (COMPLETE)
+*   [x] **Album Manager**: FIXED. Resolved crashes and model mismatches. Added auto-population and autoselect.
+*   [x] **Renaming Logic**: Verified. Network paths (`\\ONAIR\B\Songs`) and specialized genre rules (X-Mas, Acoustic, Club) are operational.
 
-### Key References:
-- `design/UX_UI_CONSTITUTION.md`: The new North Star for UI.
-- `PROPOSAL_DUPLICATE_DETECTION.md`: Phase 1 & 4 marked complete.
-- `TASKS.md`: Reference Doc list updated.
+---
+
+## 📝 Sessions Summary (Dec 27)
+- **Album Fixes**: Stabilized `AlbumManagerDialog` with smart population and internal ID tracking.
+- **Renaming Parity**: Restored legacy folder mappings in `rules.json` (akustika, clubbing).
+- **New Task**: **T-63** added (Publisher Picker) to maintain data integrity.
+
+**Next Priority**: 
+1. **T-62**: Async Background Save (Prevent UI freeze during file moves).
+2. **T-61**: Universal Tag Picker.
+3. **Refactor**: Clean up `SidePanelWidget` staging logic.

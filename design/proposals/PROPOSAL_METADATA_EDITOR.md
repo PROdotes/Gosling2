@@ -1,124 +1,63 @@
----
-tags:
-  - layer/ui
-  - domain/table
-  - domain/audio
-  - status/planned
-  - type/feature
-  - size/large
-links:
-  - "[[PROPOSAL_FIELD_REGISTRY]]"
-  - "[[PROPOSAL_TRANSACTION_LOG]]"
-  - "[[PROPOSAL_TAG_EDITOR]]"
----
-# Architectural Proposal: Metadata Editor
+# Proposal: Persistent Metadata Editor Panel (Milestone 3, Task 1)
 
-## Objective
-Transition from view-only metadata display to a robust editing interface.
+## 1. Objective
+Replace the slow "Right Click -> Properties" workflow with a persistent, always-visible side panel ("Inspector" style) to enable rapid "Edit -> Next" processing of the 400-song backlog.
 
----
+## 2. Problem Statement
+Currently, to edit a song's metadata, the user must:
+1. Right-click a song.
+2. Select "Properties".
+3. Wait for the dialog.
+4. Edit fields.
+5. Click Save.
+6. Close dialog.
+This is too slow for processing hundreds of files.
 
-## 📍 Phase 1: Inline Edit (Quick Win)
+## 3. Solution Design
+A `MetadataEditorPanel` docked to the right side of the `MainWindow`.
 
-**Goal:** Make the existing `MetadataViewerDialog` editable.
+### 3.1 UI Layout
+Vertical form layout containing specific high-priority fields:
 
-**Scope:**
-- Cells in the "Library (Database)" column become editable
-- Visual feedback: Orange = modified, Red = conflict with file
-- "Apply" button commits changes
+| Field Label | Widget Type | Behavior |
+|:---|:---|:---|
+| **Title** | `QLineEdit` | Text input. |
+| **Artist** | `QLineEdit` | Text input (future: Autocomplete). |
+| **Album** | `QLineEdit` | Text input (future: Autocomplete). |
+| **Genre** | `QComboBox` | Dropdown with `TCON` values (plus "Speech", "Commercial"). |
+| **Year** | `QSpinBox` | Numeric (1900-2100). |
+| **Status** | `QCheckBox` | "Done" (IsDone=1). |
+| **Path** | `QLabel` | Read-only path (truncated / elided). |
 
-**Implementation:**
-- Set `QTableWidget` cells to editable
-- Track changes in local dictionary (staging)
-- On Apply: call `MetadataService.write_tags()`
+**Buttons:**
+*   **Apply Changes** (Enabled only when dirty).
+*   **Discard** (Revert to selection).
 
-**Complexity:** 2 · **Estimate:** 1 day
+### 3.2 Interaction Model
+1.  **Selection**: When `LibraryWidget` selection changes:
+    *   If 0 songs selected: Clear panel, disable fields.
+    *   If 1 song selected: Load song data into fields. Store original `Song` object.
+    *   If >1 songs selected:
+        *   If values match (e.g. same Album), show value.
+        *   If values differ, show `<Various>`.
+        *   Editing a field applies to ALL selected songs (Batch Edit).
+2.  **Dirty State**:
+    *   Changing any field sets `_dirty = True` and enables "Apply".
+    *   Attempting to change selection while `_dirty` shows a "Save changes?" prompt (or auto-saves based on config, default to Prompt).
 
-### Checklist
-- [ ] Make dialog cells editable
-- [ ] Add staging dictionary for unsaved changes
-- [ ] Visual indicators (orange/red)
-- [ ] Apply button with save logic
+### 3.3 Architecture
+*   **Class**: `src.presentation.widgets.metadata_editor_panel.MetadataEditorPanel` (inherits `QWidget` or `QDockWidget`).
+*   **Signals**: 
+    *   `dataChanged()`: Emitted after successful save to refresh Library view.
+*   **Dependencies**: `MetadataService`, `SongRepository`.
 
----
+## 4. Implementation Plan
+1.  **Scaffold**: Create the widget class and layout.
+2.  **Data Loading**: Implement `load_song(song: Song)`.
+3.  **Data Saving**: Implement `save_changes()`.
+4.  **Integration**: Add to `MainWindow` and connect `selectionChanged`.
+5.  **Polishing**: Add batch editing logic (Phase 2).
 
-## 📍 Phase 2: Side Panel (Feature)
-
-**Goal:** Collapsible panel on the right side of MainWindow.
-
-**Scope:**
-- Single-track selection: shows all fields
-- Fields driven by Field Registry
-- Progressive disclosure: Core info visible, advanced in drawer
-
-**Implementation:**
-- Add `QDockWidget` to MainWindow right side
-- Connect to library selection signal
-- Generate widgets from Registry (`is_editable=True`)
-
-**Complexity:** 3 · **Estimate:** 2-3 days
-
-**Depends on:** Field Registry
-
-### Checklist
-- [ ] Create `MetadataPanel` widget
-- [ ] Add as dock widget to MainWindow
-- [ ] Connect to selection change
-- [ ] Generate fields from Registry
-- [ ] Core vs Advanced collapsible sections
-
----
-
-## 📍 Phase 3: Bulk Edit (Advanced)
-
-**Goal:** Multi-select editing with smart operations.
-
-**Scope:**
-- Multi-track: identical values shown, different = "Multiple Values"
-- Collection operations: Overwrite, Append, Remove modes
-- All edits grouped under single `BatchID` in Transaction Log
-
-**Implementation:**
-- Extend Side Panel for multi-selection
-- Mode toggle (Overwrite/Append/Remove)
-- Batch transaction wrapping
-
-**Complexity:** 4 · **Estimate:** 3-4 days
-
-**Depends on:** Side Panel, Transaction Log
-
-### Checklist
-- [ ] Multi-selection detection
-- [ ] "Multiple Values" placeholder
-- [ ] Mode toggle buttons
-- [ ] Append/Remove logic for list fields
-- [ ] BatchID grouping for undo
-
----
-
-## Radio Timing Fields
-Per `plan_database.md`, the editor must handle:
-- `CueIn` / `CueOut` (trim silence)
-- `Intro` (countdown for DJs)
-- `HookIn` / `HookOut` (preview hooks)
-- `Type` dropdown (Song, Jingle, Spot, etc.)
-
-*These are added to the Registry and appear in the panel automatically.*
-
-## Relational Fields UX
-
-### Album Type
-*   **Widget**: Combobox (Dropdown)
-*   **Source**: `Albums.AlbumType` column (TEXT)
-*   **Values**: `['Album', 'Single', 'EP', 'Compilation', 'Live', 'Soundtrack']`
-*   **Behavior**:
-    *   Dropdown shows standard list.
-    *   User can type a custom value (Soft Constraint).
-    *   On Save: Updates the linked `Album` record (via `AlbumRepository`).
-
----
-
-## Design Notes
-- **Glassmorphism:** Semi-transparent panel with frosted background
-- **Staging Indicators:** Orange dots next to modified fields
-- **Typography:** Inter or San Francisco, high-contrast for studio use
+## 5. Security & Validation
+*   Validate schema using `yellberus` rules (e.g. Year must be int).
+*   Prevent saving empty Titles.

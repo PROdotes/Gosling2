@@ -21,9 +21,35 @@
         },
         {
             "match_genres": [
-                "jazz"
+                "jazz",
+                "religiozne",
+                "oldies",
+                "x-mas",
+                "country",
+                "slow",
+                "metal",
+                "navijacke",
+                "rock",
+                "dance",
+                "trance",
+                "electronic",
+                "funk",
+                "blues",
+                "reggae"
             ],
             "target_path": "{genre}/{filename}"
+        },
+        {
+            "match_genres": [
+                "acoustic"
+            ],
+            "target_path": "akustika/{filename}"
+        },
+        {
+            "match_genres": [
+                "club"
+            ],
+            "target_path": "clubbing/{filename}"
         }
     ],
     "default_rule": "{genre}/{year}/{filename}"

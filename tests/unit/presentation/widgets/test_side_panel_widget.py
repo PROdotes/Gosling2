@@ -79,7 +79,7 @@ class TestSidePanelLogic:
         
         assert side_panel.btn_save.isEnabled()
         assert side_panel.btn_save.property("alert") is True
-        assert "Duplicate" in side_panel.btn_save.text()
+        assert "ISRC" in side_panel.btn_save.text()
 
     def test_autofill_year_on_save(self, side_panel, mock_widget_deps, qtbot):
         """Test that saving with empty year autofills current year."""

@@ -7,43 +7,97 @@ class RenamingService:
 
     def calculate_target_path(self, song) -> str:
         """
-        Generates the ideal absolute path based on song metadata and strict patterns.
-        - Pattern: {Genre}/{Year}/{Artist} - {Title}.mp3
+        Generates the ideal absolute path based on SettingsManager patterns.
+        Pattern example: "{Artist}/{Album}/{Title}"
         """
+        # 1. Get Root
         root = self.settings.get_root_directory()
         if not root:
-            # Fallback if no root set (shouldn't happen in prod, but safe for tests)
-            root = os.path.dirname(song.path) if song.path else "."
+             root = os.path.dirname(song.path) if song.path else "."
+             
+        # 2. Resolve Pattern (Priority: Rules > Settings)
+        # Load rules
+        rules = self._load_rules()
+        pattern = None
+        
+        # Check Rules
+        if rules and song.genre:
+            g_lower = song.genre.lower().strip()
+            for rule in rules.get("routing_rules", []):
+                matches = [m.lower() for m in rule.get("match_genres", [])]
+                if g_lower in matches:
+                    pattern = rule.get("target_path", "")
+                    break
+        
+        # 3. Fallback to Rules Default (Missing Link)
+        if not pattern and rules:
+            pattern = rules.get("default_rule")
 
-        # Extract and Sanitize Components
-        genre = self._sanitize(song.genre) if song.genre else "Uncategorized"
-        year = self._sanitize(str(song.year)) if song.year else "Unknown Year"
+        # 4. Fallback to Settings
+        if not pattern:
+            pattern = self.settings.get_rename_pattern()
+            
+        if not pattern:
+            # Absolute fallback
+            pattern = "{Artist}/{Album}/{Title}"
+            
+        # 3. Resolve components
+        rel_path = self._resolve_pattern(pattern, song)
         
-        # Unified Artist vs Performer fallback
-        # Check unified_artist, then first performer, then Unknown
-        artist_raw = getattr(song, 'unified_artist', None)
-        if not artist_raw and hasattr(song, 'performers') and song.performers:
-             artist_raw = song.performers[0]
+        # 4. Attach extension (preserve original if possible, else mp3)
+        ext = ".mp3"
+        if song.path:
+            _, orig_ext = os.path.splitext(song.path)
+            if orig_ext:
+                ext = orig_ext
         
-        artist = self._sanitize(str(artist_raw or "Unknown Artist"))
-        
-        title = self._sanitize(song.title) if song.title else "Unknown Title"
-        
-        # Construct Filename
-        filename = f"{artist} - {title}.mp3"
-        
-        # Calculate Folder Structure based on Business Rules
-        rel_path = self._resolve_routing_rules(genre, year, filename)
-        
-        # Build Absolute Path
+        # Check if pattern already includes extension
+        if not rel_path.lower().endswith(ext.lower()):
+            rel_path += ext
+            
         return os.path.join(root, rel_path)
 
+    def _resolve_pattern(self, pattern: str, song) -> str:
+        """Replace tokens {Artist}, {Genre}, {Year}, etc."""
+        # Data Preparation
+        artist = getattr(song, 'unified_artist', None)
+        if not artist and hasattr(song, 'performers') and song.performers:
+             artist = song.performers[0]
+        artist_clean = self._sanitize(artist or "Unknown Artist")
+        title_clean = self._sanitize(song.title or "Unknown Title")
+        
+        data = {
+            # Standard TitleCase
+            "Artist": artist_clean,
+            "Title": title_clean,
+            "Album": self._sanitize(song.album or "Unknown Album"),
+            "Genre": self._sanitize(song.genre or "Uncategorized"),
+            "Year": self._sanitize(str(song.year) if song.year else "0000"),
+            "BPM": self._sanitize(str(song.bpm) if hasattr(song, 'bpm') and song.bpm else "0"),
+            
+            # Lowercase variants (for JSON compatibility)
+            "artist": artist_clean,
+            "title": title_clean,
+            "album": self._sanitize(song.album or "Unknown Album"),
+            "genre": self._sanitize(song.genre or "Uncategorized"),
+            "year": self._sanitize(str(song.year) if song.year else "0000"),
+            
+            # Special tokens
+            "filename": f"{artist_clean} - {title_clean}"
+        }
+        
+        # Replacement
+        result = pattern
+        for key, val in data.items():
+            result = result.replace(f"{{{key}}}", val)
+            
+        return result
+
     def _load_rules(self) -> dict:
-        """Load external rules from JSON. Fallback to hardcoded defaults if missing."""
+        """Load external rules from JSON."""
         import json
         # Location mapping - eventually moved to SettingsManager
-        rules_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "design", "configs", "rules.json")
-        rules_path = os.path.normpath(rules_path)
+        rules_path = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "design", "configs", "rules.json"))
         
         try:
             if os.path.exists(rules_path):
@@ -51,37 +105,9 @@ class RenamingService:
                     return json.load(f)
         except Exception as e:
             print(f"Warning: Failed to load rules.json: {e}")
-        
-        # Absolute minimal fallback
-        return {
-            "routing_rules": [],
-            "default_rule": "{genre}/{year}/{filename}"
-        }
+        return {}
 
-    def _resolve_routing_rules(self, genre_clean: str, year_clean: str, filename: str) -> str:
-        """
-        Applies rules from JSON to determine folder structure.
-        """
-        rules = self._load_rules()
-        g_lower = genre_clean.lower()
-        
-        for rule in rules.get("routing_rules", []):
-            matches = [m.lower() for m in rule.get("match_genres", [])]
-            if g_lower in matches:
-                target = rule.get("target_path", "")
-                return target.format(
-                    genre=genre_clean,
-                    year=year_clean,
-                    filename=filename
-                )
 
-        # Default Rule
-        default = rules.get("default_rule", "{genre}/{year}/{filename}")
-        return default.format(
-            genre=genre_clean,
-            year=year_clean,
-            filename=filename
-        )
 
     def check_conflict(self, target_path: str) -> bool:
         """
@@ -127,4 +153,5 @@ class RenamingService:
         if not component: return ""
         bad_chars = '<>:"/\\|?*'
         clean = "".join(c for c in component if c not in bad_chars)
-        return clean.strip()
+        # Strip trailing dots/spaces (Windows hates 'Folder. ')
+        return clean.strip().strip('.')

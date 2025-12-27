@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QScrollArea, QFrame, QPushButton, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont, QPainter, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
+from typing import Any
 from src.core import yellberus
 
 class FlowLayout(QLayout):

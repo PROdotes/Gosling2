@@ -58,6 +58,10 @@ links: []
 | T-05 | **Audit Log (History)** | 5 | 2 | 20 | 📋 | Schema | [spec](design/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](design/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [design/LOGGING.md](design/LOGGING.md) |
+| T-61 | **Universal Tag Picker** | 2 | 4 | 2 | 💡 | Core | Tree-based dialog for Tags (Genre/Mood/etc) with Color Pills. |
+| T-62 | **Async Background Save** | 2 | 3 | 2 | ⚡ | Perf | Move save/renaming operations to background thread to prevent UI freeze on bulk edits. |
+| T-63 | **Selectable Publisher Picker** | 2 | 2 | 2 | 🏢 | Core | Convert Publisher text input in Album Manager to a searchable picker/dropdown for data integrity. |
+| T-64 | **Album Disambiguation** | 2 | 3 | 4 | 📀 | UX | Enhance Album Manager search results with sub-labels (Year, Publisher, etc.) to distinguish between duplicate titles like 'Greatest Hits'. |
 | T-53 | **UI Polish (Cyber)** | 4 | 2 | 8 | 📋 | — | Recolor App Icon to Pink; Evaluate Intensity; Library Grid Tinting. |
 | T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
 | T-36 | **Architecture Map Update** | 3 | 2 | 6 | 📋 | Post-0.1 | Update [ARCHITECTURE.md](ARCHITECTURE.md) — Missing: `src/core/`, `tools/`, `album.py`, `tag.py`, new repos. Schema section outdated. *Logged by Vesper.* |
@@ -97,7 +101,7 @@ links: []
 | T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](design/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
 | T-32 | **Pending Review Workflow** | 3 | 3 | 6 | 📋 | Tags (T-06 Phase 3) | [spec](design/proposals/PROPOSAL_ALBUMS.md#7-migration-plan-task-t-22) |
 | T-33 | **AI Playlist Generation** | 2 | 5 | 2 | 💡 | Post-1.0 | [spec](design/ideas/T-33_AI_PLAYLIST.md) |
-| T-35 | **Music API Lookup** | 3 | 4 | 6 | 💡 | Post-1.0 | [spec](design/ideas/IDEA_music_api_lookup.md) — MusicBrainz/Discogs/Spotify. Background worker pattern. *Logged by Vesper.* |
+| T-35 | **Music API Lookup** | 3 | 4 | 6 | 💡 | Post-1.0 | [spec](design/ideas/IDEA_music_api_lookup.md) — MusicBrainz/Discogs/Spotify. Workflow: Import (Pending Check) -> Background Worker -> (Found Data) -> Tag as 'Pending Review' -> Human Review -> Mark 'Done'. *Logged by Vesper.* |
 | T-39 | **MediaItem Composition** | 2 | 3 | 4 | 💡 | Post-1.0 | [idea](design/ideas/IDEA_media_item_composition.md) — Wrapper for Song/Jingle/VoiceTrack for radio automation. Option 3. *Logged by Vesper.* |
 
 ---
@@ -145,6 +149,7 @@ links: []
 | **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | 🏗️ PARTIAL: Moved Incomplete checkbox and cleaned up top layout (Dec 25). |
 | **Hardcoded Year Autofill** | `SidePanel` hardcodes "Set current year if empty". Should be configurable in Settings. | One Day (Settings UI). |
 | **Hardcoded Composer Splitter** | `SidePanel` auto-splits CamelCase composers if ending in comma. | One Day (Settings UI). |
+| **Editor Footer Layout** | Status Pill (AIR) text clipped by Save Button. Buttons too wide for panel. | ⚠️ URGENT (T-60 UI Polish). |
 
 ---
 

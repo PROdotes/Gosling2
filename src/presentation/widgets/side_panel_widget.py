@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 import copy
 import os
 from ...core import yellberus
+from ..dialogs.album_manager_dialog import AlbumManagerDialog
 
 class SidePanelWidget(QWidget):
     """
@@ -24,7 +25,14 @@ class SidePanelWidget(QWidget):
         self.library_service = library_service
         self.metadata_service = metadata_service
         self.renaming_service = renaming_service
+        self.renaming_service = renaming_service
         self.duplicate_scanner = duplicate_scanner
+        
+        # Dependency Injection for Dialogs
+        # We need access to the album repository. Assuming library service has access or can provide it.
+        # For strict DI, we should pass it, but for now we'll reach through library_service if needed
+        # or assume library_service acts as the repository provider.
+        self.album_repo = library_service.album_repo # Assuming exposed
         
         self.isrc_collision = False
         
@@ -80,16 +88,31 @@ class SidePanelWidget(QWidget):
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
         
-        # 2. Workflow State (MARK DONE) - Now in Footer
-        self.btn_done = QPushButton("DONE")
-        self.btn_done.setObjectName("MarkDoneButton")
-        self.btn_done.setCheckable(True)
-        self.btn_done.clicked.connect(self._on_done_toggled)
-        self.btn_done.setEnabled(False) 
+        # 2. Workflow State (STATUS PILL)
+        # Replaces simple checkbox button with "AIR/READY" pill logic
+        self.btn_status = QPushButton("PENDING")
+        self.btn_status.setObjectName("StatusPill")
+        self.btn_status.setCheckable(True)
+        self.btn_status.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_status.setFixedHeight(28)
+        self.btn_status.clicked.connect(self._on_status_toggled)
+        
+        # Pill Styling (Dynamic QSS injected in _update_status_visuals)
+        self.btn_status.setStyleSheet("""
+            QPushButton#StatusPill {
+                border: none;
+                border-radius: 14px; /* Pill Shape */
+                font-weight: bold;
+                color: #DDD;
+                background-color: #333;
+                padding: 0 15px;
+            }
+        """)
+        self.btn_status.setEnabled(False)
 
         footer_layout.addWidget(self.btn_discard)
         footer_layout.addStretch()
-        footer_layout.addWidget(self.btn_done)
+        footer_layout.addWidget(self.btn_status)
         footer_layout.addWidget(self.btn_save)
         layout.addWidget(footer_frame)
         
@@ -123,19 +146,22 @@ class SidePanelWidget(QWidget):
     def _update_header(self):
         if not self.current_songs:
             self.header_label.setText("No Selection")
-            self.btn_done.setEnabled(False)
+            self.btn_status.setEnabled(False)
+            self._update_status_visuals(False)
         elif len(self.current_songs) == 1:
             song = self.current_songs[0]
             artist = song.unified_artist or "Unknown Artist"
             self.header_label.setText(f"{artist} - {song.title}")
-            self.btn_done.setEnabled(True)
-            self.btn_done.setText("DONE")
-            # Sync Done state from staging or song
+            
+            # Sync Done state
             is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
-            self.btn_done.setChecked(bool(is_done))
+            self.btn_status.setChecked(bool(is_done))
+            self._update_status_visuals(bool(is_done))
+            self.btn_status.setEnabled(True)
         else:
             self.header_label.setText(f"Editing {len(self.current_songs)} Items")
-            self.btn_done.setEnabled(True) # In Bulk, MARK DONE applies to all
+            self.btn_status.setEnabled(True) # In Bulk, MARK DONE applies to all
+            self._update_status_visuals(False) # Default look for bulk
 
     def _build_fields(self):
         """Dynamic UI Factory driven by Yellberus with Grouping."""
@@ -275,6 +301,30 @@ class SidePanelWidget(QWidget):
             cb.stateChanged.connect(lambda state: self._on_field_changed(field_def.name, bool(state)))
             return cb
             
+        # T-46: Album Picker (Special Handling)
+        if field_def.name == 'album':
+            btn = QPushButton()
+            btn.setStyleSheet("""
+                text-align: left; 
+                background: #111; 
+                border: 1px solid #333; 
+                color: #DDD; 
+                padding: 6px;
+            """)
+            
+            # Display Value Logic
+            if is_multiple:
+                btn.setText("(Multiple Values)")
+            else:
+                # If value is numeric (ID), we need to resolve it to a name? 
+                # Or does 'value' come in as the name? 
+                # In current schema, song.album is a string name (Legacy) or ID?
+                # We assume we are transitioning. If it's a string, display it.
+                btn.setText(str(value) if value else "(No Album)")
+
+            btn.clicked.connect(self._open_album_manager)
+            return btn
+
         # Default: Line Edit for Alpha
         edit = QLineEdit()
         if is_multiple:
@@ -299,6 +349,43 @@ class SidePanelWidget(QWidget):
         # Escape to revert
         edit.installEventFilter(self)
         return edit
+
+    def _open_album_manager(self, checked=False):
+        """Open the T-46 Album Selector."""
+        # Gather initial data from current selection to auto-populate "Create New"
+        initial_data = {}
+        if self.current_songs:
+            song = self.current_songs[0]
+            initial_data = {
+                'title': song.album or "", # Default title guess
+                'artist': song.album_artist or (song.performers[0] if song.performers else ""),
+                'year': song.recording_year or "",
+                'publisher': song.publisher or ""
+            }
+
+        dlg = AlbumManagerDialog(self.album_repo, initial_data, self)
+        dlg.album_selected.connect(self._on_album_picked)
+        dlg.exec()
+
+    def _on_album_picked(self, album_id, album_name):
+        """Callback from Dialog."""
+        # Update the UI Button
+        if 'album' in self._field_widgets:
+            self._field_widgets['album'].setText(album_name)
+            
+        # Stage the changes
+        # Note: We are staging the Name for display/legacy, but ideally should stage ID.
+        # But for now, let's stage the 'album' field as the NAMe (to match current schema behavior)
+        # AND stage a hidden 'album_id' if the model supports it?
+        # Re-reading constraints: spec says "App updates Song.AlbumID".
+        
+        # We will stage BOTH to be safe during transition
+        # 'album' (str) -> For legacy string field
+        self._on_field_changed("album", album_name)
+        # 'album_id' (int) -> For new relation
+        self._on_field_changed("album_id", album_id) 
+        
+        # Also Auto-Fill Publisher if possible? (Future optimization)
 
     def _validate_isrc_field(self, widget, text):
         """
@@ -382,14 +469,42 @@ class SidePanelWidget(QWidget):
         self._validate_done_gate()
         self.staging_changed.emit(list(self._staged_changes.keys()))
 
-    def _on_done_toggled(self, checked):
-        self._on_field_changed("is_done", 1 if checked else 0)
-        self.btn_done.setText("DONE")
+    def _on_status_toggled(self, checked):
+        val = 1 if checked else 0
+        self._on_field_changed("is_done", val)
+        self._update_status_visuals(checked)
+
+    def _update_status_visuals(self, is_done):
+        """Apply Pro Radio styling: Green for AIR, Gray for PENDING."""
+        if is_done:
+            text = "READY [AIR]"
+            # Green Gradient
+            bg_color = "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #43A047, stop:1 #2E7D32)"
+            border = "1px solid #66BB6A"
+            color = "#FFF"
+        else:
+            text = "PENDING"
+            # Gray Gradient
+            bg_color = "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #333, stop:1 #222)"
+            border = "1px solid #444"
+            color = "#888"
+
+        self.btn_status.setText(text)
+        self.btn_status.setStyleSheet(f"""
+            QPushButton#StatusPill {{
+                background: {bg_color};
+                border: {border};
+                border-radius: 14px;
+                color: {color};
+                font-weight: bold;
+                padding: 0 15px;
+            }}
+        """)
 
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing in selection."""
         if not self.current_songs:
-            self.btn_done.setEnabled(False)
+            self.btn_status.setEnabled(False)
             return
 
         valid = True
@@ -426,12 +541,17 @@ class SidePanelWidget(QWidget):
                             break
             if not valid: break
             
-        self.btn_done.setEnabled(valid)
-        self.btn_done.setToolTip("" if valid else "Required fields or validation rules are missing.")
+        self.btn_status.setEnabled(valid)
+        if not valid:
+             self.btn_status.setToolTip("Required fields or validation rules are missing.")
+             # Force visually disabled state if needed, but setEnabled handles most
+        else:
+             self.btn_status.setToolTip("Mark as Ready for Air")
 
     def _update_save_state(self):
         has_staged = len(self._staged_changes) > 0
-        self.btn_save.setEnabled(has_staged)
+        # User Req: Save always active (for renaming triggers, etc.)
+        self.btn_save.setEnabled(True)
         
         # Check Collision (Phase 3)
         if self.isrc_collision:
@@ -446,15 +566,27 @@ class SidePanelWidget(QWidget):
 
         self._update_projected_path()
 
-    def _on_save_clicked(self):
+    def _on_save_clicked(self, checked=False):
         """Emit the entire staged buffer for the MainWindow to commit."""
+        # Allow saving even if no fields changed (e.g. to trigger rename)
+        changes_to_emit = self._staged_changes.copy()
+        
+        if not changes_to_emit and self.current_songs:
+            # Force inclusion of current songs if button was clicked but no edits made
+            for song in self.current_songs:
+                changes_to_emit[song.source_id] = {} # Empty dict implies "Save Current State"
+        
         # Auto-fill Year logic (User Request)
         from datetime import datetime
         import re
         current_year = datetime.now().year
         
-        for song_id in list(self._staged_changes.keys()):
-            changes = self._staged_changes[song_id]
+        for song_id in list(changes_to_emit.keys()):
+            # Ensure sub-dict exists
+            if song_id not in changes_to_emit:
+                 changes_to_emit[song_id] = {}
+                 
+            changes = changes_to_emit[song_id]
             
             # Check if year is valid
             has_year_change = 'recording_year' in changes
@@ -489,16 +621,20 @@ class SidePanelWidget(QWidget):
                     # Regex: Look for [a-z] followed by [A-Z]
                     formatted = re.sub(r'([a-z])([A-Z])', r'\1, \2', clean_val)
                     changes['composers'] = formatted
-
-        self.save_requested.emit(self._staged_changes)
-        # Note: MainWindow will call self.clear_staged() after successful DB write.
+        
+        self.save_requested.emit(changes_to_emit)
+        
+        # Optimistic UI update or wait for refresh?
+        # Usually Main Window refreshes us.
+        self._staged_changes.clear()
+        self._update_save_state()
 
     def trigger_save(self):
         """Public slot to trigger save (e.g. from Ctrl+S shortcut)."""
         if self.btn_save.isEnabled():
             self._on_save_clicked()
 
-    def _on_discard_clicked(self):
+    def _on_discard_clicked(self, checked=False):
         self._staged_changes = {}
         self.set_songs(self.current_songs)
         self.staging_changed.emit([]) # Clear highlights in library

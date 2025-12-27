@@ -72,8 +72,10 @@ tags:
 
 ### 🔮 Milestone 5: The Final Sprint (0.1.0)
 *Status: Queue (Prioritized)*
-*   [ ] **Proper Album Editor** (T-46) (~3.0 h)
-    *   *Task*: Replace text field with Album Manager (Search/Assign/Cover Art).
+*   [ ] **T-46 Proper Album Editor** (Relational)
+*   [ ] **T-60 Editor Footer Redesign** (UI Polish)
+*   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
+*   [ ] **T-11 Basic Playback** (VLC Wrappers)
     *   *Why*: Essential for fixing "Greatest Hits" fragmentation.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
