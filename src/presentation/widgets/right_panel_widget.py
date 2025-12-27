@@ -43,7 +43,7 @@ class RightPanelHeader(QFrame):
         super().__init__(parent)
         self.setFixedHeight(40)
         self.setObjectName("RightPanelHeader")
-        self.setStyleSheet(f"#RightPanelHeader {{ background: {COLOR_BG_PANEL}; border-bottom: 2px solid #000; }}")
+        self.setStyleSheet(f"#RightPanelHeader {{ background: {COLOR_BG_PANEL}; border: none; }}")
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 0, 5, 0)
@@ -96,7 +96,7 @@ class RightPanelFooter(QFrame):
         super().__init__(parent)
         self.setFixedHeight(100) # Enough for 2 rows comfortably
         self.setObjectName("RightPanelFooter")
-        self.setStyleSheet(f"#RightPanelFooter {{ background: {COLOR_BG_PANEL}; border-top: 2px solid #000; }}")
+        self.setStyleSheet(f"#RightPanelFooter {{ background: {COLOR_BG_PANEL}; border: none; }}")
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -183,6 +183,7 @@ class RightPanelWidget(QWidget):
     
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None):
         super().__init__(parent)
+        self.setObjectName("RightSurgicalPanel")
         self.settings_manager = settings_manager
         
         self.layout = QVBoxLayout(self)
@@ -199,8 +200,7 @@ class RightPanelWidget(QWidget):
         
         # 2. The Vertical Splitter (The Stack)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
-        self.splitter.setHandleWidth(1)
-        self.splitter.setStyleSheet("QSplitter::handle { background: #333; }")
+        self.splitter.setHandleWidth(7)
         
         # --- Zone 1: History ---
         # TODO: HistoryDrawer doesn't seem to take services yet, just indices. 
@@ -231,9 +231,8 @@ class RightPanelWidget(QWidget):
         
         self.layout.addWidget(self.splitter)
         
-        # 3. The Footer (Transport)
-        self.footer = RightPanelFooter()
-        self.layout.addWidget(self.footer)
+        self.layout.addWidget(self.splitter)
+
         
         # --- INTERNAL WIRING ---
         
@@ -242,9 +241,8 @@ class RightPanelWidget(QWidget):
         self.header.toggle_editor.connect(self._on_toggle_editor)
         self.header.toggle_compact.connect(self._on_toggle_compact)
         
-        # Footer Signals -> Facade Signals
-        self.footer.transport_command.connect(self.transport_command.emit)
-        self.footer.transition_command.connect(self.transition_command.emit)
+        # Footer removed
+
         
         # --- STATE RESTORATION ---
         self._restore_state()

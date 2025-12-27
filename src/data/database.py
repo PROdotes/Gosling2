@@ -14,8 +14,9 @@ class BaseRepository:
 
     @contextmanager
     def get_connection(self):
-        """Context manager for database connections"""
+        """Context manager for database connections. Enables WAL mode for concurrent performance."""
         conn = sqlite3.connect(self.db_path)
+        conn.execute("PRAGMA journal_mode=WAL") # Enable write-ahead logging
         conn.execute("PRAGMA foreign_keys = ON")
         conn.row_factory = sqlite3.Row
         try:
@@ -206,9 +207,16 @@ class BaseRepository:
             if 'AudioHash' not in columns:
                 cursor.execute("ALTER TABLE MediaSources ADD COLUMN AudioHash TEXT")
             
-            # Create indexes for duplicate detection
+            # Create indexes for duplicate detection and performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_audiohash ON MediaSources(AudioHash)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_songs_isrc ON Songs(ISRC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_songs_year ON Songs(RecordingYear)")
+            
+            # Reverse lookup indexes for junction tables
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_songalbums_albumid ON SongAlbums(AlbumID)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_contributorid ON MediaSourceContributorRoles(ContributorID)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_roleid ON MediaSourceContributorRoles(RoleID)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON Tags(Category)")
 
 
 

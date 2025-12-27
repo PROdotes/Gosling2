@@ -91,7 +91,7 @@ class TerminalHeader(QFrame):
                                           stop:0 #1A1A1A, stop:0.4 #222, 
                                           stop:0.5 #2A2A2A, stop:0.6 #222, 
                                           stop:1 #1A1A1A);
-                border-bottom: 2px solid #000;
+                border-bottom: 2px solid #444444;
                 border-top: 1px solid #333;
             }
         """)
@@ -242,11 +242,11 @@ class MainWindow(QMainWindow):
         # Main layout
         main_layout = QVBoxLayout(main_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(0) # We control spacing with explicit separator widgets
         
         # Global Industrial Amber Theme
         self.setStyleSheet("""
-            QMainWindow { background-color: #0A0A0A; }
+            QMainWindow { background-color: #050505; }
             QWidget { color: #DDD; }
             
             /* Industrial Amber Scrollbars */
@@ -299,28 +299,27 @@ class MainWindow(QMainWindow):
         self.title_bar.maximize_requested.connect(self._toggle_maximize)
         self.title_bar.close_requested.connect(self.close)
         main_layout.addWidget(self.title_bar)
-
-        # Content Container (where margins apply)
-        content_container = QWidget()
-        content_layout = QHBoxLayout(content_container) # Root is Horizontal to allow Right Panel Full Height
-        content_layout.setContentsMargins(5, 5, 0, 0) # No bottom/right margin for flush docking
-        content_layout.setSpacing(1)
-        main_layout.addWidget(content_container, 1)
+        
+        # --- TOP SEPARATOR (7px Black) ---
+        top_separator = QWidget()
+        top_separator.setFixedHeight(7)
+        top_separator.setStyleSheet("background-color: #000000; border: none;")
+        main_layout.addWidget(top_separator)
 
         # === THE MAIN SPLITTER (Left/Center Block | Right Panel) ===
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_splitter.setObjectName("MainRootSplitter")
-        # Handle width controlled by QSS
+        self.main_splitter.setHandleWidth(7)
 
         # --- LEFT+CENTER BLOCK (Archive + Library + Scrubber) ---
         lc_container = QWidget()
         lc_layout = QVBoxLayout(lc_container)
         lc_layout.setContentsMargins(0, 0, 0, 0)
-        lc_layout.setSpacing(0)
+        lc_layout.setSpacing(0)  # No spacing - strictly separator widgets
         
         # LC Splitter (Archive | Library)
         self.lc_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.lc_splitter.setHandleWidth(1)
+        self.lc_splitter.setHandleWidth(7)
         
         # 1. Archive/Library (Currently just LibraryWidget acting as both)
         self.library_widget = LibraryWidget(
@@ -334,13 +333,16 @@ class MainWindow(QMainWindow):
         
         lc_layout.addWidget(self.lc_splitter, 1)
         
-        # 2. FOOTER (Scrubber)
+        # --- NO SEPARATOR HERE ---
+        # (Moved to main layout below)
+        
+        # 2. FOOTER (Scrubber) - MOVED
         self.playback_widget = PlaybackControlWidget(
             self.playback_service,
             self.settings_manager
         )
         self.playback_widget.setObjectName("PlaybackDeck")
-        lc_layout.addWidget(self.playback_widget)
+        # Do not add to lc_layout yet
         
         # Add LC Block to Main Splitter
         self.main_splitter.addWidget(lc_container)
@@ -355,6 +357,16 @@ class MainWindow(QMainWindow):
             self.settings_manager
         )
         self.main_splitter.addWidget(self.right_panel)
+        main_layout.addWidget(self.main_splitter, 1)
+        
+        # --- BOTTOM SEPARATOR (7px Black) ---
+        bottom_separator = QWidget()
+        bottom_separator.setFixedHeight(7)
+        bottom_separator.setStyleSheet("background-color: #000000; border: none;")
+        main_layout.addWidget(bottom_separator)
+        
+        # Add Playback at the very bottom
+        main_layout.addWidget(self.playback_widget)
         
         # COMPATIBILITY ALIAS: Mapping legacy self.playlist_widget to the new nested instance
         # This prevents crashes in _play_next, _toggle_play_pause, etc.
@@ -369,8 +381,6 @@ class MainWindow(QMainWindow):
         # Prevent Right Panel from collapsing to 0 (Hard Stop)
         self.main_splitter.setCollapsible(1, False)
 
-        content_layout.addWidget(self.main_splitter)
-        
         # Add resize grip to bottom-right corner (for frameless window)
         self.size_grip = ResizeGrip(self)
         # Position it in the bottom-right corner
@@ -387,9 +397,10 @@ class MainWindow(QMainWindow):
         # Connect Selection -> Right Panel Facade
         self.library_widget.table_view.selectionModel().selectionChanged.connect(self._on_library_selection_changed)
 
-        # --- Right Panel (Command Deck) Signals ---
-        self.right_panel.transport_command.connect(self._handle_transport_command)
-        self.right_panel.transition_command.connect(self._handle_transition_command)
+        # --- Playback Controls (Global Footer / Command Deck) ---
+        self.playback_widget.transport_command.connect(self._handle_transport_command)
+        self.playback_widget.transition_command.connect(self._handle_transition_command)
+        self.playback_widget.volume_changed.connect(self._on_volume_changed)
         
         # --- Editor Signals (Transient Wiring) ---
         # Direct access to inner widget until SidePanel refactor is complete
@@ -402,11 +413,10 @@ class MainWindow(QMainWindow):
         playlist = self.right_panel.playlist_widget
         playlist.itemDoubleClicked.connect(self._on_playlist_double_click)
 
-        # --- Playback Controls (Global Footer) ---
+        # Legacy signals (if still emitted, but now covered by transport_command)
         self.playback_widget.play_pause_clicked.connect(self._toggle_play_pause)
         self.playback_widget.prev_clicked.connect(self._play_prev)
         self.playback_widget.next_clicked.connect(self._play_next)
-        self.playback_widget.volume_changed.connect(self._on_volume_changed)
         
         # --- Media Status (Auto-Advance) ---
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
@@ -584,26 +594,28 @@ class MainWindow(QMainWindow):
         self.settings_manager.set_volume(volume)
     
     def _restore_playlist(self) -> None:
-        """Restore last playlist"""
+        """Restore last playlist efficiently (No Disk Probing)"""
         playlist_data = self.settings_manager.get_last_playlist()
-        if playlist_data:
-            from PyQt6.QtWidgets import QListWidgetItem
-            # T-54: Access nested playlist widget
-            playlist_widget = self.right_panel.playlist_widget
-            
-            for path in playlist_data:
-                # Try to extract metadata for display
-                try:
-                    song = self.metadata_service.extract_from_mp3(path)
-                    display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
-                except Exception:
-                    display_text = os.path.basename(path)
-                
-                list_item = QListWidgetItem(display_text)
-                list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
-                playlist_widget.addItem(list_item)
+        if not playlist_data:
+            return
+
+        from PyQt6.QtWidgets import QListWidgetItem
+        playlist_widget = self.right_panel.playlist_widget
         
-        # Initial update of button state
+        # Resolve metadata from database in one efficient bulk fetch
+        songs = self.library_service.get_songs_by_paths(playlist_data)
+        song_map = {song.path: song for song in songs}
+        
+        for path in playlist_data:
+            display_text = os.path.basename(path)
+            if path in song_map:
+                song = song_map[path]
+                display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
+            
+            list_item = QListWidgetItem(display_text)
+            list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+            playlist_widget.addItem(list_item)
+    
         self.playback_widget.set_playlist_count(self.right_panel.playlist_widget.count())
     
     def _save_playlist(self) -> None:
@@ -625,18 +637,30 @@ class MainWindow(QMainWindow):
 
     def _on_library_selection_changed(self, selected, deselected) -> None:
         """Handle library row selection."""
-        # Get selected songs from the model
+        # Get selected rows from the view
         selection_model = self.library_widget.table_view.selectionModel()
         indexes = selection_model.selectedRows()
         
-        songs = []
-        if indexes:
-            for idx in indexes:
-                song = self._get_selected_song_object(idx)
-                if song:
-                    songs.append(song)
+        if not indexes:
+            self.right_panel.update_selection([])
+            return
+
+        # 1. Collect paths without hitting the DB (Memory operation)
+        path_idx = self.library_widget.field_indices.get('path', -1)
+        if path_idx == -1: return
+
+        paths = []
+        for proxy_idx in indexes:
+             source_idx = self.library_widget.proxy_model.mapToSource(proxy_idx)
+             path_item = self.library_widget.library_model.item(source_idx.row(), path_idx)
+             if path_item:
+                 paths.append(path_item.text())
+
+        # 2. Bulk fetch all song objects in ONE database trip
+        # This eliminates the 3-second freeze during multi-selection!
+        songs = self.library_service.get_songs_by_paths(paths)
             
-        # Facade Pattern: Pass data to Right Panel
+        # 3. Facade Pattern: Pass data to Right Panel
         self.right_panel.update_selection(songs)
 
     def _handle_transport_command(self, cmd: str) -> None:

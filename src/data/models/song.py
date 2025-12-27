@@ -42,15 +42,8 @@ class Song(MediaSource):
         import json
         import os
         
-        # Load ID3 frames JSON
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
-        
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                id3_frames = json.load(f)
-        except Exception:
-            id3_frames = {}
+        from src.business.services.metadata_service import MetadataService
+        id3_frames = MetadataService._get_id3_map()
         
         # Map known aliases (JSON uses user-friendly names, Song uses internal names)
         attr_map = {

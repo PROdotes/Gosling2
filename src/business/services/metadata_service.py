@@ -13,8 +13,27 @@ import os
 class MetadataService:
     """Service for extracting metadata from audio files"""
 
-    @staticmethod
-    def extract_from_mp3(path: str, source_id: Optional[int] = None) -> Song:
+    _id3_map = None
+
+    @classmethod
+    def _get_id3_map(cls):
+        """Load ID3 mapping once and cache it."""
+        if cls._id3_map is None:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        cls._id3_map = json.load(f)
+                except Exception as e:
+                    print(f"Error loading id3_frames.json: {e}")
+                    cls._id3_map = {}
+            else:
+                cls._id3_map = {}
+        return cls._id3_map
+
+    @classmethod
+    def extract_from_mp3(cls, path: str, source_id: Optional[int] = None) -> Song:
         """
         Extract metadata from an MP3 file and return a Song object.
         Dynamically maps frames using id3_frames.json (Source of Truth).
@@ -27,14 +46,8 @@ class MetadataService:
 
         duration = audio.info.length if audio.info else None
         
-        # Load ID3 Mapping
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
-        
-        id3_map = {}
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                id3_map = json.load(f)
+        # Use Cached ID3 Mapping
+        id3_map = cls._get_id3_map()
 
         # Helper to safely get list values, handling ID3v2.3 '/' splitting
         def get_values(frame_val, field_type="text") -> List[str]:
@@ -212,8 +225,8 @@ class MetadataService:
             print(f"Error reading raw tags: {e}")
             return {}
 
-    @staticmethod
-    def write_tags(song: Song) -> bool:
+    @classmethod
+    def write_tags(cls, song: Song) -> bool:
         """
         Write metadata from Song object to MP3 file.
         Dynamically uses yellberus.FIELDS and id3_frames.json for mapping.
@@ -270,19 +283,13 @@ class MetadataService:
         if song.groups: song.groups = clean_list(song.groups)
 
         try:
-            # Load ID3 Mapping from JSON (Spec T-38)
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
+            # Use Cached ID3 Mapping from JSON (Spec T-38)
+            id3_map = cls._get_id3_map()
             
             field_to_frame = {}
-            if os.path.exists(json_path):
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    for frame, info in data.items():
-                        if isinstance(info, dict) and 'field' in info:
-                            field_to_frame[info['field']] = frame
-            else:
-                print(f"Warning: id3_frames.json not found at {json_path}")
+            for frame, info in id3_map.items():
+                if isinstance(info, dict) and 'field' in info:
+                    field_to_frame[info['field']] = frame
             
             # Alias mapping (JSON uses "title", Song uses "name" but field def uses "title")
             # yellberus.FIELDS uses "title" as name, so we are good.

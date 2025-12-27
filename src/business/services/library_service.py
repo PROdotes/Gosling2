@@ -66,6 +66,14 @@ class LibraryService:
         """Get full song object by DB ID"""
         return self.song_repository.get_by_id(song_id)
 
+    def get_songs_by_ids(self, song_ids: List[int]) -> List[Song]:
+        """Bulk fetch songs by their DB IDs"""
+        return self.song_repository.get_songs_by_ids(song_ids)
+
+    def get_songs_by_paths(self, paths: List[str]) -> List[Song]:
+        """Bulk fetch songs by their paths"""
+        return self.song_repository.get_songs_by_paths(paths)
+
     def find_by_isrc(self, isrc: str) -> Optional[Song]:
         """Find a song by ISRC for duplicate detection"""
         return self.song_repository.get_by_isrc(isrc)
@@ -119,43 +127,70 @@ class LibraryService:
         
         return album
 
-    def get_distinct_filter_values(self, field_expression: str) -> List:
+    def get_distinct_filter_values(self, field_name: str) -> List:
         """
-        Get distinct values for a filterable field using dynamic SQL.
-        Uses Yellberus QUERY_FROM for the FROM clause.
-        
-        Args:
-            field_expression: The SQL expression or column name (e.g., "S.RecordingYear" or "GROUP_CONCAT(...)")
-        
-        Returns:
-            List of unique values for that field.
+        Get distinct values for a filterable field using surgical targeted queries.
+        This bypasses massive JOINs to prevent UI freezes at startup.
         """
         from src.core import yellberus
         
-        # Strip "AS Alias" if present in query_expression
-        expr = field_expression
+        # 1. OPTIMIZED PATH: Direct queries for common fields
+        query = None
+        if field_name == "recording_year":
+            query = "SELECT DISTINCT RecordingYear FROM Songs WHERE RecordingYear IS NOT NULL"
+        elif field_name == "performers":
+            query = """
+                SELECT DISTINCT C.ContributorName 
+                FROM Contributors C
+                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                WHERE R.RoleName = 'Performer'
+            """
+        elif field_name == "composers":
+            query = """
+                SELECT DISTINCT C.ContributorName 
+                FROM Contributors C
+                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                WHERE R.RoleName = 'Composer'
+            """
+        elif field_name == "publisher":
+            query = "SELECT DISTINCT PublisherName FROM Publishers"
+        elif field_name == "genre":
+            query = "SELECT DISTINCT TagName FROM Tags WHERE Category = 'Genre'"
+        elif field_name == "album":
+            query = "SELECT DISTINCT Title FROM Albums"
+        elif field_name == "album_artist":
+            query = "SELECT DISTINCT AlbumArtist FROM Albums WHERE AlbumArtist IS NOT NULL"
+
+        if query:
+            with self.song_repository.get_connection() as conn:
+                cursor = conn.execute(query)
+                results = [row[0] for row in cursor.fetchall() if row[0]]
+                return sorted(results, key=lambda x: str(x).lower() if isinstance(x, str) else x)
+
+        # 2. FALLBACK PATH: For less common or complex fields
+        field_def = yellberus.get_field(field_name)
+        if not field_def:
+            return []
+            
+        expr = field_def.query_expression or field_def.db_column
         if " AS " in expr.upper():
             expr = expr.split(" AS ")[0].strip()
-        
-        query = f"""
-            SELECT DISTINCT {expr}
-            {yellberus.QUERY_FROM}
-            {yellberus.QUERY_BASE_WHERE}
-        """
+            
+        query = f"SELECT DISTINCT {expr} {yellberus.QUERY_FROM} {yellberus.QUERY_BASE_WHERE}"
         
         with self.song_repository.get_connection() as conn:
             cursor = conn.execute(query)
-            results = []
+            # Use a set to avoid duplicates from comma-splitting
+            results = set()
             for row in cursor.fetchall():
                 val = row[0]
-                if val is not None and str(val).strip():
-                    # Handle comma-separated lists (from GROUP_CONCAT)
-                    if ',' in str(val):
-                        for item in str(val).split(','):
+                if val:
+                    if isinstance(val, str) and ',' in val:
+                        for item in val.split(','):
                             item = item.strip()
-                            if item and item not in results:
-                                results.append(item)
+                            if item: results.add(item)
                     else:
-                        if val not in results:
-                            results.append(val)
-            return sorted(results, key=lambda x: str(x).lower() if isinstance(x, str) else x)
+                        results.add(val)
+            return sorted(list(results), key=lambda x: str(x).lower() if isinstance(x, str) else x)

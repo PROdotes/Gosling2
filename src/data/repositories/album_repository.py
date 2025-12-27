@@ -202,7 +202,7 @@ class AlbumRepository(BaseRepository):
 
     def get_item_albums(self, source_id: int) -> List[Album]:
         """Get albums linked to a source item."""
-        return self.album_repository.get_albums_for_song(source_id)
+        return self.get_albums_for_song(source_id)
 
     def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
         """
@@ -212,14 +212,14 @@ class AlbumRepository(BaseRepository):
         if not album_title or not album_title.strip():
             return None
         
-        album, created = self.album_repository.get_or_create(
+        album, created = self.get_or_create(
             title=album_title.strip(),
             album_artist=artist,
             release_year=year
         )
     
         # Link song to album
-        self.album_repository.add_song_to_album(source_id, album.album_id)
+        self.add_song_to_album(source_id, album.album_id)
     
         return album
 

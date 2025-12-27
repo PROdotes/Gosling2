@@ -228,6 +228,7 @@ class FilterWidget(QWidget):
 
     def __init__(self, library_service, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("FilterWidget")
         self.library_service = library_service
         self._active_filters = {} # {field_name: set(values)}
         self._block_signals = False
@@ -512,7 +513,7 @@ class FilterWidget(QWidget):
             return []
         
         try:
-            return self.library_service.get_distinct_filter_values(expression)
+            return self.library_service.get_distinct_filter_values(field.name)
         except Exception as e:
             # Log but don't crash - filter just won't show
             print(f"[FilterWidget] Failed to get values for {field.name}: {e}")

@@ -1,23 +1,74 @@
 /* Gosling2 "Cyber-Goth" Theme - Base Stylesheet */
 /* Carbon & Neon Palette */
 
-/* --- GLOBAL WIDGETS --- */
+/* ============================================
+   GOSLING2 GLOWUP - STRUCTURAL FOUNDATION
+   The Canvas Before The Paint
+   ============================================ */
+
+/* --- THE CHASSIS (Main Window Background) --- */
+QMainWindow {
+    background-color: #050505; /* The void - deepest black */
+}
+
+/* --- DEFAULT WIDGET (Fallback) --- */
 QWidget {
-    background-color: #0A0A0A; /* Deeper Workstation Floor */
+    background-color: #0A0A0A; /* Standard panel surface */
     color: #E0E0E0;
     font-family: "Segoe UI", sans-serif;
     font-size: 10pt;
 }
 
-/* Machine-Printed Chassis Labels */
+/* --- PANEL STRUCTURE (The 5 Main Surfaces) --- */
+
+/* 1. TOP BAR (Title Bar) */
+#TitleBar, 
+#FilterWidget,
+#RightSurgicalPanel,
+#PlaybackDeck,
+.LibraryWidget {
+    background-color: #0A0A0A;
+    border: none;
+}
+
+/* Legacy Terminal Header (unused but kept for reference) */
+#TerminalHeader {
+    background-color: #0A0A0A;
+    border-bottom: 2px solid #444444;
+    padding: 8px 12px;
+}
+
+/* Panel logic consolidated above */
+
+/* 3. CENTER TABLE (Library Grid) - inherits #0A0A0A from QWidget */
+
+/* Recessed logic removed - unified to Surface */
+
+/* Deck logic removed - unified to Surface */
+
+/* --- SUB-PANELS --- */
+
+/* Chip Bay (Recessed tray in sidebar) */
+#ChipBayScroll, QScrollArea[objectName="ChipBayScroll"] {
+    background-color: #050505; /* Recessed darker panel */
+    border-top: 2px solid #333333; /* Visible separator */
+    border-bottom: 1px solid #222222;
+}
+
+QScrollArea[objectName="ChipBayScroll"] QWidget {
+    background-color: #050505; /* Ensure inner widget matches */
+}
+
+/* Machine-Printed Chassis Labels - GLOWUP: Readable contrast */
 QLabel {
-    color: #CCCCCC; /* Technical Silver (Crisp) */
+    background: transparent;
+    background-color: transparent;
+    color: #888888; /* --text-muted per GLOWUP spec */
     font-weight: bold;
-    font-family: "Agency FB", "Bahnschrift Condensed", "Segoe UI Semibold", sans-serif;
-    font-size: 10pt; /* Slightly clearer */
+    font-family: "Bahnschrift Condensed", "Agency FB", "Segoe UI Semibold", sans-serif;
+    font-size: 10pt;
     text-transform: uppercase;
     letter-spacing: 1px;
-    /* Crisp Edge Shadow */
     qproperty-alignment: 'AlignVCenter';
 }
 QLabel:disabled {
@@ -34,8 +85,8 @@ QSplitter::handle {
 }
 
 QSplitter::handle:horizontal {
-    width: 3px;
-    border-right: 1px solid #1A1A1A;
+    width: 7px;
+    background-color: #000000;
 }
 
 QStatusBar {
@@ -57,12 +108,12 @@ QSizeGrip:hover {
 }
 
 QSplitter::handle:vertical {
-    height: 6px;
-    border-bottom: 1px solid #1A1A1A;
+    height: 7px;
+    background-color: #000000;
 }
 
 QSplitter::handle:hover {
-    background-color: #D81B60; /* Neon highlight on hover */
+    background-color: #FFC66D; /* Amber Glow on Hover */
 }
 
 /* --- SCROLL BARS (Hydraulic Sliders) --- */
@@ -100,12 +151,13 @@ QLineEdit, QPlainTextEdit {
     border-left: 1px solid #000;
     border-right: 1px solid #1A1A1A;
     border-bottom: 1px solid #222;
-    border-radius: 3px;
+    border-radius: 2px; /* GLOWUP: Subtle rounding */
     padding: 5px 8px;
     color: #E0E0E0;
     font-family: 'Consolas', 'Segoe UI', monospace;
     font-size: 10pt;
-    selection-background-color: #D81B60;
+    selection-background-color: #FFC66D; /* GLOWUP: Amber text selection */
+    selection-color: #000; /* Black text on amber */
 }
 
 /* Glass Data Selector (ComboBox) */
@@ -127,9 +179,9 @@ QLineEdit:focus {
 QComboBox {
     background-color: #080808;
     border: 1px solid #333;
-    border-radius: 4px;
-    padding: 5px 8px; /* Increased vertical padding to match buttons */
-    min-height: 20px; /* Ensure optical height matches adjacent controls */
+    border-radius: 2px; /* GLOWUP: Subtle rounding */
+    padding: 5px 8px;
+    min-height: 20px;
     color: #BBB;
     font-family: "Agency FB", "Bahnschrift Condensed";
     font-size: 11pt;
@@ -137,11 +189,11 @@ QComboBox {
     letter-spacing: 1px;
 }
 QComboBox:hover {
-    border: 1px solid #D81B60; /* Neon Edge */
+    border: 1px solid #FFC66D; /* GLOWUP: Amber hover */
     color: white;
 }
 QComboBox:on { /* When expanded */
-    border-bottom: 1px solid #D81B60;
+    border-bottom: 1px solid #FFC66D; /* GLOWUP: Amber */
 }
 
 /* Kill the dropdown button, let Fusion handle the arrow */
@@ -159,25 +211,16 @@ QComboBox::down-arrow {
 QComboBox QAbstractItemView {
     background-color: #121212;
     border: 1px solid #333;
-    selection-background-color: #D81B60;
+    selection-background-color: #FFC66D; /* GLOWUP: Amber selection */
+    selection-color: #000;
     color: #CCC;
     outline: none;
 }
 
-/* Machine-Printed Chassis Labels (Stealth Mode) */
-QLabel {
-    background: transparent; /* KEY FIX: Kill the box */
-    background-color: transparent;
-    color: #555555; /* Deep Titanium - Recessed */
-    font-weight: bold;
-    font-family: "Agency FB", "Bahnschrift Condensed", "Segoe UI Semibold", sans-serif;
-    font-size: 10pt;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    qproperty-alignment: 'AlignVCenter';
-}
+/* GLOWUP: Labels need readable contrast - #888 minimum per spec */
+/* Removed duplicate QLabel definition that was overriding to #555 */
 QLineEdit:focus, QComboBox:focus, QPlainTextEdit:focus {
-    border: 1px solid #D81B60; /* Neon Activation */
+    border: 1px solid #FFC66D; /* GLOWUP: Amber focus */
     background-color: #080808;
     color: white;
 }
@@ -227,12 +270,12 @@ QTreeView#FilterTree::item:hover {
 }
 
 
-/* UNIVERSAL LED INDICATOR (Hardware Logic) */
+/* UNIVERSAL LED INDICATOR - BIGGER so glow is visible */
 QCheckBox::indicator, QTreeView::indicator {
-    width: 10px;
-    height: 10px;
-    border-radius: 5px;
-    border: 1px solid #333; /* The Socket */
+    width: 14px;  /* Bigger! */
+    height: 14px;
+    border-radius: 7px;
+    border: 1px solid #333;
     background: #050505;
 }
 
@@ -243,10 +286,10 @@ QCheckBox::indicator:unchecked, QTreeView::indicator:unchecked {
 
 QCheckBox::indicator:checked, QTreeView::indicator:checked {
     background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
-                                stop:0 #FFF, /* Hot filament */
+                                stop:0 #FFF,
                                 stop:0.2 #FFE0B2, 
                                 stop:0.7 #FFC66D, 
-                                stop:1.0 #452600); /* Outer glow */
+                                stop:1.0 #452600);
     border-color: #FFD54F;
 }
 
@@ -282,47 +325,73 @@ QCheckBox#FilterCheckbox:checked {
 
 
 
-/* --- BUTTONS --- */
+/* --- BUTTONS (GLOWUP: Backlit Console Technique) --- */
 QPushButton {
-    background-color: #333;
-    color: #DDD;
-    border: 1px solid #444;
+    /* Light-from-below gradient */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #111111,
+        stop:0.85 #1A1A1A,
+        stop:1 #252525);
+    color: #888888;
+    border: 1px solid #222222;
+    border-bottom: 2px solid #333333; /* Subtle underglow */
     padding: 6px 14px;
-    border-radius: 4px;
+    border-radius: 0px; /* Sharp edges per spec */
     font-weight: bold;
 }
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1A1A1A,
+        stop:0.85 #252525,
+        stop:1 #333333);
+    border-bottom: 2px solid #FFC66D; /* Amber underglow on hover */
+    color: #E0E0E0;
+}
 QPushButton:pressed {
-    background-color: #222;
+    /* Inverted gradient = light pressed in */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1A1A1A,
+        stop:1 #080808);
+    border-bottom: 1px solid #111111;
+    color: #888888;
 }
 
-/* Category Pills (Physical Console Modules) */
+/* Category Buttons (GLOWUP: Rubber mixer switches with backlit gradient) */
 QPushButton#CategoryPill {
-    background-color: #111;
+    /* Backlit gradient - light from below, more visible contrast */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #0A0A0A,
+        stop:0.7 #151515,
+        stop:1 #282828);  /* Brighter bottom edge */
     border: 1px solid #222;
-    border-radius: 0px;
+    border-bottom: 2px solid #3A3A3A; /* More visible underglow */
+    border-radius: 2px;
     padding: 10px 24px;
     min-width: 110px;
     font-family: "Bahnschrift Condensed", sans-serif;
     font-weight: bold;
     font-size: 11pt;
-    color: #888; /* Recessed Data */
+    color: #888;
     text-transform: uppercase;
     letter-spacing: 1.5px;
 }
 
 QPushButton#CategoryPill:hover {
-    background-color: #1A1A1A;
-    border-color: #FFC66D; /* Warm Amber Signal Hint */
-    color: #AAA;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #151515,
+        stop:0.7 #222222,
+        stop:1 #3A3A3A);
+    border-bottom: 2px solid #FFC66D; /* Amber underglow */
+    color: #E0E0E0;
 }
 
 
-/* --- T-55: CHIP BAY (HUD Data Tags) --- */
+/* --- T-55: TAG PILLS (GLOWUP: Rounded removable tags) --- */
 QPushButton#NeonChip {
     background-color: #111;
     color: #BBB;
     border: 1px solid #222;
-    border-radius: 0px;
+    border-radius: 12px; /* GLOWUP: Rounded pill shape */
     padding: 4px 11px 4px 15px; 
     font-size: 11pt;
     font-family: "Bahnschrift Condensed", sans-serif;
@@ -393,8 +462,11 @@ QPushButton#CategoryPill[category="All"]:hover       { border-color: #FFF; }
 
 
 QPushButton#CategoryPill:checked {
-    /* MATTE SIGNAL - Signal only, no glow */
-    background-color: #050505;
+    /* Pressed in look - darker with semantic border from below rules */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #050505,
+        stop:0.8 #080808,
+        stop:1 #0F0F0F);
     color: white;
     border: 1px solid #222;
 }
@@ -465,6 +537,32 @@ QTabWidget::pane {
     border-radius: 0px;
 }
 
+/* --- GLOWUP: TABLE VIEW (The spec says this, but it was MISSING!) --- */
+QTableView {
+    background-color: #0A0A0A;
+    alternate-background-color: #0F0F0F; /* Zebra striping */
+    gridline-color: #111111;
+    border: none;
+    selection-background-color: #1A1A1A; /* Subtle, not blue! */
+    selection-color: #FFFFFF;
+    font-size: 11pt;
+}
+
+QTableView::item {
+    padding: 4px 8px;
+    border-bottom: 1px solid #111; /* Horizontal lines only */
+}
+
+QTableView::item:selected {
+    background-color: #0F0F0F;
+    color: #FFFFFF;
+    /* Note: Signal rail (left amber border) requires Python delegate */
+}
+
+QTableView::item:hover {
+    background-color: #0F0F0F;
+}
+
 QTableView[drag_status="accept"] {
     border: 2px solid #4CAF50;
 }
@@ -493,7 +591,7 @@ QTableView[drag_status="reject"] {
 
 
 #LibraryHeader::section:pressed {
-    background-color: #FF8C00;
+    background-color: #FFC66D; /* Amber per spec */
     color: black;
 }
 
@@ -554,9 +652,9 @@ QHeaderView::section:vertical {
     font-weight: bold;
 }
 
-/* Metadata Labels */
+/* Metadata Labels - GLOWUP: Amber section headers */
 #FieldGroupLabel {
-    color: #2979FF; /* Identity Blue (Section Header) */
+    color: #FFC66D; /* --amber per GLOWUP spec (was blue) */
     font-family: "Bahnschrift Condensed", sans-serif;
     font-size: 11pt;
     font-weight: bold;
@@ -564,12 +662,12 @@ QHeaderView::section:vertical {
     letter-spacing: 1px;
     margin-top: 12px;
     margin-bottom: 4px;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid #333333;
     padding-bottom: 2px;
 }
 
 QLabel[objectName="FieldLabel"] {
-    color: #FF9100; /* Safety Orange */
+    color: #FFC66D; /* --amber per GLOWUP spec (was safety orange) */
     font-size: 8pt; 
     font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
     font-weight: bold;
@@ -614,51 +712,74 @@ QLabel[objectName="FieldLabel"] {
 
 
 #DiscardButton {
+    background: transparent; /* Explicit transparent */
     background-color: transparent;
-    color: #666;
+    color: #555; /* More muted */
     border: 1px solid transparent;
+    border-bottom: 1px solid transparent; /* Override default amber */
     font-weight: bold;
     font-family: "Bahnschrift Condensed", sans-serif;
     padding: 8px 16px;
 }
 #DiscardButton:hover {
-    color: #AAA;
+    background: transparent;
+    background-color: rgba(30, 30, 30, 0.5); /* Very subtle dark hover */
+    color: #888;
     border: 1px solid #333;
+    border-bottom: 1px solid #333; /* NO amber */
 }
 
+/* GLOWUP: Primary action button in AMBER with backlit gradient */
 #SaveAllButton {
     font-weight: bold;
     font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
     font-size: 11pt;
     padding: 10px 24px;
-    background-color: #D81B60; /* Theme Pink */
-    color: white;
-    border: 1px solid #C2185B;
-    border-radius: 2px;
+    /* Amber backlit gradient */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #CC9A50,
+        stop:0.85 #FFC66D,
+        stop:1 #FFD54F);
+    color: #000000;
+    border: 1px solid #FFC66D;
+    border-bottom: 3px solid #FFD54F; /* Intense underglow */
+    border-radius: 0px;
     letter-spacing: 1px;
 }
 
 #SaveAllButton:hover {
-    background-color: #E91E63;
-    border: 1px solid #FF4081;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #E0A860,
+        stop:0.85 #FFD080,
+        stop:1 #FFE082);
+    border-bottom: 3px solid #FFFFFF; /* White hot glow */
 }
 
 #SaveAllButton:disabled {
-    background-color: #1A1A1A;
-    color: #444;
-    border: 1px solid #222;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1A1A1A,
+        stop:1 #222222);
+    color: #444444;
+    border: 1px solid #222222;
+    border-bottom: 2px solid #333333;
 }
 
 #SaveAllButton[alert="true"] {
-    background-color: #B71C1C;
-    border-color: #F44336;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #8B0000,
+        stop:0.85 #B71C1C,
+        stop:1 #D32F2F);
+    border: 1px solid #F44336;
+    border-bottom: 3px solid #FF5252;
     color: #FFEBEE;
 }
 
-/* --- PLAYER DECK (Docked Module) --- */
+/* --- PLAYER DECK (GLOWUP: Gradient background, magenta rail) --- */
 #PlaybackDeck {
-    background-color: #050505; /* Full sync with Surgical Panel */
-    border-top: 1px solid #D81B60; /* Neon top border for 'docked' look */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #050505,
+        stop:1 #080808);
+    border-top: 1px solid #D81B60; /* Magenta neon rail */
 }
 
 QLabel#LargeSongLabel {

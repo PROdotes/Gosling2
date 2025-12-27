@@ -418,102 +418,29 @@ class SongRepository(BaseRepository):
             return [], []
 
     def get_by_id(self, source_id: int) -> Optional[Song]:
-        """Get full song object by ID"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-
-                # Fetch basic info from JOIN
-                cursor.execute("""
-                    SELECT
-                        MS.SourceID, MS.Name, MS.Source, MS.Duration,
-                        S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
-                        MS.Notes, MS.IsActive,
-                        (
-                            SELECT Title FROM Albums A
-                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID
-                            WHERE SA.SourceID = MS.SourceID
-                        ) as AlbumTitle,
-                        (
-                            SELECT GROUP_CONCAT(P.PublisherName, ', ')
-                            FROM SongAlbums SA
-                            JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
-                            JOIN Publishers P ON AP.PublisherID = P.PublisherID
-                            WHERE SA.SourceID = MS.SourceID
-                        ) as PublisherName,
-                        (
-                            SELECT GROUP_CONCAT(TG.TagName, ', ')
-                            FROM MediaSourceTags MST
-                            JOIN Tags TG ON MST.TagID = TG.TagID
-                            WHERE MST.SourceID = MS.SourceID AND TG.Category = 'Genre'
-                        ) as Genre
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    WHERE MS.SourceID = ?
-                """, (source_id,))
-
-                row = cursor.fetchone()
-                if not row:
-                    return None
-
-                source_id, name, path, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
-
-                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
-
-                # Fetch contributors
-                song = Song(
-                    source_id=source_id,
-                    source=path,
-                    name=name,
-                    duration=duration,
-                    bpm=bpm,
-                    recording_year=recording_year,
-                    isrc=isrc,
-                    is_done=bool(is_done_int),
-                    notes=notes,
-                    is_active=bool(is_active_int),
-                    album=album_title, # AlbumTitle
-                    publisher=publisher_name, # PublisherName
-                    genre=genre_str, # Genre
-                    groups=groups
-                )
-                cursor.execute("""
-                    SELECT R.RoleName, C.ContributorName
-                    FROM MediaSourceContributorRoles MSCR
-                    JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    WHERE MSCR.SourceID = ?
-                """, (source_id,))
-                
-                for role_name, contributor_name in cursor.fetchall():
-                    if role_name == 'Performer':
-                        song.performers.append(contributor_name)
-                    elif role_name == 'Composer':
-                        song.composers.append(contributor_name)
-                    elif role_name == 'Lyricist':
-                        song.lyricists.append(contributor_name)
-                    elif role_name == 'Producer':
-                        song.producers.append(contributor_name)
-                
-                return song
-        except Exception as e:
-            print(f"Error getting song by id: {e}")
-            return None
+        """Get full song object by ID (Legacy wrapper)"""
+        songs = self.get_songs_by_ids([source_id])
+        return songs[0] if songs else None
 
     def get_by_path(self, path: str) -> Optional[Song]:
-        """Get full song object by path"""
-        try:
-            # Normalize path for lookup
-            norm_path = os.path.normcase(os.path.abspath(path))
+        """Get full song object by path (Legacy wrapper)"""
+        songs = self.get_songs_by_paths([path])
+        return songs[0] if songs else None
+
+    def get_songs_by_ids(self, source_ids: List[int]) -> List[Song]:
+        """Bulk fetch songs by their SourceID (High Performance)"""
+        if not source_ids:
+            return []
             
+        try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Fetch basic info from JOIN
-                cursor.execute("""
+                # 1. Fetch main song data using efficient IN clause
+                placeholders = ",".join(["?"] * len(source_ids))
+                query = f"""
                     SELECT 
-                        MS.SourceID, MS.Name, MS.Duration, 
+                        MS.SourceID, MS.Source, MS.Name, MS.Duration, 
                         S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
                         MS.Notes, MS.IsActive,
                         (
@@ -536,58 +463,83 @@ class SongRepository(BaseRepository):
                         ) as Genre
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
-                    WHERE MS.Source = ?
-                """, (norm_path,))
+                    WHERE MS.SourceID IN ({placeholders})
+                """
+                cursor.execute(query, source_ids)
                 
-                row = cursor.fetchone()
-                if not row:
-                    return None
-                
-                source_id, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
-                
-                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+                songs_map = {}
+                for row in cursor.fetchall():
+                    source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
+                    
+                    groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+                    
+                    song = Song(
+                        source_id=source_id,
+                        source=path,
+                        name=name,
+                        duration=duration,
+                        bpm=bpm,
+                        recording_year=recording_year,
+                        isrc=isrc,
+                        is_done=bool(is_done_int),
+                        notes=notes,
+                        is_active=bool(is_active_int),
+                        album=album_title,
+                        publisher=publisher_name,
+                        genre=genre_str,
+                        groups=groups
+                    )
+                    songs_map[source_id] = song
 
-                # Fetch contributors
-                song = Song(
-                    source_id=source_id,
-                    source=norm_path,
-                    name=name,
-                    duration=duration,
-                    bpm=bpm,
-                    recording_year=recording_year,
-                    isrc=isrc,
-                    is_done=bool(is_done_int),
-                    notes=notes,
-                    is_active=bool(is_active_int),
-                    album=album_title, # AlbumTitle
-                    publisher=publisher_name, # PublisherName
-                    genre=genre_str, # Genre
-                    groups=groups
-                )
-                
-                # Fetch roles
-                cursor.execute("""
-                    SELECT R.RoleName, C.ContributorName
+                # 2. Fetch all roles for all songs in one go
+                query_roles = f"""
+                    SELECT MSCR.SourceID, R.RoleName, C.ContributorName
                     FROM MediaSourceContributorRoles MSCR
                     JOIN Roles R ON MSCR.RoleID = R.RoleID
                     JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    WHERE MSCR.SourceID = ?
-                """, (source_id,))
+                    WHERE MSCR.SourceID IN ({placeholders})
+                """
+                cursor.execute(query_roles, source_ids)
                 
-                for role_name, contributor_name in cursor.fetchall():
-                    if role_name == 'Performer':
-                        song.performers.append(contributor_name)
-                    elif role_name == 'Composer':
-                        song.composers.append(contributor_name)
-                    elif role_name == 'Lyricist':
-                        song.lyricists.append(contributor_name)
-                    elif role_name == 'Producer':
-                        song.producers.append(contributor_name)
+                for source_id, role_name, contributor_name in cursor.fetchall():
+                    if source_id in songs_map:
+                        song = songs_map[source_id]
+                        if role_name == 'Performer':
+                            song.performers.append(contributor_name)
+                        elif role_name == 'Composer':
+                            song.composers.append(contributor_name)
+                        elif role_name == 'Lyricist':
+                            song.lyricists.append(contributor_name)
+                        elif role_name == 'Producer':
+                            song.producers.append(contributor_name)
                 
-                return song
+                # Maintain original order of requested IDs
+                return [songs_map[sid] for sid in source_ids if sid in songs_map]
+                
         except Exception as e:
-            print(f"Error getting song by path: {e}")
-            return None
+            print(f"Error bulk fetching songs: {e}")
+            return []
+
+    def get_songs_by_paths(self, paths: List[str]) -> List[Song]:
+        """Bulk fetch songs by their absolute paths"""
+        if not paths:
+            return []
+            
+        # Optimization: Skip os.path.abspath for network performance. 
+        # Paths are already stored absolute/normalized in DB.
+        norm_paths = [os.path.normcase(p) for p in paths]
+        
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                placeholders = ",".join(["?"] * len(norm_paths))
+                cursor.execute(f"SELECT SourceID FROM MediaSources WHERE Source IN ({placeholders})", norm_paths)
+                ids = [row[0] for row in cursor.fetchall()]
+                
+            return self.get_songs_by_ids(ids)
+        except Exception as e:
+            print(f"Error resolving paths for bulk fetch: {e}")
+            return []
 
     def get_all_years(self) -> List[int]:
         """Get list of distinct recording years"""

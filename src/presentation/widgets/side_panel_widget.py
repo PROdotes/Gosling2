@@ -40,6 +40,12 @@ class SidePanelWidget(QWidget):
         self._staged_changes = {} # {song_id: {field_name: value}}
         self._field_widgets = {} # {field_name: QWidget} - Public for testing
         
+        # Debounce timer for expensive projected path calculations
+        from PyQt6.QtCore import QTimer
+        self._projected_timer = QTimer(self)
+        self._projected_timer.setSingleShot(True)
+        self._projected_timer.timeout.connect(self._do_update_projected_path)
+        
         self._init_ui()
         
     def _init_ui(self):
@@ -170,6 +176,7 @@ class SidePanelWidget(QWidget):
 
         self._validate_done_gate()
         self._update_save_state()
+        self._projected_timer.start(500)
 
         # Restore scroll
         if same_selection:
@@ -643,7 +650,7 @@ class SidePanelWidget(QWidget):
         self.btn_save.style().unpolish(self.btn_save)
         self.btn_save.style().polish(self.btn_save)
 
-        self._update_projected_path()
+        self._projected_timer.start(500)
 
     def _on_save_clicked(self, checked=False):
         """Emit the entire staged buffer for the MainWindow to commit."""
@@ -680,9 +687,12 @@ class SidePanelWidget(QWidget):
                     except:
                         effective_year = 0
             else:
-                # Check DB value
-                # This incurs a DB hit per saved song, which is acceptable for manual saves
-                song = self.library_service.get_song_by_id(song_id)
+                # Check current selection first (Performance: Avoid DB hit during save loop)
+                song = next((s for s in self.current_songs if s.source_id == song_id), None)
+                if not song:
+                    # Fallback to DB if song not in current view (unlikely but safe)
+                    song = self.library_service.get_song_by_id(song_id)
+                
                 if song:
                      effective_year = song.recording_year
             
@@ -756,6 +766,10 @@ class SidePanelWidget(QWidget):
                     setattr(song, attr, value)
         return song
 
+    def _do_update_projected_path(self):
+        """Debounced wrapper for projected path calculation."""
+        self._update_projected_path()
+
     def _update_projected_path(self):
         """Calculate and display where the file will move if saved."""
         if not self.current_songs or len(self.current_songs) != 1:
@@ -766,28 +780,53 @@ class SidePanelWidget(QWidget):
         original = self.current_songs[0]
         staged_song = self._get_staged_song(original)
         
-        try:
-            target = self.renaming_service.calculate_target_path(staged_song)
+        # Optimization: Move disk check to background thread to prevent UI freeze on network paths
+        from PyQt6.QtCore import QThread, pyqtSignal
+        
+        class ConflictCheckWorker(QThread):
+            result_ready = pyqtSignal(str, bool, bool) # target, has_conflict, is_error
+            
+            def __init__(self, renaming_service, song, staged_song):
+                super().__init__()
+                self.renaming_service = renaming_service
+                self.song = song
+                self.staged_song = staged_song
+                
+            def run(self):
+                try:
+                    target = self.renaming_service.calculate_target_path(self.staged_song)
+                    
+                    is_self = False
+                    if self.staged_song.path and os.path.normpath(self.staged_song.path) == os.path.normpath(target):
+                        is_self = True
+                        
+                    has_conflict = not is_self and self.renaming_service.check_conflict(target)
+                    self.result_ready.emit(target, has_conflict, False)
+                except Exception as e:
+                    self.result_ready.emit(str(e), True, True)
+
+        # Cleanup old worker if any
+        if hasattr(self, "_path_worker") and self._path_worker.isRunning():
+            self._path_worker.terminate()
+            self._path_worker.wait()
+
+        self._path_worker = ConflictCheckWorker(self.renaming_service, original, staged_song)
+        self._path_worker.result_ready.connect(self._on_projected_path_result)
+        self._path_worker.start()
+
+    def _on_projected_path_result(self, target, has_conflict, is_error):
+        """Handle background result."""
+        if is_error:
+            self.lbl_projected_path.setText(f"Path Error: {target}")
+            self.lbl_projected_path.setVisible(True)
+            self.lbl_projected_path.setProperty("conflict", True)
+        else:
             self.lbl_projected_path.setText(f"Projected: {target}")
             self.lbl_projected_path.setVisible(True)
-            
-            # Conflict Check
-            is_self = False
-            if staged_song.path and os.path.normpath(staged_song.path) == os.path.normpath(target):
-                 is_self = True
-            
-            has_conflict = not is_self and self.renaming_service.check_conflict(target)
             self.lbl_projected_path.setProperty("conflict", has_conflict)
             self.btn_save.setProperty("alert", has_conflict)
             
-            self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
-            self.lbl_projected_path.style().polish(self.lbl_projected_path)
-            self.btn_save.style().unpolish(self.btn_save)
-            self.btn_save.style().polish(self.btn_save)
-
-        except Exception as e:
-            self.lbl_projected_path.setText(f"Path Error: {e}")
-            self.lbl_projected_path.setVisible(True)
-            self.lbl_projected_path.setProperty("conflict", True)
-            self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
-            self.lbl_projected_path.style().polish(self.lbl_projected_path)
+        self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
+        self.lbl_projected_path.style().polish(self.lbl_projected_path)
+        self.btn_save.style().unpolish(self.btn_save)
+        self.btn_save.style().polish(self.btn_save)
