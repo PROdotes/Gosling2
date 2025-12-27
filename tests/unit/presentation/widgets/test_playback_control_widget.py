@@ -27,17 +27,17 @@ class TestPlaybackControlWidget:
 
     def test_update_play_button_state(self, widget):
         """Test play button text updates based on state"""
-        # Test Playing State
+        # 2. Test Pause (is_playing=True)
         widget.update_play_button_state(QMediaPlayer.PlaybackState.PlayingState)
-        assert widget.btn_play_pause.text() == "|| Pause"
+        assert widget.btn_play_pause.text() == "PAUSE"
         
-        # Test Stopped State
+        # 3. Test Play (is_playing=False)
         widget.update_play_button_state(QMediaPlayer.PlaybackState.StoppedState)
-        assert widget.btn_play_pause.text() == "▶ Play"
+        assert widget.btn_play_pause.text() == "PLAY"
 
         # Test Paused State
         widget.update_play_button_state(QMediaPlayer.PlaybackState.PausedState)
-        assert widget.btn_play_pause.text() == "▶ Play"
+        assert widget.btn_play_pause.text() == "PLAY"
 
     def test_crossfade_combo_sync_initial(self, widget):
         """Test combo box inits to correct value from service"""

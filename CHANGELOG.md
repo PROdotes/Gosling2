@@ -7,6 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2025-12-24
 
 ### Added
+- **T-55: The Chip Bay (Visuals)**:
+    - Implemented "Pro Audio" aesthetic for Filter Chips (Chunky, Tactile, Gradient).
+    - Added Semantic Coloring logic (Blue=Artist, Orange=Genre, Pink=Jingle, etc.).
+    - Fixed padding and typography (Em Space) for perfect visual balance.
+    - Updated `VISUAL_STYLE_GUIDE.md` to deprecate "Arcanum" style.
+- **Right Panel Architecture (The Command Deck)**:
+    - Implemented `RightPanelWidget` Facade Pattern (Header, Splitter, Footer).
+    - Integrated `PlaylistWidget`, `HistoryDrawer` (Hidden), and `SidePanelWidget` (Hidden/Toggleable).
+    - **UI Toggles**: Added Log `[H]`, Edit `[SURGERY]`, and Compact `[=]` modes.
+
+### Changed
+- **Playlist Logic**:
+    - **MoveAction**: Internal drag-and-drop now strictly reorders songs (no duplicates).
+    - **Single Selection**: Enforced `SingleSelection` mode for safety.
+    - **External Drag**: Dragging from Playlist to Library now performs a "Delete Source" (Remove from Playlist) action, properly decreasing song count.
+- **Library Widget**:
+    - **Drag Safety**: Internal Table-to-Table drags are now ignored to prevent re-import loops.
+- **Editor**:
+    - **Scroll Preservation**: Side Panel now keeps scroll position after Save/Reload.
+    - **Save Logic**: Fixed `AttributeError` by decoupling `main_window` from direct `side_panel` access.
 - **Side Panel Editor**: Full implementation of the metadata editor panel (Task T-12).
     - Supports single and bulk editing of all mapped Yellberus fields.
     - Implemented `FieldDef` awareness for correct widget types (Text, Checkbox, etc.).

@@ -45,7 +45,7 @@ links: []
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](design/done/T-15_column_customization.md) |
 | T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
 | T-49 | **Layout Conversion** | 5 | 4 | 20 | ✅ | [spec](design/specs/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) — Transformation to Frameless Workstation. |
-| T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | 🚀 | [handover](design/handover/HANDOVER_SURGICAL_REFIT.md) — Split view for Editor/Playlist. |
+| T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | ✅ | [spec](design/specs/T-54_VISUAL_ARCHITECTURE.md) — The Command Deck (Toggle Stack) with Tactical Transitions. |
 | T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | 📋 | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
 | T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` and ID3 writes. |
 | T-52 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
@@ -65,6 +65,7 @@ links: []
 ### Feature Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
+| T-55 | **Custom Field Groups** | 4 | 2 | 12 | 🚀 (Next) | Field Editor | Allow users to define field groups (Collapsible) in Settings instead of hardcoded 'Core/Advanced'. Must include "ISRC" as collapsible/toggleable for workflow efficiency. |
 | T-12 | **Side Panel** | 5 | 3 | 10 | ✅ | — | [spec](design/proposals/PROPOSAL_METADATA_EDITOR.md) <br> (Includes: Validation, Editing, Ctrl+S) |
 | T-03 | **Inline Edit** | 4 | 2 | 8 | 📋 | — | [spec](design/issues/T-03_inline_edit.md) |
 | T-10 | **Basic Chips** | 3 | 2 | 6 | 📋 | — | [spec](design/proposals/PROPOSAL_TAG_EDITOR.md) |
@@ -79,6 +80,7 @@ links: []
 | T-45 | **Compilation Paradox** | 3 | 4 | 6 | 📋 | Renaming Service | Investigate/Solve handling of re-releases ("Best of") vs Original Year in folder structure to avoid duplicates/fragmentation. |
 | T-48 | **Duplicate Detection** | 5 | 3 | 12 | ✅ | [proposal](design/proposals/PROPOSAL_DUPLICATE_DETECTION.md) |
 | T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
+| T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |

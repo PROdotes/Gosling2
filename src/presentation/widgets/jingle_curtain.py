@@ -58,13 +58,13 @@ class JingleCurtain(QFrame):
         
         self.setStyleSheet("""
             #JingleCurtain {
-                background-color: #0A0A0A;
-                border-bottom: 3px solid #D81B60;
-                /* Vertical Machined Gradient for the 'Shelf' */
-                background-image: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                                 stop:0 #1A1A1A, 
-                                                 stop:0.9 #0A0A0A,
-                                                 stop:1.0 #000000);
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                          stop:0 #1F1F1F, 
+                                          stop:0.1 #222,
+                                          stop:0.15 #1A1A1A,
+                                          stop:0.9 #0C0C0C,
+                                          stop:1.0 #000);
+                border-bottom: 3px solid #FF8C00;
             }
         """)
         
@@ -72,7 +72,7 @@ class JingleCurtain(QFrame):
         main_layout.setContentsMargins(20, 15, 20, 15)
         
         title = QLabel("QUICK-FIRE JINGLE BAYS")
-        title.setStyleSheet("color: #D81B60; font-family: 'Agency FB'; font-size: 10pt; letter-spacing: 2px; font-weight: bold;")
+        title.setStyleSheet("color: #FF8C00; font-family: 'Agency FB'; font-size: 10pt; letter-spacing: 2px; font-weight: bold;")
         main_layout.addWidget(title)
         
         grid = QGridLayout()

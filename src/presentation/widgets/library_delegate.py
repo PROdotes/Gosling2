@@ -12,12 +12,12 @@ class WorkstationDelegate(QStyledItemDelegate):
     """
     
     TYPE_COLORS = {
-        1: QColor("#2979FF"), # Music (Electric Blue - Functional Distinctness)
-        2: QColor("#9C27B0"), # Jingles (Purple)
-        3: QColor("#FF9800"), # Ads (Orange)
-        4: QColor("#8BC34A"), # Speech (Green)
-        5: QColor("#8BC34A"), # Speech
-        6: QColor("#00E5FF")  # Streams (Cyan - High Contrast)
+        1: QColor("#2979FF"), # Music (Electric Blue)
+        2: QColor("#D81B60"), # Jingles (Magenta)
+        3: QColor("#43A047"), # Ads (Green)
+        4: QColor("#FFC66D"), # Speech (Warm Amber)
+        5: QColor("#FFC66D"), # Speech
+        6: QColor("#7E57C2")  # Streams (Purple)
     }
 
     def __init__(self, field_indices, table_view, parent=None):
@@ -71,12 +71,25 @@ class WorkstationDelegate(QStyledItemDelegate):
         grad = QLinearGradient(float(rect.left()), float(rect.top()), float(rect.left()), float(rect.bottom()))
         
         if option.state & QStyle.StateFlag.State_Selected:
-            # High-Vibrancy selection still gets the Pink Pulse
-            grad.setColorAt(0, QColor("#3D051A"))
-            grad.setColorAt(1, QColor("#2D0313"))
-            painter.fillRect(rect, grad)
-            painter.setPen(QColor(216, 27, 96, 70))
+            # DYNAMIC SIGNAL SELECTION - Matches the track's 'Soul' color
+            # We fetch the color for this specific type instead of a generic orange focus
+            type_id = index.model().data(index.model().index(index.row(), self.field_indices.get('type_id', 0)), Qt.ItemDataRole.UserRole)
+            try:
+                type_id = int(float(type_id)) if type_id is not None else 1
+            except (ValueError, TypeError):
+                type_id = 1
+                
+            sig_color = self.TYPE_COLORS.get(type_id, QColor("#FF8C00"))
+            
+            rail_pen = QPen(sig_color, 1)
+            painter.setPen(rail_pen)
             painter.drawLine(rect.topLeft(), rect.topRight())
+            painter.drawLine(rect.bottomLeft() + QPoint(0, -1), rect.bottomRight() + QPoint(0, -1))
+            
+            # Very subtle contrast boost (Matte)
+            painter.fillRect(rect, QColor(sig_color.red(), sig_color.green(), sig_color.blue(), 15))
+            
+            
             
         elif is_dirty:
             grad.setColorAt(0, QColor("#221D0A"))
@@ -147,17 +160,27 @@ class WorkstationDelegate(QStyledItemDelegate):
         else:
             text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
             font = painter.font()
-            font.setFamily("Bahnschrift Condensed") # Matches Filter Tree & Theme
+            
+            # TYPOGRAPHIC HIERARCHY: Technical Data vs Content
+            is_technical = column_name in ("bpm", "recording_year", "duration", "initial_key", "is_done")
+            if is_technical:
+                font.setFamily("Consolas")
+                font.setWeight(QFont.Weight.Normal)
+                font.setPointSize(9) # Precision data is slightly smaller
+            else:
+                font.setFamily("Bahnschrift Condensed")
+                font.setWeight(QFont.Weight.Normal)
+
             if is_dirty:
                 font.setWeight(QFont.Weight.DemiBold)
-            else:
-                font.setWeight(QFont.Weight.Normal)
+            
             painter.setFont(font)
             
             text_rect = rect.adjusted(18 if is_far_left else 10, 0, -4, 0)
             
             if option.state & QStyle.StateFlag.State_Selected:
-                painter.setPen(QColor("#FFFFFF"))
+                painter.setPen(QColor("#FFFFFF")) # Bright white on selected
+                font.setWeight(QFont.Weight.DemiBold)
             else:
                 painter.setPen(QColor("#999999") if not is_dirty else QColor("#BBBBBB"))
                 
@@ -194,7 +217,8 @@ class WorkstationDelegate(QStyledItemDelegate):
     def sizeHint(self, option, index):
         """Provide a dynamic size based on font height + vertical padding."""
         self.initStyleOption(option, index)
-        h = option.fontMetrics.height() + 14 # Technical padding
+        # Bumping to 20 for 'Pro Deck' vertical breathing room
+        h = option.fontMetrics.height() + 20 
         return QSize(option.rect.width(), h)
 
     def _get_column_name_by_index(self, index_val):

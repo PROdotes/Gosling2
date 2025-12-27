@@ -100,10 +100,10 @@ class TestLibraryWidgetLogic:
 
     def test_search_filtering(self, library_widget):
         """Test basic search filtering."""
-        library_widget.search_box.setText("Title B")
+        library_widget.set_search_text("Title B")
         assert library_widget.proxy_model.rowCount() == 1
         
-        library_widget.search_box.clear()
+        library_widget.set_search_text("")
         assert library_widget.proxy_model.rowCount() == 2
 
     def test_import_file_skips_duplicate_audio(self, library_widget, mock_widget_deps):

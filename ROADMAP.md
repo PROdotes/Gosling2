@@ -60,7 +60,7 @@ tags:
 *   [x] **Radio Automation Layout (T-49)** (~4.0 h)
     *   *Task*: Pivot to Frameless Workstation (Master Deck, Dual Splitters, Hist Sidebar).
     *   *Status*: **Done** (Industrial Chassis + Masters Console).
-*   [ ] **Surgical Right-Channel (T-54)** (~2.0 h)
+*   [x] **Surgical Right-Channel (T-54)** (~2.0 h)
     *   *Task*: Split-view focus for Editor/Playlist combo.
     *   *Note*: Shift from " Spotify Tabs" to "Workstation Dashboard" focus.
 

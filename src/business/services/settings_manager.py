@@ -12,6 +12,8 @@ class SettingsManager:
     KEY_WINDOW_SIZE = "window/size"
     KEY_MAIN_SPLITTER_STATE = "window/mainSplitterState"
     KEY_V_SPLITTER_STATE = "window/vSplitterState"
+    KEY_RIGHT_PANEL_SPLITTER_STATE = "window/rightPanelSplitterState"
+    KEY_RIGHT_PANEL_TOGGLES = "window/rightPanelToggles" # JSON: {history: bool, editor: bool, compact: bool}
     KEY_RIGHT_PANEL_TAB = "window/rightPanelTab"
     
     # Library settings
@@ -20,6 +22,12 @@ class SettingsManager:
     KEY_LAST_IMPORT_DIRECTORY = "library/lastImportDirectory"
     KEY_TYPE_FILTER = "library/typeFilter"
     KEY_ROOT_DIRECTORY = "library/rootDirectory"
+    KEY_DATABASE_PATH = "library/databasePath"
+    
+    # Renaming/Moving settings
+    KEY_RENAME_PATTERN = "rules/renamePattern"
+    KEY_RENAME_ENABLED = "rules/renameEnabled"
+    KEY_MOVE_AFTER_DONE = "rules/moveAfterDone"
     
     # Playback settings
     KEY_VOLUME = "playback/volume"
@@ -36,6 +44,9 @@ class SettingsManager:
     DEFAULT_CROSSFADE_ENABLED = True
     DEFAULT_CROSSFADE_DURATION = 3000
     DEFAULT_ROOT_DIRECTORY = "C:/Music"
+    DEFAULT_RENAME_PATTERN = "{Artist}/{Album}/{Title}"
+    DEFAULT_RENAME_ENABLED = True
+    DEFAULT_MOVE_AFTER_DONE = True
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -81,6 +92,30 @@ class SettingsManager:
         """Save selected right panel tab"""
         self._settings.setValue(self.KEY_RIGHT_PANEL_TAB, index)
     
+    def get_splitter_state_by_mode(self, mode: str) -> Optional[QByteArray]:
+        """Get splitter state for a specific mode ('log' or 'edit')."""
+        return self._settings.value(f"window/splitter/{mode}")
+
+    def set_splitter_state_by_mode(self, mode: str, state: QByteArray) -> None:
+        """Save splitter state for a specific mode."""
+        self._settings.setValue(f"window/splitter/{mode}", state)
+
+    def get_right_panel_splitter_state(self) -> Optional[QByteArray]:
+        """Get saved right panel splitter state"""
+        return self._settings.value(self.KEY_RIGHT_PANEL_SPLITTER_STATE)
+
+    def set_right_panel_splitter_state(self, state: QByteArray) -> None:
+        """Save right panel splitter state"""
+        self._settings.setValue(self.KEY_RIGHT_PANEL_SPLITTER_STATE, state)
+
+    def get_right_panel_toggles(self) -> dict:
+        """Get visibility states: {'history': bool, 'editor': bool, 'compact': bool}"""
+        return self._settings.value(self.KEY_RIGHT_PANEL_TOGGLES, {'history': False, 'editor': False, 'compact': False})
+
+    def set_right_panel_toggles(self, states: dict) -> None:
+        """Save visibility states"""
+        self._settings.setValue(self.KEY_RIGHT_PANEL_TOGGLES, states)
+    
     def get_default_window_size(self) -> tuple[int, int]:
         """Get default window size"""
         return (self.DEFAULT_WINDOW_WIDTH, self.DEFAULT_WINDOW_HEIGHT)
@@ -112,6 +147,34 @@ class SettingsManager:
     def set_root_directory(self, path: str) -> None:
         """Set the root directory for file organization"""
         self._settings.setValue(self.KEY_ROOT_DIRECTORY, path)
+
+    def get_database_path(self) -> Optional[str]:
+        """Get the custom database path. Returns None if default should be used."""
+        return self._settings.value(self.KEY_DATABASE_PATH)
+        
+    def set_database_path(self, path: str) -> None:
+        """Set a custom database path."""
+        self._settings.setValue(self.KEY_DATABASE_PATH, path)
+
+    # ===== Renaming Rules =====
+    
+    def get_rename_pattern(self) -> str:
+        return self._settings.value(self.KEY_RENAME_PATTERN, self.DEFAULT_RENAME_PATTERN, type=str)
+        
+    def set_rename_pattern(self, pattern: str) -> None:
+        self._settings.setValue(self.KEY_RENAME_PATTERN, pattern)
+
+    def get_rename_enabled(self) -> bool:
+        return self._settings.value(self.KEY_RENAME_ENABLED, self.DEFAULT_RENAME_ENABLED, type=bool)
+
+    def set_rename_enabled(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_RENAME_ENABLED, enabled)
+
+    def get_move_after_done(self) -> bool:
+        return self._settings.value(self.KEY_MOVE_AFTER_DONE, self.DEFAULT_MOVE_AFTER_DONE, type=bool)
+
+    def set_move_after_done(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_MOVE_AFTER_DONE, enabled)
     
     def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:
         """

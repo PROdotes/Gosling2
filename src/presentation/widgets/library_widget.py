@@ -7,16 +7,16 @@ from PyQt6.QtWidgets import (
     QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget
 )
 import json
-from PyQt6.QtGui import (
-    QStandardItemModel, QStandardItem, QAction, 
-    QPainter, QColor, QPixmap, QIcon, QImage, QPen
-)
 from .filter_widget import FilterWidget
 from ...core import yellberus
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint
+from PyQt6.QtGui import (
+    QStandardItemModel, QStandardItem, QAction, 
+    QPainter, QColor, QPixmap, QIcon, QImage, QPen, QDrag, QFont
+)
 
 
 class DropIndicatorHeaderView(QHeaderView):
@@ -77,36 +77,140 @@ class DropIndicatorHeaderView(QHeaderView):
 
 
 class LibraryFilterProxyModel(QSortFilterProxyModel):
-    """Proxy model that supports both search text and content type filtering."""
+    """Proxy model that supports search, type, and advanced multicheck filtering."""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._type_filter_id_list = [] # Empty means show all
+        self._type_filter_id_list = []
         self._type_column = -1
+        
+        # T-55: Smart Proxy State
+        self._active_filters = {} # {field_name: set(values)}
+        self._field_indices = {} # {field_name: col_idx}
+        self._filter_match_mode = "AND"
         
     def setTypeFilter(self, type_ids: list, column: int):
         self._type_filter_id_list = type_ids
         self._type_column = column
         self.invalidateFilter()
+
+    def setCheckFilters(self, filters: dict, field_indices: dict):
+        """Update multicheck filter state {field_name: set(values)}"""
+        self._active_filters = filters
+        self._field_indices = field_indices
+        self.invalidateFilter()
+
+    def setFilterMatchMode(self, mode: str):
+        """Set cross-category logic: 'AND' or 'OR'."""
+        self._filter_match_mode = mode
+        self.invalidateFilter()
+
+    def _check_value_match(self, model, row, parent, field_name, required_val) -> bool:
+        """Surgical Match: Handles metadata, lists, and procedural commands."""
+        # Get Column Index
+        col_idx = self._field_indices.get(field_name, -1)
+        if col_idx < 0: return False
+        
+        # Get Row Data
+        row_val = model.data(model.index(row, col_idx, parent), Qt.ItemDataRole.UserRole)
+        
+        # 1. Procedural Workflow: "READY" (Valid but NOT Done)
+        # 1. Procedural Workflow: "READY" (Valid but NOT Done)
+        if field_name == 'is_done' and required_val == "READY":
+             is_already_done = bool(row_val)
+             # Catch string booleans in row_val (e.g. "1" or "0")
+             if isinstance(row_val, str):
+                 if row_val == "1" or row_val.lower() == "true": is_already_done = True
+                 elif row_val == "0" or row_val.lower() == "false": is_already_done = False
+             elif isinstance(row_val, (int, float)):
+                 is_already_done = bool(row_val)
+                 
+             if is_already_done: return False # Ready means NOT Done.
+             
+             # Construct minimal data row aligned with FIELDS
+             # Yellberus expects a list where index I matches FIELDS[I]
+             validation_row = []
+             for f in yellberus.FIELDS:
+                 f_idx = self._field_indices.get(f.name, -1)
+                 if f_idx >= 0:
+                     val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole)
+                     validation_row.append(val)
+                 else:
+                     validation_row.append(None)
+                     
+             return len(yellberus.validate_row(validation_row)) == 0
+
+        # 2. Normalize Row Data
+        if isinstance(row_val, str) and ',' in row_val:
+            row_items = [s.strip() for s in row_val.split(',')]
+        elif isinstance(row_val, (list, tuple)):
+            row_items = list(row_val)
+        else:
+            row_items = [row_val]
+
+        # 3. Normalized Matching
+        req_str = str(required_val).lower()
+        for item in row_items:
+            # 1. Exact Match
+            if item == required_val: return True
+            
+            # 2. Boolean Impedance Match (Handling "0" string trap)
+            if isinstance(required_val, bool):
+                bool_item = None
+                if isinstance(item, bool): bool_item = item
+                elif isinstance(item, (int, float)): bool_item = bool(item)
+                elif isinstance(item, str):
+                    # Pitfall: bool("0") is True in Python. Must catch explicitly.
+                    if item == "0" or item.lower() == "false": bool_item = False
+                    elif item == "1" or item.lower() == "true": bool_item = True
+                
+                if bool_item is not None and bool_item == required_val:
+                    return True
+
+            # 3. String Fallback
+            if str(item).lower() == req_str: return True
+            
+        return False
         
     def filterAcceptsRow(self, source_row, source_parent):
-        # 1. Type Filter
+        model = self.sourceModel()
+        
+        # 1. Type Filter (AND)
         if self._type_filter_id_list and self._type_column >= 0:
-            model = self.sourceModel()
             index = model.index(source_row, self._type_column, source_parent)
-            
-            # Use UserRole because it contains the raw ID
             raw_val = model.data(index, Qt.ItemDataRole.UserRole)
             try:
-                # Handle potential float/string/None from DB/Model
                 type_id = int(float(raw_val)) if raw_val is not None else -1
             except (ValueError, TypeError):
                 type_id = -1
-                
             if type_id not in self._type_filter_id_list:
                 return False
-                
-        # 2. Search Text (standard behavior)
+        
+        # 3. Multicheck Filters (Universal Logic Gate)
+        if self._active_filters:
+            # Flatten all active checkboxes into a single requirement list
+            all_requirements = []
+            for field, values in self._active_filters.items():
+                for val in values:
+                    all_requirements.append((field, val))
+            
+            if all_requirements:
+                if self._filter_match_mode == "AND":
+                    # UNIVERSAL AND: EVERY selected checkbox must be satisfied
+                    for field, req_val in all_requirements:
+                        if not self._check_value_match(model, source_row, source_parent, field, req_val):
+                            return False
+                else:
+                    # UNIVERSAL ANY: AT LEAST ONE selected checkbox is sufficient
+                    match_found = False
+                    for field, req_val in all_requirements:
+                        if self._check_value_match(model, source_row, source_parent, field, req_val):
+                            match_found = True
+                            break
+                    if not match_found:
+                        return False
+        
+        # 5. Search Text (Standard behavior)
         return super().filterAcceptsRow(source_row, source_parent)
 
 
@@ -129,6 +233,7 @@ class LibraryWidget(QWidget):
     # Signals
     add_to_playlist = pyqtSignal(list) # List of dicts {path, performer, title}
     remove_from_playlist = pyqtSignal(list) # List of paths to remove from playlist
+    play_immediately = pyqtSignal(str) # Path to play
     focus_search_requested = pyqtSignal()
 
     def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, parent=None) -> None:
@@ -154,6 +259,9 @@ class LibraryWidget(QWidget):
         
         self._init_ui()
         self._setup_connections()
+        
+        # Drag State
+        self._drag_start_pos = QPoint()
         
         # Restore saved type filter
         saved_index = self.settings_manager.get_type_filter()
@@ -183,52 +291,31 @@ class LibraryWidget(QWidget):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
         
-        # 1. THE FRONT DECK (Filters - Disappears on pull)
+        # Constraint: Prevent collapse of Filter Deck (Corridor: 200px - 400px)
+        sidebar_container.setMinimumWidth(200)
+        sidebar_container.setMaximumWidth(400)
+        
+        # 1. THE FRONT DECK (Filters - Pure Input)
         self.filter_widget = FilterWidget(self.library_service)
         self.filter_widget.setObjectName("SidebarFilter")
-        self.filter_widget.setMinimumWidth(0)
+        self.filter_widget = FilterWidget(self.library_service)
+        self.filter_widget.setObjectName("SidebarFilter")
+        # self.filter_widget.setMinimumWidth(0) -> Controlled by container now
         sidebar_layout.addWidget(self.filter_widget)
         
-        # 2. THE RAIL (The Physical Handle - Pull this LEFT)
-        self.history_btn = QPushButton("L\nO\nG")
-        self.history_btn.setFixedWidth(26)
-        self.history_btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-        self.history_btn.setObjectName("HistoryToggle")
-        self.history_btn.setStyleSheet("""
-            #HistoryToggle {
-                background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
-                                                 stop:0 #080808, stop:1 #222222);
-                color: #888;
-                font-family: 'Agency FB', 'Bahnschrift Condensed';
-                font-weight: bold;
-                font-size: 14pt;
-                border: none;
-                border-left: 3px solid #D81B60;
-                border-top-left-radius: 11px;
-                border-bottom-left-radius: 11px;
-                padding-top: 40px; 
-            }
-            #HistoryToggle:hover {
-                color: #FFF;
-                background-color: #1A1A1A;
-                border-left: 5px solid #FF1B7B; /* Bolder, brighter spine */
-            }
-            #HistoryToggle:pressed {
-                background-color: #000;
-                border-left: 7px solid #D81B60; /* Deep industrial compression */
-            }
-        """)
-        self.history_btn.clicked.connect(self.toggle_history_drawer)
-        sidebar_layout.addWidget(self.history_btn)
-
-        # 3. THE REAR DECK (History Log - Revealed on pull)
+        # 2. THE REAR DECK (History/Log is now handled by the Right Terminal)
+        # T-55 Synergy: We keep this container for potential future auxiliary tools, 
+        # but for now, the 'Log' resides in the main broadcast stack on the right.
         self.history_drawer = HistoryDrawer(self.field_indices, self)
-        self.history_drawer.setFixedWidth(0) # Starts tucked behind handle
+        self.history_drawer.setFixedWidth(0) 
         self.history_drawer.setMinimumWidth(0)
         self.history_drawer.setObjectName("SidebarHistory")
         sidebar_layout.addWidget(self.history_drawer)
         
         self.splitter.addWidget(sidebar_container)
+        
+        # Prevent Sidebar from collapsing to 0
+        self.splitter.setCollapsible(0, False)
         
         # Animation Target Constants
         self._filter_base_width = 250
@@ -241,14 +328,13 @@ class LibraryWidget(QWidget):
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
         
-        # Jingle Curtain (Zero height initially)
-        self.jingle_curtain = JingleCurtain(self)
-        center_layout.addWidget(self.jingle_curtain)
+        # Constraint: Ensure Table has breathing room
+        center_widget.setMinimumWidth(300)
         
         # Header Strip (Pills)
         header_container = QWidget()
         header_layout = QHBoxLayout(header_container)
-        header_layout.setContentsMargins(6, 4, 10, 6)
+        header_layout.setContentsMargins(0, 4, 0, 6)
         header_layout.setSpacing(6)
         
         # Category Pills
@@ -260,43 +346,18 @@ class LibraryWidget(QWidget):
         self.type_tabs = [("All", []), ("Music", [1]), ("Jingles", [2]), ("Commercials", [3]), ("Speech", [4, 5]), ("Streams", [6])]
 
         for i, (label, _) in enumerate(self.type_tabs):
-            btn = QPushButton(shorthand.get(label, label))
+            short = shorthand.get(label, label)
+            btn = QPushButton(short)
             btn.setCheckable(True)
             btn.setObjectName("CategoryPill")
+            btn.setProperty("category", label) # Set the semantic label (Music, Jingles, etc.)
             if i == 0: btn.setChecked(True)
             self.pill_group.addButton(btn, i)
             header_layout.addWidget(btn)
 
         header_layout.addStretch()
         
-        # Jingle Toggle
-        self.jingle_toggle = QPushButton("JINGLES")
-        self.jingle_toggle.setCheckable(True)
-        self.jingle_toggle.setObjectName("JingleToggle")
-        self.jingle_toggle.setStyleSheet("""
-            QPushButton#JingleToggle {
-                background-color: transparent;
-                border: 2px solid #333;
-                border-radius: 4px;
-                padding: 4px 18px;
-                color: #D81B60;
-                font-family: 'Agency FB';
-                font-weight: bold;
-                font-size: 10pt;
-                letter-spacing: 1px;
-            }
-            QPushButton#JingleToggle:hover {
-                border-color: #D81B60;
-                color: white;
-            }
-            QPushButton#JingleToggle:checked {
-                background-color: #D81B60;
-                border-color: #D81B60;
-                color: white;
-            }
-        """)
-        self.jingle_toggle.clicked.connect(self.toggle_jingle_curtain)
-        header_layout.addWidget(self.jingle_toggle)
+        header_layout.addStretch()
         
         center_layout.addWidget(header_container)
         
@@ -374,11 +435,6 @@ class LibraryWidget(QWidget):
         self.splitter.setStretchFactor(1, 1) # Table takes expansion
         self.splitter.setSizes([self._sidebar_base_width + self._rail_width, 900])
         
-        # Jingle Animation State
-        self.jingle_anim = QPropertyAnimation(self.jingle_curtain, b"curtainHeight")
-        self.jingle_anim.setDuration(450)
-        self.jingle_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-        
         main_layout.addWidget(self.splitter)
 
         # Install event filters for global drag/drop handling on child widgets
@@ -395,24 +451,35 @@ class LibraryWidget(QWidget):
         for widget in widgets_to_watch:
             widget.installEventFilter(self._event_filter_proxy)
 
-    def handle_filtered_event(self, source, event):
+    def handle_filtered_event(self, source, event) -> bool:
         """
         Handle events delegating from EventFilterProxy.
-        Replaces standard eventFilter to avoid reference cycles.
         """
         try:
-            # Handle Resize for Empty Label Position
+            # 1. Drag & Drop Initiation (on table_view viewport)
+            if source == self.table_view.viewport():
+                if event.type() == QEvent.Type.MouseButtonPress:
+                    if event.button() == Qt.MouseButton.LeftButton:
+                        self._drag_start_pos = event.position().toPoint()
+                
+                elif event.type() == QEvent.Type.MouseMove:
+                    if (event.buttons() & Qt.MouseButton.LeftButton) and self._drag_start_pos:
+                        # Check threshold
+                        if (event.position().toPoint() - self._drag_start_pos).manhattanLength() > (self.style().pixelMetric(QStyle.PixelMetric.PM_LargeIconSize) // 4):
+                            self._start_drag()
+                            return True # Event handled (drag started)
+
+            # 2. Resize for Empty Label Position
             if source == self.table_view.viewport() and event.type() == QEvent.Type.Resize:
                 self._update_empty_label_position()
 
-            # Handle Drag & Drop for ALL watched widgets
+            # 3. Handle Drag & Drop for ALL watched widgets (Accept/Drop logic)
             if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.DragLeave, QEvent.Type.Drop):
                 if event.type() == QEvent.Type.DragEnter:
                     self.dragEnterEvent(event)
                     if event.isAccepted():
                         return True
                 elif event.type() == QEvent.Type.DragMove:
-                    # Accept if matches our formats
                     mime = event.mimeData()
                     if mime.hasFormat("application/x-gosling-playlist-rows") or \
                        (mime.hasUrls() and any(u.isLocalFile() for u in mime.urls())):
@@ -420,17 +487,76 @@ class LibraryWidget(QWidget):
                         return True
                 elif event.type() == QEvent.Type.DragLeave:
                     self.dragLeaveEvent(event)
-                    # Allow propagation for cleanup
                 elif event.type() == QEvent.Type.Drop:
                     self.dropEvent(event)
                     if event.isAccepted():
                         return True
-                        
         except RuntimeError:
             # Handle case where C++ objects (like table_view) are already deleted during shutdown
             return False
-
+        except Exception:
+            pass
+            
         return False
+
+    def _start_drag(self):
+        """Prepare and start a drag operation for selected items."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        songs_to_drag = []
+        path_col = self.field_indices.get('path', -1)
+        performer_col = self.field_indices.get('performers', -1)
+        title_col = self.field_indices.get('title', -1)
+        
+        for idx in indexes:
+            source_row = self.proxy_model.mapToSource(idx).row()
+            item_path = self.library_model.item(source_row, path_col)
+            item_perf = self.library_model.item(source_row, performer_col)
+            item_title = self.library_model.item(source_row, title_col)
+            
+            if not item_path: continue
+            
+            path = item_path.data(Qt.ItemDataRole.DisplayRole)
+            performer = item_perf.data(Qt.ItemDataRole.DisplayRole) if item_perf else ""
+            title = item_title.data(Qt.ItemDataRole.DisplayRole) if item_title else ""
+            
+            if isinstance(performer, (list, tuple)):
+                performer = ", ".join(performer)
+            
+            songs_to_drag.append({
+                'path': path,
+                'performer': performer or "Unknown Artist",
+                'title': title or "Unknown Title"
+            })
+
+        if not songs_to_drag:
+            return
+
+        mime_data = QMimeData()
+        mime_data.setData("application/x-gosling-library-rows", json.dumps(songs_to_drag).encode('utf-8'))
+        
+        # Standard URL list for external drag
+        from PyQt6.QtCore import QUrl
+        urls = [QUrl.fromLocalFile(s['path']) for s in songs_to_drag if s['path']]
+        mime_data.setUrls(urls)
+
+        drag = QDrag(self.table_view)
+        drag.setMimeData(mime_data)
+        
+        # Set a drag icon (AMBER THEME)
+        pixmap = QPixmap(140, 36)
+        pixmap.fill(QColor("#FF8C00"))
+        painter = QPainter(pixmap)
+        painter.setPen(Qt.GlobalColor.black) # Black on Amber for readability
+        painter.setFont(QFont("Bahnschrift Condensed", 10))
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, f"DRAGGING {len(songs_to_drag)} ITEMS")
+        painter.end()
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(70, 18))
+        
+        drag.exec(Qt.DropAction.CopyAction | Qt.DropAction.MoveAction)
 
     def _update_empty_label_position(self):
         """Center the empty label in the table view"""
@@ -440,6 +566,11 @@ class LibraryWidget(QWidget):
 
     def dragEnterEvent(self, event):
         """Validate dragged files (MP3 or ZIP) or Playlist Items"""
+        # Ignore internal drags from the table itself (e.g. column move or row drag)
+        if event.source() == self.table_view:
+            event.ignore()
+            return
+
         mime = event.mimeData()
         
         # 1. Custom Playlist Drag (Remove from Playlist)
@@ -473,6 +604,11 @@ class LibraryWidget(QWidget):
 
     def dropEvent(self, event):
         """Handle dropped files or playlist items"""
+        # Ignore internal drags
+        if event.source() == self.table_view:
+            event.ignore()
+            return
+            
         # Reset visual feedback immediately
         self.table_view.setProperty("drag_status", "")
         self.table_view.style().unpolish(self.table_view)
@@ -580,14 +716,10 @@ class LibraryWidget(QWidget):
         """Setup internal signal/slot connections"""
         # (Internal model signals, etc.)
         
-        self.filter_widget.filter_by_performer.connect(self._filter_by_performer)
-        self.filter_widget.filter_by_unified_artist.connect(self._filter_by_unified_artist)
-        self.filter_widget.filter_by_composer.connect(self._filter_by_composer)
-        self.filter_widget.filter_by_year.connect(self._filter_by_year)
-        self.filter_widget.filter_by_status.connect(self._filter_by_status)
-        self.filter_widget.filter_changed.connect(self._filter_by_field)  # Generic handler
-        self.filter_widget.reset_filter.connect(lambda: self.load_library(refresh_filters=False))
-        self.filter_widget.incomplete_filter_toggled.connect(self._on_incomplete_toggled)
+        # T-55: Smart Proxy Connection
+        self.filter_widget.multicheck_filter_changed.connect(self._on_multicheck_filter_changed)
+        self.filter_widget.filter_mode_changed.connect(self.proxy_model.setFilterMatchMode)
+        self.filter_widget.reset_filter.connect(self._on_filter_reset)
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table_view.doubleClicked.connect(self._on_table_double_click)
@@ -612,15 +744,8 @@ class LibraryWidget(QWidget):
                     except ValueError:
                         pass
 
-        # 2. Load Data
+        # 2. Load Data (Pure Loading, filtering happens in Proxy)
         headers, data = self.library_service.get_all_songs()
-        
-        if self._show_incomplete:
-            data = [
-                row for row in data 
-                if self._get_incomplete_fields(row)
-            ]
-            
         self._populate_table(headers, data)
 
         if refresh_filters:
@@ -836,69 +961,28 @@ class LibraryWidget(QWidget):
         except Exception:
             return "00:00"
 
-    def _filter_by_performer(self, performer_name) -> None:
-        headers, data = self.library_service.get_songs_by_performer(performer_name)
-        self._populate_table(headers, data)
-
-    def _filter_by_unified_artist(self, artist_name) -> None:
-        headers, data = self.library_service.get_songs_by_unified_artist(artist_name)
-        self._populate_table(headers, data)
-
-    def _filter_by_composer(self, composer_name) -> None:
-        headers, data = self.library_service.get_songs_by_composer(composer_name)
-        self._populate_table(headers, data)
-
-    def _filter_by_year(self, year: int) -> None:
-        headers, data = self.library_service.get_songs_by_year(year)
-        self._populate_table(headers, data)
-
-    def _filter_by_status(self, is_done: bool) -> None:
-        headers, data = self.library_service.get_songs_by_status(is_done)
-        self._populate_table(headers, data)
-
-    def _filter_by_field(self, field_name: str, value) -> None:
-        """
-        Generic filter handler for any Yellberus field.
-        Builds dynamic SQL WHERE clause based on field definition.
-        """
-        # Skip if handled by legacy signals (they fire too)
-        if field_name in ('performers', 'unified_artist', 'composers', 'recording_year', 'is_done'):
-            return
+    def _on_multicheck_filter_changed(self, active_filters: dict) -> None:
+        """Handle multicheck filter state change from Sidebar."""
+        self.proxy_model.setCheckFilters(active_filters, self.field_indices)
         
-        field = yellberus.get_field(field_name)
-        if not field:
-            print(f"[Filter] Unknown field: {field_name}")
-            return
-        
-        # Get the expression to filter on
-        expression = field.query_expression or field.db_column
-        if not expression:
-            print(f"[Filter] No expression for field: {field_name}")
-            return
-        
-        # Build WHERE clause
-        # For GROUP_CONCAT fields, we need to use LIKE
-        if 'GROUP_CONCAT' in expression.upper():
-            # Extract alias if present
-            if ' AS ' in expression.upper():
-                alias = expression.upper().split(' AS ')[1].strip()
-                # Can't use alias in WHERE, use HAVING instead
-                # For now, use a subquery approach or just filter client-side
-                # Actually, let's use a simpler approach: re-query with WHERE on the base table
-                # This is a TODO: For now, use client-side filtering
-                headers, all_data = self.library_service.get_all_songs()
-                col_idx = self.field_indices.get(field_name, -1)
-                if col_idx >= 0:
-                    filtered_data = [
-                        row for row in all_data
-                        if row[col_idx] and str(value) in str(row[col_idx])
-                    ]
-                    self._populate_table(headers, filtered_data)
-                return
-        
-        # Simple column filter
-        headers, data = self.library_service.get_songs_by_field(field_name, value)
-        self._populate_table(headers, data)
+        # SYNC PERSPECTIVE: If anything under "Pending" or "Ready" is checked, 
+        # we shift to Incomplete/Triage mode to show the required columns.
+        status_filters = active_filters.get('is_done', set())
+        needs_triage_view = False
+        if False in status_filters or "READY" in status_filters:
+            needs_triage_view = True
+            
+        if needs_triage_view != self._show_incomplete:
+            self._show_incomplete = needs_triage_view
+            if needs_triage_view:
+                self._apply_incomplete_view_columns()
+            else:
+                self._load_column_layout()
+
+    def _on_filter_reset(self) -> None:
+        """Reset all filtering state."""
+        self.load_library(refresh_filters=False) 
+        self._on_multicheck_filter_changed({})
 
     def _import_file(self, file_path: str) -> bool:
         """Import a single file, return True on success"""
@@ -1055,8 +1139,13 @@ class LibraryWidget(QWidget):
         menu.addSeparator()
 
         # 2. Playback / Primary Actions
+        play_now_action = QAction("Play Now", self)
+        play_now_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay))
+        play_now_action.triggered.connect(self._on_play_selected_immediately)
+        menu.addAction(play_now_action)
+
         add_to_playlist_action = QAction("Add to Playlist", self)
-        add_to_playlist_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay))
+        add_to_playlist_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
         add_to_playlist_action.triggered.connect(self._emit_add_to_playlist)
         menu.addAction(add_to_playlist_action)
         
@@ -1609,6 +1698,17 @@ class LibraryWidget(QWidget):
                     file_id = int(file_id_item.text())
                     self.library_service.delete_song(file_id)
             self.load_library()
+
+    def _on_play_selected_immediately(self):
+        """Play the first selected song now."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes: return
+        
+        idx = indexes[0]
+        source_idx = self.proxy_model.mapToSource(idx)
+        path_item = self.library_model.item(source_idx.row(), self.field_indices['path'])
+        if path_item:
+            self.play_immediately.emit(path_item.text())
 
     def _on_table_double_click(self, index) -> None:
         """Double click adds to playlist (as per original behavior)"""

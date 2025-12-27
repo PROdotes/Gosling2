@@ -51,25 +51,18 @@ class SidePanelWidget(QWidget):
         self.lbl_projected_path.setVisible(False)
         layout.addWidget(self.lbl_projected_path)
         
-        # 2. Workflow State (MARK DONE)
-        self.btn_done = QPushButton("✅ MARK DONE")
-        self.btn_done.setObjectName("MarkDoneButton")
-        self.btn_done.setCheckable(True)
-        self.btn_done.clicked.connect(self._on_done_toggled)
-        self.btn_done.setEnabled(False) # Default to disabled (No selection)
-        layout.addWidget(self.btn_done)
         
         # 3. Scroll Area for Fields
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         
         self.field_container = QWidget()
         self.field_layout = QVBoxLayout(self.field_container)
         self.field_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
-        scroll.setWidget(self.field_container)
-        layout.addWidget(scroll, 1)
+        self.scroll.setWidget(self.field_container)
+        layout.addWidget(self.scroll, 1)
         
         # 4. Footer Actions (Save / Discard)
         footer_frame = QFrame()
@@ -82,13 +75,21 @@ class SidePanelWidget(QWidget):
         self.btn_discard.setObjectName("DiscardButton")
         self.btn_discard.clicked.connect(self._on_discard_clicked)
         
-        self.btn_save = QPushButton("SAVE ALL")
+        self.btn_save = QPushButton("SAVE")
         self.btn_save.setObjectName("SaveAllButton")
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
         
+        # 2. Workflow State (MARK DONE) - Now in Footer
+        self.btn_done = QPushButton("DONE")
+        self.btn_done.setObjectName("MarkDoneButton")
+        self.btn_done.setCheckable(True)
+        self.btn_done.clicked.connect(self._on_done_toggled)
+        self.btn_done.setEnabled(False) 
+
         footer_layout.addWidget(self.btn_discard)
         footer_layout.addStretch()
+        footer_layout.addWidget(self.btn_done)
         footer_layout.addWidget(self.btn_save)
         layout.addWidget(footer_frame)
         
@@ -96,6 +97,17 @@ class SidePanelWidget(QWidget):
 
     def set_songs(self, songs):
         """Update the editor with fresh song selection."""
+        # Capture scroll if specific update (same ID set)
+        scroll_pos = 0
+        same_selection = False
+        if self.current_songs and songs:
+             old_ids = sorted([s.source_id for s in self.current_songs])
+             new_ids = sorted([s.source_id for s in songs])
+             same_selection = (old_ids == new_ids)
+             
+        if same_selection:
+             scroll_pos = self.scroll.verticalScrollBar().value()
+
         # Note: We do NOT clear _staged_changes here. 
         # Persistence on selection loss is a key spec.
         self.current_songs = songs
@@ -103,6 +115,10 @@ class SidePanelWidget(QWidget):
         self._build_fields()
         self._validate_done_gate()
         self._update_save_state()
+        
+        # Restore scroll
+        if same_selection:
+             self.scroll.verticalScrollBar().setValue(scroll_pos)
 
     def _update_header(self):
         if not self.current_songs:
@@ -113,6 +129,7 @@ class SidePanelWidget(QWidget):
             artist = song.unified_artist or "Unknown Artist"
             self.header_label.setText(f"{artist} - {song.title}")
             self.btn_done.setEnabled(True)
+            self.btn_done.setText("DONE")
             # Sync Done state from staging or song
             is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
             self.btn_done.setChecked(bool(is_done))
@@ -128,17 +145,85 @@ class SidePanelWidget(QWidget):
 
         # Separate into Core (Required + Key Identity) and Advanced
         # We explicitly promote performers/groups to Core for better UX, even if technically optional
-        core_fields = [f for f in yellberus.FIELDS if (f.required or f.name in ['performers', 'groups']) and f.visible and f.editable]
-        adv_fields = [f for f in yellberus.FIELDS if not (f.required or f.name in ['performers', 'groups']) and f.visible and f.editable]
+        all_visible = {f.name: f for f in yellberus.FIELDS if f.visible and f.editable}
+        
+        # Define Explicit Core Layout (Order Matters)
+        core_ordered_names = [
+            'performers', 'title', 'album', 'composers', 'publisher', 
+            ['recording_year', 'genre'] # CLUSTER ROW
+        ]
+        
+        # Build Core List based on layout, filtering out any that might be invisible/disabled
+        core_layout_struct = []
+        core_names_flat = set()
+        
+        for item in core_ordered_names:
+            if isinstance(item, list):
+                # Cluster
+                cluster = [all_visible[n] for n in item if n in all_visible]
+                if cluster:
+                    core_layout_struct.append(cluster)
+                    for c in cluster: core_names_flat.add(c.name)
+            elif item in all_visible:
+                core_layout_struct.append(all_visible[item])
+                core_names_flat.add(item)
+                
+        # Advanced is everything else
+        adv_fields = [f for f in yellberus.FIELDS if f.name in all_visible and f.name not in core_names_flat]
 
         def add_group(fields, title):
             if not fields: return
             
             group_label = QLabel(title.upper())
             group_label.setObjectName("FieldGroupLabel")
+            # FORCE BLUE (Identity) - Bypass QSS
+            group_label.setStyleSheet("color: #2979FF; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 11pt; border-bottom: 1px solid #333; padding-bottom: 2px; margin-top: 12px; margin-bottom: 4px;")
             self.field_layout.addWidget(group_label)
             
-            for field in fields:
+            for item in fields:
+                # Handle Cluster (List of Fields)
+                if isinstance(item, list):
+                    # Horizontal Row Container
+                    h_container = QWidget()
+                    h_layout = QHBoxLayout(h_container)
+                    h_layout.setContentsMargins(0, 0, 0, 4)
+                    h_layout.setSpacing(10) # Gutters between Clustered Fields (Year | Genre)
+                    
+                    for field in item:
+                        # Re-use creation logic (Inline for now to access self)
+                        col = QWidget()
+                        v_col = QVBoxLayout(col)
+                        v_col.setContentsMargins(0,0,0,0)
+                        v_col.setSpacing(1)
+                        
+                        label_text = field.ui_header
+                        if field.required: label_text += " *"
+                        lbl = QLabel(label_text)
+                        lbl.setObjectName("FieldLabel")
+                        # FORCE AMBER (Bypass QSS Specificity War) - BUMP SIZE
+                        lbl.setStyleSheet("color: #FFC66D; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 10pt; text-transform: uppercase;")
+                        
+                        eff_val, is_mult = self._calculate_bulk_value(field)
+                        widget = self._create_field_widget(field, eff_val, is_mult)
+                        self._field_widgets[field.name] = widget
+                        
+                        v_col.addWidget(lbl)
+                        v_col.addWidget(widget)
+                        
+                        # Set width ratios: Year narrower (1), Genre wider (2)
+                        if field.name == 'recording_year':
+                            h_layout.addWidget(col, 1)  # 1 part
+                        elif field.name == 'genre':
+                            h_layout.addWidget(col, 2)  # 2 parts (double width)
+                        else:
+                            h_layout.addWidget(col)  # Default equal
+                        
+                    self.field_layout.addWidget(h_container)
+                    continue
+
+                # Handle Single Field (Normal)
+                field = item
+                
                 # Skip Title/Path in Bulk Mode (Spec Alpha)
                 if len(self.current_songs) > 1 and field.name in ["Title", "Path"]:
                     continue
@@ -149,7 +234,8 @@ class SidePanelWidget(QWidget):
 
                 container = QWidget()
                 row = QVBoxLayout(container)
-                row.setContentsMargins(0, 0, 0, 8)
+                row.setContentsMargins(0, 0, 0, 4) # Tighter vertical rhythm
+                row.setSpacing(1) # Tight connection between Label and Input
                 
                 # Label
                 label_text = field.ui_header
@@ -157,6 +243,8 @@ class SidePanelWidget(QWidget):
                     label_text += " *"
                 label = QLabel(label_text)
                 label.setObjectName("FieldLabel")
+                # FORCE AMBER (Bypass QSS Specificity War) - BUMP SIZE
+                label.setStyleSheet("color: #FFC66D; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 10pt; text-transform: uppercase;")
                 
                 # Determine Current Effective Value
                 effective_val, is_multiple = self._calculate_bulk_value(field)
@@ -169,7 +257,7 @@ class SidePanelWidget(QWidget):
                 row.addWidget(edit_widget)
                 self.field_layout.addWidget(container)
 
-        add_group(core_fields, "Core Metadata")
+        add_group(core_layout_struct, "Core Metadata")
         add_group(adv_fields, "Advanced Details")
 
     def _create_field_widget(self, field_def, value, is_multiple):
@@ -296,6 +384,7 @@ class SidePanelWidget(QWidget):
 
     def _on_done_toggled(self, checked):
         self._on_field_changed("is_done", 1 if checked else 0)
+        self.btn_done.setText("DONE")
 
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing in selection."""
@@ -346,10 +435,10 @@ class SidePanelWidget(QWidget):
         
         # Check Collision (Phase 3)
         if self.isrc_collision:
-            self.btn_save.setText("Save (Duplicate ISRC)")
+            self.btn_save.setText("ISRC")
             self.btn_save.setProperty("alert", True)
         else:
-            self.btn_save.setText("Save Changes")
+            self.btn_save.setText("Save")
             self.btn_save.setProperty("alert", False)
 
         self.btn_save.style().unpolish(self.btn_save)

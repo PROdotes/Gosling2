@@ -18,10 +18,10 @@ class HistoryDrawer(QFrame):
         self.setStyleSheet("""
             #HistoryDrawer {
                 background-color: #121212;
-                border-right: 2px solid #D81B60;
+                border-right: 2px solid #FF8C00;
             }
             QLabel#HistoryTitle {
-                color: #D81B60;
+                color: #FF8C00;
                 font-family: 'Tw Cen MT Condensed Bold';
                 font-size: 14pt;
                 letter-spacing: 2px;

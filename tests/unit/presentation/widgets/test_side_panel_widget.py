@@ -28,8 +28,8 @@ class TestSidePanelLogic:
         widget = QLineEdit()
         # "INVALID" is definitely invalid
         side_panel._validate_isrc_field(widget, "INVALID")
-        assert "DC3232" in widget.styleSheet()
-        # assert "Invalid ISRC" in widget.toolTip() # Tooltip might vary
+        assert widget.property("invalid") is True
+        assert widget.property("warning") in [False, None]
 
     def test_validate_isrc_duplicate_warning(self, side_panel, mock_widget_deps):
         """Test that duplicate ISRC triggers amber warning style."""
@@ -47,7 +47,7 @@ class TestSidePanelLogic:
         widget = QLineEdit()
         side_panel._validate_isrc_field(widget, "US-123-45-67890")
         
-        assert "FF9800" in widget.styleSheet()
+        assert widget.property("warning") is True
         assert "Duplicate ISRC found" in widget.toolTip()
         assert side_panel.isrc_collision is True
 
@@ -67,31 +67,31 @@ class TestSidePanelLogic:
         side_panel._validate_isrc_field(widget, "US-123-45-67890")
         
         # Should be valid (no amber/red)
-        assert "FF9800" not in widget.styleSheet()
-        assert "DC3232" not in widget.styleSheet()
-        # Just default style
-        assert "font-size: 10pt" in widget.styleSheet()
+        assert widget.property("warning") in [False, None]
+        assert widget.property("invalid") in [False, None]
         assert side_panel.isrc_collision is False
 
-    def test_save_button_red_on_collision(self, side_panel):
-        """Test save button turns red on collision."""
+    def test_save_button_collision_state(self, side_panel):
+        """Test save button enters collision state."""
         side_panel._staged_changes = {1: {'title': 'New'}} # Must have staged changes to enable save
         side_panel.isrc_collision = True
         side_panel._update_save_state()
         
         assert side_panel.btn_save.isEnabled()
-        assert "F44336" in side_panel.btn_save.styleSheet() # Red
+        assert side_panel.btn_save.property("alert") is True
         assert "Duplicate" in side_panel.btn_save.text()
 
     def test_autofill_year_on_save(self, side_panel, mock_widget_deps, qtbot):
         """Test that saving with empty year autofills current year."""
         deps = mock_widget_deps
         # Mock DB value as 0 (Empty)
-        # Note: auto-fill logic calls get_song_by_id logic if passed
         mock_song = MagicMock(spec=Song)
+        # Assuming Song fields are now property-based or dict-like
         mock_song.recording_year = 0
         deps['library_service'].get_song_by_id.return_value = mock_song
         
+        # Store current songs to avoid attribute errors
+        side_panel.current_songs = [mock_song]
         # Stage a change without year
         side_panel._staged_changes = {1: {'title': 'Changed'}}
         
@@ -100,10 +100,17 @@ class TestSidePanelLogic:
             side_panel._on_save_clicked()
             
         args = blocker.args[0]
+        # args[1] is the changes dict
         assert args[1]['recording_year'] == datetime.now().year
 
-    def test_composer_splitter(self, side_panel, qtbot):
+    def test_composer_splitter(self, side_panel, qtbot, mock_widget_deps):
         """Test that trailing comma splits CamelCase composers."""
+        # Setup mock song
+        mock_song = MagicMock(spec=Song)
+        mock_song.source_id = 1
+        mock_widget_deps['library_service'].get_song_by_id.return_value = mock_song
+        side_panel.current_songs = [mock_song]
+        
         # Stage a change with camelcase and trailing comma
         side_panel._staged_changes = {1: {'composers': 'JohnPaul,'}}
         

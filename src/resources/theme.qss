@@ -34,12 +34,30 @@ QSplitter::handle {
 }
 
 QSplitter::handle:horizontal {
-    width: 2px;
+    width: 3px;
     border-right: 1px solid #1A1A1A;
 }
 
+QStatusBar {
+    background: #080808;
+    border-top: 1px solid #222;
+    min-height: 20px;
+}
+
+QSizeGrip {
+    background-color: transparent;
+    width: 20px;
+    height: 20px;
+    image: url(:/qt-project.org/styles/commonstyle/images/standardbutton-close-16.png); /* Fallback */
+}
+
+/* Custom Size Grip Indicator (Triangle) */
+QSizeGrip:hover {
+    background-color: #1A1A1A;
+}
+
 QSplitter::handle:vertical {
-    height: 2px;
+    height: 6px;
     border-bottom: 1px solid #1A1A1A;
 }
 
@@ -91,6 +109,21 @@ QLineEdit, QPlainTextEdit {
 }
 
 /* Glass Data Selector (ComboBox) */
+QLineEdit {
+    background-color: #050505; /* Deep recessed */
+    border: 1px solid #222;
+    border-radius: 2px;
+    padding: 6px 8px; /* Taller padding (Grandma Approved) */
+    color: #F0F0F0; /* Bright White Text */
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 11pt; /* Readable Size */
+}
+
+QLineEdit:focus {
+    border: 1px solid #FFC66D; /* Warm Amber Active Border */
+    background-color: #000;
+    color: #FFF;
+}
 QComboBox {
     background-color: #080808;
     border: 1px solid #333;
@@ -162,86 +195,92 @@ QLineEdit:disabled {
 /* --- FILTER DECK (Left Channel) --- */
 QTreeView#FilterTree {
     background-color: #0A0A0A;
-    alternate-background-color: #0F0F0F;
     border: none;
-    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
-    font-size: 11pt; /* Slightly bigger for the condensed font */
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-size: 11pt;
     outline: none;
-    padding-top: 8px;
-    show-decoration-selected: 1; /* Highlight full row */
+    padding-top: 2px;
+    show-decoration-selected: 0;
 }
 
+/* ARCHIVE HEADER STYLE (The Chassis Faceplate) */
 QTreeView#FilterTree::item {
-    padding: 3px 4px;
-    border: none;
-    border-bottom: 1px solid #111; /* Add structure */
-    color: #AAA;
+    min-height: 28px;
+    padding: 4px 12px;
+    color: #888;
+    border-bottom: 1px solid #111;
 }
 
+QTreeView#FilterTree::item:has-children {
+    min-height: 34px;
+    font-weight: bold;
+    border-bottom: 1px solid #222;
+}
 QTreeView#FilterTree::item:selected {
-    background-color: #2D0313; /* Deep Pink Wash */
-    color: white;
+    background-color: transparent; 
+    color: #FFF;
 }
 
 QTreeView#FilterTree::item:hover {
-    background-color: transparent; /* No blocky background */
-    color: #FFF; /* Brighten text on hover */
+    background-color: transparent;
+    color: #FFF;
 }
+
+
+/* UNIVERSAL LED INDICATOR (Hardware Logic) */
+QCheckBox::indicator, QTreeView::indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    border: 1px solid #333; /* The Socket */
+    background: #050505;
+}
+
+QCheckBox::indicator:unchecked, QTreeView::indicator:unchecked {
+    background: #080808;
+    border-color: #222;
+}
+
+QCheckBox::indicator:checked, QTreeView::indicator:checked {
+    background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
+                                stop:0 #FFF, /* Hot filament */
+                                stop:0.2 #FFE0B2, 
+                                stop:0.7 #FFC66D, 
+                                stop:1.0 #452600); /* Outer glow */
+    border-color: #FFD54F;
+}
+
 
 /* Branch Styling */
 QTreeView#FilterTree::branch {
     background: transparent;
 }
-QTreeView#FilterTree::branch:hover {
-    background: transparent;
-}
-QTreeView#FilterTree::branch:selected {
-    background-color: #2D0313; /* Kill the Orange */
-}
-QTreeView#FilterTree::branch:selected:hover {
-    background-color: #2D0313;
-}
-
 QTreeView#FilterTree::branch:has-children:!has-siblings:closed,
 QTreeView#FilterTree::branch:closed:has-children:has-siblings {
-    border-image: none;
     image: url(Gosling2/src/resources/chevron_right.svg);
 }
 QTreeView#FilterTree::branch:open:has-children:!has-siblings,
 QTreeView#FilterTree::branch:open:has-children:has-siblings {
-    border-image: none;
     image: url(Gosling2/src/resources/chevron_down.svg);
 }
 
-/* System Toggles (Filter Checkbox) */
+
+/* System Toggles Cleanup */
 QCheckBox#FilterCheckbox {
-    spacing: 8px;
-    color: #BBB; /* Fixed: High Contrast */
-    font-family: "Agency FB", "Bahnschrift Condensed";
-    font-size: 11pt;
+    spacing: 12px;
+    color: #888; 
+    font-family: "Bahnschrift Condensed", sans-serif;
     font-weight: bold;
     text-transform: uppercase;
-    padding: 8px;
-    border-bottom: 1px solid #222;
+    padding: 10px 12px;
+    border-bottom: 1px solid #1A1A1A;
 }
-QCheckBox#FilterCheckbox:hover {
-    color: white;
-    background-color: #111;
-}
+
 QCheckBox#FilterCheckbox:checked {
-    color: #D81B60; /* Neon Pink Text */
+    color: #FFF;
 }
-QCheckBox#FilterCheckbox::indicator {
-    width: 14px;
-    height: 14px;
-    border: 1px solid #444;
-    background: #111;
-    border-radius: 2px;
-}
-QCheckBox#FilterCheckbox::indicator:checked {
-    background: #D81B60;
-    border-color: #FF4081;
-}
+
+
 
 /* --- BUTTONS --- */
 QPushButton {
@@ -256,54 +295,137 @@ QPushButton:pressed {
     background-color: #222;
 }
 
-/* Category Pills (LCARS Workstation Style) */
+/* Category Pills (Physical Console Modules) */
 QPushButton#CategoryPill {
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                     stop:0 #2A2A2A,    /* Top edge glint */
-                                     stop:0.1 #1A1A1A,  /* Main surface */
-                                     stop:0.9 #1A1A1A, 
-                                     stop:1.0 #080808); /* Bottom shadow edge */
-    border: 1px solid #050505;
-    border-radius: 6px;
-    padding: 6px 16px;
-    min-width: 80px; /* Wider physical footprint */
-    font-size: 8.5pt;
-    font-family: "Tw Cen MT Condensed Bold", "Bahnschrift Condensed", sans-serif;
+    background-color: #111;
+    border: 1px solid #222;
+    border-radius: 0px;
+    padding: 10px 24px;
+    min-width: 110px;
+    font-family: "Bahnschrift Condensed", sans-serif;
     font-weight: bold;
-    color: #888;
+    font-size: 11pt;
+    color: #888; /* Recessed Data */
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 1.5px;
 }
+
 QPushButton#CategoryPill:hover {
-    border-color: #D81B60; /* Neon highlight on proximity */
+    background-color: #1A1A1A;
+    border-color: #FFC66D; /* Warm Amber Signal Hint */
+    color: #AAA;
+}
+
+
+/* --- T-55: CHIP BAY (HUD Data Tags) --- */
+QPushButton#NeonChip {
+    background-color: #111;
     color: #BBB;
+    border: 1px solid #222;
+    border-radius: 0px;
+    padding: 4px 11px 4px 15px; 
+    font-size: 11pt;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-weight: bold;
+    min-height: 24px;
 }
+
+QPushButton#NeonChip:hover {
+    background-color: #1A1A1A;
+    border-color: #FFC66D; 
+    color: #FFF;
+}
+
+QPushButton#NeonChip:pressed {
+    background-color: #050505;
+}
+
+/* --- FILTER COMMAND RAIL (Navigation HUD) --- */
+QPushButton#CommandButton {
+    background-color: #121212;
+    border: 1px solid #222;
+    border-radius: 2px;
+    color: #888;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-weight: bold;
+    font-size: 9pt;
+    padding: 3px 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+QPushButton#CommandButton:hover {
+    background-color: #1A1A1A;
+    border-color: #444;
+    color: #CCC;
+}
+
+QPushButton#CommandButton:checked {
+    background-color: #151515;
+    border-color: #FFC66D; /* Amber 'Active' Signal */
+    color: #FFC66D;
+}
+
+
+/* --- T-55: SEMANTIC CHIP COLORS (Rail Style) --- */
+/* These match the Yellberus Registry Single Source of Truth */
+QPushButton#NeonChip[chipType="Artist"]    { border-bottom: 3px solid #2979FF; } 
+QPushButton#NeonChip[chipType="Music"]     { border-bottom: 3px solid #2979FF; } 
+QPushButton#NeonChip[chipType="Genre"]     { border-bottom: 3px solid #FFC66D; } 
+QPushButton#NeonChip[chipType="Year"]      { border-bottom: 3px solid #FFD700; } 
+QPushButton#NeonChip[chipType="Technical"] { border-bottom: 3px solid #AA00FF; } 
+QPushButton#NeonChip[chipType="Status"]    { border-bottom: 3px solid #00E676; } 
+
+/* Media Types */
+QPushButton#NeonChip[chipType="Jingle"]    { border-bottom: 3px solid #D81B60; }
+QPushButton#NeonChip[chipType="Voice"]     { border-bottom: 3px solid #FFC66D; }
+QPushButton#NeonChip[chipType="Commercial"]{ border-bottom: 3px solid #43A047; }
+QPushButton#NeonChip[chipType="Stream"]    { border-bottom: 3px solid #7E57C2; }
+
+
+/* --- SEMANTIC PILL HOVER (Visual Logic Hint) --- */
+QPushButton#CategoryPill[category="Music"]:hover      { border-color: #2979FF; }
+QPushButton#CategoryPill[category="Jingles"]:hover    { border-color: #D81B60; }
+QPushButton#CategoryPill[category="Commercials"]:hover { border-color: #43A047; }
+QPushButton#CategoryPill[category="Speech"]:hover    { border-color: #FFC66D; }
+QPushButton#CategoryPill[category="Streams"]:hover   { border-color: #7E57C2; }
+QPushButton#CategoryPill[category="All"]:hover       { border-color: #FFF; }
+
+
 QPushButton#CategoryPill:checked {
-    /* Backlit Neon Glow */
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                     stop:0 #FF4081,    /* High-vibrancy top */
-                                     stop:0.4 #D81B60,  /* Core color */
-                                     stop:0.95 #880E4F, /* Deep shadow */
-                                     stop:1.0 #450626); 
-    border-color: #000;
+    /* MATTE SIGNAL - Signal only, no glow */
+    background-color: #050505;
     color: white;
+    border: 1px solid #222;
 }
-/* Primary Action Button (Blue/Pink override usually applied via ID) */
+
+/* --- SEMANTIC PILL SIGNAL BORDERS (High Visibility) --- */
+/* Thicker 3px rails for 'pixel recognition' */
+QPushButton#CategoryPill[category="All"]:checked { border-bottom: 3px solid #FFF; color: #FFF; }
+QPushButton#CategoryPill[category="Music"]:checked { border-bottom: 3px solid #2979FF; color: #2979FF; }
+QPushButton#CategoryPill[category="Jingles"]:checked { border-bottom: 3px solid #D81B60; color: #D81B60; }
+QPushButton#CategoryPill[category="Commercials"]:checked { border-bottom: 3px solid #43A047; color: #43A047; }
+QPushButton#CategoryPill[category="Speech"]:checked { border-bottom: 3px solid #FFC66D; color: #FFC66D; }
+
+QPushButton#CategoryPill[category="Streams"]:checked { border-bottom: 3px solid #7E57C2; color: #7E57C2; }
+
+/* Primary Action Button - System Orange */
 QPushButton#PrimaryButton {
-    background-color: #D81B60; /* Pink Accent */
-    color: white;
+    background-color: #FFC66D; 
+    color: black;
     border: none;
+    border-radius: 0px;
 }
 QPushButton#PrimaryButton:hover {
-    background-color: #C2185B;
+    background-color: #FFA726;
 }
 
 /* --- TABLE VIEW (Library / Blade-Edge) --- */
 QTableView {
-    background-color: #0F0F0F; /* Deeper Black */
-    alternate-background-color: #141414; /* Very subtle scanline */
-    selection-background-color: transparent; 
-    selection-color: transparent;            
+    background-color: #0A0A0A; /* Deeper Black */
+    alternate-background-color: #0F0F0F; /* Scanline effect */
+    selection-background-color: transparent; /* Handled by Delegate */
+    selection-color: transparent;            /* Handled by Delegate */
     outline: none;
     gridline-color: transparent;
     border: none;
@@ -325,90 +447,74 @@ QTabBar::tab {
 }
 
 QTabBar::tab:selected {
-    background: #D81B60;
-    color: white;
-    border: 1px solid #FF4081;
+    background: #FFC66D;
+    color: black;
+    border: 1px solid #FFE0B2;
 }
 
 QTabBar::tab:hover:!selected {
     background: #252525;
     color: #BBB;
-    border-color: #555;
+    border-color: #444;
 }
 
 QTabWidget::pane {
     border: 1px solid #333;
-    border-top: 1px solid #D81B60; /* Neon Header Line */
+    border-top: 1px solid #FFC66D; /* Amber Header Line */
     background: #0A0A0A;
-    border-radius: 4px;
-}
-
-QTableView {
-    background-color: #0A0A0A;
-    gridline-color: #151515;
-    border: none;
-    selection-background-color: #D81B60;
-    alternate-background-color: #080808;
+    border-radius: 0px;
 }
 
 QTableView[drag_status="accept"] {
-    border: 1px solid #4CAF50;
+    border: 2px solid #4CAF50;
 }
 QTableView[drag_status="reject"] {
-    border: 1px solid #F44336;
+    border: 2px solid #F44336;
 }
 
 #LibraryHeader::section {
     padding: 10px 12px;
-    /* Deep-Etch Bevel: Pronounced edge for a 'Heavy Plastic' feel */
-    background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                                     stop:0 #3A3A3A,    /* Highlight glint */
-                                     stop:0.04 #1E1E1E, /* Solid face color */
-                                     stop:0.75 #1E1E1E, /* Face end */
-                                     stop:1.0 #000000); /* Deep etched shadow */
+    background-color: #0A0A0A; /* Flat Terminal Bar */
     border: none;
-    border-right: 1px solid #050505; 
-    border-bottom: 2px solid #D81B60; 
+    border-right: 1px solid #1A1A1A; 
+    border-bottom: 1px solid #222; /* Minimal Divider */
     
-    /* Simulate 'Taller & Narrower' via negative tracking and increased size */
-    font-family: "Tw Cen MT Condensed Bold", "Bahnschrift Condensed", sans-serif;
-    font-weight: 800;
-    color: #BBB; /* Backlit readout vibrance */
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-weight: bold;
+    color: #666; /* Recessed Labels (like in the image) */
     text-transform: uppercase;
-    font-size: 14pt; /* Much bigger/taller */
-    letter-spacing: -0.2px; /* Negative tracking makes it look 'narrower' */
+    font-size: 10pt;
+    letter-spacing: 1.5px;
 }
 
 #LibraryHeader::section:hover {
-    background-color: #1E1E1E;
-    color: #FFF;
+    color: #AAA;
 }
+
 
 #LibraryHeader::section:pressed {
-    background-color: #D81B60;
-    color: white;
+    background-color: #FF8C00;
+    color: black;
 }
 
-/* Horizontal Grid Only hack via background/alternate */
+/* Horizontal Grid Only hack: Let the delegate draw horizontal lines, we kill vertical ones */
 QTableView::item {
     padding: 0px;
-    border: none; /* Kill the spreadsheet grid */
+    border: none; 
 }
 
-QHeaderView::section {
-    background-color: #1E1E1E;
-    padding: 10px;
-    border: none;
-    border-bottom: 2px solid #222;
-    font-weight: bold;
-    color: #BBB;
-    text-transform: uppercase;
-    font-size: 9pt;
-}
-
+/* Header Spacer / Corner */
 QTableView QTableCornerButton::section {
-    background-color: #1E1E1E;
+    background-color: #1A1A1A;
     border: none;
+}
+
+/* Vertical header styling (The Blade Channel) */
+QHeaderView::section:vertical {
+    background-color: #050505;
+    border: none;
+    border-right: 1px solid #1A1A1A;
+    width: 25px;
 }
 
 
@@ -421,74 +527,114 @@ QTableView QTableCornerButton::section {
 /* --- WORKSTATION SURGICAL CHANNEL (Right Panel) --- */
 #RightSurgicalPanel {
     background-color: #050505; /* Deep surgical black */
-    border-left: 1px solid #121212;
+    border-left: 1px solid #1A1A1A;
 }
 
 #SidePanelHeader {
-    font-size: 13pt;
+    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
+    font-size: 14pt;
     font-weight: bold;
     color: #FFF;
+    text-transform: none;
     margin-bottom: 4px;
-    letter-spacing: 1px;
+    letter-spacing: 1.5px;
+    border-bottom: 2px solid #222;
+    padding-bottom: 4px;
 }
 
 #SidePanelProjectedPath {
     font-family: 'Consolas', 'Courier New', monospace;
     color: #666;
     font-size: 8pt;
+    margin-bottom: 10px;
 }
 
 #SidePanelProjectedPath[conflict="true"] {
     color: #FF5252;
+    font-weight: bold;
 }
 
 /* Metadata Labels */
 #FieldGroupLabel {
-    color: #555;
-    font-size: 8pt;
+    color: #2979FF; /* Identity Blue (Section Header) */
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-size: 11pt;
     font-weight: bold;
-    margin-top: 10px;
-    border-bottom: 1px solid #1A1A1A;
+    text-transform: none;
+    letter-spacing: 1px;
+    margin-top: 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 2px;
 }
 
-#FieldLabel {
-    color: #888;
-    font-size: 8.5pt;
+QLabel[objectName="FieldLabel"] {
+    color: #FF9100; /* Safety Orange */
+    font-size: 8pt; 
+    font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
     font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
 }
 
 /* Control Buttons (Machined Style) */
-#MarkDoneButton, #DiscardButton {
-    background-color: #1A1A1A;
-    color: #AAA;
+#MarkDoneButton {
+    background-color: #111;
+    color: #555;
     font-weight: bold;
     font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
-    padding: 8px 16px;
+    font-size: 11pt;
+    padding: 6px 16px;
     border: 1px solid #333;
     border-radius: 2px;
+    margin-top: 0px; /* Reset top margin as it's in footer now */
+    margin-right: 8px; /* Spacing from Save All */
+    letter-spacing: 1.5px;
 }
 
-#MarkDoneButton:hover, #DiscardButton:hover {
-    background-color: #222;
-    color: #FFF;
-    border: 1px solid #444;
+#MarkDoneButton:hover {
+    background-color: #1A1A1A;
+    color: #888;
+    border-color: #555;
 }
 
 #MarkDoneButton:checked {
-    background-color: #1B5E20; /* Deep industrial green */
-    color: #A5D6A7;
-    border: 1px solid #2E7D32;
+    background-color: #1B5E20; /* Deep Green */
+    color: #69F0AE; /* Bright Neon Green Text */
+    border: 1px solid #00E676;
+    /* Subtle glow for the active state */
+}
+
+#MarkDoneButton:disabled {
+    background-color: #080808;
+    color: #333;
+    border: 1px dashed #222;
+}
+
+
+#DiscardButton {
+    background-color: transparent;
+    color: #666;
+    border: 1px solid transparent;
+    font-weight: bold;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    padding: 8px 16px;
+}
+#DiscardButton:hover {
+    color: #AAA;
+    border: 1px solid #333;
 }
 
 #SaveAllButton {
     font-weight: bold;
     font-family: "Bahnschrift Condensed", "Agency FB", sans-serif;
-    padding: 8px 24px;
+    font-size: 11pt;
+    padding: 10px 24px;
     background-color: #D81B60; /* Theme Pink */
     color: white;
     border: 1px solid #C2185B;
     border-radius: 2px;
-    text-transform: uppercase;
     letter-spacing: 1px;
 }
 
@@ -505,6 +651,8 @@ QTableView QTableCornerButton::section {
 
 #SaveAllButton[alert="true"] {
     background-color: #B71C1C;
+    border-color: #F44336;
+    color: #FFEBEE;
 }
 
 /* --- PLAYER DECK (Docked Module) --- */
@@ -537,6 +685,7 @@ QLabel#PlaybackTimer {
     background: qradialgradient(cx:0.5, cy:0.5, radius:0.5, fx:0.5, fy:0.5,
                                 stop:0 #121212, stop:0.8 #000, stop:1 #D81B60);
 }
+
 
 #WaveformDeck {
     background-color: #050505;
@@ -594,6 +743,7 @@ QPushButton#BigPlayButton:hover {
     background-color: #E91E63;
     border-color: #FFF;
 }
+
 
 QPushButton#MediaButton:hover {
     background-color: #333;

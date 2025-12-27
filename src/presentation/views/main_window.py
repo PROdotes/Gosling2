@@ -3,14 +3,190 @@ import os
 from typing import Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
-    QStackedWidget, QTabBar, QSizeGrip
+    QSizeGrip
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
-from ..widgets import PlaylistWidget, PlaybackControlWidget, LibraryWidget, SidePanelWidget, CustomTitleBar
+from ..widgets import (
+    PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
+    SidePanelWidget, CustomTitleBar, JingleCurtain, HistoryDrawer
+)
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
+from PyQt6.QtWidgets import (
+    QPushButton, QFrame
+)
+from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import pyqtSignal, QSize, QItemSelectionModel
+
+class ResizeGrip(QWidget):
+    """Custom resize grip with visible triangle indicator"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(16, 16)
+        self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+        self._pressing = False
+        self._start_pos = None
+        self._start_geometry = None
+    
+    def mousePressEvent(self, event):
+        """Start resize operation"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressing = True
+            self._start_pos = event.globalPosition().toPoint()
+            self._start_geometry = self.window().geometry()
+    
+    def mouseMoveEvent(self, event):
+        """Handle resize dragging"""
+        if self._pressing and self._start_pos and self._start_geometry:
+            delta = event.globalPosition().toPoint() - self._start_pos
+            new_width = max(self._start_geometry.width() + delta.x(), self.window().minimumWidth())
+            new_height = max(self._start_geometry.height() + delta.y(), self.window().minimumHeight())
+            self.window().resize(new_width, new_height)
+    
+    def mouseReleaseEvent(self, event):
+        """End resize operation"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._pressing = False
+            self._start_pos = None
+            self._start_geometry = None
+    
+    def paintEvent(self, event):
+        """Draw diagonal lines forming a resize triangle"""
+        from PyQt6.QtGui import QPainter, QPen
+        from PyQt6.QtCore import QPoint
+        
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Transparent background - no fill needed
+        
+        # Draw three diagonal lines forming a triangle grip
+        pen = QPen(QColor("#555555"), 2.0)
+        painter.setPen(pen)
+        
+        # Line 1 (bottom-most)
+        painter.drawLine(QPoint(10, 14), QPoint(14, 10))
+        # Line 2 (middle)
+        painter.drawLine(QPoint(6, 14), QPoint(14, 6))
+        # Line 3 (top-most)
+        painter.drawLine(QPoint(2, 14), QPoint(14, 2))
+        
+        painter.end()
+
+class TerminalHeader(QFrame):
+    """Custom header for the Independent Operations Terminal."""
+    prep_toggled = pyqtSignal(bool)
+    jingles_toggled = pyqtSignal(bool)
+    history_toggled = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(34)
+        self.setObjectName("TerminalHeader")
+        self.setStyleSheet("""
+            #TerminalHeader {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
+                                          stop:0 #1A1A1A, stop:0.4 #222, 
+                                          stop:0.5 #2A2A2A, stop:0.6 #222, 
+                                          stop:1 #1A1A1A);
+                border-bottom: 2px solid #000;
+                border-top: 1px solid #333;
+            }
+        """)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setSpacing(10)
+        
+        # 1. The Dots (Independent Terminal Feel)
+        dots_container = QWidget()
+        dots_layout = QHBoxLayout(dots_container)
+        dots_layout.setContentsMargins(0, 0, 0, 0)
+        dots_layout.setSpacing(6)
+        
+        for color in ["#FF5F56", "#FFBD2E", "#27C93F"]:
+            dot = QFrame()
+            dot.setFixedSize(11, 11)
+            dot.setStyleSheet(f"background-color: {color}; border-radius: 5px;")
+            dots_layout.addWidget(dot)
+        
+        layout.addWidget(dots_container)
+        layout.addStretch()
+        
+        # 2. UTILITY TOGGLES
+        self.history_btn = self._create_toggle("LOG", self.history_toggled)
+        self.jingle_btn = self._create_toggle("CHIPS", self.jingles_toggled)
+        
+        layout.addWidget(self.history_btn)
+        layout.addWidget(self.jingle_btn)
+        
+        # 3. THE BIG HINGE (Prep Mode)
+        self.prep_btn = QPushButton("[ PREP LOG ]")
+        self.prep_btn.setCheckable(True)
+        self.prep_btn.setFixedWidth(120)
+        self.prep_btn.setObjectName("PrepLogButton")
+        self.prep_btn.setStyleSheet("""
+            QPushButton#PrepLogButton {
+                background-color: #080808;
+                border: 1px solid #333;
+                border-radius: 4px;
+                color: #888;
+                font-family: 'Agency FB', 'Bahnschrift Condensed';
+                font-weight: bold;
+                font-size: 10pt;
+                letter-spacing: 2px;
+            }
+            QPushButton#PrepLogButton:hover { border-color: #FF8BA0; color: #CCC; }
+            QPushButton#PrepLogButton:checked {
+                background-color: #1A1208;
+                border: 1px solid #FF8C00;
+                color: #FF8C00;
+            }
+        """)
+        self.prep_btn.toggled.connect(self.prep_toggled.emit)
+        layout.addWidget(self.prep_btn)
+        
+        layout.addStretch()
+        
+        # 4. THE LED (Status)
+        self.status_led = QFrame()
+        self.status_led.setFixedSize(8, 8)
+        self.status_led.setStyleSheet("background-color: #222; border-radius: 4px;")
+        layout.addWidget(self.status_led)
+        
+        self.prep_btn.toggled.connect(self._on_prep_toggled)
+
+    def _create_toggle(self, text, signal):
+        btn = QPushButton(text)
+        btn.setCheckable(True)
+        btn.setFixedSize(50, 22)
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: #111;
+                border: 1px solid #222;
+                border-radius: 3px;
+                color: #555;
+                font-family: 'Agency FB';
+                font-size: 8pt;
+                font-weight: bold;
+            }
+            QPushButton:hover { border-color: #444; color: #888; }
+            QPushButton:checked {
+                border-color: #FF8C00;
+                color: #FF8C00;
+                background-color: #000;
+            }
+        """)
+        btn.toggled.connect(signal.emit)
+        return btn
+
+    def _on_prep_toggled(self, checked):
+        if checked:
+            self.status_led.setStyleSheet("background-color: #FF8C00; border: 1px solid #FFD580; border-radius: 4px;")
+        else:
+            self.status_led.setStyleSheet("background-color: #222; border-radius: 4px;")
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -18,14 +194,17 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
 
-        # Initialize Data Access Layer
-        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
-        self.song_repository = SongRepository()
-        self.contributor_repository = ContributorRepository()
-        self.album_repository = AlbumRepository()
-
-        # Initialize Services
+        # 1. Initialize Settings First (Required for Hardware Unlocking)
         self.settings_manager = SettingsManager()
+        db_path = self.settings_manager.get_database_path()
+
+        # 2. Initialize Data Access Layer with injected path
+        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
+        self.song_repository = SongRepository(db_path)
+        self.contributor_repository = ContributorRepository(db_path)
+        self.album_repository = AlbumRepository(db_path)
+
+        # 3. Initialize Business Services
         self.library_service = LibraryService(
             self.song_repository, 
             self.contributor_repository, 
@@ -40,14 +219,16 @@ class MainWindow(QMainWindow):
         self._init_ui()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         
+        # Hide status bar to prevent automatic size grip
+        self.setStatusBar(None)
+        
         self._load_window_geometry()
         self._load_splitter_states()
+        # Setup Connections
         self._setup_connections()
-        self._setup_shortcuts()
         
         self._restore_volume()
         self._restore_playlist()
-        self._restore_right_panel_tab()
 
     def _init_ui(self) -> None:
         """Initialize the user interface"""
@@ -62,6 +243,55 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
         
+        # Global Industrial Amber Theme
+        self.setStyleSheet("""
+            QMainWindow { background-color: #0A0A0A; }
+            QWidget { color: #DDD; }
+            
+            /* Industrial Amber Scrollbars */
+            QScrollBar:vertical {
+                border: none;
+                background: #0F0F0F;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #333;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #FF8C00;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            
+            QScrollBar:horizontal {
+                border: none;
+                background: #0F0F0F;
+                height: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #333;
+                min-width: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #FF8C00;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px;
+            }
+            
+            QToolTip {
+                background-color: #1A1A1A;
+                color: #FF8C00;
+                border: 1px solid #FF8C00;
+            }
+        """)
+        
         # 0. Integrated Title Bar
         self.title_bar = CustomTitleBar(self)
         self.title_bar.minimize_requested.connect(self.showMinimized)
@@ -71,22 +301,27 @@ class MainWindow(QMainWindow):
 
         # Content Container (where margins apply)
         content_container = QWidget()
-        content_layout = QVBoxLayout(content_container)
-        content_layout.setContentsMargins(5, 5, 0, 5)
+        content_layout = QHBoxLayout(content_container) # Root is Horizontal to allow Right Panel Full Height
+        content_layout.setContentsMargins(5, 5, 0, 0) # No bottom/right margin for flush docking
+        content_layout.setSpacing(1)
         main_layout.addWidget(content_container, 1)
 
-        # Splitter: Library | Playlist
+        # === THE MAIN SPLITTER (Left/Center Block | Right Panel) ===
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter.setObjectName("MainRootSplitter")
+        # Handle width controlled by QSS
+
+        # --- LEFT+CENTER BLOCK (Archive + Library + Scrubber) ---
+        lc_container = QWidget()
+        lc_layout = QVBoxLayout(lc_container)
+        lc_layout.setContentsMargins(0, 0, 0, 0)
+        lc_layout.setSpacing(0)
         
-        # LEFT WORKSPACE (Vertical Splitter: Library | Playback)
-        left_workspace = QWidget()
-        left_workspace_layout = QVBoxLayout(left_workspace)
-        left_workspace_layout.setContentsMargins(0, 0, 0, 0)
-        left_workspace_layout.setSpacing(0)
+        # LC Splitter (Archive | Library)
+        self.lc_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.lc_splitter.setHandleWidth(1)
         
-        self.v_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.v_splitter.setObjectName("LeftVerticalSplitter")
-        
-        # Library Widget (Left/Center)
+        # 1. Archive/Library (Currently just LibraryWidget acting as both)
         self.library_widget = LibraryWidget(
             self.library_service, 
             self.metadata_service,
@@ -94,108 +329,99 @@ class MainWindow(QMainWindow):
             self.renaming_service,
             self.duplicate_scanner
         )
-        # Add Library
-        self.v_splitter.addWidget(self.library_widget)
+        self.lc_splitter.addWidget(self.library_widget)
         
-        # Add Playback
+        lc_layout.addWidget(self.lc_splitter, 1)
+        
+        # 2. FOOTER (Scrubber)
         self.playback_widget = PlaybackControlWidget(
             self.playback_service,
             self.settings_manager
         )
         self.playback_widget.setObjectName("PlaybackDeck")
-        self.v_splitter.addWidget(self.playback_widget)
+        lc_layout.addWidget(self.playback_widget)
         
-        # Set default proportions for vertical (Library 4 : Playback 1)
-        self.v_splitter.setStretchFactor(0, 4)
-        self.v_splitter.setStretchFactor(1, 1)
-        
-        left_workspace_layout.addWidget(self.v_splitter)
+        # Add LC Block to Main Splitter
+        self.main_splitter.addWidget(lc_container)
 
-        # RIGHT PANEL (Playlist / Editor)
-        right_panel = QWidget()
-        right_panel.setObjectName("RightSurgicalPanel")
-        from PyQt6.QtWidgets import QGridLayout
-        right_panel_layout = QGridLayout(right_panel)
-        right_panel_layout.setContentsMargins(0, 0, 0, 0)
-        right_panel_layout.setSpacing(0)
-        
-        # Mode Selector (Tabs)
-        self.right_tabs = QTabBar()
-        self.right_tabs.addTab("Playlist")
-        self.right_tabs.addTab("Editor")
-        self.right_tabs.setExpanding(True)
-        self.right_tabs.currentChanged.connect(self._on_right_tab_changed)
-        
-        self.right_stack = QStackedWidget()
-        
-        # Content Widgets
-        self.playlist_widget = PlaylistWidget()
-        self.side_panel = SidePanelWidget(
-            self.library_service, 
-            self.metadata_service, 
+        # --- RIGHT PANEL (Command Deck) ---
+        from ..widgets.right_panel_widget import RightPanelWidget
+        self.right_panel = RightPanelWidget(
+            self.library_service,
+            self.metadata_service,
             self.renaming_service,
-            self.duplicate_scanner
+            self.duplicate_scanner,
+            self.settings_manager
         )
+        self.main_splitter.addWidget(self.right_panel)
         
-        self.right_stack.addWidget(self.playlist_widget)
-        self.right_stack.addWidget(self.side_panel)
+        # COMPATIBILITY ALIAS: Mapping legacy self.playlist_widget to the new nested instance
+        # This prevents crashes in _play_next, _toggle_play_pause, etc.
+        self.playlist_widget = self.right_panel.playlist_widget
         
-        # Row 0: Tabs
-        right_panel_layout.addWidget(self.right_tabs, 0, 0)
-        # Row 1: Stack + Overlaid Grip
-        right_panel_layout.addWidget(self.right_stack, 1, 0)
+        # Stretches: LC=1 (Taking all space), R=0 (Fixed/Respected Size)
+        self.main_splitter.setStretchFactor(0, 1)
+        self.main_splitter.setStretchFactor(1, 0)
         
-        # Overlay the Grip in the same cell as the stack, but aligned to corner
-        self.size_grip = QSizeGrip(self)
-        right_panel_layout.addWidget(self.size_grip, 1, 0, Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight)
+        # Prevent Center (Library) from collapsing to 0
+        self.main_splitter.setCollapsible(0, False)
+        # Prevent Right Panel from collapsing to 0 (Hard Stop)
+        self.main_splitter.setCollapsible(1, False)
 
-        # Main Horizontal Splitter
-        self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.splitter.addWidget(left_workspace)
-        self.splitter.addWidget(right_panel)
+        content_layout.addWidget(self.main_splitter)
         
-        self.splitter.setStretchFactor(0, 3)
-        self.splitter.setStretchFactor(1, 1)
-        
-        content_layout.addWidget(self.splitter, 1)
+        # Add resize grip to bottom-right corner (for frameless window)
+        self.size_grip = ResizeGrip(self)
+        # Position it in the bottom-right corner
+        self.size_grip.raise_()
+
 
     def _setup_connections(self) -> None:
         """Setup signal/slot connections"""
-        # Library interactions
+        # --- Library Signals ---
         self.library_widget.add_to_playlist.connect(self._add_to_playlist)
         self.library_widget.remove_from_playlist.connect(self._remove_from_playlist)
+        self.library_widget.play_immediately.connect(self._play_path_now)
         
-        # Playlist interactions
-        # Double-click disabled by user request (prevent accidental play)
-        # self.playlist_widget.itemDoubleClicked.connect(self._on_playlist_double_click)
+        # Connect Selection -> Right Panel Facade
+        self.library_widget.table_view.selectionModel().selectionChanged.connect(self._on_library_selection_changed)
 
-        # Playback Controls
+        # --- Right Panel (Command Deck) Signals ---
+        self.right_panel.transport_command.connect(self._handle_transport_command)
+        self.right_panel.transition_command.connect(self._handle_transition_command)
+        
+        # --- Editor Signals (Transient Wiring) ---
+        # Direct access to inner widget until SidePanel refactor is complete
+        editor = self.right_panel.editor_widget
+        editor.save_requested.connect(self._on_side_panel_save_requested)
+        editor.staging_changed.connect(self.library_widget.update_dirty_rows)
+        
+        # --- Playlist Signals (Transient Wiring) ---
+        # Access inner Playlist widget
+        playlist = self.right_panel.playlist_widget
+        playlist.itemDoubleClicked.connect(self._on_playlist_double_click)
+
+        # --- Playback Controls (Global Footer) ---
         self.playback_widget.play_pause_clicked.connect(self._toggle_play_pause)
         self.playback_widget.prev_clicked.connect(self._play_prev)
         self.playback_widget.next_clicked.connect(self._play_next)
         self.playback_widget.volume_changed.connect(self._on_volume_changed)
         
-        # Media Status (auto-advance)
+        # --- Media Status (Auto-Advance) ---
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
         
-        # Connect Library Selection to Side Panel
-        # Connect Library Selection to Side Panel (Phase 2 Link)
-        self.library_widget.table_view.selectionModel().selectionChanged.connect(self._on_library_selection_changed)
-        
-        # Connect Side Panel Signals
-        self.side_panel.save_requested.connect(self._on_side_panel_save_requested)
-        self.side_panel.staging_changed.connect(self.library_widget.update_dirty_rows)
-        
-        # Global Search Wiring
+        # --- Global Search Wiring ---
         self.title_bar.search_text_changed.connect(self.library_widget.set_search_text)
         self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())
+
 
     def _setup_shortcuts(self) -> None:
         """Setup global keyboard shortcuts (T-31 legacy shortcuts)."""
         # Ctrl+S – Save staged changes (Side Panel)
         self.action_save_selected = QAction(self)
         self.action_save_selected.setShortcut("Ctrl+S")
-        self.action_save_selected.triggered.connect(self.side_panel.trigger_save)
+        # Fix T-54: Access editor via Right Panel
+        self.action_save_selected.triggered.connect(self.right_panel.editor_widget.trigger_save)
         self.addAction(self.action_save_selected)
 
         # Ctrl+D – Mark selection as Done (Yellberus-gated)
@@ -299,6 +525,16 @@ class MainWindow(QMainWindow):
         except Exception:
             self.playback_widget.update_song_label(os.path.basename(path))
 
+    def _on_playlist_double_click(self, item) -> None:
+        """Handle double-click on playlist item"""
+        self._play_item(item)
+
+    def _play_path_now(self, path: str) -> None:
+        """Direct play from library (bypassing playlist)"""
+        self.playback_service.load(path)
+        self.playback_service.play()
+        self._update_song_label(path)
+
     def closeEvent(self, event) -> None:
         """Handle window close"""
         # Save current state before cleanup
@@ -328,17 +564,10 @@ class MainWindow(QMainWindow):
         splitter_state = self.settings_manager.get_main_splitter_state()
         if splitter_state:
             # Main Horizontal
-            self.splitter.restoreState(splitter_state)
-        
-        # Vertical Splitter (Left Pane)
-        v_state = self.settings_manager.get_v_splitter_state()
-        if v_state:
-            self.v_splitter.restoreState(v_state)
+            self.main_splitter.restoreState(splitter_state)
 
     def _save_splitter_states(self) -> None:
-        self.settings_manager.set_main_splitter_state(self.splitter.saveState())
-        # Vertical Splitter
-        self.settings_manager.set_v_splitter_state(self.v_splitter.saveState())
+        self.settings_manager.set_main_splitter_state(self.main_splitter.saveState())
     
     def _restore_volume(self) -> None:
         """Restore saved volume level"""
@@ -352,10 +581,13 @@ class MainWindow(QMainWindow):
     
     def _restore_playlist(self) -> None:
         """Restore last playlist"""
-        playlist = self.settings_manager.get_last_playlist()
-        if playlist:
+        playlist_data = self.settings_manager.get_last_playlist()
+        if playlist_data:
             from PyQt6.QtWidgets import QListWidgetItem
-            for path in playlist:
+            # T-54: Access nested playlist widget
+            playlist_widget = self.right_panel.playlist_widget
+            
+            for path in playlist_data:
                 # Try to extract metadata for display
                 try:
                     song = self.metadata_service.extract_from_mp3(path)
@@ -365,49 +597,72 @@ class MainWindow(QMainWindow):
                 
                 list_item = QListWidgetItem(display_text)
                 list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
-                self.playlist_widget.addItem(list_item)
+                playlist_widget.addItem(list_item)
         
         # Initial update of button state
-        self.playback_widget.set_playlist_count(self.playlist_widget.count())
+        self.playback_widget.set_playlist_count(self.right_panel.playlist_widget.count())
     
     def _save_playlist(self) -> None:
         """Save current playlist"""
-        playlist = []
-        for i in range(self.playlist_widget.count()):
-            item = self.playlist_widget.item(i)
+        playlist_data = []
+        # T-54: Access nested playlist widget
+        playlist_widget = self.right_panel.playlist_widget
+        for i in range(playlist_widget.count()):
+            item = playlist_widget.item(i)
             data = item.data(Qt.ItemDataRole.UserRole)
             if data and "path" in data:
-                playlist.append(data["path"])
-        self.settings_manager.set_last_playlist(playlist)
+                playlist_data.append(data["path"])
+        self.settings_manager.set_last_playlist(playlist_data)
 
-    def _restore_right_panel_tab(self) -> None:
-        """Restore last selected right panel tab"""
-        index = self.settings_manager.get_right_panel_tab()
-        self.right_tabs.setCurrentIndex(index)
-        self.right_stack.setCurrentIndex(index)
 
     def _on_right_tab_changed(self, index: int) -> None:
-        """Switch between Playlist and Editor."""
-        self.right_stack.setCurrentIndex(index)
-        self.settings_manager.set_right_panel_tab(index)
+        """Legacy handler - keep for now to avoid breaking other connections if any"""
+        pass
 
     def _on_library_selection_changed(self, selected, deselected) -> None:
-        """Load selected song(s) into the Side Panel."""
+        """Handle library row selection."""
         # Get selected songs from the model
         selection_model = self.library_widget.table_view.selectionModel()
         indexes = selection_model.selectedRows()
         
-        if not indexes:
-            self.side_panel.set_songs([])
-            return
-            
         songs = []
-        for idx in indexes:
-            song = self._get_selected_song_object(idx)
-            if song:
-                songs.append(song)
+        if indexes:
+            for idx in indexes:
+                song = self._get_selected_song_object(idx)
+                if song:
+                    songs.append(song)
             
-        self.side_panel.set_songs(songs)
+        # Facade Pattern: Pass data to Right Panel
+        self.right_panel.update_selection(songs)
+
+    def _handle_transport_command(self, cmd: str) -> None:
+        """Route transport commands from Right Panel to Service helpers"""
+        # We must call the internal helpers (_play_next, etc.) because they 
+        # manage the UI state (removing items from playlist, updating labels).
+        # Calling service directly bypasses the 'Playlist Logic'.
+        
+        if cmd == 'play':
+            self._toggle_play_pause()
+        elif cmd == 'stop':
+            self.playback_service.stop()
+        elif cmd == 'next':
+            self._play_next()
+        elif cmd == 'prev':
+            self._play_prev()
+
+    def _handle_transition_command(self, type_str: str, duration_ms: int) -> None:
+        """Route transition commands."""
+        if type_str == 'cut':
+            # Force hard switch for next song
+             current_enabled = self.playback_service.crossfade_enabled
+             self.playback_service.crossfade_enabled = False
+             self._play_next() # Call UI Helper
+             self.playback_service.crossfade_enabled = current_enabled
+             
+        elif type_str == 'fade':
+            # Force Fade Duration logic
+            self.playback_service.crossfade_duration = duration_ms
+            self._play_next() # Call UI Helper
 
     def _get_selected_song_object(self, proxy_index):
         """Helper to get a real Song object from a table selection."""
@@ -419,14 +674,36 @@ class MainWindow(QMainWindow):
         source_index = self.library_widget.proxy_model.mapToSource(proxy_index)
         
         # We need the path to fetch the real model from the repo/service
-        # (Assuming the model stores the path string in the 'path' column)
-        path_column_index = self.library_widget.field_indices.get('path')
-        path_item = self.library_widget.library_model.item(source_index.row(), path_column_index)
+        path_item = self.library_widget.library_model.item(source_index.row(), path_idx)
         
         if not path_item: return None
         
         path = path_item.text()
         return self.library_service.get_song_by_path(path)
+
+    def _toggle_surgical_mode(self, enabled: bool) -> None:
+        """Reveal the Metadata Editor."""
+        self._surgical_mode_enabled = enabled
+        sizes = self.right_splitter.sizes()
+        sizes[1] = 700 if enabled else 0
+        # If opening surgery, maybe hide jingles/history to save space
+        if enabled:
+            sizes[0] = 0
+            sizes[2] = 0
+        self.right_splitter.setSizes(sizes)
+
+    def _toggle_jingle_bay(self, enabled: bool) -> None:
+        """Reveal the Jingle/Chip Bay."""
+        sizes = self.right_splitter.sizes()
+        sizes[0] = 250 if enabled else 0
+        self.right_splitter.setSizes(sizes)
+
+    def _toggle_history_log(self, enabled: bool) -> None:
+        """Reveal the Historical 'As Played' Log."""
+        sizes = self.right_splitter.sizes()
+        sizes[2] = 400 if enabled else 0
+        self.right_splitter.setSizes(sizes)
+
     def _on_side_panel_save_requested(self, staged_changes: dict) -> None:
         """Commit all staged changes to DB and ID3 tags."""
         successful_ids = []
@@ -490,7 +767,7 @@ class MainWindow(QMainWindow):
                          selected_ids.add(str(item.data(Qt.ItemDataRole.UserRole)))
             
             # 2. Clear staged for successful saves
-            self.side_panel.clear_staged(successful_ids)
+            self.right_panel.editor_widget.clear_staged(successful_ids)
             
             # 3. Reload Library (This clears the model and selection)
             self.library_widget.load_library(refresh_filters=False)
@@ -567,3 +844,13 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
+
+    def resizeEvent(self, event):
+        """Keep size grip in bottom-right corner"""
+        super().resizeEvent(event)
+        # Position grip in bottom-right corner
+        grip_size = self.size_grip.size()
+        self.size_grip.move(
+            self.width() - grip_size.width(),
+            self.height() - grip_size.height()
+        )

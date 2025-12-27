@@ -1,0 +1,30 @@
+{
+    "routing_rules": [
+        {
+            "match_genres": [
+                "patriotic",
+                "domoljubne"
+            ],
+            "target_path": "Cro/Domoljubne/{filename}"
+        },
+        {
+            "match_genres": [
+                "cro pop"
+            ],
+            "target_path": "Cro/{year}/{filename}"
+        },
+        {
+            "match_genres": [
+                "pop"
+            ],
+            "target_path": "{year}/{filename}"
+        },
+        {
+            "match_genres": [
+                "jazz"
+            ],
+            "target_path": "{genre}/{filename}"
+        }
+    ],
+    "default_rule": "{genre}/{year}/{filename}"
+}

@@ -15,19 +15,23 @@ class TestMainWindow:
              patch('src.presentation.views.main_window.MetadataService') as m_meta_cls, \
              patch('src.presentation.views.main_window.PlaybackService') as m_play_cls, \
              patch('src.presentation.views.main_window.SettingsManager') as m_set_cls, \
-             patch('src.presentation.views.main_window.RenamingService') as m_ren_cls:
+             patch('src.presentation.views.main_window.RenamingService') as m_ren_cls, \
+             patch('src.presentation.views.main_window.DuplicateScannerService') as m_dup_cls, \
+             patch('src.data.repositories.SongRepository'), \
+             patch('src.data.repositories.ContributorRepository'), \
+             patch('src.data.repositories.AlbumRepository'):
 
             m_set = MagicMock()
             m_set_cls.return_value = m_set
             
             # Use explicit None for binary fields to avoid Truthy Mock issues
             m_set.get_window_geometry.return_value = None
-            m_set.get_splitter_states.return_value = None
+            m_set.get_main_splitter_state.return_value = None
+            m_set.get_v_splitter_state.return_value = None
             m_set.get_default_window_size.return_value = (1024, 768)
             m_set.get_appearance_settings.return_value = {}
             m_set.get_volume.return_value = 50
-            m_set.get_playlist_items.return_value = []
-            m_set.get_last_right_panel_tab.return_value = 0
+            m_set.get_last_playlist.return_value = []
             m_set.get_type_filter.return_value = 0
             mock_settings = m_set # Alias for yield
 
@@ -63,12 +67,15 @@ class TestMainWindow:
 
     def test_ui_elements_exist(self, main_window):
         assert main_window.library_widget is not None
-        assert main_window.library_widget.search_box is not None
+        # Search box moved to title_bar
+        assert main_window.title_bar.search_box is not None
 
     def test_search_filtering(self, main_window):
-        # We check if the proxy model receives the filter text
-        main_window.library_widget.search_box.setText("test query")
-        assert main_window.library_widget.proxy_model.filterRegularExpression().pattern() == "test query"
+        # We check if the proxy model receives the filter text via title_bar
+        main_window.title_bar.search_box.setText("test query")
+        # Fixed string filtering might result in escaped spaces in the underlying regex pattern
+        pattern = main_window.library_widget.proxy_model.filterRegularExpression().pattern()
+        assert pattern.replace("\\", "") == "test query"
 
     def test_toggle_play_pause_calls_service(self, main_window, mock_services):
         # 1. Test Pause (is_playing=True)
@@ -118,11 +125,7 @@ class TestMainWindow:
         main_window.library_widget.mark_selection_done = MagicMock()
         main_window.library_widget.focus_search = MagicMock()
         
-        # The actions in MainWindow are connected in _setup_shortcuts.
-        # Since we patched the methods on the instance, we need to re-trigger the actions.
-        # But wait, same problem as before: the connections are to the OLD methods.
-        # We must re-connect them or test the effects.
-        
+        # Re-connect actions since shortcuts were set in __init__
         main_window.action_save_selected.triggered.disconnect()
         main_window.action_save_selected.triggered.connect(main_window.library_widget.save_selected_songs)
         

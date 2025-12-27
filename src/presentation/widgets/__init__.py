@@ -5,3 +5,5 @@ from .playback_control_widget import PlaybackControlWidget
 from .library_widget import LibraryWidget
 from .side_panel_widget import SidePanelWidget
 from .custom_title_bar import CustomTitleBar
+from .jingle_curtain import JingleCurtain
+from .history_drawer import HistoryDrawer

@@ -38,34 +38,50 @@ class RenamingService:
         # Build Absolute Path
         return os.path.join(root, rel_path)
 
+    def _load_rules(self) -> dict:
+        """Load external rules from JSON. Fallback to hardcoded defaults if missing."""
+        import json
+        # Location mapping - eventually moved to SettingsManager
+        rules_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "design", "configs", "rules.json")
+        rules_path = os.path.normpath(rules_path)
+        
+        try:
+            if os.path.exists(rules_path):
+                with open(rules_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Warning: Failed to load rules.json: {e}")
+        
+        # Absolute minimal fallback
+        return {
+            "routing_rules": [],
+            "default_rule": "{genre}/{year}/{filename}"
+        }
+
     def _resolve_routing_rules(self, genre_clean: str, year_clean: str, filename: str) -> str:
         """
-        Applies strict logic to determine folder structure.
-        Inputs are already sanitized.
+        Applies rules from JSON to determine folder structure.
         """
+        rules = self._load_rules()
         g_lower = genre_clean.lower()
         
-        # Rule 1: Patriotic / Domoljubne -> Cro/Domoljubne
-        # (Special case: Subgenre of Croatian)
-        if g_lower in ["patriotic", "domoljubne"]:
-            return os.path.join("Cro", "Domoljubne", filename)
+        for rule in rules.get("routing_rules", []):
+            matches = [m.lower() for m in rule.get("match_genres", [])]
+            if g_lower in matches:
+                target = rule.get("target_path", "")
+                return target.format(
+                    genre=genre_clean,
+                    year=year_clean,
+                    filename=filename
+                )
 
-        # Rule 2: Croatian Pop -> Cro/Year
-        if g_lower == "cro pop":
-            return os.path.join("Cro", year_clean, filename)
-
-        # Rule 3: Pop -> Year only (Skip Genre folder)
-        # "pop songs go only info year\file"
-        if g_lower == "pop":
-            return os.path.join(year_clean, filename)
-
-        # Rule 4: Jazz -> Genre only (No Year)
-        # "jazz goes into gemre\file"
-        if g_lower == "jazz":
-             return os.path.join(genre_clean, filename)
-        
-        # Default Rule: Genre/Year/File
-        return os.path.join(genre_clean, year_clean, filename)
+        # Default Rule
+        default = rules.get("default_rule", "{genre}/{year}/{filename}")
+        return default.format(
+            genre=genre_clean,
+            year=year_clean,
+            filename=filename
+        )
 
     def check_conflict(self, target_path: str) -> bool:
         """
