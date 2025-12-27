@@ -13,7 +13,7 @@ class TestAlbumModel(unittest.TestCase):
         self.assertEqual(album.tracks, [])
 
     def test_from_row_valid(self):
-        """Test from_row with valid tuple"""
+        """Test from_row with a valid tuple"""
         # Row: (AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear)
         row = (1, "Row Album", "Row Artist", "Single", 1999)
         album = Album.from_row(row)

@@ -71,37 +71,30 @@ class SidePanelWidget(QWidget):
         
         self.scroll.setWidget(self.field_container)
         layout.addWidget(self.scroll, 1)
-        
+
         # 4. Footer Actions (Save / Discard)
         footer_frame = QFrame()
         footer_frame.setObjectName("Footer")
-        
-        footer_layout = QHBoxLayout(footer_frame)
-        footer_layout.setContentsMargins(0, 10, 0, 0)
-        
-        self.btn_discard = QPushButton("Discard")
-        self.btn_discard.setObjectName("DiscardButton")
-        self.btn_discard.clicked.connect(self._on_discard_clicked)
-        
-        self.btn_save = QPushButton("SAVE")
-        self.btn_save.setObjectName("SaveAllButton")
-        self.btn_save.clicked.connect(self._on_save_clicked)
-        self.btn_save.setEnabled(False)
-        
-        # 2. Workflow State (STATUS PILL)
-        # Replaces simple checkbox button with "AIR/READY" pill logic
+
+        # We'll use a vertical layout for the footer to stack the status pill above the buttons
+        footer_main_layout = QVBoxLayout(footer_frame)
+        footer_main_layout.setContentsMargins(0, 10, 0, 0)
+        footer_main_layout.setSpacing(8)
+
+        # 2. Workflow State (STATUS PILL) - Now on its own line for maximum visibility
         self.btn_status = QPushButton("PENDING")
         self.btn_status.setObjectName("StatusPill")
         self.btn_status.setCheckable(True)
         self.btn_status.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_status.setFixedHeight(28)
+        self.btn_status.setFixedHeight(32)  # Slightly taller for better touch/click
+        self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_status.clicked.connect(self._on_status_toggled)
-        
+
         # Pill Styling (Dynamic QSS injected in _update_status_visuals)
         self.btn_status.setStyleSheet("""
             QPushButton#StatusPill {
                 border: none;
-                border-radius: 14px; /* Pill Shape */
+                border-radius: 16px;
                 font-weight: bold;
                 color: #DDD;
                 background-color: #333;
@@ -109,13 +102,32 @@ class SidePanelWidget(QWidget):
             }
         """)
         self.btn_status.setEnabled(False)
+        footer_main_layout.addWidget(self.btn_status)
 
-        footer_layout.addWidget(self.btn_discard)
-        footer_layout.addStretch()
-        footer_layout.addWidget(self.btn_status)
-        footer_layout.addWidget(self.btn_save)
+        # Button Row (Discard / Save)
+        button_row = QWidget()
+        button_layout = QHBoxLayout(button_row)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(10)
+
+        self.btn_discard = QPushButton("Discard")
+        self.btn_discard.setObjectName("DiscardButton")
+        self.btn_discard.setFixedWidth(80)  # Keep discard small
+        self.btn_discard.clicked.connect(self._on_discard_clicked)
+
+        self.btn_save = QPushButton("SAVE")
+        self.btn_save.setObjectName("SaveAllButton")
+        self.btn_save.setFixedHeight(32)
+        self.btn_save.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.btn_save.clicked.connect(self._on_save_clicked)
+        self.btn_save.setEnabled(False)
+
+        button_layout.addWidget(self.btn_discard)
+        button_layout.addWidget(self.btn_save)
+
+        footer_main_layout.addWidget(button_row)
         layout.addWidget(footer_frame)
-        
+
         self._clear_fields()
 
     def set_songs(self, songs):
@@ -127,18 +139,38 @@ class SidePanelWidget(QWidget):
              old_ids = sorted([s.source_id for s in self.current_songs])
              new_ids = sorted([s.source_id for s in songs])
              same_selection = (old_ids == new_ids)
-             
+
         if same_selection:
              scroll_pos = self.scroll.verticalScrollBar().value()
 
-        # Note: We do NOT clear _staged_changes here. 
+        # Performance: Skip expensive UI rebuild if selection hasn't actually changed
+        # This fixes 3-second lag in PyCharm when clicking the same song repeatedly
+        if same_selection:
+            self.scroll.verticalScrollBar().setValue(scroll_pos)
+            return
+
+        # Note: We do NOT clear _staged_changes here.
         # Persistence on selection loss is a key spec.
+
+        # Performance: Only rebuild UI if song count changes (single→bulk or vice versa)
+        # For same-count selections, just update widget values
+        old_count = len(self.current_songs) if self.current_songs else 0
+        new_count = len(songs) if songs else 0
+        needs_rebuild = (old_count == 0 or new_count == 0 or
+                        (old_count == 1) != (new_count == 1))  # 1 vs many
+
         self.current_songs = songs
         self._update_header()
-        self._build_fields()
+
+        if needs_rebuild:
+            self._build_fields()
+        else:
+            # Just refresh field values without rebuilding widgets
+            self._refresh_field_values()
+
         self._validate_done_gate()
         self._update_save_state()
-        
+
         # Restore scroll
         if same_selection:
              self.scroll.verticalScrollBar().setValue(scroll_pos)
@@ -285,6 +317,53 @@ class SidePanelWidget(QWidget):
 
         add_group(core_layout_struct, "Core Metadata")
         add_group(adv_fields, "Advanced Details")
+
+    def _refresh_field_values(self):
+        """Update existing widget values without rebuilding UI (performance optimization)."""
+        if not self.current_songs:
+            return
+
+        for field_name, widget in self._field_widgets.items():
+            # Find the field definition
+            field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
+            if not field_def:
+                continue
+
+            # Calculate new value
+            effective_val, is_multiple = self._calculate_bulk_value(field_def)
+
+            # CRITICAL: Block signals to prevent triggering _on_field_changed
+            # This prevents false "unsaved changes" when switching between songs
+            widget.blockSignals(True)
+            try:
+                # Update widget based on type
+                if isinstance(widget, QCheckBox):
+                    if is_multiple:
+                        widget.setCheckState(Qt.CheckState.PartiallyChecked)
+                    else:
+                        val_bool = str(effective_val).lower() in ("true", "1", "yes") if isinstance(effective_val, str) else bool(effective_val)
+                        widget.setChecked(val_bool if effective_val is not None else False)
+
+                elif isinstance(widget, QPushButton):  # Album picker
+                    if is_multiple:
+                        widget.setText("(Multiple Values)")
+                    else:
+                        widget.setText(str(effective_val) if effective_val else "(No Album)")
+
+                elif isinstance(widget, QLineEdit):
+                    if is_multiple:
+                        widget.setPlaceholderText("(Multiple Values)")
+                        widget.setText("")
+                    else:
+                        # Format lists properly
+                        if isinstance(effective_val, list):
+                            text_val = ", ".join(str(v) for v in effective_val) if effective_val else ""
+                        else:
+                            text_val = str(effective_val) if effective_val is not None else ""
+                        widget.setText(text_val)
+            finally:
+                # Always restore signals
+                widget.blockSignals(False)
 
     def _create_field_widget(self, field_def, value, is_multiple):
         # Determine strict type or strategy

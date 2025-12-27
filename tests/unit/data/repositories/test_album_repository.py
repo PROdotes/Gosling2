@@ -109,11 +109,13 @@ class TestAlbumRepository(unittest.TestCase):
         supporting the "Snapshot" sync strategy (Fixes the Append bug).
         """
         from src.data.repositories.song_repository import SongRepository
+        from src.data.models.song import Song
         import os
 
         # Setup
         song_repo = SongRepository()
-        test_path = os.path.normcase(os.path.abspath("C:\\\\Music\\\\Replacement_Test.mp3"))
+        # Ensure path is absolutely identical to how repository stores it
+        test_path = os.path.normcase(os.path.abspath("C:\\Music\\Replacement_Test.mp3"))
 
         # Cleanup old
         with song_repo.get_connection() as conn:
@@ -124,13 +126,18 @@ class TestAlbumRepository(unittest.TestCase):
         source_id = song_repo.insert(test_path)
 
         # 2. Add to Album1 via update
-        song = song_repo.get_by_path(test_path)
+        song = song_repo.get_by_id(source_id)
         song.album = "Replacement_Album1"
+        song.album_artist = "Test Artist"
+        song.recording_year = 2024
         song_repo.update(song)
 
-        # 3. Add to Album2 via update (should REPLACE Album1)
-        song = song_repo.get_by_path(test_path)
+        # 3. Add to Album2 via update (should REPLACE Album1 link)
+        song = song_repo.get_by_id(source_id)
         song.album = "Replacement_Album2"
+        # Keep same artist/year to test title replacement
+        song.album_artist = "Test Artist"
+        song.recording_year = 2024
         song_repo.update(song)
 
         # 4. Verify: Song should be on Album2 ONLY
@@ -144,7 +151,7 @@ class TestAlbumRepository(unittest.TestCase):
         # Cleanup
         with song_repo.get_connection() as conn:
             conn.execute("DELETE FROM MediaSources WHERE Source = ?", (test_path,))
-            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Additive_Album%'")
+            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Replacement_Album%'")
 
     def test_get_or_create(self):
         """Verify get_or_create returns existing album or creates new."""

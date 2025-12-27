@@ -100,16 +100,20 @@ class LibraryService:
         """Get albums linked to a source item."""
         return self.album_repository.get_albums_for_song(source_id)
 
-    def assign_album(self, source_id: int, album_title: str) -> Album:
+    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
         """
-        Link a song to an album by title (Find or Create).
-        If the song is already linked to this album, does nothing.
+        Link a song to an album by title, artist, and year (Find or Create).
+        This prevents different artists with the same album title from merging.
         """
         if not album_title or not album_title.strip():
             return None
             
-        album, created = self.album_repository.get_or_create(album_title.strip())
-        
+        album, created = self.album_repository.get_or_create(
+            title=album_title.strip(),
+            album_artist=artist,
+            release_year=year
+        )
+
         # Check if already linked? (Repository uses INSERT OR IGNORE, safe to call)
         self.album_repository.add_song_to_album(source_id, album.album_id)
         

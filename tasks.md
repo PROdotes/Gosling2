@@ -46,7 +46,7 @@ links: []
 | T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](design/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
 | T-49 | **Layout Conversion** | 5 | 4 | 20 | ✅ | [spec](design/specs/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) — Transformation to Frameless Workstation. |
 | T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | ✅ | [spec](design/specs/T-54_VISUAL_ARCHITECTURE.md) — The Command Deck (Toggle Stack) with Tactical Transitions. |
-| T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | 📋 | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
+| T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | ✅ | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
 | T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` ID3 writes. |
 | T-52 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
 
