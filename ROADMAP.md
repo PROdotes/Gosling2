@@ -81,8 +81,10 @@ tags:
     *   *Task*: Record INSERT/UPDATE events.
 *   [ ] **Settings UI** (T-49) (~1.5 h)
     *   *Task*: UI for Root Directory & Rules.
-*   [ ] **Dynamic Renaming Rules** (T-50) (~2.0 h)
+*   [x] **Dynamic Renaming Rules** (T-50) (~2.0 h)
     *   *Task*: Externalize hardcoded 'Patriotic/Cro' logic to config file.
+*   [x] **UI Polish & Icon (T-53)**
+    *   *Task*: SVG Icon fix & Settings Entry Point (T-57).
 *   [ ] **Tag Verification** (T-51) (~1.0 h)
     *   *Task*: Verify `TXXX:GOSLING_DONE` and ID3 writes.
 

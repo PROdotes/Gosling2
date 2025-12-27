@@ -249,6 +249,7 @@ class FilterWidget(QWidget):
         self.tree_view = QTreeView()
         self.tree_view.setObjectName("FilterTree")
         self.tree_view.setModel(self.tree_model)
+        self.tree_view.setHeaderHidden(True) # Hide "1" column header
         self.tree_view.setExpandsOnDoubleClick(False)
         self.tree_view.setIndentation(0) # KILL THE ZIG-ZAG (Surgical Rule)
         self.tree_view.clicked.connect(self._on_tree_clicked) # Row-level toggling
@@ -465,9 +466,7 @@ class FilterWidget(QWidget):
         
         self.tree_model.appendRow(root_item)
         
-        # PERSPECTIVE RESTORATION: Auto-expand Status (Triage) on launch
-        if field.name == "is_done":
-            self.tree_view.expand(root_item.index())
+
 
 
 

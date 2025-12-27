@@ -47,7 +47,7 @@ links: []
 | T-49 | **Layout Conversion** | 5 | 4 | 20 | ✅ | [spec](design/specs/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) — Transformation to Frameless Workstation. |
 | T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | ✅ | [spec](design/specs/T-54_VISUAL_ARCHITECTURE.md) — The Command Deck (Toggle Stack) with Tactical Transitions. |
 | T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | 📋 | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
-| T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` and ID3 writes. |
+| T-51 | **Tag Verification** | 5 | 1 | 25 | 📋 | Verify `TXXX:GOSLING_DONE` ID3 writes. |
 | T-52 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
 
 ### Foundation Work
@@ -62,7 +62,8 @@ links: []
 | T-62 | **Async Background Save** | 2 | 3 | 2 | ⚡ | Perf | Move save/renaming operations to background thread to prevent UI freeze on bulk edits. |
 | T-63 | **Selectable Publisher Picker** | 2 | 2 | 2 | 🏢 | Core | Convert Publisher text input in Album Manager to a searchable picker/dropdown for data integrity. |
 | T-64 | **Album Disambiguation** | 2 | 3 | 4 | 📀 | UX | Enhance Album Manager search results with sub-labels (Year, Publisher, etc.) to distinguish between duplicate titles like 'Greatest Hits'. |
-| T-53 | **UI Polish (Cyber)** | 4 | 2 | 8 | 📋 | — | Recolor App Icon to Pink; Evaluate Intensity; Library Grid Tinting. |
+| T-53 | **UI Polish (Cyber)** | 4 | 2 | 8 | 🏗️ PARTIAL | — | Grid Colors Done. **Issue**: SVG Icon renders tiny. |
+| T-57 | **Settings Entry Point** | 3 | 1 | 15 | 💡 | — | Move App Icon to Top-Left and use as click-trigger for Settings. |
 | T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
 | T-36 | **Architecture Map Update** | 3 | 2 | 6 | 📋 | Post-0.1 | Update [ARCHITECTURE.md](ARCHITECTURE.md) — Missing: `src/core/`, `tools/`, `album.py`, `tag.py`, new repos. Schema section outdated. *Logged by Vesper.* |
 

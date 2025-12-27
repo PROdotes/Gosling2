@@ -413,6 +413,9 @@ class MainWindow(QMainWindow):
         # --- Global Search Wiring ---
         self.title_bar.search_text_changed.connect(self.library_widget.set_search_text)
         self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())
+        
+        # --- T-57: Global Settings Trigger ---
+        self.title_bar.settings_requested.connect(lambda: print("TODO: Open Settings Dialog (T-52)"))
 
 
     def _setup_shortcuts(self) -> None:

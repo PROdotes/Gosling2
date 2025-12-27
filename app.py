@@ -16,7 +16,7 @@ def main() -> None:
     app.setOrganizationName("Prodo")
 
     # Set App Icon
-    icon_path = os.path.join(os.path.dirname(__file__), "resources", "app_icon.png")
+    icon_path = os.path.join(os.path.dirname(__file__), "resources", "app_icon.svg")
     app.setWindowIcon(QIcon(icon_path))
     
     # Use Fusion style for consistent QSS rendering (fixes native Windows ghosts)

@@ -1,5 +1,7 @@
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QLineEdit, QSizePolicy
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint
+from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QSize
+import os
 
 class CustomTitleBar(QWidget):
     """
@@ -11,6 +13,7 @@ class CustomTitleBar(QWidget):
     maximize_requested = pyqtSignal()
     close_requested = pyqtSignal()
     search_text_changed = pyqtSignal(str)
+    settings_requested = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -24,10 +27,22 @@ class CustomTitleBar(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # 1. Logo Section
-        self.logo_label = QLabel("GOSLING // WORKSTATION")
-        self.logo_label.setObjectName("AppLogo")
-        layout.addWidget(self.logo_label)
+        # 1. Logo/Settings Button (Icon Only)
+        self.btn_logo_icon = QPushButton()
+        self.btn_logo_icon.setObjectName("AppLogoIcon")
+        # Use absolute path to ensure resource loading
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "resources", "app_icon.svg")
+        self.btn_logo_icon.setIcon(QIcon(icon_path))
+        self.btn_logo_icon.setIconSize(QSize(24, 24))
+        self.btn_logo_icon.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_logo_icon.clicked.connect(self.settings_requested.emit)
+        
+        # 1b. Title Label (Draggable)
+        self.lbl_title = QLabel("  GOSLING // WORKSTATION")
+        self.lbl_title.setObjectName("AppTitleLabel")
+        
+        layout.addWidget(self.btn_logo_icon)
+        layout.addWidget(self.lbl_title)
         
         # 2. Search Section (The Draggable Search Strip)
         self.search_box = QLineEdit()
@@ -40,7 +55,7 @@ class CustomTitleBar(QWidget):
         self.draggable_area.setObjectName("SystemDraggableArea")
         self.draggable_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-        layout.addWidget(self.logo_label)
+        # layout.addWidget(self.logo_label) # Removed
         layout.addSpacing(20)
         layout.addWidget(self.search_box)
         layout.addWidget(self.draggable_area)
