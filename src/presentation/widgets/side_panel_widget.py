@@ -548,6 +548,15 @@ class SidePanelWidget(QFrame):
         self._on_field_changed("is_done", val)
         self._update_status_visuals(checked)
 
+    def _on_status_toggled(self, checked=False):
+        """Toggle the ready/pending state."""
+        # Fix: GlowButton signal might drop arg, check state directly
+        is_ready = self.btn_status.isChecked()
+        # Value 1 = Done, 0 = Pending
+        val = 1 if is_ready else 0
+        self._on_field_changed("is_done", val)
+        self._update_status_visuals(is_ready)
+
     def _update_status_visuals(self, is_done):
         """Apply Pro Radio styling: Green for AIR, Gray for PENDING via QSS dynamic property."""
         if is_done:

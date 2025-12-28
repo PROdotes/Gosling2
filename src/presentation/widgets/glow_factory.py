@@ -200,6 +200,11 @@ class GlowButton(GlowWidget):
         # Sync color state on check changes for toggle buttons
         self.btn.toggled.connect(self._on_toggled)
 
+    def showEvent(self, event):
+        """Sync initial state on first show (handles startup states with blocked signals)."""
+        super().showEvent(event)
+        self._on_toggled(self.btn.isChecked())
+
     def _on_toggled(self, checked):
         if checked:
             self._show_glow()

@@ -3,7 +3,7 @@ import os
 from typing import List, Optional, Tuple
 from src.data.database import BaseRepository
 from ..models.song import Song
-from ...core import yellberus
+from ...core import yellberus, logger
 from .album_repository import AlbumRepository
 
 
@@ -19,7 +19,7 @@ class SongRepository(BaseRepository):
                 yellberus.check_db_integrity(conn.cursor())
         except Exception as e:
             # Don't crash startup on integrity check error
-            print(f"Non-fatal integrity check error: {e}")
+            logger.error(f"Non-fatal integrity check error: {e}")
 
     def insert(self, file_path: str) -> Optional[int]:
         """Insert a new file record"""
@@ -48,7 +48,7 @@ class SongRepository(BaseRepository):
                 
                 return source_id
         except Exception as e:
-            print(f"Error inserting song: {e}")
+            logger.error(f"Error inserting song: {e}")
             return None
 
     def get_all(self) -> Tuple[List[str], List[Tuple]]:
@@ -64,7 +64,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching library data: {e}")
+            logger.error(f"Error fetching library data: {e}")
             return [], []
 
     def delete(self, file_id: int) -> bool:
@@ -76,7 +76,7 @@ class SongRepository(BaseRepository):
                 cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (file_id,))
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"Error deleting song: {e}")
+            logger.error(f"Error deleting song: {e}")
             return False
 
     def update(self, song: Song) -> bool:
@@ -126,7 +126,7 @@ class SongRepository(BaseRepository):
 
                 return True
         except Exception as e:
-            print(f"Error updating song: {e}")
+            logger.error(f"Error updating song: {e}")
             return False
 
     def update_status(self, file_id: int, is_done: bool) -> bool:
@@ -140,7 +140,7 @@ class SongRepository(BaseRepository):
                 )
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"Error updating song status: {e}")
+            logger.error(f"Error updating song status: {e}")
             return False
 
     def _sync_contributor_roles(self, song: Song, conn) -> None:
@@ -360,7 +360,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by performer: {e}")
+            logger.error(f"Error fetching songs by performer: {e}")
             return [], []
 
     def get_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
@@ -381,7 +381,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by composer: {e}")
+            logger.error(f"Error fetching songs by composer: {e}")
             return [], []
 
     def get_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
@@ -414,7 +414,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by unified artists: {e}")
+            logger.error(f"Error fetching songs by unified artists: {e}")
             return [], []
 
     def get_by_id(self, source_id: int) -> Optional[Song]:
@@ -517,7 +517,7 @@ class SongRepository(BaseRepository):
                 return [songs_map[sid] for sid in source_ids if sid in songs_map]
                 
         except Exception as e:
-            print(f"Error bulk fetching songs: {e}")
+            logger.error(f"Error bulk fetching songs: {e}")
             return []
 
     def get_songs_by_paths(self, paths: List[str]) -> List[Song]:
@@ -538,7 +538,7 @@ class SongRepository(BaseRepository):
                 
             return self.get_songs_by_ids(ids)
         except Exception as e:
-            print(f"Error resolving paths for bulk fetch: {e}")
+            logger.error(f"Error resolving paths for bulk fetch: {e}")
             return []
 
     def get_all_years(self) -> List[int]:
@@ -549,7 +549,7 @@ class SongRepository(BaseRepository):
                 cursor.execute("SELECT DISTINCT RecordingYear FROM Songs WHERE RecordingYear IS NOT NULL ORDER BY RecordingYear DESC")
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            print(f"Error getting all years: {e}")
+            logger.error(f"Error getting all years: {e}")
             return []
 
     # get_all_groups removed (Legacy zombie logic)
@@ -571,7 +571,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by year: {e}")
+            logger.error(f"Error fetching songs by year: {e}")
             return [], []
 
     def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
@@ -593,7 +593,7 @@ class SongRepository(BaseRepository):
                 data = cursor.fetchall()
                 return headers, data
         except Exception as e:
-            print(f"Error fetching songs by status: {e}")
+            logger.error(f"Error fetching songs by status: {e}")
             return [], []
 
     def get_by_isrc(self, isrc: str) -> Optional[Song]:
@@ -610,7 +610,7 @@ class SongRepository(BaseRepository):
                     return self.get_by_id(row[0])
                 return None
         except Exception as e:
-            print(f"Error getting song by ISRC: {e}")
+            logger.error(f"Error getting song by ISRC: {e}")
             return None
     
     def get_by_audio_hash(self, audio_hash: str) -> Optional[Song]:
@@ -627,6 +627,6 @@ class SongRepository(BaseRepository):
                     return self.get_by_id(row[0])
                 return None
         except Exception as e:
-            print(f"Error getting song by audio hash: {e}")
+            logger.error(f"Error getting song by audio hash: {e}")
             return None
             

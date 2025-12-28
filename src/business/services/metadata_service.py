@@ -4,8 +4,9 @@ from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, ID3NoHeaderError
 from ...data.models.song import Song
 from ...core.yellberus import FIELDS
+from ...core import logger
 import mutagen.id3
-from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC
+from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER
 import json
 import os
 
@@ -26,7 +27,7 @@ class MetadataService:
                     with open(json_path, 'r', encoding='utf-8') as f:
                         cls._id3_map = json.load(f)
                 except Exception as e:
-                    print(f"Error loading id3_frames.json: {e}")
+                    logger.error(f"Error loading id3_frames.json: {e}")
                     cls._id3_map = {}
             else:
                 cls._id3_map = {}
@@ -354,7 +355,7 @@ class MetadataService:
                     continue
                 
                 if not FrameClass:
-                    print(f"Warning: Unknown Mutagen class for {frame_id}")
+                    logger.warning(f"Unknown Mutagen class for {frame_id}")
                     continue
                 
                 # Write
@@ -369,7 +370,6 @@ class MetadataService:
             if song.recording_year is not None:
                 audio.tags.delall('TDRC')
                 audio.tags.delall('TYER')
-                from mutagen.id3 import TDRC, TYER
                 s_year = str(song.recording_year)
                 audio.tags.add(TDRC(encoding=1, text=s_year))
                 audio.tags.add(TYER(encoding=1, text=s_year))
@@ -392,9 +392,8 @@ class MetadataService:
             # 3. Is Done (Dual: TKEY + TXXX:GOSLING_DONE)
             audio.tags.delall('TKEY')
             audio.tags.delall('TXXX:GOSLING_DONE')
-            from mutagen.id3 import TKEY
-            audio.tags.add(TKEY(encoding=1, text='true' if song.is_done else ' '))
-            audio.tags.add(TXXX(encoding=1, desc='GOSLING_DONE', text='1' if song.is_done else '0'))
+            audio.tags.add(TKEY(encoding=1, text=['true' if song.is_done else '']))
+            audio.tags.add(TXXX(encoding=1, desc='GOSLING_DONE', text=['1' if song.is_done else '0']))
 
             # 4. Author Union (Legacy: TCOM = Composers + Lyricists)
             audio.tags.delall('TCOM')
@@ -403,7 +402,6 @@ class MetadataService:
             
             # Write Modern Lyricists
             if song.lyricists:
-                from mutagen.id3 import TCOM, TEXT, TOLY
                 audio.tags.add(TEXT(encoding=1, text=song.lyricists))
                 audio.tags.add(TOLY(encoding=1, text=song.lyricists))
 
@@ -420,7 +418,6 @@ class MetadataService:
                     seen.add(l)
             
             if union_list:
-                from mutagen.id3 import TCOM
                 audio.tags.add(TCOM(encoding=1, text=union_list))
             else:
                  pass # TCOM cleared.
@@ -432,5 +429,6 @@ class MetadataService:
             return True
 
         except Exception as e:
-            print(f"Error writing tags to {song.path}: {e}")
+            from src.core import logger
+            logger.error(f"Error writing tags to {song.path}: {e}")
             return False

@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QScrollArea, QFrame, 
-    QFrame, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate
+    QFrame, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate, QPushButton
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont, QPainter, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
@@ -247,7 +247,7 @@ class FilterWidget(QFrame):
         
         rail_layout.addStretch()
         
-        self.btn_match_mode = GlowButton("MATCH: ALL")
+        self.btn_match_mode = GlowButton("ALL")
         self.btn_match_mode.setObjectName("CommandButton")
         self.btn_match_mode.setCheckable(True)
         self.btn_match_mode.setChecked(True) 
@@ -516,10 +516,10 @@ class FilterWidget(QFrame):
     def _on_toggle_match_mode(self):
         if self._filter_match_mode == "AND":
             self._filter_match_mode = "OR"
-            self.btn_match_mode.setText("MATCH: ANY")
+            self.btn_match_mode.setText("ANY")
             self.btn_match_mode.setChecked(False)
         else:
             self._filter_match_mode = "AND"
-            self.btn_match_mode.setText("MATCH: ALL")
+            self.btn_match_mode.setText("ALL")
             self.btn_match_mode.setChecked(True)
         self.filter_mode_changed.emit(self._filter_match_mode)

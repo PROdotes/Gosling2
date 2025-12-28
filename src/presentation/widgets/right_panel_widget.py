@@ -104,11 +104,22 @@ class RightPanelFooter(QFrame):
         
         # Fade Duration
         self.combo_fade = QComboBox()
-        self.combo_fade.setObjectName("FadeDurationCombo")  # Styled in QSS
+        self.combo_fade.setObjectName("FadeDurationCombo")
         self.combo_fade.addItems(["1s", "2s", "3s", "5s", "10s"])
+        
+        # Perfection Alignment Hack: Make it editable but read-only to center the text
+        self.combo_fade.setEditable(True)
+        self.combo_fade.lineEdit().setReadOnly(True)
+        self.combo_fade.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.combo_fade.lineEdit().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        
+        # Center the items in the popup too
+        for i in range(self.combo_fade.count()):
+            self.combo_fade.setItemData(i, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
+            
         self.combo_fade.setCurrentText("3s")
-        self.combo_fade.setFixedWidth(60)
-        self.combo_fade.setFixedHeight(28)
+        self.combo_fade.setFixedWidth(65) # Buffer for centering + arrow
+        self.combo_fade.setFixedHeight(24)
         self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         trans_layout.addWidget(self.btn_cut)
@@ -167,8 +178,8 @@ class RightPanelWidget(QWidget):
         self.layout.setSpacing(5)
         
         # Constraint: Prevent collapse of Command Deck (Corridor: 260px - 500px)
-        self.setMinimumWidth(270)
-        self.setMaximumWidth(500)
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(550)
         
         # 1. The Header
         self.header = RightPanelHeader()

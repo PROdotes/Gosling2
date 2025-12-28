@@ -142,8 +142,8 @@ class RenamingService:
             return True
             
         except (OSError, shutil.Error) as e:
-            # Log error? For now just fail safe.
-            print(f"Rename Error: {e}")
+            from src.core import logger
+            logger.error(f"Rename Error during file move: {e}")
             return False
 
     def _sanitize(self, component: str) -> str:

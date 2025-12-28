@@ -23,7 +23,8 @@ class ContributorRepository(BaseRepository):
                 cursor.execute(query, (role_name,))
                 return cursor.fetchall()
         except Exception as e:
-            print(f"Error fetching contributors: {e}")
+            from src.core import logger
+            logger.error(f"Error fetching contributors: {e}")
             return []
 
     def get_all_aliases(self) -> List[str]:
@@ -34,7 +35,8 @@ class ContributorRepository(BaseRepository):
                 cursor.execute("SELECT DISTINCT AliasName FROM ContributorAliases ORDER BY AliasName ASC")
                 return [row[0] for row in cursor.fetchall()]
         except Exception as e:
-            print(f"Error fetching aliases: {e}")
+            from src.core import logger
+            logger.error(f"Error fetching aliases: {e}")
             return []
 
     def resolve_identity_graph(self, search_term: str) -> List[str]:
@@ -110,7 +112,8 @@ class ContributorRepository(BaseRepository):
                     identities.add(row[0])
 
         except Exception as e:
-            print(f"Error resolving identity graph: {e}")
+            from src.core import logger
+            logger.error(f"Error resolving identity graph: {e}")
             return [term] # Fallback
 
         return list(identities)

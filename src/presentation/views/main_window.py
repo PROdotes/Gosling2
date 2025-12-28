@@ -3,7 +3,7 @@ import os
 from typing import Optional
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
-    QSizeGrip
+    QSizeGrip, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtMultimedia import QMediaPlayer
@@ -185,6 +185,7 @@ class MainWindow(QMainWindow):
     def _init_ui(self) -> None:
         """Initialize the user interface"""
         self.setWindowTitle("Gosling2 Music Player")
+        self.setMinimumSize(1080, 640) # Prevent "Trash Compactor" squashing of panels
 
         # Create central widget
         main_widget = QWidget()
@@ -277,9 +278,9 @@ class MainWindow(QMainWindow):
         # This prevents crashes in _play_next, _toggle_play_pause, etc.
         self.playlist_widget = self.right_panel.playlist_widget
         
-        # Stretches: LC=1 (Taking all space), R=0 (Fixed/Respected Size)
-        self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 0)
+        # Stretches: LC=0 (Rigid - Mid Squeezes Side), R=1 (Fluid - Side gets squeezed)
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
         
         # Prevent Center (Library) from collapsing to 0
         self.main_splitter.setCollapsible(0, False)
@@ -639,115 +640,86 @@ class MainWindow(QMainWindow):
 
     def _on_side_panel_save_requested(self, staged_changes: dict) -> None:
         """Commit all staged changes to DB and ID3 tags."""
+        from ...core import logger, yellberus
+        logger.info(f"Save requested for {len(staged_changes)} songs.")
         successful_ids = []
         songs_to_check = []
         
-        for song_id, changes in staged_changes.items():
-            # 1. Fetch current song model
-            song = self.library_service.song_repository.get_by_id(song_id)
-            if not song: continue
-            
-            # 2. Apply changes to the model with type coercion
-            for field_name, value in changes.items():
-                field_def = self._get_yellberus_field(field_name)
-                if not field_def: continue
+        try:
+            for song_id, changes in staged_changes.items():
+                song = self.library_service.song_repository.get_by_id(song_id)
+                if not song: continue
                 
-                # Coerce types based on Yellberus definition
-                from ...core import yellberus
-                value = yellberus.cast_from_string(field_def, value)
-                
-                # Map field name to model attribute
-                attr = field_def.model_attr or field_def.name
-                
-                if hasattr(song, attr):
-                    setattr(song, attr, value)
-                else:
-                    from ...core import yellberus
-                    yellberus.yell(f"SidePanel save: Song model missing attribute '{attr}' for field '{field_name}'")
-            
-            
-            # 3. Save to ID3 First (Pessimistic: Ensure file is writable)
-            id3_success = self.metadata_service.write_tags(song)
-            
-            # 4. If ID3 succeeds (or is skipped/non-fatal), Save to DB
-            # Note: We consider ID3 failure fatal for consistency in this "Editor" context.
-            if id3_success:
-                if self.library_service.update_song(song):
-                    successful_ids.append(song_id)
-                    songs_to_check.append(song)
-            else:
-                QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}\n\nCheck if file is read-only or in use.")
-                
-        # Cleanup
-        if successful_ids:
-            # 1. Capture current selection (Source IDs) to preserve across reload
-            selected_ids = set()
-            id_col = self.library_widget.field_indices.get('file_id', -1)
-            
-            # We need QItemSelectionModel for flags
-            from PyQt6.QtCore import QItemSelectionModel
-            
-            if id_col != -1:
-                selection_model = self.library_widget.table_view.selectionModel()
-                # Get selected rows from proxy
-                for proxy_idx in selection_model.selectedRows():
-                     # Map to source
-                     source_idx = self.library_widget.proxy_model.mapToSource(proxy_idx)
-                     # Get ID from source model
-                     item = self.library_widget.library_model.item(source_idx.row(), id_col)
-                     if item:
-                         # Store as string for easy comparison
-                         selected_ids.add(str(item.data(Qt.ItemDataRole.UserRole)))
-            
-            # 2. Clear staged for successful saves
-            self.right_panel.editor_widget.clear_staged(successful_ids)
-            
-            # 3. Reload Library (This clears the model and selection)
-            self.library_widget.load_library(refresh_filters=False)
-            
-            # 4. Restore Selection
-            if selected_ids and id_col != -1:
-                new_selection_model = self.library_widget.table_view.selectionModel()
-                source_model = self.library_widget.library_model
-                proxy_model = self.library_widget.proxy_model
-                
-                # Iterate rows to find matches
-                for row in range(source_model.rowCount()):
-                    item = source_model.item(row, id_col)
-                    if item and str(item.data(Qt.ItemDataRole.UserRole)) in selected_ids:
-                        # Map source row back to proxy index (column 0 for full row selection)
-                        source_idx = source_model.index(row, 0)
-                        proxy_idx = proxy_model.mapFromSource(source_idx)
-                        if proxy_idx.isValid():
-                            new_selection_model.select(
-                                proxy_idx, 
-                                QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
-                            )
-            
-            # 5. Refresh Side Panel manually (ensure it shows clean data)
-            self._on_library_selection_changed(None, None)
-            
-            # Removed Auto-Advance per user request
-            
-            self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
-
-            # 6. Check for Auto-Rename Candidates (Rule: Done + Path Changed)
-            rename_needed = False
-            for song in songs_to_check:
-                if song.is_done:
+                # Apply changes with type coercion
+                for field_name, value in changes.items():
                     try:
-                        target = self.renaming_service.calculate_target_path(song)
-                        if song.path:
-                             current_norm = os.path.normcase(os.path.normpath(song.path))
-                             target_norm = os.path.normcase(os.path.normpath(target))
-                             if current_norm != target_norm:
-                                 rename_needed = True
-                                 break
-                    except Exception:
-                        continue
+                        field_def = self._get_yellberus_field(field_name)
+                        if not field_def: continue
+                        value = yellberus.cast_from_string(field_def, value)
+                        attr = field_def.model_attr or field_def.name
+                        if hasattr(song, attr):
+                            setattr(song, attr, value)
+                    except Exception as e:
+                        logger.error(f"Error applying change {field_name}: {e}")
+                
+                # Save to ID3
+                if self.metadata_service.write_tags(song):
+                    # Save to DB
+                    if self.library_service.update_song(song):
+                        successful_ids.append(song_id)
+                        songs_to_check.append(song)
+                else:
+                    QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}")
+                    
+            if successful_ids:
+                # Capture current selection by SourceID
+                selected_ids = []
+                id_col = self.library_widget.field_indices.get('file_id', -1)
+                if id_col != -1:
+                    for proxy_idx in self.library_widget.table_view.selectionModel().selectedRows():
+                         src_idx = self.library_widget.proxy_model.mapToSource(proxy_idx)
+                         item = self.library_widget.library_model.item(src_idx.row(), id_col)
+                         if item: selected_ids.append(str(item.data(Qt.ItemDataRole.UserRole)))
+                
+                self.right_panel.editor_widget.clear_staged(successful_ids)
+                self.library_widget.load_library(refresh_filters=False)
+                
+                # Restore Selection
+                if selected_ids:
+                    sm = self.library_widget.table_view.selectionModel()
+                    m = self.library_widget.library_model
+                    pm = self.library_widget.proxy_model
+                    from PyQt6.QtCore import QItemSelectionModel
+                    for row in range(m.rowCount()):
+                        item = m.item(row, id_col)
+                        if item and str(item.data(Qt.ItemDataRole.UserRole)) in selected_ids:
+                            idx = pm.mapFromSource(m.index(row, 0))
+                            if idx.isValid():
+                                sm.select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+                
+                self._on_library_selection_changed(None, None)
+                self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
+    
+                # Check for Auto-Rename
+                rename_needed = False
+                for song in songs_to_check:
+                    if song.is_done:
+                        try:
+                            target = self.renaming_service.calculate_target_path(song)
+                            if song.path:
+                                 if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
+                                     rename_needed = True
+                                     break
+                        except Exception as e:
+                            logger.error(f"Rename check failed: {e}")
+                
+                if rename_needed:
+                    self.library_widget.rename_selection()
             
-            if rename_needed:
-                self.library_widget.rename_selection()
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            logger.error(f"Save process crashed: {e}")
 
     def _auto_advance_selection(self):
         """Move selection to the next row in the library table."""

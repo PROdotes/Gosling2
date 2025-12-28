@@ -117,7 +117,56 @@ QLineEdit, QTextEdit, QComboBox, #GlowInput {
     padding: 6px 12px; 
     color: #FFFFFF; 
     font-family: "Consolas", monospace;
-    font-size: 11pt; /* Slightly larger search text */
+    font-size: 11pt; 
+}
+
+/* QComboBox Arrow & Dropdown Styling */
+QComboBox::drop-down {
+    border: none;
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 20px;
+}
+
+QComboBox::arrow {
+    image: none; 
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #FFC66D; /* Amber Triangle */
+    margin-right: 12px;
+}
+
+/* Compact override for the X-Fade duration picker */
+#FadeDurationCombo {
+    padding-left: 0px; 
+    font-size: 10pt;
+    border-radius: 8px;
+}
+#FadeDurationCombo QLineEdit {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+    selection-background-color: #555555;
+    padding-left: 10px; /* Offset for the arrow on the right */
+}
+#FadeDurationCombo::drop-down {
+    width: 15px;
+    subcontrol-origin: border;
+}
+#FadeDurationCombo::arrow {
+    margin-right: 4px;
+    border-top-width: 4px;
+    border-left-width: 3px;
+    border-right-width: 3px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #111111;
+    border: 1px solid #333333;
+    selection-background-color: #FFC66D;
+    selection-color: #000000;
+    color: #FFFFFF;
+    outline: none;
 }
 
 /* Data View Palette (QPalette colors for custom delegates) */
@@ -156,7 +205,7 @@ QPushButton {
     border: 1px solid #000000;
     border-radius: 10px;
     padding: 6px 14px;
-    color: transparent; /* Ghost-Killer: Native text is never rendered */
+    color: #DDDDDD; 
     font-weight: bold;
 }
  
@@ -171,7 +220,6 @@ QPushButton {
  }
 
 QPushButton:hover {
-    color: transparent;
     border: 1px solid #111111;
 }
 
@@ -182,7 +230,6 @@ QPushButton:pressed {
         stop:1 #1A1A1A);
     border: 1px solid #000000;
     padding-top: 1px;
-    color: transparent;
 }
 
 QPushButton:checked {
@@ -193,7 +240,6 @@ QPushButton:checked {
         stop:1 #2A2A2A);
     border: 1px solid #000000;
     padding: 6px 14px;
-    color: transparent;
 }
 
 /* Chips (Tag Chips with ×) */
@@ -203,6 +249,7 @@ QPushButton:checked {
     border-radius: 4px; 
     padding: 4px 10px;
     font-weight: bold;
+    color: #FFFFFF; /* Override global PushButton transparency */
 }
 
 /* History Table Item Specifics */

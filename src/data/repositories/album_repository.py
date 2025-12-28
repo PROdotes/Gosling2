@@ -167,7 +167,8 @@ class AlbumRepository(BaseRepository):
                 ))
                 return cursor.rowcount > 0
         except Exception as e:
-            print(f"Error updating album: {e}")
+            from src.core import logger
+            logger.error(f"Error updating album: {e}")
             return False
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:

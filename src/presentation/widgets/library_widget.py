@@ -297,9 +297,9 @@ class LibraryWidget(QWidget):
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
         
-        # Constraint: Prevent collapse of Filter Deck (Corridor: 200px - 400px)
+        # Constraint: Prevent collapse of Filter Deck (Corridor: 180px - 350px)
         sidebar_container.setMinimumWidth(200)
-        sidebar_container.setMaximumWidth(400)
+        sidebar_container.setMaximumWidth(350)
         
         # 1. THE FRONT DECK (Filters - Pure Input)
         self.filter_widget = FilterWidget(self.library_service)
@@ -332,8 +332,8 @@ class LibraryWidget(QWidget):
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
         
-        # Constraint: Ensure Table has breathing room
-        center_widget.setMinimumWidth(300)
+        # Constraint: Ensure Table has breathing room (Prevents header crunch)
+        center_widget.setMinimumWidth(550)
         
         # Header Strip (Pills)
         header_container = QWidget()
@@ -438,8 +438,10 @@ class LibraryWidget(QWidget):
         self._sidebar_expanded_width = 450
         
         # Set Initial Proportions
-        self.splitter.setStretchFactor(0, 0) # Sidebar stays fixed-ish
-        self.splitter.setStretchFactor(1, 1) # Table takes expansion
+        # Sidebar (0): Fluid (1) - Acts as sponge/shock absorber
+        # Table (1): Rigid (0) - Maintains width priority
+        self.splitter.setStretchFactor(0, 1) 
+        self.splitter.setStretchFactor(1, 0) 
         self.splitter.setSizes([self._sidebar_base_width + self._rail_width, 900])
         
         main_layout.addWidget(self.splitter)
@@ -1664,21 +1666,7 @@ class LibraryWidget(QWidget):
         if count > 0:
             self.load_library()
 
-    def rename_selection(self) -> None:
-        """
-        Placeholder for Rename functionality.
-        Logic to be implemented tomorrow per specs.
-        """
-        indexes = self.table_view.selectionModel().selectedRows()
-        if not indexes:
-            return
-            
-        count = len(indexes)
-        QMessageBox.information(
-            self, 
-            "Rename File(s)", 
-            f"Renaming {count} file(s) according to specs...\n(Feature coming tomorrow)"
-        )
+
 
     def _delete_selected(self) -> None:
         indexes = self.table_view.selectionModel().selectedRows()
@@ -1824,82 +1812,90 @@ class LibraryWidget(QWidget):
         Renames selected files based on metadata using RenamingService.
         Triggers strictly if gates (Done/Clean/Unique) are passed.
         """
-        indexes = self.table_view.selectionModel().selectedRows()
-        if not indexes:
-            return
+        try:
+            indexes = self.table_view.selectionModel().selectedRows()
+            if not indexes:
+                return
+    
+            # Double-check Gate 2 (Cleanliness) - Prevent Ctrl+R bypass
+            if self._dirty_ids:
+                 QMessageBox.warning(self, "Unsaved Changes", "Please save all changes before renaming.")
+                 return
+    
+            confirm = QMessageBox.question(
+                self, 
+                "Rename Files", 
+                f"Are you sure you want to rename {len(indexes)} file(s) and move them to their library folders?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
 
-        # Double-check Gate 2 (Cleanliness) - Prevent Ctrl+R bypass
-        if self._dirty_ids:
-             QMessageBox.warning(self, "Unsaved Changes", "Please save all changes before renaming.")
-             return
-
-        confirm = QMessageBox.question(
-            self, 
-            "Rename Files", 
-            f"Are you sure you want to rename {len(indexes)} file(s) and move them to their library folders?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
         
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
+            if confirm != QMessageBox.StandardButton.Yes:
+                return
 
-        success_count = 0
-        error_count = 0
-        errors = []
+            success_count = 0
+            error_count = 0
+            errors = []
 
-        id_col = self.field_indices.get('file_id', -1)
+            id_col = self.field_indices.get('file_id', -1)
 
-        for idx in indexes:
-            source_idx = self.proxy_model.mapToSource(idx)
-            item = self.library_model.item(source_idx.row(), id_col)
-            if not item: continue
-            
-            raw_val = item.data(Qt.ItemDataRole.UserRole)
-            try:
-                sid = int(float(raw_val)) if raw_val is not None else None
-                if sid is not None:
-                    song = self.library_service.get_song_by_id(sid)
-                    if not song: continue
+            for idx in indexes:
+                source_idx = self.proxy_model.mapToSource(idx)
+                item = self.library_model.item(source_idx.row(), id_col)
+                if not item: continue
+                
+                raw_val = item.data(Qt.ItemDataRole.UserRole)
+                try:
+                    sid = int(float(raw_val)) if raw_val is not None else None
+                    if sid is not None:
+                        song = self.library_service.get_song_by_id(sid)
+                        if not song: continue
 
-                    # Gate 1: Completeness
-                    if not song.is_done: 
-                        errors.append(f"{song.title}: Not marked as Done")
-                        error_count += 1
-                        continue
-
-                    # Gate 3: Conflict (Calculated live)
-                    target = self.renaming_service.calculate_target_path(song)
-                    
-                    # Optimization: If path matches target, skip
-                    if song.path:
-                        current = os.path.normcase(os.path.normpath(song.path))
-                        new_target = os.path.normcase(os.path.normpath(target))
-                        if current == new_target:
+                        # Gate 1: Completeness
+                        if not song.is_done: 
+                            errors.append(f"{song.title}: Not marked as Done")
+                            error_count += 1
                             continue
 
-                    if self.renaming_service.rename_song(song, target_path=target):
-                        # Success! Persist new path to DB
-                        self.library_service.update_song(song)
-                        success_count += 1
-                    else:
-                        errors.append(f"{song.title}: Rename failed (Conflict or Access Denied)")
-                        error_count += 1
+                        # Gate 3: Conflict (Calculated live)
+                        target = self.renaming_service.calculate_target_path(song)
+                        
+                        # Optimization: If path matches target, skip
+                        if song.path:
+                            current = os.path.normcase(os.path.normpath(song.path))
+                            new_target = os.path.normcase(os.path.normpath(target))
+                            if current == new_target:
+                                continue
 
-            except Exception as e:
-                errors.append(f"Error processing item: {e}")
-                error_count += 1
+                        if self.renaming_service.rename_song(song, target_path=target):
+                            # Success! Persist new path to DB
+                            self.library_service.update_song(song)
+                            success_count += 1
+                        else:
+                            errors.append(f"{song.title}: Rename failed (Conflict or Access Denied)")
+                            error_count += 1
 
-        # Summary Report
-        if error_count > 0:
-            error_msg = "\n".join(errors[:10])
-            if len(errors) > 10: error_msg += "\n...and more."
-            QMessageBox.warning(self, "Rename Results", f"Renamed {success_count} files.\n\nErrors:\n{error_msg}")
-        elif success_count > 0:
-             QMessageBox.information(self, "Success", f"Successfully renamed and moved {success_count} files.")
-        
-        # Refresh to show new paths
-        if success_count > 0:
-            self.load_library()
+                except Exception as e:
+                    errors.append(f"Error processing item: {e}")
+                    error_count += 1
+
+            # Summary Report
+            if error_count > 0:
+                error_msg = "\n".join(errors[:10])
+                if len(errors) > 10: error_msg += "\n...and more."
+                QMessageBox.warning(self, "Rename Results", f"Renamed {success_count} files.\n\nErrors:\n{error_msg}")
+            elif success_count > 0:
+                 QMessageBox.information(self, "Success", f"Successfully renamed and moved {success_count} files.")
+            
+            # Refresh to show new paths
+            if success_count > 0:
+                self.load_library()
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Rename Error", f"Critical error during rename: {e}")
+
 
     def _get_incomplete_fields(self, row_data: list) -> set:
         """Identify which fields are incomplete based on Yellberus registry.
