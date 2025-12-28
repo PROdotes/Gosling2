@@ -34,11 +34,13 @@ QLineEdit, QTextEdit, QComboBox {
 }
 QLineEdit:focus, QComboBox:focus { border: 1px solid #FFC66D; }
 
-/* --- 3. THE STYLE BRIDGE (Pushing Hex to Python) --- */
-#LibraryTable, #FilterTree, #PlaylistWidget {
+
+#LibraryTable, #FilterTree, #PlaylistWidget, #EditorScroll, #FieldContainer {
     background-color: transparent;
     border: none;
-    
+}
+
+#LibraryTable, #FilterTree, #PlaylistWidget {
     /* Core 5 Palette Bridge */
     qproperty-paletteAmber: #FFC66D;
     qproperty-paletteMutedAmber: #FF8C00;
@@ -70,6 +72,7 @@ QPushButton#CategoryPill:checked {
     background: #FFC66D;
     color: #000000;
 }
+
 
 /* --- 5. SCROLLBARS --- */
 QScrollBar:vertical { border: none; background: transparent; width: 10px; }

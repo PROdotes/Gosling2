@@ -9,7 +9,7 @@ import os
 from ...core import yellberus
 from ..dialogs.album_manager_dialog import AlbumManagerDialog
 
-class SidePanelWidget(QWidget):
+class SidePanelWidget(QFrame):
     """
     Metadata Editor (Stage) driven by Yellberus Field Registry.
     Implements a validation-gated 'Done' workflow and staging buffer.
@@ -30,7 +30,6 @@ class SidePanelWidget(QWidget):
         
         # QSS Styling Support
         self.setObjectName("SidePanelEditor")
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         
         # Dependency Injection for Dialogs
         # We need access to the album repository. Assuming library service has access or can provide it.
@@ -72,10 +71,12 @@ class SidePanelWidget(QWidget):
         
         # 3. Scroll Area for Fields
         self.scroll = QScrollArea()
+        self.scroll.setObjectName("EditorScroll")
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.Shape.NoFrame)
         
-        self.field_container = QWidget()
+        self.field_container = QFrame()
+        self.field_container.setObjectName("FieldContainer")
         self.field_layout = QVBoxLayout(self.field_container)
         self.field_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         

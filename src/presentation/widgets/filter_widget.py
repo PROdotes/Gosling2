@@ -215,7 +215,7 @@ class FilterTreeDelegate(QStyledItemDelegate):
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
 
-class FilterWidget(QWidget):
+class FilterWidget(QFrame):
     """Widget for filtering the library using Yellberus registry."""
     filter_changed = pyqtSignal(str, object)
     filter_mode_changed = pyqtSignal(str)

@@ -4,7 +4,7 @@ import weakref
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
-    QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget
+    QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget, QFrame
 )
 import json
 from ...resources import constants
@@ -346,10 +346,7 @@ class LibraryWidget(QWidget):
         
         # 1. THE FRONT DECK (Filters - Pure Input)
         self.filter_widget = FilterWidget(self.library_service)
-        self.filter_widget.setObjectName("SidebarFilter")
-        self.filter_widget = FilterWidget(self.library_service)
-        self.filter_widget.setObjectName("SidebarFilter")
-        # self.filter_widget.setMinimumWidth(0) -> Controlled by container now
+        self.filter_widget.setObjectName("FilterWidget")
         sidebar_layout.addWidget(self.filter_widget)
         
         # 2. THE REAR DECK (History/Log is now handled by the Right Terminal)
@@ -372,7 +369,8 @@ class LibraryWidget(QWidget):
         self._rail_width = 26
         
         # --- CENTER AREA (The Mission Deck) ---
-        center_widget = QWidget()
+        center_widget = QFrame()
+        center_widget.setObjectName("CenterLibraryPanel")
         center_layout = QVBoxLayout(center_widget)
         center_layout.setContentsMargins(0, 0, 0, 0)
         center_layout.setSpacing(0)
@@ -419,7 +417,7 @@ class LibraryWidget(QWidget):
         self.proxy_model.setSortRole(Qt.ItemDataRole.UserRole) # Use UserRole for sorting
         
         self.table_view = LibraryTable()
-        self.table_view.setObjectName("LibraryTable") 
+        self.table_view.setObjectName("LibraryTable")
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

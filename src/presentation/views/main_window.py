@@ -85,34 +85,13 @@ class TerminalHeader(QFrame):
         super().__init__(parent)
         self.setFixedHeight(34)
         self.setObjectName("TerminalHeader")
-        self.setStyleSheet("""
-            #TerminalHeader {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1, 
-                                          stop:0 #1A1A1A, stop:0.4 #222, 
-                                          stop:0.5 #2A2A2A, stop:0.6 #222, 
-                                          stop:1 #1A1A1A);
-                border-bottom: 2px solid #444444;
-                border-top: 1px solid #333;
-            }
-        """)
+        # Style moved to theme.qss
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 0, 10, 0)
         layout.setSpacing(10)
         
-        # 1. The Dots (Independent Terminal Feel)
-        dots_container = QWidget()
-        dots_layout = QHBoxLayout(dots_container)
-        dots_layout.setContentsMargins(0, 0, 0, 0)
-        dots_layout.setSpacing(6)
-        
-        for color in ["#FF5F56", "#FFBD2E", "#27C93F"]:
-            dot = QFrame()
-            dot.setFixedSize(11, 11)
-            dot.setStyleSheet(f"background-color: {color}; border-radius: 5px;")
-            dots_layout.addWidget(dot)
-        
-        layout.addWidget(dots_container)
+        # 1. Spacer (replaces Dots)
         layout.addStretch()
         
         # 2. UTILITY TOGGLES
@@ -127,24 +106,8 @@ class TerminalHeader(QFrame):
         self.prep_btn.setCheckable(True)
         self.prep_btn.setFixedWidth(120)
         self.prep_btn.setObjectName("PrepLogButton")
-        self.prep_btn.setStyleSheet("""
-            QPushButton#PrepLogButton {
-                background-color: #080808;
-                border: 1px solid #333;
-                border-radius: 4px;
-                color: #888;
-                font-family: 'Agency FB', 'Bahnschrift Condensed';
-                font-weight: bold;
-                font-size: 10pt;
-                letter-spacing: 2px;
-            }
-            QPushButton#PrepLogButton:hover { border-color: #FF8BA0; color: #CCC; }
-            QPushButton#PrepLogButton:checked {
-                background-color: #1A1208;
-                border: 1px solid #FF8C00;
-                color: #FF8C00;
-            }
-        """)
+        # Style moved to theme.qss
+        
         self.prep_btn.toggled.connect(self.prep_toggled.emit)
         layout.addWidget(self.prep_btn)
         
@@ -153,7 +116,9 @@ class TerminalHeader(QFrame):
         # 4. THE LED (Status)
         self.status_led = QFrame()
         self.status_led.setFixedSize(8, 8)
-        self.status_led.setStyleSheet("background-color: #222; border-radius: 4px;")
+        self.status_led.setObjectName("StatusLed")
+        # Style moved to theme.qss
+        
         layout.addWidget(self.status_led)
         
         self.prep_btn.toggled.connect(self._on_prep_toggled)
@@ -162,31 +127,16 @@ class TerminalHeader(QFrame):
         btn = QPushButton(text)
         btn.setCheckable(True)
         btn.setFixedSize(50, 22)
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #111;
-                border: 1px solid #222;
-                border-radius: 3px;
-                color: #555;
-                font-family: 'Agency FB';
-                font-size: 8pt;
-                font-weight: bold;
-            }
-            QPushButton:hover { border-color: #444; color: #888; }
-            QPushButton:checked {
-                border-color: #FF8C00;
-                color: #FF8C00;
-                background-color: #000;
-            }
-        """)
+        btn.setObjectName(f"TerminalToggle_{text}")
+        # Style moved to theme.qss
+        
         btn.toggled.connect(signal.emit)
         return btn
 
     def _on_prep_toggled(self, checked):
-        if checked:
-            self.status_led.setStyleSheet("background-color: #FF8C00; border: 1px solid #FFD580; border-radius: 4px;")
-        else:
-            self.status_led.setStyleSheet("background-color: #222; border-radius: 4px;")
+        self.status_led.setProperty("active", checked)
+        self.status_led.style().unpolish(self.status_led)
+        self.status_led.style().polish(self.status_led)
 
 class MainWindow(QMainWindow):
     """Main application window"""
@@ -245,53 +195,9 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(0) # We control spacing with explicit separator widgets
         
         # Global Industrial Amber Theme
-        self.setStyleSheet("""
-            QMainWindow { background-color: #050505; }
-            QWidget { color: #DDD; }
-            
-            /* Industrial Amber Scrollbars */
-            QScrollBar:vertical {
-                border: none;
-                background: #0F0F0F;
-                width: 10px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #333;
-                min-height: 20px;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background: #FF8C00;
-            }
-            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-                height: 0px;
-            }
-            
-            QScrollBar:horizontal {
-                border: none;
-                background: #0F0F0F;
-                height: 10px;
-                margin: 0px;
-            }
-            QScrollBar::handle:horizontal {
-                background: #333;
-                min-width: 20px;
-                border-radius: 5px;
-            }
-            QScrollBar::handle:horizontal:hover {
-                background: #FF8C00;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-            }
-            
-            QToolTip {
-                background-color: #1A1A1A;
-                color: #FF8C00;
-                border: 1px solid #FF8C00;
-            }
-        """)
+        # Hardcoded styles removed; relying on src/resources/theme.qss
+        # This prevents duplicate definitions and "ghost" overrides.
+
         
         # 0. Integrated Title Bar
         self.title_bar = CustomTitleBar(self)
@@ -303,7 +209,8 @@ class MainWindow(QMainWindow):
         # --- TOP SEPARATOR (7px Black) ---
         top_separator = QWidget()
         top_separator.setFixedHeight(7)
-        top_separator.setStyleSheet("background-color: #000000; border: none;")
+        top_separator.setObjectName("SeparatorLine")
+
         main_layout.addWidget(top_separator)
 
         # === THE MAIN SPLITTER (Left/Center Block | Right Panel) ===
@@ -362,7 +269,8 @@ class MainWindow(QMainWindow):
         # --- BOTTOM SEPARATOR (7px Black) ---
         bottom_separator = QWidget()
         bottom_separator.setFixedHeight(7)
-        bottom_separator.setStyleSheet("background-color: #000000; border: none;")
+        bottom_separator.setObjectName("SeparatorLine")
+
         main_layout.addWidget(bottom_separator)
         
         # Add Playback at the very bottom
