@@ -3,6 +3,7 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 from .seek_slider import SeekSlider
+from .glow_factory import GlowButton
 
 # Note: All styling moved to theme.qss - see "PLAYBACK CONTROL WIDGET STYLES" section
 
@@ -127,10 +128,9 @@ class PlaybackControlWidget(QWidget):
         # Styling via QSS - no inline styles
 
     def _create_cmd_btn(self, text, command_id):
-        btn = QPushButton(text)
+        btn = GlowButton(text)
         btn.setFixedHeight(30)
         btn.setFixedWidth(70)
-        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setProperty("class", "PlaybackCommand")  # For QSS: QPushButton.PlaybackCommand
         
         if command_id == "next_fade":

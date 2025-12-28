@@ -3,7 +3,7 @@ import zipfile
 import weakref
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-    QTableView, QPushButton, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
+    QTableView, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
     QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget, QFrame
 )
 import json
@@ -18,6 +18,7 @@ from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QPen, QDrag, QFont
 )
+from .glow_factory import GlowButton
 
 
 class DropIndicatorHeaderView(QHeaderView):
@@ -343,6 +344,7 @@ class LibraryWidget(QWidget):
         # Category Pills
         self.pill_group = QButtonGroup(self)
         self.pill_group.setExclusive(True)
+        self.category_glow_btns = [] # Store the wrappers for direct text updates
         self.pill_group.idClicked.connect(self._on_pill_clicked)
 
         shorthand = {"All": "ALL", "Music": "MUS", "Jingles": "JIN", "Commercials": "COM", "Speech": "SP", "Streams": "STR"}
@@ -350,12 +352,13 @@ class LibraryWidget(QWidget):
 
         for i, (label, _) in enumerate(self.type_tabs):
             short = shorthand.get(label, label)
-            btn = QPushButton(short)
+            btn = GlowButton(short)
             btn.setCheckable(True)
             btn.setObjectName("CategoryPill")
             btn.setProperty("category", label) # Set the semantic label (Music, Jingles, etc.)
             if i == 0: btn.setChecked(True)
-            self.pill_group.addButton(btn, i)
+            self.pill_group.addButton(btn.btn, i)
+            self.category_glow_btns.append(btn)
             header_layout.addWidget(btn)
 
         header_layout.addStretch()
@@ -608,11 +611,11 @@ class LibraryWidget(QWidget):
 
     def dropEvent(self, event):
         """Handle dropped files or playlist items"""
-        # Ignore internal drags
+        # 1. Internal Drag (Table -> Table): Explicitly Ignore to prevent re-import
         if event.source() == self.table_view:
             event.ignore()
             return
-            
+
         # Reset visual feedback immediately
         self.table_view.setProperty("drag_status", "")
         self.table_view.style().unpolish(self.table_view)
@@ -620,19 +623,12 @@ class LibraryWidget(QWidget):
         
         mime = event.mimeData()
 
-        # 1. Handle Playlist Drop (Remove)
+        # 2. Handle Playlist Drop (Remove from Playlist via MoveAction)
         if mime.hasFormat("application/x-gosling-playlist-rows"):
-            try:
-                data = mime.data("application/x-gosling-playlist-rows")
-                rows = json.loads(data.data().decode('utf-8'))
-                if rows:
-                    self.remove_from_playlist.emit(rows)
-                event.acceptProposedAction()
-                return
-            except Exception as e:
-                print(f"Error handling playlist drop: {e}")
-                event.ignore()
-                return
+            # We accept the drop as a 'MoveAction'. 
+            # The source (PlaylistWidget) checking for MoveAction result will handle the deletion.
+            event.acceptProposedAction()
+            return
 
         # 2. Handle File Drop (Import)
         if not mime.hasUrls():
@@ -849,10 +845,10 @@ class LibraryWidget(QWidget):
         for i in range(len(self.type_tabs)):
             label, _ = self.type_tabs[i]
             count = counts[i]
-            btn = self.pill_group.button(i)
-            if btn:
+            if i < len(self.category_glow_btns):
+                glow_btn = self.category_glow_btns[i]
                 short = shorthand.get(label, label)
-                btn.setText(f"{short} ({count})")
+                glow_btn.setText(f"{short} ({count})")
 
     def _populate_table(self, headers, data) -> None:
         """Populate the table with data, preserving layout state."""

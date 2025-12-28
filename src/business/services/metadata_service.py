@@ -225,6 +225,9 @@ class MetadataService:
             print(f"Error reading raw tags: {e}")
             return {}
 
+    # Alias for compatibility with Playlist/UI
+    get_id3 = get_raw_tags
+
     @classmethod
     def write_tags(cls, song: Song) -> bool:
         """

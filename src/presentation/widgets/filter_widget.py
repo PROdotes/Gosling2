@@ -1,12 +1,13 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QScrollArea, QFrame, 
-    QPushButton, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate
+    QFrame, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont, QPainter, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
 from typing import Any
 from ...core import yellberus
 from ...resources import constants
+from .glow_factory import GlowButton
 
 class FlowLayout(QLayout):
     """Layout that arranges items horizontally and wraps them to the next line."""
@@ -234,19 +235,19 @@ class FilterWidget(QFrame):
         rail_layout = QHBoxLayout()
         rail_layout.setSpacing(4)
         
-        btn_expand = QPushButton("ALL +")
+        btn_expand = GlowButton("ALL +")
         btn_expand.setObjectName("CommandButton")
         btn_expand.clicked.connect(self.tree_view.expandAll)
         rail_layout.addWidget(btn_expand)
         
-        btn_collapse = QPushButton("ALL -")
+        btn_collapse = GlowButton("ALL -")
         btn_collapse.setObjectName("CommandButton")
         btn_collapse.clicked.connect(self.tree_view.collapseAll)
         rail_layout.addWidget(btn_collapse)
         
         rail_layout.addStretch()
         
-        self.btn_match_mode = QPushButton("MATCH: ALL")
+        self.btn_match_mode = GlowButton("MATCH: ALL")
         self.btn_match_mode.setObjectName("CommandButton")
         self.btn_match_mode.setCheckable(True)
         self.btn_match_mode.setChecked(True) 

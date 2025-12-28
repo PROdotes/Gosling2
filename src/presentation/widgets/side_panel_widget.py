@@ -1,9 +1,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QLineEdit, QCheckBox, QComboBox, QPushButton, QScrollArea,
-    QFrame, QSizePolicy
+    QLineEdit, QCheckBox, QComboBox, QScrollArea,
+    QFrame, QSizePolicy, QPushButton
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from .glow_factory import GlowLineEdit, GlowButton
 import copy
 import os
 from ...core import yellberus
@@ -93,11 +94,12 @@ class SidePanelWidget(QFrame):
         footer_main_layout.setSpacing(8)
 
         # 2. Workflow State (STATUS PILL) - Now on its own line for maximum visibility
-        self.btn_status = QPushButton("PENDING")
+        self.btn_status = GlowButton("PENDING")
         self.btn_status.setObjectName("StatusPill")
         self.btn_status.setCheckable(True)
         self.btn_status.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_status.setFixedHeight(32)  # Slightly taller for better touch/click
+        self.btn_status.setFixedHeight(32)
+        self.btn_status.setMinimumWidth(180) # Force physical weight
         self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_status.clicked.connect(self._on_status_toggled)
 
@@ -111,15 +113,14 @@ class SidePanelWidget(QFrame):
         button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(10)
 
-        self.btn_discard = QPushButton("Discard")
+        self.btn_discard = GlowButton("Discard")
         self.btn_discard.setObjectName("DiscardButton")
         self.btn_discard.setFixedWidth(80)  # Keep discard small
         self.btn_discard.clicked.connect(self._on_discard_clicked)
 
-        self.btn_save = QPushButton("SAVE")
+        self.btn_save = GlowButton("SAVE")
         self.btn_save.setObjectName("SaveAllButton")
         self.btn_save.setFixedHeight(32)
-        self.btn_save.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
 
@@ -130,6 +131,7 @@ class SidePanelWidget(QFrame):
         layout.addWidget(footer_frame)
 
         self._clear_fields()
+        self._update_save_state()
 
     def set_songs(self, songs):
         """Update the editor with fresh song selection."""
@@ -349,7 +351,7 @@ class SidePanelWidget(QFrame):
                     else:
                         widget.setText(str(effective_val) if effective_val else "(No Album)")
 
-                elif isinstance(widget, QLineEdit):
+                elif isinstance(widget, (QLineEdit, GlowLineEdit)):
                     if is_multiple:
                         widget.setPlaceholderText("(Multiple Values)")
                         widget.setText("")
@@ -381,7 +383,7 @@ class SidePanelWidget(QFrame):
             
         # T-46: Album Picker (Special Handling)
         if field_def.name == 'album':
-            btn = QPushButton()
+            btn = GlowButton()
             btn.setObjectName("AlbumPickerButton")  # Styling via QSS
             
             # Display Value Logic
@@ -398,7 +400,7 @@ class SidePanelWidget(QFrame):
             return btn
 
         # Default: Line Edit for Alpha
-        edit = QLineEdit()
+        edit = GlowLineEdit()
         if is_multiple:
             edit.setPlaceholderText("(Multiple Values)")
         else:
@@ -608,6 +610,7 @@ class SidePanelWidget(QFrame):
 
     def _update_save_state(self):
         has_staged = len(self._staged_changes) > 0
+        self.btn_discard.setEnabled(has_staged)
         # User Req: Save always active (for renaming triggers, etc.)
         self.btn_save.setEnabled(True)
         

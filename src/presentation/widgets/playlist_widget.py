@@ -128,31 +128,133 @@ class PlaylistWidget(QListWidget):
         self.setDragDropMode(QListWidget.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.doubleClicked.connect(self._on_table_double_click)
+        # self.doubleClicked.connect(self._on_table_double_click)
         self.delegate = PlaylistItemDelegate(self)
         self.setItemDelegate(self.delegate)
         self._preview_row = None
         self._preview_after = False
 
-    def _on_table_double_click(self, index):
-        item = self.itemFromIndex(index)
-        if item: self.itemDoubleClicked.emit(item.data(Qt.ItemDataRole.UserRole))
+    # def _on_table_double_click(self, index):
+    #     item = self.itemFromIndex(index)
+    #     if item: self.itemDoubleClicked.emit(item.data(Qt.ItemDataRole.UserRole))
+
+    def dragLeaveEvent(self, event):
+        self._preview_row = None
+        self.viewport().update()
+        super().dragLeaveEvent(event)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls() or event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
             event.acceptProposedAction()
 
     def dragMoveEvent(self, event):
-        self._preview_row = self.row(self.itemAt(event.position().toPoint()))
-        self._preview_after = False
-        if self._preview_row != -1:
-            item_rect = self.visualItemRect(self.item(self._preview_row))
-            if event.position().y() > item_rect.center().y(): self._preview_after = True
+        item = self.itemAt(event.position().toPoint())
+        if item:
+            self._preview_row = self.row(item)
+            item_rect = self.visualItemRect(item)
+            self._preview_after = event.position().y() > item_rect.center().y()
+        else:
+            # Hovering empty space -> Append to bottom
+            if self.count() > 0:
+                self._preview_row = self.count() - 1 
+                self._preview_after = True
+            else:
+                self._preview_row = None # Empty list handled elsewhere or no line needed
+                
         self.viewport().update()
         event.acceptProposedAction()
 
     def dropEvent(self, event):
+        # 1. Self-Reordering (Internal Move)
+        if event.source() == self:
+            event.setDropAction(Qt.DropAction.MoveAction)
+            event.accept()
+            
+            # Manual Move Logic
+            # 1. Gather Items
+            items = self.selectedItems()
+            if not items: return
+            
+            # Sort by row to handle removals cleanly
+            rows = sorted([self.row(i) for i in items])
+            
+            # 2. Extract Data
+            moved_data = []
+            for item in items:
+                data = item.data(Qt.ItemDataRole.UserRole)
+                text = item.text() # "Performer | Title"
+                moved_data.append((text, data))
+            
+            # 3. Determine Insertion Point
+            # Use preview_row as the base
+            target_row = self._preview_row if self._preview_row is not None else self.count()
+            if self._preview_after and self._preview_row is not None:
+                target_row += 1
+            
+            # 4. Remove Originals (Adjust target_row dynamically)
+            # We must be careful: if we remove items ABOVE target_row, target_row shifts down.
+            rows_above_target = [r for r in rows if r < target_row]
+            shift = len(rows_above_target)
+            final_row = target_row - shift
+            
+            for item in items:
+                self.takeItem(self.row(item)) # Removes from list, row becomes -1
+                
+            # 5. Insert New Items
+            from PyQt6.QtWidgets import QListWidgetItem
+            for text, data in reversed(moved_data):
+                new_item = QListWidgetItem(text)
+                new_item.setData(Qt.ItemDataRole.UserRole, data)
+                self.insertItem(final_row, new_item)
+                # Select the moved items? Optional polish.
+                new_item.setSelected(True)
+
+            self._preview_row = None
+            self.viewport().update()
+            
+            # startDrag loop checks self.row(item) >= 0. 
+            # Since we took originals, their row is -1.
+            # So startDrag will safely do nothing.
+            return
+            
+        # Target Row Logic (For External Drops)
+        if self._preview_row is not None:
+             drop_row = self._preview_row
+             # If dropping "after" the item, increment index
+             if self._preview_after:
+                 drop_row += 1
+        else:
+             # Dropping in void -> append to end
+             drop_row = self.count()
+
         self._preview_row = None
+        
+        # 2. Internal Drag (from Library via Custom MIME)
+        if event.mimeData().hasFormat("application/x-gosling-library-rows"):
+            json_data = event.mimeData().data("application/x-gosling-library-rows").data().decode('utf-8')
+            try:
+                songs = json.loads(json_data)
+                
+                # Direct Insertion (Standardized)
+                from PyQt6.QtWidgets import QListWidgetItem
+                
+                # Reverse iterate if inserting so they appear in correct order
+                for s in reversed(songs):
+                     title_disp = s.get('title', 'Unknown Title')
+                     perf_disp = s.get('performer', 'Unknown Artist')
+                     path = s.get('path')
+                     
+                     list_item = QListWidgetItem(f"{perf_disp} | {title_disp}")
+                     list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+                     self.insertItem(drop_row, list_item)
+                         
+                event.acceptProposedAction()
+                return
+            except Exception as e:
+                print(f"Error processing library drop: {e}")
+                return
+
+        # 3. External Drag (Files from Explorer)
         if event.mimeData().hasUrls():
             paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
             if paths:
@@ -160,11 +262,28 @@ class PlaylistWidget(QListWidget):
                 main_window = self.window()
                 library_widget = main_window.findChild(LibraryWidget)
                 if library_widget:
-                    songs = []
+                    
+                    # Pre-calculate songs to insert
+                    songs_to_insert = []
                     for path in paths:
-                        metadata = library_widget.metadata_service.get_metadata(path)
-                        songs.append(metadata)
-                    library_widget.add_to_playlist.emit(songs)
+                        try:
+                            song_obj = library_widget.metadata_service.extract_from_mp3(path)
+                            songs_to_insert.append({
+                                "path": path,
+                                "performer": song_obj.performers[0] if song_obj.performers else (song_obj.artist or "Unknown"),
+                                "title": song_obj.title or "Unknown Title"
+                            })
+                        except Exception as e:
+                            print(f"Error parsing drop: {e}")
+                            songs_to_insert.append({"path": path, "performer": "Unknown", "title": "Unknown Title"})
+
+                    # Direct Insertion
+                    from PyQt6.QtWidgets import QListWidgetItem
+                    for s in reversed(songs_to_insert):
+                         list_item = QListWidgetItem(f"{s['performer']} | {s['title']}")
+                         list_item.setData(Qt.ItemDataRole.UserRole, {"path": s['path']})
+                         self.insertItem(drop_row, list_item)
+
             event.acceptProposedAction()
         else: super().dropEvent(event)
 

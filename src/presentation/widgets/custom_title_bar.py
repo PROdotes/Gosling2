@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QLineEdit
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QSize
 import os
+from .glow_factory import GlowLineEdit, GlowButton
 
 class CustomTitleBar(QWidget):
     """
@@ -25,16 +26,18 @@ class CustomTitleBar(QWidget):
 
     def _init_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(5, 0, 5, 0) # Use layout margin for the gap at the edges
         layout.setSpacing(0)
         
-        # 1. Logo/Settings Button (Icon Only)
-        self.btn_logo_icon = QPushButton()
+        # 1. Logo/Settings Button (Icon Only) - Standard GlowButton with no hardcoded size
+        self.btn_logo_icon = GlowButton()
         self.btn_logo_icon.setObjectName("AppLogoIcon")
+        self.btn_logo_icon.setProperty("class", "SystemButton")
+        self.btn_logo_icon.setGlowRadius(6) # Match QSS radius
         # Use absolute path to ensure resource loading
         icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "resources", "app_icon.svg")
         self.btn_logo_icon.setIcon(QIcon(icon_path))
-        self.btn_logo_icon.setIconSize(QSize(24, 24))
+        self.btn_logo_icon.setIconSize(QSize(22, 22)) # Slightly smaller icon content
         self.btn_logo_icon.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_logo_icon.clicked.connect(self.settings_requested.emit)
         
@@ -66,11 +69,11 @@ class CustomTitleBar(QWidget):
         self.lbl_title.raise_()  # Ensure on top
         
         layout.addWidget(self.btn_logo_icon)
-        layout.addSpacing(8)  # Space between icon and title
+        layout.addSpacing(5)  # Space between logo and title
         layout.addWidget(title_container)
         
         # 2. Search Section (The Draggable Search Strip)
-        self.search_box = QLineEdit()
+        self.search_box = GlowLineEdit()
         self.search_box.setPlaceholderText("Search Library...")
         self.search_box.setMaximumWidth(400)
         self.search_box.textChanged.connect(self.search_text_changed.emit)
@@ -80,22 +83,27 @@ class CustomTitleBar(QWidget):
         self.draggable_area.setObjectName("SystemDraggableArea")
         self.draggable_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
-        # layout.addWidget(self.logo_label) # Removed
         layout.addSpacing(10)
         layout.addWidget(self.search_box)
         layout.addWidget(self.draggable_area)
         
-        # 3. System Controls
-        self.btn_min = QPushButton("－")
+        # 3. System Controls - Pure GlowButtons driven by QSS class
+        self.btn_min = GlowButton("－")
         self.btn_min.setObjectName("MinimizeButton")
+        self.btn_min.setProperty("class", "SystemButton")
+        self.btn_min.setGlowRadius(6)
         self.btn_min.clicked.connect(self.minimize_requested.emit)
         
-        self.btn_max = QPushButton("▢")
+        self.btn_max = GlowButton("▢")
         self.btn_max.setObjectName("MaximizeButton")
+        self.btn_max.setProperty("class", "SystemButton")
+        self.btn_max.setGlowRadius(6)
         self.btn_max.clicked.connect(self.maximize_requested.emit)
         
-        self.btn_close = QPushButton("✕")
+        self.btn_close = GlowButton("✕")
         self.btn_close.setObjectName("CloseButton")
+        self.btn_close.setProperty("class", "SystemButton")
+        self.btn_close.setGlowRadius(6)
         self.btn_close.clicked.connect(self.close_requested.emit)
         
         layout.addWidget(self.btn_min)

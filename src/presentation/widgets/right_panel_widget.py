@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from .history_drawer import HistoryDrawer
 from .side_panel_widget import SidePanelWidget
 from .playlist_widget import PlaylistWidget
+from .glow_factory import GlowButton
 
 # Note: All styling moved to theme.qss - see "RIGHT PANEL WIDGET STYLES" section
 
@@ -55,10 +56,8 @@ class RightPanelHeader(QFrame):
 
 
     def _create_toggle(self, text, signal):
-        btn = QPushButton(text)
+        btn = GlowButton(text)
         btn.setCheckable(True)
-        btn.setFixedHeight(28)
-        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         btn.setProperty("class", "RightPanelToggle")  # For QSS: QPushButton.RightPanelToggle
         btn.toggled.connect(signal.emit)
         return btn
@@ -120,9 +119,7 @@ class RightPanelFooter(QFrame):
         layout.addLayout(trans_layout)
 
     def _create_cmd_btn(self, text, command_id):
-        btn = QPushButton(text)
-        btn.setFixedHeight(34)
-        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn = GlowButton(text)
         btn.setProperty("class", "RightPanelCommand")  # For QSS: QPushButton.RightPanelCommand
         
         # Connect depending on type

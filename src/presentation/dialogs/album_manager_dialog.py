@@ -1,10 +1,11 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QListWidget, QListWidgetItem, QPushButton, QStackedWidget,
+    QListWidget, QListWidgetItem, QStackedWidget,
     QFrame, QMessageBox, QComboBox, QWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize
 from PyQt6.QtGui import QAction
+from ..widgets.glow_factory import GlowLineEdit, GlowButton
 
 class AlbumManagerDialog(QDialog):
     """
@@ -42,7 +43,7 @@ class AlbumManagerDialog(QDialog):
         header_layout.addWidget(self.lbl_title)
         header_layout.addStretch()
         
-        self.btn_mode_toggle = QPushButton("Create New (+)")
+        self.btn_mode_toggle = GlowButton("Create New (+)")
         self.btn_mode_toggle.clicked.connect(self._toggle_mode)
         header_layout.addWidget(self.btn_mode_toggle)
         
@@ -56,7 +57,7 @@ class AlbumManagerDialog(QDialog):
         search_layout = QVBoxLayout(self.page_search)
         search_layout.setContentsMargins(0,0,0,0)
         
-        self.txt_search = QLineEdit()
+        self.txt_search = GlowLineEdit()
         self.txt_search.setPlaceholderText("Search Albums...")
         self.txt_search.textChanged.connect(self._on_search_text_changed)
         search_layout.addWidget(self.txt_search)
@@ -102,10 +103,10 @@ class AlbumManagerDialog(QDialog):
         
         # 3. Footer actions
         footer = QHBoxLayout()
-        self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
         
-        self.btn_confirm = QPushButton("Select")
+        self.btn_confirm = GlowButton("Select")
         self.btn_confirm.setObjectName("Primary")
         self.btn_confirm.setEnabled(False)
         self.btn_confirm.clicked.connect(self._on_confirm_clicked)
@@ -126,7 +127,7 @@ class AlbumManagerDialog(QDialog):
     def _add_field(self, layout, label_text):
         lbl = QLabel(label_text.upper())
         lbl.setObjectName("DialogFieldLabel")
-        inp = QLineEdit()
+        inp = GlowLineEdit()
         layout.addWidget(lbl)
         layout.addWidget(inp)
         return inp

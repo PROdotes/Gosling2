@@ -24,37 +24,42 @@ QLineEdit, QTextEdit, QComboBox {
 /* 1C. Panel Backgrounds (Dark Gradients) */
 #TitleBar, #FilterWidget, #RightSurgicalPanel, #PlaybackDeck, #CenterLibraryPanel,
 #AlbumManagerDialog {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222222, stop:1 #0A0A0A);
-    border-bottom: 2px solid #222222;
+    /* Richer "Satin Metal" Depth: Subtle top highlight fading to deep void */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2A2A2A, 
+        stop:0.02 #222222,
+        stop:1 #080808);
+    border-bottom: 2px solid #1A1A1A; /* Darker bottom lip for weight */
     border-radius: 8px;
 }
 
 /* 1D. Title Bar Specifics */
 #TitleBar {
     min-height: 36px;
-    padding: 4px 8px;
+    padding: 0 4px; /* Reduced to let GlowWidget margins handle spacing */
 }
-#AppLogoIcon {
+QPushButton#AppLogoIcon {
     min-width: 26px;
     max-width: 26px;
     min-height: 26px;
     max-height: 26px;
-    margin-left: 5px;
 }
-#MinimizeButton, #MaximizeButton, #CloseButton {
+/* Standard System Controls (Perfectly weighted squares) */
+QPushButton.SystemButton {
     min-width: 26px;
     max-width: 26px;
     min-height: 26px;
     max-height: 26px;
-    margin-left: 2px;
+    padding: 0;
+    border-radius: 6px;
     font-size: 11pt;
 }
-#CloseButton {
-    margin-right: 4px;
-}
-#CloseButton:hover {
-    background-color: #CC0000;
-    border-color: #CC0000;
+QPushButton#CloseButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #E53935, 
+        stop:1 #B71C1C);
+    /* Use solid loop border for the red state too */
+    border: 1px solid #000000;
     color: #FFFFFF;
 }
 #AppTitleLabel, #AppTitleGlow {
@@ -67,15 +72,25 @@ QLineEdit, QTextEdit, QComboBox {
 /* --- 2. THE AMBER GROUP (#FFC66D) --- */
 
 /* Amber Borders */
-QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
+/* Amber Borders */
+QLineEdit:focus, QTextEdit:focus, #GlowInput:focus {
     border: 1px solid #FFC66D;
 }
+/* Exclude QComboBox generally OR just enforce specific style for PlaybackDeck? 
+   User said "it" (showing the X-FADE combo). safest to exclude ALL Combos from the glow 
+   if they are purely selectors, but SidePanel combos might want it.
+   Let's target the specific ones or remove generic QComboBox:focus rule. 
+   Given "this shouldn't be selectable... you know what i mean", likely refers to mostly all combos.
+   But let's be distinctive. */
+QComboBox:focus {
+    border: 1px solid #444444; /* Standard Border */
+}
+/* Re-apply Glow ONLY for Editable Combos if needed? For now, User hates the outline. */
 QScrollBar::handle:vertical:hover {
     border: 1px solid #FFC66D;
 }
 
 /* Amber Backgrounds (Selection/Active States) */
-QPushButton#CategoryPill:checked,
 #HistoryTable::item:selected {
     background-color: #FFC66D;
     color: #000000;
@@ -89,7 +104,7 @@ QPushButton#CategoryPill:checked,
 /* --- 3. INPUTS & COMPONENTS --- */
 
 /* Inputs (Inset Effect) */
-QLineEdit, QTextEdit, QComboBox {
+QLineEdit, QTextEdit, QComboBox, #GlowInput {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
         stop:0 #000000, 
         stop:0.15 #0A0A0A, 
@@ -102,6 +117,7 @@ QLineEdit, QTextEdit, QComboBox {
     padding: 6px 12px; 
     color: #FFFFFF; 
     font-family: "Consolas", monospace;
+    font-size: 11pt; /* Slightly larger search text */
 }
 
 /* Data View Palette (QPalette colors for custom delegates) */
@@ -129,20 +145,55 @@ QLineEdit, QTextEdit, QComboBox {
     border-right: 1px solid #222222;
 }
 
-/* --- 6. BUTTONS (Base Push Style) --- */
+/* --- 6. BUTTONS (Workstation Outset Style) --- */
 QPushButton {
-    background-color: #1A1A1A;
-    border: 1px solid #333333;
-    border-radius: 4px;
-    padding: 4px 8px;
-    color: #888888;
+    /* The light is now part of the background, so it rounds perfectly without nicks */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #555555, 
+        stop:0.08 #3D3D3D, 
+        stop:0.15 #2D2D2D,
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    border-radius: 10px;
+    padding: 6px 14px;
+    color: transparent; /* Ghost-Killer: Native text is never rendered */
+    font-weight: bold;
 }
+ 
+ GlowButton#CategoryPill[category="Music"] { qproperty-glowColor: #32A8FF; }
+ GlowButton#CategoryPill[category="Jingles"] { qproperty-glowColor: #FF4DFF; }
+ GlowButton#CategoryPill[category="Commercials"] { qproperty-glowColor: #4DFFB8; }
+ GlowButton#CategoryPill[category="Speech"] { qproperty-glowColor: #AAAAAA; }
+ GlowButton#CategoryPill[category="Streams"] { qproperty-glowColor: #00FFFF; }
+
+ GlowButton#StatusPill { 
+     qproperty-glowColor: #26E28C; /* Station Green */
+ }
+
 QPushButton:hover {
-    border-color: #FFC66D;
-    color: #FFC66D;
+    color: transparent;
+    border: 1px solid #111111;
 }
+
 QPushButton:pressed {
-    background-color: #111111;
+    /* Atmospheric Sink: Shadow cast by the chassis edge above */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #121212, 
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    padding-top: 1px;
+    color: transparent;
+}
+
+QPushButton:checked {
+    /* Recessed Metal: Top-heavy shadow from occlusion */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #151515, 
+        stop:0.3 #1A1A1A,
+        stop:1 #2A2A2A);
+    border: 1px solid #000000;
+    padding: 6px 14px;
+    color: transparent;
 }
 
 /* Chips (Tag Chips with ×) */
