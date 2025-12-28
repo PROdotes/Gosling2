@@ -38,12 +38,36 @@ class CustomTitleBar(QWidget):
         self.btn_logo_icon.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_logo_icon.clicked.connect(self.settings_requested.emit)
         
-        # 1b. Title Label (Draggable)
-        self.lbl_title = QLabel("  GOSLING // WORKSTATION")
+        # 1b. Title Label with Glow Effect (stacked labels)
+        from PyQt6.QtWidgets import QGraphicsBlurEffect
+        
+        title_text = "GOSLING // WORKSTATION"
+        
+        # Container for stacked labels
+        title_container = QWidget()
+        title_container.setFixedSize(300, 36)  # Wider container
+        
+        # Vertical center offset
+        v_center = 3
+        h_margin = 2  # Left margin for glow clearance
+        
+        # Glow label (behind, blurred)
+        self.lbl_title_glow = QLabel(title_text, title_container)
+        self.lbl_title_glow.setObjectName("AppTitleGlow")
+        blur = QGraphicsBlurEffect()
+        blur.setBlurRadius(8)
+        self.lbl_title_glow.setGraphicsEffect(blur)
+        self.lbl_title_glow.move(h_margin + 2, v_center + 2)  # Slight offset for halo
+        
+        # Main label (on top, crisp)
+        self.lbl_title = QLabel(title_text, title_container)
         self.lbl_title.setObjectName("AppTitleLabel")
+        self.lbl_title.move(h_margin, v_center)
+        self.lbl_title.raise_()  # Ensure on top
         
         layout.addWidget(self.btn_logo_icon)
-        layout.addWidget(self.lbl_title)
+        layout.addSpacing(8)  # Space between icon and title
+        layout.addWidget(title_container)
         
         # 2. Search Section (The Draggable Search Strip)
         self.search_box = QLineEdit()
@@ -57,7 +81,7 @@ class CustomTitleBar(QWidget):
         self.draggable_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # layout.addWidget(self.logo_label) # Removed
-        layout.addSpacing(20)
+        layout.addSpacing(10)
         layout.addWidget(self.search_box)
         layout.addWidget(self.draggable_area)
         

@@ -17,8 +17,7 @@ QWidget {
 /* 1B. Glass Panels (The #333333 Border Group) */
 #TitleBar, #FilterWidget, #RightSurgicalPanel, #PlaybackDeck, #CenterLibraryPanel,
 #AlbumManagerDialog,
-QLineEdit, QTextEdit, QComboBox,
-QPushButton#CategoryPill, JingleButton, [objectName^="Chip_"] {
+QLineEdit, QTextEdit, QComboBox {
     border: 1px solid #333333;
 }
 
@@ -30,10 +29,48 @@ QPushButton#CategoryPill, JingleButton, [objectName^="Chip_"] {
     border-radius: 8px;
 }
 
+/* 1D. Title Bar Specifics */
+#TitleBar {
+    min-height: 36px;
+    padding: 4px 8px;
+}
+#AppLogoIcon {
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    margin-left: 5px;
+}
+#MinimizeButton, #MaximizeButton, #CloseButton {
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 26px;
+    max-height: 26px;
+    margin-left: 2px;
+    font-size: 11pt;
+}
+#CloseButton {
+    margin-right: 4px;
+}
+#CloseButton:hover {
+    background-color: #CC0000;
+    border-color: #CC0000;
+    color: #FFFFFF;
+}
+#AppTitleLabel, #AppTitleGlow {
+    color: #FFC66D;
+    font-size: 16pt;
+    font-weight: bold;
+    background: transparent;
+}
+
 /* --- 2. THE AMBER GROUP (#FFC66D) --- */
 
 /* Amber Borders */
-QLineEdit:focus, QComboBox:focus, QScrollBar::handle:vertical:hover {
+QLineEdit:focus, QComboBox:focus, QTextEdit:focus {
+    border: 1px solid #FFC66D;
+}
+QScrollBar::handle:vertical:hover {
     border: 1px solid #FFC66D;
 }
 
@@ -51,11 +88,18 @@ QPushButton#CategoryPill:checked,
 
 /* --- 3. INPUTS & COMPONENTS --- */
 
-/* Inputs */
+/* Inputs (Inset Effect) */
 QLineEdit, QTextEdit, QComboBox {
-    background-color: #050505; 
-    border-radius: 2px;
-    padding: 6px 10px; 
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #000000, 
+        stop:0.15 #0A0A0A, 
+        stop:1 #151515);
+    border-top: 1px solid #222222;
+    border-left: 1px solid #222222;
+    border-bottom: 1px solid #444444;
+    border-right: 1px solid #444444;
+    border-radius: 10px;
+    padding: 6px 12px; 
     color: #FFFFFF; 
     font-family: "Consolas", monospace;
 }
@@ -85,9 +129,26 @@ QLineEdit, QTextEdit, QComboBox {
     border-right: 1px solid #222222;
 }
 
-/* Buttons & Chips Base */
-QPushButton#CategoryPill, JingleButton, [objectName^="Chip_"] {
+/* --- 6. BUTTONS (Base Push Style) --- */
+QPushButton {
+    background-color: #1A1A1A;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #888888;
+}
+QPushButton:hover {
+    border-color: #FFC66D;
+    color: #FFC66D;
+}
+QPushButton:pressed {
+    background-color: #111111;
+}
+
+/* Chips (Tag Chips with ×) */
+[objectName^="Chip_"] {
     background: rgba(30,30,30,0.8); 
+    border: 1px solid #333333;
     border-radius: 4px; 
     padding: 4px 10px;
     font-weight: bold;
