@@ -14,6 +14,7 @@ from ..widgets import (
     SidePanelWidget, CustomTitleBar, JingleCurtain, HistoryDrawer
 )
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
+from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
 )
@@ -63,7 +64,7 @@ class ResizeGrip(QWidget):
         # Transparent background - no fill needed
         
         # Draw three diagonal lines forming a triangle grip
-        pen = QPen(QColor("#555555"), 2.0)
+        pen = QPen(QColor(constants.COLOR_BORDER_LIGHT), 2.0)
         painter.setPen(pen)
         
         # Line 1 (bottom-most)

@@ -69,7 +69,7 @@ class DropIndicatorHeaderView(QHeaderView):
         # Draw drop indicator line
         if self._dragging and self._drop_indicator_pos >= 0:
             painter = QPainter(self.viewport())
-            pen = QPen(QColor("#00FF00"), 4)  # Bright lime green, 4px wide
+            pen = QPen(QColor(constants.COLOR_DROP_INDICATOR), 4)
             painter.setPen(pen)
             
             x = self._drop_indicator_pos - self.offset()
@@ -229,51 +229,8 @@ class EventFilterProxy(QObject):
 
 
 class LibraryTable(QTableView):
-    """Table view for the library with formal bridge properties."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._paletteAmber = QColor(constants.COLOR_AMBER)
-        self._paletteMutedAmber = QColor(constants.COLOR_MUTED_AMBER)
-        self._paletteMagenta = QColor(constants.COLOR_MAGENTA)
-        self._paletteBlack = QColor(constants.COLOR_BLACK)
-        self._paletteGray = QColor(constants.COLOR_GRAY)
-        self._paletteWhite = QColor(constants.COLOR_WHITE)
-        self._paletteVoid = QColor(constants.COLOR_VOID)
-
-    @pyqtProperty(QColor)
-    def paletteAmber(self): return self._paletteAmber
-    @paletteAmber.setter
-    def paletteAmber(self, c): self._paletteAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMutedAmber(self): return self._paletteMutedAmber
-    @paletteMutedAmber.setter
-    def paletteMutedAmber(self, c): self._paletteMutedAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMagenta(self): return self._paletteMagenta
-    @paletteMagenta.setter
-    def paletteMagenta(self, c): self._paletteMagenta = c
-
-    @pyqtProperty(QColor)
-    def paletteBlack(self): return self._paletteBlack
-    @paletteBlack.setter
-    def paletteBlack(self, c): self._paletteBlack = c
-
-    @pyqtProperty(QColor)
-    def paletteGray(self): return self._paletteGray
-    @paletteGray.setter
-    def paletteGray(self, c): self._paletteGray = c
-
-    @pyqtProperty(QColor)
-    def paletteWhite(self): return self._paletteWhite
-    @paletteWhite.setter
-    def paletteWhite(self, c): self._paletteWhite = c
-
-    @pyqtProperty(QColor)
-    def paletteVoid(self): return self._paletteVoid
-    @paletteVoid.setter
-    def paletteVoid(self, c): self._paletteVoid = c
+    """Table view for the library."""
+    pass
 
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
@@ -595,7 +552,7 @@ class LibraryWidget(QWidget):
         
         # Set a drag icon (AMBER THEME)
         pixmap = QPixmap(140, 36)
-        pixmap.fill(QColor("#FF8C00"))
+        pixmap.fill(QColor(constants.COLOR_MUTED_AMBER))
         painter = QPainter(pixmap)
         painter.setPen(Qt.GlobalColor.black) # Black on Amber for readability
         painter.setFont(QFont("Bahnschrift Condensed", 10))

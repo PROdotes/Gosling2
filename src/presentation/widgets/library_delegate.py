@@ -3,10 +3,11 @@ from PyQt6.QtCore import Qt, QRect, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QFont, QBrush, QPen, QLinearGradient
 from ...resources import constants
 
+
 class WorkstationDelegate(QStyledItemDelegate):
     """
     Rhythmic Workstation Delegate for Gosling2.
-    Reads dynamic palette values from the parent widget's properties (pushed from QSS).
+    Reads colors from QPalette (QSS-controlled), falls back to constants.
     """
     
     def __init__(self, field_indices, table_view, parent=None):
@@ -14,26 +15,26 @@ class WorkstationDelegate(QStyledItemDelegate):
         self.field_indices = field_indices
         self.table_view = table_view
         
-        # Semantic mapping to QSS property names
-        self._zone_map = {
-            1: "paletteAmber",
-            2: "paletteMagenta",
-            3: "paletteMutedAmber",
-            4: "paletteGray",
-            5: "paletteGray",
-            6: "paletteGray"
+        # Semantic mapping to color constants (fallbacks)
+        self._zone_colors = {
+            1: constants.COLOR_AMBER,
+            2: constants.COLOR_MAGENTA,
+            3: constants.COLOR_MUTED_AMBER,
+            4: constants.COLOR_GRAY,
+            5: constants.COLOR_GRAY,
+            6: constants.COLOR_GRAY
         }
-
-    def _get_qss_color(self, prop_name: str, fallback_hex: str) -> QColor:
-        """Fetch color pushed by QSS 'qproperty-propName'"""
-        color = self.table_view.property(prop_name)
-        if isinstance(color, QColor):
-            return color
-        return QColor(fallback_hex)
 
     def paint(self, painter: QPainter, option: QStyleOptionViewItem, index):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Read colors from palette (QSS-controlled)
+        palette = option.palette
+        text_color = palette.color(palette.ColorRole.Text)
+        base_color = palette.color(palette.ColorRole.Base)
+        alt_color = palette.color(palette.ColorRole.AlternateBase)
+        highlight_text = palette.color(palette.ColorRole.HighlightedText)
         
         # 1. Base Setup
         self.initStyleOption(option, index)
@@ -50,7 +51,7 @@ class WorkstationDelegate(QStyledItemDelegate):
             first_col_logical = self.table_view.horizontalHeader().logicalIndex(0)
             is_far_left = (index.column() == first_col_logical)
 
-        # 2. COLOR DISPATCH (Read from QSS Bridge)
+        # 2. COLOR DISPATCH
         type_idx = self.field_indices.get('type_id', -1)
         type_id = 1
         if type_idx != -1:
@@ -58,8 +59,7 @@ class WorkstationDelegate(QStyledItemDelegate):
             try: type_id = int(val) 
             except: pass
         
-        category_prop = self._zone_map.get(type_id, "paletteAmber")
-        category_color = self._get_qss_color(category_prop, constants.COLOR_AMBER)
+        category_color = QColor(self._zone_colors.get(type_id, constants.COLOR_AMBER))
 
         # 3. BACKGROUND RENDERING
         if option.state & QStyle.StateFlag.State_Selected:
@@ -72,8 +72,10 @@ class WorkstationDelegate(QStyledItemDelegate):
             painter.fillRect(rect, highlight_fill)
         else:
             is_alt = option.features & QStyleOptionViewItem.ViewItemFeature.Alternate
-            base_color = self._get_qss_color("paletteVoid" if is_alt else "paletteBlack", constants.COLOR_BLACK)
-            painter.fillRect(rect, base_color)
+            bg = alt_color if (is_alt and alt_color.isValid()) else base_color
+            if not bg.isValid():
+                bg = QColor(constants.COLOR_VOID if is_alt else constants.COLOR_BLACK)
+            painter.fillRect(rect, bg)
             
             # Subtle Category Tint
             tint = QColor(category_color)
@@ -81,7 +83,8 @@ class WorkstationDelegate(QStyledItemDelegate):
             painter.fillRect(rect, tint)
 
         # 4. PHYSICAL SEPARATION
-        painter.setPen(self._get_qss_color("paletteBlack", constants.COLOR_BLACK))
+        sep_color = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
+        painter.setPen(sep_color)
         painter.drawLine(rect.bottomLeft(), rect.bottomRight())
 
         # 5. CYLINDRICAL BLADE (Far Left)
@@ -111,9 +114,11 @@ class WorkstationDelegate(QStyledItemDelegate):
             text_rect = rect.adjusted(18 if is_far_left else 10, 0, -4, 0)
             
             if option.state & QStyle.StateFlag.State_Selected:
-                painter.setPen(self._get_qss_color("paletteWhite", constants.COLOR_WHITE))
+                sel_text = highlight_text if highlight_text.isValid() else QColor(constants.COLOR_WHITE)
+                painter.setPen(sel_text)
             else:
-                painter.setPen(self._get_qss_color("paletteGray", constants.COLOR_GRAY))
+                norm_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
+                painter.setPen(norm_text)
                 
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
@@ -126,13 +131,20 @@ class WorkstationDelegate(QStyledItemDelegate):
         is_done = str(val).lower() in ('true', '1')
         
         badge_rect = option.rect.adjusted(10, 5, -10, -6)
+        palette = option.palette
         
         if is_done:
-            bg = self._get_qss_color("paletteMagenta", constants.COLOR_MAGENTA)
-            txt = self._get_qss_color("paletteBlack", constants.COLOR_BLACK)
+            bg = QColor(constants.COLOR_MAGENTA)  # Semantic: always magenta for "done"
+            txt = palette.color(palette.ColorRole.Base)
+            if not txt.isValid():
+                txt = QColor(constants.COLOR_BLACK)
         else:
-            bg = self._get_qss_color("paletteVoid", constants.COLOR_VOID)
-            txt = self._get_qss_color("paletteGray", constants.COLOR_GRAY)
+            bg = palette.color(palette.ColorRole.AlternateBase)
+            if not bg.isValid():
+                bg = QColor(constants.COLOR_VOID)
+            txt = palette.color(palette.ColorRole.Text)
+            if not txt.isValid():
+                txt = QColor(constants.COLOR_GRAY)
             
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(bg))

@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont, QPainter, QPen
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize, pyqtProperty
+from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
 from typing import Any
 from ...core import yellberus
 from ...resources import constants
@@ -89,68 +89,32 @@ class FlowLayout(QLayout):
         return y + line_height - rect.y() + bottom
 
 class FilterTree(QTreeView):
-    """Tree view for filters with formal bridge properties."""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._paletteAmber = QColor(constants.COLOR_AMBER)
-        self._paletteMutedAmber = QColor(constants.COLOR_MUTED_AMBER)
-        self._paletteMagenta = QColor(constants.COLOR_MAGENTA)
-        self._paletteBlack = QColor(constants.COLOR_BLACK)
-        self._paletteGray = QColor(constants.COLOR_GRAY)
-        self._paletteWhite = QColor(constants.COLOR_WHITE)
-        self._paletteVoid = QColor(constants.COLOR_VOID)
-
-    @pyqtProperty(QColor)
-    def paletteAmber(self): return self._paletteAmber
-    @paletteAmber.setter
-    def paletteAmber(self, c): self._paletteAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMutedAmber(self): return self._paletteMutedAmber
-    @paletteMutedAmber.setter
-    def paletteMutedAmber(self, c): self._paletteMutedAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMagenta(self): return self._paletteMagenta
-    @paletteMagenta.setter
-    def paletteMagenta(self, c): self._paletteMagenta = c
-
-    @pyqtProperty(QColor)
-    def paletteBlack(self): return self._paletteBlack
-    @paletteBlack.setter
-    def paletteBlack(self, c): self._paletteBlack = c
-
-    @pyqtProperty(QColor)
-    def paletteGray(self): return self._paletteGray
-    @paletteGray.setter
-    def paletteGray(self, c): self._paletteGray = c
-
-    @pyqtProperty(QColor)
-    def paletteWhite(self): return self._paletteWhite
-    @paletteWhite.setter
-    def paletteWhite(self, c): self._paletteWhite = c
-
-    @pyqtProperty(QColor)
-    def paletteVoid(self): return self._paletteVoid
-    @paletteVoid.setter
-    def paletteVoid(self, c): self._paletteVoid = c
-
-    # ADDED: Bridge property for hover color
-    @pyqtProperty(QColor)
-    def paletteHover(self): return getattr(self, "_paletteHover", QColor(constants.COLOR_VOID))
-    @paletteHover.setter
-    def paletteHover(self, c): self._paletteHover = c
+    """Tree view for filters."""
+    pass
 
 class FilterTreeDelegate(QStyledItemDelegate):
-    """Delegate for drawing hierarchical backgrounds using the Property Bridge."""
+    """Delegate for drawing hierarchical filter tree items.
+    Reads colors from QPalette (controlled by QSS), falls back to constants.
+    """
 
-    def _get_prop(self, widget, name, fallback=constants.COLOR_GRAY):
-        if hasattr(widget, name): return getattr(widget, name)
-        return QColor(fallback)
+    # Zone to color constant mapping (fallbacks)
+    ZONE_COLORS = {
+        "amber": constants.COLOR_AMBER,
+        "muted_amber": constants.COLOR_MUTED_AMBER,
+        "magenta": constants.COLOR_MAGENTA,
+        "gray": constants.COLOR_GRAY
+    }
 
     def paint(self, painter: QPainter, option, index):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Read colors from palette (QSS-controlled)
+        palette = option.palette
+        text_color = palette.color(palette.ColorRole.Text)
+        base_color = palette.color(palette.ColorRole.Base)
+        alt_color = palette.color(palette.ColorRole.AlternateBase)
+        highlight_color = palette.color(palette.ColorRole.Highlight)
         
         hint = index.data(Qt.ItemDataRole.AccessibleTextRole)
         field_name = index.data(Qt.ItemDataRole.UserRole + 1)
@@ -163,32 +127,27 @@ class FilterTreeDelegate(QStyledItemDelegate):
         
         field_def = yellberus.get_field(field_name)
         zone = field_def.zone if field_def else "amber"
-        
-        zone_to_prop = {
-            "amber": "paletteAmber",
-            "muted_amber": "paletteMutedAmber",
-            "magenta": "paletteMagenta",
-            "gray": "paletteGray"
-        }
-        prop_name = zone_to_prop.get(zone, "paletteAmber")
-        sig_color = self._get_prop(option.widget, prop_name, constants.COLOR_AMBER)
+        sig_color = QColor(self.ZONE_COLORS.get(zone, constants.COLOR_AMBER))
             
         full_row_rect = QRect(0, option.rect.y(), option.widget.width(), option.rect.height())
         
-        # Backgrounds matching mechanical theme via Bridge
+        # Backgrounds - use palette colors
         if option.state & QStyle.StateFlag.State_MouseOver:
-            # Use bridge property for hover color
-            painter.fillRect(full_row_rect, self._get_prop(option.widget, "paletteHover", constants.COLOR_VOID))
+            hover_color = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
+            painter.fillRect(full_row_rect, hover_color)
         elif hint == "root":
-            painter.fillRect(full_row_rect, self._get_prop(option.widget, "paletteBlack", constants.COLOR_BLACK))
+            root_bg = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
+            painter.fillRect(full_row_rect, root_bg)
         elif hint == "branch":
-            painter.fillRect(full_row_rect, self._get_prop(option.widget, "paletteVoid", constants.COLOR_VOID))
+            branch_bg = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
+            painter.fillRect(full_row_rect, branch_bg)
             
         strip_width = 4 if (option.state & QStyle.StateFlag.State_Selected) else 2
         painter.fillRect(0, option.rect.y(), strip_width, option.rect.height(), sig_color)
             
         if hint == "root":
-            painter.setPen(self._get_prop(option.widget, "paletteVoid", constants.COLOR_VOID))
+            divider_color = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
+            painter.setPen(divider_color)
             painter.drawLine(full_row_rect.bottomLeft(), full_row_rect.bottomRight())
 
         painter.restore()
@@ -200,13 +159,15 @@ class FilterTreeDelegate(QStyledItemDelegate):
             font = option.font
             font.setBold(True); font.setPointSize(11)
             painter.setFont(font)
-            painter.setPen(self._get_prop(option.widget, "paletteWhite", constants.COLOR_WHITE))
+            root_text = highlight_color if highlight_color.isValid() else QColor(constants.COLOR_WHITE)
+            painter.setPen(root_text)
             text_rect = option.rect.adjusted(root_x, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
         elif hint == "branch":
             painter.save()
-            painter.setPen(self._get_prop(option.widget, "paletteGray", constants.COLOR_GRAY))
+            branch_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
+            painter.setPen(branch_text)
             text_rect = option.rect.adjusted(branch_x, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
@@ -221,12 +182,15 @@ class FilterTreeDelegate(QStyledItemDelegate):
                 painter.drawEllipse(led_rect)
             else:
                 painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.setPen(QPen(self._get_prop(option.widget, "paletteVoid", constants.COLOR_VOID), 1))
+                unchecked_border = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
+                painter.setPen(QPen(unchecked_border, 1))
                 painter.drawEllipse(led_rect)
-            painter.setPen(self._get_prop(option.widget, "paletteGray", constants.COLOR_GRAY))
+            child_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
+            painter.setPen(child_text)
             text_rect = option.rect.adjusted(child_x + 18, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
+
 
 class FilterWidget(QFrame):
     """Widget for filtering the library using Yellberus registry."""

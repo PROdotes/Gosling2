@@ -8,8 +8,10 @@ COLOR_BLACK = "#000000"       # Chassis / Void
 COLOR_GRAY = "#888888"        # Ghost Data / Muted Text
 
 # Support Colors (Strictly for Contrast/Physicality)
-COLOR_WHITE = "#FFFFFF"       # High-Contrast Text
-COLOR_VOID = "#111111"        # Near-Black Surface
+COLOR_WHITE = "#FFFFFF"           # High-Contrast Text
+COLOR_VOID = "#111111"            # Near-Black Surface
+COLOR_DROP_INDICATOR = "#00FF00"  # Drag & Drop Visual Feedback
+COLOR_BORDER_LIGHT = "#555555"    # Subtle Border/Grip
 
 # UI Dimensions
 SLIDER_SIZE = 30

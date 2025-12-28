@@ -2,13 +2,16 @@
 import os
 import json
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QStyledItemDelegate, QStyle
-from PyQt6.QtCore import Qt, QRect, QSize, QUrl, pyqtSignal, pyqtProperty
+from PyQt6.QtCore import Qt, QRect, QSize, QUrl, pyqtSignal
 from PyQt6.QtGui import QFont, QPen, QColor, QPainter
 from ...business.services.metadata_service import MetadataService
 from ...resources import constants
 
+
 class PlaylistItemDelegate(QStyledItemDelegate):
-    """Custom delegate for playlist items using the Property Bridge."""
+    """Custom delegate for playlist items.
+    Reads colors from QPalette (QSS-controlled), falls back to constants.
+    """
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -17,19 +20,20 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         self.mini_font = QFont("Bahnschrift Condensed", 10)
         self.mini_mode = False
 
-    ITEM_SPACING = 4 # Gap between items in pixels
-
-    def _get_qss_color(self, widget, prop_name: str, fallback_hex: str) -> QColor:
-        color = widget.property(prop_name)
-        if isinstance(color, QColor):
-            return color
-        return QColor(fallback_hex)
+    ITEM_SPACING = 4
 
     def paint(self, painter, option, index) -> None:
         """Custom paint for playlist items"""
         painter.save()
         
-        # Adjust rect for spacing
+        # Read colors from palette (QSS-controlled)
+        palette = option.palette
+        base_color = palette.color(palette.ColorRole.Base)
+        alt_color = palette.color(palette.ColorRole.AlternateBase)
+        text_color = palette.color(palette.ColorRole.Text)
+        highlight_color = palette.color(palette.ColorRole.Highlight)
+        highlight_text = palette.color(palette.ColorRole.HighlightedText)
+        
         visual_rect = QRect(
             option.rect.left(),
             option.rect.top(),
@@ -37,18 +41,18 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             option.rect.height() - self.ITEM_SPACING
         )
 
-        # Background - fetch from widget properties (pushed by QSS)
-        row_color = self._get_qss_color(option.widget, "paletteVoid", constants.COLOR_VOID)
-        sel_color = self._get_qss_color(option.widget, "paletteAmber", constants.COLOR_AMBER)
+        # Colors with fallbacks
+        row_bg = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
+        sel_bg = highlight_color if highlight_color.isValid() else QColor(constants.COLOR_AMBER)
 
         if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(visual_rect, sel_color)
-            text_color = self._get_qss_color(option.widget, "paletteBlack", constants.COLOR_BLACK)
+            painter.fillRect(visual_rect, sel_bg)
+            txt_color = highlight_text if highlight_text.isValid() else QColor(constants.COLOR_BLACK)
         else:
-            painter.fillRect(visual_rect, row_color)
-            text_color = self._get_qss_color(option.widget, "paletteWhite", constants.COLOR_WHITE)
-            # Divider
-            painter.setPen(self._get_qss_color(option.widget, "paletteBlack", constants.COLOR_BLACK))
+            painter.fillRect(visual_rect, row_bg)
+            txt_color = text_color if text_color.isValid() else QColor(constants.COLOR_WHITE)
+            divider = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
+            painter.setPen(divider)
             painter.drawLine(visual_rect.bottomLeft(), visual_rect.bottomRight())
         
         # Text
@@ -64,7 +68,7 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         
         if self.mini_mode:
             painter.setFont(self.mini_font)
-            painter.setPen(text_color)
+            painter.setPen(txt_color)
             combined = f"{performer.upper()} - {title}" if title else performer.upper()
             painter.drawText(
                 visual_rect.adjusted(padding, 0, -padding, 0),
@@ -72,14 +76,14 @@ class PlaylistItemDelegate(QStyledItemDelegate):
                 combined
             )
         else:
-            # Circle
+            # Circle (semantic: always magenta)
             circle_diameter = int(visual_rect.height() * 0.75)
             circle_top = visual_rect.top() + (visual_rect.height() - circle_diameter) // 2
             circle_right_padding = -int(circle_diameter * 0.3)
             circle_left = visual_rect.right() - circle_diameter - circle_right_padding
             circle_rect = QRect(circle_left, circle_top, circle_diameter, circle_diameter)
 
-            painter.setBrush(self._get_qss_color(option.widget, "paletteMagenta", constants.COLOR_MAGENTA))
+            painter.setBrush(QColor(constants.COLOR_MAGENTA))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(circle_rect)
 
@@ -93,11 +97,11 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             title_rect = QRect(text_rect.left(), text_rect.top() + text_rect.height() // 2, text_rect.width(), text_rect.height() // 2)
 
             painter.setFont(self.performer_font)
-            painter.setPen(text_color)
+            painter.setPen(txt_color)
             painter.drawText(performer_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, performer.strip())
 
             painter.setFont(self.title_font)
-            painter.setPen(text_color)
+            painter.setPen(txt_color)
             painter.drawText(title_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title.strip())
 
         painter.restore()
@@ -107,61 +111,18 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         height = 24 if self.mini_mode else 54
         return QSize(width, height + self.ITEM_SPACING)
 
+
 class PlaylistWidget(QListWidget):
-    """Custom list widget with formal bridge properties."""
+    """Custom list widget for playlist."""
 
     itemDoubleClicked = pyqtSignal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("PlaylistWidget")
-        
-        self._paletteAmber = QColor(constants.COLOR_AMBER)
-        self._paletteMutedAmber = QColor(constants.COLOR_MUTED_AMBER)
-        self._paletteMagenta = QColor(constants.COLOR_MAGENTA)
-        self._paletteBlack = QColor(constants.COLOR_BLACK)
-        self._paletteGray = QColor(constants.COLOR_GRAY)
-        self._paletteWhite = QColor(constants.COLOR_WHITE)
-        self._paletteVoid = QColor(constants.COLOR_VOID)
         self._init_setup()
     
-    @pyqtProperty(QColor)
-    def paletteAmber(self): return self._paletteAmber
-    @paletteAmber.setter
-    def paletteAmber(self, c): self._paletteAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMutedAmber(self): return self._paletteMutedAmber
-    @paletteMutedAmber.setter
-    def paletteMutedAmber(self, c): self._paletteMutedAmber = c
-
-    @pyqtProperty(QColor)
-    def paletteMagenta(self): return self._paletteMagenta
-    @paletteMagenta.setter
-    def paletteMagenta(self, c): self._paletteMagenta = c
-
-    @pyqtProperty(QColor)
-    def paletteBlack(self): return self._paletteBlack
-    @paletteBlack.setter
-    def paletteBlack(self, c): self._paletteBlack = c
-
-    @pyqtProperty(QColor)
-    def paletteGray(self): return self._paletteGray
-    @paletteGray.setter
-    def paletteGray(self, c): self._paletteGray = c
-
-    @pyqtProperty(QColor)
-    def paletteWhite(self): return self._paletteWhite
-    @paletteWhite.setter
-    def paletteWhite(self, c): self._paletteWhite = c
-
-    @pyqtProperty(QColor)
-    def paletteVoid(self): return self._paletteVoid
-    @paletteVoid.setter
-    def paletteVoid(self, c): self._paletteVoid = c
-
     def _init_setup(self):
-        # Move setup logic here to avoid constructor bloat
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setDragDropMode(QListWidget.DragDropMode.DragDrop)
@@ -211,7 +172,7 @@ class PlaylistWidget(QListWidget):
         super().paintEvent(event)
         if self._preview_row is not None:
             painter = QPainter(self.viewport())
-            pen = QPen(self.property("paletteAmber") or QColor(constants.COLOR_AMBER), 2)
+            pen = QPen(QColor(constants.COLOR_AMBER), 2)
             painter.setPen(pen)
             item = self.item(self._preview_row)
             if item:

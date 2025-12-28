@@ -185,6 +185,7 @@ class RightPanelWidget(QWidget):
         # TODO: HistoryDrawer doesn't seem to take services yet, just indices. 
         # Ideally it should read from a log service.
         self.history_widget = HistoryDrawer({}, self) 
+        self.history_widget.setMinimumHeight(100)
         self.history_widget.hide() # Default Hidden
         
         # --- Zone 2: Editor ---
@@ -203,9 +204,9 @@ class RightPanelWidget(QWidget):
         self.splitter.addWidget(self.playlist_widget)
         
         # Playlist is the anchor (Item 2)
-        # We allow them to collapse but Playlist resists
-        self.splitter.setCollapsible(0, True) 
-        self.splitter.setCollapsible(1, True) 
+        # History and Editor can't collapse to 0 when visible
+        self.splitter.setCollapsible(0, False) 
+        self.splitter.setCollapsible(1, False) 
         self.splitter.setCollapsible(2, False)
         
         self.layout.addWidget(self.splitter)
