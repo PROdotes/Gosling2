@@ -26,7 +26,7 @@ QPushButton#CategoryPill, JingleButton, [objectName^="Chip_"] {
 #TitleBar, #FilterWidget, #RightSurgicalPanel, #PlaybackDeck, #CenterLibraryPanel,
 #AlbumManagerDialog {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222222, stop:1 #0A0A0A);
-    border-bottom: 2px solid #000000;
+    border-bottom: 2px solid #222222;
     border-radius: 8px;
 }
 
@@ -107,4 +107,16 @@ QScrollBar::handle:vertical {
     min-height: 20px;
 }
 
-QSplitter::handle { background-color: #000000; }
+/* --- 5. SPLITTERS & SEPARATORS (Visual Void Between Panels) --- */
+/* Splitters: width for vertical handles, height for horizontal handles */
+QSplitter::handle { 
+    background-color: #000000; 
+    width: 7px;
+    height: 7px;
+}
+/* Separators: full width, fixed height */
+#SeparatorLine { 
+    background-color: #000000; 
+    min-height: 7px;
+    max-height: 7px;
+}

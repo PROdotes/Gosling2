@@ -179,7 +179,6 @@ class RightPanelWidget(QWidget):
         
         # 2. The Vertical Splitter (The Stack)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
-        self.splitter.setHandleWidth(7)
         
         # --- Zone 1: History ---
         # TODO: HistoryDrawer doesn't seem to take services yet, just indices. 

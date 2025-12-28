@@ -289,7 +289,6 @@ class LibraryWidget(QWidget):
         # Splitter for Sidebar + Table Area
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setObjectName("MainSplitter")
-        self.splitter.setHandleWidth(7)
         
         # --- SIDEBAR AREA (Mechanical Console) ---
         sidebar_container = QWidget()

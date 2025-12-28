@@ -209,7 +209,6 @@ class MainWindow(QMainWindow):
         
         # --- TOP SEPARATOR (7px Black) ---
         top_separator = QWidget()
-        top_separator.setFixedHeight(7)
         top_separator.setObjectName("SeparatorLine")
 
         main_layout.addWidget(top_separator)
@@ -217,7 +216,6 @@ class MainWindow(QMainWindow):
         # === THE MAIN SPLITTER (Left/Center Block | Right Panel) ===
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.main_splitter.setObjectName("MainRootSplitter")
-        self.main_splitter.setHandleWidth(7)
 
         # --- LEFT+CENTER BLOCK (Archive + Library + Scrubber) ---
         lc_container = QWidget()
@@ -227,7 +225,6 @@ class MainWindow(QMainWindow):
         
         # LC Splitter (Archive | Library)
         self.lc_splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.lc_splitter.setHandleWidth(7)
         
         # 1. Archive/Library (Currently just LibraryWidget acting as both)
         self.library_widget = LibraryWidget(
@@ -269,7 +266,6 @@ class MainWindow(QMainWindow):
         
         # --- BOTTOM SEPARATOR (7px Black) ---
         bottom_separator = QWidget()
-        bottom_separator.setFixedHeight(7)
         bottom_separator.setObjectName("SeparatorLine")
 
         main_layout.addWidget(bottom_separator)
