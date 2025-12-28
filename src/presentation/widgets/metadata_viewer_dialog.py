@@ -4,6 +4,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QColor
+from ...resources import constants
 
 class MetadataViewerDialog(QDialog):
     """Dialog to compare File metadata vs Library metadata"""
@@ -23,6 +24,7 @@ class MetadataViewerDialog(QDialog):
         self.file_has_newer = False
         self.db_has_newer = False # Conceptual, really just different
         
+        self.setObjectName("MetadataViewerDialog")
         self.setWindowTitle("Metadata Comparison")
         self.resize(800, 600)
         self._init_ui()
@@ -43,6 +45,7 @@ class MetadataViewerDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["Field", "File (Source)", "Library (Database)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)  # Read-only
+        self.table.setObjectName("ComparisonTable")
         layout.addWidget(self.table)
 
         # Buttons
@@ -108,7 +111,7 @@ class MetadataViewerDialog(QDialog):
             pass
             
         self.ID3_FRAMES = ID3_FRAMES
-        from src.core import yellberus
+        from ...core import yellberus
 
         # 1. Mapped Fields (Using Yellberus Registry)
         self.mapped_fields = []
@@ -181,9 +184,9 @@ class MetadataViewerDialog(QDialog):
         self.table.insertRow(row)
         header_item = QTableWidgetItem(title)
         
-        # Enhanced Styling for Headers
-        header_item.setBackground(QColor(40, 50, 60)) 
-        header_item.setForeground(QColor(220, 230, 240))
+        # Enhanced Styling for Headers (Core 5)
+        header_item.setBackground(QColor(constants.COLOR_VOID)) 
+        header_item.setForeground(QColor(constants.COLOR_AMBER))
         header_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         
         header_item.setFlags(Qt.ItemFlag.ItemIsEnabled)
@@ -217,7 +220,7 @@ class MetadataViewerDialog(QDialog):
 
         if is_raw:
             # Grey out the DB column to indicate it's expected to be missing
-            db_item.setForeground(QColor("gray"))
+            db_item.setForeground(QColor(constants.COLOR_GRAY))
             italic = db_item.font()
             italic.setItalic(True)
             db_item.setFont(italic)
@@ -225,14 +228,18 @@ class MetadataViewerDialog(QDialog):
             # Comparison logic for Core Data
             # If db is missing entirely (song not in lib), grey out
             if not self.db_song and db_val is None:
-                 db_item.setForeground(QColor("gray"))
+                 db_item.setForeground(QColor(constants.COLOR_GRAY))
             elif file_str != db_str:
                 # Discrepancy!
                 self.has_discrepancies = True
-                bg_color = QColor(255, 220, 220) # Light red/pink
-                file_item.setBackground(bg_color)
-                db_item.setBackground(bg_color)
-                self.table.item(row, 0).setBackground(bg_color) # Highlight label too
+                
+                # Use a subtle highlight gradient from constants
+                warn_color = QColor(constants.COLOR_MAGENTA)
+                warn_color.setAlpha(40)
+                
+                file_item.setBackground(warn_color)
+                db_item.setBackground(warn_color)
+                self.table.item(row, 0).setBackground(warn_color) # Highlight label too
 
                 font = file_item.font()
                 font.setBold(True)

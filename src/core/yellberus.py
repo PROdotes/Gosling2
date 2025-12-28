@@ -26,7 +26,7 @@ class FieldDef:
     ui_header: str                 # Column header (e.g., "Title")
     db_column: str                 # SQL column name (e.g., "MS.Name")
     field_type: FieldType = FieldType.TEXT
-    color: str = "#FFC66D"         # Semantic color (Amber default)
+    zone: str = "amber"            # Semantic zone (amber, blue, green, gray)
 
     
     # Validation
@@ -127,7 +127,7 @@ FIELDS: List[FieldDef] = [
         portable=False,
         query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
         strategy='first_letter_grouper',
-        color='#2979FF',
+        zone='amber',
     ),
     FieldDef(
         name='title',
@@ -146,7 +146,7 @@ FIELDS: List[FieldDef] = [
         query_expression='GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle',
         required=True,
         strategy='first_letter_grouper',
-        color='#2979FF', # IDENTITY: Blue
+        zone='amber', # IDENTITY
     ),
     FieldDef(
         name='composers',
@@ -159,7 +159,7 @@ FIELDS: List[FieldDef] = [
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Composer' THEN C.ContributorName END, ', ') AS Composers",
         required=True,
         strategy='first_letter_grouper',
-        color='#FFC66D', # ATTRIBUTE: Amber
+        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='publisher',
@@ -170,7 +170,7 @@ FIELDS: List[FieldDef] = [
         query_expression='GROUP_CONCAT(DISTINCT P.PublisherName) AS Publisher',
         required=True,
         strategy='first_letter_grouper',
-        color='#2979FF', # IDENTITY: Blue
+        zone='amber', # IDENTITY
     ),
 
     FieldDef(
@@ -182,7 +182,7 @@ FIELDS: List[FieldDef] = [
         id3_tag='TDRC',
         required=True,
         strategy='decade_grouper',
-        color='#FFC66D', # ATTRIBUTE: Amber
+        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='genre',
@@ -193,7 +193,7 @@ FIELDS: List[FieldDef] = [
         query_expression='GROUP_CONCAT(DISTINCT TG.TagName) AS Genre',
         required=True,
         strategy='decade_grouper',
-        color='#FFC66D', # Warm Amber (Matches Speech/All)
+        zone='amber', # Warm Amber (Matches Speech/All)
     ),
     FieldDef(
         name='isrc',
@@ -224,7 +224,7 @@ FIELDS: List[FieldDef] = [
         id3_tag='TIPL',
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Producer' THEN C.ContributorName END, ', ') AS Producers",
         strategy='first_letter_grouper',
-        color='#FFC66D', # ATTRIBUTE: Amber
+        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='lyricists',
@@ -236,7 +236,7 @@ FIELDS: List[FieldDef] = [
         portable=False,
         query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Lyricist' THEN C.ContributorName END, ', ') AS Lyricists",
         strategy='first_letter_grouper',
-        color='#FFC66D', # ATTRIBUTE: Amber
+        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='album_artist',
@@ -263,7 +263,7 @@ FIELDS: List[FieldDef] = [
         portable=False,
         searchable=False,
         strategy='boolean',
-        color='#43A047', # Console Green (Matches Commercials)
+        zone='magenta', # Console Magenta (Matches Surgical Highlights)
     ),
 
     FieldDef(
@@ -310,7 +310,7 @@ FIELDS: List[FieldDef] = [
         min_value=0,
         searchable=False,
         strategy='range',
-        color='#43A047', # SYSTEM: Green
+        zone='gray', # SYSTEM
     ),
     FieldDef(
         name='is_active',
@@ -321,7 +321,7 @@ FIELDS: List[FieldDef] = [
         portable=False,
         searchable=False,
         strategy='boolean',
-        color='#43A047', # SYSTEM: Green
+        zone='gray', # SYSTEM
     ),
 
 

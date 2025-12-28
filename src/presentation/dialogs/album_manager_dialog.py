@@ -25,31 +25,8 @@ class AlbumManagerDialog(QDialog):
         self.setFixedSize(600, 500)
         self.setModal(True)
         
-        # Internal Styling to match "Pro Workstation"
-        self.setStyleSheet("""
-            QDialog { background-color: #1A1A1A; color: #DDD; }
-            QLineEdit { 
-                background: #111; border: 1px solid #333; 
-                padding: 6px; color: #EEE; font-size: 10pt;
-            }
-            QLineEdit:focus { border: 1px solid #FF8C00; }
-            QListWidget {
-                background: #111; border: 1px solid #333;
-                font-size: 10pt;
-            }
-            QListWidget::item:selected {
-                background: #333; border-left: 3px solid #FF8C00;
-            }
-            QPushButton {
-                background: #2A2A2A; border: 1px solid #444; color: #CCC;
-                padding: 6px; font-weight: bold;
-            }
-            QPushButton:hover { background: #333; border-color: #666; }
-            QPushButton#Primary { 
-                background: #FF8C00; color: #000; border: none;
-            }
-            QPushButton#Primary:hover { background: #FFA500; }
-        """)
+        # Styling moved to theme.qss
+        self.setObjectName("AlbumManagerDialog")
         
         self._init_ui()
         
@@ -60,13 +37,12 @@ class AlbumManagerDialog(QDialog):
         # 1. Header (Mode Switcher)
         header_layout = QHBoxLayout()
         self.lbl_title = QLabel("SELECT ALBUM")
-        self.lbl_title.setStyleSheet("font-size: 14pt; font-weight: bold; color: #FF8C00;")
+        self.lbl_title.setObjectName("DialogHeaderTitle")
         
         header_layout.addWidget(self.lbl_title)
         header_layout.addStretch()
         
         self.btn_mode_toggle = QPushButton("Create New (+)")
-        self.btn_mode_toggle.setFixedWidth(120)
         self.btn_mode_toggle.clicked.connect(self._toggle_mode)
         header_layout.addWidget(self.btn_mode_toggle)
         
@@ -100,7 +76,7 @@ class AlbumManagerDialog(QDialog):
         
         # Form
         form_frame = QFrame()
-        form_frame.setStyleSheet("background: #111; border: 1px solid #333; border-radius: 4px;")
+        form_frame.setObjectName("DialogFormContainer")
         form_layout = QVBoxLayout(form_frame)
         
         self.inp_title = self._add_field(form_layout, "Album Title *")
@@ -110,10 +86,9 @@ class AlbumManagerDialog(QDialog):
         
         # Type Dropdown
         lbl_type = QLabel("Release Type")
-        lbl_type.setStyleSheet("color: #888; font-size: 9pt;")
+        lbl_type.setObjectName("DialogFieldLabel")
         self.cmb_type = QComboBox()
         self.cmb_type.addItems(["Album", "EP", "Single", "Compilation", "Anthology"])
-        self.cmb_type.setStyleSheet("background: #000; color: #DDD; padding: 4px; border: 1px solid #333;")
         
         form_layout.addWidget(lbl_type)
         form_layout.addWidget(self.cmb_type)
@@ -150,7 +125,7 @@ class AlbumManagerDialog(QDialog):
 
     def _add_field(self, layout, label_text):
         lbl = QLabel(label_text.upper())
-        lbl.setStyleSheet("color: #888; font-size: 8pt; font-weight: bold;")
+        lbl.setObjectName("DialogFieldLabel")
         inp = QLineEdit()
         layout.addWidget(lbl)
         layout.addWidget(inp)

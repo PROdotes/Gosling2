@@ -2,13 +2,13 @@
 import os
 import json
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QStyledItemDelegate, QStyle
-from PyQt6.QtCore import Qt, QRect, QSize, QUrl, pyqtSignal
+from PyQt6.QtCore import Qt, QRect, QSize, QUrl, pyqtSignal, pyqtProperty
 from PyQt6.QtGui import QFont, QPen, QColor, QPainter
 from ...business.services.metadata_service import MetadataService
-
+from ...resources import constants
 
 class PlaylistItemDelegate(QStyledItemDelegate):
-    """Custom delegate for playlist items"""
+    """Custom delegate for playlist items using the Property Bridge."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -19,11 +19,17 @@ class PlaylistItemDelegate(QStyledItemDelegate):
 
     ITEM_SPACING = 4 # Gap between items in pixels
 
+    def _get_qss_color(self, widget, prop_name: str, fallback_hex: str) -> QColor:
+        color = widget.property(prop_name)
+        if isinstance(color, QColor):
+            return color
+        return QColor(fallback_hex)
+
     def paint(self, painter, option, index) -> None:
         """Custom paint for playlist items"""
         painter.save()
         
-        # Adjust rect for spacing - make the visual item slightly smaller than the allocated space
+        # Adjust rect for spacing
         visual_rect = QRect(
             option.rect.left(),
             option.rect.top(),
@@ -31,17 +37,20 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             option.rect.height() - self.ITEM_SPACING
         )
 
-        # Background
+        # Background - fetch from widget properties (pushed by QSS)
+        row_color = self._get_qss_color(option.widget, "paletteVoid", constants.COLOR_VOID)
+        sel_color = self._get_qss_color(option.widget, "paletteAmber", constants.COLOR_AMBER)
+
         if option.state & QStyle.StateFlag.State_Selected:
-            painter.fillRect(visual_rect, QColor("#FF8C00")) # Industrial Amber Selection
-            painter.setPen(QColor("#000")) # Black text on selection
+            painter.fillRect(visual_rect, sel_color)
+            text_color = self._get_qss_color(option.widget, "paletteBlack", constants.COLOR_BLACK)
         else:
-            painter.fillRect(visual_rect, QColor("#111111")) # Machined Black 
-            # Add subtle bottom line
-            painter.setPen(QColor("#000"))
+            painter.fillRect(visual_rect, row_color)
+            text_color = self._get_qss_color(option.widget, "paletteWhite", constants.COLOR_WHITE)
+            # Divider
+            painter.setPen(self._get_qss_color(option.widget, "paletteBlack", constants.COLOR_BLACK))
             painter.drawLine(visual_rect.bottomLeft(), visual_rect.bottomRight())
         
-
         # Text
         display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
         if "|" in display_text:
@@ -51,14 +60,11 @@ class PlaylistItemDelegate(QStyledItemDelegate):
         else:
             performer, title = display_text, ""
 
-        padding = 5
+        padding = 10
         
         if self.mini_mode:
-            # High-density Surgical Row
             painter.setFont(self.mini_font)
-            painter.setPen(QPen(option.palette.text() if not (option.state & QStyle.StateFlag.State_Selected) else Qt.GlobalColor.white, 1))
-            
-            # Draw combined text: PERFORMER - Title
+            painter.setPen(text_color)
             combined = f"{performer.upper()} - {title}" if title else performer.upper()
             painter.drawText(
                 visual_rect.adjusted(padding, 0, -padding, 0),
@@ -66,15 +72,14 @@ class PlaylistItemDelegate(QStyledItemDelegate):
                 combined
             )
         else:
-            # Full Consumer Row
-            # Circle (right side)
+            # Circle
             circle_diameter = int(visual_rect.height() * 0.75)
             circle_top = visual_rect.top() + (visual_rect.height() - circle_diameter) // 2
             circle_right_padding = -int(circle_diameter * 0.3)
             circle_left = visual_rect.right() - circle_diameter - circle_right_padding
             circle_rect = QRect(circle_left, circle_top, circle_diameter, circle_diameter)
 
-            painter.setBrush(QColor("#f44336"))
+            painter.setBrush(self._get_qss_color(option.widget, "paletteMagenta", constants.COLOR_MAGENTA))
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(circle_rect)
 
@@ -84,244 +89,165 @@ class PlaylistItemDelegate(QStyledItemDelegate):
                 circle_rect.left() - visual_rect.left() - 2 * padding,
                 visual_rect.height() - 2 * padding
             )
-
-            performer_rect = QRect(
-                text_rect.left(), text_rect.top(),
-                text_rect.width(), text_rect.height() // 2
-            )
-            title_rect = QRect(
-                text_rect.left(), text_rect.top() + text_rect.height() // 2,
-                text_rect.width(), text_rect.height() // 2
-            )
+            performer_rect = QRect(text_rect.left(), text_rect.top(), text_rect.width(), text_rect.height() // 2)
+            title_rect = QRect(text_rect.left(), text_rect.top() + text_rect.height() // 2, text_rect.width(), text_rect.height() // 2)
 
             painter.setFont(self.performer_font)
-            painter.setPen(QPen(option.palette.text(), 1))
-            painter.drawText(
-                performer_rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                performer.strip()
-            )
+            painter.setPen(text_color)
+            painter.drawText(performer_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, performer.strip())
 
             painter.setFont(self.title_font)
-            painter.drawText(
-                title_rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                title.strip()
-            )
+            painter.setPen(text_color)
+            painter.drawText(title_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title.strip())
 
         painter.restore()
 
     def sizeHint(self, option, index) -> QSize:
-        """Return preferred size"""
         width = option.rect.width() if option.rect.width() > 0 else 200
-        # Mini: 28px, Full: 54px (+ spacing)
         height = 24 if self.mini_mode else 54
         return QSize(width, height + self.ITEM_SPACING)
 
-
 class PlaylistWidget(QListWidget):
-    """Custom list widget with drag and drop for playlists"""
+    """Custom list widget with formal bridge properties."""
 
     itemDoubleClicked = pyqtSignal(object)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("PlaylistWidget")
+        
+        self._paletteAmber = QColor(constants.COLOR_AMBER)
+        self._paletteMutedAmber = QColor(constants.COLOR_MUTED_AMBER)
+        self._paletteMagenta = QColor(constants.COLOR_MAGENTA)
+        self._paletteBlack = QColor(constants.COLOR_BLACK)
+        self._paletteGray = QColor(constants.COLOR_GRAY)
+        self._paletteWhite = QColor(constants.COLOR_WHITE)
+        self._paletteVoid = QColor(constants.COLOR_VOID)
+        self._init_setup()
+    
+    @pyqtProperty(QColor)
+    def paletteAmber(self): return self._paletteAmber
+    @paletteAmber.setter
+    def paletteAmber(self, c): self._paletteAmber = c
+
+    @pyqtProperty(QColor)
+    def paletteMutedAmber(self): return self._paletteMutedAmber
+    @paletteMutedAmber.setter
+    def paletteMutedAmber(self, c): self._paletteMutedAmber = c
+
+    @pyqtProperty(QColor)
+    def paletteMagenta(self): return self._paletteMagenta
+    @paletteMagenta.setter
+    def paletteMagenta(self, c): self._paletteMagenta = c
+
+    @pyqtProperty(QColor)
+    def paletteBlack(self): return self._paletteBlack
+    @paletteBlack.setter
+    def paletteBlack(self, c): self._paletteBlack = c
+
+    @pyqtProperty(QColor)
+    def paletteGray(self): return self._paletteGray
+    @paletteGray.setter
+    def paletteGray(self, c): self._paletteGray = c
+
+    @pyqtProperty(QColor)
+    def paletteWhite(self): return self._paletteWhite
+    @paletteWhite.setter
+    def paletteWhite(self, c): self._paletteWhite = c
+
+    @pyqtProperty(QColor)
+    def paletteVoid(self): return self._paletteVoid
+    @paletteVoid.setter
+    def paletteVoid(self, c): self._paletteVoid = c
+
+    def _init_setup(self):
+        # Move setup logic here to avoid constructor bloat
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
         self.setDragDropMode(QListWidget.DragDropMode.DragDrop)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        
-        # Double Click to Play
         self.doubleClicked.connect(self._on_table_double_click)
-        
         self.delegate = PlaylistItemDelegate(self)
         self.setItemDelegate(self.delegate)
-        
         self._preview_row = None
         self._preview_after = False
 
-    def startDrag(self, supportedActions):
-        """Override startDrag to control removal logic"""
-        from PyQt6.QtGui import QDrag
-        
-        # Capture items explicitly BEFORE drag starts
-        drag_items = self.selectedItems()
-        if not drag_items:
-            return
+    def _on_table_double_click(self, index):
+        item = self.itemFromIndex(index)
+        if item: self.itemDoubleClicked.emit(item.data(Qt.ItemDataRole.UserRole))
 
-        drag = QDrag(self)
-        drag.setMimeData(self.mimeData(drag_items))
-        # drag.setPixmap(self.grab().scaledToWidth(200)) # Optional visual
-        
-        # Execute drag
-        res = drag.exec(supportedActions, Qt.DropAction.MoveAction)
-        
-        # Manual Cleanup if MoveAction
-        if res == Qt.DropAction.MoveAction:
-            # Safe removal: Remove captured original items
-            for item in drag_items:
-                row = self.row(item)
-                if row >= 0:
-                    self.takeItem(row)
-
-    def set_mini_mode(self, enabled: bool) -> None:
-        """Toggle detailed vs. high-density row rendering"""
-        if self.delegate.mini_mode != enabled:
-            self.delegate.mini_mode = enabled
-            # Force refresh of all items
-            self.doItemsLayout()
-            self.viewport().update()
-
-    def mimeData(self, items):
-        """Override to add custom mime type for internal D&D verification"""
-        mime = super().mimeData(items)
-        if items:
-            # Store paths (legacy/debug)
-            paths = []
-            # Store rows (for specific removal)
-            rows = []
-            
-            for item in items:
-                row = self.row(item)
-                if row >= 0:
-                    rows.append(row)
-                
-                data = item.data(Qt.ItemDataRole.UserRole)
-                if data and "path" in data:
-                    paths.append(data["path"])
-            
-            if paths:
-                mime.setData("application/x-gosling-playlist-items", json.dumps(paths).encode('utf-8'))
-            if rows:
-                mime.setData("application/x-gosling-playlist-rows", json.dumps(rows).encode('utf-8'))
-        
-        return mime
-
-    def dragEnterEvent(self, event) -> None:
-        """Handle drag enter"""
-        mime = event.mimeData()
-        if mime.hasFormat("application/x-gosling-library-rows"):
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls() or event.mimeData().hasFormat('application/x-qabstractitemmodeldatalist'):
             event.acceptProposedAction()
-        elif mime.hasUrls():
-            # Check if at least one URL is an MP3
-            has_mp3 = any(url.toLocalFile().lower().endswith('.mp3') for url in mime.urls())
-            if has_mp3:
-                event.acceptProposedAction()
-            else:
-                event.ignore()
-        elif event.source() == self:
-             event.acceptProposedAction()
-        else:
-            event.ignore()
 
-    def dragMoveEvent(self, event) -> None:
-        """Handle drag move with preview line"""
-        pos = event.position().toPoint()
-        index = self.indexAt(pos)
-
-        if index.isValid():
-            rect = self.visualItemRect(self.item(index.row()))
-            midpoint = rect.top() + rect.height() / 2
-            self._preview_row = index.row()
-            self._preview_after = pos.y() >= midpoint
-        else:
-            self._preview_row = self.count() - 1
-            self._preview_after = True
-
+    def dragMoveEvent(self, event):
+        self._preview_row = self.row(self.itemAt(event.position().toPoint()))
+        self._preview_after = False
+        if self._preview_row != -1:
+            item_rect = self.visualItemRect(self.item(self._preview_row))
+            if event.position().y() > item_rect.center().y(): self._preview_after = True
         self.viewport().update()
         event.acceptProposedAction()
 
-    def dragLeaveEvent(self, event) -> None:
-        """Handle drag leave"""
+    def dropEvent(self, event):
         self._preview_row = None
-        self.viewport().update()
-
-    def dropEvent(self, event) -> None:
-        """Handle drop event"""
-        mime = event.mimeData()
-        pos = event.position().toPoint()
-        index = self.indexAt(pos)
-        
-        if index.isValid():
-            insert_row = index.row() + (1 if self._preview_after else 0)
-        else:
-            insert_row = self.count()
-
-        # 1. Incoming from Gosling Library (Optimized)
-        if mime.hasFormat("application/x-gosling-library-rows"):
-            try:
-                songs = json.loads(mime.data("application/x-gosling-library-rows").data().decode('utf-8'))
-                for s in songs:
-                    display_text = f"{s['performer']} | {s['title']}"
-                    item = QListWidgetItem(display_text)
-                    item.setData(Qt.ItemDataRole.UserRole, {"path": s['path']})
-                    self.insertItem(insert_row, item)
-                    insert_row += 1
-                event.acceptProposedAction()
-            except Exception:
-                event.ignore()
-            self._preview_row = None
-            self.viewport().update()
-            return
-
-        # 2. Incoming Local Files
-        if mime.hasUrls():
-            for url in mime.urls():
-                path = url.toLocalFile()
-                if not os.path.isfile(path):
-                    continue
-                
-                ext = path.lower().split('.')[-1]
-                if ext not in ['mp3']:
-                    continue
-
-                display_text = os.path.basename(path)
-                try:
-                    song = MetadataService.extract_from_mp3(path)
-                    if song:
-                        display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
-                except Exception:
-                    pass
-
-                item = QListWidgetItem(display_text)
-                item.setData(Qt.ItemDataRole.UserRole, {"path": path})
-                self.insertItem(insert_row, item)
-                insert_row += 1
+        if event.mimeData().hasUrls():
+            paths = [url.toLocalFile() for url in event.mimeData().urls() if url.isLocalFile()]
+            if paths:
+                from .library_widget import LibraryWidget
+                main_window = self.window()
+                library_widget = main_window.findChild(LibraryWidget)
+                if library_widget:
+                    songs = []
+                    for path in paths:
+                        metadata = library_widget.metadata_service.get_metadata(path)
+                        songs.append(metadata)
+                    library_widget.add_to_playlist.emit(songs)
             event.acceptProposedAction()
-            self._preview_row = None
-            self.viewport().update()
-            return
-        
-        # 3. Internal Move
-        super().dropEvent(event)
-        self._preview_row = None
+        else: super().dropEvent(event)
 
-    def paintEvent(self, event) -> None:
-        """Custom paint to show drop preview line"""
+    def paintEvent(self, event):
         super().paintEvent(event)
-        if self._preview_row is None:
-            return
-
-        painter = QPainter(self.viewport())
-        pen = QPen(QColor("#FF8C00"), 2) # Industrial Amber Preview Line
-        painter.setPen(pen)
-
-        if self._preview_row < self.count():
+        if self._preview_row is not None:
+            painter = QPainter(self.viewport())
+            pen = QPen(self.property("paletteAmber") or QColor(constants.COLOR_AMBER), 2)
+            painter.setPen(pen)
             item = self.item(self._preview_row)
             if item:
                 rect = self.visualItemRect(item)
                 y = rect.bottom() if self._preview_after else rect.top()
-                painter.drawLine(0, y, self.viewport().width(), y)
-        elif self.count() > 0:
-            last_item = self.item(self.count() - 1)
-            if last_item:
-                last_rect = self.visualItemRect(last_item)
-                y = last_rect.bottom()
-                painter.drawLine(0, y, self.viewport().width(), y)
+                painter.drawLine(rect.left(), y, rect.right(), y)
+            painter.end()
 
-    def _on_table_double_click(self, index) -> None:
-        """Handle double click on item"""
-        item = self.item(index.row())
-        if item:
-            self.itemDoubleClicked.emit(item)
+    def startDrag(self, supportedActions):
+        from PyQt6.QtGui import QDrag
+        drag_items = self.selectedItems()
+        if not drag_items: return
+        drag = QDrag(self)
+        drag.setMimeData(self.mimeData(drag_items))
+        res = drag.exec(supportedActions, Qt.DropAction.MoveAction)
+        if res == Qt.DropAction.MoveAction:
+            for item in drag_items:
+                row = self.row(item)
+                if row >= 0: self.takeItem(row)
+
+    def set_mini_mode(self, enabled: bool) -> None:
+        if self.delegate.mini_mode != enabled:
+            self.delegate.mini_mode = enabled
+            self.doItemsLayout()
+            self.viewport().update()
+
+    def mimeData(self, items):
+        mime = super().mimeData(items)
+        if items:
+            paths = []
+            rows = []
+            for item in items:
+                row = self.row(item)
+                if row >= 0: rows.append(row)
+                data = item.data(Qt.ItemDataRole.UserRole)
+                if data and "path" in data: paths.append(data["path"])
+            if paths: mime.setData("application/x-gosling-playlist-items", json.dumps(paths).encode('utf-8'))
+            if rows: mime.setData("application/x-gosling-playlist-rows", json.dumps(rows).encode('utf-8'))
+        return mime

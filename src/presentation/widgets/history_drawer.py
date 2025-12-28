@@ -13,24 +13,7 @@ class HistoryDrawer(QFrame):
         super().__init__(parent)
         self.field_indices = field_indices
         self.setObjectName("HistoryDrawer")
-        
-        # Style the drawer (Machined Metal look)
-        self.setStyleSheet("""
-            #HistoryDrawer {
-                background-color: #121212;
-                border-right: 2px solid #FF8C00;
-            }
-            QLabel#HistoryTitle {
-                color: #FF8C00;
-                font-family: 'Tw Cen MT Condensed Bold';
-                font-size: 14pt;
-                letter-spacing: 2px;
-                padding: 10px;
-                background-color: #000;
-                text-transform: uppercase;
-                border-bottom: 1px solid #222;
-            }
-        """)
+        # Styling via QSS: QFrame#HistoryDrawer, QLabel#HistoryTitle
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

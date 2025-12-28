@@ -28,6 +28,10 @@ class SidePanelWidget(QWidget):
         self.renaming_service = renaming_service
         self.duplicate_scanner = duplicate_scanner
         
+        # QSS Styling Support
+        self.setObjectName("SidePanelEditor")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        
         # Dependency Injection for Dialogs
         # We need access to the album repository. Assuming library service has access or can provide it.
         # For strict DI, we should pass it, but for now we'll reach through library_service if needed
@@ -96,17 +100,7 @@ class SidePanelWidget(QWidget):
         self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_status.clicked.connect(self._on_status_toggled)
 
-        # Pill Styling (Dynamic QSS injected in _update_status_visuals)
-        self.btn_status.setStyleSheet("""
-            QPushButton#StatusPill {
-                border: none;
-                border-radius: 16px;
-                font-weight: bold;
-                color: #DDD;
-                background-color: #333;
-                padding: 0 15px;
-            }
-        """)
+        # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
         self.btn_status.setEnabled(False)
         footer_main_layout.addWidget(self.btn_status)
 
@@ -241,8 +235,7 @@ class SidePanelWidget(QWidget):
             
             group_label = QLabel(title.upper())
             group_label.setObjectName("FieldGroupLabel")
-            # FORCE BLUE (Identity) - Bypass QSS
-            group_label.setStyleSheet("color: #2979FF; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 11pt; border-bottom: 1px solid #333; padding-bottom: 2px; margin-top: 12px; margin-bottom: 4px;")
+            # Styling via QSS: QLabel#FieldGroupLabel
             self.field_layout.addWidget(group_label)
             
             for item in fields:
@@ -265,8 +258,7 @@ class SidePanelWidget(QWidget):
                         if field.required: label_text += " *"
                         lbl = QLabel(label_text)
                         lbl.setObjectName("FieldLabel")
-                        # FORCE AMBER (Bypass QSS Specificity War) - BUMP SIZE
-                        lbl.setStyleSheet("color: #FFC66D; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 10pt; text-transform: uppercase;")
+                        # Styling via QSS: QLabel#FieldLabel
                         
                         eff_val, is_mult = self._calculate_bulk_value(field)
                         widget = self._create_field_widget(field, eff_val, is_mult)
@@ -308,8 +300,7 @@ class SidePanelWidget(QWidget):
                     label_text += " *"
                 label = QLabel(label_text)
                 label.setObjectName("FieldLabel")
-                # FORCE AMBER (Bypass QSS Specificity War) - BUMP SIZE
-                label.setStyleSheet("color: #FFC66D; font-weight: bold; font-family: 'Bahnschrift Condensed'; font-size: 10pt; text-transform: uppercase;")
+                # Styling via QSS: QLabel#FieldLabel
                 
                 # Determine Current Effective Value
                 effective_val, is_multiple = self._calculate_bulk_value(field)
@@ -390,13 +381,7 @@ class SidePanelWidget(QWidget):
         # T-46: Album Picker (Special Handling)
         if field_def.name == 'album':
             btn = QPushButton()
-            btn.setStyleSheet("""
-                text-align: left; 
-                background: #111; 
-                border: 1px solid #333; 
-                color: #DDD; 
-                padding: 6px;
-            """)
+            btn.setObjectName("AlbumPickerButton")  # Styling via QSS
             
             # Display Value Logic
             if is_multiple:
@@ -561,31 +546,17 @@ class SidePanelWidget(QWidget):
         self._update_status_visuals(checked)
 
     def _update_status_visuals(self, is_done):
-        """Apply Pro Radio styling: Green for AIR, Gray for PENDING."""
+        """Apply Pro Radio styling: Green for AIR, Gray for PENDING via QSS dynamic property."""
         if is_done:
-            text = "READY [AIR]"
-            # Green Gradient
-            bg_color = "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #43A047, stop:1 #2E7D32)"
-            border = "1px solid #66BB6A"
-            color = "#FFF"
+            self.btn_status.setText("READY [AIR]")
+            self.btn_status.setProperty("state", "ready")
         else:
-            text = "PENDING"
-            # Gray Gradient
-            bg_color = "qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #333, stop:1 #222)"
-            border = "1px solid #444"
-            color = "#888"
-
-        self.btn_status.setText(text)
-        self.btn_status.setStyleSheet(f"""
-            QPushButton#StatusPill {{
-                background: {bg_color};
-                border: {border};
-                border-radius: 14px;
-                color: {color};
-                font-weight: bold;
-                padding: 0 15px;
-            }}
-        """)
+            self.btn_status.setText("PENDING")
+            self.btn_status.setProperty("state", "pending")
+        
+        # Force style refresh for dynamic property change
+        self.btn_status.style().unpolish(self.btn_status)
+        self.btn_status.style().polish(self.btn_status)
 
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing in selection."""

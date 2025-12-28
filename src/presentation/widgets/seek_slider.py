@@ -14,6 +14,7 @@ class SeekSlider(QSlider):
 
     def __init__(self, orientation=Qt.Orientation.Horizontal, parent=None) -> None:
         super().__init__(orientation, parent)
+        self.setObjectName("SeekSlider")  # For QSS styling
         self.setMouseTracking(True)
         self.total_duration_secs = 0
         self._last_tooltip = None

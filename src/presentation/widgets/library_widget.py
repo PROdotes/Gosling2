@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget
 )
 import json
+from ...resources import constants
 from .filter_widget import FilterWidget
 from ...core import yellberus
 from .library_delegate import WorkstationDelegate
@@ -227,6 +228,53 @@ class EventFilterProxy(QObject):
         return False
 
 
+class LibraryTable(QTableView):
+    """Table view for the library with formal bridge properties."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._paletteAmber = QColor(constants.COLOR_AMBER)
+        self._paletteMutedAmber = QColor(constants.COLOR_MUTED_AMBER)
+        self._paletteMagenta = QColor(constants.COLOR_MAGENTA)
+        self._paletteBlack = QColor(constants.COLOR_BLACK)
+        self._paletteGray = QColor(constants.COLOR_GRAY)
+        self._paletteWhite = QColor(constants.COLOR_WHITE)
+        self._paletteVoid = QColor(constants.COLOR_VOID)
+
+    @pyqtProperty(QColor)
+    def paletteAmber(self): return self._paletteAmber
+    @paletteAmber.setter
+    def paletteAmber(self, c): self._paletteAmber = c
+
+    @pyqtProperty(QColor)
+    def paletteMutedAmber(self): return self._paletteMutedAmber
+    @paletteMutedAmber.setter
+    def paletteMutedAmber(self, c): self._paletteMutedAmber = c
+
+    @pyqtProperty(QColor)
+    def paletteMagenta(self): return self._paletteMagenta
+    @paletteMagenta.setter
+    def paletteMagenta(self, c): self._paletteMagenta = c
+
+    @pyqtProperty(QColor)
+    def paletteBlack(self): return self._paletteBlack
+    @paletteBlack.setter
+    def paletteBlack(self, c): self._paletteBlack = c
+
+    @pyqtProperty(QColor)
+    def paletteGray(self): return self._paletteGray
+    @paletteGray.setter
+    def paletteGray(self, c): self._paletteGray = c
+
+    @pyqtProperty(QColor)
+    def paletteWhite(self): return self._paletteWhite
+    @paletteWhite.setter
+    def paletteWhite(self, c): self._paletteWhite = c
+
+    @pyqtProperty(QColor)
+    def paletteVoid(self): return self._paletteVoid
+    @paletteVoid.setter
+    def paletteVoid(self, c): self._paletteVoid = c
+
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
 
@@ -370,7 +418,8 @@ class LibraryWidget(QWidget):
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         self.proxy_model.setSortRole(Qt.ItemDataRole.UserRole) # Use UserRole for sorting
         
-        self.table_view = QTableView()
+        self.table_view = LibraryTable()
+        self.table_view.setObjectName("LibraryTable") 
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

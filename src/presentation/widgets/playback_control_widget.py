@@ -4,24 +4,7 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 from .seek_slider import SeekSlider
 
-# --- STYLING CONSTANTS (Matched to Hospital/Industrial Spec) ---
-COLOR_ACCENT = "#FF8C00"
-COLOR_BG_PANEL = "#1A1A1A"
-COLOR_BG_HEADER = "#2A2A2A"
-COLOR_TEXT_DIM = "#888888"
-
-STYLE_BTN_BASE = f"""
-    QPushButton {{
-        background: {COLOR_BG_HEADER}; 
-        border: 1px solid #333; 
-        color: {COLOR_TEXT_DIM}; 
-        font-weight: bold;
-        font-family: 'Bahnschrift Condensed', 'Arial Narrow';
-        font-size: 10pt;
-    }}
-    QPushButton:hover {{ border-color: #666; color: #BBB; }}
-    QPushButton:pressed {{ background: #111; }}
-"""
+# Note: All styling moved to theme.qss - see "PLAYBACK CONTROL WIDGET STYLES" section
 
 class PlaybackControlWidget(QWidget):
     """
@@ -43,8 +26,10 @@ class PlaybackControlWidget(QWidget):
 
     def __init__(self, playback_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("PlaybackDeck")
         self.playback_service = playback_service
         self.settings_manager = settings_manager
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._playlist_count = 0
         
         self._init_ui()
@@ -52,41 +37,50 @@ class PlaybackControlWidget(QWidget):
 
     def _init_ui(self) -> None:
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # --- LEFT: THE IDENT (Metadata & Cover) ---
-        self.cover_bay = QFrame()
-        self.cover_bay.setFixedSize(60, 60)
-        self.cover_bay.setObjectName("CoverBay")
-        layout.addWidget(self.cover_bay)
-
-        # --- CENTER: THE ENGINE (Transport + Transitions) ---
-        engine_layout = QVBoxLayout()
-        engine_layout.setSpacing(4)
+        # --- LEFT: THE IDENT BAY (Album Art) ---
+        ident_layout = QVBoxLayout()
+        ident_layout.setSpacing(5)
         
-        # Row 1: The readout
-        self.song_label = QLabel("NO MEDIA ARMED")
-        self.song_label.setObjectName("LargeSongLabel")
-        engine_layout.addWidget(self.song_label)
+        # Cover Placeholder
+        self.cover_bay = QFrame()
+        self.cover_bay.setObjectName("CoverBay")
+        self.cover_bay.setFixedSize(60, 60)
+        ident_layout.addWidget(self.cover_bay)
+        
+        # Song Name (Compact)
+        self.lbl_song = QLabel("NO MEDIA ARMED")
+        self.lbl_song.setObjectName("LargeSongLabel")
+        ident_layout.addWidget(self.lbl_song)
+        
+        layout.addLayout(ident_layout, 1)
+
+        # --- CENTER: THE ENGINE (Transport Controls) ---
+        engine_layout = QVBoxLayout()
+        engine_layout.setSpacing(5)
+        
+        # Row 1: The readout (moved to ident_layout)
         
         # Row 2: Transport & Transition Controls
         controls_row = QHBoxLayout()
-        controls_row.setSpacing(6)
+        controls_row.setSpacing(5)
         
         # Transport
         self.btn_prev = self._create_cmd_btn("|<", "prev")
         self.btn_play = self._create_cmd_btn("PLAY", "play")
+        self.btn_play.setObjectName("PlaybackPlayButton")  # Special amber styling
         self.btn_stop = self._create_cmd_btn("STOP", "stop")
         self.btn_next = self._create_cmd_btn(">|", "next_fade")
         
         # Transitions
         self.combo_fade = QComboBox()
+        self.combo_fade.setObjectName("PlaybackFadeCombo")  # Styled in QSS
         self.combo_fade.addItems(["0s", "1s", "2s", "3s", "5s", "10s"])
         self.combo_fade.setCurrentText("3s")
         self.combo_fade.setFixedWidth(60)
         self.combo_fade.setFixedHeight(30)
-        self.combo_fade.setStyleSheet(f"background: #111; color: {COLOR_ACCENT}; border: 1px solid #333;")
         
         for w in [self.btn_prev, self.btn_play, self.btn_stop, self.btn_next]:
             controls_row.addWidget(w)
@@ -116,6 +110,7 @@ class PlaybackControlWidget(QWidget):
         
         self.vol_icon = QLabel("🔈")
         self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setObjectName("VolumeSlider")  # For QSS styling
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setFixedWidth(80)
         
@@ -129,36 +124,14 @@ class PlaybackControlWidget(QWidget):
         monitor_layout.addLayout(footer_row)
         layout.addLayout(monitor_layout, 3)
 
-        self.setStyleSheet(f"""
-            PlaybackControlWidget {{
-                background-color: #0A0A0A;
-                border: none;
-            }}
-            #LargeSongLabel {{
-                color: {COLOR_ACCENT};
-                font-family: 'Bahnschrift Condensed';
-                font-size: 14pt;
-                font-weight: bold;
-            }}
-            #CoverBay {{
-                border: 2px solid #333;
-                background-color: #000;
-            }}
-            #PlaybackTimer {{
-                color: #666;
-                font-family: 'Consolas', monospace;
-                font-size: 9pt;
-            }}
-        """)
+        # Styling via QSS - no inline styles
 
     def _create_cmd_btn(self, text, command_id):
         btn = QPushButton(text)
         btn.setFixedHeight(30)
         btn.setFixedWidth(70)
         btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        btn.setStyleSheet(STYLE_BTN_BASE)
-        if command_id == "play":
-            btn.setStyleSheet(STYLE_BTN_BASE + f"QPushButton {{ color: {COLOR_ACCENT}; border-color: {COLOR_ACCENT}; }}")
+        btn.setProperty("class", "PlaybackCommand")  # For QSS: QPushButton.PlaybackCommand
         
         if command_id == "next_fade":
             btn.clicked.connect(lambda: self._emit_transition("fade"))
@@ -206,7 +179,7 @@ class PlaybackControlWidget(QWidget):
         self.lbl_time_remaining.setText(f"- {self._format_time(remaining)}")
 
     def update_song_label(self, text):
-        self.song_label.setText(text)
+        self.lbl_song.setText(text)
 
     def _format_time(self, ms: int) -> str:
         seconds = int(ms / 1000)

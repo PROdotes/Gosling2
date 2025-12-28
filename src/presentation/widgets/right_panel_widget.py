@@ -8,27 +8,7 @@ from .history_drawer import HistoryDrawer
 from .side_panel_widget import SidePanelWidget
 from .playlist_widget import PlaylistWidget
 
-# --- STYLING CONSTANTS (From Style Guide) ---
-COLOR_ACCENT = "#FF8C00"
-COLOR_BG_PANEL = "#1A1A1A"
-COLOR_BG_HEADER = "#2A2A2A"
-COLOR_TEXT_DIM = "#888888"
-
-STYLE_BTN_BASE = f"""
-    QPushButton {{
-        background: {COLOR_BG_HEADER}; 
-        border: 1px solid #333; 
-        color: {COLOR_TEXT_DIM}; 
-        font-weight: bold;
-        font-family: 'Bahnschrift Condensed', 'Arial Narrow';
-    }}
-    QPushButton:hover {{ border-color: #666; color: #BBB; }}
-    QPushButton:checked {{
-        background: #111; 
-        border: 1px solid {COLOR_ACCENT}; 
-        color: {COLOR_ACCENT};
-    }}
-"""
+# Note: All styling moved to theme.qss - see "RIGHT PANEL WIDGET STYLES" section
 
 class RightPanelHeader(QFrame):
     """
@@ -43,7 +23,7 @@ class RightPanelHeader(QFrame):
         super().__init__(parent)
         self.setFixedHeight(40)
         self.setObjectName("RightPanelHeader")
-        self.setStyleSheet(f"#RightPanelHeader {{ background: {COLOR_BG_PANEL}; border: none; }}")
+        # Styling via QSS: QFrame#RightPanelHeader
         
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 0, 5, 0)
@@ -60,8 +40,8 @@ class RightPanelHeader(QFrame):
         
         # Center: Editor (Big)
         self.btn_edit = self._create_toggle("[ EDIT MODE ]", self.toggle_editor)
+        self.btn_edit.setObjectName("EditModeButton")  # For larger font in QSS
         self.btn_edit.setFixedWidth(140)
-        self.btn_edit.setStyleSheet(self.btn_edit.styleSheet() + "font-size: 10pt; letter-spacing: 1px;")
         layout.addWidget(self.btn_edit)
         
         # Add stretch to center SURGERY MODE
@@ -78,8 +58,8 @@ class RightPanelHeader(QFrame):
         btn = QPushButton(text)
         btn.setCheckable(True)
         btn.setFixedHeight(28)
-        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus) # SAFETY PROTOCOL: No Keyboard Focus
-        btn.setStyleSheet(STYLE_BTN_BASE)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn.setProperty("class", "RightPanelToggle")  # For QSS: QPushButton.RightPanelToggle
         btn.toggled.connect(signal.emit)
         return btn
 
@@ -94,9 +74,9 @@ class RightPanelFooter(QFrame):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(100) # Enough for 2 rows comfortably
+        self.setFixedHeight(100)
         self.setObjectName("RightPanelFooter")
-        self.setStyleSheet(f"#RightPanelFooter {{ background: {COLOR_BG_PANEL}; border: none; }}")
+        # Styling via QSS: QFrame#RightPanelFooter
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -108,14 +88,12 @@ class RightPanelFooter(QFrame):
         
         self.btn_prev = self._create_cmd_btn("|<", "prev")
         self.btn_play = self._create_cmd_btn("PLAY", "play")
+        self.btn_play.setObjectName("PlayButton")  # Special amber styling in QSS
         self.btn_stop = self._create_cmd_btn("STOP", "stop")
         self.btn_next = self._create_cmd_btn(">|", "next")
         
         for btn in [self.btn_prev, self.btn_play, self.btn_stop, self.btn_next]:
             transport_layout.addWidget(btn)
-        
-        # Play button gets special color
-        self.btn_play.setStyleSheet(STYLE_BTN_BASE.replace(COLOR_TEXT_DIM, "#FFF") + f"QPushButton {{ background: #222; border: 1px solid {COLOR_ACCENT}; color: {COLOR_ACCENT}; }}")
 
         layout.addLayout(transport_layout)
         
@@ -127,12 +105,12 @@ class RightPanelFooter(QFrame):
         
         # Fade Duration
         self.combo_fade = QComboBox()
+        self.combo_fade.setObjectName("FadeDurationCombo")  # Styled in QSS
         self.combo_fade.addItems(["1s", "2s", "3s", "5s", "10s"])
         self.combo_fade.setCurrentText("3s")
         self.combo_fade.setFixedWidth(60)
         self.combo_fade.setFixedHeight(28)
-        self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Safety
-        self.combo_fade.setStyleSheet(f"background: #111; color: {COLOR_ACCENT}; border: 1px solid #333;")
+        self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         trans_layout.addWidget(self.btn_cut)
         trans_layout.addStretch()
@@ -144,8 +122,8 @@ class RightPanelFooter(QFrame):
     def _create_cmd_btn(self, text, command_id):
         btn = QPushButton(text)
         btn.setFixedHeight(34)
-        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus) # SAFETY PROTOCOL
-        btn.setStyleSheet(STYLE_BTN_BASE)
+        btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        btn.setProperty("class", "RightPanelCommand")  # For QSS: QPushButton.RightPanelCommand
         
         # Connect depending on type
         if command_id in ['cut', 'fade']:
@@ -184,11 +162,12 @@ class RightPanelWidget(QWidget):
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None):
         super().__init__(parent)
         self.setObjectName("RightSurgicalPanel")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.settings_manager = settings_manager
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(0, 0, 0, 0)
-        self.layout.setSpacing(0)
+        self.layout.setContentsMargins(8, 8, 8, 8)  # Show panel gradient around edges
+        self.layout.setSpacing(5)
         
         # Constraint: Prevent collapse of Command Deck (Corridor: 260px - 500px)
         self.setMinimumWidth(270)
@@ -228,8 +207,6 @@ class RightPanelWidget(QWidget):
         self.splitter.setCollapsible(0, True) 
         self.splitter.setCollapsible(1, True) 
         self.splitter.setCollapsible(2, False)
-        
-        self.layout.addWidget(self.splitter)
         
         self.layout.addWidget(self.splitter)
 

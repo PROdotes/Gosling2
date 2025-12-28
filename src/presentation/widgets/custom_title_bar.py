@@ -18,6 +18,7 @@ class CustomTitleBar(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("TitleBar")
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._drag_pos = QPoint()
         
         self._init_ui()

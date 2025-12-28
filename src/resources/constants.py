@@ -1,10 +1,15 @@
 """Constants and configuration"""
 
-# UI Colors
-GREEN_HEX = "5f8a53"
-SELECTED_COLOR = "#1E5096"
-NORMAL_COLOR = "#444444"
-CIRCLE_COLOR = "#f44336"
+# UI Colors (The Core 5 Console Palette)
+COLOR_AMBER = "#FFC66D"       # Main Accent / Signal
+COLOR_MUTED_AMBER = "#FF8C00" # Secondary / Tactical
+COLOR_MAGENTA = "#FF00FF"     # Critical / Surgical Highlights
+COLOR_BLACK = "#000000"       # Chassis / Void
+COLOR_GRAY = "#888888"        # Ghost Data / Muted Text
+
+# Support Colors (Strictly for Contrast/Physicality)
+COLOR_WHITE = "#FFFFFF"       # High-Contrast Text
+COLOR_VOID = "#111111"        # Near-Black Surface
 
 # UI Dimensions
 SLIDER_SIZE = 30
@@ -14,5 +19,4 @@ PLAYLIST_ITEM_HEIGHT = 54
 DEFAULT_ROLES = ["Performer", "Composer", "Lyricist", "Producer"]
 
 # File extensions
-SUPPORTED_AUDIO_FORMATS = ['.mp3', '.flac', '.wav', '.m4a']
-
+SUPPORTED_AUDIO_FORMATS = ['.mp3']

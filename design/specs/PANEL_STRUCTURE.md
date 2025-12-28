@@ -26,6 +26,7 @@ Main Window (#050505 - The Chassis/Void)
 │   ├── Panel header
 │   ├── Form sections
 │   ├── Action buttons
+│   ├── **NO Transport Controls** (Strictly Metadata/History)
 │   └── Border-left: 1px solid #1A1A1A
 │
 └── 5. BOTTOM PLAYBACK DECK (#050505 - distinct)
