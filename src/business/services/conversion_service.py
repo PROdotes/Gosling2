@@ -1,0 +1,124 @@
+import os
+import subprocess
+from typing import Optional, Callable
+# (Mutagen imports removed, logic now handled by MetadataService)
+
+class ConversionService:
+    """Service for handling audio format conversions (e.g., WAV to MP3)."""
+    
+    def __init__(self, settings_manager):
+        self.settings = settings_manager
+
+    def is_ffmpeg_available(self) -> bool:
+        """Checks if FFmpeg is available and executable."""
+        ffmpeg_path = self.settings.get_ffmpeg_path() or "ffmpeg"
+        try:
+            # Try to run ffmpeg -version
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                
+            subprocess.run(
+                [ffmpeg_path, "-version"], 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                startupinfo=startupinfo,
+                check=True
+            )
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+            return False
+
+    def convert_wav_to_mp3(self, wav_path: str, progress_callback: Optional[Callable[[int], None]] = None) -> Optional[str]:
+        """
+        Converts a WAV file to MP3 based on settings.
+        Returns the path to the new MP3 file on success, None on failure.
+        """
+        if not os.path.exists(wav_path):
+            return None
+            
+        if not wav_path.lower().endswith(".wav"):
+            return None
+
+        ffmpeg_path = self.settings.get_ffmpeg_path() or "ffmpeg"
+        quality_setting = self.settings.get_conversion_bitrate() or "320k"
+        
+        # 1. Parse Quality args
+        # VBR (V0) -> -q:a 0
+        # 320k -> -b:a 320k
+        quality_args = []
+        if "VBR" in quality_setting.upper():
+            quality_args = ["-q:a", "0"]
+        else:
+            # Strip standard 'k' if user accidentally included it, FFmpeg handles '320k' fine though
+            quality_args = ["-b:a", quality_setting]
+
+        # Output path
+        mp3_path = os.path.splitext(wav_path)[0] + ".mp3"
+        
+        if os.path.exists(mp3_path):
+            return None
+
+        try:
+            # Run FFmpeg
+            cmd = [
+                ffmpeg_path,
+                "-i", wav_path,
+                "-vn",             # No video
+                "-ar", "44100",    # Standard sample rate
+                "-ac", "2",        # Stereo
+            ]
+            cmd.extend(quality_args)
+            cmd.extend([
+                "-y",              # Overwrite output
+                mp3_path
+            ])
+            
+            # Hide console on Windows
+            startupinfo = None
+            if os.name == 'nt':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                startupinfo=startupinfo,
+                text=True
+            )
+            
+            stdout, stderr = process.communicate()
+            
+            if process.returncode != 0:
+                from src.core import logger
+                logger.error(f"FFmpeg failed (Code {process.returncode}): {stderr}")
+                return None
+                
+            return mp3_path
+            
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Conversion Error: {e}")
+            return None
+
+    def sync_tags(self, source_song, target_mp3_path: str) -> bool:
+        """
+        Copies metadata from the database/Song object to the newly created MP3.
+        Reuses MetadataService.write_tags for DRY consistency.
+        """
+        # We need to temporarily point the song's path to the new MP3
+        original_path = source_song.path
+        source_song.path = target_mp3_path
+        
+        try:
+            from .metadata_service import MetadataService
+            return MetadataService.write_tags(source_song)
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Tag Sync Error: {e}")
+            return False
+        finally:
+            # Restore original path
+            source_song.path = original_path

@@ -34,6 +34,53 @@ class MetadataService:
         return cls._id3_map
 
     @classmethod
+    def extract_metadata(cls, path: str, source_id: Optional[int] = None) -> Song:
+        """
+        Generic entry point for metadata extraction.
+        Supports MP3 (ID3) and WAV (RIFF).
+        """
+        ext = path.lower().split('.')[-1]
+        if ext == 'wav':
+            return cls.extract_from_wav(path, source_id)
+        return cls.extract_from_mp3(path, source_id)
+
+    @classmethod
+    def extract_from_wav(cls, path: str, source_id: Optional[int] = None) -> Song:
+        """Extract metadata from WAV (RIFF) using basic mapping."""
+        from mutagen.wave import WAVE
+        try:
+            audio = WAVE(path)
+        except Exception as e:
+            return Song(source_id=source_id, source=path)
+
+        # WAV/RIFF has very limited standard tags (INFO chunk)
+        tags = audio.tags if audio.tags else {}
+        song = Song(source_id=source_id, source=path)
+        song.duration = audio.info.length if audio.info else None
+        
+        # Simple RIFF Map (Standard "INFO" keys)
+        # INAM: Title, IART: Artist, IPRD: Album, ICRD: Year, IGNR: Genre
+        # Title (INAM=RIFF, TIT2=ID3)
+        title_val = tags.get('INAM') or tags.get('TIT2')
+        if title_val: song.name = str(title_val).strip()
+        
+        # Artist (IART=RIFF, TPE1=ID3)
+        artist_val = tags.get('IART') or tags.get('ARTIST') or tags.get('TPE1')
+        if artist_val:
+             song.performers = [str(artist_val).strip()]
+             
+        # Album (IPRD=RIFF, TALB=ID3)
+        album_val = tags.get('IPRD') or tags.get('TALB')
+        if album_val: song.album = str(album_val).strip()
+
+        if 'ICRD' in tags: 
+            try: song.recording_year = int(str(tags['ICRD'])[:4])
+            except: pass
+        if 'IGNR' in tags: song.genre = str(tags['IGNR']).strip()
+        
+        return song
+
+    @classmethod
     def extract_from_mp3(cls, path: str, source_id: Optional[int] = None) -> Song:
         """
         Extract metadata from an MP3 file and return a Song object.

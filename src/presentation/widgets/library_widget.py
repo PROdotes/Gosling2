@@ -1,6 +1,8 @@
 import os
 import zipfile
 import weakref
+from typing import Optional, List, Set, Union
+from ...data.models.song import Song
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
@@ -13,7 +15,7 @@ from ...core import yellberus
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint, QModelIndex
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QPen, QDrag, QFont
@@ -242,13 +244,14 @@ class LibraryWidget(QWidget):
     play_immediately = pyqtSignal(str) # Path to play
     focus_search_requested = pyqtSignal()
 
-    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
         self.settings_manager = settings_manager
         self.renaming_service = renaming_service
         self.duplicate_scanner = duplicate_scanner
+        self.conversion_service = conversion_service
         
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
@@ -596,7 +599,7 @@ class LibraryWidget(QWidget):
                 if url.isLocalFile():
                     path = url.toLocalFile()
                     ext = path.lower().split('.')[-1]
-                    if ext in ['mp3', 'zip']:
+                    if ext in ['mp3', 'zip', 'wav']:
                         event.acceptProposedAction()
                         self.table_view.setProperty("drag_status", "accept")
                         self.table_view.style().unpolish(self.table_view)
@@ -612,104 +615,162 @@ class LibraryWidget(QWidget):
         event.accept()
 
     def dropEvent(self, event):
-        """Handle dropped files or playlist items"""
-        # 1. Internal Drag (Table -> Table): Explicitly Ignore to prevent re-import
+        """Handle dropped files or playlist items with WAV detection and ZIP inspection."""
         if event.source() == self.table_view:
             event.ignore()
             return
 
-        # Reset visual feedback immediately
         self.table_view.setProperty("drag_status", "")
         self.table_view.style().unpolish(self.table_view)
         self.table_view.style().polish(self.table_view)
         
         mime = event.mimeData()
-
-        # 2. Handle Playlist Drop (Remove from Playlist via MoveAction)
         if mime.hasFormat("application/x-gosling-playlist-rows"):
-            # We accept the drop as a 'MoveAction'. 
-            # The source (PlaylistWidget) checking for MoveAction result will handle the deletion.
             event.acceptProposedAction()
             return
 
-        # 2. Handle File Drop (Import)
         if not mime.hasUrls():
             event.ignore()
             return
-            
-        file_paths = []
-        for url in mime.urls():
-            if url.isLocalFile():
-                path = url.toLocalFile()
-                ext = path.lower().split('.')[-1]
-                if ext == 'mp3':
-                    file_paths.append(path)
-                elif ext == 'zip':
-                    # Extract zip and add valid mp3s to list
-                    extracted = self._process_zip_file(path)
-                    file_paths.extend(extracted)
+
+        standalone_mp3s = []
+        standalone_wavs = []
+        zip_info = {} # path -> {'mp3': [], 'wav': []}
         
-        if file_paths:
+        for url in mime.urls():
+            if not url.isLocalFile(): continue
+            path = os.path.abspath(url.toLocalFile())
+            ext = path.lower().split('.')[-1]
+            
+            if ext == 'mp3':
+                standalone_mp3s.append(path)
+            elif ext == 'wav':
+                standalone_wavs.append(path)
+            elif ext == 'zip':
+                try:
+                    with zipfile.ZipFile(path, 'r') as zr:
+                        members = zr.namelist()
+                        mp3s = [m for m in members if m.lower().endswith('.mp3') and '..' not in m]
+                        wavs = [m for m in members if m.lower().endswith('.wav') and '..' not in m]
+                        if mp3s or wavs:
+                            zip_info[path] = {'mp3': mp3s, 'wav': wavs}
+                except Exception:
+                    pass
+
+        total_wavs = len(standalone_wavs) + sum(len(v['wav']) for v in zip_info.values())
+        
+        convert_choice = False
+        delete_wav_choice = False
+
+        if total_wavs > 0:
+            if self.conversion_service and self.conversion_service.is_ffmpeg_available():
+                reply = QMessageBox.question(
+                    self, "WAV Files Detected",
+                    f"{total_wavs} WAV file(s) found in the import. Convert them to MP3?\n\n(Lossy collection preference)",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                convert_choice = (reply == QMessageBox.StandardButton.Yes)
+                
+                if convert_choice:
+                    # The "Pester" Prompt (Per User Request)
+                    del_reply = QMessageBox.question(
+                        self, "Cleanup Confirmation",
+                        "Delete original WAV files after successful conversion?\n\n(Source files will be removed from disk)",
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    )
+                    delete_wav_choice = (del_reply == QMessageBox.StandardButton.Yes)
+            else:
+                # FFmpeg missing - User wants to know!
+                QMessageBox.warning(self, "Conversion Unavailable", 
+                                    "WAV files detected but FFmpeg was not found.\n\nPlease configure FFmpeg in Settings to enable conversion.")
+                # We do NOT return here, we allow dropping other files (MP3s) if any.
+                # But WAVs will be ignored.
+
+        final_import_list = []
+        final_import_list.extend(standalone_mp3s)
+        
+        failed_conversions = 0
+        
+        # 1. Standalone WAVs
+        if convert_choice:
+            for wv in standalone_wavs:
+                # Sniff metadata from WAV before it's gone
+                wav_song = self.metadata_service.extract_metadata(wv)
+                mp3 = self.conversion_service.convert_wav_to_mp3(wv)
+                if mp3:
+                    # Carry over tags to the new MP3
+                    self.conversion_service.sync_tags(wav_song, mp3)
+                    final_import_list.append(os.path.abspath(mp3))
+                    if delete_wav_choice:
+                        try: os.remove(wv) 
+                        except: pass
+                else:
+                    failed_conversions += 1
+        
+        # 2. Handle ZIPs
+        for zp, info in zip_info.items():
+            base_dir = os.path.dirname(zp)
+            zip_import_list = []
+            
+            # Extract MP3s always
+            with zipfile.ZipFile(zp, 'r') as zr:
+                for m in info['mp3']:
+                    try:
+                        zr.extract(m, base_dir)
+                        zip_import_list.append(os.path.abspath(os.path.join(base_dir, m)))
+                    except Exception: pass
+                
+                # Extract and Convert WAVs if user said YES
+                if convert_choice:
+                    for m in info['wav']:
+                        try:
+                            zr.extract(m, base_dir)
+                            temp_wav = os.path.join(base_dir, m)
+                            # Sniff metadata
+                            wav_song = self.metadata_service.extract_metadata(temp_wav)
+                            new_mp3 = self.conversion_service.convert_wav_to_mp3(temp_wav)
+                            if new_mp3:
+                                # Carry over tags
+                                self.conversion_service.sync_tags(wav_song, new_mp3)
+                                zip_import_list.append(os.path.abspath(new_mp3))
+                                try: os.remove(temp_wav)
+                                except: pass
+                            else:
+                                failed_conversions += 1
+                        except Exception: 
+                            failed_conversions += 1
+            
+            final_import_list.extend(zip_import_list)
+            
+            # Deletion Logic
+            should_delete_zip = False
+            if not info['wav']: 
+                # Pure MP3 zip, safe to clear
+                should_delete_zip = True
+            elif convert_choice and delete_wav_choice and failed_conversions == 0:
+                # Converted and user explicitly said YES to cleanup (AND NO FAILURES)
+                should_delete_zip = True
+            
+            if should_delete_zip:
+                try: os.remove(zp)
+                except: pass
+
+        if final_import_list or failed_conversions > 0:
             event.acceptProposedAction()
-            count = self.import_files_list(file_paths)
-            QMessageBox.information(self, "Import Result", f"Imported {count} file(s)")
+            count = 0
+            if final_import_list:
+                count = self.import_files_list(final_import_list)
+            
+            msg = f"Imported {count} file(s)."
+            if failed_conversions > 0:
+                msg += f"\n\nWARNING: {failed_conversions} WAV file(s) failed to convert.\nCheck FFmpeg settings."
+            
+            if failed_conversions > 0:
+                 QMessageBox.warning(self, "Import Result", msg)
+            else:
+                 QMessageBox.information(self, "Import Result", msg)
         else:
             event.ignore()
-
-    def _process_zip_file(self, zip_path):
-        """Extract valid MP3s from zip to the same folder.
-        
-        Logic:
-        1. Check if ANY of the mp3s in the zip already exist in destination.
-        2. If YES: Warn user and abort (do nothing).
-        3. If NO: Extract all mp3s, verify they are there, then DELETE the zip file.
-        
-        Returns list of absolute paths to the extracted MP3s.
-        """
-        extracted_paths = []
-        base_dir = os.path.dirname(zip_path)
-        mp3_members = []
-        
-        try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # 1. Identify MP3s
-                for member in zip_ref.namelist():
-                    if member.lower().endswith('.mp3'):
-                        # Security check: prevent Zip Slip
-                        if '..' not in member:
-                            mp3_members.append(member)
-                
-                if not mp3_members:
-                    return []
-
-                # 2. Check Collisions
-                for member in mp3_members:
-                    target_path = os.path.join(base_dir, member)
-                    if os.path.exists(target_path):
-                        # Collision detected!
-                        QMessageBox.warning(
-                            self, 
-                            "Import Aborted", 
-                            f"The file '{member}' already exists in the destination folder.\n\nAborting import to prevent overwriting."
-                        )
-                        return []
-
-                # 3. Extract All
-                for member in mp3_members:
-                    zip_ref.extract(member, base_dir)
-                    target_path = os.path.join(base_dir, member)
-                    extracted_paths.append(os.path.abspath(target_path))
-                    
-            # 4. Delete Zip (only if we reached here successfully)
-            try:
-                os.remove(zip_path)
-            except OSError as e:
-                print(f"Error deleting zip file {zip_path}: {e}")
-                
-        except zipfile.BadZipFile:
-            print(f"Error: {zip_path} is not a valid zip file")
-            
-        return extracted_paths
 
     def _setup_top_controls(self, parent_layout) -> None:
         pass
@@ -1200,6 +1261,31 @@ class LibraryWidget(QWidget):
         show_id3_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         show_id3_action.triggered.connect(self._show_id3_tags)
         menu.addAction(show_id3_action)
+
+        # 2b. Converter Surgery (WAV -> MP3)
+        if indexes and self.conversion_service:
+            # Check if any WAVs are selected
+            has_wav = False
+            path_col = self.field_indices.get('path', -1)
+            for idx in indexes:
+                source_idx = self.proxy_model.mapToSource(idx)
+                item = self.library_model.item(source_idx.row(), path_col)
+                if item and item.text().lower().endswith(".wav"):
+                    has_wav = True
+                    break
+            
+            if has_wav:
+                menu.addSeparator()
+                convert_action = QAction("CONVERT TO MP3", self)
+                # Amber themed icon or just standard
+                convert_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay)) 
+                convert_action.triggered.connect(self._on_convert_selected)
+                
+                if not self.settings_manager.get_conversion_enabled():
+                    convert_action.setEnabled(False)
+                    convert_action.setToolTip("Conversion disabled in settings.")
+                
+                menu.addAction(convert_action)
         
         menu.addSeparator()
         
@@ -1698,6 +1784,49 @@ class LibraryWidget(QWidget):
         if path_item:
             self.play_immediately.emit(path_item.text())
 
+    def _on_convert_selected(self) -> None:
+        """Handle manual conversion of selected WAV files."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        wav_paths = []
+
+        for idx in indexes:
+            song = self._get_song_from_index(idx)
+            if song and song.path and song.path.lower().endswith(".wav"):
+                wav_paths.append(song)
+
+        if not wav_paths:
+            return
+
+        reply = QMessageBox.question(
+            self, "Confirm Conversion",
+            f"Convert {len(wav_paths)} WAV file(s) to MP3?\n\nTags will be preserved and the WAVs will remain in place.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.No:
+            return
+
+        success_count = 0
+        for song in wav_paths:
+            # 1. Convert
+            mp3_path = self.conversion_service.convert_wav_to_mp3(song.path)
+            if mp3_path:
+                # 2. Sync Tags
+                self.conversion_service.sync_tags(song, mp3_path)
+                
+                # 3. Import New MP3
+                if self._import_file(mp3_path):
+                    success_count += 1
+        
+        if success_count > 0:
+            self.load_library()
+            QMessageBox.information(self, "Conversion Finished", f"Successfully converted and imported {success_count} MP3(s).")
+        else:
+            QMessageBox.warning(self, "Conversion Failed", "Conversion failed. Check log or FFmpeg path in settings.")
+
     def _on_table_double_click(self, index) -> None:
         """Double click adds to playlist (as per original behavior)"""
         self._emit_add_to_playlist()
@@ -1902,4 +2031,23 @@ class LibraryWidget(QWidget):
         Returns a set of field names that failed validation.
         """
         return yellberus.validate_row(row_data)
+
+    def _get_song_from_index(self, index: QModelIndex) -> Optional[Song]:
+        """Helper to fetch a Song object from a TableView index (proxy)."""
+        if not index.isValid():
+            return None
+        source_idx = self.proxy_model.mapToSource(index)
+        id_col = self.field_indices.get('file_id', -1)
+        id_item = self.library_model.item(source_idx.row(), id_col)
+        if not id_item:
+            return None
+            
+        raw_val = id_item.data(Qt.ItemDataRole.UserRole)
+        try:
+            sid = int(float(raw_val)) if raw_val is not None else None
+            if sid is not None:
+                return self.library_service.get_song_by_id(sid)
+        except (ValueError, TypeError):
+            pass
+        return None
 

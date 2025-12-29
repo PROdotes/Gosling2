@@ -69,3 +69,4 @@ sqldb/
 settings.ini
 
 .idea/workspace.xml
+tests/unit/tools/bin/ffmpeg.exe

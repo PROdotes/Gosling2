@@ -5,6 +5,7 @@ from .playback_service import PlaybackService
 from .settings_manager import SettingsManager
 from .renaming_service import RenamingService
 from .duplicate_scanner import DuplicateScannerService
+from .conversion_service import ConversionService
 
-__all__ = ['LibraryService', 'MetadataService', 'PlaybackService', 'SettingsManager', 'RenamingService', 'DuplicateScannerService']
+__all__ = ['LibraryService', 'MetadataService', 'PlaybackService', 'SettingsManager', 'RenamingService', 'DuplicateScannerService', 'ConversionService']
 

@@ -82,6 +82,13 @@
 - **New Task**: **T-63** added (Publisher Picker) to maintain data integrity.
 
 **Next Priority**: 
-1. **T-62**: Async Background Save (Prevent UI freeze during file moves).
-2. **T-61**: Universal Tag Picker.
-3. **Refactor**: Clean up `SidePanelWidget` staging logic.
+1. **T-68**: **Background Import Pipeline** (Prevent UI freeze during large imports & FFmpeg conversions).
+2. **T-62**: Async Background Save (Prevent UI freeze during file moves).
+3. **T-61**: Universal Tag Picker.
+4. **Refactor**: Clean up `SidePanelWidget` staging logic.
+
+### 🛑 Work Stoppage (User Left Work)
+- **Status Check**: 
+    - WAV Import Logic: **SAFE** (Explicit warnings added).
+    - Album Creator: **CRASHING** (Despite robustness patch, user reports crash persists). **URGENT**: Needs debug trace analysis in next session.
+- **Victory Note**: Confirmed `TPE1` (ID3) tags **DO** exist in hybrid WAVs. Added fallback logic to `metadata_service.py` (`IART`/`TPE1`) which resolved the request.

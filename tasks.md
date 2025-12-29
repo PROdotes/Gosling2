@@ -62,6 +62,7 @@ links: []
 | T-61 | **Universal Tag Picker** | 2 | 4 | 2 | 💡 | Core | Tree-based dialog for Tags (Genre/Mood/etc) with Color Pills. |
 | T-62 | **Async Background Save** | 2 | 3 | 2 | ⚡ | Perf | Move save/renaming operations to background thread to prevent UI freeze on bulk edits. |
 | T-63 | **Selectable Publisher Picker** | 2 | 2 | 2 | 🏢 | Core | Convert Publisher text input in Album Manager to a searchable picker/dropdown for data integrity. |
+| T-68 | **Background Import** | 5 | 4 | 10 | 📋 | — | Move file copy, zip extraction, and FFmpeg conversion to worker thread. Fixes UI freeze during large imports. |
 | T-64 | **Album Disambiguation** | 2 | 3 | 4 | 📀 | UX | Enhance Album Manager search results with sub-labels (Year, Publisher, etc.) to distinguish between duplicate titles like 'Greatest Hits'. |
 | T-53 | **UI Polish (Cyber)** | 4 | 2 | 8 | 🏗️ PARTIAL | — | Grid Colors Done. **Issue**: SVG Icon renders tiny. |
 | T-57 | **Settings Entry Point** | 3 | 1 | 15 | 💡 | — | Move App Icon to Top-Left and use as click-trigger for Settings. |

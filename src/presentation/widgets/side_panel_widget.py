@@ -269,7 +269,6 @@ class SidePanelWidget(QFrame):
                 line = QFrame()
                 line.setFixedHeight(2)
                 line.setObjectName("FieldGroupLine")
-                line.setStyleSheet("background-color: #555555;")
                 self.field_layout.addWidget(line)
                 self.field_layout.addSpacing(18) # Room before the next field (e.g. ISRC)
             

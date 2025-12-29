@@ -13,7 +13,8 @@ from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
     SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland
 )
-from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
+from ..dialogs import SettingsDialog
+from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService
 from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
@@ -165,6 +166,7 @@ class MainWindow(QMainWindow):
         self.playback_service = PlaybackService(self.settings_manager)
         self.renaming_service = RenamingService(self.settings_manager)
         self.duplicate_scanner = DuplicateScannerService(self.library_service)
+        self.conversion_service = ConversionService(self.settings_manager)
 
         # Initialize UI
         self._init_ui()
@@ -245,7 +247,8 @@ class MainWindow(QMainWindow):
             self.metadata_service,
             self.settings_manager,
             self.renaming_service,
-            self.duplicate_scanner
+            self.duplicate_scanner,
+            self.conversion_service
         )
         self.lc_splitter.addWidget(self.library_widget)
         
@@ -344,7 +347,7 @@ class MainWindow(QMainWindow):
         self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())
         
         # --- T-57: Global Settings Trigger ---
-        self.title_bar.settings_requested.connect(lambda: print("TODO: Open Settings Dialog (T-52)"))
+        self.title_bar.settings_requested.connect(self._open_settings)
 
 
     def _setup_shortcuts(self) -> None:
@@ -769,6 +772,14 @@ class MainWindow(QMainWindow):
             self.showNormal()
         else:
             self.showMaximized()
+
+    def _open_settings(self):
+        """Open the Settings Dialog (T-52 MVP)."""
+        dlg = SettingsDialog(self.settings_manager, self)
+        if dlg.exec():
+            # Refresh components that might depend on root path or rules
+            self.library_widget.load_library()
+            # Renaming service is already linked to settings_manager
 
     def resizeEvent(self, event):
         """Keep size grip in bottom-right corner"""

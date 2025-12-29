@@ -37,6 +37,11 @@ class SettingsManager:
     KEY_CROSSFADE_ENABLED = "playback/crossfadeEnabled"
     KEY_CROSSFADE_DURATION = "playback/crossfadeDuration"
     
+    # Conversion settings
+    KEY_CONVERSION_ENABLED = "conversion/enabled"
+    KEY_CONVERSION_BITRATE = "conversion/bitrate" # e.g. "320k"
+    KEY_FFMPEG_PATH = "conversion/ffmpegPath"
+    
     # Default values
     DEFAULT_VOLUME = 50
     DEFAULT_WINDOW_WIDTH = 1200
@@ -47,6 +52,10 @@ class SettingsManager:
     DEFAULT_RENAME_PATTERN = "{Artist}/{Album}/{Title}"
     DEFAULT_RENAME_ENABLED = True
     DEFAULT_MOVE_AFTER_DONE = True
+    
+    DEFAULT_CONVERSION_ENABLED = False
+    DEFAULT_CONVERSION_BITRATE = "320k"
+    DEFAULT_FFMPEG_PATH = "ffmpeg"
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -287,6 +296,20 @@ class SettingsManager:
     def set_crossfade_duration(self, duration: int) -> None:
         """Set crossfade duration in milliseconds"""
         self._settings.setValue(self.KEY_CROSSFADE_DURATION, duration)
+
+    # ===== Conversion Settings =====
+
+    def get_conversion_bitrate(self) -> str:
+        return self._settings.value(self.KEY_CONVERSION_BITRATE, self.DEFAULT_CONVERSION_BITRATE, type=str)
+
+    def set_conversion_bitrate(self, bitrate: str) -> None:
+        self._settings.setValue(self.KEY_CONVERSION_BITRATE, bitrate)
+
+    def get_ffmpeg_path(self) -> str:
+        return self._settings.value(self.KEY_FFMPEG_PATH, self.DEFAULT_FFMPEG_PATH, type=str)
+
+    def set_ffmpeg_path(self, path: str) -> None:
+        self._settings.setValue(self.KEY_FFMPEG_PATH, path)
     
     # ===== Utility Methods =====
     

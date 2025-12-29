@@ -101,6 +101,11 @@ QScrollBar::handle:vertical:hover {
     color: #000000;
 }
 
+#FieldGroupLine {
+    background-color: #555555;
+    max-height: 2px;
+}
+
 /* Amber Text */
 #LibraryHeader::section {
     color: #FFC66D;
