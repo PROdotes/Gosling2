@@ -306,3 +306,6 @@ QSplitter::handle {
     min-height: 7px;
     max-height: 7px;
 }
+GlowButton#PlaybackPlayButton {
+    qproperty-glowColor: #FFC66D;
+}

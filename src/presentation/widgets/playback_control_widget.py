@@ -41,22 +41,27 @@ class PlaybackControlWidget(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # --- LEFT: THE IDENT BAY (Album Art) ---
-        ident_layout = QVBoxLayout()
-        ident_layout.setSpacing(5)
+        # --- LEFT: THE IDENT BAY (Album Art & Song Info) ---
+        # Fixed-width container prevents 'shimmering' layouts when song titles change
+        self.ident_container = QFrame()
+        self.ident_container.setFixedWidth(200)
+        ident_layout = QVBoxLayout(self.ident_container)
+        ident_layout.setContentsMargins(0, 0, 0, 0)
+        ident_layout.setSpacing(2)
         
         # Cover Placeholder
         self.cover_bay = QFrame()
         self.cover_bay.setObjectName("CoverBay")
-        self.cover_bay.setFixedSize(60, 60)
+        self.cover_bay.setFixedSize(50, 50) 
         ident_layout.addWidget(self.cover_bay)
         
         # Song Name (Compact)
         self.lbl_song = QLabel("NO MEDIA ARMED")
         self.lbl_song.setObjectName("LargeSongLabel")
+        self.lbl_song.setWordWrap(False) # Force single line
         ident_layout.addWidget(self.lbl_song)
         
-        layout.addLayout(ident_layout, 1)
+        layout.addWidget(self.ident_container)
 
         # --- CENTER: THE ENGINE (Transport Controls) ---
         engine_layout = QVBoxLayout()
@@ -71,7 +76,12 @@ class PlaybackControlWidget(QWidget):
         # Transport
         self.btn_prev = self._create_cmd_btn("|<", "prev")
         self.btn_play = self._create_cmd_btn("PLAY", "play")
-        self.btn_play.setObjectName("PlaybackPlayButton")  # Special amber styling
+        self.btn_play.setObjectName("PlaybackPlayButton")
+        self.btn_play.setCheckable(True)
+        
+        self.btn_pause = self._create_cmd_btn("PAUSE", "pause")
+        self.btn_pause.setCheckable(True)
+
         self.btn_stop = self._create_cmd_btn("STOP", "stop")
         self.btn_next = self._create_cmd_btn(">|", "next_fade")
         
@@ -99,10 +109,10 @@ class PlaybackControlWidget(QWidget):
         self.combo_fade.setFixedHeight(31) # Visual docking sweet spot
         self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
-        for w in [self.btn_prev, self.btn_play, self.btn_stop, self.btn_next]:
+        for w in [self.btn_prev, self.btn_play, self.btn_pause, self.btn_stop, self.btn_next]:
             controls_row.addWidget(w)
         
-        controls_row.addSpacing(2) # Visual docking (closer to skip)
+        controls_row.addSpacing(2) 
         controls_row.addWidget(self.combo_fade)
         
         lbl_xfade = QLabel("X-FADE:")
@@ -154,10 +164,25 @@ class PlaybackControlWidget(QWidget):
             btn.clicked.connect(lambda: self._emit_transition("fade"))
         elif command_id in ["cut", "fade"]:
             btn.clicked.connect(lambda: self._emit_transition(command_id))
+        elif command_id == "play":
+            # Tape Logic: Direct interception for 'Latched' start/resume
+            btn.clicked.connect(lambda: self._handle_play_click())
         else:
             btn.clicked.connect(lambda: self.transport_command.emit(command_id))
             
         return btn
+
+    def _handle_play_click(self):
+        """Play acts as a latched start/resume. Ignore redundant off-toggles."""
+        state = self.playback_service.active_player.playbackState()
+        
+        if state == QMediaPlayer.PlaybackState.PlayingState:
+            self.btn_play.setChecked(True)
+        elif state == QMediaPlayer.PlaybackState.PausedState:
+            self.btn_play.setChecked(True)
+            self.transport_command.emit("play")
+        else:
+            self.transport_command.emit("play")
 
     def _emit_transition(self, cmd):
         dur_str = self.combo_fade.currentText().rstrip('s')
@@ -176,10 +201,16 @@ class PlaybackControlWidget(QWidget):
         self.playback_service.state_changed.connect(self._on_state_changed)
 
     def _on_state_changed(self, state):
+        """Sync visuals with Tape Recorder states."""
         if state == QMediaPlayer.PlaybackState.PlayingState:
-            self.btn_play.setText("PAUSE")
-        else:
-            self.btn_play.setText("PLAY")
+            self.btn_play.setChecked(True)
+            self.btn_pause.setChecked(False)
+        elif state == QMediaPlayer.PlaybackState.PausedState:
+            self.btn_play.setChecked(True)
+            self.btn_pause.setChecked(True)
+        else: # Stopped or Null
+            self.btn_play.setChecked(False)
+            self.btn_pause.setChecked(False)
 
     def update_duration(self, duration):
         self.playback_slider.updateDuration(duration)

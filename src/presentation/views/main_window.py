@@ -570,13 +570,21 @@ class MainWindow(QMainWindow):
         self.right_panel.update_selection(songs)
 
     def _handle_transport_command(self, cmd: str) -> None:
-        """Route transport commands from Right Panel to Service helpers"""
-        # We must call the internal helpers (_play_next, etc.) because they 
-        # manage the UI state (removing items from playlist, updating labels).
-        # Calling service directly bypasses the 'Playlist Logic'.
+        """Route transport commands with Tape Recorder logic."""
+        state = self.playback_service.active_player.playbackState()
         
         if cmd == 'play':
-            self._toggle_play_pause()
+            # Tape Logic: Play ONLY starts from stop. 
+            if state == QMediaPlayer.PlaybackState.StoppedState:
+                self._toggle_play_pause() 
+                
+        elif cmd == 'pause':
+            # Tape Logic: Pause is the ONLY movement toggle.
+            if state == QMediaPlayer.PlaybackState.PlayingState:
+                self.playback_service.pause()
+            elif state == QMediaPlayer.PlaybackState.PausedState:
+                self.playback_service.play()
+                
         elif cmd == 'stop':
             self.playback_service.stop()
         elif cmd == 'next':
