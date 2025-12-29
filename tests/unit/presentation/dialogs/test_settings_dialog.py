@@ -27,7 +27,8 @@ def test_settings_dialog_load_save(qtbot, mock_settings):
     # 3. Trigger Save
     dialog._on_save_clicked()
     
+    import os
     # 4. Verify mock calls
-    mock_settings.set_root_directory.assert_called_with("D:/NewMusic")
+    mock_settings.set_root_directory.assert_called_with(os.path.normpath("D:/NewMusic"))
     mock_settings.set_conversion_bitrate.assert_called_with("VBR (V0)")
     mock_settings.sync.assert_called_once()

@@ -11,6 +11,7 @@ class CustomTitleBar(QWidget):
     """
     search_text_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
+    maximize_requested = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -82,8 +83,9 @@ class CustomTitleBar(QWidget):
             event.accept()
 
     def mouseDoubleClickEvent(self, event):
-        # Forward to parent/window for maximize
-        pass
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.maximize_requested.emit()
+            event.accept()
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton:

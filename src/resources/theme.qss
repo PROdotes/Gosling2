@@ -181,6 +181,11 @@ QLineEdit, QTextEdit, QComboBox, #GlowInput {
     font-family: "Consolas", monospace;
     font-size: 12pt; 
 }
+ 
+/* Read-Only / Managed State (e.g. Publisher tied to Album) */
+QLineEdit[managed="true"], #GlowInput[managed="true"] {
+    color: #555555;
+}
 
 /* QComboBox Arrow & Dropdown Styling */
 QComboBox::drop-down {
@@ -371,3 +376,56 @@ QSplitter::handle {
 GlowButton#PlaybackPlayButton {
     qproperty-glowColor: #FFC66D;
 }
+
+/* --- 7. SPECIAL FIELDS --- */
+QLineEdit#AlbumDisplay {
+    color: #555555;
+    font-weight: bold;
+    /* Ensure it looks 'disabled' but custom styled, overriding generic QLineEdit */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #050505, 
+        stop:1 #080808);
+    border: 1px solid #222222;
+    padding: 3px 8px;
+    font-size: 12pt;
+    min-height: 24px; /* Force visual match with standard inputs */
+}
+
+QPushButton#AlbumActionButton {
+    border-radius: 8px; /* Slightly squarer than main pills */
+    padding: 0;
+    font-size: 14pt;
+    font-weight: bold;
+    color: #AAAAAA;
+}
+QPushButton#AlbumActionButton:hover {
+    color: #FFFFFF;
+    border: 1px solid #444444;
+}
+
+/* --- 10. Album Manager Polish --- */
+#AlbumManagerList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    min-height: 400px;
+}
+
+#AlbumManagerList::item {
+    min-height: 42px;
+    padding: 12px;
+    border-bottom: 1px solid #1A1A1A;
+    color: #DDDDDD;
+}
+
+#AlbumManagerList::item:hover {
+    background-color: #1A1A1A;
+    border-radius: 4px;
+}
+
+#AlbumManagerList::item:selected {
+    background-color: #FFC66D;
+    color: #000000;
+    border-radius: 4px;
+}
+

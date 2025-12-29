@@ -32,6 +32,16 @@ def inject():
 
     repo = SongRepository()
     
+    # 0. THE NUKE: Clear existing data for a clean fixture state
+    print("Nuking existing library data...")
+    with repo.get_connection() as conn:
+        conn.execute("DELETE FROM SongAlbums")
+        conn.execute("DELETE FROM AlbumPublishers")
+        conn.execute("DELETE FROM Albums")
+        conn.execute("DELETE FROM MediaSources")
+        conn.execute("DELETE FROM Contributors") # Optional but usually good for clean starts
+        conn.commit()
+
     print(f"Loaded {len(songs_data)} songs from fixture.")
     
     count = 0

@@ -62,13 +62,21 @@ class AlbumRepository(BaseRepository):
                 return Album.from_row(row)
         return None
 
-    def search(self, query: str, limit: int = 100) -> List[Album]:
-        """Fuzzy search for albums by title or artist."""
-        sql_query = """
-            SELECT AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear 
-            FROM Albums 
-            WHERE Title LIKE ? OR AlbumArtist LIKE ?
-            ORDER BY CASE WHEN Title LIKE ? THEN 1 ELSE 2 END, Title
+    def search(self, query: str, limit: int = 100, empty_only: bool = False) -> List[Album]:
+        """Fuzzy search for albums by title or artist, including song counts."""
+        # Dynamic HAVING clause
+        having_clause = "HAVING SongCount = 0" if empty_only else ""
+        
+        sql_query = f"""
+            SELECT 
+                a.AlbumID, a.Title, a.AlbumArtist, a.AlbumType, a.ReleaseYear,
+                COUNT(sa.SourceID) as SongCount
+            FROM Albums a
+            LEFT JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
+            WHERE a.Title LIKE ? OR a.AlbumArtist LIKE ?
+            GROUP BY a.AlbumID
+            {having_clause}
+            ORDER BY CASE WHEN a.Title LIKE ? THEN 1 ELSE 2 END, a.Title
             LIMIT ?
         """
         wildcard = f"%{query}%"
@@ -167,8 +175,11 @@ class AlbumRepository(BaseRepository):
                 ))
                 return cursor.rowcount > 0
         except Exception as e:
-            from src.core import logger
-            logger.error(f"Error updating album: {e}")
+            try:
+                from src.core import logger
+                logger.error(f"Error updating album: {e}")
+            except ImportError:
+                print(f"Error updating album (Logger unavailable): {e}")
             return False
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:
@@ -223,5 +234,63 @@ class AlbumRepository(BaseRepository):
         self.add_song_to_album(source_id, album.album_id)
     
         return album
+
+    def delete_album(self, album_id: int) -> bool:
+        """Delete an album by ID. Explicitly clears links to prevent orphaned data."""
+        try:
+            with self.get_connection() as conn:
+                # 1. Clear links manually (in case cascade isn't configured in older DBs)
+                conn.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (album_id,))
+                # 2. Delete the album record
+                cursor = conn.execute("DELETE FROM Albums WHERE AlbumID = ?", (album_id,))
+                return cursor.rowcount > 0
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error deleting album {album_id}: {e}")
+            return False
+
+    def get_song_count(self, album_id: int) -> int:
+        """Get number of songs in an album."""
+        query = "SELECT COUNT(*) FROM SongAlbums WHERE AlbumID = ?"
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (album_id,))
+            row = cursor.fetchone()
+            return row[0] if row else 0
+
+    def get_publisher(self, album_id: int) -> Optional[str]:
+        """Get the primary publisher name for an album."""
+        query = """
+            SELECT p.PublisherName 
+            FROM Publishers p
+            JOIN AlbumPublishers ap ON p.PublisherID = ap.PublisherID
+            WHERE ap.AlbumID = ?
+            LIMIT 1
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (album_id,))
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def set_publisher(self, album_id: int, publisher_name: str) -> None:
+        """Set the publisher for an album (Replace existing)."""
+        if not publisher_name or not publisher_name.strip():
+             # Handle Unsetting
+             with self.get_connection() as conn:
+                 conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+             return
+             
+        pub_name = publisher_name.strip()
+        with self.get_connection() as conn:
+            # Ensure Publisher exists
+            conn.execute("INSERT OR IGNORE INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
+            # Get ID
+            cursor = conn.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
+            pub_row = cursor.fetchone()
+            if not pub_row: return
+            pub_id = pub_row[0]
+            
+            # Link to Album (Replace old)
+            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
 
 

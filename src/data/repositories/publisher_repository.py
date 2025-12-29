@@ -78,6 +78,46 @@ class PublisherRepository(BaseRepository):
                 publishers.append(Publisher.from_row(row))
         return publishers
 
+    def search(self, query: str = "") -> List[Publisher]:
+        """Search for publishers by name."""
+        sql = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers"
+        params = []
+        if query:
+            sql += " WHERE PublisherName LIKE ?"
+            params.append(f"%{query}%")
+        
+        sql += " ORDER BY PublisherName ASC"
+        
+        publishers = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, params)
+            for row in cursor.fetchall():
+                publishers.append(Publisher.from_row(row))
+        return publishers
+
+    def update(self, publisher: Publisher) -> bool:
+        """Update an existing publisher."""
+        query = """
+            UPDATE Publishers
+            SET PublisherName = ?, ParentPublisherID = ?
+            WHERE PublisherID = ?
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, (
+                publisher.publisher_name,
+                publisher.parent_publisher_id,
+                publisher.publisher_id
+            ))
+            return cursor.rowcount > 0
+
+    def delete(self, publisher_id: int) -> bool:
+        """Delete a publisher from the database."""
+        with self.get_connection() as conn:
+            # Also clean up links
+            conn.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (publisher_id,))
+            cursor = conn.execute("DELETE FROM Publishers WHERE PublisherID = ?", (publisher_id,))
+            return cursor.rowcount > 0
+
     def get_with_descendants(self, publisher_id: int) -> List[Publisher]:
         """
         Get a publisher and all its descendants (children, grandchildren, etc.).

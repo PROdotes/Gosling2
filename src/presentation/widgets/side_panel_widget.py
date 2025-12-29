@@ -16,9 +16,8 @@ class SidePanelWidget(QFrame):
     Implements a validation-gated 'Done' workflow and staging buffer.
     """
     
-    # Signals
-    # Emitted when the user clicks 'SAVE ALL'. MainWindow will handle the actual DB/ID3 write.
-    save_requested = pyqtSignal(dict) # _staged_changes
+    # Signalling (dict = changes, set = album_deletions)
+    save_requested = pyqtSignal(dict, set) 
     staging_changed = pyqtSignal(list) # list of song_ids in staging
     
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, parent=None) -> None:
@@ -42,6 +41,7 @@ class SidePanelWidget(QFrame):
         
         self.current_songs = [] # List of Song objects
         self._staged_changes = {} # {song_id: {field_name: value}}
+        self._hidden_album_ids = set() # {album_id, ...} - Hidden from picker search
         self._field_widgets = {} # {field_name: QWidget} - Public for testing
         
         # Debounce timer for expensive projected path calculations
@@ -151,7 +151,7 @@ class SidePanelWidget(QFrame):
         self._clear_fields()
         self._update_save_state()
 
-    def set_songs(self, songs):
+    def set_songs(self, songs: List[Any], force: bool = False):
         """Update the editor with fresh song selection."""
         # Capture scroll if specific update (same ID set)
         scroll_pos = 0
@@ -165,8 +165,8 @@ class SidePanelWidget(QFrame):
              scroll_pos = self.scroll.verticalScrollBar().value()
 
         # Performance: Skip expensive UI rebuild if selection hasn't actually changed
-        # This fixes 3-second lag in PyCharm when clicking the same song repeatedly
-        if same_selection:
+        # EXCEPT if force=True (e.g. for Discard)
+        if same_selection and not force:
             self.scroll.verticalScrollBar().setValue(scroll_pos)
             return
 
@@ -392,6 +392,19 @@ class SidePanelWidget(QFrame):
                         else:
                             text_val = str(effective_val) if effective_val is not None else ""
                         widget.setText(text_val)
+
+                    # T-69: Publisher Feedback (Locked State)
+                    if field_name == 'publisher':
+                        alb_def = next((f for f in yellberus.FIELDS if f.name == 'album'), None)
+                        alb_val, alb_multi = self._calculate_bulk_value(alb_def)
+                        is_managed = (alb_val is not None) or alb_multi
+                        
+                        if is_managed:
+                            widget.setPlaceholderText("Managed by Album")
+                            widget.setToolTip("Publisher is locked to the selected Album.")
+                        else:
+                            widget.setPlaceholderText("Set Album to define Publisher")
+                            widget.setToolTip("Publishers are managed via the Album Manager.")
             finally:
                 # Always restore signals
                 widget.blockSignals(False)
@@ -431,6 +444,15 @@ class SidePanelWidget(QFrame):
 
         # Default: Line Edit for Alpha
         edit = GlowLineEdit()
+        
+        # T-69: Publisher is managed via Album, so it's read-only in the editor
+        if field_def.name == 'publisher':
+            edit.setReadOnly(True)
+            edit.setProperty("managed", True) # For CSS if we want to dim it
+            edit.setToolTip("Publisher is managed at the Album level.")
+            edit.style().unpolish(edit)
+            edit.style().polish(edit)
+            
         if is_multiple:
             edit.setPlaceholderText("(Multiple Values)")
         else:
@@ -460,16 +482,101 @@ class SidePanelWidget(QFrame):
         initial_data = {}
         if self.current_songs:
             song = self.current_songs[0]
+            sid = song.source_id
             initial_data = {
-                'title': song.album or "", # Default title guess
-                'artist': song.album_artist or (song.performers[0] if song.performers else ""),
-                'year': song.recording_year or "",
-                'publisher': song.publisher or ""
+                'title': self._get_effective_value(sid, 'album', song.album) or "",
+                'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or (song.performers[0] if song.performers else ""),
+                'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
+                'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or ""
             }
 
-        dlg = AlbumManagerDialog(self.album_repo, initial_data, self)
+        dlg = AlbumManagerDialog(
+            self.album_repo, initial_data, self, 
+            staged_deletions=self._hidden_album_ids
+        )
         dlg.album_selected.connect(self._on_album_picked)
+        dlg.save_and_select_requested.connect(self._on_save_select_picked)
+        dlg.album_deleted.connect(self._on_album_deleted_externally)
         dlg.exec()
+        
+        # Sync: Re-fetch current selection to ensure memory matches DB (e.g. if album was deleted)
+        if self.current_songs:
+             from ...data.models.song import Song
+             refreshed = []
+             dirty_found = False
+             for s in self.current_songs:
+                  old_album_id = getattr(s, 'album_id', None)
+                  song_data = self.library_service.song_repository.get_by_id(s.source_id)
+                  if song_data:
+                       # If DB album is now different (e.g. deleted), STAGE the change to trip the Amber Alert
+                       new_album_id = getattr(song_data, 'album_id', None)
+                       if new_album_id != old_album_id:
+                            # Use _on_field_changed to ensure it hits the staging buffer and emits the signal
+                            self._on_field_changed("album", song_data.album)
+                            self._on_field_changed("album_id", new_album_id)
+                            dirty_found = True
+                       refreshed.append(song_data)
+             
+             self.current_songs = refreshed
+             self.set_songs(self.current_songs, force=True)
+             
+             # Force Library Refresh to clear the text column
+             if hasattr(self, 'parent') and self.parent():
+                  try:
+                      win = self.window()
+                      if hasattr(win, 'library_widget'):
+                          win.library_widget.refresh(refresh_filters=False)
+                  except:
+                      pass
+
+    def _on_album_deleted_externally(self, album_id):
+        """Handle album deletion from Manager by staging it for ALL affected songs."""
+        if not self.library_service:
+            return
+            
+        # 1. Find every song in the library that belongs to this album
+        headers, data = self.library_service.song_repository.get_all()
+        try:
+             alb_id_idx = -1
+             for i, h in enumerate(headers):
+                 if h in ('SA.AlbumID', 'AlbumID'):
+                     alb_id_idx = i
+                     break
+                     
+             source_id_idx = -1
+             for i, h in enumerate(headers):
+                 if h in ('MS.SourceID', 'SourceID'):
+                     source_id_idx = i
+                     break
+                     
+             if alb_id_idx == -1 or source_id_idx == -1:
+                 return
+        except:
+             return
+             
+        affected_ids = []
+        for row in data:
+             if row[alb_id_idx] == album_id:
+                  affected_ids.append(row[source_id_idx])
+                  
+        if not affected_ids:
+             return
+             
+        # 2. Stage the removal for all of them
+        for sid in affected_ids:
+             if sid not in self._staged_changes:
+                  self._staged_changes[sid] = {}
+             
+             self._staged_changes[sid]['album'] = None
+             self._staged_changes[sid]['album_id'] = None
+        
+        # 3. Mark as Hidden (UX only, the Save prompt handles actual DB delete)
+        self._hidden_album_ids.add(album_id)
+             
+        # 4. Broadcast to Library
+        self.staging_changed.emit(list(self._staged_changes.keys()))
+        self._update_save_state()
+        self._refresh_field_values()
 
     def _on_album_picked(self, album_id, album_name):
         """Callback from Dialog."""
@@ -489,7 +596,23 @@ class SidePanelWidget(QFrame):
         # 'album_id' (int) -> For new relation
         self._on_field_changed("album_id", album_id) 
         
-        # Also Auto-Fill Publisher if possible? (Future optimization)
+        # T-69: Auto-Fill Publisher from Album
+        pub_name = self.album_repo.get_publisher(album_id)
+        if pub_name:
+            self._on_field_changed("publisher", pub_name)
+        else:
+            # If album has no publisher, maybe clear it or keep? 
+            # Usually better to clear it to match the album's state
+            self._on_field_changed("publisher", None)
+            
+        # Ensure UI reflects the new managed state (Enabling/Disabling)
+        self._refresh_field_values()
+
+    def _on_save_select_picked(self, album_id, album_name):
+        """Callback from Dialog requesting an immediate atomic save."""
+        self._on_album_picked(album_id, album_name)
+        # Surgical Shortcut: Just commit metadata
+        self.trigger_save()
 
     def _validate_isrc_field(self, widget, text):
         """
@@ -546,6 +669,22 @@ class SidePanelWidget(QFrame):
         if len(self.current_songs) == 1:
             return v0, False
             
+        # T-69: Special Union logic for Publisher
+        if field_def.name == 'publisher':
+            all_pubs = set()
+            for song in self.current_songs:
+                val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
+                if val:
+                    # Split comma-separated list from DB and add to set
+                    parts = [p.strip() for p in str(val).split(',')]
+                    all_pubs.update(p for p in parts if p)
+            
+            if not all_pubs:
+                return "", False
+            
+            # Return sorted union
+            return ", ".join(sorted(list(all_pubs))), False
+
         # Bulk Mode: Compare values
         is_multiple = False
         for song in self.current_songs[1:]:
@@ -667,7 +806,7 @@ class SidePanelWidget(QFrame):
 
         self._projected_timer.start(500)
 
-    def _on_save_clicked(self, checked=False):
+    def _on_save_clicked(self, checked=False, commit_deletions=True):
         """Emit the entire staged buffer for the MainWindow to commit."""
         # Allow saving even if no fields changed (e.g. to trigger rename)
         changes_to_emit = self._staged_changes.copy()
@@ -726,12 +865,17 @@ class SidePanelWidget(QFrame):
                     formatted = re.sub(r'([a-z])([A-Z])', r'\1, \2', clean_val)
                     changes['composers'] = formatted
         
-        self.save_requested.emit(changes_to_emit)
+        self.save_requested.emit(changes_to_emit, self._hidden_album_ids)
         
         # Optimistic UI update or wait for refresh?
         # Usually Main Window refreshes us.
         self._staged_changes.clear()
+        self._hidden_album_ids.clear()
+            
         self._update_save_state()
+        
+        # Broadcast dirty state (Magenta Alert)
+        self.staging_changed.emit(list(self._staged_changes.keys()) if self._staged_changes else [])
 
     def trigger_save(self):
         """Public slot to trigger save (e.g. from Ctrl+S shortcut)."""
@@ -740,13 +884,21 @@ class SidePanelWidget(QFrame):
 
     def _on_discard_clicked(self, checked=False):
         self._staged_changes = {}
-        self.set_songs(self.current_songs)
+        self._hidden_album_ids.clear()
+        
+        # Re-fetch from DB to get the original data (restores the labels/links)
+        ids = [s.source_id for s in self.current_songs]
+        if ids:
+            self.current_songs = self.library_service.get_songs_by_ids(ids)
+            
+        self.set_songs(self.current_songs, force=True)
         self.staging_changed.emit([]) # Clear highlights in library
 
     def clear_staged(self, song_ids=None):
         """Remove IDs from staging (post-save cleanup)."""
         if song_ids is None:
             self._staged_changes = {}
+            self._hidden_album_ids.clear()
         else:
             for sid in song_ids:
                 if sid in self._staged_changes:

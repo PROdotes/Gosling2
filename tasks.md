@@ -68,6 +68,7 @@ links: []
 | T-57 | **Settings Entry Point** | 3 | 1 | 15 | 💡 | — | Move App Icon to Top-Left and use as click-trigger for Settings. |
 | T-34 | **MD Tagging Conventions** | 3 | 1 | 15 | 📋 | Post-0.1 | [spec](design/specs/T-34_MD_TAGGING_CONVENTIONS.md) — Document frontmatter tag vocabulary. *Logged by Vesper.* |
 | T-36 | **Architecture Map Update** | 3 | 2 | 6 | 📋 | Post-0.1 | Update [ARCHITECTURE.md](ARCHITECTURE.md) — Missing: `src/core/`, `tools/`, `album.py`, `tag.py`, new repos. Schema section outdated. *Logged by Vesper.* |
+| T-69 | **The Album Crisis** | 5 | 4 | 5 | 🧠 | T-46 | RETHINK: What is a "Delete"? Currently, unlinking an album stages $N$ file writes (too heavy). Deletion should probably be a lightweight consequence of empty state, not a mass-write event. |
 
 ### Feature Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |

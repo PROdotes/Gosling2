@@ -142,7 +142,9 @@ class GlowLineEdit(GlowWidget):
     def setProperty(self, n, v): 
         self.edit.setProperty(n, v)
         self.edit.style().unpolish(self.edit)
-        self.edit.style().polish(self.edit)
+        self.edit.style().polish(self.edit)    
+    def setFocusPolicy(self, p): self.edit.setFocusPolicy(p)
+    def clear(self): self.edit.clear()
     
     # Expose signals
     @property

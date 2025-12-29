@@ -358,6 +358,44 @@ class TestAlbumRepository(unittest.TestCase):
             conn.execute("DELETE FROM Albums WHERE Title = 'Case_Bobby_Tables'")
 
 
+    def test_delete_album_integrity(self):
+        """
+        Verify that get_song_count returns correct count and
+        delete_album removes album and unlinks songs (cascade check).
+        """
+        # 1. Create album + songs
+        album = self.repo.create("Case_Delete_Integrity")
+        
+        with self.repo.get_connection() as conn:
+            # Create dummy song
+            conn.execute("INSERT INTO MediaSources (TypeID, Name, Source, IsActive) VALUES (1, 'Del', 'C:\\\\Del.mp3', 1)")
+            sid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (sid,))
+        
+        # 2. Link
+        self.repo.add_song_to_album(sid, album.album_id)
+        
+        # 3. Check Count
+        count = self.repo.get_song_count(album.album_id)
+        self.assertEqual(count, 1, "Should have 1 song")
+        
+        # 4. Delete
+        success = self.repo.delete_album(album.album_id)
+        self.assertTrue(success)
+        
+        # 5. Check Album Gone
+        found = self.repo.get_by_id(album.album_id)
+        self.assertIsNone(found)
+        
+        # 6. Check Links Gone (Cascade verification)
+        links = self.repo.get_albums_for_song(sid)
+        self.assertEqual(len(links), 0, "Links should be cascaded")
+        
+        # Cleanup song
+        with self.repo.get_connection() as conn:
+            conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Del.mp3'")
+
+
 if __name__ == "__main__":
     unittest.main()
 

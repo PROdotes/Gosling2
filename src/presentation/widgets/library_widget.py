@@ -281,6 +281,12 @@ class LibraryWidget(QWidget):
             
         self.load_library()
 
+    def update_dirty_rows(self, ids: list):
+        """Update the list of IDs with unsaved changes for visual feedback."""
+        self._dirty_ids = set(ids)
+        # Force the table to repaint to reflect new amber glows
+        if hasattr(self, 'table_view') and self.table_view:
+            self.table_view.viewport().update()
 
 
     def _init_ui(self) -> None:
@@ -1936,7 +1942,7 @@ class LibraryWidget(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Export Error", f"Failed to write tags:\n{e}")
 
-    def rename_selection(self) -> None:
+    def rename_selection(self, refresh: bool = True) -> None:
         """
         Renames selected files based on metadata using RenamingService.
         Triggers strictly if gates (Done/Clean/Unique) are passed.
@@ -2017,7 +2023,7 @@ class LibraryWidget(QWidget):
                  QMessageBox.information(self, "Success", f"Successfully renamed and moved {success_count} files.")
             
             # Refresh to show new paths
-            if success_count > 0:
+            if success_count > 0 and refresh:
                 self.load_library()
 
         except Exception as e:

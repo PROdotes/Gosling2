@@ -196,6 +196,13 @@ class SongRepository(BaseRepository):
         
         # 1. Clear existing links (Fixes the "Append" bug)
         cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+        
+        # 1.5 Precise Linking (Shortcut)
+        # If the UI passed a specific Album ID, use it directly!
+        if getattr(song, 'album_id', None) is not None:
+             cursor.execute("INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, song.album_id))
+             # Also update the Album's name/artist if they differ? No, trust the ID.
+             return
 
         if not song.album or not song.album.strip():
             return
@@ -444,10 +451,15 @@ class SongRepository(BaseRepository):
                         S.TempoBPM, S.RecordingYear, S.ISRC, S.IsDone, S.Groups,
                         MS.Notes, MS.IsActive,
                         (
-                            SELECT Title FROM Albums A 
+                            SELECT A.Title FROM Albums A 
                             JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
                             WHERE SA.SourceID = MS.SourceID
                         ) as AlbumTitle,
+                        (
+                            SELECT A.AlbumID FROM Albums A 
+                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as AlbumID,
                         (
                             SELECT GROUP_CONCAT(P.PublisherName, ', ')
                             FROM SongAlbums SA 
@@ -469,7 +481,7 @@ class SongRepository(BaseRepository):
                 
                 songs_map = {}
                 for row in cursor.fetchall():
-                    source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, publisher_name, genre_str = row
+                    source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, album_id, publisher_name, genre_str = row
                     
                     groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
                     
@@ -485,6 +497,7 @@ class SongRepository(BaseRepository):
                         notes=notes,
                         is_active=bool(is_active_int),
                         album=album_title,
+                        album_id=album_id,
                         publisher=publisher_name,
                         genre=genre_str,
                         groups=groups

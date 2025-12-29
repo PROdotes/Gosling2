@@ -170,7 +170,12 @@ class MainWindow(QMainWindow):
 
         # Initialize UI
         self._init_ui()
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        self.setWindowFlags(
+            Qt.WindowType.FramelessWindowHint | 
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowSystemMenuHint |
+            Qt.WindowType.WindowMinimizeButtonHint
+        )
         
         # Hide status bar to prevent automatic size grip
         self.setStatusBar(None)
@@ -210,6 +215,7 @@ class MainWindow(QMainWindow):
         title_area_layout.setSpacing(0)
         
         self.title_bar = CustomTitleBar(self)
+        self.title_bar.maximize_requested.connect(self._toggle_maximize)
         title_area_layout.addWidget(self.title_bar, 1)
         
         # Floating System controls (The Island)
@@ -661,17 +667,22 @@ class MainWindow(QMainWindow):
         sizes[2] = 400 if enabled else 0
         self.right_splitter.setSizes(sizes)
 
-    def _on_side_panel_save_requested(self, staged_changes: dict) -> None:
+    def _on_side_panel_save_requested(self, staged_changes: dict, staged_album_deletions: set = None) -> None:
         """Commit all staged changes to DB and ID3 tags."""
         from ...core import logger, yellberus
         logger.info(f"Save requested for {len(staged_changes)} songs.")
         successful_ids = []
         songs_to_check = []
+        albums_to_check = set()
         
         try:
             for song_id, changes in staged_changes.items():
                 song = self.library_service.song_repository.get_by_id(song_id)
                 if not song: continue
+                
+                # Metadata Editing Logic (T-46): Tracking Orphans
+                if 'album_id' in changes or 'album' in changes:
+                    if song.album_id: albums_to_check.add(song.album_id)
                 
                 # Apply changes with type coercion
                 for field_name, value in changes.items():
@@ -693,6 +704,23 @@ class MainWindow(QMainWindow):
                         songs_to_check.append(song)
                 else:
                     QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}")
+            
+            # Check for Orphaned Albums (T-46)
+            for alb_id in albums_to_check:
+                try:
+                    count = self.library_service.album_repo.get_song_count(alb_id)
+                    if count == 0:
+                        alb = self.library_service.album_repo.get_by_id(alb_id)
+                        name = alb.title if alb else "Unknown Album"
+                        reply = QMessageBox.question(
+                            self, "Empty Album Detected", 
+                            f"The album '{name}' is now empty.\nDo you want to delete it?",
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                        )
+                        if reply == QMessageBox.StandardButton.Yes:
+                            self.library_service.album_repo.delete_album(alb_id)
+                except Exception as e:
+                    logger.error(f"Error checking orphan album {alb_id}: {e}")
                     
             if successful_ids:
                 # Capture current selection by SourceID
@@ -705,6 +733,24 @@ class MainWindow(QMainWindow):
                          if item: selected_ids.append(str(item.data(Qt.ItemDataRole.UserRole)))
                 
                 self.right_panel.editor_widget.clear_staged(successful_ids)
+                
+                # Check for Auto-Rename BEFORE refresh so we can batch the UI update
+                rename_needed = False
+                for song in songs_to_check:
+                    if song.is_done:
+                        try:
+                            target = self.renaming_service.calculate_target_path(song)
+                            if song.path:
+                                 if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
+                                     rename_needed = True
+                                     break
+                        except Exception as e:
+                            logger.error(f"Rename check failed: {e}")
+                
+                if rename_needed:
+                    # Trigger rename (which handles its own confirmation)
+                    self.library_widget.rename_selection(refresh=False)
+                
                 self.library_widget.load_library(refresh_filters=False)
                 
                 # Restore Selection
@@ -722,22 +768,6 @@ class MainWindow(QMainWindow):
                 
                 self._on_library_selection_changed(None, None)
                 self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
-    
-                # Check for Auto-Rename
-                rename_needed = False
-                for song in songs_to_check:
-                    if song.is_done:
-                        try:
-                            target = self.renaming_service.calculate_target_path(song)
-                            if song.path:
-                                 if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
-                                     rename_needed = True
-                                     break
-                        except Exception as e:
-                            logger.error(f"Rename check failed: {e}")
-                
-                if rename_needed:
-                    self.library_widget.rename_selection()
             
         except Exception as e:
             import traceback

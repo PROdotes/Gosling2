@@ -149,6 +149,16 @@ FIELDS: List[FieldDef] = [
         zone='amber', # IDENTITY
     ),
     FieldDef(
+        name='album_id',
+        ui_header='Album ID',
+        db_column='SA.AlbumID',
+        field_type=FieldType.INTEGER,
+        editable=False,
+        portable=False,
+        searchable=False,
+        visible=False,
+    ),
+    FieldDef(
         name='composers',
         ui_header='Composer',
         db_column='Composers',
@@ -323,8 +333,6 @@ FIELDS: List[FieldDef] = [
         strategy='boolean',
         zone='gray', # SYSTEM
     ),
-
-
     FieldDef(
         name='audio_hash',
         ui_header='Audio Hash',

@@ -90,5 +90,6 @@
 ### 🛑 Work Stoppage (User Left Work)
 - **Status Check**: 
     - WAV Import Logic: **SAFE** (Explicit warnings added).
-    - Album Creator: **CRASHING** (Despite robustness patch, user reports crash persists). **URGENT**: Needs debug trace analysis in next session.
+    - [x] Album Creator: **FIXED** (Robustness + Proxy methods added to GlowFactory).
+    - [x] Album Manager: **Empty visibility**, **Manual Delete**, and **Orphan Prompt** implemented.
 - **Victory Note**: Confirmed `TPE1` (ID3) tags **DO** exist in hybrid WAVs. Added fallback logic to `metadata_service.py` (`IART`/`TPE1`) which resolved the request.

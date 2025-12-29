@@ -51,7 +51,7 @@ class WorkstationDelegate(QStyledItemDelegate):
             first_col_logical = self.table_view.horizontalHeader().logicalIndex(0)
             is_far_left = (index.column() == first_col_logical)
 
-        # 2. COLOR DISPATCH
+        # 2. COLOR DISPATCH (Category Zone)
         type_idx = self.field_indices.get('type_id', -1)
         type_id = 1
         if type_idx != -1:
@@ -61,7 +61,22 @@ class WorkstationDelegate(QStyledItemDelegate):
         
         category_color = QColor(self._zone_colors.get(type_id, constants.COLOR_AMBER))
 
-        # 3. BACKGROUND RENDERING
+        # 3. DIRTY STATE DETECTION
+        id_col = self.field_indices.get('file_id', -1)
+        item_id = -1
+        if id_col != -1:
+            idx_id = index.model().index(index.row(), id_col)
+            val = index.model().data(idx_id, Qt.ItemDataRole.UserRole)
+            try:
+                if val is not None:
+                    item_id = int(float(val))
+            except (ValueError, TypeError):
+                pass
+
+        dirty_ids = getattr(self.parent(), '_dirty_ids', set())
+        is_dirty = (item_id != -1 and (item_id in dirty_ids or str(item_id) in dirty_ids))
+
+        # 4. BACKGROUND RENDERING
         if option.state & QStyle.StateFlag.State_Selected:
             painter.setPen(QPen(category_color, 1))
             painter.drawLine(rect.topLeft(), rect.topRight())
@@ -82,22 +97,29 @@ class WorkstationDelegate(QStyledItemDelegate):
             tint.setAlpha(8) 
             painter.fillRect(rect, tint)
 
-        # 4. PHYSICAL SEPARATION
+        # 5. PHYSICAL SEPARATION (Bottom Border)
         sep_color = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
         painter.setPen(sep_color)
         painter.drawLine(rect.bottomLeft(), rect.bottomRight())
 
-        # 5. CYLINDRICAL BLADE (Far Left)
+        # 6. CYLINDRICAL BLADE (Far Left)
         if is_far_left:
+            # DIRTY = MAGENTA ALERT, NORMAL = ZONE COLOR
+            blade_color = QColor("#FF00FF") if is_dirty else category_color
             blade_rect = QRect(rect.left(), rect.top(), 7, rect.height() - 1)
-            blade_grad = QLinearGradient(float(blade_rect.left()), 0, float(blade_rect.right()), 0)
-            blade_grad.setColorAt(0.0, category_color.darker(150))
-            blade_grad.setColorAt(0.4, category_color)
-            blade_grad.setColorAt(0.6, category_color)
-            blade_grad.setColorAt(1.0, category_color.darker(150))
-            painter.fillRect(blade_rect, blade_grad)
+            
+            if is_dirty:
+                # Solid Neon Magenta
+                painter.fillRect(blade_rect, blade_color)
+            else:
+                # Polished Cylindrical Gradient
+                blade_grad = QLinearGradient(float(blade_rect.left()), 0, float(blade_rect.right()), 0)
+                blade_grad.setColorAt(0.0, blade_color.darker(200))
+                blade_grad.setColorAt(0.5, blade_color)
+                blade_grad.setColorAt(1.0, blade_color.darker(200))
+                painter.fillRect(blade_rect, blade_grad)
 
-        # 6. CONTENT
+        # 7. CONTENT RENDERING
         column_name = self._get_column_name_by_index(index.column())
         if column_name == "is_done":
             self._draw_status_badge(painter, option, index, category_color)
@@ -110,12 +132,18 @@ class WorkstationDelegate(QStyledItemDelegate):
             else:
                 font.setFamily("Bahnschrift Condensed")
 
+            if is_dirty:
+                font.setBold(True)
+            
             painter.setFont(font)
             text_rect = rect.adjusted(18 if is_far_left else 10, 0, -4, 0)
-            
+
             if option.state & QStyle.StateFlag.State_Selected:
                 sel_text = highlight_text if highlight_text.isValid() else QColor(constants.COLOR_WHITE)
                 painter.setPen(sel_text)
+            elif is_dirty:
+                # Dirty text glows Amber
+                painter.setPen(QColor(constants.COLOR_AMBER))
             else:
                 norm_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
                 painter.setPen(norm_text)
