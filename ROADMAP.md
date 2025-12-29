@@ -75,6 +75,7 @@ tags:
 *   [ ] **T-46 Proper Album Editor** (Relational)
 *   [ ] **T-60 Editor Footer Redesign** (UI Polish)
 *   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
+*   [ ] **T-70 Artist Selector** (Database-backed Picker)
 *   [ ] **T-11 Basic Playback** (VLC Wrappers)
     *   *Why*: Essential for fixing "Greatest Hits" fragmentation.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)

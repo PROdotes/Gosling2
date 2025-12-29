@@ -472,7 +472,12 @@ class SongRepository(BaseRepository):
                             FROM MediaSourceTags MST
                             JOIN Tags TG ON MST.TagID = TG.TagID
                             WHERE MST.SourceID = MS.SourceID AND TG.Category = 'Genre'
-                        ) as Genre
+                        ) as Genre,
+                        (
+                            SELECT A.AlbumArtist FROM Albums A 
+                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                            WHERE SA.SourceID = MS.SourceID
+                        ) as AlbumArtist
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.SourceID IN ({placeholders})
@@ -481,7 +486,7 @@ class SongRepository(BaseRepository):
                 
                 songs_map = {}
                 for row in cursor.fetchall():
-                    source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, album_id, publisher_name, genre_str = row
+                    source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, notes, is_active_int, album_title, album_id, publisher_name, genre_str, album_artist = row
                     
                     groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
                     
@@ -498,6 +503,7 @@ class SongRepository(BaseRepository):
                         is_active=bool(is_active_int),
                         album=album_title,
                         album_id=album_id,
+                        album_artist=album_artist, # Mapped from DB
                         publisher=publisher_name,
                         genre=genre_str,
                         groups=groups

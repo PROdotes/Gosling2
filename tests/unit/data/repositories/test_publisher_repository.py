@@ -22,6 +22,52 @@ class TestPublisherRepository:
         assert fetched is not None
         assert fetched.publisher_name == "Sony Music"
 
+    def test_search(self, repo):
+        # Setup data
+        repo.create("Alpha Records")
+        repo.create("Beta Music")
+        repo.create("Alpha Beta Systems")
+        
+        # Exact match logic is not what search is usually, usually 'like'
+        # searching 'Alpha' should find 2
+        results = repo.search("Alpha")
+        assert len(results) == 2
+        names = {p.publisher_name for p in results}
+        assert "Alpha Records" in names
+        assert "Alpha Beta Systems" in names
+        
+        # Case insensitive check (if repo supports it)
+        results_lower = repo.search("alpha")
+        assert len(results_lower) == 2
+        
+        # Empty search = all?
+        all_pubs = repo.search("")
+        assert len(all_pubs) == 3
+
+    def test_update(self, repo):
+        pub = repo.create("Old Name")
+        pub.publisher_name = "New Name"
+        
+        updated = repo.update(pub)
+        assert updated is True
+        
+        fetched = repo.get_by_id(pub.publisher_id)
+        assert fetched.publisher_name == "New Name"
+
+    def test_delete(self, repo):
+        pub = repo.create("To Delete")
+        pub_id = pub.publisher_id
+        
+        # Verify it exists
+        assert repo.get_by_id(pub_id) is not None
+        
+        # Delete
+        success = repo.delete(pub_id)
+        assert success is True
+        
+        # Verify it's gone
+        assert repo.get_by_id(pub_id) is None
+
     def test_get_or_create(self, repo):
         # First creation
         p1, created1 = repo.get_or_create("Universal")
