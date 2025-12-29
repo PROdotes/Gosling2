@@ -77,19 +77,37 @@ class PlaybackControlWidget(QWidget):
         
         # Transitions
         self.combo_fade = QComboBox()
-        self.combo_fade.setObjectName("PlaybackFadeCombo")  # Styled in QSS
+        self.combo_fade.setObjectName("PlaybackFadeCombo")
         self.combo_fade.addItems(["0s", "1s", "2s", "3s", "5s", "10s"])
+        
+        # Perfection Alignment Hack: Make it editable but read-only to center the text
+        self.combo_fade.setEditable(True)
+        self.combo_fade.lineEdit().setReadOnly(True)
+        self.combo_fade.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.combo_fade.lineEdit().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.combo_fade.lineEdit().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        
+        # Click-Anywhere: The combo itself now handles everything
+        self.combo_fade.mousePressEvent = lambda e: self.combo_fade.showPopup()
+        
+        # Center the items in the popup too
+        for i in range(self.combo_fade.count()):
+            self.combo_fade.setItemData(i, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
+            
         self.combo_fade.setCurrentText("3s")
-        self.combo_fade.setFixedWidth(60)
-        self.combo_fade.setFixedHeight(30)
+        self.combo_fade.setFixedWidth(55) # Tighter fit for [10s]
+        self.combo_fade.setFixedHeight(31) # Visual docking sweet spot
+        self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         for w in [self.btn_prev, self.btn_play, self.btn_stop, self.btn_next]:
             controls_row.addWidget(w)
         
-        controls_row.addSpacing(20) # Separation
-        
-        controls_row.addWidget(QLabel("X-FADE:"))
+        controls_row.addSpacing(2) # Visual docking (closer to skip)
         controls_row.addWidget(self.combo_fade)
+        
+        lbl_xfade = QLabel("X-FADE:")
+        lbl_xfade.setObjectName("PlaybackXFadeLabel") # For potential QSS styling
+        controls_row.addWidget(lbl_xfade)
             
         engine_layout.addLayout(controls_row)
         layout.addLayout(engine_layout, 2)
@@ -118,7 +136,6 @@ class PlaybackControlWidget(QWidget):
         footer_row.addWidget(self.lbl_time_passed)
         footer_row.addStretch()
         footer_row.addWidget(self.lbl_time_remaining)
-        footer_row.addSpacing(15)
         footer_row.addWidget(self.vol_icon)
         footer_row.addWidget(self.volume_slider)
         

@@ -136,37 +136,64 @@ QComboBox::arrow {
     margin-right: 12px;
 }
 
-/* Compact override for the X-Fade duration picker */
-#FadeDurationCombo {
-    padding-left: 0px; 
-    font-size: 10pt;
-    border-radius: 8px;
+/* Compact 'True Stealth Pill' overrides for transition duration pickers */
+#FadeDurationCombo, #PlaybackFadeCombo {
+    padding: 0px; 
+    font-size: 12pt;
+    border-radius: 10px; 
+    min-width: 55px; 
+    /* Warm LCD Display: Satin Dark Gradient + Corner Notch */
+    background: qradialgradient(cx:1, cy:1, radius: 0.2, fx:1, fy:1, stop:0 #FFC66D, stop:0.7 #FFC66D, stop:0.8 transparent),
+                qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+                    stop:0 #181818, 
+                    stop:1 #080808);
+    border: 1px solid #444444;
 }
-#FadeDurationCombo QLineEdit {
+
+#FadeDurationCombo:hover, #PlaybackFadeCombo:hover {
+    border: 1px solid #FFC66D;
+}
+
+#FadeDurationCombo QLineEdit, #PlaybackFadeCombo QLineEdit {
     background: transparent;
     border: none;
-    color: #FFFFFF;
+    color: #FFC66D; /* Amber readout text */
     selection-background-color: #555555;
-    padding-left: 10px; /* Offset for the arrow on the right */
+    padding: 0px; 
 }
-#FadeDurationCombo::drop-down {
-    width: 15px;
-    subcontrol-origin: border;
+
+/* Kill all subcontrols - the background painted notch is our only indicator */
+#FadeDurationCombo::drop-down, #PlaybackFadeCombo::drop-down {
+    width: 0px;
+    height: 0px;
+    border: none;
 }
-#FadeDurationCombo::arrow {
-    margin-right: 4px;
-    border-top-width: 4px;
-    border-left-width: 3px;
-    border-right-width: 3px;
+
+#FadeDurationCombo::arrow, #PlaybackFadeCombo::arrow {
+    image: none;
+    width: 0px;
+    height: 0px;
 }
 
 QComboBox QAbstractItemView {
     background-color: #111111;
-    border: 1px solid #333333;
-    selection-background-color: #FFC66D;
-    selection-color: #000000;
-    color: #FFFFFF;
+    border: 1px solid #444444;
+    color: #FFC66D; /* Amber text for the list */
     outline: none;
+    padding: 4px;
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 24px;
+    padding-left: 10px;
+    color: #AAAAAA;
+}
+
+QComboBox QAbstractItemView::item:selected {
+    background-color: #222222;
+    border: 1px solid #FFC66D;
+    color: #FFC66D;
+    border-radius: 4px;
 }
 
 /* Data View Palette (QPalette colors for custom delegates) */

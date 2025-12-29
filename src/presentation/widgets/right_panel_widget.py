@@ -112,14 +112,18 @@ class RightPanelFooter(QFrame):
         self.combo_fade.lineEdit().setReadOnly(True)
         self.combo_fade.lineEdit().setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.combo_fade.lineEdit().setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.combo_fade.lineEdit().setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        
+        # Click-Anywhere: The combo itself now handles everything
+        self.combo_fade.mousePressEvent = lambda e: self.combo_fade.showPopup()
         
         # Center the items in the popup too
         for i in range(self.combo_fade.count()):
             self.combo_fade.setItemData(i, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
             
         self.combo_fade.setCurrentText("3s")
-        self.combo_fade.setFixedWidth(65) # Buffer for centering + arrow
-        self.combo_fade.setFixedHeight(24)
+        self.combo_fade.setFixedWidth(55) # Compact width for [10s]
+        self.combo_fade.setFixedHeight(31) # Visual docking sweet spot
         self.combo_fade.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         
         trans_layout.addWidget(self.btn_cut)
