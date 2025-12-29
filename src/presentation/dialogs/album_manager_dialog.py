@@ -83,6 +83,7 @@ class AlbumManagerDialog(QDialog):
         header_layout.addStretch()
         
         self.btn_create_new = GlowButton("Create New Album (+)")
+        self.btn_create_new.setFixedWidth(160) # Prevent clipping due to GlowButton empty-text layout issue
         self.btn_create_new.clicked.connect(self._start_create_new)
         header_layout.addWidget(self.btn_create_new)
         
@@ -126,13 +127,22 @@ class AlbumManagerDialog(QDialog):
         self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
         
+        # Save Button (Moved to Global Footer for Stability)
+        self.btn_save_inspector = GlowButton("Save Changes")
+        self.btn_save_inspector.setObjectName("Primary")
+        self.btn_save_inspector.setFixedWidth(140)
+        self.btn_save_inspector.setEnabled(False) # Initially disabled
+        self.btn_save_inspector.clicked.connect(self._save_inspector)
+
         self.btn_select = GlowButton("Select Album")
         self.btn_select.setObjectName("Primary")
+        self.btn_select.setFixedWidth(140) # Fix clipping
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self._on_select_clicked)
         
         footer_layout.addWidget(self.btn_cancel)
         footer_layout.addStretch()
+        footer_layout.addWidget(self.btn_save_inspector)
         footer_layout.addWidget(self.btn_select)
         
         main_layout.addWidget(footer)
@@ -228,15 +238,10 @@ class AlbumManagerDialog(QDialog):
         
         layout.addStretch()
         
-        # Save Actions (Inside Inspector)
-        btn_bar = QHBoxLayout()
-        self.btn_save_inspector = GlowButton("Save Changes")
-        self.btn_save_inspector.setObjectName("Primary")
-        self.btn_save_inspector.clicked.connect(self._save_inspector)
-        
-        btn_bar.addStretch()
-        btn_bar.addWidget(self.btn_save_inspector)
-        layout.addLayout(btn_bar)
+        # Save Actions moved to Footer
+        # btn_bar = QHBoxLayout()
+        # ... removed ...
+        # layout.addLayout(btn_bar)
         
         # Disable by default
         container.setEnabled(False)
@@ -294,6 +299,7 @@ class AlbumManagerDialog(QDialog):
         
         # Enable Inspector
         self.pane_inspector.setEnabled(True)
+        self.btn_save_inspector.setEnabled(True)
         self.pane_inspector.setStyleSheet("border: 1px solid #ffaa00;") # Visual cue
         self.inp_title.setFocus()
         
@@ -328,6 +334,7 @@ class AlbumManagerDialog(QDialog):
         
         # 3. Enable UI
         self.pane_inspector.setEnabled(True)
+        self.btn_save_inspector.setEnabled(True)
         self.pane_inspector.setStyleSheet("") # Clear create cue
         self.btn_select.setEnabled(True)
         self.lbl_title.setText("EDITING ALBUM")

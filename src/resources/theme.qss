@@ -129,6 +129,8 @@ QScrollBar::handle:vertical:hover {
     margin-bottom: -1px; /* Pull input even closer */
 }
 
+
+
 #SidePanelProjectedPath {
     font-family: "Consolas", monospace;
     font-size: 8pt;
@@ -403,6 +405,8 @@ QPushButton#AlbumActionButton:hover {
     border: 1px solid #444444;
 }
 
+
+
 /* --- 10. Album Manager Polish --- */
 #AlbumManagerList {
     background-color: transparent;
@@ -434,22 +438,42 @@ QPushButton#AlbumActionButton:hover {
 #AlbumManagerDialog {
     background-color: #050505; /* Deep Void */
     border: 1px solid #333;
+    /* Removed border-radius to prevent ugly corner clipping on OS window */
+}
+
+#DialogHeader {
+    background-color: #080808;
+    border-bottom: 2px solid #1A1A1A;
+}
+
+#DialogHeaderTitle {
+    color: #FFC66D;
+    font-size: 11pt; /* Matching Side Panel specific size */
+    font-weight: bold;
+    letter-spacing: 2px;
+    background-color: #000000; /* Pill Chassis */
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 4px 12px;
 }
 
 /* Pane Z: The Context (Song List) */
+#DialogContextPane {
+    border-right: 1px solid #111;
+}
 #DialogContextList {
     background-color: #080808;
     border-right: 1px solid #222;
-    color: #666;
-    font-size: 11px;
-    font-family: "Consolas", monospace;
+    color: #DDDDDD; /* Much brighter for readability */
+    font-size: 10pt; /* Standard size, not tiny */
+    font-family: "Segoe UI", sans-serif;
     outline: none;
     border: none;
 }
 
 #DialogContextList::item {
-    padding: 2px 8px;
-    border-bottom: 1px solid #111;
+    padding: 6px 12px; /* Breathable spacing */
+    border-bottom: 1px solid #161616;
 }
 
 #DialogContextList::item:selected {
@@ -489,42 +513,46 @@ QPushButton#AlbumActionButton:hover {
 }
 
 #DialogFieldLabel {
-    color: #444;
-    font-size: 10px;
+    color: #BBBBBB;
+    font-size: 10pt;
     font-weight: bold;
     text-transform: uppercase;
-    margin-bottom: 4px;
     letter-spacing: 1px;
+    margin-left: 8px; /* Matching Side Panel Spec */
+    margin-bottom: 2px;
 }
 
 /* Pane C: The Sidecar (Publisher) */
 #PublisherSidecar {
-    background-color: #0c0c0c;
-    border-left: 1px solid #333;
+    background-color: #0b0b0b; /* Slightly lighter than inspector for contrast? */
+    border-left: 1px solid #222;
 }
 
-/* Sidecar Search Input */
-#PublisherSidecar QLineEdit {
-    background-color: #080808;
-    border: 1px solid #222;
-    border-radius: 4px;
-    padding: 4px;
-    color: #CCC;
+#PublisherSidecar #DialogFieldLabel {
+    color: #888;
+    margin-bottom: 8px; /* More header-like spacing */
 }
 
-/* Sidecar List */
+/* Ensure the list reuses the high-quality table look */
 #PublisherSidecar QListWidget {
     background-color: transparent;
     border: none;
+    outline: none;
 }
 
 #PublisherSidecar QListWidget::item {
-    padding: 6px;
-    color: #777;
-    border-bottom: 1px solid #111;
+    padding: 8px 12px;
+    border-bottom: 1px solid #161616;
+    color: #999;
+}
+
+#PublisherSidecar QListWidget::item:hover {
+    background-color: #161616;
+    color: #DDD;
 }
 
 #PublisherSidecar QListWidget::item:selected {
-    background-color: #111;
+    background-color: #1A1A1A;
     color: #FFC66D;
+    border-left: 2px solid #FFC66D;
 }
