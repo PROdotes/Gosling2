@@ -11,7 +11,7 @@ from PyQt6.QtGui import QAction
 
 from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
-    SidePanelWidget, CustomTitleBar, JingleCurtain, HistoryDrawer
+    SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland
 )
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService
 from ...resources import constants
@@ -201,12 +201,24 @@ class MainWindow(QMainWindow):
         # This prevents duplicate definitions and "ghost" overrides.
 
         
-        # 0. Integrated Title Bar
+        # 0. Integrated Title Area
+        title_area_container = QWidget()
+        title_area_layout = QHBoxLayout(title_area_container)
+        title_area_layout.setContentsMargins(0, 0, 0, 0)
+        title_area_layout.setSpacing(0)
+        
         self.title_bar = CustomTitleBar(self)
-        self.title_bar.minimize_requested.connect(self.showMinimized)
-        self.title_bar.maximize_requested.connect(self._toggle_maximize)
-        self.title_bar.close_requested.connect(self.close)
-        main_layout.addWidget(self.title_bar)
+        title_area_layout.addWidget(self.title_bar, 1)
+        
+        # Floating System controls (The Island)
+        self.system_island = SystemIsland(self)
+        self.system_island.minimize_requested.connect(self.showMinimized)
+        self.system_island.maximize_requested.connect(self._toggle_maximize)
+        self.system_island.close_requested.connect(self.close)
+        
+        title_area_layout.addWidget(self.system_island, 0, Qt.AlignmentFlag.AlignTop)
+        
+        main_layout.addWidget(title_area_container)
         
         # --- TOP SEPARATOR (7px Black) ---
         top_separator = QWidget()

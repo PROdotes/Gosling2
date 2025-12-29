@@ -38,11 +38,16 @@ QLineEdit, QTextEdit, QComboBox {
     min-height: 36px;
     padding: 0 4px; /* Reduced to let GlowWidget margins handle spacing */
 }
+
+#TitleBarIsland {
+    background-color: #000000;
+}
+
 QPushButton#AppLogoIcon {
-    min-width: 26px;
-    max-width: 26px;
-    min-height: 26px;
-    max-height: 26px;
+    min-width: 32px;
+    max-width: 32px;
+    min-height: 32px;
+    max-height: 32px;
 }
 /* Standard System Controls (Perfectly weighted squares) */
 QPushButton.SystemButton {
@@ -51,8 +56,8 @@ QPushButton.SystemButton {
     min-height: 26px;
     max-height: 26px;
     padding: 0;
-    border-radius: 6px;
-    font-size: 11pt;
+    border-radius: 8px;
+    font-size: 12pt;
 }
 QPushButton#CloseButton:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
@@ -114,10 +119,10 @@ QLineEdit, QTextEdit, QComboBox, #GlowInput {
     border-bottom: 1px solid #444444;
     border-right: 1px solid #444444;
     border-radius: 10px;
-    padding: 6px 12px; 
+    padding: 2px 12px; 
     color: #FFFFFF; 
     font-family: "Consolas", monospace;
-    font-size: 11pt; 
+    font-size: 12pt; 
 }
 
 /* QComboBox Arrow & Dropdown Styling */

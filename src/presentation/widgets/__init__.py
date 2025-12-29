@@ -7,3 +7,4 @@ from .side_panel_widget import SidePanelWidget
 from .custom_title_bar import CustomTitleBar
 from .jingle_curtain import JingleCurtain
 from .history_drawer import HistoryDrawer
+from .system_island import SystemIsland
