@@ -106,6 +106,58 @@ QScrollBar::handle:vertical:hover {
     color: #FFC66D;
 }
 
+/* 1b. Side Panel Specifics */
+#SidePanelHeader {
+    font-size: 16pt;
+    font-weight: bold;
+    color: #FFC66D;
+    margin-bottom: 0px;
+}
+
+#FieldLabel {
+    color: #BBBBBB;
+    font-size: 10pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-left: 8px; /* Nudge right */
+    margin-bottom: -1px; /* Pull input even closer */
+}
+
+#SidePanelProjectedPath {
+    font-family: "Consolas", monospace;
+    font-size: 8pt;
+    color: #666666; /* Dim by default */
+    padding: 2px;
+}
+
+#SidePanelProjectedPath[conflict="true"] {
+    color: #E53935; /* Alert Red */
+    font-weight: 900;
+    font-size: 9pt;
+}
+
+#HeaderSeparator {
+    background-color: #DDDDDD;
+}
+
+#StatusLED {
+    min-width: 8px;
+    max-width: 8px;
+    min-height: 8px;
+    max-height: 8px;
+    border-radius: 4px;
+    margin-right: 5px;
+    background-color: transparent;
+    border: 1px solid #333333;
+}
+
+#StatusLED[state="alert"] {
+    background-color: #E53935;
+    border: 1px solid #E53935;
+    /* Future: glow or animation can be added here */
+}
+
 /* --- 3. INPUTS & COMPONENTS --- */
 
 /* Inputs (Inset Effect) */
@@ -119,7 +171,7 @@ QLineEdit, QTextEdit, QComboBox, #GlowInput {
     border-bottom: 1px solid #444444;
     border-right: 1px solid #444444;
     border-radius: 10px;
-    padding: 2px 12px; 
+    padding: 3px 8px; 
     color: #FFFFFF; 
     font-family: "Consolas", monospace;
     font-size: 12pt; 

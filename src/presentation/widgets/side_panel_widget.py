@@ -54,20 +54,14 @@ class SidePanelWidget(QFrame):
         
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 0)
+        layout.setContentsMargins(10, 0, 10, 0) # Slammed to the top
         
         # 1. Header Area
         self.header_label = QLabel("No Selection")
         self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
+        self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.header_label)
-
-        # 1b. Projected Path Feedback
-        self.lbl_projected_path = QLabel("")
-        self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
-        self.lbl_projected_path.setWordWrap(True)
-        self.lbl_projected_path.setVisible(False)
-        layout.addWidget(self.lbl_projected_path)
         
         
         # 3. Scroll Area for Fields
@@ -80,6 +74,7 @@ class SidePanelWidget(QFrame):
         self.field_container.setObjectName("FieldContainer")
         self.field_layout = QVBoxLayout(self.field_container)
         self.field_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.field_layout.setSpacing(0) # Programmatic spacing control
         
         self.scroll.setWidget(self.field_container)
         layout.addWidget(self.scroll, 1)
@@ -93,7 +88,12 @@ class SidePanelWidget(QFrame):
         footer_main_layout.setContentsMargins(0, 10, 0, 0)
         footer_main_layout.setSpacing(8)
 
-        # 2. Workflow State (STATUS PILL) - Now on its own line for maximum visibility
+        # 2. Workflow State (STATUS PILL) - Grouped with LED
+        status_row = QWidget()
+        status_layout = QHBoxLayout(status_row)
+        status_layout.setContentsMargins(0, 0, 0, 0)
+        status_layout.setSpacing(8)
+
         self.btn_status = GlowButton("PENDING")
         self.btn_status.setObjectName("StatusPill")
         self.btn_status.setCheckable(True)
@@ -102,10 +102,28 @@ class SidePanelWidget(QFrame):
         self.btn_status.setMinimumWidth(180) # Force physical weight
         self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_status.clicked.connect(self._on_status_toggled)
+        self.btn_status.installEventFilter(self)
+
+        # The Status LED (indicates Rename/Move pending) - Moved next to READY
+        self.save_led = QFrame()
+        self.save_led.setObjectName("StatusLED")
+        self.save_led.setProperty("state", "off")
+        self.save_led.setToolTip("Rename/Move detected")
+
+        # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
+        self.lbl_projected_path = QLabel("")
+        self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
+        self.lbl_projected_path.setWordWrap(True)
+        self.lbl_projected_path.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_projected_path.setVisible(False)
+        
+        status_layout.addWidget(self.btn_status, 1)
+        status_layout.addWidget(self.save_led)
 
         # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
         self.btn_status.setEnabled(False)
-        footer_main_layout.addWidget(self.btn_status)
+        footer_main_layout.addWidget(self.lbl_projected_path) # Above status
+        footer_main_layout.addWidget(status_row)
 
         # Button Row (Discard / Save)
         button_row = QWidget()
@@ -186,7 +204,16 @@ class SidePanelWidget(QFrame):
             self._update_status_visuals(False)
         elif len(self.current_songs) == 1:
             song = self.current_songs[0]
-            artist = song.unified_artist or "Unknown Artist"
+            # Priority: Staged Performers > Staged Unified Artist > DB Unified Artist
+            p_val = self._get_effective_value(song.source_id, "performers", song.performers)
+            if isinstance(p_val, list) and p_val:
+                artist = p_val[0]
+            elif isinstance(p_val, str) and p_val:
+                artist = p_val
+            else:
+                artist = self._get_effective_value(song.source_id, "unified_artist", song.unified_artist)
+            
+            artist = artist or "Unknown Artist"
             self.header_label.setText(f"{artist} - {song.title}")
             
             # Sync Done state
@@ -233,13 +260,18 @@ class SidePanelWidget(QFrame):
         # Advanced is everything else
         adv_fields = [f for f in yellberus.FIELDS if f.name in all_visible and f.name not in core_names_flat]
 
-        def add_group(fields, title):
+        def add_group(fields, title, show_line=True):
             if not fields: return
             
-            group_label = QLabel(title.upper())
-            group_label.setObjectName("FieldGroupLabel")
-            # Styling via QSS: QLabel#FieldGroupLabel
-            self.field_layout.addWidget(group_label)
+            if show_line:
+                self.field_layout.addSpacing(1) # Gap before line
+                # Replace Label with a 555555 Line (2px)
+                line = QFrame()
+                line.setFixedHeight(2)
+                line.setObjectName("FieldGroupLine")
+                line.setStyleSheet("background-color: #555555;")
+                self.field_layout.addWidget(line)
+                self.field_layout.addSpacing(18) # Room before the next field (e.g. ISRC)
             
             for item in fields:
                 # Handle Cluster (List of Fields)
@@ -255,10 +287,9 @@ class SidePanelWidget(QFrame):
                         col = QWidget()
                         v_col = QVBoxLayout(col)
                         v_col.setContentsMargins(0,0,0,0)
-                        v_col.setSpacing(1)
+                        v_col.setSpacing(0) # Slammed
                         
                         label_text = field.ui_header
-                        if field.required: label_text += " *"
                         lbl = QLabel(label_text)
                         lbl.setObjectName("FieldLabel")
                         # Styling via QSS: QLabel#FieldLabel
@@ -279,6 +310,7 @@ class SidePanelWidget(QFrame):
                             h_layout.addWidget(col)  # Default equal
                         
                     self.field_layout.addWidget(h_container)
+                    self.field_layout.addSpacing(8) # Consistent gap
                     continue
 
                 # Handle Single Field (Normal)
@@ -295,12 +327,10 @@ class SidePanelWidget(QFrame):
                 container = QWidget()
                 row = QVBoxLayout(container)
                 row.setContentsMargins(0, 0, 0, 4) # Tighter vertical rhythm
-                row.setSpacing(1) # Tight connection between Label and Input
+                row.setSpacing(0) # Slammed to input
                 
                 # Label
                 label_text = field.ui_header
-                if field.required:
-                    label_text += " *"
                 label = QLabel(label_text)
                 label.setObjectName("FieldLabel")
                 # Styling via QSS: QLabel#FieldLabel
@@ -315,9 +345,10 @@ class SidePanelWidget(QFrame):
                 row.addWidget(label)
                 row.addWidget(edit_widget)
                 self.field_layout.addWidget(container)
+                self.field_layout.addSpacing(8) # Consistent gap between fields
 
-        add_group(core_layout_struct, "Core Metadata")
-        add_group(adv_fields, "Advanced Details")
+        add_group(core_layout_struct, "Core Metadata", show_line=False)
+        add_group(adv_fields, "Advanced Details", show_line=True)
 
     def _refresh_field_values(self):
         """Update existing widget values without rebuilding UI (performance optimization)."""
@@ -539,6 +570,7 @@ class SidePanelWidget(QFrame):
                 self._staged_changes[song.source_id] = {}
             self._staged_changes[song.source_id][field_name] = value
             
+        self._update_header()
         self._update_save_state()
         self._validate_done_gate()
         self.staging_changed.emit(list(self._staged_changes.keys()))
@@ -731,7 +763,15 @@ class SidePanelWidget(QFrame):
                 item.widget().deleteLater()
 
     def eventFilter(self, source, event):
-        # Escape key handling for revert coming in Phase 4
+        from PyQt6.QtCore import QEvent
+        if source == self.btn_status:
+            if event.type() == QEvent.Type.Enter:
+                # Reveal path on hover if it exists
+                if self.lbl_projected_path.text():
+                    self.lbl_projected_path.setVisible(True)
+            elif event.type() == QEvent.Type.Leave:
+                # Always hide on leave. The LED handles the persistent alert now.
+                self.lbl_projected_path.setVisible(False)
         return super().eventFilter(source, event)
 
     def _get_staged_song(self, original_song):
@@ -746,8 +786,9 @@ class SidePanelWidget(QFrame):
                 field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
                 if field_def:
                     attr = field_def.model_attr or field_def.name
-                    # Direct attribute set (assuming data matches type)
-                    setattr(song, attr, value)
+                    # NEW: Cast string from UI to proper Python type (e.g. List, Int)
+                    casted_value = yellberus.cast_from_string(field_def, value)
+                    setattr(song, attr, casted_value)
         return song
 
     def _do_update_projected_path(self):
@@ -768,7 +809,7 @@ class SidePanelWidget(QFrame):
         from PyQt6.QtCore import QThread, pyqtSignal
         
         class ConflictCheckWorker(QThread):
-            result_ready = pyqtSignal(str, bool, bool) # target, has_conflict, is_error
+            result_ready = pyqtSignal(str, bool, bool, bool) # target, has_conflict, has_changed, is_error
             
             def __init__(self, renaming_service, song, staged_song):
                 super().__init__()
@@ -781,13 +822,14 @@ class SidePanelWidget(QFrame):
                     target = self.renaming_service.calculate_target_path(self.staged_song)
                     
                     is_self = False
-                    if self.staged_song.path and os.path.normpath(self.staged_song.path) == os.path.normpath(target):
+                    if self.song.path and os.path.normpath(self.song.path) == os.path.normpath(target):
                         is_self = True
                         
                     has_conflict = not is_self and self.renaming_service.check_conflict(target)
-                    self.result_ready.emit(target, has_conflict, False)
+                    has_changed = not is_self
+                    self.result_ready.emit(target, has_conflict, has_changed, False)
                 except Exception as e:
-                    self.result_ready.emit(str(e), True, True)
+                    self.result_ready.emit(str(e), True, True, True)
 
         # Cleanup old worker if any
         if hasattr(self, "_path_worker") and self._path_worker.isRunning():
@@ -798,19 +840,30 @@ class SidePanelWidget(QFrame):
         self._path_worker.result_ready.connect(self._on_projected_path_result)
         self._path_worker.start()
 
-    def _on_projected_path_result(self, target, has_conflict, is_error):
+    def _on_projected_path_result(self, target, has_conflict, has_changed, is_error):
         """Handle background result."""
         if is_error:
-            self.lbl_projected_path.setText(f"Path Error: {target}")
-            self.lbl_projected_path.setVisible(True)
-            self.lbl_projected_path.setProperty("conflict", True)
+            self.lbl_projected_path.setText(target)
+            self.lbl_projected_path.setProperty("conflict", "true")
+            self.save_led.setProperty("state", "alert")
         else:
-            self.lbl_projected_path.setText(f"Projected: {target}")
-            self.lbl_projected_path.setVisible(True)
-            self.lbl_projected_path.setProperty("conflict", has_conflict)
-            self.btn_save.setProperty("alert", has_conflict)
+            # Clean display: normpath fixes the \ / mix
+            display_path = os.path.normpath(target)
+            self.lbl_projected_path.setText(display_path)
+            
+            # User Req: LED Red/Bold if path is different from DB (has_changed) or is a conflict
+            is_alert = has_changed or has_conflict
+            
+            # The path is now strictly HOVER-ONLY to reclaim vertical space
+            self.lbl_projected_path.setVisible(False)
+            
+            self.lbl_projected_path.setProperty("conflict", "true" if is_alert else "false")
+            self.save_led.setProperty("state", "alert" if is_alert else "off")
+            self.btn_save.setProperty("alert", is_alert)
             
         self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
         self.lbl_projected_path.style().polish(self.lbl_projected_path)
+        self.save_led.style().unpolish(self.save_led)
+        self.save_led.style().polish(self.save_led)
         self.btn_save.style().unpolish(self.btn_save)
         self.btn_save.style().polish(self.btn_save)

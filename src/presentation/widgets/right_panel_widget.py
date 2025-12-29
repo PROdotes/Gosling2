@@ -178,7 +178,7 @@ class RightPanelWidget(QWidget):
         self.settings_manager = settings_manager
         
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(8, 8, 8, 8)  # Show panel gradient around edges
+        self.layout.setContentsMargins(8, 6, 8, 8)  # Shifted top 2px up
         self.layout.setSpacing(5)
         
         # Constraint: Prevent collapse of Command Deck (Corridor: 260px - 500px)
@@ -188,6 +188,13 @@ class RightPanelWidget(QWidget):
         # 1. The Header
         self.header = RightPanelHeader()
         self.layout.addWidget(self.header)
+
+        # 1b. The Walled-Off Separator (White line)
+        self.layout.addSpacing(1) # Tighter gap
+        line = QFrame()
+        line.setObjectName("HeaderSeparator")
+        line.setFixedHeight(1)
+        self.layout.addWidget(line)
         
         # 2. The Vertical Splitter (The Stack)
         self.splitter = QSplitter(Qt.Orientation.Vertical)
