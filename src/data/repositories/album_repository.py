@@ -212,6 +212,37 @@ class AlbumRepository(BaseRepository):
                 albums.append(Album.from_row(row))
         return albums
 
+    def get_songs_in_album(self, album_id: int) -> List[dict]:
+        """
+        Get lightweight list of songs in an album for preview.
+        Returns [{'title': str, 'artist': str}]
+        """
+        query = """
+            SELECT MS.Name, 
+                   COALESCE(
+                       (SELECT Group_Concat(C.ContributorName, ', ') 
+                        FROM MediaSourceContributorRoles MSCR 
+                        JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+                        JOIN Roles R ON MSCR.RoleID = R.RoleID
+                        WHERE MSCR.SourceID = MS.SourceID AND R.RoleName = 'Performer'
+                       ), 
+                       'Unknown'
+                   ) as Artist
+            FROM MediaSources MS
+            JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
+            WHERE SA.AlbumID = ?
+            ORDER BY SA.TrackNumber ASC, MS.Name ASC
+        """
+        songs = []
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query, (album_id,))
+                for row in cursor.fetchall():
+                    songs.append({'title': row[0], 'artist': row[1]})
+        except Exception as e:
+            print(f"Error fetching album songs: {e}")
+        return songs
+
     def get_item_albums(self, source_id: int) -> List[Album]:
         """Get albums linked to a source item."""
         return self.get_albums_for_song(source_id)

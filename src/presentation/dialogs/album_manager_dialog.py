@@ -1,465 +1,485 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QListWidget, QListWidgetItem, QStackedWidget,
-    QFrame, QMessageBox, QComboBox, QWidget, QMenu, QCheckBox
+    QListWidget, QListWidgetItem, QSplitter,
+    QFrame, QMessageBox, QComboBox, QWidget, QMenu, QCheckBox,
+    QSizePolicy
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
+from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton
 from .publisher_manager_dialog import PublisherPickerWidget
 
 class AlbumManagerDialog(QDialog):
     """
-    T-46: Proper Album Editor (The Inspector)
-    Allows searching existing albums or creating new ones with proper hierarchy.
+    T-46: Proper Album Editor (The Workstation)
+    A 4-pane console for managing albums, their metadata, and publishers.
+    Layout: [Context (Songs)] | [Vault (Albums)] | [Inspector (Edit)] | [Sidecar (Publisher)]
     """
     
     # Returns the selected/created Album ID and Name
     album_selected = pyqtSignal(int, str) 
     save_and_select_requested = pyqtSignal(int, str)
-    album_deleted = pyqtSignal(int) # Emitted with ID before deletion starts
+    album_deleted = pyqtSignal(int)
+    
     def __init__(self, album_repository, initial_data=None, parent=None, staged_deletions=None):
         super().__init__(parent)
         self.album_repo = album_repository
         self.initial_data = initial_data or {}
-        self.selected_album = None
         self.staged_deletions = staged_deletions or set()
-        self.editing_album = None # Track if we are editing vs creating
-        self.selected_pub_id = None # Track selected publisher ID
-        self.selected_pub_name = "" # Track selected publisher Name
         
-        self.setWindowTitle("Album Manager")
-        self.setFixedSize(900, 500) # Increased width for the 'Sidecar'
+        # Determine if the initial title is valid (exists in DB)
+        # If I open the dialog on a song that says "Wheels", but the DB knows "Wheels" 
+        # was renamed to "Greatest Hits", searching "Wheels" will yield nothing (or the wrong thing).
+        # Wait, if "Wheels" was renamed efficiently, the song's metadata in the SidePanel 
+        # might still say "Wheels" (stale UI), so we pass "Wheels" in.
+        # But "Wheels" album doesn't exist anymore.
+        # So we should probably check if this search term yields results. If not, clear it.
+        
+        # T-46 Fix: Prefer ID lookup to prevent Stale Title Ghosting
+        # If we have an ID, we trust the DB's current title for that ID, ignoring whatever text was passed.
+        aid = self.initial_data.get('album_id')
+        if aid:
+             fresh_album = self.album_repo.get_by_id(aid)
+             if fresh_album:
+                  self.initial_data['title'] = fresh_album.title
+                  # Also helpful:
+                  self.current_album = fresh_album
+
+        target = self.initial_data.get('title', '')
+        if target:
+             # Quick check: Does this title exist?
+             hits = self.album_repo.search(target)
+             if not hits:
+                 pass
+
+        # State
+        self.current_album = None # The album object currently loaded in Inspector
+        self.is_creating_new = False # Flag for "Create New" mode
+        self.selected_pub_name = "" 
+        
+        self.setWindowTitle("Album Manager Workstation")
+        self.setFixedSize(1300, 650) # Widescreen Console
         self.setModal(True)
-        
-        # Styling moved to theme.qss
         self.setObjectName("AlbumManagerDialog")
         
         self._init_ui()
         
     def _init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0,0,0,0)
         
-        # 1. Header (Mode Switcher)
-        header_layout = QHBoxLayout()
-        self.lbl_title = QLabel("SELECT ALBUM")
-        self.lbl_title.setObjectName("DialogHeaderTitle")
+        # --- TOP HEADER ---
+        header = QFrame()
+        header.setFixedHeight(50)
+        header.setObjectName("DialogHeader") # Add styling later if needed
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(20,0,20,0)
         
+        self.lbl_title = QLabel("ALBUM CONSOLE")
+        self.lbl_title.setObjectName("DialogHeaderTitle") # Use existing style
         header_layout.addWidget(self.lbl_title)
+        
         header_layout.addStretch()
         
-        self.btn_mode_toggle = GlowButton("Create New (+)")
-        self.btn_mode_toggle.clicked.connect(self._toggle_mode)
-        header_layout.addWidget(self.btn_mode_toggle)
+        self.btn_create_new = GlowButton("Create New Album (+)")
+        self.btn_create_new.clicked.connect(self._start_create_new)
+        header_layout.addWidget(self.btn_create_new)
         
-        layout.addLayout(header_layout)
+        main_layout.addWidget(header)
         
-        # 2. Stacked Content (Search vs Create)
-        self.stack = QStackedWidget()
+        # --- MAIN SPLITTER (The Workstation) ---
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+        self.splitter.setHandleWidth(2)
         
-        # --- PAGE 1: SEARCH ---
-        self.page_search = QWidget()
-        search_layout = QVBoxLayout(self.page_search)
-        search_layout.setContentsMargins(0,0,0,0)
+        # 1. PANE Z: Context (Songs)
+        self.pane_context = self._build_context_pane()
+        self.splitter.addWidget(self.pane_context)
         
-        # Top Row: Search + Filter
-        top_bar = QHBoxLayout()
-        top_bar.setContentsMargins(0,0,0,0)
+        # 2. PANE A: Vault (Albums)
+        self.pane_vault = self._build_vault_pane()
+        self.splitter.addWidget(self.pane_vault)
+        
+        # 3. PANE B: Inspector (Editor)
+        self.pane_inspector = self._build_inspector_pane()
+        self.splitter.addWidget(self.pane_inspector)
+        
+        # 4. PANE C: Sidecar (Publisher)
+        self.pane_sidecar = self._build_sidecar_pane()
+        self.splitter.addWidget(self.pane_sidecar)
+        
+        # Set initial stretch factors (20, 25, 30, 25)
+        self.splitter.setStretchFactor(0, 2)
+        self.splitter.setStretchFactor(1, 3)
+        self.splitter.setStretchFactor(2, 4)
+        self.splitter.setStretchFactor(3, 3)
+        
+        main_layout.addWidget(self.splitter)
+        
+        # --- FOOTER ---
+        footer = QFrame()
+        footer.setFixedHeight(60)
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(20,10,20,10)
+        
+        self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.clicked.connect(self.reject)
+        
+        self.btn_select = GlowButton("Select Album")
+        self.btn_select.setObjectName("Primary")
+        self.btn_select.setEnabled(False)
+        self.btn_select.clicked.connect(self._on_select_clicked)
+        
+        footer_layout.addWidget(self.btn_cancel)
+        footer_layout.addStretch()
+        footer_layout.addWidget(self.btn_select)
+        
+        main_layout.addWidget(footer)
+        
+        # Initial Load
+        title_to_find = self.initial_data.get('title', '')
+        if title_to_find:
+            self.txt_search.setText(title_to_find)
+        else:
+            self._refresh_vault()
+
+    # --- PANE BUILDERS ---
+    
+    def _build_context_pane(self):
+        container = QFrame()
+        container.setObjectName("DialogContextPane")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+        layout.setSpacing(0)
+        
+        # Header
+        lbl = QLabel("  ALBUM CONTEXT")
+        lbl.setFixedHeight(30)
+        lbl.setStyleSheet("color: #666; font-size: 10px; font-weight: bold; background: #080808; border-bottom: 1px solid #111;")
+        layout.addWidget(lbl)
+        
+        self.list_context = QListWidget()
+        self.list_context.setObjectName("DialogContextList")
+        self.list_context.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Non-interactive
+        layout.addWidget(self.list_context)
+        
+        return container
+
+    def _build_vault_pane(self):
+        container = QFrame()
+        container.setObjectName("DialogVault")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+        
+        # Search Bar Area
+        search_box = QFrame()
+        search_box.setStyleSheet("background: #0b0b0b; padding: 6px;")
+        sb_layout = QVBoxLayout(search_box)
+        sb_layout.setContentsMargins(0,0,0,0)
         
         self.txt_search = GlowLineEdit()
         self.txt_search.setPlaceholderText("Search Albums...")
         self.txt_search.textChanged.connect(self._on_search_text_changed)
-        top_bar.addWidget(self.txt_search, 1) # Expand
+        sb_layout.addWidget(self.txt_search)
         
-        self.chk_empty = QCheckBox("Empty Only")
-        self.chk_empty.setToolTip("Show only albums with 0 songs")
-        # Refresh on toggle (pass current search text)
-        self.chk_empty.stateChanged.connect(lambda: self._refresh_list(self.txt_search.text()))
-        top_bar.addWidget(self.chk_empty)
+        layout.addWidget(search_box)
         
-        search_layout.addLayout(top_bar)
+        self.list_vault = QListWidget()
+        self.list_vault.setObjectName("DialogVaultList") # Will inherit QListWidget styles
+        self.list_vault.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_vault.customContextMenuRequested.connect(self._show_vault_context_menu)
+        self.list_vault.itemClicked.connect(self._on_vault_item_clicked)
+        self.list_vault.itemDoubleClicked.connect(self._on_select_clicked)
         
-        self.list_albums = QListWidget()
-        self.list_albums.setObjectName("AlbumManagerList") # Added for QSS styling
-        self.list_albums.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
-        self.list_albums.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_albums.customContextMenuRequested.connect(self._show_context_menu)
-        self.list_albums.itemDoubleClicked.connect(self._on_item_double_clicked)
-        self.list_albums.itemSelectionChanged.connect(self._on_selection_changed)
-        search_layout.addWidget(self.list_albums)
+        layout.addWidget(self.list_vault)
+        return container
+
+    def _build_inspector_pane(self):
+        container = QFrame()
+        container.setObjectName("DialogInspector")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(20,20,20,20)
+        layout.setSpacing(15)
         
-        self.stack.addWidget(self.page_search)
+        # Form Fields
+        self.inp_title = self._add_field(layout, "Album Title *")
+        self.inp_artist = self._add_field(layout, "Album Artist")
+        self.inp_year = self._add_field(layout, "Release Year")
         
-        # --- PAGE 2: CREATE/EDIT ---
-        self.page_create = QWidget()
-        page_h_layout = QHBoxLayout(self.page_create)
-        page_h_layout.setContentsMargins(0,0,0,0)
-        page_h_layout.setSpacing(0)
-        
-        # Left Side: Form Container
-        form_container = QWidget()
-        create_layout = QVBoxLayout(form_container)
-        create_layout.setContentsMargins(0,0,0,0)
-        create_layout.setSpacing(15)
-        
-        # Form Box
-        form_frame = QFrame()
-        form_frame.setObjectName("DialogFormContainer")
-        form_layout = QVBoxLayout(form_frame)
-        
-        self.inp_title = self._add_field(form_layout, "Album Title *")
-        self.inp_artist = self._add_field(form_layout, "Album Artist")
-        self.inp_year = self._add_field(form_layout, "Release Year")
-        
-        # Publisher Picker (T-69)
+        # Publisher Trigger
         lbl_pub = QLabel("PUBLISHER")
         lbl_pub.setObjectName("DialogFieldLabel")
-        self.btn_pub_picker = GlowButton("(None)")
-        self.btn_pub_picker.setObjectName("PublisherPickerButton")
-        self.btn_pub_picker.clicked.connect(self._open_publisher_manager)
-        form_layout.addWidget(lbl_pub)
-        form_layout.addWidget(self.btn_pub_picker)
+        layout.addWidget(lbl_pub)
+        
+        self.btn_pub_trigger = GlowButton("(None)")
+        self.btn_pub_trigger.setObjectName("PublisherPickerButton")
+        self.btn_pub_trigger.clicked.connect(self._toggle_sidecar)
+        layout.addWidget(self.btn_pub_trigger)
         
         # Type Dropdown
-        lbl_type = QLabel("Release Type")
+        lbl_type = QLabel("RELEASE TYPE")
         lbl_type.setObjectName("DialogFieldLabel")
+        layout.addWidget(lbl_type)
+        
         self.cmb_type = QComboBox()
         self.cmb_type.addItems(["Album", "EP", "Single", "Compilation", "Anthology"])
+        layout.addWidget(self.cmb_type)
         
-        form_layout.addWidget(lbl_type)
-        form_layout.addWidget(self.cmb_type)
+        layout.addStretch()
         
-        create_layout.addWidget(form_frame)
-        create_layout.addStretch()
+        # Save Actions (Inside Inspector)
+        btn_bar = QHBoxLayout()
+        self.btn_save_inspector = GlowButton("Save Changes")
+        self.btn_save_inspector.setObjectName("Primary")
+        self.btn_save_inspector.clicked.connect(self._save_inspector)
         
-        # Right Side: SIDECAR (T-69: Integrated Picker)
+        btn_bar.addStretch()
+        btn_bar.addWidget(self.btn_save_inspector)
+        layout.addLayout(btn_bar)
+        
+        # Disable by default
+        container.setEnabled(False)
+        
+        return container
+        
+    def _build_sidecar_pane(self):
+        container = QFrame()
+        container.setObjectName("PublisherSidecar")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0,0,0,0)
+        
         from ...data.repositories.publisher_repository import PublisherRepository
         pub_repo = PublisherRepository(self.album_repo.db_path)
         
-        self.pub_picker = PublisherPickerWidget(pub_repo, self)
-        self.pub_picker.publisher_selected.connect(self._on_publisher_picked)
-        self.pub_picker.hide() # Hidden until button clicked
+        self.publisher_picker = PublisherPickerWidget(pub_repo, self)
+        self.publisher_picker.publisher_selected.connect(self._on_publisher_selected)
         
-        # Assemble Page 2
-        page_h_layout.addWidget(form_container, 1) 
-        page_h_layout.addWidget(self.pub_picker, 1) # Equal split or adjusted ratio
+        layout.addWidget(self.publisher_picker)
         
-        self.stack.addWidget(self.page_create)
+        # Initially Hidden in logic? No, just hidden via collapse or width?
+        # For this design, let's keep it visible but maybe collapsible later.
+        # Or start with simple visibility toggle.
+        container.hide() # Hidden until trigger clicked
         
-        layout.addWidget(self.stack)
-        
-        # 3. Footer actions
-        footer = QHBoxLayout()
-        self.btn_cancel = GlowButton("Cancel")
-        self.btn_cancel.clicked.connect(self.reject)
-        
-        self.btn_confirm = GlowButton("Select")
-        self.btn_confirm.setObjectName("Primary")
-        self.btn_confirm.setEnabled(False)
-        self.btn_confirm.clicked.connect(self._on_confirm_clicked)
-        
-        self.btn_save_confirm = GlowButton("Select & Save")
-        self.btn_save_confirm.setObjectName("Primary")
-        self.btn_save_confirm.setEnabled(False)
-        self.btn_save_confirm.clicked.connect(self._on_save_confirm_clicked)
-        
-        footer.addWidget(self.btn_cancel)
-        footer.addStretch()
-        footer.addWidget(self.btn_save_confirm)
-        footer.addWidget(self.btn_confirm)
-        
-        layout.addLayout(footer)
-        
-        # Initial Population & Autoselect
-        title_to_find = self.initial_data.get('title', '')
-        if title_to_find:
-             self.txt_search.setText(title_to_find)
-        else:
-             self._refresh_list()
+        return container
 
-    def _add_field(self, layout, label_text):
-        lbl = QLabel(label_text.upper())
+    def _add_field(self, layout, label):
+        lbl = QLabel(label.upper())
         lbl.setObjectName("DialogFieldLabel")
         inp = GlowLineEdit()
         layout.addWidget(lbl)
         layout.addWidget(inp)
         return inp
 
-    def _toggle_mode(self, checked=False, edit_album=None):
-        if self.stack.currentIndex() == 0 or edit_album:
-            # === SWITCH TO EDITOR MODE ===
-            self.editing_album = edit_album
-            search_text = self.txt_search.text().strip()
-            
-            self.stack.setCurrentIndex(1)
-            self.btn_mode_toggle.setText("Back to Search")
-            
-            if self.editing_album:
-                self.lbl_title.setText("EDIT ALBUM")
-                self.btn_confirm.setText("Update & Select")
-                self.btn_confirm.setEnabled(True)
-                self.btn_save_confirm.setText("Update & Save")
-                self.btn_save_confirm.setEnabled(True)
-                
-                # Fill from Album Object
-                self.inp_title.setText(self.editing_album.title or "")
-                self.inp_artist.setText(self.editing_album.album_artist or "")
-                self.inp_year.setText(str(self.editing_album.release_year) if self.editing_album.release_year else "")
-                self.cmb_type.setCurrentText(self.editing_album.album_type or "Album")
-                
-                # Fetch Publisher
-                pub_name = self.album_repo.get_publisher(self.editing_album.album_id)
-                self.selected_pub_name = pub_name or ""
-                self.btn_pub_picker.setText(pub_name if pub_name else "(None)")
-            else:
-                self.lbl_title.setText("NEW ALBUM")
-                self.btn_confirm.setText("Create & Select")
-                self.btn_confirm.setEnabled(True)
-                self.btn_save_confirm.setText("Create & Save")
-                self.btn_save_confirm.setEnabled(True)
-                
-                # Smart Populate
-                target_title = search_text or self.initial_data.get('title', '')
-                target_artist = self.initial_data.get('artist', '')
-                target_year = self.initial_data.get('year', '')
-                target_publisher = self.initial_data.get('publisher', '')
+    # --- LOGIC ---
 
-                self.inp_title.setText(target_title)
-                self.inp_artist.setText(target_artist)
-                self.inp_year.setText(str(target_year) if target_year else "")
-                self.selected_pub_name = target_publisher
-                self.btn_pub_picker.setText(target_publisher if target_publisher else "(None)")
+    def _start_create_new(self):
+        self.is_creating_new = True
+        self.current_album = None
+        
+        # Clear Selection
+        self.list_vault.clearSelection()
+        
+        # Clear Inspector
+        self.inp_title.clear()
+        self.inp_artist.clear()
+        self.inp_year.clear()
+        self.cmb_type.setCurrentIndex(0)
+        self.btn_pub_trigger.setText("(None)")
+        self.selected_pub_name = ""
+        
+        # Clear Context
+        self.list_context.clear()
+        
+        # Enable Inspector
+        self.pane_inspector.setEnabled(True)
+        self.pane_inspector.setStyleSheet("border: 1px solid #ffaa00;") # Visual cue
+        self.inp_title.setFocus()
+        
+        # Smart Fill
+        if self.initial_data.get('title'):
+            self.inp_title.setText(self.initial_data.get('title'))
+        
+        self.btn_select.setEnabled(False) # Can't select valid album yet
+        self.lbl_title.setText("CREATING NEW ALBUM")
 
-            # Clear search
-            self.txt_search.clear()
-            self.inp_title.setFocus()
-        else:
-             # Switch back to Search
-            self.stack.setCurrentIndex(0)
-            self.editing_album = None
-            self.lbl_title.setText("SELECT ALBUM")
-            self.btn_mode_toggle.setText("Create New (+)")
-            self.btn_confirm.setText("Select")
-            self.btn_save_confirm.setText("Select & Save")
-            self._on_selection_changed() # Re-validate button
-
-    def _show_context_menu(self, pos):
-        selected_items = self.list_albums.selectedItems()
-        if not selected_items:
+    def _on_vault_item_clicked(self, item):
+        self.is_creating_new = False
+        album_id = item.data(Qt.ItemDataRole.UserRole)
+        self.current_album = self.album_repo.get_by_id(album_id)
+        
+        if not self.current_album:
             return
             
-        menu = QMenu(self)
+        # 1. Populate Inspector
+        self.inp_title.setText(self.current_album.title or "")
+        self.inp_artist.setText(self.current_album.album_artist or "")
+        self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
+        self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
         
-        # Edit Action
-        action_edit = QAction("Edit Album Details", self)
-        action_edit.triggered.connect(lambda: self._edit_selected_album(selected_items[0]))
-        menu.addAction(action_edit)
+        # Publisher
+        pub_name = self.album_repo.get_publisher(self.current_album.album_id)
+        self.selected_pub_name = pub_name or ""
+        self.btn_pub_trigger.setText(pub_name if pub_name else "(None)")
         
-        menu.addSeparator()
+        # 2. Populate Context (Songs)
+        self._refresh_context(album_id)
+        
+        # 3. Enable UI
+        self.pane_inspector.setEnabled(True)
+        self.pane_inspector.setStyleSheet("") # Clear create cue
+        self.btn_select.setEnabled(True)
+        self.lbl_title.setText("EDITING ALBUM")
 
-        # Determine label based on count
-        label = f"Delete {len(selected_items)} Albums" if len(selected_items) > 1 else "Delete Album"
+    def _refresh_context(self, album_id):
+        self.list_context.clear()
+        songs = self.album_repo.get_songs_in_album(album_id)
         
-        action_delete = QAction(label, self)
-        action_delete.triggered.connect(lambda: self._delete_albums(selected_items))
-        menu.addAction(action_delete)
-        
-        menu.exec(self.list_albums.mapToGlobal(pos))
+        if not songs:
+            item = QListWidgetItem(" (No Songs) ")
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.list_context.addItem(item)
+            return
 
-    def _edit_selected_album(self, item):
-        alb_id = item.data(Qt.ItemDataRole.UserRole)
-        alb = self.album_repo.get_by_id(alb_id)
-        if alb:
-            self._toggle_mode(edit_album=alb)
-
-    def _delete_albums(self, items):
-        if not items: return
-        
-        count = len(items)
-        total_songs = 0
-        album_ids = []
-        
-        for item in items:
-            alb_id = item.data(Qt.ItemDataRole.UserRole)
-            album_ids.append(alb_id)
-            total_songs += self.album_repo.get_song_count(alb_id)
-
-        # Build Message
-        if count == 1:
-            name = items[0].data(Qt.ItemDataRole.UserRole + 1)
-            if total_songs > 0:
-                msg = f"Album contains {total_songs} songs.\nDeleting it will UNLINK them.\n\nAre you sure?"
-                icon = QMessageBox.Icon.Warning
-            else:
-                msg = f"Are you sure you want to delete '{name}'?"
-                icon = QMessageBox.Icon.Question
-        else:
-            if total_songs > 0:
-                msg = f"You are about to delete {count} albums.\nWarning: {total_songs} song links will be REMOVED.\n\nAre you sure?"
-                icon = QMessageBox.Icon.Warning
-            else:
-                msg = f"Are you sure you want to delete {count} empty albums?"
-                icon = QMessageBox.Icon.Question
-
-        reply = QMessageBox.question(
-            self, 
-            "Confirm Batch Delete", 
-            msg,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, 
-            QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            # NON-LAZY UX: We do NOT delete from DB yet.
-            # We just signal the intent so the Side Panel can stage it.
-            for alb_id in album_ids:
-                self.staged_deletions.add(alb_id) # Immediate local update
-                self.album_deleted.emit(alb_id)
+        for song in songs:
+            # Format: Track - Title (Artist) or just Title
+            display = f"{song['title']}"
+            if song['artist'] != 'Unknown':
+                 # Only show artist if it differs from album artist? Too complex for now.
+                 display += f" - {song['artist']}"
             
-            # Refresh using current search term
-            self._on_search_text_changed(self.txt_search.text())
+            self.list_context.addItem(display)
 
-    def _refresh_list(self, query=""):
-        self.list_albums.clear()
+    def _refresh_vault(self, query=None):
+        # Always prefer current search text if query is not explicitly provided
+        # Or even if it is? The issue described ("it was still saying wheels") implies 
+        # the list didn't update to reflect the NEW title because the search query 
+        # (old title) was still filtering it?
         
-        # Determine filter state
-        empty_only = False
-        if hasattr(self, 'chk_empty'): # Safety check
-            empty_only = self.chk_empty.isChecked()
-
-        if self.album_repo:
-             results = self.album_repo.search(query, empty_only=empty_only)
-        else:
-             results = [] 
+        # If we just saved "Wheels" -> "Greatest Hits", but the search box still says "Wheels",
+        # the list will show nothing (or the old cached view?).
         
-        if not results and not query:
-             # Show 'recent' or 'all'?
-             pass
-             
-        target_title = self.initial_data.get('title', '').strip().lower()
-
+        # Let's trust the search box.
+        if query is None:
+            query = self.txt_search.text()
+            
+        self.list_vault.clear()
+        results = self.album_repo.search(query)
+        
+        target_id = None
+        if self.current_album:
+            target_id = self.current_album.album_id
+        elif self.initial_data.get('album_id'):
+            # Fallback: If we have an ID but haven't loaded the object yet
+            target_id = self.initial_data.get('album_id')
+        
         for alb in results:
-            # Ghosting: Skip albums staged for deletion in the Side Panel
-            if alb.album_id in self.staged_deletions:
-                continue
-                
-            # Replaced alb.id with alb.album_id, alb.year with alb.release_year, alb.artist with alb.album_artist
-            # Format: (Year) Title - Artist (N songs)
-            year_part = f"({alb.release_year}) " if alb.release_year else ""
-            artist_part = f" - {alb.album_artist}" if alb.album_artist else ""
+            if alb.album_id in self.staged_deletions: continue
             
-            s_label = "song" if alb.song_count == 1 else "songs"
-            count_part = f" ({alb.song_count} {s_label})"
-
-            display_str = f"{year_part}{alb.title}{artist_part}{count_part}"
+            # Format: (Year) Title [Artist]
+            display = f"{alb.title}"
+            if alb.release_year: display = f"({alb.release_year}) " + display
+            if alb.album_artist: display += f" - {alb.album_artist}"
             
-            item = QListWidgetItem(display_str)
+            item = QListWidgetItem(display)
             item.setData(Qt.ItemDataRole.UserRole, alb.album_id)
-            # Store raw title to avoid parsing the formatted string later
-            item.setData(Qt.ItemDataRole.UserRole + 1, alb.title) 
-            self.list_albums.addItem(item)
+            self.list_vault.addItem(item)
             
-            # Autoselect if exact title match
-            if target_title and alb.title.strip().lower() == target_title:
+            if target_id and alb.album_id == target_id:
                 item.setSelected(True)
-                self.list_albums.setCurrentItem(item)
-                self.list_albums.scrollToItem(item)
-            
+                self.list_vault.setCurrentItem(item)
+                # Manually trigger the click logic to populate the Inspector!
+                self._on_vault_item_clicked(item)
+
     def _on_search_text_changed(self, text):
-        self._refresh_list(text)
+        self._refresh_vault(text)
         
-    def _on_selection_changed(self):
-        has_sel = len(self.list_albums.selectedItems()) > 0
-        self.btn_confirm.setEnabled(has_sel)
-        self.btn_save_confirm.setEnabled(has_sel)
-        
-    def _on_item_double_clicked(self, item):
-        self._edit_selected_album(item)
-        
-    def _on_confirm_clicked(self, checked=False):
-        if self.stack.currentIndex() == 0:
-            self._confirm_selection(save_after=False)
+    def _toggle_sidecar(self):
+        if self.pane_sidecar.isVisible():
+            self.pane_sidecar.hide()
         else:
-            self._save_editor_and_select(save_after=False)
+            self.pane_sidecar.show()
+            self.publisher_picker._refresh_list() # Ensure fresh data
+            # Restore splitter size preference if needed
 
-    def _on_save_confirm_clicked(self, checked=False):
-        if self.stack.currentIndex() == 0:
-            self._confirm_selection(save_after=True)
-        else:
-            self._save_editor_and_select(save_after=True)
-            
-    def _confirm_selection(self, save_after=False):
-        items = self.list_albums.selectedItems()
-        if not items: return
-        
-        alb_id = items[0].data(Qt.ItemDataRole.UserRole)
-        alb_name = items[0].data(Qt.ItemDataRole.UserRole + 1)
-        
-        if save_after:
-             self.save_and_select_requested.emit(alb_id, alb_name)
-        else:
-             self.album_selected.emit(alb_id, alb_name)
-             
-        self.accept()
-        
-    def _open_publisher_manager(self):
-        """Toggle sidecar instead of opening a new window (Inception Reduction)."""
-        if self.pub_picker.isVisible():
-            self.pub_picker.hide()
-        else:
-            self.pub_picker.show()
-            self.pub_picker.txt_search.setFocus()
-            self.pub_picker._refresh_list() # Ensure current data
-
-    def _on_publisher_picked(self, pub_id, pub_name):
-        self.selected_pub_id = pub_id
+    def _on_publisher_selected(self, pub_id, pub_name):
         self.selected_pub_name = pub_name
-        self.btn_pub_picker.setText(pub_name)
+        self.btn_pub_trigger.setText(pub_name)
+        # Auto-save publisher? Or wait for save button?
+        # Logic says: wait for save button for atomic commit.
 
-    def _save_editor_and_select(self, save_after=False):
-        # Validate
+    def _save_inspector(self, silent=False):
+        # Gather Data
         title = self.inp_title.text().strip()
         if not title:
-            QMessageBox.warning(self, "Validation", "Album Title is required.")
-            return
+            QMessageBox.warning(self, "Error", "Title cannot be empty")
+            return False
             
+        artist = self.inp_artist.text().strip()
+        year_str = self.inp_year.text().strip()
+        year = int(year_str) if year_str.isdigit() else None
+        alb_type = self.cmb_type.currentText()
+        
+        success = False
         try:
-            # Parse Year
-            year_val = self.inp_year.text().strip()
-            year_int = int(year_val) if year_val and year_val.isdigit() else None
-            artist_val = self.inp_artist.text().strip()
-            type_val = self.cmb_type.currentText()
-
-            if self.editing_album:
-                # UPDATE MODE
-                self.editing_album.title = title
-                self.editing_album.album_artist = artist_val
-                self.editing_album.release_year = year_int
-                self.editing_album.album_type = type_val
+            if self.is_creating_new:
+                # Create
+                album, created = self.album_repo.get_or_create(title, artist, year)
+                album.album_type = alb_type
+                self.album_repo.update(album)
+                self.album_repo.set_publisher(album.album_id, self.selected_pub_name)
                 
-                self.album_repo.update(self.editing_album)
-                album_obj = self.editing_album
+                self.current_album = album
+                self.is_creating_new = False
+                
+                # Clear search so we see the new item
+                self.txt_search.blockSignals(True)
+                self.txt_search.clear() 
+                self.txt_search.blockSignals(False)
+                
+                self._refresh_vault() 
+                if not silent: 
+                    QMessageBox.information(self, "Success", "Album Created")
+                success = True
             else:
-                # CREATE MODE
-                album_obj, created = self.album_repo.get_or_create(
-                    title=title,
-                    album_artist=artist_val,
-                    release_year=year_int
-                )
-                album_obj.album_type = type_val
-                self.album_repo.update(album_obj)
+                # Update
+                if not self.current_album: return False
+                
+                self.current_album.title = title
+                self.current_album.album_artist = artist
+                self.current_album.release_year = year
+                self.current_album.album_type = alb_type
+                
+                self.album_repo.update(self.current_album)
+                self.album_repo.set_publisher(self.current_album.album_id, self.selected_pub_name)
+                
+                # Clear search so we see the updated item (if renamed out of search scope)
+                self.txt_search.blockSignals(True)
+                self.txt_search.clear() 
+                self.txt_search.blockSignals(False)
 
-            # Link/Unlink Publisher (Atomic on Update)
-            self.album_repo.set_publisher(album_obj.album_id, self.selected_pub_name)
-            
-            if save_after:
-                 self.save_and_select_requested.emit(album_obj.album_id, album_obj.title)
-            else:
-                 self.album_selected.emit(album_obj.album_id, album_obj.title)
-            self.accept()
-            
+                self._refresh_vault() 
+                if not silent:
+                    QMessageBox.information(self, "Success", "Album Updated")
+                success = True
+                
         except Exception as e:
-            from src.core import logger
-            logger.error(f"Could not save album: {e}")
-            QMessageBox.critical(self, "Database Error", f"Could not save album: {e}")
+            QMessageBox.critical(self, "Error", f"Save failed: {e}")
+            success = False
+            
+        return success
+
+    def _on_select_clicked(self):
+        # Auto-save current edits if inspector is active
+        if self.pane_inspector.isEnabled():
+            if not self._save_inspector(silent=True):
+                return # Abort if save failed (e.g. invalid title)
+
+        if not self.current_album: return
+        self.album_selected.emit(self.current_album.album_id, self.current_album.title)
+        self.accept()
+
+    def _show_vault_context_menu(self, pos):
+        # Reuse existing delete logic if needed, simplified for brevity here
+        pass

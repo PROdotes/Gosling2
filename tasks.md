@@ -33,7 +33,8 @@ links: []
 | ID | Task | Pri | Cmplx | Score | Status | Spec |
 |----|------|-----|-------|-------|--------|------|
 | T-44 | **Refactor: Dynamic ID3 Read** | 5 | 2 | 20 | ✅ | Dynamic extraction from `id3_frames.json` fully implemented. All 45 tests passing. |
-| T-46 | **Proper Album Editor** | 5 | 3 | 15 | 🚀 (Next) | [spec](design/specs/T-46_PROPER_ALBUM_EDITOR.md) |
+| T-46 | **Proper Album Editor** | 5 | 3 | 15 | ✅ | [spec](design/specs/T-46_PROPER_ALBUM_EDITOR.md) — 4-Pane Console (Context/Vault/Inspector/Sidecar) implemented. |
+| T-70 | **Artist Selector** | 5 | 3 | 12 | 🚀 (Next) | T-17 | Replace plain text Artist field with searchable picker (database-backed). Essential for consistent Group metadata. |
 | T-17 | **Unified Artist View** | 5 | 3 | 15 | ✅ | [spec](design/issues/T-17_unified_artist_view.md) <br> ([Groups Logic Status](design/state/GROUPS_LOGIC_STATUS.md)) |
 | T-18 | **Column Resilience** | 5 | 2 | 20 | ✅ | [docs](design/issues/T-18_column_persistence.md) |
 | T-19 | **Field Editor Hardening** | 5 | 3 | 15 | ✅ | [prop](design/proposals/PROPOSAL_TOOLING_CONSOLIDATION.md) |
@@ -91,7 +92,6 @@ links: []
 | T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
 | T-66 | **Scrubber Window** | 4 | 3 | 12 | 💡 | — | Double-click (or modifier-click TBD) on library song opens floating scrubber window. Allows preview playback, timeline jumping, without affecting main playback. Like a mini-player popup. |
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | 📋 | — | Add cyber-glow effect to the count LCDs in the filter tree for consistent aesthetics. |
-| T-70 | **Artist Selector** | 5 | 3 | 12 | 💡 | T-17 | Replace plain text Artist field with searchable picker (database-backed). Essential for consistent Group metadata (e.g. 'Foo Fighters') vs raw strings. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |

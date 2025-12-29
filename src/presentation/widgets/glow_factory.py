@@ -202,6 +202,12 @@ class GlowButton(GlowWidget):
         # Sync color state on check changes for toggle buttons
         self.btn.toggled.connect(self._on_toggled)
 
+    def changeEvent(self, event):
+        """Auto-update styles when enabled state changes (e.g. via parent)."""
+        if event.type() == QEvent.Type.EnabledChange:
+            self._update_text_styles()
+        super().changeEvent(event)
+
     def showEvent(self, event):
         """Sync initial state on first show (handles startup states with blocked signals)."""
         super().showEvent(event)
@@ -270,6 +276,7 @@ class GlowButton(GlowWidget):
         self.lbl_glow.setText(text)
         self.lbl_main.setText(text)
         self.btn.setText("") # Ensure native text is never shown
+        self._update_text_styles() # Refresh color state immediately
 
     def setFont(self, f): 
         self.btn.setFont(f)

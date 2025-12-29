@@ -164,15 +164,6 @@ class SidePanelWidget(QFrame):
         if same_selection:
              scroll_pos = self.scroll.verticalScrollBar().value()
 
-        # Performance: Skip expensive UI rebuild if selection hasn't actually changed
-        # EXCEPT if force=True (e.g. for Discard)
-        if same_selection and not force:
-            self.scroll.verticalScrollBar().setValue(scroll_pos)
-            return
-
-        # Note: We do NOT clear _staged_changes here.
-        # Persistence on selection loss is a key spec.
-
         # Performance: Only rebuild UI if song count changes (single→bulk or vice versa)
         # For same-count selections, just update widget values
         old_count = len(self.current_songs) if self.current_songs else 0
@@ -183,10 +174,18 @@ class SidePanelWidget(QFrame):
         self.current_songs = songs
         self._update_header()
 
-        if needs_rebuild:
+        if same_selection and not force and not needs_rebuild:
+             # Just refresh values (data update) without destroying widgets
+             self._refresh_field_values()
+             self.scroll.verticalScrollBar().setValue(scroll_pos)
+             self._validate_done_gate()
+             self._update_save_state()
+             return
+
+        if needs_rebuild or force:
             self._build_fields()
         else:
-            # Just refresh field values without rebuilding widgets
+            # Should be covered by above, but safe fallback
             self._refresh_field_values()
 
         self._validate_done_gate()
@@ -487,7 +486,8 @@ class SidePanelWidget(QFrame):
                 'title': self._get_effective_value(sid, 'album', song.album) or "",
                 'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or (song.performers[0] if song.performers else ""),
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
-                'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or ""
+                'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
+                'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None))
             }
 
         dlg = AlbumManagerDialog(
@@ -601,9 +601,17 @@ class SidePanelWidget(QFrame):
         if pub_name:
             self._on_field_changed("publisher", pub_name)
         else:
-            # If album has no publisher, maybe clear it or keep? 
-            # Usually better to clear it to match the album's state
             self._on_field_changed("publisher", None)
+
+        # T-46: Auto-Fill Album Artist & Year (Sync ID3 to DB Source of Truth)
+        # We must update these so the ID3 write logic (which reads from Song object) 
+        # gets the NEW values, not the old stale ones.
+        full_album = self.album_repo.get_by_id(album_id)
+        if full_album:
+             if full_album.album_artist:
+                 self._on_field_changed("album_artist", full_album.album_artist)
+             if full_album.release_year:
+                 self._on_field_changed("recording_year", full_album.release_year)
             
         # Ensure UI reflects the new managed state (Enabling/Disabling)
         self._refresh_field_values()
@@ -612,7 +620,7 @@ class SidePanelWidget(QFrame):
         """Callback from Dialog requesting an immediate atomic save."""
         self._on_album_picked(album_id, album_name)
         # Surgical Shortcut: Just commit metadata
-        self.trigger_save()
+        self.trigger_save() # ensure save logic reads staged album_id
 
     def _validate_isrc_field(self, widget, text):
         """
@@ -934,6 +942,10 @@ class SidePanelWidget(QFrame):
             staged = self._staged_changes[sid]
             # Apply known attributes logic
             for field_name, value in staged.items():
+                if field_name == 'album_id':
+                     song.album_id = value
+                     continue
+                     
                 field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
                 if field_def:
                     attr = field_def.model_attr or field_def.name

@@ -429,3 +429,102 @@ QPushButton#AlbumActionButton:hover {
     border-radius: 4px;
 }
 
+/* --- ALBUM MANAGER PRO CONSOLE (T-46) --- */
+
+#AlbumManagerDialog {
+    background-color: #050505; /* Deep Void */
+    border: 1px solid #333;
+}
+
+/* Pane Z: The Context (Song List) */
+#DialogContextList {
+    background-color: #080808;
+    border-right: 1px solid #222;
+    color: #666;
+    font-size: 11px;
+    font-family: "Consolas", monospace;
+    outline: none;
+    border: none;
+}
+
+#DialogContextList::item {
+    padding: 2px 8px;
+    border-bottom: 1px solid #111;
+}
+
+#DialogContextList::item:selected {
+    background-color: #111;
+    color: #AAA; /* Subtle selection, read-only feel */
+}
+
+/* Pane A: The Vault (Album List) */
+#DialogVault {
+    background-color: #0b0b0b;
+    border-right: 1px solid #222;
+    min-width: 200px;
+}
+
+#DialogVaultList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+#DialogVaultList::item {
+    padding: 8px 12px;
+    color: #888;
+    border-bottom: 1px solid #111;
+    min-height: 30px;
+}
+
+#DialogVaultList::item:selected {
+    background-color: #1a1a1a;
+    color: #ffaa00; /* Console Amber */
+    border-left: 2px solid #ffaa00;
+}
+
+/* Pane B: The Inspector (Form) */
+#DialogInspector {
+    background-color: #050505;
+}
+
+#DialogFieldLabel {
+    color: #444;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+}
+
+/* Pane C: The Sidecar (Publisher) */
+#PublisherSidecar {
+    background-color: #0c0c0c;
+    border-left: 1px solid #333;
+}
+
+/* Sidecar Search Input */
+#PublisherSidecar QLineEdit {
+    background-color: #080808;
+    border: 1px solid #222;
+    border-radius: 4px;
+    padding: 4px;
+    color: #CCC;
+}
+
+/* Sidecar List */
+#PublisherSidecar QListWidget {
+    background-color: transparent;
+    border: none;
+}
+
+#PublisherSidecar QListWidget::item {
+    padding: 6px;
+    color: #777;
+    border-bottom: 1px solid #111;
+}
+
+#PublisherSidecar QListWidget::item:selected {
+    background-color: #111;
+    color: #FFC66D;
+}

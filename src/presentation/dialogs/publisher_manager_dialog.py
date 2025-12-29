@@ -49,6 +49,7 @@ class PublisherPickerWidget(QWidget):
         super().__init__(parent)
         self.pub_repo = publisher_repository
         self._init_ui()
+        self._refresh_list() # Initial load
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
