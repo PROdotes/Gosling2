@@ -78,6 +78,9 @@ tags:
 
 ### 🔮 Milestone 5: The Final Sprint (0.1.0)
 *Status: Queue (Prioritized)*
+*   [x] **Filter Tree Search & State Persistence** (~2.0 h)
+    *   *Task*: Main search filters both table and filter tree; expansion state persists across restarts.
+    *   *Status*: **Done** - Implemented recursive tree filtering with QSettings persistence.
 *   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
 *   [ ] **T-70 Artist Selector** (Database-backed Picker)
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)

@@ -202,13 +202,14 @@ class FilterWidget(QFrame):
     multicheck_filter_changed = pyqtSignal(dict)
     reset_filter = pyqtSignal()
     
-    def __init__(self, library_service, parent=None) -> None:
+    def __init__(self, library_service, settings_manager=None, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("FilterWidget")
         self.library_service = library_service
         self._active_filters = {}
         self._block_signals = False
         self._filter_match_mode = "AND"
+        self.settings_manager = settings_manager
         
         self._init_ui()
         self.populate()
@@ -230,6 +231,10 @@ class FilterWidget(QFrame):
         self.tree_view.clicked.connect(self._on_tree_clicked)
         self.tree_view.doubleClicked.connect(self._on_tree_double_clicked)
         self.tree_view.setItemDelegate(FilterTreeDelegate())
+        
+        # Connect expansion signals for state persistence
+        self.tree_view.expanded.connect(self._on_item_expanded)
+        self.tree_view.collapsed.connect(self._on_item_collapsed)
         
         # 2. COMMAND RAIL (HUD Level Control)
         rail_layout = QHBoxLayout()
@@ -296,6 +301,9 @@ class FilterWidget(QFrame):
                 
         self.tree_view.collapseAll()
         self._block_signals = False
+        
+        # Restore saved expansion state
+        self.restore_expansion_state()
 
     def _add_list_filter(self, field: yellberus.FieldDef) -> None:
         values = self._get_field_values(field)
@@ -523,3 +531,64 @@ class FilterWidget(QFrame):
             self.btn_match_mode.setText("ALL")
             self.btn_match_mode.setChecked(True)
         self.filter_mode_changed.emit(self._filter_match_mode)
+
+    # ===== Expansion State Persistence =====
+    
+    def _on_item_expanded(self, index):
+        """Save expansion state when user expands an item."""
+        if not self.settings_manager:
+            return
+        
+        item = self.tree_model.itemFromIndex(index)
+        if item and not item.isCheckable():  # Only save parent/branch state
+            state = self.settings_manager.get_filter_tree_expansion_state()
+            state[item.text()] = True
+            self.settings_manager.set_filter_tree_expansion_state(state)
+    
+    def _on_item_collapsed(self, index):
+        """Save expansion state when user collapses an item."""
+        if not self.settings_manager:
+            return
+        
+        item = self.tree_model.itemFromIndex(index)
+        if item and not item.isCheckable():
+            state = self.settings_manager.get_filter_tree_expansion_state()
+            state[item.text()] = False
+            self.settings_manager.set_filter_tree_expansion_state(state)
+    
+    def restore_expansion_state(self):
+        """Restore saved expansion state after populating tree."""
+        if not self.settings_manager:
+            return
+        
+        saved_state = self.settings_manager.get_filter_tree_expansion_state()
+        if not saved_state:
+            return
+        
+        # Build set of items that actually exist in current tree
+        existing_items = {}  # {item_name: QModelIndex}
+        for row in range(self.tree_model.rowCount()):
+            root_item = self.tree_model.item(row)
+            if root_item:
+                self._collect_items(root_item, existing_items)
+        
+        # Block signals during restore to avoid triggering saves
+        self.tree_view.blockSignals(True)
+        try:
+            # Apply state only for items that exist
+            for item_name, is_expanded in saved_state.items():
+                if item_name in existing_items:
+                    self.tree_view.setExpanded(existing_items[item_name], is_expanded)
+        finally:
+            self.tree_view.blockSignals(False)
+    
+    def _collect_items(self, item, items_dict):
+        """Recursively collect all parent/branch items in the tree."""
+        if not item.isCheckable():  # Only parents/branches
+            index = self.tree_model.indexFromItem(item)
+            items_dict[item.text()] = index
+        
+        for child_row in range(item.rowCount()):
+            child = item.child(child_row)
+            if child:
+                self._collect_items(child, items_dict)

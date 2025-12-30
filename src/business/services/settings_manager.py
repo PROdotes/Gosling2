@@ -45,6 +45,9 @@ class SettingsManager:
     # Search Settings (T-81)
     KEY_SEARCH_PROVIDER = "search/provider"
     
+    # Filter Tree Settings
+    KEY_FILTER_TREE_EXPANSION = "filter_tree/expansion_state"
+    
     # Default values
     DEFAULT_VOLUME = 50
     DEFAULT_WINDOW_WIDTH = 1200
@@ -322,6 +325,23 @@ class SettingsManager:
 
     def set_search_provider(self, provider: str) -> None:
         self._settings.setValue(self.KEY_SEARCH_PROVIDER, provider)
+    
+    # ===== Filter Tree Settings =====
+    
+    def get_filter_tree_expansion_state(self) -> dict:
+        """Get saved expansion state for filter tree items."""
+        import json
+        state_json = self._settings.value(self.KEY_FILTER_TREE_EXPANSION, "{}", type=str)
+        try:
+            return json.loads(state_json)
+        except:
+            return {}
+    
+    def set_filter_tree_expansion_state(self, state: dict) -> None:
+        """Save expansion state for filter tree items."""
+        import json
+        state_json = json.dumps(state)
+        self._settings.setValue(self.KEY_FILTER_TREE_EXPANSION, state_json)
     
     # ===== Utility Methods =====
     

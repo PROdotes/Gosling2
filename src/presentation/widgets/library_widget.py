@@ -311,7 +311,7 @@ class LibraryWidget(QWidget):
         sidebar_container.setMaximumWidth(350)
         
         # 1. THE FRONT DECK (Filters - Pure Input)
-        self.filter_widget = FilterWidget(self.library_service)
+        self.filter_widget = FilterWidget(self.library_service, self.settings_manager)
         self.filter_widget.setObjectName("FilterWidget")
         sidebar_layout.addWidget(self.filter_widget)
         
