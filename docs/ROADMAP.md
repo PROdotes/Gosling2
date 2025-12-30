@@ -38,6 +38,12 @@ tags:
     *   *Status*: **Done** — All layers consolidated (Data, Business, Presentation). Test count: 363.
     *   *Why*: Merging 56 files makes future features faster/safer.
     *   *Risk*: Low (Boring work).
+*   [x] **T-46 Proper Album Editor** (~3.5 h) (Dec 29)
+    *   *Status*: **Done**. Four-pane manager (Album, Context, Inspector, Sidecar) implemented.
+    *   *Ref*: T-46.
+*   [x] **T-55 Custom Field Sections** (~2.0 h) (Dec 30)
+    *   *Status*: **Done**. Fields grouped by logic (Core, Classification, Credits, etc.).
+    *   *Ref*: T-55.
 
 ### 🛠️ Milestone 3: Usable UI (Backlog Enabler)
 *Status: Required for processing 400-song backlog*
@@ -72,22 +78,22 @@ tags:
 
 ### 🔮 Milestone 5: The Final Sprint (0.1.0)
 *Status: Queue (Prioritized)*
-*   [ ] **T-46 Proper Album Editor** (Relational)
-*   [ ] **T-60 Editor Footer Redesign** (UI Polish)
 *   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
 *   [ ] **T-70 Artist Selector** (Database-backed Picker)
-*   [ ] **T-11 Basic Playback** (VLC Wrappers)
-    *   *Why*: Essential for fixing "Greatest Hits" fragmentation.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
-*   [ ] **Settings UI** (T-49) (~1.5 h)
+*   [ ] **Settings UI** (T-52) (~1.5 h)
     *   *Task*: UI for Root Directory & Rules.
 *   [x] **Dynamic Renaming Rules** (T-50) (~2.0 h)
     *   *Task*: Externalize hardcoded 'Patriotic/Cro' logic to config file.
 *   [x] **UI Polish & Icon (T-53)**
     *   *Task*: SVG Icon fix & Settings Entry Point (T-57).
-*   [ ] **Tag Verification** (T-51) (~1.0 h)
+*   [x] **Tag Verification** (T-51) (~1.0 h)
     *   *Task*: Verify `TXXX:GOSLING_DONE` and ID3 writes.
+    *   *Status*: **Done** - Verified dual-write (TKEY legacy + TXXX modern) working correctly.
+*   [ ] **Background Import** (T-68) (~2.0 h)
+    *   *Task*: Move file operations to worker thread to prevent UI freeze.
+    *   *Why*: Required for Release Criteria #1 (Import 1k songs).
 
 ---
 
@@ -97,8 +103,8 @@ tags:
 *   [ ] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
 *   [ ] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
 -   [ ] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
-- [ ] [**T-80 Smart Preview Pattern**](docs/tasks/T-80_smart_preview_pattern.md): Generalize the "Passive Preview" (tooltip with list view + click-to-jump) to all linked DB fields.
-- [x] [**T-81 Restore Web Search**](docs/tasks/T-81_restore_web_search.md): (Basic Restore Complete) Add persistence/Settings Manager later.
+- [ ] [**T-80 Smart Preview Pattern**](tasks/T-80_smart_preview_pattern.md): Generalize the "Passive Preview" (tooltip with list view + click-to-jump) to all linked DB fields.
+- [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
 *   [ ] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
 
 ---

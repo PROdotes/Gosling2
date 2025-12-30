@@ -15,7 +15,7 @@ tags:
 *Blocking the user from processing their 400-song backlog.*
 
 ### Task 1: Side Panel (Metadata Editor)
-**Spec**: `design/proposals/PROPOSAL_METADATA_EDITOR.md`
+**Spec**: `docs/proposals/PROPOSAL_METADATA_EDITOR.md`
 **Why**: Currently, editing requires right-click -> Properties. We need a persistent side panel for rapid editing.
 *   **Subtask A: UI Scaffold**
     *   Create `src/presentation/widgets/metadata_editor_panel.py`.
@@ -29,7 +29,7 @@ tags:
     *   Call `MetadataService.update_song()`.
 
 ### Task 2: Auto-Renamer (File System)
-**Spec**: `design/proposals/PROPOSAL_RENAMING_SERVICE.md`
+**Spec**: `docs/proposals/PROPOSAL_RENAMING_SERVICE.md`
 **Why**: Files need to move to `\\onair\Genre\` when marked "Done".
 *   **Subtask A: Rules Engine**
     *   Create `src/business/services/renaming_service.py`.
@@ -40,7 +40,7 @@ tags:
     *   Trigger on "Save" if `Auto-Move` is enabled in settings.
 
 ### Task 3: Legacy Shortcuts
-**Spec**: `design/issues/T-31_legacy_shortcuts.md`
+**Spec**: `docs/issues/T-31_legacy_shortcuts.md`
 *   **Subtask A**: Implement Global Shortcuts in `MainWindow`.
     *   `Ctrl+D`: Toggle "Is Done" status for selected song(s).
     *   `Ctrl+S`: Save changes (if Editor is focused).
@@ -94,7 +94,7 @@ tags:
 ---
 
 ### Task 7: Test Inventory Enforcer (Tooling)
-**Spec**: `design/specs/TOOL_TEST_INVENTORY.md`
+**Spec**: `docs/specs/TOOL_TEST_INVENTORY.md`
 **Goal**: Automate "The Law of Inventory" so users don't have to manual check.
 *   **Subtask A: Enhance Audit Tool**
     *   Modify `tools/audit_test_coverage.py` or create `tools/lint_tests.py`.
@@ -106,7 +106,7 @@ tags:
 ## 📝 Instructions for Agents
 
 1.  **Pick a Task**: Read the top-most unassigned task.
-2.  **Read Specs**: Check `design/proposals/` for valid specs. If missing, create a skeletal spec.
+2.  **Read Specs**: Check `docs/proposals/` for valid specs. If missing, create a skeletal spec.
 3.  **Create Logic**: Implement Business Layer first.
 4.  **Create UI**: Implement Presentation Layer second.
 5.  **Verify**: Run `pytest` and manual verification.

@@ -41,7 +41,7 @@ The previous agent failed logic/robustness separation. **ALWAYS** verify against
     - `test_metadata_fixtures.py`
 
 ### 3. Playback / UI - **NEXT STEPS**
-- [ ] Resume from Step 3 in `design/specs/T04_TEST_CONSOLIDATION_PLAN.md`.
+- [ ] Resume from Step 3 in `docs/specs/T04_TEST_CONSOLIDATION_PLAN.md`.
 - [ ] Ensure `test_playback_service.py` (Logic) is kept separate from `_mutation.py` (Robustness).
 
 ---

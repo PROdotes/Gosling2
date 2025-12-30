@@ -26,7 +26,7 @@ death_step: 2074
 *   **Technical Context**:
     - `tools/field_editor.py` - Main editor, color logic may need fixes.
     - `tools/yellberus_parser.py` - I added a `defaults` param to `write_yellberus()` that may be incorrect.
-    - `design/proposals/FIELD_EDITOR_SPEC.md` - I edited the Rules section (lines 140-150) but my interpretation was wrong.
+    - `docs/proposals/FIELD_EDITOR_SPEC.md` - I edited the Rules section (lines 140-150) but my interpretation was wrong.
     - The actual correct defaults behavior was NEVER properly explained to me before signoff.
 
 ## 4. Directives (User Interaction)

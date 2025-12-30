@@ -12,7 +12,7 @@ This document lists project-specific tools and their ownership domains. Agents m
 **Owns**:
 - All `FieldDef` properties in `src/core/yellberus.py` EXCEPT `query_expression`
 - Cross-references with `id3_frames.json` for portable fields
-- Syncs with `design/FIELD_REGISTRY.md`
+- Syncs with `../docs/FIELD_REGISTRY.md`
 
 **Agent Rules**:
 - ❌ **DO NOT** manually edit field properties (visible, filterable, required, etc.)

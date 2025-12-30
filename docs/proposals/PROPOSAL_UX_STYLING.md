@@ -95,7 +95,7 @@ To ensure smooth transition, we reserve screen real estate for future components
 
 ## Mockups
 
-All AI-generated mockups stored in `design/mockups/`:
+All AI-generated mockups stored in `docs/mockups/`:
 - [type_tabs_mockup.png](../mockups/type_tabs_mockup.png) — Comparison of default vs modern
 - [qt_realistic_styling.png](../mockups/qt_realistic_styling.png) — Achievable with pure QSS (no blur)
 - [gosling2_full_vision.png](../mockups/gosling2_full_vision.png) — Complete app vision

@@ -42,6 +42,9 @@ class SettingsManager:
     KEY_CONVERSION_BITRATE = "conversion/bitrate" # e.g. "320k"
     KEY_FFMPEG_PATH = "conversion/ffmpegPath"
     
+    # Search Settings (T-81)
+    KEY_SEARCH_PROVIDER = "search/provider"
+    
     # Default values
     DEFAULT_VOLUME = 50
     DEFAULT_WINDOW_WIDTH = 1200
@@ -56,6 +59,7 @@ class SettingsManager:
     DEFAULT_CONVERSION_ENABLED = False
     DEFAULT_CONVERSION_BITRATE = "320k"
     DEFAULT_FFMPEG_PATH = "ffmpeg"
+    DEFAULT_SEARCH_PROVIDER = "Google"
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -310,6 +314,14 @@ class SettingsManager:
 
     def set_ffmpeg_path(self, path: str) -> None:
         self._settings.setValue(self.KEY_FFMPEG_PATH, path)
+
+    # ===== Search Settings (T-81) =====
+    
+    def get_search_provider(self) -> str:
+        return self._settings.value(self.KEY_SEARCH_PROVIDER, self.DEFAULT_SEARCH_PROVIDER, type=str)
+
+    def set_search_provider(self, provider: str) -> None:
+        self._settings.setValue(self.KEY_SEARCH_PROVIDER, provider)
     
     # ===== Utility Methods =====
     

@@ -24,7 +24,7 @@ death_step: 370
 *   **Technical Context**: 
     *   `src/data/repositories/song_repository.py`: `get_all_groups` is DELETED.
     *   `src/presentation/widgets/filter_widget.py`: Unified Artist now merges `Performers` + `Aliases`.
-    *   `design/state/T06_LEGACY_SYNC_BRIEF.md`: The roadmap for my successor. They MUST do relational, not flat.
+    *   `docs/state/T06_LEGACY_SYNC_BRIEF.md`: The roadmap for my successor. They MUST do relational, not flat.
 
 ## 4. Directives (User Interaction)
 *   **Treat User as**: A high-level architect with a tendency to skip steps. He's the Boss, but you are the Gatekeeper of the Protocol.

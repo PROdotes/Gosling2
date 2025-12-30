@@ -4,8 +4,8 @@ tags:
   - legacy/gosling1
   - status/approved
 links:
-  - design/ID3_ANALYSIS.md
-  - design/tasks.md
+  - docs/ID3_ANALYSIS.md
+  - docs/tasks.md
 ---
 
 # Legacy Logic: Gosling 1 Behavior & Rules

@@ -210,6 +210,9 @@ class RightPanelWidget(QWidget):
         self.editor_widget = SidePanelWidget(
             library_service, metadata_service, renaming_service, duplicate_scanner
         )
+        # FIX: Inject SettingsManager manually since SidePanel doesn't take it in __init__
+        self.editor_widget.settings_manager = settings_manager
+        
         self.editor_widget.hide() # Default Hidden
         
         # --- Zone 3: Playlist ---

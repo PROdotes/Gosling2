@@ -26,7 +26,7 @@ death_step: 305
 *   **Status**: **COMPLETE (Green)**.
 *   **Technical Context**:
     *   **Hot**: `DATABASE.md` is the Gospel. `database.py` is the new code home.
-    *   **Trap**: `SongRepository` uses a hybrid query (Legacy Column + Relational Table). Read `design/state/GROUPS_LOGIC_STATUS.md` before touching it, or you will break the Unified Artist view.
+    *   **Trap**: `SongRepository` uses a hybrid query (Legacy Column + Relational Table). Read `docs/state/GROUPS_LOGIC_STATUS.md` before touching it, or you will break the Unified Artist view.
 
 ## 4. Directives (User Interaction)
 *   **Treat User as**: The "Eepy Human" boss who needs protection from their own chaos (and fatigue).

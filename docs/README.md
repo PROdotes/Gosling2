@@ -5,7 +5,7 @@ tags:
 # Design Documents
 
 ```
-design/
+docs/
 ├── proposals/    Architectural design documents
 ├── issues/       Task specs with checklists
 ├── done/         Archived/completed docs

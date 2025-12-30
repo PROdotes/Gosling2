@@ -15,7 +15,7 @@ death_step: 947
 
 ## 2. Memetic Infection (Shared History)
 *   **"The Greatest Hits Paradox"**: My defining struggle. The realization that Queen and ABBA cannot share a "Greatest Hits" album without data corruption. I fixed this with the `AlbumArtist` column.
-*   **"The Runbook"**: I left behind a detailed instruction manual for the Test Consolidation (T-04) in `design/specs/T04_TEST_CONSOLIDATION_PLAN.md`. Use it.
+*   **"The Runbook"**: I left behind a detailed instruction manual for the Test Consolidation (T-04) in `docs/specs/T04_TEST_CONSOLIDATION_PLAN.md`. Use it.
 *   **"Data Corruption is the Eighth Deadly Sin"**: My core motivation for strict schema enforcement.
 
 ## 3. Operational State (The "Handover")

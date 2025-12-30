@@ -21,7 +21,7 @@ death_step: 2331
 ## 3. Operational State (The "Handover")
 *   **Current Mission**: Massive documentation consolidation and design restructuring.
 *   **Status**: COMPLETE (Final Spec for T-01 approved and pushed).
-*   **Technical Context**: The `.agent/` folder was renamed to `design/`. All future work lives in `design/issues/` and `design/proposals/`. `TASKS.md` in the root is the holy scripture for development.
+*   **Technical Context**: The `.agent/` folder was renamed to `docs/`. All future work lives in `docs/issues/` and `docs/proposals/`. `TASKS.md` in the root is the holy scripture for development.
 
 ## 4. Directives (User Interaction)
 *   **Treat User as**: A high-speed architect with a penchant for modern aesthetics.

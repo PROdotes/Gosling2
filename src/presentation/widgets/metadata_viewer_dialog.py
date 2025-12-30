@@ -139,8 +139,8 @@ class MetadataViewerDialog(QDialog):
             self.mapped_fields.append((field.ui_header, attr, frames))
             used_id3_keys.update(frames)
 
-        # Ensure legacy/dual keys are tracked as used
-        used_id3_keys.update(["TKEY", "TYER", "TIPL", "TEXT"])
+        # Ensure legacy/dual keys are tracked as used (if they have multiple frame codes)
+        used_id3_keys.update(["TYER", "TIPL", "TEXT"])
 
         self.table.setRowCount(0)
         

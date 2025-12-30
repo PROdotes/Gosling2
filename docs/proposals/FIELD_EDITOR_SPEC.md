@@ -9,7 +9,7 @@
 
 1. **View all fields** from `yellberus.py` in an editable table.
 2. **Add new fields** without manually editing Python.
-3. **Export to Markdown** → regenerate `design/FIELD_REGISTRY.md`.
+3. **Export to Markdown** → regenerate `docs/FIELD_REGISTRY.md`.
 4. **Write to Yellberus** → regenerate the `FIELDS` list in `yellberus.py` (with backup).
 5. **Detect discrepancies** between code and documentation (highlight mismatches).
 6. **Safe by default** → backup files before any write operation.
@@ -159,7 +159,7 @@ The "Defaults" row represents the `FieldDef` class attributes in `yellberus.py`.
 | File | Read | Write |
 |------|------|-------|
 | `src/core/yellberus.py` | ✅ Parse FIELDS list | ✅ Regenerate FIELDS block |
-| `design/FIELD_REGISTRY.md` | ✅ (for comparison) | ✅ Regenerate table |
+| `docs/FIELD_REGISTRY.md` | ✅ (for comparison) | ✅ Regenerate table |
 | `tools/field_editor.py` | — | — (the tool itself) |
 | `*.backup` | — | ✅ Created before each write |
 
@@ -234,7 +234,7 @@ FieldDef(
 ### 3. Save to MD
 1. Iterate over table rows.
 2. Generate markdown table string.
-3. Write to `design/FIELD_REGISTRY.md` (replace "Current Fields" section).
+3. Write to `docs/FIELD_REGISTRY.md` (replace "Current Fields" section).
 
 ### 4. Copy Python Snippet
 1. For each row marked `planned` or modified:

@@ -91,6 +91,34 @@ class SettingsDialog(QDialog):
         ffmpeg_row.addWidget(self.btn_ffmpeg_browse)
         layout.addLayout(ffmpeg_row)
         
+        # --- SECTION: WORKFLOW ---
+        line2 = QFrame()
+        line2.setObjectName("FieldGroupLine")
+        layout.addWidget(line2)
+
+        workflow_label = QLabel("WORKFLOW")
+        workflow_label.setObjectName("FieldLabel")
+        layout.addWidget(workflow_label)
+        
+        # Search Provider Row
+        search_layout = QHBoxLayout()
+        search_label = QLabel("SEARCH PROVIDER")
+        search_label.setFixedWidth(120)
+        
+        self.cmb_search_provider = QComboBox()
+        self.cmb_search_provider.addItems([
+            "Google",
+            "Spotify",
+            "YouTube",
+            "MusicBrainz",
+            "Discogs"
+        ])
+        self.cmb_search_provider.setObjectName("SidePanelCombo")
+        
+        search_layout.addWidget(search_label)
+        search_layout.addWidget(self.cmb_search_provider, 1)
+        layout.addLayout(search_layout)
+        
         layout.addStretch()
         
         # --- BUTTONS ---
@@ -126,6 +154,12 @@ class SettingsDialog(QDialog):
                 self.cmb_bitrate.setCurrentText("320k")
                 
         self.txt_ffmpeg_path.setText(self.settings_manager.get_ffmpeg_path())
+        
+        # Search Provider
+        current_provider = self.settings_manager.get_search_provider()
+        idx = self.cmb_search_provider.findText(current_provider)
+        if idx >= 0:
+            self.cmb_search_provider.setCurrentIndex(idx)
 
     def _on_browse_clicked(self):
         current = self.txt_root_dir.text() or "."
@@ -151,6 +185,9 @@ class SettingsDialog(QDialog):
         # Conversion
         self.settings_manager.set_conversion_bitrate(self.cmb_bitrate.currentText())
         self.settings_manager.set_ffmpeg_path(self.txt_ffmpeg_path.text().strip())
+        
+        # Search
+        self.settings_manager.set_search_provider(self.cmb_search_provider.currentText())
 
         self.settings_manager.sync()
         self.accept()

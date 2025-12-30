@@ -90,7 +90,7 @@ Most projects skip this and accumulate debt until collapse. Gosling2 won't be on
 **Goal**: Innovation. The "wouldn't it be cool if" features.
 
 **Candidate Features**:
-- [ ] **AI Playlist Generation** — Natural language → smart playlists ([T-33](design/ideas/T-33_AI_PLAYLIST.md))
+- [ ] **AI Playlist Generation** — Natural language → smart playlists ([T-33](docs/ideas/T-33_AI_PLAYLIST.md))
 - [ ] **External Integrations** — Spotify API, MusicBrainz, Discogs
 - [ ] **Advanced Analytics** — Play history insights, genre trends
 - [ ] **Multi-user Support** — Permissions, concurrent editing

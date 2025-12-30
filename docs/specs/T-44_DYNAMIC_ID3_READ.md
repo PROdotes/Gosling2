@@ -1,7 +1,7 @@
 ---
 tags:
   - spec
-  - design/refactor
+  - docs/refactor
   - status/proposed
   - priority/critical
 ---

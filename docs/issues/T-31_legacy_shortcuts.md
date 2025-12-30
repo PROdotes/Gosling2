@@ -4,7 +4,7 @@ tags:
   - domain/ui
   - status/open
 links:
-  - design/reference/LEGACY_LOGIC.md
+  - docs/reference/LEGACY_LOGIC.md
 ---
 
 # T-31: Legacy Keyboard Shortcuts

@@ -121,7 +121,11 @@ class SidePanelWidget(QFrame):
         self.btn_web.clicked.connect(self._on_web_search)
         self.btn_web.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.btn_web.customContextMenuRequested.connect(self._show_search_menu)
+        
+        # T-81: Load saved provider
         self._search_provider = "Google"
+        if hasattr(self.library_service, 'settings_manager'):
+             self._search_provider = self.library_service.settings_manager.get_search_provider()
 
         # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
         self.lbl_projected_path = QLabel("")
@@ -131,8 +135,8 @@ class SidePanelWidget(QFrame):
         self.lbl_projected_path.setVisible(False)
         
         status_layout.addWidget(self.btn_status, 1)
-        status_layout.addWidget(self.btn_web) 
         status_layout.addWidget(self.save_led)
+        status_layout.addWidget(self.btn_web)
 
         # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
         self.btn_status.setEnabled(False)
@@ -1063,14 +1067,31 @@ class SidePanelWidget(QFrame):
     def _show_search_menu(self, pos):
         menu = QMenu(self)
         providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
+        
+        # Get current provider dynamically
+        current = "Google"
+        # Check injected settings_manager first
+        if hasattr(self, 'settings_manager'):
+             current = self.settings_manager.get_search_provider()
+        elif hasattr(self.library_service, 'settings_manager'):
+             current = self.library_service.settings_manager.get_search_provider()
+        
         for p in providers:
             action = QAction(p, self)
             action.setCheckable(True)
-            if p == self._search_provider:
+            if p == current:
                 action.setChecked(True)
             
-            # Capture variable in lambda
-            def set_provider(name=p):
+            def set_provider(checked, name=p):
+                # Update settings directly
+                if hasattr(self, 'settings_manager'):
+                    self.settings_manager.set_search_provider(name)
+                    self.settings_manager.sync()
+                elif hasattr(self.library_service, 'settings_manager'):
+                    self.library_service.settings_manager.set_search_provider(name)
+                    self.library_service.settings_manager.sync()
+                
+                # Update local variable
                 self._search_provider = name
                 
             action.triggered.connect(set_provider)
@@ -1080,15 +1101,30 @@ class SidePanelWidget(QFrame):
     def _on_web_search(self):
         if not self.current_songs: return
         song = self.current_songs[0]
+
+        # T-81: Always read latest provider from settings
+        # This handles updates from Settings Dialog or Context Menu
+        if hasattr(self, 'settings_manager'):
+             self._search_provider = self.settings_manager.get_search_provider()
+        elif hasattr(self.library_service, 'settings_manager'):
+             self._search_provider = self.library_service.settings_manager.get_search_provider()
         
         # Priority: Search what's in the EDITOR fields (what the user sees)
         artist = ""
         title = ""
         
-        if 'artist' in self._field_widgets:
-             artist = self._field_widgets['artist'].text()
+        # Fix T-81: Correct field lookups
+        if 'performers' in self._field_widgets:
+             artist = self._field_widgets['performers'].text()
+        elif 'unified_artist' in self._field_widgets:
+             artist = self._field_widgets['unified_artist'].text()
         else: 
-             artist = getattr(song, 'artist', "") or ""
+             # Fallback to model
+             p = getattr(song, 'performers', [])
+             if p and isinstance(p, list) and p:
+                 artist = p[0]
+             else:
+                 artist = getattr(song, 'unified_artist', "") or getattr(song, 'artist', "") or ""
              
         if 'title' in self._field_widgets:
              title = self._field_widgets['title'].text()
@@ -1112,23 +1148,43 @@ class SidePanelWidget(QFrame):
         elif self._search_provider == "Discogs":
              url = f"https://www.discogs.com/search/?q={q_clean}&type=release"
         elif self._search_provider == "MusicBrainz":
-             # Special Query: artist:"..." AND recording:"..."
-             if artist and title:
-                 aq = urllib.parse.quote(artist)
-                 tq = urllib.parse.quote(title)
-                 url = f"https://musicbrainz.org/search?query=artist:%22{aq}%22+AND+recording:%22{tq}%22&type=recording&method=indexed"
-             else:
-                 url = f"https://musicbrainz.org/search?query={q_clean}&type=recording"
+             # T-81 Revised: Using Tag Lookup endpoint for accurate tagging
+             # https://musicbrainz.org/taglookup/index?tag-lookup.artist=...
+             
+             params = {
+                 'tag-lookup.artist': artist,
+                 'tag-lookup.track': title
+             }
+             
+             # Attempt to grab Album if available
+             album = ""
+             if 'album' in self._field_widgets:
+                 album = self._field_widgets['album'].text()
+             elif hasattr(song, 'album'):
+                 album = song.album
+             
+             if album and album != "(No Album)" and album != "(Multiple Values)":
+                 params['tag-lookup.release'] = album
+
+             # Duration in ms (if available) - Helps disambiguate versions
+             if hasattr(song, 'duration') and song.duration:
+                 try:
+                     # song.duration usually in seconds (float)
+                     ms = int(float(song.duration) * 1000)
+                     params['tag-lookup.duration'] = str(ms)
+                 except:
+                     pass
+
+             query_string = urllib.parse.urlencode(params)
+             url = f"https://musicbrainz.org/taglookup/index?{query_string}"
 
         if url:
             QDesktopServices.openUrl(QUrl(url))
-
+            
+            # Just hide the projected path to avoid visual clutter
             self.lbl_projected_path.setVisible(False)
             
-            self.lbl_projected_path.setProperty("conflict", "true" if is_alert else "false")
-            self.save_led.setProperty("state", "alert" if is_alert else "off")
-            self.btn_save.setProperty("alert", is_alert)
-            
+        # Clean up styles regardless of what happened
         self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
         self.lbl_projected_path.style().polish(self.lbl_projected_path)
         self.save_led.style().unpolish(self.save_led)

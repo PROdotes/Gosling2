@@ -1708,6 +1708,58 @@ class LibraryWidget(QWidget):
     def set_search_text(self, text: str) -> None:
         """Public slot for global search box."""
         self.proxy_model.setFilterFixedString(text)
+        # Also filter the filter tree
+        if hasattr(self, 'filter_widget') and self.filter_widget:
+            self._filter_tree_items(text)
+
+    def _filter_tree_items(self, search_text: str) -> None:
+        """Filter filter tree items based on search text. Hides leaf items that don't match,
+        and hides parent/branch nodes if all their children are hidden."""
+        if not hasattr(self.filter_widget, 'tree_model') or not self.filter_widget.tree_model:
+            return
+        
+        search_lower = search_text.lower().strip()
+        tree_view = self.filter_widget.tree_view
+        model = self.filter_widget.tree_model
+        
+        # Recursively filter items
+        for row in range(model.rowCount()):
+            root_item = model.item(row)
+            if root_item:
+                self._filter_tree_item_recursive(root_item, search_lower, tree_view, model)
+    
+    def _filter_tree_item_recursive(self, item, search_text, tree_view, model) -> bool:
+        """Recursively filter tree items. Returns True if item or any child matches."""
+        hint = item.data(Qt.ItemDataRole.AccessibleTextRole)
+        
+        # For leaf items (checkable), check if text matches
+        if item.isCheckable():
+            item_text = item.text().lower()
+            matches = not search_text or search_text in item_text
+            index = model.indexFromItem(item)
+            tree_view.setRowHidden(index.row(), index.parent(), not matches)
+            return matches
+        
+        # For parent/branch items, check children
+        has_visible_child = False
+        for child_row in range(item.rowCount()):
+            child_item = item.child(child_row)
+            if child_item:
+                if self._filter_tree_item_recursive(child_item, search_text, tree_view, model):
+                    has_visible_child = True
+        
+        # Hide parent if no visible children
+        index = model.indexFromItem(item)
+        if hint == "root":
+            # Hide roots too if they have no visible children
+            tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
+            if not has_visible_child and search_text:
+                tree_view.collapse(index)
+        else:
+            # Hide branches with no visible children
+            tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
+        
+        return has_visible_child
 
     def focus_search(self) -> None:
         """Request focus for the global search box."""

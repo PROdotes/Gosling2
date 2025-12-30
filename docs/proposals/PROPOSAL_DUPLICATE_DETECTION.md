@@ -6,8 +6,8 @@ tags:
   - size/medium
   - milestone/0.1.0
 links:
-  - design/reference/LEGACY_LOGIC.md
-  - design/DATABASE.md
+  - docs/reference/LEGACY_LOGIC.md
+  - docs/DATABASE.md
 ---
 
 # Architectural Proposal: Duplicate Detection & Import Logic

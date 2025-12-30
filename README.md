@@ -161,9 +161,9 @@ pytest -v
 
 | File | Purpose |
 |------|---------|
-| [DATABASE.md](DATABASE.md) | Schema specification & governance |
-| [TESTING.md](TESTING.md) | Test strategy & "10 layers of yell" |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | Detailed architecture guide |
+| [docs/DATABASE.md](docs/DATABASE.md) | Schema specification & governance |
+| [docs/TESTING.md](docs/TESTING.md) | Test strategy & "10 layers of yell" |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Detailed architecture guide |
 | [tasks.md](tasks.md) | Development roadmap |
 
 ---

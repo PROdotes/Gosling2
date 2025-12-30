@@ -2,7 +2,7 @@
 
 ## 🚨 Consolidation in Progress
 We are currently in the process of consolidating the test suite (Task T-04).
-Please refer to `design/specs/T04_TEST_CONSOLIDATION_PLAN.md` for instructions.
+Please refer to `docs/specs/T04_TEST_CONSOLIDATION_PLAN.md` for instructions.
 
 ## Structure
 - `unit/`: Unit tests. Currently fragmented.
