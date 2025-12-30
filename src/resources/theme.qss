@@ -457,6 +457,33 @@ QPushButton#AlbumActionButton:hover {
     padding: 4px 12px;
 }
 
+#HeaderContextSep {
+    color: #333333;
+    font-size: 24pt;
+    margin: 0 15px;
+    font-weight: 100;
+}
+
+#HeaderArtistLabel {
+    color: #999999;
+    font-size: 14pt;
+    font-weight: bold;
+}
+
+#HeaderTitleLabel {
+    color: #FFFFFF;
+    font-size: 14pt;
+    font-weight: 900;
+    margin-left: 2px;
+}
+
+#HeaderDash {
+    color: #666666;
+    font-size: 14pt;
+    font-weight: bold;
+    margin: 0 4px;
+}
+
 /* Pane Z: The Context (Song List) */
 #DialogContextPane {
     border-right: 1px solid #111;

@@ -1,9 +1,11 @@
+from typing import List, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QLineEdit, QCheckBox, QComboBox, QScrollArea,
-    QFrame, QSizePolicy, QPushButton
+    QFrame, QSizePolicy, QPushButton, QMenu
 )
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QDesktopServices
+from PyQt6.QtCore import Qt, pyqtSignal, QUrl
 from .glow_factory import GlowLineEdit, GlowButton
 import copy
 import os
@@ -99,7 +101,7 @@ class SidePanelWidget(QFrame):
         self.btn_status.setCheckable(True)
         self.btn_status.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_status.setFixedHeight(32)
-        self.btn_status.setMinimumWidth(180) # Force physical weight
+        self.btn_status.setMinimumWidth(120) # Reduced from 180 to fit search button
         self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.btn_status.clicked.connect(self._on_status_toggled)
         self.btn_status.installEventFilter(self)
@@ -110,6 +112,17 @@ class SidePanelWidget(QFrame):
         self.save_led.setProperty("state", "off")
         self.save_led.setToolTip("Rename/Move detected")
 
+        # Search Button (Restored Feature)
+        self.btn_web = GlowButton("WEB") # Short label
+        self.btn_web.setObjectName("WebSearchButton")
+        self.btn_web.setFixedWidth(50)
+        self.btn_web.setFixedHeight(32)
+        self.btn_web.setToolTip("Search Metadata (Right-click to switch provider)")
+        self.btn_web.clicked.connect(self._on_web_search)
+        self.btn_web.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.btn_web.customContextMenuRequested.connect(self._show_search_menu)
+        self._search_provider = "Google"
+
         # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
         self.lbl_projected_path = QLabel("")
         self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
@@ -118,6 +131,7 @@ class SidePanelWidget(QFrame):
         self.lbl_projected_path.setVisible(False)
         
         status_layout.addWidget(self.btn_status, 1)
+        status_layout.addWidget(self.btn_web) 
         status_layout.addWidget(self.save_led)
 
         # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
@@ -199,6 +213,7 @@ class SidePanelWidget(QFrame):
     def _update_header(self):
         if not self.current_songs:
             self.header_label.setText("No Selection")
+            self.btn_status.setChecked(False)
             self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
         elif len(self.current_songs) == 1:
@@ -222,6 +237,7 @@ class SidePanelWidget(QFrame):
             self.btn_status.setEnabled(True)
         else:
             self.header_label.setText(f"Editing {len(self.current_songs)} Items")
+            self.btn_status.setChecked(False)
             self.btn_status.setEnabled(True) # In Bulk, MARK DONE applies to all
             self._update_status_visuals(False) # Default look for bulk
 
@@ -374,11 +390,13 @@ class SidePanelWidget(QFrame):
                         val_bool = str(effective_val).lower() in ("true", "1", "yes") if isinstance(effective_val, str) else bool(effective_val)
                         widget.setChecked(val_bool if effective_val is not None else False)
 
-                elif isinstance(widget, QPushButton):  # Album picker
+                elif isinstance(widget, (QPushButton, GlowButton)):  # Album picker
                     if is_multiple:
                         widget.setText("(Multiple Values)")
                     else:
-                        widget.setText(str(effective_val) if effective_val else "(No Album)")
+                        # Fix T-Bug: Avoid str(None) -> "None" trap. 
+                        display_text = str(effective_val) if (effective_val and str(effective_val).strip()) else "(No Album)"
+                        widget.setText(display_text)
 
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
                     if is_multiple:
@@ -444,6 +462,10 @@ class SidePanelWidget(QFrame):
         # Default: Line Edit for Alpha
         edit = GlowLineEdit()
         
+        # User Req: Enable Multi-line Overlay for long fields
+        if field_def.name in ['composers', 'performers', 'producers', 'lyrics', 'comment']:
+            edit.enable_overlay()
+        
         # T-69: Publisher is managed via Album, so it's read-only in the editor
         if field_def.name == 'publisher':
             edit.setReadOnly(True)
@@ -487,7 +509,8 @@ class SidePanelWidget(QFrame):
                 'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or (song.performers[0] if song.performers else ""),
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
-                'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None))
+                'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None)),
+                'song_display': f"{song.performers[0] if song.performers else 'Unknown'} - {song.title}"
             }
 
         dlg = AlbumManagerDialog(
@@ -719,6 +742,7 @@ class SidePanelWidget(QFrame):
         self._update_header()
         self._update_save_state()
         self._validate_done_gate()
+        self._projected_timer.start(500)
         self.staging_changed.emit(list(self._staged_changes.keys()))
 
     def _on_status_toggled(self, checked):
@@ -1018,6 +1042,87 @@ class SidePanelWidget(QFrame):
             is_alert = has_changed or has_conflict
             
             # The path is now strictly HOVER-ONLY to reclaim vertical space
+            self.lbl_projected_path.setVisible(False)
+            self.save_led.setToolTip(f"Pending Move: {display_path}") # Update tooltip for context
+            
+            if is_alert:
+                 self.lbl_projected_path.setStyleSheet("color: #FF5555; font-weight: bold;")
+                 # If conflict, stay red. If just move, amber?
+                 if has_conflict: 
+                     self.save_led.setProperty("state", "conflict")
+                 elif has_changed:
+                     # If ready, green blinking? No, amber solid
+                     self.save_led.setProperty("state", "alert")
+            else:
+                 self.lbl_projected_path.setStyleSheet("color: #AAAAAA;")
+                 self.save_led.setProperty("state", "off")
+            
+            self.save_led.style().unpolish(self.save_led)
+            self.save_led.style().polish(self.save_led)
+
+    def _show_search_menu(self, pos):
+        menu = QMenu(self)
+        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
+        for p in providers:
+            action = QAction(p, self)
+            action.setCheckable(True)
+            if p == self._search_provider:
+                action.setChecked(True)
+            
+            # Capture variable in lambda
+            def set_provider(name=p):
+                self._search_provider = name
+                
+            action.triggered.connect(set_provider)
+            menu.addAction(action)
+        menu.exec(self.btn_web.mapToGlobal(pos))
+
+    def _on_web_search(self):
+        if not self.current_songs: return
+        song = self.current_songs[0]
+        
+        # Priority: Search what's in the EDITOR fields (what the user sees)
+        artist = ""
+        title = ""
+        
+        if 'artist' in self._field_widgets:
+             artist = self._field_widgets['artist'].text()
+        else: 
+             artist = getattr(song, 'artist', "") or ""
+             
+        if 'title' in self._field_widgets:
+             title = self._field_widgets['title'].text()
+        else:
+             title = getattr(song, 'title', "") or ""
+             
+        if not artist and not title:
+             return 
+        
+        # URL Logic
+        import urllib.parse
+        q_clean = urllib.parse.quote(f"{artist} {title}")
+        
+        url = ""
+        if self._search_provider == "Google":
+             url = f"https://www.google.com/search?q={q_clean}"
+        elif self._search_provider == "Spotify":
+             url = f"https://open.spotify.com/search/{q_clean}"
+        elif self._search_provider == "YouTube":
+             url = f"https://www.youtube.com/results?search_query={q_clean}"
+        elif self._search_provider == "Discogs":
+             url = f"https://www.discogs.com/search/?q={q_clean}&type=release"
+        elif self._search_provider == "MusicBrainz":
+             # Special Query: artist:"..." AND recording:"..."
+             if artist and title:
+                 aq = urllib.parse.quote(artist)
+                 tq = urllib.parse.quote(title)
+                 url = f"https://musicbrainz.org/search?query=artist:%22{aq}%22+AND+recording:%22{tq}%22&type=recording&method=indexed"
+             else:
+                 url = f"https://musicbrainz.org/search?query={q_clean}&type=recording"
+
+        if url:
+            QDesktopServices.openUrl(QUrl(url))
+
             self.lbl_projected_path.setVisible(False)
             
             self.lbl_projected_path.setProperty("conflict", "true" if is_alert else "false")

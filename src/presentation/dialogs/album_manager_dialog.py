@@ -80,6 +80,36 @@ class AlbumManagerDialog(QDialog):
         self.lbl_title.setObjectName("DialogHeaderTitle") # Use existing style
         header_layout.addWidget(self.lbl_title)
         
+        # Context Display (Song currently being worked on)
+        song_display = self.initial_data.get('song_display')
+        if song_display:
+            parts = song_display.split(" - ", 1)
+            
+            # Separator
+            sep = QLabel("|")
+            sep.setObjectName("HeaderContextSep")
+            header_layout.addWidget(sep)
+            
+            if len(parts) == 2:
+                artist, title = parts
+                
+                lbl_artist = QLabel(artist)
+                lbl_artist.setObjectName("HeaderArtistLabel")
+                header_layout.addWidget(lbl_artist)
+                
+                lbl_dash = QLabel("-") # Visual hyphen
+                lbl_dash.setObjectName("HeaderDash")
+                header_layout.addWidget(lbl_dash)
+                
+                lbl_title_song = QLabel(title)
+                lbl_title_song.setObjectName("HeaderTitleLabel") 
+                header_layout.addWidget(lbl_title_song)
+            else:
+                # Fallback
+                lbl_full = QLabel(song_display)
+                lbl_full.setObjectName("HeaderTitleLabel")
+                header_layout.addWidget(lbl_full)
+
         header_layout.addStretch()
         
         self.btn_create_new = GlowButton("Create New Album (+)")
@@ -290,7 +320,7 @@ class AlbumManagerDialog(QDialog):
         self.inp_title.clear()
         self.inp_artist.clear()
         self.inp_year.clear()
-        self.cmb_type.setCurrentIndex(0)
+        self.cmb_type.setCurrentText("Single")
         self.btn_pub_trigger.setText("(None)")
         self.selected_pub_name = ""
         
@@ -306,6 +336,10 @@ class AlbumManagerDialog(QDialog):
         # Smart Fill
         if self.initial_data.get('title'):
             self.inp_title.setText(self.initial_data.get('title'))
+        if self.initial_data.get('artist'):
+            self.inp_artist.setText(self.initial_data.get('artist'))
+        if self.initial_data.get('year'):
+            self.inp_year.setText(str(self.initial_data.get('year')))
         
         self.btn_select.setEnabled(False) # Can't select valid album yet
         self.lbl_title.setText("CREATING NEW ALBUM")
@@ -320,7 +354,12 @@ class AlbumManagerDialog(QDialog):
             
         # 1. Populate Inspector
         self.inp_title.setText(self.current_album.title or "")
-        self.inp_artist.setText(self.current_album.album_artist or "")
+        
+        # Smart Fill for Existing: If DB has no artist, suggest from song context
+        db_artist = self.current_album.album_artist
+        if not db_artist and self.initial_data.get('artist'):
+            db_artist = self.initial_data.get('artist')
+        self.inp_artist.setText(db_artist or "")
         self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
         self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
         

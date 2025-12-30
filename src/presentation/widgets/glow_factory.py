@@ -3,7 +3,7 @@ GlowFactory - Unified workstation halo effects for various widgets.
 Supports 'focus' triggers (for inputs) and 'hover' triggers (for buttons).
 """
 from PyQt6.QtWidgets import (
-    QWidget, QLineEdit, QPushButton, QFrame, QGraphicsBlurEffect, QHBoxLayout, QLabel, QGridLayout
+    QWidget, QLineEdit, QPushButton, QFrame, QGraphicsBlurEffect, QHBoxLayout, QLabel, QGridLayout, QPlainTextEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QEvent, pyqtProperty
 
@@ -124,6 +124,155 @@ class GlowWidget(QWidget):
         return super().blockSignals(b)
 
 
+
+
+class ReviewTooltip(QLabel):
+    """Passive dropdown preview for long fields."""
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.WindowType.ToolTip | Qt.WindowType.WindowDoesNotAcceptFocus) 
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        
+        self.setWordWrap(True)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: #0c0c0c;
+                color: #C0C0C0;
+                border: 1px solid #FFC66D;
+                border-radius: 4px;
+                padding: 6px;
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+            }
+        """)
+        # Allow clicking links
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.linkActivated.connect(self._on_link_clicked)
+        self._current_indices = [] # Stores (start, end) for each item index
+        self._target_edit = None
+
+    def _on_link_clicked(self, link):
+        if not self._target_edit or not link.startswith("idx_"):
+            return
+            
+        try:
+            idx = int(link.split("_")[1])
+            if 0 <= idx < len(self._current_indices):
+                start_pos = self._current_indices[idx]
+                
+                # Hack: Jump to end first to force scroll/view update
+                self._target_edit.setCursorPosition(len(self._target_edit.text()))
+                
+                # Defer the jump-back to force the view to scroll 'leftwards' to the target
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(10, lambda: self._finish_jump(start_pos))
+        except:
+            pass
+
+    def _finish_jump(self, pos):
+        if self._target_edit:
+            self._target_edit.setCursorPosition(pos)
+            self._target_edit.setFocus()
+
+    def update_with_cursor(self, edit_widget):
+        self._target_edit = edit_widget
+        text = edit_widget.text()
+        cursor_pos = edit_widget.cursorPosition()
+        
+        if not text:
+            self.hide()
+            return
+
+        # Smart Formatting & Highlighting
+        has_list = "," in text
+        
+        display_html = ""
+        self._current_indices = []
+        
+        if has_list:
+            parts = text.split(',')
+            current_idx = 0
+            active_part_index = -1
+            
+            # 1. Map indices
+            for i, part in enumerate(parts):
+                part_len = len(part)
+                # Store start position of this chunk (skipping the split comma logic roughly)
+                # Actually, split doesn't tell us gaps. But we assume 1 char comma.
+                # To be precise:
+                # We should probably use regex or cumulative sum assuming ',' is the separator.
+                start_pos = current_idx
+                end_pos = current_idx + part_len
+                
+                # If this is not the first item, we likely skipped a comma
+                # But wait, we iterate parts.
+                # "A,B". parts=["A", "B"]. A=0-1. B=2-3.
+                
+                # Check for active cursor
+                # Grace period: include the comma after it as "active" for that item?
+                if start_pos <= cursor_pos <= end_pos + 1: 
+                    active_part_index = i
+                
+                # Store start pos for clicking
+                # Adjust start_pos to skip leading whitespace if any?
+                # part includes the whitespace typically if we didn't strip it yet.
+                # We strip for DISPLAY, but for CURSOR we need raw offsets.
+                
+                # Actually, let's keep 'part' RAW for index calculation
+                # And 'clean_part' for display.
+                
+                # Store the start of the CONTENT (skipping leading space of the part?)
+                # If text is "A, B", part 2 is " B". Start is 2.
+                # User wants cursor at 3 ("B"). 
+                # So we calculate whitespace offset.
+                ws_len = len(part) - len(part.lstrip())
+                click_target = start_pos + ws_len
+                
+                self._current_indices.append(click_target)
+                
+                current_idx += part_len + 1 # +1 for comma
+            
+            if active_part_index == -1: active_part_index = len(parts)-1
+
+            # 2. Build HTML
+            lines = []
+            for i, part in enumerate(parts):
+                clean_part = part.strip()
+                style = "color: #999999; text-decoration: none;"
+                if i == active_part_index:
+                    style = "color: #FFC66D; font-weight: bold; text-decoration: none;"
+                
+                # Wrap in Link
+                lines.append(f"<a href='idx_{i}' style='{style}'>{clean_part}</a>")
+            
+            display_html = "<br>".join(lines)
+            
+        else:
+            display_html = text
+            
+        # ... Sizing Logic ...
+        
+        # Smart Check: Is the text actually cut off? (Using raw text)
+        fm = edit_widget.fontMetrics()
+        text_width = fm.horizontalAdvance(text)
+        visible_width = edit_widget.width() - 8 
+        is_truncated = text_width > visible_width
+        
+        if not is_truncated and not has_list:
+             self.hide()
+             return
+            
+        base_geo = edit_widget.rect()
+        global_pos = edit_widget.mapToGlobal(base_geo.bottomLeft())
+        w = base_geo.width() 
+        self.setFixedWidth(w)
+        
+        self.setText(display_html)
+        self.adjustSize()
+        
+        self.move(global_pos.x(), global_pos.y() + 4)
+        self.show()
+
+
 class GlowLineEdit(GlowWidget):
     """Workstation Input with Amber Halo on focus."""
     def __init__(self, parent=None):
@@ -131,6 +280,41 @@ class GlowLineEdit(GlowWidget):
         self.edit.setObjectName("GlowInput")
         super().__init__(self.edit, trigger_mode="focus", parent=parent)
         
+        # Preview capability
+        self._preview_tip = None
+        self._use_preview = False 
+
+    def enable_overlay(self):
+        """Turn on the Passive Preview mode."""
+        self._use_preview = True
+        # Connect signals
+        self.edit.textChanged.connect(self._update_preview)
+        self.edit.cursorPositionChanged.connect(lambda old, new: self._update_preview())
+        
+    def _update_preview(self, force_show=False):
+        if self._preview_tip:
+             # If forcing, show it regardless of current state
+             if force_show or self._preview_tip.isVisible():
+                 self._preview_tip.update_with_cursor(self.edit)
+
+    def eventFilter(self, obj, event):
+        # Intercept focus to trigger preview
+        if self._use_preview and obj is self.edit:
+            if event.type() == QEvent.Type.FocusIn:
+                if not self._preview_tip:
+                    self._preview_tip = ReviewTooltip(self.window())
+                
+                # Use Timer to allow layout to settle
+                from PyQt6.QtCore import QTimer
+                # Force show on Focus In
+                QTimer.singleShot(50, lambda: self._update_preview(force_show=True))
+                
+            elif event.type() == QEvent.Type.FocusOut:
+                if self._preview_tip:
+                    self._preview_tip.hide()
+            
+        return super().eventFilter(obj, event)
+
     # Proxy methods for direct access
     def text(self): return self.edit.text()
     def setText(self, t): self.edit.setText(t)
@@ -357,6 +541,8 @@ class GlowButton(GlowWidget):
 
     def setEnabled(self, e): 
         self.btn.setEnabled(e)
+        if not e:
+            self._hide_glow()
         self._update_text_styles()
         
     def setCursor(self, c): self.btn.setCursor(c)

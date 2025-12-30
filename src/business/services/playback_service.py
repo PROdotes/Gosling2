@@ -4,6 +4,10 @@ from PyQt6.QtCore import QObject, pyqtSignal, QUrl, QTimer
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from typing import TYPE_CHECKING
 
+import shutil
+import tempfile
+import os
+
 if TYPE_CHECKING:
     from .settings_manager import SettingsManager
 
@@ -46,6 +50,8 @@ class PlaybackService(QObject):
 
         self._playlist: List[str] = []
         self._current_index: int = -1
+        
+        self._temp_files: List[str] = [] # Track temp copies for cleanup
         
         # Connect signals for the initial active player
         self._connect_signals(self.active_player)
@@ -119,11 +125,40 @@ class PlaybackService(QObject):
 
     # --- Playback Control ---
 
+    def _get_temp_copy(self, file_path: str) -> str:
+        """Create a temp copy to avoid file locking"""
+        if not os.path.exists(file_path):
+            return file_path # Fallback
+            
+        try:
+            # Create a unique temp file with same extension
+            ext = os.path.splitext(file_path)[1]
+            fd, temp_path = tempfile.mkstemp(suffix=ext, prefix="gosling_play_")
+            os.close(fd) # Close file descriptor immediately
+            
+            # Copy content
+            shutil.copy2(file_path, temp_path)
+            self._temp_files.append(temp_path)
+            
+            # Auto-cleanup old temps if list gets too big (e.g. > 50)
+            if len(self._temp_files) > 50:
+                oldest = self._temp_files.pop(0)
+                try:
+                    if os.path.exists(oldest): os.remove(oldest)
+                except: pass
+                
+            return temp_path
+        except Exception:
+            # Fallback to original if copy fails
+            return file_path
+
     def load(self, file_path: str) -> None:
         """Load a media file into active player (Hard Load)"""
         # If we load manually, we stop any crossfade
         self._stop_crossfade()
-        self.active_player.setSource(QUrl.fromLocalFile(file_path))
+        
+        real_source = self._get_temp_copy(file_path)
+        self.active_player.setSource(QUrl.fromLocalFile(real_source))
 
     def play(self) -> None:
         self.active_player.play()
@@ -252,7 +287,9 @@ class PlaybackService(QObject):
         
         # 2. Setup Incoming Player
         incoming_player = self._players[incoming_index]
-        incoming_player.setSource(QUrl.fromLocalFile(next_path))
+        
+        real_next = self._get_temp_copy(next_path)
+        incoming_player.setSource(QUrl.fromLocalFile(real_next))
         
         # 3. Switch "Active" Pointer (UI tracks the NEW song immediately)
         self._active_index = incoming_index
@@ -322,6 +359,15 @@ class PlaybackService(QObject):
         """Clean up resources"""
         if not self._players:
             return
+
+        # Clean temp files
+        for tmp in self._temp_files:
+            try:
+                if os.path.exists(tmp):
+                    os.remove(tmp)
+            except:
+                pass
+        self._temp_files.clear()
 
         self._stop_crossfade()
         for player in self._players:

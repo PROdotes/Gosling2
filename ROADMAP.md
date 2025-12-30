@@ -96,6 +96,10 @@ tags:
 
 *   [ ] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
 *   [ ] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
+-   [ ] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
+- [ ] [**T-80 Smart Preview Pattern**](docs/tasks/T-80_smart_preview_pattern.md): Generalize the "Passive Preview" (tooltip with list view + click-to-jump) to all linked DB fields.
+- [x] [**T-81 Restore Web Search**](docs/tasks/T-81_restore_web_search.md): (Basic Restore Complete) Add persistence/Settings Manager later.
+*   [ ] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
 
 ---
 
