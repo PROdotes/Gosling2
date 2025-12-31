@@ -24,6 +24,13 @@ class AlbumManagerDialog(QDialog):
     save_and_select_requested = pyqtSignal(int, str)
     album_deleted = pyqtSignal(int)
     
+    # Geometry (The Workstation Dimensions)
+    BASE_WIDTH = 950
+    BASE_HEIGHT = 650
+    SIDECAR_WIDTH = 300
+    EXPANDED_WIDTH = BASE_WIDTH + SIDECAR_WIDTH
+    PANE_MIN_WIDTH = 250
+    
     def __init__(self, album_repository, initial_data=None, parent=None, staged_deletions=None):
         super().__init__(parent)
         self.album_repo = album_repository
@@ -49,7 +56,7 @@ class AlbumManagerDialog(QDialog):
         self.selected_pub_name = "" 
         
         self.setWindowTitle("Album Manager Workstation")
-        self.setMinimumSize(950, 650)
+        self.setMinimumSize(self.BASE_WIDTH, self.BASE_HEIGHT)
         self.setModal(True)
         self.setObjectName("AlbumManagerDialog")
         
@@ -63,7 +70,7 @@ class AlbumManagerDialog(QDialog):
         
         # --- LEFT: MAIN CONTAINER ---
         self.main_container = QFrame()
-        self.main_container.setMinimumWidth(950)
+        self.main_container.setMinimumWidth(self.BASE_WIDTH)
         main_layout = QVBoxLayout(self.main_container)
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0,0,0,0)
@@ -71,7 +78,7 @@ class AlbumManagerDialog(QDialog):
         # --- TOP HEADER ---
         header = QFrame()
         header.setFixedHeight(50)
-        header.setMaximumWidth(950) # Lock width to prevent jump
+        header.setMaximumWidth(self.BASE_WIDTH) # Lock width to prevent jump
         header.setObjectName("DialogHeader") 
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(20,0,20,0)
@@ -121,12 +128,12 @@ class AlbumManagerDialog(QDialog):
         
         # 1. PANE Z: Context (Songs)
         self.pane_context = self._build_context_pane()
-        self.pane_context.setMinimumWidth(250)
+        self.pane_context.setMinimumWidth(self.PANE_MIN_WIDTH)
         self.splitter.addWidget(self.pane_context)
         
         # 2. PANE A: Vault (Albums)
         self.pane_vault = self._build_vault_pane()
-        self.pane_vault.setMinimumWidth(250)
+        self.pane_vault.setMinimumWidth(self.PANE_MIN_WIDTH)
         self.splitter.addWidget(self.pane_vault)
         
         # 3. PANE B: Inspector (Editor)
@@ -143,7 +150,7 @@ class AlbumManagerDialog(QDialog):
         footer = QFrame()
         footer.setObjectName("DialogFooter")
         footer.setFixedHeight(60)
-        footer.setMaximumWidth(950) # Lock width to prevent jump
+        footer.setMaximumWidth(self.BASE_WIDTH) # Lock width to prevent jump
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(20,10,20,10)
         footer_layout.setSpacing(10) 
@@ -281,7 +288,7 @@ class AlbumManagerDialog(QDialog):
     def _build_sidecar_pane(self):
         container = QFrame()
         container.setObjectName("PublisherSidecar")
-        container.setFixedWidth(300)
+        container.setFixedWidth(self.SIDECAR_WIDTH)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0,0,0,0)
         
@@ -500,12 +507,12 @@ class AlbumManagerDialog(QDialog):
     def _toggle_sidecar(self):
         if self.pane_sidecar.isVisible():
             self.pane_sidecar.hide()
-            self.setMinimumWidth(950)
-            self.resize(950, self.height())
+            self.setMinimumWidth(self.BASE_WIDTH)
+            self.resize(self.BASE_WIDTH, self.height())
         else:
             self.pane_sidecar.show()
-            self.setMinimumWidth(1250)
-            self.resize(1250, self.height())
+            self.setMinimumWidth(self.EXPANDED_WIDTH)
+            self.resize(self.EXPANDED_WIDTH, self.height())
             self.publisher_picker._refresh_list()
             self.publisher_picker.select_publisher_by_name(self.selected_pub_name)
             

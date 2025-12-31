@@ -1,25 +1,31 @@
-## 🚧 Pending Work (From .agent/today.md)
-* [ ] **Geometry Refactor**: Clean up the "Magic Numbers" (950, 1250, 300) introduced in `album_manager_dialog.py`.
-* [ ] **T-46 Polish**: Resolve the "tiny jitter" in footer buttons during expansion.
-* [ ] **GlowButton Analysis**: Verify if QSS sizing correctly propagates to the internal `QPushButton`.
+# 2025-12-31 - Morning Session (The Cat Session)
 
-## 🗂️ Metadata Editor Friction Points
+## 📌 Context
+- **Protocol Reset**: Implemented GOSLING VOW v5.3 (The Bone Version). Focused on "slow walk" partnership and anti-nag.
+- **Album Manager Refinement**: De-hammed the Python code by moving styling to QSS.
+
+## ✅ Completed Today
+- [x] Stripped `setStyleSheet`, `setFixedWidth`, and `setFixedSize` from `album_manager_dialog.py`.
+- [x] Implemented "Drawer Expansion" logic: Window grows by 300px when Publisher sidecar is toggled.
+- [x] Preserved Muscle Memory: Added a footer spacer to counteract button movement during expand.
+- [x] Standardized Album Manager selectors in `theme.qss`.
+- [x] Resolved "tiny jitter" in footer buttons during expansion.
+- [x] Refactored Magic Numbers into class constants for better maintenance.
+
+## 🗂️ Metadata Editor Friction Points (Design Log)
 
 ### 1. "Hidden" Web Search (The "WEB" Button)
-**The Issue:** Users (like your boss) feel stuck when a field like **Composers** is empty, missing the connection that the "WEB" button at the bottom can solve the problem for them. It lacks contextual "affinity."
-
-**Proposed "Low-Impact/High-Intuition" Fixes:**
-* [ ] **Labeling Change:** Rename `WEB` to `TAGS 🔍` or `FIND DATA`.
-* [ ] **Field-Level Trigger:** Add a tiny, subtle search magnifying glass icon *directly* inside or next to the Composers line edit when it's empty.
-* [ ] **Empty State Hint:** If a required field is empty, show a ghosted placeholder like `Click WEB below to lookup...` or similar.
-* [ ] **Visual Linking:** When hovering over the Web button, briefly highlight the fields it can populate (e.g., Composer, Publisher, Year) with a subtle amber pulse.
+**The Issue:** Users feel stuck when a field like **Composers** is empty, missing the connection that the "WEB" button can solve it.
+- **Solution Drafted**: T-82 Web Search Affinity [prop](docs/proposals/PROPOSAL_WEB_SEARCH_AFFINITY.md)
 
 ### 2. Managed Field Editing (Publisher Jump)
-**The Issue:** Boss tried to edit Publisher directly by clicking the label. Since it's an Album property (not Song), it's currently "locked" and unintuitive in the Side Panel.
+**The Issue:** Editing "locked" relational fields (Publisher) in the Side Panel is unintuitive.
+- **Solution Drafted**: T-83 Publisher Jump [prop](docs/proposals/PROPOSAL_PUBLISHER_JUMP.md)
 
-**Proposed Ideas:**
-* [ ] **Interactive Label:** Turn "Publisher" label into a link. Clicking opens a menu: "Edit via [Album A]", "Edit via [Album B]".
-* [ ] **Jump Badge:** A small icon inside the Publisher field that opens the Album Manager filtered to that specific album.
-* [ ] **Ghost Editing:** Allow typing directly in the field, then show a confirmation: "This updates the publisher for all songs on [Album Name]. Proceed?"
+## 🚧 Next Steps
+- **GlowButton Analysis**: Verify if QSS sizing correctly propagates to the internal `QPushButton` in the 500-line `GlowButton` monster.
+- **T-82: Web Search Affinity**: Implement UI cues to bridge the gap between empty fields and the search button.
+- **T-83: Publisher Jump**: Add interactive links/badges to allow editing album-level fields from the Side Panel.
 
----
+## ⚠️ Known Issues / Warnings
+- None currently active.
