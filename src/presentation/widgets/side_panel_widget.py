@@ -479,6 +479,10 @@ class SidePanelWidget(QFrame):
         if field_def.name == 'album':
             btn = GlowButton()
             btn.setObjectName("AlbumPickerButton")  # Styling via QSS
+            btn.set_text_align(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            btn.set_font_weight("500")
+            btn.set_font_family("Consolas")
+            btn.set_font_size(12)
             
             # Display Value Logic
             if is_multiple:
@@ -502,11 +506,22 @@ class SidePanelWidget(QFrame):
         
         # T-69: Publisher is managed via Album, so it's read-only in the editor
         if field_def.name == 'publisher':
-            edit.setReadOnly(True)
-            edit.setProperty("managed", True) # For CSS if we want to dim it
-            edit.setToolTip("Publisher is managed at the Album level.")
-            edit.style().unpolish(edit)
-            edit.style().polish(edit)
+            btn = GlowButton()
+            btn.setObjectName("PublisherPickerButton") # Styling via QSS
+            btn.set_text_align(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            btn.set_font_weight("500")
+            btn.set_font_family("Consolas")
+            btn.set_font_size(12)
+            
+            # Display Logic
+            if is_multiple:
+                btn.setText("(Multiple Values)")
+            else:
+                btn.setText(str(value) if value else "(No Publisher)")
+                
+            # Connect to opening manager with focus flag
+            btn.clicked.connect(lambda: self._open_album_manager(focus_publisher=True))
+            return btn
             
         if is_multiple:
             edit.setPlaceholderText("(Multiple Values)")
@@ -541,7 +556,7 @@ class SidePanelWidget(QFrame):
         edit.installEventFilter(self)
         return edit
 
-    def _open_album_manager(self, checked=False):
+    def _open_album_manager(self, checked=False, focus_publisher=False):
         """Open the T-46 Album Selector."""
         # Gather initial data from current selection to auto-populate "Create New"
         initial_data = {}
@@ -554,7 +569,8 @@ class SidePanelWidget(QFrame):
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
                 'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None)),
-                'song_display': f"{song.performers[0] if song.performers else 'Unknown'} - {song.title}"
+                'song_display': f"{song.performers[0] if song.performers else 'Unknown'} - {song.title}",
+                'focus_publisher': focus_publisher
             }
 
         from ..dialogs.album_manager_dialog import AlbumManagerDialog

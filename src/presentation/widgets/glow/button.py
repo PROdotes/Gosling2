@@ -42,6 +42,11 @@ class GlowButton(GlowWidget):
         self.btn_grid.addWidget(self.lbl_main, 0, 0)
         
         self._radius_css = "border-radius: 10px;" # Default pill shape
+        self._text_align = Qt.AlignmentFlag.AlignCenter
+        self._font_weight = "bold"
+        self._font_family = None # None = Inherit/Default
+        self._font_size = None   # None = Inherit/Default
+        
         self._update_text_styles()
         
         self.btn.clicked.connect(self.clicked.emit)
@@ -60,6 +65,33 @@ class GlowButton(GlowWidget):
     def set_radius_style(self, css_string):
         """Override the default 10px border radius (e.g. for split buttons)."""
         self._radius_css = css_string
+        self._update_text_styles()
+
+    def set_text_align(self, alignment):
+        self._text_align = alignment
+        self.lbl_main.setAlignment(alignment)
+        self.lbl_glow.setAlignment(alignment)
+        # Add padding if left aligned to match inputs
+        if alignment & Qt.AlignmentFlag.AlignLeft:
+            self.lbl_main.setIndent(8)
+            self.lbl_glow.setIndent(8)
+        else:
+            self.lbl_main.setIndent(0)
+            self.lbl_glow.setIndent(0)
+
+    def set_font_weight(self, weight):
+        """e.g. 'bold', 'normal', '100'"""
+        self._font_weight = weight
+        self._update_text_styles()
+        
+    def set_font_family(self, family):
+        """e.g. 'Consolas'"""
+        self._font_family = family
+        self._update_text_styles()
+
+    def set_font_size(self, size_pt):
+        """e.g. 12"""
+        self._font_size = size_pt
         self._update_text_styles()
 
     def _on_toggled(self, checked):
@@ -90,8 +122,14 @@ class GlowButton(GlowWidget):
             color = "#DDDDDD"
             border_col = "#000000"
             
-        self.lbl_main.setStyleSheet(f"color: {color}; background: transparent; font-weight: bold;")
-        self.lbl_glow.setStyleSheet(f"color: {self.glow_color}; background: transparent; font-weight: bold;")
+        font_style = f"font-weight: {self._font_weight};"
+        if self._font_family:
+            font_style += f" font-family: {self._font_family};"
+        if self._font_size:
+            font_style += f" font-size: {self._font_size}pt;"
+            
+        self.lbl_main.setStyleSheet(f"color: {color}; background: transparent; {font_style}")
+        self.lbl_glow.setStyleSheet(f"color: {self.glow_color}; background: transparent; {font_style}")
         
         # Dynamic Border with custom or default radius
         self.btn.setStyleSheet(f"border: 1px solid {border_col}; {self._radius_css}")
@@ -137,6 +175,7 @@ class GlowButton(GlowWidget):
     def isEnabled(self): return self.btn.isEnabled()
     def isVisible(self): return self.btn.isVisible()
     def text(self): return self.lbl_main.text()
+    def click(self): self.btn.click()
     def setCheckable(self, c): self.btn.setCheckable(c)
     def setChecked(self, c): self.btn.setChecked(c)
     def setIcon(self, i): self.btn.setIcon(i)

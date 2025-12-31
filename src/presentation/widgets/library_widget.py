@@ -426,6 +426,8 @@ class LibraryWidget(QWidget):
         self.table_view.setShowGrid(False)  # Blade-Edge: No vertical lines
         self.table_view.verticalHeader().setVisible(False)
         self.table_view.setAlternatingRowColors(True)
+        self.table_view.setHorizontalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
+        self.table_view.setVerticalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
         
         # Use custom header with drop indicator
         custom_header = DropIndicatorHeaderView(Qt.Orientation.Horizontal, self.table_view)

@@ -168,7 +168,7 @@ QScrollBar::handle:vertical:hover {
 /* --- 3. INPUTS & COMPONENTS --- */
 
 /* Inputs (Inset Effect) */
-QLineEdit, QTextEdit, QComboBox, #GlowInput {
+QLineEdit, QTextEdit, QComboBox, #GlowInput, #AlbumPickerButton, #PublisherPickerButton {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
         stop:0 #000000, 
         stop:0.15 #0A0A0A, 
@@ -184,6 +184,17 @@ QLineEdit, QTextEdit, QComboBox, #GlowInput {
     font-size: 12pt; 
 }
  
+/* Button Pickers - Mimic Inputs */
+#AlbumPickerButton, #PublisherPickerButton {
+    text-align: left;
+    font-weight: normal;
+    font-size: 13pt;
+    padding: 3px 0px; /* Restore vertical padding to match Input height */
+}
+#AlbumPickerButton:hover, #PublisherPickerButton:hover {
+    border: 1px solid #FFC66D;
+}
+
 /* Read-Only / Managed State (e.g. Publisher tied to Album) */
 QLineEdit[managed="true"], #GlowInput[managed="true"] {
     color: #555555;

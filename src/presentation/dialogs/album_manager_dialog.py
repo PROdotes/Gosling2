@@ -62,6 +62,20 @@ class AlbumManagerDialog(QDialog):
         
         self._init_ui()
         
+    def showEvent(self, event):
+        super().showEvent(event)
+        # T-83: Auto-Focus Publisher if requested (The Jump)
+        if self.initial_data.get('focus_publisher'):
+            # Defer slightly to ensure layout is done
+            QTimer.singleShot(100, self._trigger_publisher_jump)
+            
+    def _trigger_publisher_jump(self):
+        if hasattr(self, 'btn_pub_trigger'):
+            self.btn_pub_trigger.setFocus()
+            # Optional: auto-expand the sidecar? 
+            # If we click it, it expands. User said "Selects the publisher".
+            self.btn_pub_trigger.click()
+        
     def _init_ui(self):
         # ROOT LAYOUT: HBox [MainContainer] [SidecarContainer]
         self.root_layout = QHBoxLayout(self)
