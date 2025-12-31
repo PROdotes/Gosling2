@@ -57,7 +57,7 @@ QPushButton.SystemButton {
     max-height: 26px;
     padding: 0;
     border-radius: 8px;
-    font-size: 12pt;
+    font-size: 14pt;
 }
 QPushButton#CloseButton:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
@@ -154,7 +154,7 @@ QScrollBar::handle:vertical:hover {
     min-height: 8px;
     max-height: 8px;
     border-radius: 4px;
-    margin-right: 5px;
+    /* margin-right: 5px; REMOVED to let layout control spacing */
     background-color: transparent;
     border: 1px solid #333333;
 }

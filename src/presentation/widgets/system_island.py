@@ -45,3 +45,12 @@ class SystemIsland(QFrame):
         btn.setProperty("class", "SystemButton")
         btn.setGlowRadius(6)
         return btn
+
+    def update_maximize_icon(self, is_maximized: bool):
+        """Update the maximize button icon based on window state."""
+        if is_maximized:
+            self.btn_max.setText("❐") # Restore (Overlapping Squares)
+            self.btn_max.setToolTip("Restore Down")
+        else:
+            self.btn_max.setText("▢") # Maximize (Single Square)
+            self.btn_max.setToolTip("Maximize")

@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2025-12-24
 
 ### Added
+- **Split-Search Module**: Replaced singular 'WEB' button with a dedicated 'Affinity' module (Magnifier + Dropdown) for clearer separation of Search Action vs Provider Selection.
+- **Validation Feedback**: Hovering over the disabled 'PENDING' button now displays a specific checklist of missing fields or errors.
+- **Window State Logic**: Title bar icons now react to OS window state changes (Maximize/Restore).
+- **GlowFactory Refactor**: Split monolithic `glow_factory.py` into modular package `src/presentation/widgets/glow/`. ([T-47])
 - **GlowFactory Refactor (T-47)**:
     - **Modular Architecture**: Split monolithic `glow_factory.py` into `glow/` package (`base`, `button`, `line_edit`, `combo_box`, `led`).
     - **Visual Unity**: Unified interaction states (Amber Border on Hover/Focus) across Inputs and Buttons.

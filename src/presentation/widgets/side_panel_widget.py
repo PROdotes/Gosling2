@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QCheckBox, QComboBox, QScrollArea,
     QFrame, QSizePolicy, QPushButton, QMenu
 )
-from PyQt6.QtGui import QAction, QDesktopServices
+from PyQt6.QtGui import QAction, QDesktopServices, QIcon, QPixmap, QPainter, QColor, QFont, QPen
 from PyQt6.QtCore import Qt, pyqtSignal, QUrl
 from .glow_factory import GlowLineEdit, GlowButton
 import copy
@@ -94,7 +94,7 @@ class SidePanelWidget(QFrame):
         status_row = QWidget()
         status_layout = QHBoxLayout(status_row)
         status_layout.setContentsMargins(0, 0, 0, 0)
-        status_layout.setSpacing(8)
+        status_layout.setSpacing(3) # Tighten LED to Button
 
         self.btn_status = GlowButton("PENDING")
         self.btn_status.setObjectName("StatusPill")
@@ -112,20 +112,48 @@ class SidePanelWidget(QFrame):
         self.save_led.setProperty("state", "off")
         self.save_led.setToolTip("Rename/Move detected")
 
-        # Search Button (Restored Feature)
-        self.btn_web = GlowButton("WEB") # Short label
-        self.btn_web.setObjectName("WebSearchButton")
-        self.btn_web.setFixedWidth(50)
-        self.btn_web.setFixedHeight(32)
-        self.btn_web.setToolTip("Search Metadata (Right-click to switch provider)")
-        self.btn_web.clicked.connect(self._on_web_search)
-        self.btn_web.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.btn_web.customContextMenuRequested.connect(self._show_search_menu)
+        # T-82: Split-Search Module (The Affinity)
+        # Replaces single 'WEB' button with Action (Magnifier) | Gap | Menu (Arrow)
+        search_container = QWidget()
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(0) # Zero spacing for split-button look
+
+        # 1. Main Action Button (Magnifier) - Triggers Default Search
+        self.btn_search_action = GlowButton("🔍")
+        self.btn_search_action.setObjectName("WebSearchAction")
+        self.btn_search_action.setFixedWidth(42) 
+        self.btn_search_action.setFixedHeight(32)
+        # Split Pill: Flat Right Edge (small radius)
+        self.btn_search_action.set_radius_style(
+            "border-top-left-radius: 10px; border-bottom-left-radius: 10px; border-top-right-radius: 2px; border-bottom-right-radius: 2px;"
+        )
+        self.btn_search_action.setToolTip("Search Metadata") 
+        self.btn_search_action.clicked.connect(self._on_web_search)
+        # Allow right-click on main button to also switch provider (Power User feature)
+        self.btn_search_action.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.btn_search_action.customContextMenuRequested.connect(self._show_search_menu)
         
+        # 2. Menu Button (Arrow) - Select Provider
+        self.btn_search_menu = GlowButton("▼") 
+        self.btn_search_menu.setObjectName("WebSearchMenu")
+        self.btn_search_menu.setFixedWidth(24) 
+        self.btn_search_menu.setFixedHeight(32)
+        # Split Pill: Flat Left Edge (small radius)
+        self.btn_search_menu.set_radius_style(
+            "border-top-left-radius: 2px; border-bottom-left-radius: 2px; border-top-right-radius: 10px; border-bottom-right-radius: 10px;"
+        )
+        self.btn_search_menu.setToolTip("Select Search Provider")
+        self.btn_search_menu.clicked.connect(self._show_search_menu_btn)
+        
+        search_layout.addWidget(self.btn_search_action)
+        search_layout.addWidget(self.btn_search_menu)
+
         # T-81: Load saved provider
         self._search_provider = "Google"
         if hasattr(self.library_service, 'settings_manager'):
              self._search_provider = self.library_service.settings_manager.get_search_provider()
+             self.btn_search_action.setToolTip(f"Search Metadata via {self._search_provider}")
 
         # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
         self.lbl_projected_path = QLabel("", self) # Explicit parent to ensure overlay works (not top-level window)
@@ -136,7 +164,8 @@ class SidePanelWidget(QFrame):
         
         status_layout.addWidget(self.save_led)
         status_layout.addWidget(self.btn_status, 1)
-        status_layout.addWidget(self.btn_web)
+        status_layout.addSpacing(20) # Significant gap to separate Workflow from Tools
+        status_layout.addWidget(search_container)
 
         # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
         self.btn_status.setEnabled(False)
@@ -494,6 +523,16 @@ class SidePanelWidget(QFrame):
             
         edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, text))
         
+        # Affinity: Inline Search Action
+        if isinstance(edit, GlowLineEdit) and field_def.name not in ["is_done", "publisher", "isrc"]:
+            icons = self._get_magnifier_icons()
+            edit.add_inline_tool(
+                icons[0], # Normal
+                lambda checked=False, f=field_def: self._on_inline_search(f),
+                f"Search Web for {field_def.ui_header}",
+                icons[1]  # Hover
+            )
+        
         # Add ISRC validation (real-time text color feedback)
         if field_def.name == 'isrc':
             edit.textChanged.connect(lambda text: self._validate_isrc_field(edit, text))
@@ -783,49 +822,60 @@ class SidePanelWidget(QFrame):
         self.btn_status.style().polish(self.btn_status)
 
     def _validate_done_gate(self):
-        """Disable MARK DONE if required fields are missing in selection."""
+        """Disable MARK DONE if required fields are missing, showing why in tooltip."""
         if not self.current_songs:
             self.btn_status.setEnabled(False)
+            self.btn_status.setToolTip("")
             return
 
-        valid = True
+        missing_reasons = set()
+        
         for song in self.current_songs:
+            # 1. Check Required Single Fields
             for field in yellberus.FIELDS:
                 if field.required:
                     val = self._get_effective_value(song.source_id, field.name, getattr(song, field.model_attr or field.name, ""))
                     if val is None or str(val).strip() == "":
-                        valid = False
-                        break
-            if valid:
-            # Check Cross-Field Validation Groups (e.g. Unified Artist: Performer OR Group)
-                for group in yellberus.VALIDATION_GROUPS:
-                    if group.get("rule") == "at_least_one":
-                        fields = group.get("fields", [])
-                        has_any = False
-                        for field_name in fields:
-                            field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
-                            if not field_def: continue
-                            
-                            attr = field_def.model_attr or field_def.name
-                            val = self._get_effective_value(song.source_id, field_name, getattr(song, attr, ""))
-                            
-                            # Check for non-empty value (handle list and string)
-                            if val:
-                                if isinstance(val, list) and len(val) > 0: has_any = True
-                                elif isinstance(val, str) and val.strip(): has_any = True
-                                elif isinstance(val, (int, float, bool)): has_any = True
-                            
-                            if has_any: break
+                        # Add to set (deduplicates if multiple songs miss same field)
+                        missing_reasons.add(f"Missing: {field.ui_header}")
+
+            # 2. Check Validation Groups (e.g. Unified Artist)
+            for group in yellberus.VALIDATION_GROUPS:
+                if group.get("rule") == "at_least_one":
+                    fields = group.get("fields", [])
+                    has_any = False
+                    
+                    # Check each field in group
+                    for field_name in fields:
+                        field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
+                        if not field_def: continue
                         
-                        if not has_any:
-                            valid = False
-                            break
-            if not valid: break
+                        attr = field_def.model_attr or field_def.name
+                        val = self._get_effective_value(song.source_id, field_name, getattr(song, attr, ""))
+                        
+                        if val:
+                            if isinstance(val, list) and len(val) > 0: has_any = True
+                            elif isinstance(val, str) and val.strip(): has_any = True
+                            elif isinstance(val, (int, float, bool)): has_any = True
+                        
+                        if has_any: break
+                    
+                    if not has_any:
+                        # Improve group naming if possible
+                        group_name = " / ".join([str(f).title() for f in fields[:2]])
+                        missing_reasons.add(f"Required: {group_name}...")
+
+        # 3. ISRC Collision Check (Global state)
+        if self.isrc_collision:
+            missing_reasons.add("Duplicate ISRC Detected")
             
+        valid = len(missing_reasons) == 0
         self.btn_status.setEnabled(valid)
+        
         if not valid:
-             self.btn_status.setToolTip("Required fields or validation rules are missing.")
-             # Force visually disabled state if needed, but setEnabled handles most
+             # Sort for stability
+             reasons_list = "\n".join([f"• {r}" for r in sorted(list(missing_reasons))])
+             self.btn_status.setToolTip(f"Cannot Mark Ready:\n{reasons_list}")
         else:
              self.btn_status.setToolTip("Mark as Ready for Air")
 
@@ -1087,7 +1137,20 @@ class SidePanelWidget(QFrame):
             self.save_led.style().unpolish(self.save_led)
             self.save_led.style().polish(self.save_led)
 
+    def _show_search_menu_btn(self):
+        """Handle Left-Click on the Menu Button."""
+        # Show menu anchored to bottom-left of the menu button
+        p = self.btn_search_menu.mapToGlobal(self.btn_search_menu.rect().bottomLeft())
+        self._show_search_menu_internal(p)
+
     def _show_search_menu(self, pos):
+        """Handle Right-Click Context Menu on main button."""
+        # Show menu at mouse position (relative to widget)
+        p = self.btn_search_action.mapToGlobal(pos)
+        self._show_search_menu_internal(p)
+
+    def _show_search_menu_internal(self, global_pos):
+        """Shared Menu Builder."""
         menu = QMenu(self)
         providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
         
@@ -1114,12 +1177,14 @@ class SidePanelWidget(QFrame):
                     self.library_service.settings_manager.set_search_provider(name)
                     self.library_service.settings_manager.sync()
                 
-                # Update local variable
+                # Update local variable and tooltip
                 self._search_provider = name
+                self.btn_search_action.setToolTip(f"Search Metadata via {name}")
                 
             action.triggered.connect(set_provider)
             menu.addAction(action)
-        menu.exec(self.btn_web.mapToGlobal(pos))
+            
+        menu.exec(global_pos)
 
     def _on_web_search(self):
         if not self.current_songs: return
@@ -1203,14 +1268,89 @@ class SidePanelWidget(QFrame):
 
         if url:
             QDesktopServices.openUrl(QUrl(url))
+
+    def _get_search_url(self, provider, query_text):
+        """Helper to construct search URL based on provider."""
+        import urllib.parse
+        q_clean = urllib.parse.quote(query_text)
+        
+        if provider == "Google":
+             return f"https://www.google.com/search?q={q_clean}"
+        elif provider == "Spotify":
+             return f"https://open.spotify.com/search/{q_clean}"
+        elif provider == "YouTube":
+             return f"https://www.youtube.com/results?search_query={q_clean}"
+        elif provider == "MusicBrainz":
+             return f"https://musicbrainz.org/search?query={q_clean}&type=release&method=indexed"
+        elif provider == "Discogs":
+             return f"https://www.discogs.com/search/?q={q_clean}&type=release"
+        return ""
+
+    def _on_inline_search(self, field_def):
+        """Handle click on inline magnifier."""
+        if not self.current_songs: return
+        song = self.current_songs[0]
+        
+        # Get context from fields or model
+        artist = ""
+        if 'performers' in self._field_widgets: artist = self._field_widgets['performers'].text()
+        else: artist = getattr(song, 'performers', [""])[0] if getattr(song, 'performers', None) else ""
             
-            # Just hide the projected path to avoid visual clutter
-            self.lbl_projected_path.setVisible(False)
+        title = ""
+        if 'title' in self._field_widgets: title = self._field_widgets['title'].text()
+        else: title = getattr(song, 'title', "")
+
+        # 1. Determine Provider
+        provider = "Google"
+        if hasattr(self.library_service, 'settings_manager'):
+             provider = self.library_service.settings_manager.get_search_provider()
+        
+        # 2. Add Context if Google
+        base = f"{artist} {title}"
+        if provider == "Google":
+            query = f"{base} {field_def.ui_header}"
+        else:
+            query = base
             
-        # Clean up styles regardless of what happened
-        self.lbl_projected_path.style().unpolish(self.lbl_projected_path)
-        self.lbl_projected_path.style().polish(self.lbl_projected_path)
-        self.save_led.style().unpolish(self.save_led)
-        self.save_led.style().polish(self.save_led)
-        self.btn_save.style().unpolish(self.btn_save)
-        self.btn_save.style().polish(self.btn_save)
+        # 3. Launch
+        url = self._get_search_url(provider, query)
+        if url:
+             QDesktopServices.openUrl(QUrl(url))
+
+    def _get_magnifier_icons(self):
+        """Lazy create Start/Hover magnifier icons."""
+        if not hasattr(self, '_icons_magnifier'):
+            def draw_icon(color_str, glow=False):
+                # 20x20 to allow glow spill (icon is centered ~16x16)
+                pix = QPixmap(20, 20)
+                pix.fill(Qt.GlobalColor.transparent)
+                painter = QPainter(pix)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                
+                # Center offset
+                ox, oy = 2, 2
+                
+                if glow:
+                    # Glow Pass (Thick, Low Opacity)
+                    glow_color = QColor(color_str)
+                    glow_color.setAlpha(100)
+                    painter.setPen(QPen(glow_color, 4)) # Fat pen
+                    painter.setBrush(Qt.BrushStyle.NoBrush)
+                    painter.drawEllipse(ox+3, oy+3, 8, 8)
+                    painter.drawLine(ox+10, oy+10, ox+14, oy+14)
+                
+                # Sharp Pass
+                painter.setPen(QColor(color_str))
+                painter.setBrush(Qt.BrushStyle.NoBrush)
+                painter.drawEllipse(ox+3, oy+3, 8, 8)
+                painter.drawLine(ox+10, oy+10, ox+14, oy+14)
+                
+                painter.end()
+                return QIcon(pix)
+
+            # Return Tuple: (Normal, Hover)
+            # Normal: #CCCCCC (Light Grey)
+            # Hover: #FFC66D (Amber) with Glow
+            self._icons_magnifier = (draw_icon("#CCCCCC", glow=False), draw_icon("#FFC66D", glow=True))
+            
+        return self._icons_magnifier

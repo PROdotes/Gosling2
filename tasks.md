@@ -63,7 +63,7 @@ links: []
 | T-07 | **Logging Migration** | 3 | 2 | 6 | 📋 | — | [docs/LOGGING.md](docs/LOGGING.md) |
 | T-61 | **Universal Tag Picker** | 2 | 4 | 2 | 💡 | Core | Tree-based dialog for Tags (Genre/Mood/etc) with Color Pills. |
 | T-62 | **Async Background Save** | 2 | 3 | 2 | ⚡ | Perf | Move save/renaming operations to background thread to prevent UI freeze on bulk edits. |
-| T-82 | **Web Search Affinity** | 4 | 2 | 8 | 📋 | — | [prop](docs/proposals/PROPOSAL_WEB_SEARCH_AFFINITY.md) — Connect empty fields (Composer) to search button via inline icons/labels. |
+| T-82 | **Web Search Affinity** | 4 | 2 | 8 | ✅ | — | [prop](docs/proposals/PROPOSAL_WEB_SEARCH_AFFINITY.md) — Connect empty fields (Composer) to search button via inline icons/labels. |
 | T-83 | **Publisher Jump** | 4 | 2 | 8 | 📋 | — | [prop](docs/proposals/PROPOSAL_PUBLISHER_JUMP.md) — Allow editing album properties (Publisher) directly from Song view via jump-badge/link. |
 | T-63 | **Selectable Publisher Picker** | 2 | 2 | 2 | 🏢 | Core | Convert Publisher text input in Album Manager to a searchable picker/dropdown for data integrity. |
 | T-68 | **Background Import** | 5 | 4 | 10 | 📋 | — | Move file copy, zip extraction, and FFmpeg conversion to worker thread. Fixes UI freeze during large imports. |
@@ -91,6 +91,7 @@ links: []
 | T-45 | **Compilation Paradox** | 3 | 4 | 6 | 📋 | Renaming Service | Investigate/Solve handling of re-releases ("Best of") vs Original Year in folder structure to avoid duplicates/fragmentation. |
 | T-48 | **Duplicate Detection** | 5 | 3 | 12 | ✅ | [proposal](docs/proposals/PROPOSAL_DUPLICATE_DETECTION.md) |
 | T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
+| T-84 | **System SVGs** | 4 | 2 | 8 | 📋 | UI | Replace Unicode icons in TitleBar/SystemIsland with crisp SVGs. |
 | T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
 | T-66 | **Scrubber Window** | 4 | 3 | 12 | 💡 | — | Double-click (or modifier-click TBD) on library song opens floating scrubber window. Allows preview playback, timeline jumping, without affecting main playback. Like a mini-player popup. |
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | 📋 | — | Add cyber-glow effect to the count LCDs in the filter tree for consistent aesthetics. |

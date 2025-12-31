@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 from ..widgets.glow import GlowLED
 from PyQt6.QtGui import QFont, QColor
-from PyQt6.QtCore import pyqtSignal, QSize, QItemSelectionModel
+from PyQt6.QtCore import pyqtSignal, QSize, QItemSelectionModel, QEvent
 
 class ResizeGrip(QWidget):
     """Custom resize grip with visible triangle indicator"""
@@ -808,6 +808,13 @@ class MainWindow(QMainWindow):
             # Refresh components that might depend on root path or rules
             self.library_widget.load_library()
             # Renaming service is already linked to settings_manager
+
+    def changeEvent(self, event):
+        """Handle window state changes (Maximize/Restore) from OS or Buttons."""
+        if event.type() == QEvent.Type.WindowStateChange:
+            if hasattr(self, 'system_island'):
+                self.system_island.update_maximize_icon(self.isMaximized())
+        super().changeEvent(event)
 
     def resizeEvent(self, event):
         """Keep size grip in bottom-right corner"""

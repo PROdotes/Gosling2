@@ -1,5 +1,6 @@
-from PyQt6.QtWidgets import QLineEdit
-from PyQt6.QtCore import Qt, QEvent, QTimer
+from PyQt6.QtWidgets import QLineEdit, QPushButton
+from PyQt6.QtCore import Qt, QEvent, QTimer, QSize
+from PyQt6.QtGui import QIcon
 from .base import GlowWidget
 from .tooltip import ReviewTooltip
 
@@ -13,6 +14,61 @@ class GlowLineEdit(GlowWidget):
         # Preview capability
         self._preview_tip = None
         self._use_preview = False 
+        self._inline_tool = None # The optional button
+
+    def add_inline_tool(self, icon_normal: QIcon, callback, tooltip="", icon_hover: QIcon = None):
+        """Add a clickable tool button inside the widget (Right side)."""
+        if self._inline_tool: return # One tool max for now
+        
+        btn = QPushButton()
+        btn.setIcon(icon_normal)
+        btn.setIconSize(QSize(16, 16))
+        btn.setToolTip(tooltip)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFlat(True)
+        btn.setFixedWidth(24)
+        
+        # Style: Transparent (No Box)
+        btn.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+            }
+        """)
+        
+        btn.clicked.connect(callback)
+        
+        # Manual Hover Logic for Icon Swapping
+        if icon_hover:
+            # We must keep references to prevent GC? No, local is fine if captured
+            # But safer to store them on the button
+            btn._icon_normal = icon_normal
+            btn._icon_hover = icon_hover
+            
+            def on_enter(e):
+                btn.setIcon(btn._icon_hover)
+                
+            def on_leave(e):
+                btn.setIcon(btn._icon_normal)
+                
+            # Monkey Patch events (Simplest for dynamic widget)
+            # Alternatively use eventFilter, but this is direct
+            btn.enterEvent = on_enter
+            btn.leaveEvent = on_leave
+        
+        # Add to layout (After the edit)
+        # Note: GlowWidget uses QHBoxLayout. 
+        self.layout.addWidget(btn, 0)
+        self._inline_tool = btn
+        
+        # Auto-hide logic (Default: Show only when empty)
+        self.edit.textChanged.connect(self._check_tool_visibility)
+        # Check initial
+        self._check_tool_visibility(self.edit.text())
+        
+    def _check_tool_visibility(self, text):
+        if self._inline_tool:
+            self._inline_tool.setVisible(text == "") 
 
     def enable_overlay(self):
         """Turn on the Passive Preview mode."""

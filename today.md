@@ -24,8 +24,14 @@
 - **Solution Drafted**: T-83 Publisher Jump [prop](docs/proposals/PROPOSAL_PUBLISHER_JUMP.md)
 
 ## 🚧 Next Steps
-- **T-82: Web Search Affinity**: Implement UI cues to bridge the gap between empty fields and the search button.
-- **T-83: Publisher Jump**: Add interactive links/badges to allow editing album-level fields from the Side Panel.
+- [ ] **T-82: Web Search Affinity** (In Progress)
+  - [x] Restored Web Search Button (Split Module: Magnifier + Menu Arrow).
+  - [x] Implemented explicit validation feedback in PENDING button tooltip.
+  - [x] Fixed Maximize/Restore button icon state (SystemIsland).
+  - [x] **Implement "Affinity"** (Inline Magnifiers):
+        - Tech: Switched to `QPushButton` inside `GlowWidget`. Added custom Multi-Pass icon drawing to simulate "Glass Glow" effect (thick transparent stroke underlay).
+        - Interaction: Click triggers search. Special handling for Google context.
+- [ ] **T-83: Publisher Jump** (Side Panel -> Album Manager shortcut).ive links/badges to allow editing album-level fields from the Side Panel.
 
 ## ⚠️ Known Issues / Warnings
 - None currently active.

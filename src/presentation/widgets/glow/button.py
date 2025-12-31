@@ -41,6 +41,7 @@ class GlowButton(GlowWidget):
         self.btn_grid.addWidget(self.lbl_glow, 0, 0)
         self.btn_grid.addWidget(self.lbl_main, 0, 0)
         
+        self._radius_css = "border-radius: 10px;" # Default pill shape
         self._update_text_styles()
         
         self.btn.clicked.connect(self.clicked.emit)
@@ -55,6 +56,11 @@ class GlowButton(GlowWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self._on_toggled(self.btn.isChecked())
+
+    def set_radius_style(self, css_string):
+        """Override the default 10px border radius (e.g. for split buttons)."""
+        self._radius_css = css_string
+        self._update_text_styles()
 
     def _on_toggled(self, checked):
         if checked:
@@ -73,7 +79,7 @@ class GlowButton(GlowWidget):
         
         if not is_enabled:
             color = "#444444"
-            border_col = "#444444"
+            border_col = "#000000" # Black border for disabled state (recede)
         elif is_checked:
             color = self.glow_color
             border_col = self.glow_color
@@ -87,8 +93,8 @@ class GlowButton(GlowWidget):
         self.lbl_main.setStyleSheet(f"color: {color}; background: transparent; font-weight: bold;")
         self.lbl_glow.setStyleSheet(f"color: {self.glow_color}; background: transparent; font-weight: bold;")
         
-        # Dynamic Border with preserved rounded corners
-        self.btn.setStyleSheet(f"border: 1px solid {border_col}; border-radius: 10px;")
+        # Dynamic Border with custom or default radius
+        self.btn.setStyleSheet(f"border: 1px solid {border_col}; {self._radius_css}")
         
         if is_checked:
             self.lbl_glow.show()
