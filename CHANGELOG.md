@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased] - 2025-12-24
 
 ### Added
+- **GlowFactory Refactor (T-47)**:
+    - **Modular Architecture**: Split monolithic `glow_factory.py` into `glow/` package (`base`, `button`, `line_edit`, `combo_box`, `led`).
+    - **Visual Unity**: Unified interaction states (Amber Border on Hover/Focus) across Inputs and Buttons.
+    - **GlowLED**: Implemented dynamic status indicator component with property-driven animation.
+    - **Fixes**: Resolved Dropdown focus-dimming ("Sticky Glow"), Missing Arrow icons (Absolute Path), and "Clown Conflict" on colored buttons.
 - **T-55: The Chip Bay (Visuals)**:
     - Implemented "Pro Audio" aesthetic for Filter Chips (Chunky, Tactile, Gradient).
     - Added Semantic Coloring logic (Blue=Artist, Orange=Genre, Pink=Jingle, etc.).

@@ -30,7 +30,7 @@ def main() -> None:
                 qss = f.read()
                 # Harden Asset Paths: Ensure URLs are relative to the theme file, not CWD
                 base_dir = os.path.dirname(theme_path).replace("\\", "/")
-                qss = qss.replace("url(Gosling2/src/resources/", f"url({base_dir}/")
+                qss = qss.replace("url(src/resources/", f"url({base_dir}/")
                 app.setStyleSheet(qss)
     except Exception as e:
         print(f"Failed to load theme: {e}")

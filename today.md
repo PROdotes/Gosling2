@@ -11,6 +11,7 @@
 - [x] Standardized Album Manager selectors in `theme.qss`.
 - [x] Resolved "tiny jitter" in footer buttons during expansion.
 - [x] Refactored Magic Numbers into class constants for better maintenance.
+- [x] **GlowFactory Refactor**: Split monolithic `glow_factory.py` into modular package. Fixed visual regressions (dim inputs, clown buttons, missing arrows) and implemented `GlowLED`.
 
 ## 🗂️ Metadata Editor Friction Points (Design Log)
 
@@ -23,7 +24,6 @@
 - **Solution Drafted**: T-83 Publisher Jump [prop](docs/proposals/PROPOSAL_PUBLISHER_JUMP.md)
 
 ## 🚧 Next Steps
-- **GlowButton Analysis**: Verify if QSS sizing correctly propagates to the internal `QPushButton` in the 500-line `GlowButton` monster.
 - **T-82: Web Search Affinity**: Implement UI cues to bridge the gap between empty fields and the search button.
 - **T-83: Publisher Jump**: Add interactive links/badges to allow editing album-level fields from the Side Panel.
 

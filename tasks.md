@@ -45,6 +45,7 @@ links: []
 | T-02 | **Field Registry** | 5 | 4 | 10 | ✅ | [done/T-02_field_registry.md](docs/done/T-02_field_registry.md) |
 | T-15 | **Column Customization**| 4 | 2 | 8 | ✅ | [done/T-15_column_customization.md](docs/done/T-15_column_customization.md) |
 | T-38 | **Dynamic ID3 Write** | 5 | 3 | 10 | ✅ | [spec](docs/specs/T-38_DYNAMIC_ID3_WRITE.md) — Implemented via `FieldDef.id3_tag` in Yellberus (Python Source of Truth). JSON dependency removed.
+| T-47 | **GlowFactory Refactor** | 5 | 2 | 20 | ✅ | Split monolithic factory into modular `glow/` package. Implemented `GlowLED`. Unified border/glow logic for inputs and buttons.
 | T-49 | **Layout Conversion** | 5 | 4 | 20 | ✅ | [spec](docs/specs/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) — Transformation to Frameless Workstation. |
 | T-54 | **Surgical Right-Channel**| 5 | 3 | 15 | ✅ | [spec](docs/specs/T-54_VISUAL_ARCHITECTURE.md) — The Command Deck (Toggle Stack) with Tactical Transitions. |
 | T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | ✅ | Externalize hardcoded 'Patriotic/Cro' logic to config file. |

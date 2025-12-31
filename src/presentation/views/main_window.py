@@ -19,6 +19,7 @@ from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
 )
+from ..widgets.glow import GlowLED
 from PyQt6.QtGui import QFont, QColor
 from PyQt6.QtCore import pyqtSignal, QSize, QItemSelectionModel
 
@@ -116,8 +117,7 @@ class TerminalHeader(QFrame):
         layout.addStretch()
         
         # 4. THE LED (Status)
-        self.status_led = QFrame()
-        self.status_led.setFixedSize(8, 8)
+        self.status_led = GlowLED(color="#FFC66D", size=8)
         self.status_led.setObjectName("StatusLed")
         # Style moved to theme.qss
         
@@ -136,9 +136,7 @@ class TerminalHeader(QFrame):
         return btn
 
     def _on_prep_toggled(self, checked):
-        self.status_led.setProperty("active", checked)
-        self.status_led.style().unpolish(self.status_led)
-        self.status_led.style().polish(self.status_led)
+        self.status_led.setActive(checked)
 
 class MainWindow(QMainWindow):
     """Main application window"""

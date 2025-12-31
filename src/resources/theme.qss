@@ -78,7 +78,7 @@ QPushButton#CloseButton:hover {
 
 /* Amber Borders */
 /* Amber Borders */
-QLineEdit:focus, QTextEdit:focus, #GlowInput:focus {
+QLineEdit:focus, QTextEdit:focus, #GlowInput:focus, QComboBox[glowing="true"] {
     border: 1px solid #FFC66D;
 }
 /* Exclude QComboBox generally OR just enforce specific style for PlaybackDeck? 
@@ -197,11 +197,10 @@ QComboBox::drop-down {
     width: 20px;
 }
 
-QComboBox::arrow {
-    image: none; 
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid #FFC66D; /* Amber Triangle */
+QComboBox::down-arrow {
+    image: url(src/resources/arrow_down.svg);
+    width: 12px;
+    height: 12px;
     margin-right: 12px;
 }
 
