@@ -1,24 +1,21 @@
 
-# 2025-12-24 - Battle Plan (Night Session)
+# 2025-12-31 - Morning Session (The Cat Session)
 
 ## 📌 Context
-- **Side Panel (T-12) Completed**: Staged changes, Strict Validation, Selection Resilience.
-- **Repository Fixed**: `Notes`, `IsActive`, `Publisher`, `Genre` logic corrected.
-- **Critical Fix Applied**: `MetadataService.write_tags` FORCED to use `ID3v2.3` and `UTF-16` (encoding=1) to ensure visibility in Windows Explorer.
-    - **DO NOT REVERT THIS** unless you want invisible tags.
-- **Yellberus**: JSON dependency is DEAD. Python `FieldDef` is Source of Truth for ID3 mappings.
+- **Protocol Reset**: Implemented GOSLING VOW v5.3 (The Bone Version). Focused on "slow walk" partnership and anti-nag.
+- **Album Manager Refinement**: De-hammed the Python code by moving styling to QSS.
 
 ## ✅ Completed Today
-- [x] Trace "Notes don't save" bug (Fixed in Repo/Model).
-- [x] Trace "Tag Write Failure" (Fixed in MetadataService + Encoding).
-- [x] Document Validation Rules (Year, ISRC, Unified).
-- [x] Updated TASKS.md (T-12, T-38).
+- [x] Stripped `setStyleSheet`, `setFixedWidth`, and `setFixedSize` from `album_manager_dialog.py`.
+- [x] Implemented "Drawer Expansion" logic: Window grows by 300px when Publisher sidecar is toggled.
+- [x] Preserved Muscle Memory: Added a footer spacer to counteract button movement during expand.
+- [x] Standardized Album Manager selectors in `theme.qss`.
 
 ## 🚧 Next Steps
-1.  **T-04 Test Consolidation**: The test suite is still fragmented.
-2.  **T-06 Legacy Sync**: Album logic refinement.
-3.  **T-20 Bulk Edit**: Polishing the Side Panel for multi-selection awareness (already partially working).
+- **T-46 Polish**: Resolve the "tiny jitter" in footer buttons during expansion.
+- **Geometry Refactor**: Clean up the "Magic Numbers" (950, 1250, 300) introduced in `album_manager_dialog.py`.
+- **GlowButton Analysis**: Verify if QSS sizing correctly propagates to the internal `QPushButton` in the 500-line `GlowButton` monster.
 
 ## ⚠️ Known Issues / Warnings
-- **Composer/Lyricist Union**: `TCOM` tag includes Lyricists. This is intentional (Legacy Logic).
-- **ID3 Compatibility**: We are strictly V2.3/UTF-16 now. Usage of V2.4 is banned until further notice.
+- **Magic Numbers**: Layout dimensions are currently hardcoded in Python to ensure stability during the drawer toggle.
+- **Footer Jitter**: Buttons move slightly left on expansion; likely a margin/spacing mismatch.

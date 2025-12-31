@@ -58,7 +58,7 @@ class AlbumManagerDialog(QDialog):
         self.selected_pub_name = "" 
         
         self.setWindowTitle("Album Manager Workstation")
-        self.setFixedSize(1300, 650) # Widescreen Console
+        self.setMinimumSize(950, 650)
         self.setModal(True)
         self.setObjectName("AlbumManagerDialog")
         
@@ -113,7 +113,6 @@ class AlbumManagerDialog(QDialog):
         header_layout.addStretch()
         
         self.btn_create_new = GlowButton("Create New Album (+)")
-        self.btn_create_new.setFixedWidth(160) # Prevent clipping due to GlowButton empty-text layout issue
         self.btn_create_new.clicked.connect(self._start_create_new)
         header_layout.addWidget(self.btn_create_new)
         
@@ -126,10 +125,12 @@ class AlbumManagerDialog(QDialog):
         
         # 1. PANE Z: Context (Songs)
         self.pane_context = self._build_context_pane()
+        self.pane_context.setMinimumWidth(250)
         self.splitter.addWidget(self.pane_context)
         
         # 2. PANE A: Vault (Albums)
         self.pane_vault = self._build_vault_pane()
+        self.pane_vault.setMinimumWidth(250)
         self.splitter.addWidget(self.pane_vault)
         
         # 3. PANE B: Inspector (Editor)
@@ -140,11 +141,11 @@ class AlbumManagerDialog(QDialog):
         self.pane_sidecar = self._build_sidecar_pane()
         self.splitter.addWidget(self.pane_sidecar)
         
-        # Set initial stretch factors (20, 25, 30, 25)
-        self.splitter.setStretchFactor(0, 2)
-        self.splitter.setStretchFactor(1, 3)
-        self.splitter.setStretchFactor(2, 4)
-        self.splitter.setStretchFactor(3, 3)
+        # Set initial stretch factors: Anchors (0) | Inspector (1) | sidecar (0)
+        self.splitter.setStretchFactor(0, 0)
+        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setStretchFactor(2, 1)
+        self.splitter.setStretchFactor(3, 0)
         
         main_layout.addWidget(self.splitter)
         
@@ -153,6 +154,7 @@ class AlbumManagerDialog(QDialog):
         footer.setFixedHeight(60)
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(20,10,20,10)
+        footer_layout.setSpacing(10) # Constant spacing between buttons
         
         self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
@@ -160,20 +162,25 @@ class AlbumManagerDialog(QDialog):
         # Save Button (Moved to Global Footer for Stability)
         self.btn_save_inspector = GlowButton("Save Changes")
         self.btn_save_inspector.setObjectName("Primary")
-        self.btn_save_inspector.setFixedWidth(140)
         self.btn_save_inspector.setEnabled(False) # Initially disabled
         self.btn_save_inspector.clicked.connect(self._save_inspector)
 
         self.btn_select = GlowButton("Select Album")
         self.btn_select.setObjectName("Primary")
-        self.btn_select.setFixedWidth(140) # Fix clipping
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self._on_select_clicked)
+        
+        # Muscle Memory Spacer: Prevents buttons from jumping when Sidecar expands
+        # Subtract the right margin (20) and spacing (10) from the expansion delta (300)
+        self.footer_spacer = QWidget()
+        self.footer_spacer.setFixedWidth(290) # 300 expansion - 10 spacing
+        self.footer_spacer.hide()
         
         footer_layout.addWidget(self.btn_cancel)
         footer_layout.addStretch()
         footer_layout.addWidget(self.btn_save_inspector)
         footer_layout.addWidget(self.btn_select)
+        footer_layout.addWidget(self.footer_spacer)
         
         main_layout.addWidget(footer)
         
@@ -196,7 +203,7 @@ class AlbumManagerDialog(QDialog):
         # Header
         lbl = QLabel("  ALBUM CONTEXT")
         lbl.setFixedHeight(30)
-        lbl.setStyleSheet("color: #666; font-size: 10px; font-weight: bold; background: #080808; border-bottom: 1px solid #111;")
+        lbl.setObjectName("PaneHeaderLabel")
         layout.addWidget(lbl)
         
         self.list_context = QListWidget()
@@ -214,7 +221,7 @@ class AlbumManagerDialog(QDialog):
         
         # Search Bar Area
         search_box = QFrame()
-        search_box.setStyleSheet("background: #0b0b0b; padding: 6px;")
+        search_box.setObjectName("VaultSearchBox")
         sb_layout = QVBoxLayout(search_box)
         sb_layout.setContentsMargins(0,0,0,0)
         
@@ -281,6 +288,7 @@ class AlbumManagerDialog(QDialog):
     def _build_sidecar_pane(self):
         container = QFrame()
         container.setObjectName("PublisherSidecar")
+        container.setFixedWidth(300)
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0,0,0,0)
         
@@ -330,7 +338,9 @@ class AlbumManagerDialog(QDialog):
         # Enable Inspector
         self.pane_inspector.setEnabled(True)
         self.btn_save_inspector.setEnabled(True)
-        self.pane_inspector.setStyleSheet("border: 1px solid #ffaa00;") # Visual cue
+        self.pane_inspector.setProperty("state", "creating")
+        self.pane_inspector.style().unpolish(self.pane_inspector)
+        self.pane_inspector.style().polish(self.pane_inspector)
         self.inp_title.setFocus()
         
         # Smart Fill
@@ -374,7 +384,9 @@ class AlbumManagerDialog(QDialog):
         # 3. Enable UI
         self.pane_inspector.setEnabled(True)
         self.btn_save_inspector.setEnabled(True)
-        self.pane_inspector.setStyleSheet("") # Clear create cue
+        self.pane_inspector.setProperty("state", "") # Clear create cue
+        self.pane_inspector.style().unpolish(self.pane_inspector)
+        self.pane_inspector.style().polish(self.pane_inspector)
         self.btn_select.setEnabled(True)
         self.lbl_title.setText("EDITING ALBUM")
 
@@ -444,7 +456,13 @@ class AlbumManagerDialog(QDialog):
     def _toggle_sidecar(self):
         if self.pane_sidecar.isVisible():
             self.pane_sidecar.hide()
+            self.footer_spacer.hide()
+            self.setMinimumWidth(950)
+            self.resize(950, self.height())
         else:
+            self.setMinimumWidth(1250)
+            self.resize(1250, self.height())
+            self.footer_spacer.show()
             self.pane_sidecar.show()
             self.publisher_picker._refresh_list() # Ensure fresh data
             # Restore splitter size preference if needed

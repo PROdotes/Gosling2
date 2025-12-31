@@ -583,3 +583,32 @@ QPushButton#AlbumActionButton:hover {
     color: #FFC66D;
     border-left: 2px solid #FFC66D;
 }
+
+/* --- ALBUM MANAGER REFINEMENT (v2.1) --- */
+
+#AlbumManagerDialog {
+    min-width: 950px;
+    min-height: 650px;
+}
+
+#PaneHeaderLabel {
+    color: #666;
+    font-size: 10px;
+    font-weight: bold;
+    background: #080808;
+    border-bottom: 2px solid #111;
+}
+
+#VaultSearchBox {
+    background: #0b0b0b;
+    padding: 6px;
+}
+
+#DialogInspector[state="creating"] {
+    border: 1px solid #ffaa00;
+}
+
+/* Centralized Button Sizing for Dialogs */
+#AlbumManagerDialog GlowButton {
+    min-width: 140px;
+}
