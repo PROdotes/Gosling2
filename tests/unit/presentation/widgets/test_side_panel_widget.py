@@ -37,11 +37,18 @@ class TestSidePanelLogic:
         mock_song = MagicMock(spec=Song)
         mock_song.source_id = 999
         mock_song.name = "Duplicate Song"
+        mock_song.performers = ["Artist"]
+        mock_song.title = "Duplicate Song"
+        mock_song.unified_artist = "Artist"
         deps['duplicate_scanner'].check_isrc_duplicate.return_value = mock_song
         
         # Setup side panel with a DIFFERENT song (ID 1)
         current_song = MagicMock(spec=Song)
         current_song.source_id = 1
+        current_song.performers = ["Current Artist"]
+        current_song.title = "Current Track"
+        current_song.unified_artist = "Current Artist"
+        current_song.is_done = False
         side_panel.set_songs([current_song])
         
         widget = QLineEdit()
@@ -56,11 +63,19 @@ class TestSidePanelLogic:
         deps = mock_widget_deps
         mock_song = MagicMock(spec=Song)
         mock_song.source_id = 1
+        mock_song.name = "Same Song"
+        mock_song.performers = ["Artist"]
+        mock_song.title = "Same Song"
+        mock_song.unified_artist = "Artist"
         deps['duplicate_scanner'].check_isrc_duplicate.return_value = mock_song
         
         # Setup side panel with SAME song (ID 1)
         current_song = MagicMock(spec=Song)
         current_song.source_id = 1
+        current_song.performers = ["Artist"]
+        current_song.title = "Same Song"
+        current_song.unified_artist = "Artist"
+        current_song.is_done = False
         side_panel.set_songs([current_song])
         
         widget = QLineEdit()
@@ -87,7 +102,12 @@ class TestSidePanelLogic:
         # Mock DB value as 0 (Empty)
         mock_song = MagicMock(spec=Song)
         # Assuming Song fields are now property-based or dict-like
+        mock_song.source_id = 1
         mock_song.recording_year = 0
+        mock_song.performers = "Artist"
+        mock_song.title = "Title"
+        mock_song.unified_artist = "Artist"
+        mock_song.is_done = False
         deps['library_service'].get_song_by_id.return_value = mock_song
         
         # Store current songs to avoid attribute errors
@@ -108,6 +128,10 @@ class TestSidePanelLogic:
         # Setup mock song
         mock_song = MagicMock(spec=Song)
         mock_song.source_id = 1
+        mock_song.performers = "Artist"
+        mock_song.title = "Title"
+        mock_song.unified_artist = "Artist"
+        mock_song.is_done = False
         mock_widget_deps['library_service'].get_song_by_id.return_value = mock_song
         side_panel.current_songs = [mock_song]
         

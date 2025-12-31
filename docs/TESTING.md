@@ -126,6 +126,12 @@ A task is not **Done** when the code passes; it is Done when the directory is cl
     *   Files that meet Law 5's "May Skip" criteria (e.g., pure constants, abstract interfaces) must be explicitly added to `tools/test_audit.ignore`.
     *   **Rule**: Silent skipping is forbidden. You either Test it or Ignore it explicitly.
 
+### 9. The Law of Silence (No Interactivity)
+**Tests Wait for No One.**
+UI tests must be completely non-interactive. Any component that normally triggers a message box (`QMessageBox`) must be silenced in tests.
+*   **Protocol**: Use a `silence_popups` fixture (global or local) to patch `information`, `warning`, `critical`, and `question`.
+*   **Standard Mock**: `QMessageBox.question` should generally return `QMessageBox.StandardButton.Yes` to follow the "Happy Path" by default, unless test-specific behavior is needed.
+
 ---
 
 ## 🛡️ The "Yelling" Safety Net (Integrity)

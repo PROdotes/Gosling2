@@ -6,14 +6,17 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
-from ..widgets.glow_factory import GlowLineEdit, GlowButton
+from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
 from .publisher_manager_dialog import PublisherPickerWidget
+from ...data.repositories.publisher_repository import PublisherRepository
 
 class AlbumManagerDialog(QDialog):
     """
     T-46: Proper Album Editor (The Workstation)
     A 4-pane console for managing albums, their metadata, and publishers.
     Layout: [Context (Songs)] | [Vault (Albums)] | [Inspector (Edit)] | [Sidecar (Publisher)]
+    
+    Refactor T-63: Layout split into HBox[MainContainer, Sidecar] to prevent button jumping.
     """
     
     # Returns the selected/created Album ID and Name
@@ -28,32 +31,20 @@ class AlbumManagerDialog(QDialog):
         self.staged_deletions = staged_deletions or set()
         
         # Determine if the initial title is valid (exists in DB)
-        # If I open the dialog on a song that says "Wheels", but the DB knows "Wheels" 
-        # was renamed to "Greatest Hits", searching "Wheels" will yield nothing (or the wrong thing).
-        # Wait, if "Wheels" was renamed efficiently, the song's metadata in the SidePanel 
-        # might still say "Wheels" (stale UI), so we pass "Wheels" in.
-        # But "Wheels" album doesn't exist anymore.
-        # So we should probably check if this search term yields results. If not, clear it.
-        
-        # T-46 Fix: Prefer ID lookup to prevent Stale Title Ghosting
-        # If we have an ID, we trust the DB's current title for that ID, ignoring whatever text was passed.
         aid = self.initial_data.get('album_id')
         if aid:
              fresh_album = self.album_repo.get_by_id(aid)
              if fresh_album:
                   self.initial_data['title'] = fresh_album.title
-                  # Also helpful:
                   self.current_album = fresh_album
 
         target = self.initial_data.get('title', '')
         if target:
-             # Quick check: Does this title exist?
              hits = self.album_repo.search(target)
-             if not hits:
-                 pass
 
         # State
-        self.current_album = None # The album object currently loaded in Inspector
+        if not hasattr(self, 'current_album'):
+            self.current_album = None # The album object currently loaded in Inspector
         self.is_creating_new = False # Flag for "Create New" mode
         self.selected_pub_name = "" 
         
@@ -65,47 +56,52 @@ class AlbumManagerDialog(QDialog):
         self._init_ui()
         
     def _init_ui(self):
-        main_layout = QVBoxLayout(self)
+        # ROOT LAYOUT: HBox [MainContainer] [SidecarContainer]
+        self.root_layout = QHBoxLayout(self)
+        self.root_layout.setContentsMargins(0,0,0,0)
+        self.root_layout.setSpacing(0)
+        
+        # --- LEFT: MAIN CONTAINER ---
+        self.main_container = QFrame()
+        self.main_container.setMinimumWidth(950)
+        main_layout = QVBoxLayout(self.main_container)
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0,0,0,0)
         
         # --- TOP HEADER ---
         header = QFrame()
         header.setFixedHeight(50)
-        header.setObjectName("DialogHeader") # Add styling later if needed
+        header.setMaximumWidth(950) # Lock width to prevent jump
+        header.setObjectName("DialogHeader") 
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(20,0,20,0)
+        header_layout.setSpacing(10) 
         
         self.lbl_title = QLabel("ALBUM CONSOLE")
-        self.lbl_title.setObjectName("DialogHeaderTitle") # Use existing style
+        self.lbl_title.setObjectName("DialogHeaderTitle") 
+        self.lbl_title.setFixedWidth(200) # Compact fixed width
         header_layout.addWidget(self.lbl_title)
         
         # Context Display (Song currently being worked on)
         song_display = self.initial_data.get('song_display')
         if song_display:
             parts = song_display.split(" - ", 1)
-            
-            # Separator
             sep = QLabel("|")
             sep.setObjectName("HeaderContextSep")
             header_layout.addWidget(sep)
             
             if len(parts) == 2:
                 artist, title = parts
-                
                 lbl_artist = QLabel(artist)
                 lbl_artist.setObjectName("HeaderArtistLabel")
                 header_layout.addWidget(lbl_artist)
-                
-                lbl_dash = QLabel("-") # Visual hyphen
+                lbl_dash = QLabel("-") 
                 lbl_dash.setObjectName("HeaderDash")
                 header_layout.addWidget(lbl_dash)
-                
                 lbl_title_song = QLabel(title)
                 lbl_title_song.setObjectName("HeaderTitleLabel") 
                 header_layout.addWidget(lbl_title_song)
             else:
-                # Fallback
                 lbl_full = QLabel(song_display)
                 lbl_full.setObjectName("HeaderTitleLabel")
                 header_layout.addWidget(lbl_full)
@@ -113,7 +109,7 @@ class AlbumManagerDialog(QDialog):
         header_layout.addStretch()
         
         self.btn_create_new = GlowButton("Create New Album (+)")
-        self.btn_create_new.clicked.connect(self._start_create_new)
+        self.btn_create_new.clicked.connect(self._toggle_create_mode)
         header_layout.addWidget(self.btn_create_new)
         
         main_layout.addWidget(header)
@@ -137,52 +133,49 @@ class AlbumManagerDialog(QDialog):
         self.pane_inspector = self._build_inspector_pane()
         self.splitter.addWidget(self.pane_inspector)
         
-        # 4. PANE C: Sidecar (Publisher)
-        self.pane_sidecar = self._build_sidecar_pane()
-        self.splitter.addWidget(self.pane_sidecar)
-        
-        # Set initial stretch factors: Anchors (0) | Inspector (1) | sidecar (0)
         self.splitter.setStretchFactor(0, 0)
         self.splitter.setStretchFactor(1, 0)
         self.splitter.setStretchFactor(2, 1)
-        self.splitter.setStretchFactor(3, 0)
         
         main_layout.addWidget(self.splitter)
         
         # --- FOOTER ---
         footer = QFrame()
+        footer.setObjectName("DialogFooter")
         footer.setFixedHeight(60)
+        footer.setMaximumWidth(950) # Lock width to prevent jump
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(20,10,20,10)
-        footer_layout.setSpacing(10) # Constant spacing between buttons
+        footer_layout.setSpacing(10) 
         
         self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
         
-        # Save Button (Moved to Global Footer for Stability)
         self.btn_save_inspector = GlowButton("Save Changes")
         self.btn_save_inspector.setObjectName("Primary")
         self.btn_save_inspector.setEnabled(False) # Initially disabled
         self.btn_save_inspector.clicked.connect(self._save_inspector)
 
-        self.btn_select = GlowButton("Select Album")
+        self.btn_select = GlowButton("Accept Changes")
         self.btn_select.setObjectName("Primary")
         self.btn_select.setEnabled(False)
         self.btn_select.clicked.connect(self._on_select_clicked)
-        
-        # Muscle Memory Spacer: Prevents buttons from jumping when Sidecar expands
-        # Subtract the right margin (20) and spacing (10) from the expansion delta (300)
-        self.footer_spacer = QWidget()
-        self.footer_spacer.setFixedWidth(290) # 300 expansion - 10 spacing
-        self.footer_spacer.hide()
         
         footer_layout.addWidget(self.btn_cancel)
         footer_layout.addStretch()
         footer_layout.addWidget(self.btn_save_inspector)
         footer_layout.addWidget(self.btn_select)
-        footer_layout.addWidget(self.footer_spacer)
         
         main_layout.addWidget(footer)
+        
+        # Add Main to Root
+        self.root_layout.addWidget(self.main_container, 1) # Stretch factor 1
+        
+        # --- RIGHT: SIDECAR CONTAINER ---
+        self.pane_sidecar = self._build_sidecar_pane()
+        self.pane_sidecar.hide() # Hidden by default
+        self.root_layout.addWidget(self.pane_sidecar, 0) # Fixed width
+        
         
         # Initial Load
         title_to_find = self.initial_data.get('title', '')
@@ -247,38 +240,38 @@ class AlbumManagerDialog(QDialog):
         container.setObjectName("DialogInspector")
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20,20,20,20)
-        layout.setSpacing(15)
+        layout.setSpacing(0)  # Zero spacing - manual control like side panel
         
-        # Form Fields
+        # Form Fields (use FieldLabel for tight label-to-input proximity)
         self.inp_title = self._add_field(layout, "Album Title *")
+        layout.addSpacing(12)  # Consistent gap between field groups
         self.inp_artist = self._add_field(layout, "Album Artist")
+        layout.addSpacing(12)
         self.inp_year = self._add_field(layout, "Release Year")
+        layout.addSpacing(12)
         
         # Publisher Trigger
         lbl_pub = QLabel("PUBLISHER")
-        lbl_pub.setObjectName("DialogFieldLabel")
+        lbl_pub.setObjectName("FieldLabel")  # Use same class as side panel
         layout.addWidget(lbl_pub)
         
         self.btn_pub_trigger = GlowButton("(None)")
         self.btn_pub_trigger.setObjectName("PublisherPickerButton")
         self.btn_pub_trigger.clicked.connect(self._toggle_sidecar)
         layout.addWidget(self.btn_pub_trigger)
+        layout.addSpacing(12)  # Consistent gap between field groups
         
         # Type Dropdown
         lbl_type = QLabel("RELEASE TYPE")
-        lbl_type.setObjectName("DialogFieldLabel")
+        lbl_type.setObjectName("FieldLabel")  # Use same class as side panel
         layout.addWidget(lbl_type)
         
-        self.cmb_type = QComboBox()
+        self.cmb_type = GlowComboBox()
+        self.cmb_type.setEditable(False)  # Fixed list, not searchable
         self.cmb_type.addItems(["Album", "EP", "Single", "Compilation", "Anthology"])
         layout.addWidget(self.cmb_type)
         
         layout.addStretch()
-        
-        # Save Actions moved to Footer
-        # btn_bar = QHBoxLayout()
-        # ... removed ...
-        # layout.addLayout(btn_bar)
         
         # Disable by default
         container.setEnabled(False)
@@ -292,7 +285,7 @@ class AlbumManagerDialog(QDialog):
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0,0,0,0)
         
-        from ...data.repositories.publisher_repository import PublisherRepository
+        # from ...data.repositories.publisher_repository import PublisherRepository
         pub_repo = PublisherRepository(self.album_repo.db_path)
         
         self.publisher_picker = PublisherPickerWidget(pub_repo, self)
@@ -300,16 +293,11 @@ class AlbumManagerDialog(QDialog):
         
         layout.addWidget(self.publisher_picker)
         
-        # Initially Hidden in logic? No, just hidden via collapse or width?
-        # For this design, let's keep it visible but maybe collapsible later.
-        # Or start with simple visibility toggle.
-        container.hide() # Hidden until trigger clicked
-        
         return container
 
     def _add_field(self, layout, label):
         lbl = QLabel(label.upper())
-        lbl.setObjectName("DialogFieldLabel")
+        lbl.setObjectName("FieldLabel")  # Same as side panel for tight proximity
         inp = GlowLineEdit()
         layout.addWidget(lbl)
         layout.addWidget(inp)
@@ -317,20 +305,26 @@ class AlbumManagerDialog(QDialog):
 
     # --- LOGIC ---
 
+    def _toggle_create_mode(self):
+        if self.is_creating_new:
+            self._cancel_create_new()
+        else:
+            self._start_create_new()
+
     def _start_create_new(self):
+        # Save state
+        curr = self.list_vault.currentItem()
+        self.last_selected_id = curr.data(Qt.ItemDataRole.UserRole) if curr else None
+        
         self.is_creating_new = True
         self.current_album = None
+        self.btn_create_new.setText("Cancel Creating (x)")
+        self.btn_create_new.setObjectName("CancelButton") 
+        self.btn_create_new.style().unpolish(self.btn_create_new)
+        self.btn_create_new.style().polish(self.btn_create_new)
         
         # Clear Selection
         self.list_vault.clearSelection()
-        
-        # Clear Inspector
-        self.inp_title.clear()
-        self.inp_artist.clear()
-        self.inp_year.clear()
-        self.cmb_type.setCurrentText("Single")
-        self.btn_pub_trigger.setText("(None)")
-        self.selected_pub_name = ""
         
         # Clear Context
         self.list_context.clear()
@@ -341,8 +335,17 @@ class AlbumManagerDialog(QDialog):
         self.pane_inspector.setProperty("state", "creating")
         self.pane_inspector.style().unpolish(self.pane_inspector)
         self.pane_inspector.style().polish(self.pane_inspector)
-        self.inp_title.setFocus()
         
+        # Reset Fields Logic + Ghost Styling
+        inputs = [self.inp_title, self.inp_artist, self.inp_year]
+        for inp in inputs:
+            inp.clear()
+            inp.edit.setStyleSheet("color: #666;") # Ghost color (Darker)
+            # Disconnect previous temporary slots if any (complex in PyQt, simple approach: unique connection)
+            try: inp.edit.textEdited.disconnect(self._ungrey_text)
+            except: pass
+            inp.edit.textEdited.connect(self._ungrey_text)
+
         # Smart Fill
         if self.initial_data.get('title'):
             self.inp_title.setText(self.initial_data.get('title'))
@@ -350,12 +353,58 @@ class AlbumManagerDialog(QDialog):
             self.inp_artist.setText(self.initial_data.get('artist'))
         if self.initial_data.get('year'):
             self.inp_year.setText(str(self.initial_data.get('year')))
+            
+        self.cmb_type.setCurrentText("Single")
+        self.btn_pub_trigger.setText("(None)")
+        self.selected_pub_name = ""
         
-        self.btn_select.setEnabled(False) # Can't select valid album yet
-        self.lbl_title.setText("CREATING NEW ALBUM")
+        self.inp_title.setFocus()
+        self.btn_select.setEnabled(False) 
+        self.lbl_title.setText("CREATING ALBUM")
+
+    def _cancel_create_new(self):
+        self.is_creating_new = False
+        self.btn_create_new.setText("Create New Album (+)")
+        self.btn_create_new.setObjectName("GlowButton") # Reset style
+        self.btn_create_new.style().unpolish(self.btn_create_new)
+        self.btn_create_new.style().polish(self.btn_create_new)
+        
+        # Ungrey fields
+        inputs = [self.inp_title, self.inp_artist, self.inp_year]
+        for inp in inputs:
+            inp.edit.setStyleSheet("")
+            try: inp.edit.textEdited.disconnect(self._ungrey_text)
+            except: pass
+
+        if self.last_selected_id:
+            # Restore selection
+            self._refresh_vault() # Ensure list is fresh
+            # Find item
+            for i in range(self.list_vault.count()):
+                item = self.list_vault.item(i)
+                if item.data(Qt.ItemDataRole.UserRole) == self.last_selected_id:
+                    self.list_vault.setCurrentItem(item)
+                    self._on_vault_item_clicked(item)
+                    return
+        
+        # If no previous selection, just disable inspector
+        self.pane_inspector.setEnabled(False)
+        self.lbl_title.setText("ALBUM CONSOLE")
+        
+    def _ungrey_text(self):
+        sender = self.sender()
+        if sender:
+            sender.setStyleSheet("")
 
     def _on_vault_item_clicked(self, item):
-        self.is_creating_new = False
+        # Reset Create Button if we were creating
+        if self.is_creating_new:
+             self.is_creating_new = False
+             self.btn_create_new.setText("Create New Album (+)")
+             # Reset ghost styling
+             for inp in [self.inp_title, self.inp_artist, self.inp_year]:
+                 inp.edit.setStyleSheet("")
+        
         album_id = item.data(Qt.ItemDataRole.UserRole)
         self.current_album = self.album_repo.get_by_id(album_id)
         
@@ -370,7 +419,11 @@ class AlbumManagerDialog(QDialog):
         if not db_artist and self.initial_data.get('artist'):
             db_artist = self.initial_data.get('artist')
         self.inp_artist.setText(db_artist or "")
-        self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
+        # Smart Fill Year
+        db_year = self.current_album.release_year
+        if not db_year and self.initial_data.get('year'):
+            db_year = self.initial_data.get('year')
+        self.inp_year.setText(str(db_year) if db_year else "")
         self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
         
         # Publisher
@@ -410,15 +463,6 @@ class AlbumManagerDialog(QDialog):
             self.list_context.addItem(display)
 
     def _refresh_vault(self, query=None):
-        # Always prefer current search text if query is not explicitly provided
-        # Or even if it is? The issue described ("it was still saying wheels") implies 
-        # the list didn't update to reflect the NEW title because the search query 
-        # (old title) was still filtering it?
-        
-        # If we just saved "Wheels" -> "Greatest Hits", but the search box still says "Wheels",
-        # the list will show nothing (or the old cached view?).
-        
-        # Let's trust the search box.
         if query is None:
             query = self.txt_search.text()
             
@@ -456,17 +500,15 @@ class AlbumManagerDialog(QDialog):
     def _toggle_sidecar(self):
         if self.pane_sidecar.isVisible():
             self.pane_sidecar.hide()
-            self.footer_spacer.hide()
             self.setMinimumWidth(950)
             self.resize(950, self.height())
         else:
+            self.pane_sidecar.show()
             self.setMinimumWidth(1250)
             self.resize(1250, self.height())
-            self.footer_spacer.show()
-            self.pane_sidecar.show()
-            self.publisher_picker._refresh_list() # Ensure fresh data
-            # Restore splitter size preference if needed
-
+            self.publisher_picker._refresh_list()
+            self.publisher_picker.select_publisher_by_name(self.selected_pub_name)
+            
     def _on_publisher_selected(self, pub_id, pub_name):
         self.selected_pub_name = pub_name
         self.btn_pub_trigger.setText(pub_name)
@@ -545,5 +587,35 @@ class AlbumManagerDialog(QDialog):
         self.accept()
 
     def _show_vault_context_menu(self, pos):
-        # Reuse existing delete logic if needed, simplified for brevity here
-        pass
+        item = self.list_vault.itemAt(pos)
+        if not item: return
+        
+        menu = QMenu(self)
+        del_act = QAction("Delete Album", self)
+        del_act.triggered.connect(self._on_delete)
+        menu.addAction(del_act)
+        
+        menu.exec(self.list_vault.mapToGlobal(pos))
+
+    def _on_delete(self):
+        item = self.list_vault.currentItem()
+        if not item: return
+        
+        album_id = item.data(Qt.ItemDataRole.UserRole)
+        album = self.album_repo.get_by_id(album_id)
+        if not album: return
+        
+        if QMessageBox.question(self, "Delete Album", 
+                                f"Are you sure you want to delete '{album.title}'?\nThis will unlink all songs.") == QMessageBox.StandardButton.Yes:
+            if self.album_repo.delete_album(album_id):
+                # If we deleted the current one, clear inspector
+                if self.current_album and self.current_album.album_id == album_id:
+                    self.current_album = None
+                    self.current_id = None
+                    self.inp_title.clear()
+                    self.inp_artist.clear()
+                    self.inp_year.clear()
+                    self.btn_pub_trigger.setText("(None)")
+                    self.pane_inspector.setEnabled(False)
+                
+                self._refresh_vault()

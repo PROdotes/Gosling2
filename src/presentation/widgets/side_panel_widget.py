@@ -10,7 +10,7 @@ from .glow_factory import GlowLineEdit, GlowButton
 import copy
 import os
 from ...core import yellberus
-from ..dialogs.album_manager_dialog import AlbumManagerDialog
+# from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
 
 class SidePanelWidget(QFrame):
     """
@@ -128,20 +128,21 @@ class SidePanelWidget(QFrame):
              self._search_provider = self.library_service.settings_manager.get_search_provider()
 
         # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
-        self.lbl_projected_path = QLabel("")
+        self.lbl_projected_path = QLabel("", self) # Explicit parent to ensure overlay works (not top-level window)
         self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
         self.lbl_projected_path.setWordWrap(True)
         self.lbl_projected_path.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_projected_path.setVisible(False)
         
-        status_layout.addWidget(self.btn_status, 1)
         status_layout.addWidget(self.save_led)
+        status_layout.addWidget(self.btn_status, 1)
         status_layout.addWidget(self.btn_web)
 
         # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
         self.btn_status.setEnabled(False)
-        footer_main_layout.addWidget(self.lbl_projected_path) # Above status
         footer_main_layout.addWidget(status_row)
+        # lbl_projected_path is now an overlay managed in eventFilter, not added to layout
+
 
         # Button Row (Discard / Save)
         button_row = QWidget()
@@ -517,6 +518,7 @@ class SidePanelWidget(QFrame):
                 'song_display': f"{song.performers[0] if song.performers else 'Unknown'} - {song.title}"
             }
 
+        from ..dialogs.album_manager_dialog import AlbumManagerDialog
         dlg = AlbumManagerDialog(
             self.album_repo, initial_data, self, 
             staged_deletions=self._hidden_album_ids
@@ -658,11 +660,13 @@ class SidePanelWidget(QFrame):
         
         # Empty is valid (ISRC is optional)
         if not text or not text.strip():
+            self.isrc_collision = False
             widget.setProperty("invalid", False)
             widget.setToolTip("")
         
         # 1. Validate Format
         elif not validate_isrc(text):
+            self.isrc_collision = False
             widget.setProperty("invalid", True)
             widget.setToolTip("Invalid ISRC Format")
         
@@ -681,10 +685,12 @@ class SidePanelWidget(QFrame):
                     widget.setProperty("warning", True)
                     widget.setToolTip(f"Duplicate ISRC found: {duplicate.name}")
                 else:
+                    self.isrc_collision = False
                     widget.setProperty("invalid", False)
                     widget.setProperty("warning", False)
                     widget.setToolTip("")
             else:
+                self.isrc_collision = False
                 widget.setProperty("invalid", False)
                 widget.setProperty("warning", False)
                 widget.setToolTip("")
@@ -950,14 +956,31 @@ class SidePanelWidget(QFrame):
                 item.widget().deleteLater()
 
     def eventFilter(self, source, event):
-        from PyQt6.QtCore import QEvent
+        from PyQt6.QtCore import QEvent, QPoint
         if source == self.btn_status:
             if event.type() == QEvent.Type.Enter:
-                # Reveal path on hover if it exists
+                # Reveal path on hover as an Overlay (Absolute Position)
                 if self.lbl_projected_path.text():
+                    # Calculate coordinates
+                    btn_pos = self.btn_status.mapTo(self, QPoint(0, 0))
+                    target_width = self.width() - 20
+                    
+                    self.lbl_projected_path.setFixedWidth(target_width)
+                    self.lbl_projected_path.adjustSize()
+                    target_height = self.lbl_projected_path.height()
+                    
+                    # Ensure it didn't collapse (sanity check)
+                    if target_height < 30: target_height = 30
+                    self.lbl_projected_path.setFixedHeight(target_height)
+                    
+                    target_y = btn_pos.y() - target_height - 5
+                    self.lbl_projected_path.move(10, target_y)
+                    
+                    self.lbl_projected_path.raise_()
                     self.lbl_projected_path.setVisible(True)
+                    
             elif event.type() == QEvent.Type.Leave:
-                # Always hide on leave. The LED handles the persistent alert now.
+                # Always hide on leave
                 self.lbl_projected_path.setVisible(False)
         return super().eventFilter(source, event)
 

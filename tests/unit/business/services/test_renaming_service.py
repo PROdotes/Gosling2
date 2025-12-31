@@ -1,7 +1,7 @@
 
 import pytest
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 from src.business.services.renaming_service import RenamingService
 from src.data.models.song import Song
 
@@ -9,10 +9,12 @@ from src.data.models.song import Song
 @pytest.fixture
 def mock_song():
     song = MagicMock(spec=Song)
+    # Configure as instance attributes
     song.unified_artist = "Logic Boys"
     song.title = "Algorithmic Beats"
     song.year = "2024"
     song.genre = "Techno"
+    song.bpm = 120
     # Use generic path based on OS sep
     song.path = os.path.join("music", "incoming", "random_file.mp3")
     return song
@@ -21,7 +23,8 @@ def mock_song():
 def service():
     # Mock SettingsManager
     settings_mock = MagicMock()
-    settings_mock.get_renaming_pattern.return_value = "{Genre}/{Year}/{Artist} - {Title}.mp3"
+    # Fix method name: get_rename_pattern, not get_renaming_pattern
+    settings_mock.get_rename_pattern.return_value = "{Genre}/{Year}/{Artist} - {Title}.mp3"
     # Use generic root
     settings_mock.get_root_directory.return_value = os.path.join("music", "library")
     

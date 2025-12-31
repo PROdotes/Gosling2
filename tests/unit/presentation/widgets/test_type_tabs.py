@@ -62,9 +62,9 @@ def test_pills_initialization(library_widget):
     pill_group = library_widget.pill_group
     assert len(pill_group.buttons()) == 6
     # Shorthand + counts from fixture (6 total, 1 Music, 1 Jingle)
-    assert pill_group.button(0).text() == "ALL (6)"
-    assert pill_group.button(1).text() == "MUS (1)"
-    assert pill_group.button(2).text() == "JIN (1)"
+    assert library_widget.category_glow_btns[0].text() == "ALL (6)"
+    assert library_widget.category_glow_btns[1].text() == "MUS (1)"
+    assert library_widget.category_glow_btns[2].text() == "JIN (1)"
 
 def test_pill_counts_logic(library_widget):
     """Verify that counts are calculated (internal state check)."""

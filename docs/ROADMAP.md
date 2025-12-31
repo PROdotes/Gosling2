@@ -109,6 +109,7 @@ tags:
 - [ ] [**T-80 Smart Preview Pattern**](tasks/T-80_smart_preview_pattern.md): Generalize the "Passive Preview" (tooltip with list view + click-to-jump) to all linked DB fields.
 - [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
 *   [ ] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
+*   [ ] **UX Issue**: "Create New Album" button in Album Manager is confusing for users. Redesign needed.
 
 ---
 

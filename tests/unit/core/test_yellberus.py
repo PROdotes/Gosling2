@@ -82,35 +82,37 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching current FIELDS order (21 columns):
+    # Create a mock row matching current FIELDS order (23 columns):
     row = (
         "Artist",          # 0: performers
         "Group",           # 1: groups
         "Unified",         # 2: unified_artist
         "Title",           # 3: title
         "Album",           # 4: album
-        "Composer",        # 5: composers
-        "Publisher",       # 6: publisher
-        2024,              # 7: recording_year
-        "Genre",           # 8: genre
-        "ISRC123",         # 9: isrc
-        180,               # 10: duration
-        "Producer",        # 11: producers
-        "Lyricist",        # 12: lyricists
-        "Album Artist",    # 13: album_artist
-        "Notes",           # 14: notes
-        False,             # 15: is_done
-        "/path",           # 16: path
-        1,                 # 17: file_id
-        1,                 # 18: type_id
-        120,               # 19: bpm
-        True,              # 20: is_active
+        123,               # 5: album_id (NEW)
+        "Composer",        # 6: composers
+        "Publisher",       # 7: publisher
+        2024,              # 8: recording_year
+        "Genre",           # 9: genre
+        "ISRC123",         # 10: isrc
+        180,               # 11: duration
+        "Producer",        # 12: producers
+        "Lyricist",        # 13: lyricists
+        "Album Artist",    # 14: album_artist
+        "Notes",           # 15: notes
+        False,             # 16: is_done
+        "/path",           # 17: path
+        1,                 # 18: file_id
+        1,                 # 19: type_id
+        120,               # 20: bpm
+        True,              # 21: is_active
+        "abc",             # 22: audio_hash (NEW)
     )
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 21 tuples
-    assert len(tagged) == 21
+    # Should have 23 tuples
+    assert len(tagged) == 23
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -124,29 +126,31 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    # Row matching current FIELDS order (21 columns)
+    # Row matching current FIELDS order (23 columns)
     row = (
         "Artist 1, Artist 2", # 0: performers
         "Test Group",      # 1: groups
         "Unified Artist",  # 2: unified_artist
         "Test Song",       # 3: title
         "Test Album",      # 4: album
-        "Bach",            # 5: composers
-        "Test Publisher",  # 6: publisher
-        2024,              # 7: recording_year
-        "Test Genre",      # 8: genre
-        "USMV123",         # 9: isrc
-        200,               # 10: duration
-        "Test Producer",   # 11: producers
-        "Test Lyricist",   # 12: lyricists
-        "Test Album Artist", # 13: album_artist
-        None,              # 14: notes
-        True,              # 15: is_done
-        "/music/test.mp3", # 16: path
-        1,                 # 17: file_id
-        1,                 # 18: type_id
-        128,               # 19: bpm
-        True,              # 20: is_active
+        123,               # 5: album_id
+        "Bach",            # 6: composers
+        "Test Publisher",  # 7: publisher
+        2024,              # 8: recording_year
+        "Test Genre",      # 9: genre
+        "USMV123",         # 10: isrc
+        200,               # 11: duration
+        "Test Producer",   # 12: producers
+        "Test Lyricist",   # 13: lyricists
+        "Test Album Artist", # 14: album_artist
+        None,              # 15: notes
+        True,              # 16: is_done
+        "/music/test.mp3", # 17: path
+        1,                 # 18: file_id
+        1,                 # 19: type_id
+        128,               # 20: bpm
+        True,              # 21: is_active
+        "abc",             # 22: audio_hash
     )
     
     song = Song.from_row(row)
@@ -160,3 +164,4 @@ def test_song_from_row():
     assert song.recording_year == 2024
     assert song.isrc == "USMV123"
     assert song.is_done is True
+    assert song.album_id == 123

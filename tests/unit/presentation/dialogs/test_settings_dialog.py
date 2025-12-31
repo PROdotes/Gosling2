@@ -1,6 +1,6 @@
 import pytest
-from unittest.mock import MagicMock
-from PyQt6.QtWidgets import QApplication
+from unittest.mock import MagicMock, patch
+from PyQt6.QtWidgets import QMessageBox
 from src.presentation.dialogs.settings_dialog import SettingsDialog
 
 @pytest.fixture
@@ -9,6 +9,7 @@ def mock_settings():
     settings.get_root_directory.return_value = "C:/Music"
     settings.get_conversion_bitrate.return_value = "320k"
     settings.get_ffmpeg_path.return_value = "ffmpeg"
+    settings.get_search_provider.return_value = "Google" # Fix for findText TypeError
     return settings
 
 def test_settings_dialog_load_save(qtbot, mock_settings):

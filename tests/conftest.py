@@ -14,6 +14,16 @@ sys.path.insert(0, str(src_path))
 # Path to the real test MP3 fixture
 FIXTURE_MP3 = Path(__file__).parent / "fixtures" / "test.mp3"
 
+@pytest.fixture(autouse=True)
+def silence_popups():
+    """Silence all QMessageBox popups globally for non-interactive testing."""
+    from PyQt6.QtWidgets import QMessageBox
+    with patch('PyQt6.QtWidgets.QMessageBox.information'), \
+         patch('PyQt6.QtWidgets.QMessageBox.warning'), \
+         patch('PyQt6.QtWidgets.QMessageBox.critical'), \
+         patch('PyQt6.QtWidgets.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes):
+        yield
+
 @pytest.fixture
 def test_mp3(tmp_path):
     """Create a test MP3 file by copying the fixture"""

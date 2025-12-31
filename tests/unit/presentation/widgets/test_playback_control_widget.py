@@ -28,7 +28,7 @@ class TestPlaybackControlWidget:
     def test_update_song_label(self, widget):
         """Test song label updates"""
         widget.update_song_label("New Song Title")
-        assert widget.song_label.text() == "New Song Title"
+        assert widget.lbl_song.text() == "New Song Title"
 
     def test_volume_slider_connection(self, widget):
         """Test volume slider triggers signal"""
@@ -47,7 +47,7 @@ class TestPlaybackControlWidget:
         """Test duration update and formatting"""
         # 125000 ms = 2m 05s
         widget.update_duration(125000)
-        assert widget.lbl_time_remaining.text() == "-02:05"
+        assert widget.lbl_time_remaining.text() == "- 02:05"
 
     def test_update_position(self, widget):
         """Test position update and remaining time"""

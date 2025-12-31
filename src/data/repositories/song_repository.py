@@ -198,10 +198,22 @@ class SongRepository(BaseRepository):
         cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
         
         # 1.5 Precise Linking (Shortcut)
-        # If the UI passed a specific Album ID, use it directly!
+        # If the UI passed a specific Album ID AND no album text (or we want to trust ID), use it.
+        # CRITICAL: If song.album is provided, it might mean the user edited the text!
+        # We should only trust album_id if song.album is None or matches the existing record.
+        use_precise_id = False
         if getattr(song, 'album_id', None) is not None:
+            if not song.album:
+                use_precise_id = True
+            else:
+                # Check if name matches existing ID to see if it's stale
+                cursor.execute("SELECT Title FROM Albums WHERE AlbumID = ?", (song.album_id,))
+                id_row = cursor.fetchone()
+                if id_row and id_row[0].lower() == song.album.strip().lower():
+                    use_precise_id = True
+
+        if use_precise_id:
              cursor.execute("INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID) VALUES (?, ?)", (song.source_id, song.album_id))
-             # Also update the Album's name/artist if they differ? No, trust the ID.
              return
 
         if not song.album or not song.album.strip():

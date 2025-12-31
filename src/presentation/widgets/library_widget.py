@@ -279,6 +279,9 @@ class LibraryWidget(QWidget):
             btn.setChecked(True)
             self._on_type_tab_changed(saved_index)
             
+        # State Tracking
+        self._sort_column = -1
+        self._sort_order = Qt.SortOrder.AscendingOrder
         self.load_library()
 
     def update_dirty_rows(self, ids: list):
@@ -287,6 +290,34 @@ class LibraryWidget(QWidget):
         # Force the table to repaint to reflect new amber glows
         if hasattr(self, 'table_view') and self.table_view:
             self.table_view.viewport().update()
+
+    def _handle_sort_request(self, logicalIndex):
+        """Handle header clicks for tri-state sorting (Asc -> Desc -> Reset) using explicit state."""
+        header = self.table_view.horizontalHeader()
+        
+        # 1. New Column or currently Reset -> Ascending
+        if self._sort_column != logicalIndex:
+            self._sort_column = logicalIndex
+            self._sort_order = Qt.SortOrder.AscendingOrder
+            
+            header.setSortIndicatorShown(True)
+            header.setSortIndicator(logicalIndex, self._sort_order)
+            self.proxy_model.sort(logicalIndex, self._sort_order)
+            
+        # 2. Same Column: Asc -> Desc
+        elif self._sort_order == Qt.SortOrder.AscendingOrder:
+            self._sort_order = Qt.SortOrder.DescendingOrder
+            
+            header.setSortIndicator(logicalIndex, self._sort_order)
+            self.proxy_model.sort(logicalIndex, self._sort_order)
+            
+        # 3. Same Column: Desc -> Reset
+        else:
+            self._sort_column = -1
+            self._sort_order = Qt.SortOrder.AscendingOrder
+            
+            header.setSortIndicatorShown(False)
+            self.proxy_model.sort(-1)
 
 
     def _init_ui(self) -> None:
@@ -389,7 +420,7 @@ class LibraryWidget(QWidget):
         self.table_view.setModel(self.proxy_model)
         self.table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table_view.setSortingEnabled(True)
+        self.table_view.setSortingEnabled(False) # Disable default 2-state sort (we want tri-state)
         self.table_view.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self.table_view.setMouseTracking(True) # Enable hover effects in delegate
         self.table_view.setShowGrid(False)  # Blade-Edge: No vertical lines
@@ -416,6 +447,10 @@ class LibraryWidget(QWidget):
         header.setSectionsMovable(True)
         header.setHighlightSections(True)  # Highlight section being dragged
         header.setSectionsClickable(True)  # Required for highlight to work
+        
+        # Tri-State Sorting (Asc -> Desc -> Reset)
+        header.setSortIndicatorShown(True) # Force indicator since sortingEnabled is False
+        header.sectionClicked.connect(self._handle_sort_request)
         
         # T-18: Auto-save layout on move/resize
         header.sectionMoved.connect(self._on_column_moved)
@@ -794,6 +829,10 @@ class LibraryWidget(QWidget):
         self.table_view.doubleClicked.connect(self._on_table_double_click)
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
+
+    # Method moved to top of class (near init) for state tracking
+
+
     def load_library(self, refresh_filters=True):
         """Load library from database, preserving selection if possible."""
         # 1. Capture current selection (IDs)

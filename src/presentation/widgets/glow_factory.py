@@ -3,7 +3,8 @@ GlowFactory - Unified workstation halo effects for various widgets.
 Supports 'focus' triggers (for inputs) and 'hover' triggers (for buttons).
 """
 from PyQt6.QtWidgets import (
-    QWidget, QLineEdit, QPushButton, QFrame, QGraphicsBlurEffect, QHBoxLayout, QLabel, QGridLayout, QPlainTextEdit
+    QWidget, QLineEdit, QPushButton, QFrame, QGraphicsBlurEffect, QHBoxLayout, 
+    QLabel, QGridLayout, QPlainTextEdit, QComboBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QEvent, pyqtProperty
 
@@ -51,7 +52,7 @@ class GlowWidget(QWidget):
         self._update_glow_style()
         
         # 2. THE CHILD
-        self.layout.addWidget(self.child)
+        self.layout.addWidget(self.child, 1)
         self.child.installEventFilter(self)
         
         # Ensure glow is behind
@@ -547,3 +548,102 @@ class GlowButton(GlowWidget):
         
     def setCursor(self, c): self.btn.setCursor(c)
     def setFocusPolicy(self, p): self.btn.setFocusPolicy(p)
+
+
+class GlowComboBox(QWidget):
+    """
+    Editable ComboBox with focus glow effect.
+    
+    Uses a container+overlay approach instead of the wrapper approach
+    (like GlowWidget) to avoid layout expansion issues in QHBoxLayout.
+    The glow frame is a sibling positioned behind the combo on focus.
+    """
+    # Proxy the main signals
+    currentIndexChanged = pyqtSignal(int)
+    currentTextChanged = pyqtSignal(str)
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.glow_margin = 5
+        self.glow_color = "#FFC66D"
+        
+        # Layout with margins for glow (uniform like GlowLineEdit/GlowButton)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(self.glow_margin, self.glow_margin, 
+                                   self.glow_margin, self.glow_margin)
+        layout.setSpacing(0)
+        
+        # The glow frame (sibling, hidden by default)
+        self._glow_frame = QFrame(self)
+        self._glow_frame.setStyleSheet(f"background-color: {self.glow_color}; border-radius: 10px;")
+        self._glow_blur = QGraphicsBlurEffect()
+        self._glow_blur.setBlurRadius(4)
+        self._glow_frame.setGraphicsEffect(self._glow_blur)
+        self._glow_frame.hide()
+        
+        # The actual combo
+        self.combo = QComboBox()
+        self.combo.setEditable(True)
+        self.combo.installEventFilter(self)
+        layout.addWidget(self.combo)
+        
+        # Forward signals
+        self.combo.currentIndexChanged.connect(self.currentIndexChanged.emit)
+        self.combo.currentTextChanged.connect(self.currentTextChanged.emit)
+    
+    def eventFilter(self, obj, event):
+        if obj is self.combo:
+            if event.type() == QEvent.Type.FocusIn:
+                self._show_glow()
+            elif event.type() == QEvent.Type.FocusOut:
+                # Don't hide glow if dropdown popup is open
+                if not self.combo.view().isVisible():
+                    self._hide_glow()
+        return super().eventFilter(obj, event)
+    
+    def _show_glow(self):
+        # Position glow behind combo
+        self._glow_frame.setGeometry(self.combo.geometry())
+        self._glow_frame.show()
+        self._glow_frame.lower()
+        self.combo.raise_()
+    
+    def _hide_glow(self):
+        self._glow_frame.hide()
+    
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # Keep glow synced if visible
+        if self._glow_frame.isVisible():
+            self._glow_frame.setGeometry(self.combo.geometry())
+    
+    def setGlowColor(self, color):
+        self.glow_color = color
+        self._glow_frame.setStyleSheet(f"background-color: {color}; border-radius: 10px;")
+    
+    # Proxy methods for QComboBox API
+    def setInsertPolicy(self, p): self.combo.setInsertPolicy(p)
+    def completer(self): return self.combo.completer()
+    def setObjectName(self, n): 
+        super().setObjectName(n)
+        self.combo.setObjectName(n)
+    def addItem(self, text, data=None): self.combo.addItem(text, data)
+    def addItems(self, items): self.combo.addItems(items)
+    def clear(self): self.combo.clear()
+    def count(self): return self.combo.count()
+    def currentIndex(self): return self.combo.currentIndex()
+    def currentText(self): return self.combo.currentText()
+    def currentData(self, role=Qt.ItemDataRole.UserRole): return self.combo.currentData(role)
+    def setCurrentIndex(self, i): self.combo.setCurrentIndex(i)
+    def setCurrentText(self, t): self.combo.setCurrentText(t)
+    def findData(self, data): return self.combo.findData(data)
+    def findText(self, text): return self.combo.findText(text)
+    def itemData(self, i, role=Qt.ItemDataRole.UserRole): return self.combo.itemData(i, role)
+    def setItemData(self, i, data, role=Qt.ItemDataRole.UserRole): self.combo.setItemData(i, data, role)
+    def blockSignals(self, b): return self.combo.blockSignals(b)
+    def setFocus(self): self.combo.setFocus()
+    def setEnabled(self, e): self.combo.setEnabled(e)
+    def setEditable(self, e): self.combo.setEditable(e)
+    def itemText(self, i): return self.combo.itemText(i)
+

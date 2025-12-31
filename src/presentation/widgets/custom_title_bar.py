@@ -25,6 +25,7 @@ class CustomTitleBar(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 0, 5, 0)
         layout.setSpacing(0)
+        layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         
         # 1. Logo
         self.btn_logo_icon = GlowButton()
@@ -41,7 +42,7 @@ class CustomTitleBar(QWidget):
         from PyQt6.QtWidgets import QGraphicsBlurEffect
         title_text = "GOSLING // WORKSTATION"
         title_container = QWidget()
-        title_container.setFixedSize(300, 40)
+        title_container.setFixedSize(220, 40) # Tightened from 300 to avoid extra padding
         v_center, h_margin = 3, 2
         
         self.lbl_title_glow = QLabel(title_text, title_container)
@@ -56,14 +57,10 @@ class CustomTitleBar(QWidget):
         self.lbl_title.move(h_margin, v_center)
         self.lbl_title.raise_()
         
-        layout.addWidget(self.btn_logo_icon)
-        layout.addSpacing(5)
-        layout.addWidget(title_container)
-        
         # 2. Search
         self.search_box = GlowLineEdit()
         self.search_box.setPlaceholderText("Search Library...")
-        self.search_box.setMinimumWidth(400)
+        self.search_box.setFixedWidth(400) # Fixed width prevents it from pushing Title to center
         self.search_box.setContentsMargins(0, 3, 0, 4)
         self.search_box.textChanged.connect(self.search_text_changed.emit)
         
@@ -72,9 +69,13 @@ class CustomTitleBar(QWidget):
         self.draggable_area.setObjectName("SystemDraggableArea")
         self.draggable_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
+        # Assemble Left-to-Right
+        layout.addWidget(self.btn_logo_icon)
         layout.addSpacing(10)
+        layout.addWidget(title_container)
+        layout.addSpacing(20)
         layout.addWidget(self.search_box)
-        layout.addWidget(self.draggable_area)
+        layout.addWidget(self.draggable_area, 1) # Force it to swallow the rest with stretch factor 1
 
     # Draggable logic
     def mousePressEvent(self, event):

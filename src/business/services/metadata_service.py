@@ -439,7 +439,7 @@ class MetadataService:
             # 3. Is Done (Dual: TKEY + TXXX:GOSLING_DONE)
             audio.tags.delall('TKEY')
             audio.tags.delall('TXXX:GOSLING_DONE')
-            audio.tags.add(TKEY(encoding=1, text=['true' if song.is_done else '']))
+            audio.tags.add(TKEY(encoding=1, text=['true' if song.is_done else ' ']))
             audio.tags.add(TXXX(encoding=1, desc='GOSLING_DONE', text=['1' if song.is_done else '0']))
 
             # 4. Author Union (Legacy: TCOM = Composers + Lyricists)

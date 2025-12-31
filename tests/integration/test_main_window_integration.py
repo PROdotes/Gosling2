@@ -48,14 +48,20 @@ class TestMainWindowIntegration:
 
     def test_ui_elements_exist(self, window):
         """Test that all UI elements are created"""
-        assert window.library_widget.btn_import is not None
-        assert window.library_widget.btn_scan_folder is not None
-        assert window.library_widget.btn_refresh is not None
-        assert window.library_widget.search_box is not None
+        # Library elements
         assert window.library_widget.table_view is not None
+        assert window.library_widget.filter_widget is not None
+        
+        # Search is in Title Bar
+        assert window.title_bar.search_box is not None
+        
+        # Playlist & Info (Right Panel)
         assert window.playlist_widget is not None
+        assert window.right_panel is not None
+        
+        # Playback elements
         assert window.playback_widget.playback_slider is not None
-        assert window.playback_widget.btn_play_pause is not None
+        assert window.playback_widget.btn_play is not None
         assert window.playback_widget.volume_slider is not None
 
     def test_services_initialized(self, window):

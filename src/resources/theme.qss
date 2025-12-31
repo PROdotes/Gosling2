@@ -436,14 +436,18 @@ QPushButton#AlbumActionButton:hover {
 /* --- ALBUM MANAGER PRO CONSOLE (T-46) --- */
 
 #AlbumManagerDialog {
-    background-color: #050505; /* Deep Void */
-    border: 1px solid #333;
+    /* Removed overrides to inherit global 'Satin Metal' theme */
     /* Removed border-radius to prevent ugly corner clipping on OS window */
 }
 
 #DialogHeader {
-    background-color: #080808;
+    background-color: rgba(0, 0, 0, 0.4);
     border-bottom: 2px solid #1A1A1A;
+}
+
+#DialogFooter {
+    background-color: rgba(0, 0, 0, 0.4);
+    border-top: 1px solid #333;
 }
 
 #DialogHeaderTitle {
@@ -454,7 +458,8 @@ QPushButton#AlbumActionButton:hover {
     background-color: #000000; /* Pill Chassis */
     border: 1px solid #333;
     border-radius: 6px;
-    padding: 4px 12px;
+    padding: 1px 12px; 
+    max-height: 28px; /* +2px adjustment */
 }
 
 #HeaderContextSep {
@@ -489,7 +494,7 @@ QPushButton#AlbumActionButton:hover {
     border-right: 1px solid #111;
 }
 #DialogContextList {
-    background-color: #080808;
+    background-color: transparent;
     border-right: 1px solid #222;
     color: #DDDDDD; /* Much brighter for readability */
     font-size: 10pt; /* Standard size, not tiny */
@@ -510,7 +515,7 @@ QPushButton#AlbumActionButton:hover {
 
 /* Pane A: The Vault (Album List) */
 #DialogVault {
-    background-color: #0b0b0b;
+    background-color: rgba(0, 0, 0, 0.45);
     border-right: 1px solid #222;
     min-width: 200px;
 }
@@ -536,7 +541,7 @@ QPushButton#AlbumActionButton:hover {
 
 /* Pane B: The Inspector (Form) */
 #DialogInspector {
-    background-color: #050505;
+    background-color: transparent;
 }
 
 #DialogFieldLabel {
@@ -546,12 +551,24 @@ QPushButton#AlbumActionButton:hover {
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-left: 8px; /* Matching Side Panel Spec */
-    margin-bottom: 2px;
+    margin-top: 2px; /* Separate from previous section (Gestalt proximity) */
+    margin-bottom: -1px; /* Stay close to the field it labels */
+}
+
+#SidecarHeaderLabel {
+    color: #E0E0E0; /* Lighter */
+    font-size: 11pt; /* Bigger (10->11) */
+    font-weight: bold;
+    qproperty-alignment: AlignCenter;
+    min-height: 40px; /* Ensure 40px height for vertical centering appearance */
+    border-bottom: 1px solid #333; /* Optional divider look */
+    padding-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 /* Pane C: The Sidecar (Publisher) */
 #PublisherSidecar {
-    background-color: #0b0b0b; /* Slightly lighter than inspector for contrast? */
+    background-color: rgba(0, 0, 0, 0.4); /* Distinct Dark Glass */
     border-left: 1px solid #222;
 }
 
@@ -611,4 +628,42 @@ QPushButton#AlbumActionButton:hover {
 /* Centralized Button Sizing for Dialogs */
 #AlbumManagerDialog GlowButton {
     min-width: 140px;
+}
+
+/* --- PUBLISHER PARENT SELECTOR (T-63) --- */
+#PublisherParentCombo {
+    padding-right: 20px;
+}
+
+#PublisherParentCombo:focus {
+    border: 1px solid #FFC66D;  /* Amber glow on focus */
+}
+
+#PublisherParentCombo::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 24px; 
+    border: 1px solid #000; /* Distinct Black Border around the button */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #222222, 
+        stop:0.1 #2A2A2A, 
+        stop:1 #1A1A1A);
+    border-top-right-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+#PublisherParentCombo::down-arrow {
+    image: url(src/resources/arrow_down.svg);
+    width: 12px;
+    height: 12px;
+    margin: 0;
+}
+
+#SidePanelProjectedPath {
+    background-color: #0c0c0c;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 9pt;
+    font-weight: bold;
 }
