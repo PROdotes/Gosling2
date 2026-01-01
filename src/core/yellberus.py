@@ -39,6 +39,7 @@ class FieldDef:
     visible: bool = True
     editable: bool = True
     searchable: bool = True
+    ui_search: bool = False        # Link to external search (Google, Spotify)
     
     # Filter behavior
     filterable: bool = False
@@ -60,13 +61,20 @@ QUERY_FROM = """
     JOIN Songs S ON MS.SourceID = S.SourceID
     LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
     LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
+    LEFT JOIN ContributorAliases CA ON MSCR.CreditedAliasID = CA.AliasID
+    LEFT JOIN ContributorAliases CA_ALL ON C.ContributorID = CA_ALL.ContributorID
+    LEFT JOIN GroupMembers GM ON C.ContributorID = GM.GroupID
+    LEFT JOIN Contributors MEM ON GM.MemberID = MEM.ContributorID
+    LEFT JOIN ContributorAliases MA ON MEM.ContributorID = MA.ContributorID
     LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
     LEFT JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
     LEFT JOIN Albums A ON SA.AlbumID = A.AlbumID
     LEFT JOIN AlbumPublishers AP ON A.AlbumID = AP.AlbumID
     LEFT JOIN Publishers P ON AP.PublisherID = P.PublisherID
-    LEFT JOIN MediaSourceTags MST ON MS.SourceID = MST.SourceID
-    LEFT JOIN Tags TG ON MST.TagID = TG.TagID AND TG.Category = 'Genre'
+    LEFT JOIN MediaSourceTags MST_G ON MS.SourceID = MST_G.SourceID
+    LEFT JOIN Tags TG_G ON MST_G.TagID = TG_G.TagID AND TG_G.TagCategory = 'Genre'
+    LEFT JOIN MediaSourceTags MST_M ON MS.SourceID = MST_M.SourceID
+    LEFT JOIN Tags TG_M ON MST_M.TagID = TG_M.TagID AND TG_M.TagCategory = 'Mood'
 """
 
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
@@ -106,14 +114,16 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         id3_tag='TPE1',
         min_length=1,
-        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ') AS Performers",
+        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Performer' THEN COALESCE(CA.AliasName, C.ContributorName) END) AS Performers",
         searchable=False,
-        strategy='first_letter_grouper',
+        strategy='list',
+        ui_search=True,
+        zone='amber',
     ),
     FieldDef(
         name='groups',
         ui_header='Groups',
-        db_column='S.Groups',
+        db_column='S.SongGroups',
         id3_tag='TIT1',
         searchable=False,
         visible=False,
@@ -125,17 +135,19 @@ FIELDS: List[FieldDef] = [
         editable=False,
         filterable=True,
         portable=False,
-        query_expression="COALESCE(NULLIF(S.Groups, ''), GROUP_CONCAT(CASE WHEN R.RoleName = 'Performer' THEN C.ContributorName END, ', ')) AS UnifiedArtist",
-        strategy='first_letter_grouper',
+        query_expression="COALESCE(NULLIF(S.SongGroups, ''), GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Performer' THEN COALESCE(CA.AliasName, C.ContributorName) END)) || ' ::: ' || COALESCE(GROUP_CONCAT(DISTINCT CA_ALL.AliasName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT C.ContributorName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT MEM.ContributorName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT MA.AliasName), '') AS UnifiedArtist",
+        strategy='list',
         zone='amber',
     ),
     FieldDef(
         name='title',
         ui_header='Title',
-        db_column='MS.Name',
+        db_column='MS.MediaName',
         id3_tag='TIT2',
         min_length=1,
         required=True,
+        ui_search=True,
+        zone='amber',
     ),
     FieldDef(
         name='album',
@@ -143,9 +155,10 @@ FIELDS: List[FieldDef] = [
         db_column='AlbumTitle',
         filterable=True,
         id3_tag='TALB',
-        query_expression='GROUP_CONCAT(DISTINCT A.Title) AS AlbumTitle',
+        query_expression='GROUP_CONCAT(DISTINCT A.AlbumTitle) AS AlbumTitle',
         required=True,
-        strategy='first_letter_grouper',
+        strategy='list',
+        ui_search=True,
         zone='amber', # IDENTITY
     ),
     FieldDef(
@@ -166,20 +179,23 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TCOM',
         min_length=1,
-        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Composer' THEN C.ContributorName END, ', ') AS Composers",
+        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Composer' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Composers",
         required=True,
-        strategy='first_letter_grouper',
+        strategy='list',
+        ui_search=True,
         zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='publisher',
         ui_header='Publisher',
         db_column='Publisher',
+        field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TPUB',
         query_expression='GROUP_CONCAT(DISTINCT P.PublisherName) AS Publisher',
         required=True,
-        strategy='first_letter_grouper',
+        strategy='list',
+        ui_search=True,
         zone='amber', # IDENTITY
     ),
 
@@ -192,18 +208,34 @@ FIELDS: List[FieldDef] = [
         id3_tag='TDRC',
         required=True,
         strategy='decade_grouper',
+        ui_search=True,
         zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='genre',
         ui_header='Genre',
         db_column='Genre',
+        field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TCON',
-        query_expression='GROUP_CONCAT(DISTINCT TG.TagName) AS Genre',
+        query_expression='GROUP_CONCAT(DISTINCT TG_G.TagName) AS Genre',
         required=True,
-        strategy='decade_grouper',
+        strategy='list',
+        ui_search=True,
         zone='amber', # Warm Amber (Matches Speech/All)
+    ),
+    FieldDef(
+        name='mood',
+        ui_header='Mood',
+        db_column='Mood',
+        field_type=FieldType.LIST,
+        filterable=True,
+        id3_tag='TMOO',
+        query_expression='GROUP_CONCAT(DISTINCT TG_M.TagName) AS Mood',
+        required=False,
+        strategy='list',
+        ui_search=True,
+        zone='amber',
     ),
     FieldDef(
         name='isrc',
@@ -216,7 +248,7 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='duration',
         ui_header='Duration',
-        db_column='MS.Duration',
+        db_column='MS.SourceDuration',
         field_type=FieldType.DURATION,
         editable=False,
         id3_tag='TLEN',
@@ -232,8 +264,9 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TIPL',
-        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Producer' THEN C.ContributorName END, ', ') AS Producers",
-        strategy='first_letter_grouper',
+        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Producer' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Producers",
+        strategy='list',
+        ui_search=True,
         zone='amber', # ATTRIBUTE
     ),
     FieldDef(
@@ -244,8 +277,9 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TEXT',
         portable=False,
-        query_expression="GROUP_CONCAT(CASE WHEN R.RoleName = 'Lyricist' THEN C.ContributorName END, ', ') AS Lyricists",
-        strategy='first_letter_grouper',
+        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Lyricist' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Lyricists",
+        strategy='list',
+        ui_search=True,
         zone='amber', # ATTRIBUTE
     ),
     FieldDef(
@@ -254,20 +288,20 @@ FIELDS: List[FieldDef] = [
         db_column='AlbumArtist',
         id3_tag='TPE2',
         query_expression='GROUP_CONCAT(DISTINCT A.AlbumArtist) AS AlbumArtist',
-        strategy='first_letter_grouper',
+        strategy='list',
         visible=False,
     ),
     FieldDef(
         name='notes',
         ui_header='Notes',
-        db_column='MS.Notes',
+        db_column='MS.SourceNotes',
         portable=False,
         searchable=False,
     ),
     FieldDef(
         name='is_done',
         ui_header='Status',
-        db_column='S.IsDone',
+        db_column='S.SongIsDone',
         field_type=FieldType.BOOLEAN,
         filterable=True,
         portable=False,
@@ -279,7 +313,7 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='path',
         ui_header='Path',
-        db_column='MS.Source',
+        db_column='MS.SourcePath',
         editable=False,
         model_attr='source',
         portable=False,

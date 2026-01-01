@@ -774,3 +774,36 @@ class TestDynamicID3Write:
             assert found_tipl, "TIPL Producer not written"
             assert found_txxx_prod, "TXXX:PRODUCER not written"
 
+class TestMetadataMultiAlbum:
+    """
+    Phase 4: Multi-Album & Publisher Verification (Waterfall Resolution).
+    """
+
+    def test_write_multi_value_tpub(self, mock_mp3):
+        """Verify TPUB (Publisher) accepts list values for ID3v2.4 support."""
+        from mutagen.id3 import TPUB
+        
+        # Setup Mock
+        mock_audio = mock_mp3.return_value
+        mock_audio.tags = MagicMock()
+        mock_audio.tags.add = MagicMock()
+        
+        # Song with multi-value publisher (as hydrated by SongRepository Waterfall)
+        song = Song(
+            source="test.mp3",
+            name="Test",
+            publisher=["Label A", "Label B"] # List!
+        )
+        
+        MetadataService.write_tags(song)
+        
+        found_tpub = False
+        for call in mock_audio.tags.add.call_args_list:
+            frame = call[0][0]
+            if isinstance(frame, TPUB):
+                # Mutagen expects list for text frames in ID3v2.4
+                # If our Service handles it correctly, frame.text should be the list.
+                if frame.text == ["Label A", "Label B"]:
+                    found_tpub = True
+        
+        assert found_tpub, "TPUB did not receive multi-value list ['Label A', 'Label B']"

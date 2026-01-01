@@ -24,7 +24,7 @@ class TestAlbumRepository(unittest.TestCase):
         # Remove test albums
         try:
             with self.repo.get_connection() as conn:
-                conn.execute("DELETE FROM Albums WHERE Title LIKE 'Case_%'")
+                conn.execute("DELETE FROM Albums WHERE AlbumTitle LIKE 'Case_%'")
         except Exception:
             pass
 
@@ -79,7 +79,7 @@ class TestAlbumRepository(unittest.TestCase):
         # Create a "song" (we just need a SourceID, so we fake it via raw insert)
         with self.repo.get_connection() as conn:
             # Insert fake MediaSource
-            conn.execute("INSERT INTO MediaSources (TypeID, Name, Source, IsActive) VALUES (1, 'Multi Test', 'C:\\\\Multi.mp3', 1)")
+            conn.execute("INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) VALUES (1, 'Multi Test', 'C:\\\\Multi.mp3', 1)")
             cursor = conn.execute("SELECT last_insert_rowid()")
             source_id = cursor.fetchone()[0]
             # Insert Songs record
@@ -101,7 +101,7 @@ class TestAlbumRepository(unittest.TestCase):
 
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Multi.mp3'")
+            conn.execute("DELETE FROM MediaSources WHERE SourcePath = 'C:\\\\Multi.mp3'")
 
     def test_sync_album_replacement(self):
         """
@@ -119,8 +119,8 @@ class TestAlbumRepository(unittest.TestCase):
 
         # Cleanup old
         with song_repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = ?", (test_path,))
-            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Replacement_Album%'")
+            conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (test_path,))
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle LIKE 'Replacement_Album%'")
 
         # 1. Insert song
         source_id = song_repo.insert(test_path)
@@ -144,14 +144,14 @@ class TestAlbumRepository(unittest.TestCase):
         albums = self.repo.get_albums_for_song(source_id)
         album_titles = [a.title for a in albums]
 
-        self.assertNotIn("Replacement_Album1", album_titles, "Album1 should have been replaced")
-        self.assertIn("Replacement_Album2", album_titles, "Song should be on Album2")
-        self.assertEqual(len(albums), 1, "Song should be on exactly 1 album (Snapshot strategy)")
+        self.assertIn("Replacement_Album1", album_titles, "Album1 should be kept (demoted)")
+        self.assertIn("Replacement_Album2", album_titles, "Album2 should be added (promoted)")
+        self.assertEqual(len(albums), 2, "Song should be on 2 albums (Append/Promote strategy)")
 
         # Cleanup
         with song_repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = ?", (test_path,))
-            conn.execute("DELETE FROM Albums WHERE Title LIKE 'Replacement_Album%'")
+            conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (test_path,))
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle LIKE 'Replacement_Album%'")
 
     def test_get_or_create(self):
         """Verify get_or_create returns existing album or creates new."""
@@ -171,7 +171,7 @@ class TestAlbumRepository(unittest.TestCase):
         album = self.repo.create("Case_Remove_Test")
 
         with self.repo.get_connection() as conn:
-            conn.execute("INSERT INTO MediaSources (TypeID, Name, Source, IsActive) VALUES (1, 'Remove Test', 'C:\\\\Remove.mp3', 1)")
+            conn.execute("INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) VALUES (1, 'Remove Test', 'C:\\\\Remove.mp3', 1)")
             cursor = conn.execute("SELECT last_insert_rowid()")
             source_id = cursor.fetchone()[0]
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (source_id,))
@@ -188,7 +188,7 @@ class TestAlbumRepository(unittest.TestCase):
 
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Remove.mp3'")
+            conn.execute("DELETE FROM MediaSources WHERE SourcePath = 'C:\\\\Remove.mp3'")
 
 
     # ==================== GREATEST HITS FIX TESTS ====================
@@ -222,7 +222,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Greatest_Hits'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Greatest_Hits'")
 
     def test_same_artist_different_years(self):
         """
@@ -238,7 +238,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Same_Artist'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Same_Artist'")
 
     def test_same_artist_same_year_reuses(self):
         """
@@ -253,7 +253,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Reuse_Test'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Reuse_Test'")
 
     def test_null_artist_handling(self):
         """
@@ -274,7 +274,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Compilation'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Compilation'")
 
     def test_artist_case_insensitive(self):
         """
@@ -290,7 +290,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Artist_Case'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Artist_Case'")
 
     def test_create_with_album_artist(self):
         """
@@ -308,7 +308,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Create_Artist_Test'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Create_Artist_Test'")
 
     def test_find_by_key_with_all_fields(self):
         """
@@ -328,7 +328,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_FindKey_Test'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_FindKey_Test'")
 
     def test_bobby_tables_album_artist(self):
         """
@@ -355,7 +355,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM Albums WHERE Title = 'Case_Bobby_Tables'")
+            conn.execute("DELETE FROM Albums WHERE AlbumTitle = 'Case_Bobby_Tables'")
 
 
     def test_delete_album_integrity(self):
@@ -368,7 +368,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         with self.repo.get_connection() as conn:
             # Create dummy song
-            conn.execute("INSERT INTO MediaSources (TypeID, Name, Source, IsActive) VALUES (1, 'Del', 'C:\\\\Del.mp3', 1)")
+            conn.execute("INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) VALUES (1, 'Del', 'C:\\\\Del.mp3', 1)")
             sid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (sid,))
         
@@ -393,7 +393,7 @@ class TestAlbumRepository(unittest.TestCase):
         
         # Cleanup song
         with self.repo.get_connection() as conn:
-            conn.execute("DELETE FROM MediaSources WHERE Source = 'C:\\\\Del.mp3'")
+            conn.execute("DELETE FROM MediaSources WHERE SourcePath = 'C:\\\\Del.mp3'")
 
 
 if __name__ == "__main__":

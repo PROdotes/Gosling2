@@ -34,8 +34,8 @@ class TestT06Publishers(unittest.TestCase):
         try:
             with self.song_repo.get_connection() as conn:
                 conn.execute("DELETE FROM Publishers WHERE PublisherName = ?", (self.test_publisher,))
-                conn.execute("DELETE FROM Albums WHERE Title = ? OR Title = 'T06_Publisher_Song.mp3'", (self.test_album,))
-                conn.execute("DELETE FROM MediaSources WHERE Source = ?", (self.test_path,))
+                conn.execute("DELETE FROM Albums WHERE AlbumTitle = ? OR AlbumTitle = 't06_publisher_song.mp3'", (self.test_album,))
+                conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (self.test_path,))
         except Exception:
             pass
 
@@ -59,7 +59,7 @@ class TestT06Publishers(unittest.TestCase):
         
         # 3. Verification Read
         song_fresh = self.song_repo.get_by_path(self.test_path)
-        self.assertEqual(song_fresh.publisher, self.test_publisher)
+        self.assertEqual(song_fresh.publisher, [self.test_publisher])
         
         # 4. DB Verification
         pub = self.pub_repo.find_by_name(self.test_publisher)
@@ -95,17 +95,18 @@ class TestT06Publishers(unittest.TestCase):
         
         # 4. Verification
         song_fresh = self.song_repo.get_by_path(self.test_path)
-        self.assertEqual(song_fresh.publisher, self.test_publisher)
+        self.assertEqual(song_fresh.publisher, [self.test_publisher])
         self.assertEqual(song_fresh.album, self.test_album)
         
-        # 5. Check Link Table via Repo
+        # 5. Check Link Table via Repo (Track Override shouldn't touch AlbumPublishers)
         # We need album ID first
         with self.song_repo.get_connection() as conn:
-            cursor = conn.execute("SELECT AlbumID FROM Albums WHERE Title=?", (self.test_album,))
+            cursor = conn.execute("SELECT AlbumID FROM Albums WHERE AlbumTitle=?", (self.test_album,))
             album_id = cursor.fetchone()[0]
             
         pubs = self.pub_repo.get_publishers_for_album(album_id)
-        self.assertTrue(any(p.publisher_name == self.test_publisher for p in pubs))
+        # Should be empty or not contain the track override publisher
+        self.assertFalse(any(p.publisher_name == self.test_publisher for p in pubs), "Track Override should NOT add to Album Publishers")
 
 if __name__ == "__main__":
     unittest.main()

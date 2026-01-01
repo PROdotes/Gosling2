@@ -44,14 +44,17 @@ class PublisherCreatorDialog(QDialog):
 
 
 class PublisherPickerDialog(QDialog):
-    """Searchable combo dialog for selecting an existing publisher."""
+    """
+    Searchable combo dialog for selecting an existing publisher.
+    Now supports Smart Creation (matching Artist workflow).
+    """
     def __init__(self, repo, exclude_ids=None, parent=None):
         super().__init__(parent)
         self.repo = repo
         self.exclude_ids = exclude_ids or set()
         self.selected_pub = None
         
-        self.setWindowTitle("Select Publisher")
+        self.setWindowTitle("Select or Add Publisher")
         self.setFixedSize(380, 180)
         self.setObjectName("PublisherPickerDialog")
         
@@ -59,7 +62,7 @@ class PublisherPickerDialog(QDialog):
         layout.setSpacing(12)
         
         lbl = QLabel("SELECT OR CREATE PUBLISHER")
-        lbl.setObjectName("FieldLabel")
+        lbl.setObjectName("DialogFieldLabel")
         layout.addWidget(lbl)
         
         # Searchable combo (same as parent selector)
@@ -67,16 +70,12 @@ class PublisherPickerDialog(QDialog):
         h_row.setSpacing(10)
         
         self.cmb = GlowComboBox()
+        self.cmb.setEditable(True) # ENABLE EDITING
         self.cmb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.cmb.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self.cmb.completer().setFilterMode(Qt.MatchFlag.MatchContains)
         self.cmb.setObjectName("PublisherParentCombo")
         h_row.addWidget(self.cmb)
-        
-        btn_new = QPushButton("NEW")
-        btn_new.setFixedWidth(60)
-        btn_new.clicked.connect(self._create_new)
-        h_row.addWidget(btn_new)
         
         layout.addLayout(h_row)
         layout.addStretch()
@@ -84,19 +83,24 @@ class PublisherPickerDialog(QDialog):
         # Buttons
         btns = QHBoxLayout()
         btns.addStretch()
-        btn_cancel = GlowButton("Cancel")
-        btn_cancel.clicked.connect(self.reject)
-        btns.addWidget(btn_cancel)
+        self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.clicked.connect(self.reject)
+        btns.addWidget(self.btn_cancel)
         
-        btn_select = GlowButton("Select")
-        btn_select.setObjectName("Primary")
-        btn_select.clicked.connect(self._on_select)
-        btns.addWidget(btn_select)
+        self.btn_select = GlowButton("Select / Create")
+        self.btn_select.setObjectName("Primary")
+        self.btn_select.btn.setDefault(True) # Make Enter trigger this button
+        self.btn_select.clicked.connect(self._on_select)
+        
+        # Connect Enter key in the editable line edit to submission
+        self.cmb.lineEdit().returnPressed.connect(self._on_select)
+        btns.addWidget(self.btn_select)
         btns.addStretch()
         
         layout.addLayout(btns)
         
         self._populate()
+        self.cmb.setFocus()
     
     def _populate(self):
         self.cmb.blockSignals(True)
@@ -105,25 +109,47 @@ class PublisherPickerDialog(QDialog):
         for p in all_pubs:
             if p.publisher_id not in self.exclude_ids:
                 self.cmb.addItem(p.publisher_name, p.publisher_id)
+        
+        self.cmb.setCurrentIndex(-1)
         self.cmb.blockSignals(False)
-    
-    def _create_new(self):
-        diag = PublisherCreatorDialog(parent=self)
-        if diag.exec():
-            name = diag.get_name()
-            if name:
-                new_pub, _ = self.repo.get_or_create(name)
-                self._populate()
-                idx = self.cmb.findData(new_pub.publisher_id)
-                if idx >= 0:
-                    self.cmb.setCurrentIndex(idx)
     
     def _on_select(self):
         pub_id = self.cmb.currentData()
+        current_text = self.cmb.currentText().strip()
+
+        if not current_text:
+            return
+
+        # Case A: Selection from list
         if pub_id:
             self.selected_pub = self.repo.get_by_id(pub_id)
             self.accept()
-    
+            return
+
+        # Case B: Direct typed but matches existing?
+        existing = self.repo.find_by_name(current_text)
+        if existing:
+            self.selected_pub = existing
+            self.accept()
+            return
+
+        # Case C: Fast Create
+        reply = QMessageBox.question(
+            self,
+            "Create Publisher?",
+            f"Publisher '{current_text}' not found.\n\nCreate new record?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                new_pub, _ = self.repo.get_or_create(current_text)
+                self.selected_pub = new_pub
+                self.accept()
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to create publisher: {e}")
+
     def get_selected(self):
         return self.selected_pub
 
@@ -172,9 +198,9 @@ class PublisherDetailsDialog(QDialog):
         self.cmb_parent.setObjectName("PublisherParentCombo")
         h_parent.addWidget(self.cmb_parent)
         
-        # Use native QPushButton to avoid GlowWidget layout interference
-        self.btn_new_parent = QPushButton("NEW")
-        self.btn_new_parent.setFixedWidth(60)
+        # Use GlowButton for consistent workstation look
+        self.btn_new_parent = GlowButton("NEW")
+        self.btn_new_parent.setFixedSize(60, 26)
         self.btn_new_parent.setToolTip("Create New Parent")
         self.btn_new_parent.clicked.connect(self._create_new_parent)
         h_parent.addWidget(self.btn_new_parent)
@@ -198,8 +224,8 @@ class PublisherDetailsDialog(QDialog):
         h_children_header.addWidget(lbl_children)
         h_children_header.addStretch()
         
-        btn_add_child = QPushButton("ADD")
-        btn_add_child.setFixedWidth(60)
+        btn_add_child = GlowButton("ADD")
+        btn_add_child.setFixedSize(60, 26)
         btn_add_child.setToolTip("Link existing publisher as child")
         btn_add_child.clicked.connect(self._add_child)
         h_children_header.addWidget(btn_add_child)

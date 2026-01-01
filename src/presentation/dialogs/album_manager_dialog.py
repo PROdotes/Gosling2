@@ -132,13 +132,21 @@ class AlbumManagerDialog(QDialog):
         self.btn_create_new = GlowButton("Create New Album (+)")
         self.btn_create_new.clicked.connect(self._toggle_create_mode)
         header_layout.addWidget(self.btn_create_new)
+
+        # T-46: View Toggle (Expert vs Focused)
+        self.btn_view_toggle = GlowButton("View: Full")
+        self.btn_view_toggle.setCheckable(True)
+        self.btn_view_toggle.setChecked(True) # Default to Full
+        self.btn_view_toggle.setFixedWidth(100)
+        self.btn_view_toggle.toggled.connect(self._toggle_view_mode)
+        header_layout.addWidget(self.btn_view_toggle)
         
         main_layout.addWidget(header)
         
         # --- MAIN SPLITTER (The Workstation) ---
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.setChildrenCollapsible(False)
-        self.splitter.setHandleWidth(2)
+        self.splitter.setHandleWidth(7) # Void Style (T-63)
         
         # 1. PANE Z: Context (Songs)
         self.pane_context = self._build_context_pane()
@@ -222,7 +230,9 @@ class AlbumManagerDialog(QDialog):
         
         self.list_context = QListWidget()
         self.list_context.setObjectName("DialogContextList")
-        self.list_context.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Non-interactive
+        self.list_context.setFocusPolicy(Qt.FocusPolicy.StrongFocus) # Allow interaction
+        self.list_context.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_context.customContextMenuRequested.connect(self._show_context_pane_menu)
         layout.addWidget(self.list_context)
         
         return container
@@ -475,13 +485,42 @@ class AlbumManagerDialog(QDialog):
             return
 
         for song in songs:
-            # Format: Track - Title (Artist) or just Title
-            display = f"{song['title']}"
+            # Format: [★] Track - Title (Artist)
+            is_primary = song.get('is_primary', 0)
+            star = "★ " if is_primary else "   "
+            
+            display = f"{star}{song['title']}"
             if song['artist'] != 'Unknown':
-                 # Only show artist if it differs from album artist? Too complex for now.
                  display += f" - {song['artist']}"
             
-            self.list_context.addItem(display)
+            item = QListWidgetItem(display)
+            item.setData(Qt.ItemDataRole.UserRole, song['source_id']) # Store SourceID
+            
+            # Highlight primary
+            if is_primary:
+                item.setForeground(Qt.GlobalColor.yellow) # Or use a QSS class if possible
+                item.setToolTip("Primary Album (Metadata Source)")
+                
+            self.list_context.addItem(item)
+
+    def _show_context_pane_menu(self, pos):
+        item = self.list_context.itemAt(pos)
+        if not item: return
+        
+        source_id = item.data(Qt.ItemDataRole.UserRole)
+        if not source_id or not self.current_album: return
+        
+        menu = QMenu(self)
+        mk_primary = QAction("Set as Primary Album", self)
+        mk_primary.triggered.connect(lambda: self._set_as_primary(source_id))
+        menu.addAction(mk_primary)
+        
+        menu.exec(self.list_context.mapToGlobal(pos))
+
+    def _set_as_primary(self, source_id):
+        if not self.current_album: return
+        self.album_repo.set_primary_album(source_id, self.current_album.album_id)
+        self._refresh_context(self.current_album.album_id)
 
     def _refresh_vault(self, query=None):
         if query is None:
@@ -640,3 +679,17 @@ class AlbumManagerDialog(QDialog):
                     self.pane_inspector.setEnabled(False)
                 
                 self._refresh_vault()
+
+    def _toggle_view_mode(self, checked):
+        """Toggle between Full (Expert) and Focused (Editor) modes."""
+        # Checked = Full Mode (Show Vault/Context)
+        # Unchecked = Focused Mode (Hide Vault/Context)
+        
+        if checked:
+            self.btn_view_toggle.setText("View: Full")
+            self.pane_context.show()
+            self.pane_vault.show()
+        else:
+            self.btn_view_toggle.setText("View: Edit")
+            self.pane_context.hide()
+            self.pane_vault.hide()

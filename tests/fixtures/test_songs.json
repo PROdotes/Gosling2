@@ -6,7 +6,8 @@
         "album": "Nevermind",
         "year": 1991,
         "publisher": "DGC Records",
-        "genre": "Grunge"
+        "genre": "Grunge",
+        "mood": "Aggressive, Raw"
     },
     {
         "path": "C:\\Music\\Nirvana\\Polly.mp3",
@@ -15,7 +16,8 @@
         "album": "Nevermind",
         "year": 1991,
         "publisher": "DGC Records",
-        "genre": "Grunge, Acoustic"
+        "genre": "Grunge, Acoustic",
+        "mood": "Somber, Dark"
     },
     {
         "path": "C:\\Music\\Nirvana\\In Bloom.mp3",
@@ -24,7 +26,8 @@
         "album": "Nevermind",
         "year": 1991,
         "publisher": "DGC Records",
-        "genre": "Grunge"
+        "genre": "Grunge",
+        "mood": "Powerful"
     },
     {
         "path": "C:\\Music\\ABBA\\Dancing Queen.mp3",
@@ -33,16 +36,20 @@
         "album": "Greatest Hits",
         "year": 1992,
         "publisher": "Polar Music",
-        "genre": "Pop, Disco"
+        "genre": "Pop, Disco",
+        "mood": "Happy, Uplifting"
     },
     {
-        "path": "C:\\Music\\Queen\\Bohemian Rhapsody.mp3",
+        "path": "C:\\Music\\Queen\\Greatest Hits\\Bohemian Rhapsody.mp3",
         "title": "Bohemian Rhapsody",
         "artist": "Queen",
         "album": "Greatest Hits",
         "year": 1981,
-        "publisher": "EMI",
-        "genre": "Rock, Opera"
+        "publisher": "EMI, Queen Productions Ltd, Parlophone",
+        "genre": "Rock, Opera",
+        "mood": "Epic, Dramatic",
+        "composers": "Freddie Mercury",
+        "producers": "Roy Thomas Baker / Queen"
     },
     {
         "path": "C:\\Music\\Queen\\Bohemian Rhapsody.mp3",
@@ -51,7 +58,8 @@
         "album": "A Night at the Opera",
         "year": 1975,
         "publisher": "EMI",
-        "genre": "Rock"
+        "genre": "Rock",
+        "composers": "Freddie Mercury"
     },
     {
         "path": "C:\\Music\\Queen\\Another One Bites The Dust.mp3",
@@ -59,7 +67,7 @@
         "artist": "Queen",
         "album": "Greatest Hits",
         "year": 1981,
-        "publisher": "EMI"
+        "publisher": "EMI, Queen Productions Ltd, Parlophone"
     },
     {
         "path": "C:\\Music\\Beatles\\Yesterday.mp3",
@@ -67,7 +75,9 @@
         "artist": "The Beatles",
         "album": "Help!",
         "year": 1965,
-        "publisher": "Capitol Records"
+        "publisher": "Northern Songs, Capitol Records",
+        "composers": "Lennon-McCartney",
+        "producers": "George Martin"
     },
     {
         "path": "C:\\Music\\Compilations\\Summer Vibes.mp3",
@@ -78,5 +88,24 @@
         "year": 2024,
         "publisher": "Compilation Records",
         "genre": "Pop, Dance"
+    },
+    {
+        "path": "C:\\Music\\Singles\\No Album.mp3",
+        "title": "No Album",
+        "artist": "Unknown Artist",
+        "year": 2023,
+        "publisher": "Indie Label",
+        "genre": "Electronic",
+        "_comment": "TEST: Single Paradox - Song without an album should auto-create a Single release"
+    },
+    {
+        "path": "C:\\Music\\Queen\\Greatest Hits\\Radio Ga Ga.mp3",
+        "title": "Radio Ga Ga",
+        "artist": "Queen",
+        "album": "Greatest Hits",
+        "year": 1981,
+        "publisher": "Special License Corp",
+        "genre": "Synth-pop",
+        "_comment": "TEST: Track Override - This song has a DIFFERENT publisher than the album (EMI). Should show as local override, not inherited."
     }
 ]

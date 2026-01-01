@@ -53,10 +53,11 @@ class BaseRepository:
                 CREATE TABLE IF NOT EXISTS MediaSources (
                     SourceID INTEGER PRIMARY KEY,
                     TypeID INTEGER NOT NULL,
-                    Name TEXT NOT NULL,
-                    Notes TEXT,
-                    Source TEXT NOT NULL UNIQUE,
-                    Duration REAL,
+                    MediaName TEXT NOT NULL,
+                    SourceNotes TEXT,
+                    SourcePath TEXT NOT NULL UNIQUE,
+                    SourceDuration REAL,
+                    AudioHash TEXT,
                     IsActive BOOLEAN DEFAULT 1,
                     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
                 )
@@ -69,8 +70,8 @@ class BaseRepository:
                     TempoBPM INTEGER,
                     RecordingYear INTEGER,
                     ISRC TEXT,
-                    Groups TEXT,
-                    IsDone BOOLEAN DEFAULT 0,
+                    SongGroups TEXT,
+                    SongIsDone BOOLEAN DEFAULT 0,
                     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
                 )
             """)
@@ -81,7 +82,7 @@ class BaseRepository:
                     ContributorID INTEGER PRIMARY KEY,
                     ContributorName TEXT NOT NULL UNIQUE,
                     SortName TEXT,
-                    Type TEXT CHECK(Type IN ('person', 'group'))
+                    ContributorType TEXT CHECK(ContributorType IN ('person', 'group'))
                 )
             """)
 
@@ -106,10 +107,12 @@ class BaseRepository:
                     SourceID INTEGER NOT NULL,
                     ContributorID INTEGER NOT NULL,
                     RoleID INTEGER NOT NULL,
+                    CreditedAliasID INTEGER,
                     PRIMARY KEY (SourceID, ContributorID, RoleID),
                     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
                     FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID) ON DELETE CASCADE,
-                    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
+                    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID),
+                    FOREIGN KEY (CreditedAliasID) REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL
                 )
             """)
 
@@ -138,7 +141,7 @@ class BaseRepository:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Albums (
                     AlbumID INTEGER PRIMARY KEY,
-                    Title TEXT NOT NULL,
+                    AlbumTitle TEXT NOT NULL,
                     AlbumArtist TEXT,
                     AlbumType TEXT,
                     ReleaseYear INTEGER
@@ -151,6 +154,9 @@ class BaseRepository:
                     SourceID INTEGER NOT NULL,
                     AlbumID INTEGER NOT NULL,
                     TrackNumber INTEGER,
+                    DiscNumber INTEGER DEFAULT 1,
+                    IsPrimary BOOLEAN DEFAULT 1,
+                    TrackPublisherID INTEGER,
                     PRIMARY KEY (SourceID, AlbumID),
                     FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
                     FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE
@@ -178,13 +184,24 @@ class BaseRepository:
                 )
             """)
 
+            # 26. RecordingPublishers (Master Owners)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS RecordingPublishers (
+                    SourceID INTEGER NOT NULL,
+                    PublisherID INTEGER NOT NULL,
+                    PRIMARY KEY (SourceID, PublisherID),
+                    FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
+                    FOREIGN KEY (PublisherID) REFERENCES Publishers(PublisherID) ON DELETE CASCADE
+                )
+            """)
+
             # 9. Tags
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Tags (
                     TagID INTEGER PRIMARY KEY,
                     TagName TEXT NOT NULL,
-                    Category TEXT,
-                    UNIQUE(TagName, Category)
+                    TagCategory TEXT,
+                    UNIQUE(TagName, TagCategory)
                 )
             """)
 
@@ -206,6 +223,24 @@ class BaseRepository:
             columns = [row[1] for row in cursor.fetchall()]
             if 'AudioHash' not in columns:
                 cursor.execute("ALTER TABLE MediaSources ADD COLUMN AudioHash TEXT")
+
+            # SongAlbums Migrations (DiscNumber, IsPrimary, TrackPublisherID)
+            cursor.execute("PRAGMA table_info(SongAlbums)")
+            sa_cols = [row[1] for row in cursor.fetchall()]
+            if 'DiscNumber' not in sa_cols:
+                cursor.execute("ALTER TABLE SongAlbums ADD COLUMN DiscNumber INTEGER DEFAULT 1")
+            if 'IsPrimary' not in sa_cols:
+                # If we are adding IsPrimary, existing links should be Primary? 
+                # Yes, until we have logic to say otherwise.
+                cursor.execute("ALTER TABLE SongAlbums ADD COLUMN IsPrimary BOOLEAN DEFAULT 1")
+            if 'TrackPublisherID' not in sa_cols:
+                cursor.execute("ALTER TABLE SongAlbums ADD COLUMN TrackPublisherID INTEGER")
+
+            # MediaSourceContributorRoles Migrations (CreditedAliasID)
+            cursor.execute("PRAGMA table_info(MediaSourceContributorRoles)")
+            mscr_cols = [row[1] for row in cursor.fetchall()]
+            if 'CreditedAliasID' not in mscr_cols:
+                cursor.execute("ALTER TABLE MediaSourceContributorRoles ADD COLUMN CreditedAliasID INTEGER REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL")
             
             # Create indexes for duplicate detection and performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_audiohash ON MediaSources(AudioHash)")
@@ -216,7 +251,7 @@ class BaseRepository:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_songalbums_albumid ON SongAlbums(AlbumID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_contributorid ON MediaSourceContributorRoles(ContributorID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_roleid ON MediaSourceContributorRoles(RoleID)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON Tags(Category)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON Tags(TagCategory)")
 
 
 

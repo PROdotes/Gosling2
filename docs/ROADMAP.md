@@ -82,7 +82,10 @@ tags:
     *   *Task*: Main search filters both table and filter tree; expansion state persists across restarts.
     *   *Status*: **Done** - Implemented recursive tree filtering with QSettings persistence.
 *   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
-*   [ ] **T-70 Artist Selector** (Database-backed Picker)
+*   [x] [**T-70 Artist Selector**](tasks/T-70_artist_manager_plan.md) (Database-backed Picker)
+*   [x] **Multi-Album Infrastructure** (T-22/T-63)
+    *   *Status*: **Core Schema & Logic Done**.
+    *   *Ref*: `PROPOSAL_MULTI_ALBUM_INFRASTRUCTURE.md`.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
 *   [ ] **Settings UI** (T-52) (~1.5 h)

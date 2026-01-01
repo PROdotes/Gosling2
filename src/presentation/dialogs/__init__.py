@@ -1,2 +1,3 @@
 from .album_manager_dialog import AlbumManagerDialog
 from .settings_dialog import SettingsDialog
+from .artist_manager_dialog import ArtistCreatorDialog, ArtistPickerWidget, ArtistDetailsDialog

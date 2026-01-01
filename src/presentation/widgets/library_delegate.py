@@ -125,6 +125,10 @@ class WorkstationDelegate(QStyledItemDelegate):
             self._draw_status_badge(painter, option, index, category_color)
         else:
             text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+            # T-70: Strip "Secret Payload" (Identity Bubble search data) using separator
+            if " ::: " in text:
+                text = text.split(" ::: ")[0].strip()
+            
             font = painter.font()
             if column_name in ("bpm", "recording_year", "duration", "initial_key"):
                 font.setFamily("Consolas")

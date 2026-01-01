@@ -82,37 +82,38 @@ def test_portable_flag():
 
 def test_row_to_tagged_tuples():
     """Test Yellberus returns tagged tuples for Song."""
-    # Create a mock row matching current FIELDS order (23 columns):
+    # Create a mock row matching current FIELDS order (24 columns):
     row = (
         "Artist",          # 0: performers
         "Group",           # 1: groups
         "Unified",         # 2: unified_artist
         "Title",           # 3: title
         "Album",           # 4: album
-        123,               # 5: album_id (NEW)
+        123,               # 5: album_id
         "Composer",        # 6: composers
         "Publisher",       # 7: publisher
         2024,              # 8: recording_year
         "Genre",           # 9: genre
-        "ISRC123",         # 10: isrc
-        180,               # 11: duration
-        "Producer",        # 12: producers
-        "Lyricist",        # 13: lyricists
-        "Album Artist",    # 14: album_artist
-        "Notes",           # 15: notes
-        False,             # 16: is_done
-        "/path",           # 17: path
-        1,                 # 18: file_id
-        1,                 # 19: type_id
-        120,               # 20: bpm
-        True,              # 21: is_active
-        "abc",             # 22: audio_hash (NEW)
+        "Chill",           # 10: mood (NEW)
+        "ISRC123",         # 11: isrc
+        180,               # 12: duration
+        "Producer",        # 13: producers
+        "Lyricist",        # 14: lyricists
+        "Album Artist",    # 15: album_artist
+        "Notes",           # 16: notes
+        False,             # 17: is_done
+        "/path",           # 18: path
+        1,                 # 19: file_id
+        1,                 # 20: type_id
+        120,               # 21: bpm
+        True,              # 22: is_active
+        "abc",             # 23: audio_hash
     )
     
     tagged = yellberus.row_to_tagged_tuples(row)
     
-    # Should have 23 tuples
-    assert len(tagged) == 23
+    # Should have 24 tuples
+    assert len(tagged) == 24
     
     # Portable fields should have ID3 frame tags
     assert ("Title", "TIT2") in tagged
@@ -126,7 +127,7 @@ def test_song_from_row():
     """Test Song.from_row uses tagged tuples and JSON lookup."""
     from src.data.models.song import Song
     
-    # Row matching current FIELDS order (23 columns)
+    # Row matching current FIELDS order (24 columns)
     row = (
         "Artist 1, Artist 2", # 0: performers
         "Test Group",      # 1: groups
@@ -138,19 +139,20 @@ def test_song_from_row():
         "Test Publisher",  # 7: publisher
         2024,              # 8: recording_year
         "Test Genre",      # 9: genre
-        "USMV123",         # 10: isrc
-        200,               # 11: duration
-        "Test Producer",   # 12: producers
-        "Test Lyricist",   # 13: lyricists
-        "Test Album Artist", # 14: album_artist
-        None,              # 15: notes
-        True,              # 16: is_done
-        "/music/test.mp3", # 17: path
-        1,                 # 18: file_id
-        1,                 # 19: type_id
-        128,               # 20: bpm
-        True,              # 21: is_active
-        "abc",             # 22: audio_hash
+        "Relaxed",         # 10: mood (NEW)
+        "USMV123",         # 11: isrc
+        200,               # 12: duration
+        "Test Producer",   # 13: producers
+        "Test Lyricist",   # 14: lyricists
+        "Test Album Artist", # 15: album_artist
+        None,              # 16: notes
+        True,              # 17: is_done
+        "/music/test.mp3", # 18: path
+        1,                 # 19: file_id
+        1,                 # 20: type_id
+        128,               # 21: bpm
+        True,              # 22: is_active
+        "abc",             # 23: audio_hash
     )
     
     song = Song.from_row(row)
@@ -165,3 +167,4 @@ def test_song_from_row():
     assert song.isrc == "USMV123"
     assert song.is_done is True
     assert song.album_id == 123
+    assert song.mood == ["Relaxed"]  # Verify mood field

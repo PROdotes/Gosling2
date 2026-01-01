@@ -1,40 +1,112 @@
-from PyQt6.QtWidgets import QFrame, QVBoxLayout
-from PyQt6.QtCore import pyqtProperty
-from .base import GlowWidget
+from PyQt6.QtWidgets import QWidget
+from PyQt6.QtCore import pyqtProperty, Qt, QRect, QSize, QPointF
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient
 
-class GlowLED(GlowWidget):
+class GlowLED(QWidget):
     """
-    Indication LED (Status Light) with Amber Halo.
-    Can be toggled active/inactive.
+    Indication LED (Status Light) rendered via QPainter.
+    Matches FilterTreeDelegate aesthetic (Solid Dot + Halo).
     """
     def __init__(self, color="#FFC66D", size=8, parent=None):
-        self.led = QFrame()
-        self.led.setFixedSize(size, size)
-        self.led.setObjectName("StatusLed") # Hook for QSS base style
-        
-        super().__init__(self.led, trigger_mode="manual", parent=parent)
-        self.setGlowColor(color)
-        
-        # Center the LED in the GlowWidget
-        self.layout.addStretch()
-        self.layout.addWidget(self.led)
-        self.layout.addStretch()
-        
+        super().__init__(parent)
+        self._color = QColor(color)
+        self._led_size = size
         self._active = False
+        
+        # Calculate size with halo padding. 
+        # For gradient, we want a larger, softer falloff.
+        # Halo = 100% of size (2x total diameter approx)
+        self._halo_padding = int(size * 1.0) 
+        total_size = size + (self._halo_padding * 2)
+        self.setFixedSize(total_size, total_size)
+        
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def setActive(self, active: bool):
         self._active = active
-        self.led.setProperty("active", active)
-        self.led.style().unpolish(self.led)
-        self.led.style().polish(self.led)
-        
-        if active:
-            self._show_glow()
-        else:
-            self._hide_glow()
+        self.update()
+
+    def setGlowColor(self, color):
+        self._color = QColor(color)
+        self.update()
 
     @pyqtProperty(bool)
     def active(self): return self._active
     
     @active.setter
     def active(self, val): self.setActive(val)
+
+    RING_COLOR = "#444444"
+
+    @staticmethod
+    def draw_led(painter: QPainter, rect: QRect, color: QColor, active: bool, size: int, ring_color: QColor = None, max_radius: float = None):
+        """
+        Shared renderer for all LEDs (Widgets & Delegates).
+        """
+        if ring_color is None:
+             ring_color = QColor(GlowLED.RING_COLOR)
+
+        # Center rect
+        center = rect.center()
+        cx, cy = center.x(), center.y()
+        r = size / 2
+        
+        # Define LED geometry from center
+        led_rect = QRect(int(cx - r), int(cy - r), int(size), int(size))
+        
+        if active:
+            # 1. Halo (Radial Gradient for Gaussian-like look)
+            # T-70: Tighter glow for small LEDs (1.2x instead of 1.5x)
+            halo_radius = size * 1.2
+            
+            # Clamp to max_radius if provided (prevent row clipping)
+            if max_radius is not None and halo_radius > max_radius:
+                halo_radius = max_radius
+                
+            gradient = QRadialGradient(QPointF(cx, cy), halo_radius)
+            
+            # Gradient stops
+            c_center = QColor(color)
+            c_center.setAlpha(180) # Increased pop (was 150)
+            
+            c_mid = QColor(color)
+            c_mid.setAlpha(60) # Slight mid bump (was 50)
+            
+            c_edge = QColor(color)
+            c_edge.setAlpha(0) # Transparent edge
+            
+            gradient.setColorAt(0.0, c_center)
+            gradient.setColorAt(0.5, c_mid)
+            gradient.setColorAt(1.0, c_edge)
+            
+            painter.setBrush(QBrush(gradient))
+            painter.setPen(Qt.PenStyle.NoPen)
+            
+            # Draw gradient rect (larger than led)
+            h = int(halo_radius)
+            painter.drawEllipse(center, h, h)
+            
+            # 2. Core (Solid, No Pen)
+            painter.setBrush(color)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.drawEllipse(led_rect)
+            
+        else:
+            # Unactive State (Subtle Ring)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(ring_color, 1))
+            painter.drawEllipse(led_rect)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Delegate painting to shared logic
+        GlowLED.draw_led(
+            painter, 
+            self.rect(), 
+            self._color, 
+            self._active, 
+            self._led_size
+        )
+

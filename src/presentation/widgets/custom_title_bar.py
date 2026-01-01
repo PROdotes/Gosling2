@@ -42,11 +42,12 @@ class CustomTitleBar(QWidget):
         from PyQt6.QtWidgets import QGraphicsBlurEffect
         title_text = "GOSLING // WORKSTATION"
         title_container = QWidget()
-        title_container.setFixedSize(220, 40) # Tightened from 300 to avoid extra padding
+        title_container.setFixedSize(320, 40) # Increased from 220 to prevent cropping
         v_center, h_margin = 3, 2
         
         self.lbl_title_glow = QLabel(title_text, title_container)
         self.lbl_title_glow.setObjectName("AppTitleGlow")
+        self.lbl_title_glow.adjustSize()
         blur = QGraphicsBlurEffect()
         blur.setBlurRadius(9)
         self.lbl_title_glow.setGraphicsEffect(blur)
@@ -54,6 +55,7 @@ class CustomTitleBar(QWidget):
         
         self.lbl_title = QLabel(title_text, title_container)
         self.lbl_title.setObjectName("AppTitleLabel")
+        self.lbl_title.adjustSize()
         self.lbl_title.move(h_margin, v_center)
         self.lbl_title.raise_()
         

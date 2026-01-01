@@ -34,8 +34,8 @@ class TestT06Albums(unittest.TestCase):
     def cleanup(self):
         try:
             with self.song_repo.get_connection() as conn:
-                conn.execute("DELETE FROM Albums WHERE Title = ?", (self.test_album,))
-                conn.execute("DELETE FROM MediaSources WHERE Source = ?", (self.test_path,))
+                conn.execute("DELETE FROM Albums WHERE AlbumTitle = ?", (self.test_album,))
+                conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (self.test_path,))
         except Exception:
             pass
 

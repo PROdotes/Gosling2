@@ -1,6 +1,6 @@
 """Library management service"""
 from typing import List, Optional, Tuple
-from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
+from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
 from ...data.models.song import Song
 from ...data.models.album import Album
 
@@ -8,17 +8,32 @@ from ...data.models.album import Album
 class LibraryService:
     """Service for managing the music library"""
 
-    def __init__(self, song_repository: SongRepository, contributor_repository: ContributorRepository, album_repository: Optional[AlbumRepository] = None):
+    def __init__(self, song_repository: SongRepository, contributor_repository: ContributorRepository, 
+                 album_repository: Optional[AlbumRepository] = None,
+                 publisher_repository: Optional[PublisherRepository] = None,
+                 tag_repository: Optional[TagRepository] = None):
         self.song_repository = song_repository
         self.contributor_repository = contributor_repository
         # Optional for now to avoid breaking existing instantiations not yet updated, 
         # but internal logic will assume it exists if needed.
         self.album_repository = album_repository or AlbumRepository()
+        self.publisher_repository = publisher_repository or PublisherRepository()
+        self.tag_repository = tag_repository or TagRepository()
 
     @property
     def album_repo(self):
         """Bridge accessor for UI components expecting 'album_repo'"""
         return self.album_repository
+
+    @property
+    def publisher_repo(self):
+        """Bridge accessor for UI components expecting 'publisher_repo'"""
+        return self.publisher_repository
+
+    @property
+    def tag_repo(self):
+        """Bridge accessor for UI components expecting 'tag_repo'"""
+        return self.tag_repository
 
     def add_file(self, file_path: str) -> Optional[int]:
         """Add a file to the library"""
@@ -157,9 +172,11 @@ class LibraryService:
         elif field_name == "publisher":
             query = "SELECT DISTINCT PublisherName FROM Publishers"
         elif field_name == "genre":
-            query = "SELECT DISTINCT TagName FROM Tags WHERE Category = 'Genre'"
+            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Genre'"
+        elif field_name == "mood":
+            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Mood'"
         elif field_name == "album":
-            query = "SELECT DISTINCT Title FROM Albums"
+            query = "SELECT DISTINCT AlbumTitle FROM Albums"
         elif field_name == "album_artist":
             query = "SELECT DISTINCT AlbumArtist FROM Albums WHERE AlbumArtist IS NOT NULL"
 

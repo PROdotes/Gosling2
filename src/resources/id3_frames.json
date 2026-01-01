@@ -82,10 +82,15 @@
     "TPE3": "Conductor/performer refinement",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
     "TPOS": "Part of a set",
+    "TMOO": {
+        "description": "Mood",
+        "field": "mood",
+        "type": "text"
+    },
     "TPUB": {
         "description": "Publisher",
         "field": "publisher",
-        "type": "text"
+        "type": "list"
     },
     "TRCK": "Track number/Position in set",
     "TRDA": "Recording dates",

@@ -7,7 +7,7 @@ class TagRepository(BaseRepository):
 
     def get_by_id(self, tag_id: int) -> Optional[Tag]:
         """Retrieve tag by ID."""
-        query = "SELECT TagID, TagName, Category FROM Tags WHERE TagID = ?"
+        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ?"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (tag_id,))
             row = cursor.fetchone()
@@ -21,10 +21,10 @@ class TagRepository(BaseRepository):
         If category is None, it matches where Category IS NULL.
         """
         if category:
-            query = "SELECT TagID, TagName, Category FROM Tags WHERE TagName = ? COLLATE NOCASE AND Category = ?"
+            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory = ?"
             params = (name, category)
         else:
-            query = "SELECT TagID, TagName, Category FROM Tags WHERE TagName = ? COLLATE NOCASE AND Category IS NULL"
+            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory IS NULL"
             params = (name,)
             
         with self.get_connection() as conn:
@@ -36,7 +36,7 @@ class TagRepository(BaseRepository):
 
     def create(self, name: str, category: Optional[str] = None) -> Tag:
         """Create a new tag."""
-        query = "INSERT INTO Tags (TagName, Category) VALUES (?, ?)"
+        query = "INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (name, category))
             tag_id = cursor.lastrowid
@@ -75,7 +75,7 @@ class TagRepository(BaseRepository):
             query = """
                 DELETE FROM MediaSourceTags 
                 WHERE SourceID = ? 
-                AND TagID IN (SELECT TagID FROM Tags WHERE Category = ?)
+                AND TagID IN (SELECT TagID FROM Tags WHERE TagCategory = ?)
             """
             params = (source_id, category)
         else:
@@ -89,15 +89,15 @@ class TagRepository(BaseRepository):
         """Get all tags associated with a source item."""
         if category:
             query = """
-                SELECT t.TagID, t.TagName, t.Category
+                SELECT t.TagID, t.TagName, t.TagCategory
                 FROM Tags t
                 JOIN MediaSourceTags mst ON t.TagID = mst.TagID
-                WHERE mst.SourceID = ? AND t.Category = ?
+                WHERE mst.SourceID = ? AND t.TagCategory = ?
             """
             params = (source_id, category)
         else:
             query = """
-                SELECT t.TagID, t.TagName, t.Category
+                SELECT t.TagID, t.TagName, t.TagCategory
                 FROM Tags t
                 JOIN MediaSourceTags mst ON t.TagID = mst.TagID
                 WHERE mst.SourceID = ?
@@ -113,7 +113,7 @@ class TagRepository(BaseRepository):
     
     def get_all_by_category(self, category: str) -> List[Tag]:
         """Get all distinct tags of a certain category."""
-        query = "SELECT TagID, TagName, Category FROM Tags WHERE Category = ? ORDER BY TagName"
+        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagCategory = ? ORDER BY TagName"
         tags = []
         with self.get_connection() as conn:
             cursor = conn.execute(query, (category,))

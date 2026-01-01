@@ -17,9 +17,12 @@ class TestMainWindow:
              patch('src.presentation.views.main_window.SettingsManager') as m_set_cls, \
              patch('src.presentation.views.main_window.RenamingService') as m_ren_cls, \
              patch('src.presentation.views.main_window.DuplicateScannerService') as m_dup_cls, \
-             patch('src.data.repositories.SongRepository'), \
-             patch('src.data.repositories.ContributorRepository'), \
-             patch('src.data.repositories.AlbumRepository'):
+             patch('src.presentation.views.main_window.ConversionService') as m_conv_cls, \
+             patch('src.data.repositories.SongRepository') as m_song_repo, \
+             patch('src.data.repositories.ContributorRepository') as m_contrib_repo, \
+             patch('src.data.repositories.AlbumRepository') as m_album_repo, \
+             patch('src.data.repositories.PublisherRepository') as m_pub_repo, \
+             patch('src.data.repositories.TagRepository') as m_tag_repo:
 
             m_set = MagicMock()
             m_set_cls.return_value = m_set
@@ -33,6 +36,7 @@ class TestMainWindow:
             m_set.get_volume.return_value = 50
             m_set.get_last_playlist.return_value = []
             m_set.get_type_filter.return_value = 0
+            m_set.get_database_path.return_value = ":memory:"  # Safe in-memory path
             mock_settings = m_set # Alias for yield
 
             m_lib = MagicMock()
@@ -40,6 +44,33 @@ class TestMainWindow:
             m_lib.get_all_songs.return_value = ([], [])
             m_lib.get_contributors_by_role.return_value = []
             m_lib.get_all_years.return_value = []
+            
+            # Add repository mocks to library service (needed by SidePanelWidget)
+            mock_contributor = MagicMock()
+            mock_contributor.contributor_id = 1
+            mock_contributor.contributor_name = "Test Artist"
+            m_lib.contributor_repository = MagicMock()
+            m_lib.contributor_repository.get_or_create.return_value = (mock_contributor, False)
+            
+            mock_publisher = MagicMock()
+            mock_publisher.publisher_id = 1
+            mock_publisher.publisher_name = "Test Publisher"
+            mock_publisher.parent_publisher_id = None
+            m_lib.publisher_repo = MagicMock()
+            m_lib.publisher_repo.get_or_create.return_value = (mock_publisher, False)
+            m_lib.publisher_repo.get_by_id.return_value = None
+            
+            mock_album = MagicMock()
+            mock_album.album_id = 1
+            mock_album.title = "Test Album"
+            m_lib.album_repo = MagicMock()
+            m_lib.album_repo.get_or_create.return_value = (mock_album, False)
+            
+            mock_tag = MagicMock()
+            mock_tag.tag_id = 1
+            mock_tag.tag_name = "Test Tag"
+            m_lib.tag_repo = MagicMock()
+            m_lib.tag_repo.get_or_create.return_value = (mock_tag, False)
 
             m_play = MagicMock()
             m_play_cls.return_value = m_play

@@ -34,7 +34,8 @@ links: []
 |----|------|-----|-------|-------|--------|------|
 | T-44 | **Refactor: Dynamic ID3 Read** | 5 | 2 | 20 | ✅ | Dynamic extraction from `id3_frames.json` fully implemented. All 45 tests passing. |
 | T-46 | **Proper Album Editor** | 5 | 3 | 15 | ✅ | [spec](docs/specs/T-46_PROPER_ALBUM_EDITOR.md) — 4-Pane Console (Context/Vault/Inspector/Sidecar) implemented. |
-| T-70 | **Artist Selector** | 5 | 3 | 12 | 🚀 (Next) | T-17 | Replace plain text Artist field with searchable picker (database-backed). Essential for consistent Group metadata. |
+| T-70 | **Artist Selector** | 5 | 3 | 12 | ✅ | T-17 | Replace plain text Artist field with searchable picker (database-backed). Essential for consistent Group metadata. |
+| T-71 | **All Contributors Filter** | 5 | 2 | 20 | ✅ | Implemented recursive "All Contributors" view in Filter Tree with Type Grouping (Groups/People). |
 | T-17 | **Unified Artist View** | 5 | 3 | 15 | ✅ | [spec](docs/issues/T-17_unified_artist_view.md) <br> ([Groups Logic Status](docs/state/GROUPS_LOGIC_STATUS.md)) |
 | T-18 | **Column Resilience** | 5 | 2 | 20 | ✅ | [docs](docs/issues/T-18_column_persistence.md) |
 | T-19 | **Field Editor Hardening** | 5 | 3 | 15 | ✅ | [prop](docs/proposals/PROPOSAL_TOOLING_CONSOLIDATION.md) |
@@ -56,7 +57,7 @@ links: []
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
-| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | SPLIT: library_widget, yellberus, field_editor, song_repository. **song_repository issues**: Raw SQL in `_sync_album`/`_sync_publisher` (should use repos with `conn` param); fragile tuple unpacking in `get_by_path` (use named columns). **Audit**: Remove useless 1-line wrapper methods (pointless indirection). |
+| T-28 | **Refactor: Leviathans** | 4 | 4 | 8 | 📋 | — | [**MASTER PLAN**](docs/proposals/MODULARIZATION_MASTER_PLAN.md) — SPLIT: `library_widget` (2032→7 modules), `side_panel_widget` (1465→6), `yellberus` (673→5), `main_window` (763→5), `filter_widget` (730→4). |
 | — | **Schema Update** | 5 | 3 | 10 | ✅ | — | — |
 | T-05 | **Audit Log (History)** | 5 | 2 | 20 | 📋 | Schema | [spec](docs/issues/T-05_log_core.md) |
 | T-13 | **Undo Core** | 4 | 2 | 8 | 📋 | Log Core | [spec](docs/proposals/PROPOSAL_TRANSACTION_LOG.md) |
@@ -90,6 +91,7 @@ links: []
 | T-43 | **Custom Field Groups** | 3 | 2 | 12 | 📋 | Field Editor | Allow users to define custom groups in Field Editor instead of hardcoded 'Core/Advanced'. |
 | T-45 | **Compilation Paradox** | 3 | 4 | 6 | 📋 | Renaming Service | Investigate/Solve handling of re-releases ("Best of") vs Original Year in folder structure to avoid duplicates/fragmentation. |
 | T-48 | **Duplicate Detection** | 5 | 3 | 12 | ✅ | [proposal](docs/proposals/PROPOSAL_DUPLICATE_DETECTION.md) |
+| T-98 | **Mood Support** | 5 | 2 | 20 | ✅ | — | Implemented distinct tagging system (TMOO) parallel to Genre. |
 | T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
 | T-84 | **System SVGs** | 4 | 2 | 8 | 📋 | UI | Replace Unicode icons in TitleBar/SystemIsland with crisp SVGs. |
 | T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
@@ -155,11 +157,9 @@ links: []
 | **Custom ID3 Tags** | No way to make a field portable without a JSON mapping. User can't specify TXXX:fieldname or custom frames through UI. | ✅ FIXED (Popup implemented) |
 | **Album Duplicates** | `find_by_title` is case-sensitive ("nevermind" != "Nevermind"). And `Greatest Hits` titles merge different artists. | Fix case-sensitivity ASAP. Defer "AlbumArtist" schema change. |
 | **Album Renaming** | `AlbumRepository` has no `update()` method. Typo corrections create orphan albums. | Implement update() + proper migration logic. |
-| **Publisher Hierarchy** | `Publisher.parent_publisher_id` allows circular references (A→B→A). No validation exists. ~~Also: no "get descendants" query.~~ | Add cycle detection in `set_parent()`. ✅ `get_with_descendants()` implemented. |
-| **Repository Duplication** | `AlbumRepository`, `PublisherRepository`, `TagRepository` all have identical CRUD patterns (`get_by_id`, `find_by_name`, `get_or_create`). | Refactor to generic `EntityRepository[T]` base class. ~1 day. |
-| **Filter Widget Legacy** | `library_widget.py` has hardcoded legacy filter methods (`_filter_by_performer`, etc.) that are thin wrappers. `filter_widget.py` has legacy signals. | 🏗️ PARTIAL: Moved Incomplete checkbox and cleaned up top layout (Dec 25). |
 | **Hardcoded Year Autofill** | `SidePanel` hardcodes "Set current year if empty". Should be configurable in Settings. | One Day (Settings UI). |
 | **Hardcoded Composer Splitter** | `SidePanel` auto-splits CamelCase composers if ending in comma. | One Day (Settings UI). |
+| **Publisher Hierarchy** | `Publisher.parent_publisher_id` allows circular references (A→B→A). No validation exists. | ✅ `get_with_descendants()` implemented. UI visualization added. |
 
 ---
 
@@ -172,3 +172,7 @@ links: []
 | [docs/LOGGING.md](docs/LOGGING.md) | Logging Architecture |
 | [docs/UX_UI_CONSTITUTION.md](docs/UX_UI_CONSTITUTION.md) | Radio Automation Design Philosophy |
 | [docs/METADATA_CONSTITUTION.md](docs/METADATA_CONSTITUTION.md) | The Law of Data Relationships |
+| [docs/proposals/MODULARIZATION_MASTER_PLAN.md](docs/proposals/MODULARIZATION_MASTER_PLAN.md) | Big File Refactoring Plan (T-28) |
+| [docs/TEST_REMEDIATION_PLAN.md](docs/TEST_REMEDIATION_PLAN.md) | Test Suite Status (430 tests) |
+| [docs/STRATEGY_v0.2.md](docs/STRATEGY_v0.2.md) | Strangler Fig Refactor Strategy |
+

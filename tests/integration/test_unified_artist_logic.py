@@ -17,7 +17,7 @@ def seed_db(repo):
         
         # 1. Contributors
         # 1=Bob (Person), 2=The Cows (Group), 3=The Bull (Person/Group)
-        cursor.executemany("INSERT INTO Contributors (ContributorID, ContributorName, SortName, Type) VALUES (?, ?, ?, ?)", [
+        cursor.executemany("INSERT INTO Contributors (ContributorID, ContributorName, SortName, ContributorType) VALUES (?, ?, ?, ?)", [
             (1, "Bob", "Bob", "person"),
             (2, "The Cows", "Cows, The", "group"),
             (3, "The Bull", "Bull, The", "group")

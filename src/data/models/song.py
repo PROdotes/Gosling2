@@ -17,8 +17,9 @@ class Song(MediaSource):
     album: Optional[str] = None
     album_id: Optional[int] = None # Added for precise linking (T-46)
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
-    publisher: Optional[str] = None
+    publisher: Optional[object] = None # Union[str, List[str]]
     genre: Optional[str] = None
+    mood: Optional[str] = None
     notes: Optional[str] = None
     is_active: bool = True
     
@@ -28,6 +29,10 @@ class Song(MediaSource):
     lyricists: List[str] = field(default_factory=list)
     producers: List[str] = field(default_factory=list)
     groups: List[str] = field(default_factory=list)
+    
+    # Multi-Album Support (T-22)
+    # List of dicts: {album_id, title, year, track_number, is_primary}
+    releases: List[dict] = field(default_factory=list)
 
     @classmethod
     def from_row(cls, row: tuple) -> 'Song':

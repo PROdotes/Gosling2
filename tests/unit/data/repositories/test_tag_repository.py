@@ -38,7 +38,7 @@ class TestTagRepository:
         fake_source_id = 100
         with repo.get_connection() as conn:
             # We need to insert into MediaSources first with ALL constraints met
-            conn.execute("INSERT INTO MediaSources (SourceID, Source, Name, IsActive, TypeID) VALUES (?, 'test.mp3', 'Test Title', 1, 1)", (fake_source_id,))
+            conn.execute("INSERT INTO MediaSources (SourceID, SourcePath, MediaName, IsActive, TypeID) VALUES (?, 'test.mp3', 'Test Title', 1, 1)", (fake_source_id,))
 
         # Link
         repo.add_tag_to_source(fake_source_id, tag.tag_id)

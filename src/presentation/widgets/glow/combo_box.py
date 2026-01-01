@@ -77,3 +77,5 @@ class GlowComboBox(GlowWidget):
     def setEnabled(self, e): self.combo.setEnabled(e)
     def setEditable(self, e): self.combo.setEditable(e)
     def itemText(self, i): return self.combo.itemText(i)
+    def clearEditText(self): self.combo.clearEditText()
+    def lineEdit(self): return self.combo.lineEdit()

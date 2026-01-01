@@ -150,10 +150,29 @@ Before you (The Agent) commit any test changes, you must answer these three ques
 ---
 
 ## 🚀 Quick Run Commands
+
+### For Humans (Direct pytest)
 ```bash
 # Run Logic only
 pytest tests/unit/ -k "not mutation"
 
 # Run everything
 pytest
+
+# Run with coverage
+pytest --cov=src
 ```
+
+### For Agents/CI (Use wrapper script)
+The `tools/run_tests.py` wrapper solves PowerShell encoding issues and saves clean output to `test_output.txt`:
+```bash
+# Run all tests (output saved to test_output.txt)
+python tools/run_tests.py
+
+# Run with specific options
+python tools/run_tests.py -x --tb=long    # Stop on first failure
+python tools/run_tests.py tests/unit/     # Run only unit tests
+python tools/run_tests.py -q --tb=no      # Minimal output
+```
+
+**Why the wrapper?** PowerShell mangles pytest's progress bars and ANSI codes. The wrapper captures output with proper UTF-8 encoding.

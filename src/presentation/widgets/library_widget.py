@@ -83,8 +83,9 @@ class DropIndicatorHeaderView(QHeaderView):
 class LibraryFilterProxyModel(QSortFilterProxyModel):
     """Proxy model that supports search, type, and advanced multicheck filtering."""
     
-    def __init__(self, parent=None):
+    def __init__(self, contributor_repo=None, parent=None):
         super().__init__(parent)
+        self.contributor_repo = contributor_repo
         self._type_filter_id_list = []
         self._type_column = -1
         
@@ -100,80 +101,143 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
     def setCheckFilters(self, filters: dict, field_indices: dict):
         """Update multicheck filter state {field_name: set(values)}"""
-        self._active_filters = filters
+        # Clear high-frequency caches
+        if hasattr(self, '_filter_cache'):
+            self._filter_cache = {}
+
+        # T-70 Identity Awareness: Expand performers to include aliases/related names
+        processed_filters = filters.copy()
+        if self.contributor_repo and 'performers' in processed_filters:
+            perf_set = processed_filters['performers']
+            if perf_set:
+                expanded = set()
+                for name in perf_set:
+                    # Resolve identity graph (e.g. Robert -> Bob, Bobby)
+                    expanded.update(self.contributor_repo.resolve_identity_graph(name))
+                processed_filters['performers'] = expanded
+
+        self._active_filters = processed_filters
         self._field_indices = field_indices
         self.invalidateFilter()
 
     def setFilterMatchMode(self, mode: str):
         """Set cross-category logic: 'AND' or 'OR'."""
         self._filter_match_mode = mode
+        if hasattr(self, '_filter_cache'):
+            self._filter_cache = {}
         self.invalidateFilter()
 
     def _check_value_match(self, model, row, parent, field_name, required_val) -> bool:
-        """Surgical Match: Handles metadata, lists, and procedural commands."""
-        # Get Column Index
-        col_idx = self._field_indices.get(field_name, -1)
-        if col_idx < 0: return False
+        """Surgical Match: Handles metadata, lists, procedural commands, and virtual filters."""
         
-        # Get Row Data
-        row_val = model.data(model.index(row, col_idx, parent), Qt.ItemDataRole.UserRole)
-        
-        # 1. Procedural Workflow: "READY" (Valid but NOT Done)
-        # 1. Procedural Workflow: "READY" (Valid but NOT Done)
-        if field_name == 'is_done' and required_val == "READY":
-             is_already_done = bool(row_val)
-             # Catch string booleans in row_val (e.g. "1" or "0")
-             if isinstance(row_val, str):
-                 if row_val == "1" or row_val.lower() == "true": is_already_done = True
-                 elif row_val == "0" or row_val.lower() == "false": is_already_done = False
-             elif isinstance(row_val, (int, float)):
-                 is_already_done = bool(row_val)
-                 
-             if is_already_done: return False # Ready means NOT Done.
-             
-             # Construct minimal data row aligned with FIELDS
-             # Yellberus expects a list where index I matches FIELDS[I]
-             validation_row = []
-             for f in yellberus.FIELDS:
-                 f_idx = self._field_indices.get(f.name, -1)
-                 if f_idx >= 0:
-                     val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole)
-                     validation_row.append(val)
-                 else:
-                     validation_row.append(None)
-                     
-             return len(yellberus.validate_row(validation_row)) == 0
-
-        # 2. Normalize Row Data
-        if isinstance(row_val, str) and ',' in row_val:
-            row_items = [s.strip() for s in row_val.split(',')]
-        elif isinstance(row_val, (list, tuple)):
-            row_items = list(row_val)
+        # 1. Identify Target Columns
+        target_indices = []
+        if field_name == 'all_contributors':
+             # T-71 Virtual Filter: Scan all contributor columns
+             contrib_fields = ['performers', 'composers', 'producers', 'lyricists', 'album_artist']
+             for c_field in contrib_fields:
+                 idx = self._field_indices.get(c_field, -1)
+                 if idx >= 0: target_indices.append(idx)
         else:
-            row_items = [row_val]
-
-        # 3. Normalized Matching
+            col_idx = self._field_indices.get(field_name, -1)
+            if col_idx >= 0: target_indices.append(col_idx)
+            
+        if not target_indices: return False
+        
         req_str = str(required_val).lower()
-        for item in row_items:
-            # 1. Exact Match
-            if item == required_val: return True
-            
-            # 2. Boolean Impedance Match (Handling "0" string trap)
-            if isinstance(required_val, bool):
-                bool_item = None
-                if isinstance(item, bool): bool_item = item
-                elif isinstance(item, (int, float)): bool_item = bool(item)
-                elif isinstance(item, str):
-                    # Pitfall: bool("0") is True in Python. Must catch explicitly.
-                    if item == "0" or item.lower() == "false": bool_item = False
-                    elif item == "1" or item.lower() == "true": bool_item = True
-                
-                if bool_item is not None and bool_item == required_val:
-                    return True
+        
+        # Prepare candidates for "All Contributors" (Group Logic)
+        # If user selects "Paul McCartney", we also want to match rows with "The Beatles"
+        match_candidates = {req_str}
+        
+        # T-70: Apply Identity Graph Expansion to Artist fields
+        if field_name in ('all_contributors', 'unified_artist', 'performers'):
+            if not hasattr(self, '_group_membership_cache'): self._group_membership_cache = {}
+            if req_str not in self._group_membership_cache:
+                source_widget = self.parent()
+                if hasattr(source_widget, 'library_service'):
+                    # Find all identities (Aliases + Groups)
+                    # Use resolve_identity_graph to get aliases and group memberships
+                    expanded = source_widget.library_service.contributor_repository.resolve_identity_graph(str(required_val))
+                    self._group_membership_cache[req_str] = {e.lower() for e in expanded}
+                else:
+                    self._group_membership_cache[req_str] = set()
+            match_candidates.update(self._group_membership_cache[req_str])
+        
+        # 2. Iterate Target Columns (Unified Logic)
+        for col_idx in target_indices:
+            row_val = model.data(model.index(row, col_idx, parent), Qt.ItemDataRole.UserRole)
 
-            # 3. String Fallback
-            if str(item).lower() == req_str: return True
-            
+            # A. Special Case: "is_done" Workflow (Only applies if field_name matches)
+            if field_name == 'is_done' and required_val == "READY":
+                 is_already_done = bool(row_val)
+                 if isinstance(row_val, str):
+                     if row_val == "1" or row_val.lower() == "true": is_already_done = True
+                     elif row_val == "0" or row_val.lower() == "false": is_already_done = False
+                 elif isinstance(row_val, (int, float)):
+                     is_already_done = bool(row_val)
+                 
+                 if is_already_done: return False # Ready means NOT Done.
+                 
+                 # Validate Row Completeness
+                 validation_row = []
+                 for f in yellberus.FIELDS:
+                     f_idx = self._field_indices.get(f.name, -1)
+                     val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole) if f_idx >= 0 else None
+                     validation_row.append(val)
+                     
+                 # Pass if validation returns no errors
+                 return len(yellberus.validate_row(validation_row)) == 0
+
+            # B. Normalize Row Data (Handle Lists and CSV Strings)
+            if isinstance(row_val, str) and ',' in row_val:
+                row_items = [s.strip() for s in row_val.split(',')]
+            elif isinstance(row_val, (list, tuple)):
+                row_items = list(row_val)
+            else:
+                row_items = [row_val]
+
+            # C. Match Against Items
+            for item in row_items:
+                # T-70: Strip Payload for matching
+                if isinstance(item, str) and " ::: " in item:
+                    item = item.split(" ::: ")[0].strip()
+                
+                # 1. Exact Match
+                if item == required_val: return True
+                
+                # 2. Boolean Impedance Match
+                if isinstance(required_val, bool):
+                     bool_item = None
+                     if isinstance(item, bool): bool_item = item
+                     elif isinstance(item, (int, float)): bool_item = bool(item)
+                     elif isinstance(item, str):
+                         if item == "0" or item.lower() == "false": bool_item = False
+                         elif item == "1" or item.lower() == "true": bool_item = True
+                     if bool_item is not None and bool_item == required_val: return True
+
+                # 3. String / Candidate Match (includes Group logic)
+                item_lower = str(item).lower()
+                if item_lower in match_candidates: return True
+                
+                # 4. Hierarchical Publisher Logic (T-70)
+                if field_name == 'publisher':
+                    if not hasattr(self, '_publisher_hierarchy_cache'): self._publisher_hierarchy_cache = {}
+                    if not hasattr(self, '_filter_cache'): self._filter_cache = {}
+                    
+                    cache_key = f"pub_descendants_{required_val}"
+                    if cache_key not in self._filter_cache:
+                        source_widget = self.parent()
+                        if hasattr(source_widget, 'library_service'):
+                             svc = source_widget.library_service
+                             pub, _ = svc.publisher_repo.get_or_create(str(required_val))
+                             descendants = svc.publisher_repo.get_with_descendants(pub.publisher_id)
+                             self._filter_cache[cache_key] = {d.publisher_name.lower() for d in descendants}
+                         
+                    valid_names = self._filter_cache.get(cache_key, set())
+                    if str(item).lower() in valid_names:
+                        return True
+
         return False
         
     def filterAcceptsRow(self, source_row, source_parent):
@@ -407,9 +471,9 @@ class LibraryWidget(QWidget):
         
         center_layout.addWidget(header_container)
         
-        # The Library Table
+        # Digital Filter Brain
         self.library_model = QStandardItemModel()
-        self.proxy_model = LibraryFilterProxyModel()
+        self.proxy_model = LibraryFilterProxyModel(self.library_service.contributor_repository, parent=self)
         self.proxy_model.setSourceModel(self.library_model)
         self.proxy_model.setFilterKeyColumn(-1) # Search all columns
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -453,6 +517,8 @@ class LibraryWidget(QWidget):
         # Tri-State Sorting (Asc -> Desc -> Reset)
         header.setSortIndicatorShown(True) # Force indicator since sortingEnabled is False
         header.sectionClicked.connect(self._handle_sort_request)
+        # T-70: "Turbo Sort" - Treat double-click as second sort toggle
+        header.sectionDoubleClicked.connect(self._handle_sort_request)
         
         # T-18: Auto-save layout on move/resize
         header.sectionMoved.connect(self._on_column_moved)
@@ -1091,7 +1157,8 @@ class LibraryWidget(QWidget):
 
     def _on_filter_reset(self) -> None:
         """Reset all filtering state."""
-        self.load_library(refresh_filters=False) 
+        # Must refresh filters (populate) to restore expansion state and update counts
+        self.load_library(refresh_filters=True) 
         self._on_multicheck_filter_changed({})
 
     def _import_file(self, file_path: str) -> bool:
@@ -1749,9 +1816,14 @@ class LibraryWidget(QWidget):
     def set_search_text(self, text: str) -> None:
         """Public slot for global search box."""
         self.proxy_model.setFilterFixedString(text)
+        
         # Also filter the filter tree
         if hasattr(self, 'filter_widget') and self.filter_widget:
-            self._filter_tree_items(text)
+            if not text:
+                # Restore full tree and expansion state on clear
+                self.filter_widget.populate()
+            else:
+                self._filter_tree_items(text)
 
     def _filter_tree_items(self, search_text: str) -> None:
         """Filter filter tree items based on search text. Hides leaf items that don't match,
@@ -1768,11 +1840,12 @@ class LibraryWidget(QWidget):
             root_item = model.item(row)
             if root_item:
                 self._filter_tree_item_recursive(root_item, search_lower, tree_view, model)
+        
+        # After filtering, restore expansion state for items that are now visible
+        self.filter_widget.restore_expansion_state()
     
     def _filter_tree_item_recursive(self, item, search_text, tree_view, model) -> bool:
         """Recursively filter tree items. Returns True if item or any child matches."""
-        hint = item.data(Qt.ItemDataRole.AccessibleTextRole)
-        
         # For leaf items (checkable), check if text matches
         if item.isCheckable():
             item_text = item.text().lower()
@@ -1781,7 +1854,7 @@ class LibraryWidget(QWidget):
             tree_view.setRowHidden(index.row(), index.parent(), not matches)
             return matches
         
-        # For parent/branch items, check children
+        # For parent/branch items, check children first
         has_visible_child = False
         for child_row in range(item.rowCount()):
             child_item = item.child(child_row)
@@ -1791,14 +1864,7 @@ class LibraryWidget(QWidget):
         
         # Hide parent if no visible children
         index = model.indexFromItem(item)
-        if hint == "root":
-            # Hide roots too if they have no visible children
-            tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
-            if not has_visible_child and search_text:
-                tree_view.collapse(index)
-        else:
-            # Hide branches with no visible children
-            tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
+        tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
         
         return has_visible_child
 
@@ -2149,4 +2215,3 @@ class LibraryWidget(QWidget):
         except (ValueError, TypeError):
             pass
         return None
-

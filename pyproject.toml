@@ -3,7 +3,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = ["-v", "--strict-markers", "--ignore=tests/disabled_integrity"]
+addopts = ["-v", "--strict-markers", "--color=no", "--tb=short"]
 
 [tool.coverage.run]
 source = ["src"]

@@ -158,6 +158,37 @@ def mock_widget_deps():
     # Default library data (Empty but structured)
     deps['library_service'].get_all_songs.return_value = ([], [])
     
+    # Repository mocks (SidePanelWidget accesses these via library_service)
+    # Contributor repo
+    mock_contributor = MagicMock()
+    mock_contributor.contributor_id = 1
+    mock_contributor.contributor_name = "Test Artist"
+    deps['library_service'].contributor_repository = MagicMock()
+    deps['library_service'].contributor_repository.get_or_create.return_value = (mock_contributor, False)
+    
+    # Publisher repo
+    mock_publisher = MagicMock()
+    mock_publisher.publisher_id = 1
+    mock_publisher.publisher_name = "Test Publisher"
+    mock_publisher.parent_publisher_id = None
+    deps['library_service'].publisher_repo = MagicMock()
+    deps['library_service'].publisher_repo.get_or_create.return_value = (mock_publisher, False)
+    deps['library_service'].publisher_repo.get_by_id.return_value = None
+    
+    # Album repo
+    mock_album = MagicMock()
+    mock_album.album_id = 1
+    mock_album.title = "Test Album"
+    deps['library_service'].album_repo = MagicMock()
+    deps['library_service'].album_repo.get_or_create.return_value = (mock_album, False)
+    
+    # Tag repo (for Genre/Mood)
+    mock_tag = MagicMock()
+    mock_tag.tag_id = 1
+    mock_tag.tag_name = "Test Genre"
+    deps['library_service'].tag_repo = MagicMock()
+    deps['library_service'].tag_repo.get_or_create.return_value = (mock_tag, False)
+    
     return deps
 
 @pytest.fixture

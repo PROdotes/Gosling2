@@ -242,3 +242,132 @@ class TestSongRepoEdgeCases:
 
 
 
+class TestSongRepoMultiAlbum:
+    """Tests for Phase 2/3 Multi-Album Infrastructure."""
+
+    def test_sync_album_non_destructive(self, song_repo, sample_song):
+        """Verify _sync_album promotes new target and preserves old links."""
+        crud = TestSongRepoCRUD()
+        file_id = crud._create_song(song_repo, sample_song)
+        
+        # 1. Link to Album A (Primary)
+        sample_song.album = "Album A"
+        sample_song.recording_year = 2020
+        
+        with song_repo.get_connection() as conn:
+            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            conn.commit()
+        
+        # Verify 1 link
+        with song_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT AlbumID, IsPrimary FROM SongAlbums WHERE SourceID = ?", (file_id,))
+            links = cursor.fetchall()
+            assert len(links) == 1
+            id_a = links[0][0]
+            assert links[0][1] == 1 # Primary
+
+        # 2. Link to Album B (Should Become Primary, A becomes Secondary)
+        sample_song.album = "Album B"
+        with song_repo.get_connection() as conn:
+            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            conn.commit()
+        
+        # Verify 2 links
+        with song_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT AlbumID, IsPrimary FROM SongAlbums WHERE SourceID = ? ORDER BY AlbumID", (file_id,))
+            links = cursor.fetchall()
+            assert len(links) == 2
+            
+            # Map ID to Primary status
+            status_map = {row[0]: row[1] for row in links}
+            
+            # A should be 0
+            assert status_map[id_a] == 0
+            
+            # B (the new one) should be 1
+            id_b = [k for k in status_map.keys() if k != id_a][0]
+            assert status_map[id_b] == 1
+
+    def test_sync_publisher_single_paradox(self, song_repo, sample_song):
+        """Verify 'Single' album creation if no album exists but publisher does."""
+        crud = TestSongRepoCRUD()
+        file_id = crud._create_song(song_repo, sample_song)
+        
+        sample_song.publisher = "Indie Label"
+        sample_song.album = None # Explicitly None for Single Paradox
+        
+        with song_repo.get_connection() as conn:
+            song_repo._sync_publisher(sample_song, conn)
+            conn.commit()
+            
+        # Verify Album 'Single' created
+        with song_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            # Check SongAlbums
+            cursor.execute("SELECT AlbumID FROM SongAlbums WHERE SourceID = ?", (file_id,))
+            link = cursor.fetchone()
+            assert link is not None
+            alb_id = link[0]
+            
+            # Check Album Type
+            cursor.execute("SELECT AlbumTitle, AlbumType FROM Albums WHERE AlbumID = ?", (alb_id,))
+            alb = cursor.fetchone()
+            assert alb[1] == "Single"
+            
+            # Verify Publisher linked to Album (Level 2)
+            cursor.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (alb_id,))
+            pub_link = cursor.fetchone()
+            assert pub_link is not None
+
+    def test_sync_publisher_track_override(self, song_repo, sample_song):
+        """Verify Track Override (Level 1) vs Album (Level 2)."""
+        crud = TestSongRepoCRUD()
+        file_id = crud._create_song(song_repo, sample_song)
+        
+        # 1. Setup Album A with "Major Label"
+        sample_song.album = "Album A"
+        
+        with song_repo.get_connection() as conn:
+            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            
+            # Manually set Album Publisher to Major Label
+            cursor = conn.cursor()
+            cursor.execute("SELECT AlbumID FROM SongAlbums WHERE SourceID=?", (file_id,))
+            row = cursor.fetchone()
+            assert row is not None
+            alb_id = row[0]
+            
+            cursor.execute("INSERT INTO Publishers (PublisherName) VALUES ('Major Label')")
+            maj_id = cursor.lastrowid
+            cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (alb_id, maj_id))
+            conn.commit()
+
+        # 2. Set 'Remix Label' on Song (Override)
+        sample_song.publisher = "Remix Label"
+        with song_repo.get_connection() as conn:
+            song_repo._sync_publisher(sample_song, conn)
+            conn.commit()
+            
+        # 3. Verify Waterfall Resolution via get_songs_by_ids
+        # This checks the SQL Priority Logic
+        fetched_list = song_repo.get_songs_by_ids([file_id])
+        assert len(fetched_list) == 1
+        fetched = fetched_list[0]
+        
+        # Should return "Remix Label" (Level 1)
+        assert fetched.publisher == ["Remix Label"]
+        
+        # Verify Level 2 (Album Publisher) is still "Major Label" in DB
+        with song_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID=?", (alb_id,))
+            pids = [r[0] for r in cursor.fetchall()]
+            assert maj_id in pids # Should still be there
+            
+            # Verify TrackPublisherID is set
+            cursor.execute("SELECT TrackPublisherID FROM SongAlbums WHERE SourceID=?", (file_id,))
+            track_pid = cursor.fetchone()[0]
+            assert track_pid is not None
+            assert track_pid != maj_id

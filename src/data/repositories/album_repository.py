@@ -7,7 +7,7 @@ class AlbumRepository(BaseRepository):
 
     def get_by_id(self, album_id: int) -> Optional[Album]:
         """Retrieve album by ID."""
-        query = "SELECT AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
+        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (album_id,))
             row = cursor.fetchone()
@@ -17,7 +17,7 @@ class AlbumRepository(BaseRepository):
 
     def find_by_title(self, title: str) -> Optional[Album]:
         """Retrieve album by exact title match (case-insensitive)."""
-        query = "SELECT AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE Title = ? COLLATE NOCASE"
+        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (title,))
             row = cursor.fetchone()
@@ -36,7 +36,7 @@ class AlbumRepository(BaseRepository):
         Handles NULL values appropriately for disambiguation.
         """
         # Build query dynamically based on what's provided
-        conditions = ["Title = ? COLLATE NOCASE"]
+        conditions = ["AlbumTitle = ? COLLATE NOCASE"]
         params = [title]
         
         if album_artist:
@@ -50,7 +50,7 @@ class AlbumRepository(BaseRepository):
             params.append(release_year)
         
         query = f"""
-            SELECT AlbumID, Title, AlbumArtist, AlbumType, ReleaseYear 
+            SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear 
             FROM Albums 
             WHERE {' AND '.join(conditions)}
         """
@@ -69,14 +69,14 @@ class AlbumRepository(BaseRepository):
         
         sql_query = f"""
             SELECT 
-                a.AlbumID, a.Title, a.AlbumArtist, a.AlbumType, a.ReleaseYear,
+                a.AlbumID, a.AlbumTitle, a.AlbumArtist, a.AlbumType, a.ReleaseYear,
                 COUNT(sa.SourceID) as SongCount
             FROM Albums a
             LEFT JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
-            WHERE a.Title LIKE ? OR a.AlbumArtist LIKE ?
+            WHERE a.AlbumTitle LIKE ? OR a.AlbumArtist LIKE ?
             GROUP BY a.AlbumID
             {having_clause}
-            ORDER BY CASE WHEN a.Title LIKE ? THEN 1 ELSE 2 END, a.Title
+            ORDER BY CASE WHEN a.AlbumTitle LIKE ? THEN 1 ELSE 2 END, a.AlbumTitle
             LIMIT ?
         """
         wildcard = f"%{query}%"
@@ -122,7 +122,7 @@ class AlbumRepository(BaseRepository):
     ) -> Album:
         """Create a new album."""
         query = """
-            INSERT INTO Albums (Title, AlbumArtist, AlbumType, ReleaseYear)
+            INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear)
             VALUES (?, ?, ?, ?)
         """
         with self.get_connection() as conn:
@@ -161,7 +161,7 @@ class AlbumRepository(BaseRepository):
             return False
         query = """
             UPDATE Albums
-            SET Title = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ?
+            SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ?
             WHERE AlbumID = ?
         """
         try:
@@ -183,13 +183,19 @@ class AlbumRepository(BaseRepository):
             return False
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:
-        """Link a song to an album."""
-        query = """
-            INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber)
-            VALUES (?, ?, ?)
-        """
+        """Link a song to an album. First link is Primary."""
         with self.get_connection() as conn:
-            conn.execute(query, (source_id, album_id, track_number))
+            # Check if any primary link exists
+            cur = conn.execute("SELECT 1 FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1", (source_id,))
+            has_primary = cur.fetchone() is not None
+            
+            is_primary = 0 if has_primary else 1
+            
+            query = """
+                INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary)
+                VALUES (?, ?, ?, ?)
+            """
+            conn.execute(query, (source_id, album_id, track_number, is_primary))
 
     def remove_song_from_album(self, source_id: int, album_id: int) -> None:
         """Unlink a song from an album."""
@@ -200,7 +206,7 @@ class AlbumRepository(BaseRepository):
     def get_albums_for_song(self, source_id: int) -> List[Album]:
         """Get all albums a song appears on."""
         query = """
-            SELECT a.AlbumID, a.Title, a.AlbumArtist, a.AlbumType, a.ReleaseYear
+            SELECT a.AlbumID, a.AlbumTitle, a.AlbumArtist, a.AlbumType, a.ReleaseYear
             FROM Albums a
             JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
             WHERE sa.SourceID = ?
@@ -218,7 +224,7 @@ class AlbumRepository(BaseRepository):
         Returns [{'title': str, 'artist': str}]
         """
         query = """
-            SELECT MS.Name, 
+            SELECT MS.MediaName, 
                    COALESCE(
                        (SELECT Group_Concat(C.ContributorName, ', ') 
                         FROM MediaSourceContributorRoles MSCR 
@@ -227,21 +233,36 @@ class AlbumRepository(BaseRepository):
                         WHERE MSCR.SourceID = MS.SourceID AND R.RoleName = 'Performer'
                        ), 
                        'Unknown'
-                   ) as Artist
+                   ) as Artist,
+                   SA.IsPrimary,
+                   MS.SourceID
             FROM MediaSources MS
             JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
             WHERE SA.AlbumID = ?
-            ORDER BY SA.TrackNumber ASC, MS.Name ASC
+            ORDER BY SA.TrackNumber ASC, MS.MediaName ASC
         """
         songs = []
         try:
             with self.get_connection() as conn:
                 cursor = conn.execute(query, (album_id,))
                 for row in cursor.fetchall():
-                    songs.append({'title': row[0], 'artist': row[1]})
+                    songs.append({
+                        'title': row[0], 
+                        'artist': row[1],
+                        'is_primary': bool(row[2]),
+                        'source_id': row[3]
+                    })
         except Exception as e:
             print(f"Error fetching album songs: {e}")
         return songs
+
+    def set_primary_album(self, source_id: int, album_id: int) -> None:
+        """Promote an album link to be the Primary source."""
+        with self.get_connection() as conn:
+            # 1. Demote all
+            conn.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,))
+            # 2. Promote specific
+            conn.execute("UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id))
 
     def get_item_albums(self, source_id: int) -> List[Album]:
         """Get albums linked to a source item."""
@@ -289,13 +310,12 @@ class AlbumRepository(BaseRepository):
             return row[0] if row else 0
 
     def get_publisher(self, album_id: int) -> Optional[str]:
-        """Get the primary publisher name for an album."""
+        """Get all publisher names for an album (comma-separated)."""
         query = """
-            SELECT p.PublisherName 
+            SELECT GROUP_CONCAT(p.PublisherName, ', ')
             FROM Publishers p
             JOIN AlbumPublishers ap ON p.PublisherID = ap.PublisherID
             WHERE ap.AlbumID = ?
-            LIMIT 1
         """
         with self.get_connection() as conn:
             cursor = conn.execute(query, (album_id,))

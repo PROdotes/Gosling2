@@ -1,0 +1,55 @@
+[
+    {
+        "name": "Nirvana",
+        "type": "group",
+        "members": [
+            "Kurt Cobain",
+            "Dave Grohl",
+            "Krist Novoselic"
+        ]
+    },
+    {
+        "name": "Queen",
+        "type": "group",
+        "members": [
+            "Freddie Mercury",
+            "Brian May",
+            "Roger Taylor",
+            "John Deacon"
+        ]
+    },
+    {
+        "name": "Freddie Mercury",
+        "type": "person",
+        "aliases": [
+            "Farrokh Bulsara"
+        ]
+    },
+    {
+        "name": "The Beatles",
+        "type": "group",
+        "members": [
+            "John Lennon",
+            "Paul McCartney",
+            "George Harrison",
+            "Ringo Starr"
+        ]
+    },
+    {
+        "name": "ABBA",
+        "type": "group",
+        "members": [
+            "Agnetha Fältskog",
+            "Björn Ulvaeus",
+            "Benny Andersson",
+            "Anni-Frid Lyngstad"
+        ]
+    },
+    {
+        "name": "DJ Someone",
+        "type": "person",
+        "aliases": [
+            "The Ghost of Mixes"
+        ]
+    }
+]

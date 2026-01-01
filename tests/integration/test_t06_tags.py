@@ -29,7 +29,7 @@ class TestT06Tags(unittest.TestCase):
         try:
             with self.song_repo.get_connection() as conn:
                 conn.execute("DELETE FROM Tags WHERE TagName LIKE 'T06_%'")
-                conn.execute("DELETE FROM MediaSources WHERE Source = ?", (self.test_path,))
+                conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (self.test_path,))
         except Exception:
             pass
 

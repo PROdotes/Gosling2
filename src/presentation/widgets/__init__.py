@@ -8,3 +8,5 @@ from .custom_title_bar import CustomTitleBar
 from .jingle_curtain import JingleCurtain
 from .history_drawer import HistoryDrawer
 from .system_island import SystemIsland
+from .chip_tray_widget import ChipTrayWidget
+from .flow_layout import FlowLayout

@@ -149,16 +149,20 @@ class MainWindow(QMainWindow):
         db_path = self.settings_manager.get_database_path()
 
         # 2. Initialize Data Access Layer with injected path
-        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository
+        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
         self.song_repository = SongRepository(db_path)
         self.contributor_repository = ContributorRepository(db_path)
         self.album_repository = AlbumRepository(db_path)
+        self.publisher_repository = PublisherRepository(db_path)
+        self.tag_repository = TagRepository(db_path)
 
         # 3. Initialize Business Services
         self.library_service = LibraryService(
             self.song_repository, 
             self.contributor_repository, 
-            self.album_repository
+            self.album_repository,
+            self.publisher_repository,
+            self.tag_repository
         )
         self.metadata_service = MetadataService()
         self.playback_service = PlaybackService(self.settings_manager)
@@ -673,6 +677,18 @@ class MainWindow(QMainWindow):
         songs_to_check = []
         albums_to_check = set()
         
+        # T-70: Smart Filter Refresh
+        # Only rebuild the expensive filter tree if a "Filter-Critical" field changed.
+        needs_filter_refresh = False
+        filter_triggers = {
+            'performers', 'groups', 'unified_artist', 
+            'album', 'composers', 'publisher', 
+            'recording_year', 'year', 
+            'genre', 'genre_list', 'mood', 'mood_list', 
+            'bpm', 'energy', 'initial_key', 
+            'is_done'
+        }
+        
         try:
             for song_id, changes in staged_changes.items():
                 song = self.library_service.song_repository.get_by_id(song_id)
@@ -684,6 +700,8 @@ class MainWindow(QMainWindow):
                 
                 # Apply changes with type coercion
                 for field_name, value in changes.items():
+                    if field_name in filter_triggers:
+                        needs_filter_refresh = True
                     try:
                         field_def = self._get_yellberus_field(field_name)
                         if not field_def: continue
@@ -749,7 +767,7 @@ class MainWindow(QMainWindow):
                     # Trigger rename (which handles its own confirmation)
                     self.library_widget.rename_selection(refresh=False)
                 
-                self.library_widget.load_library(refresh_filters=False)
+                self.library_widget.load_library(refresh_filters=needs_filter_refresh)
                 
                 # Restore Selection
                 if selected_ids:

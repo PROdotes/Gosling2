@@ -7,7 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
 from typing import Any
 from ...core import yellberus
 from ...resources import constants
-from .glow_factory import GlowButton
+from .glow_factory import GlowButton, GlowLED
 
 class FlowLayout(QLayout):
     """Layout that arranges items horizontally and wraps them to the next line."""
@@ -91,7 +91,21 @@ class FlowLayout(QLayout):
 
 class FilterTree(QTreeView):
     """Tree view for filters."""
-    pass
+    user_interaction = False
+
+    def mousePressEvent(self, event):
+        self.user_interaction = True
+        try:
+            super().mousePressEvent(event)
+        finally:
+            self.user_interaction = False
+
+    def keyPressEvent(self, event):
+        self.user_interaction = True
+        try:
+            super().keyPressEvent(event)
+        finally:
+            self.user_interaction = False
 
 class FilterTreeDelegate(QStyledItemDelegate):
     """Delegate for drawing hierarchical filter tree items.
@@ -153,7 +167,7 @@ class FilterTreeDelegate(QStyledItemDelegate):
 
         painter.restore()
         
-        root_x, branch_x, child_x = 30, 45, 60
+        root_x, branch_x, child_x = 30, 35, 55
         
         if hint == "root":
             painter.save()
@@ -174,21 +188,30 @@ class FilterTreeDelegate(QStyledItemDelegate):
             painter.restore()
         else:
             painter.save()
+            
+            # Determine indent based on parent type
+            parent_hint = index.parent().data(Qt.ItemDataRole.AccessibleTextRole) if index.parent().isValid() else None
+            if parent_hint == "root":
+                # Direct child of root - use branch indentation
+                item_x = branch_x
+            else:
+                # Child of branch - use deeper indentation
+                item_x = child_x
+            
             led_size = 8
-            led_rect = QRect(child_x, option.rect.y() + (option.rect.height() - led_size)//2, led_size, led_size)
+            led_rect = QRect(item_x, option.rect.y() + (option.rect.height() - led_size)//2, led_size, led_size)
             check_val = index.data(Qt.ItemDataRole.CheckStateRole)
             is_checked = (check_val == Qt.CheckState.Checked or check_val == 2)
-            if is_checked:
-                painter.setBrush(sig_color); painter.setPen(QPen(sig_color, 1))
-                painter.drawEllipse(led_rect)
-            else:
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                unchecked_border = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
-                painter.setPen(QPen(unchecked_border, 1))
-                painter.drawEllipse(led_rect)
+            # T-70: Unified LED Rendering via GlowLED
+            # We pass the led_rect. Since it's exactly led_size x led_size, 
+            # centering logic in draw_led effectively fills it.
+            ring_col = alt_color if alt_color.isValid() else None
+            # Clamp glow to row height to prevent clipping
+            max_r = min((option.rect.height() / 2) - 1, led_size * 2) 
+            GlowLED.draw_led(painter, led_rect, sig_color, is_checked, led_size, ring_color=ring_col, max_radius=max_r)
             child_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
             painter.setPen(child_text)
-            text_rect = option.rect.adjusted(child_x + 18, 0, 0, 0)
+            text_rect = option.rect.adjusted(item_x + 18, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
 
@@ -233,8 +256,8 @@ class FilterWidget(QFrame):
         self.tree_view.setItemDelegate(FilterTreeDelegate())
         
         # Connect expansion signals for state persistence
-        self.tree_view.expanded.connect(self._on_item_expanded)
-        self.tree_view.collapsed.connect(self._on_item_collapsed)
+        self.tree_view.expanded.connect(self._on_tree_expanded)
+        self.tree_view.collapsed.connect(self._on_tree_collapsed)
         
         # 2. COMMAND RAIL (HUD Level Control)
         rail_layout = QHBoxLayout()
@@ -264,17 +287,20 @@ class FilterWidget(QFrame):
         # 3. PRIMARY VIEWPORT
         layout.addWidget(self.tree_view, 1)
 
-        # 4. CHIP BAY
+        # 4. CHIP BAY (Active Filters)
+        # Persistent Footer (No Layout Jumps)
         self.chip_bay_scroll = QScrollArea()
         self.chip_bay_scroll.setObjectName("ChipBayScroll")
         self.chip_bay_scroll.setWidgetResizable(True)
-        self.chip_bay_scroll.setMinimumHeight(85)
-        self.chip_bay_scroll.setMaximumHeight(150)
+        self.chip_bay_scroll.setMinimumHeight(110)
+        self.chip_bay_scroll.setMaximumHeight(200)
+        self.chip_bay_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.chip_bay_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.chip_bay_scroll.setVisible(False)
+        # Always Visible
+        self.chip_bay_scroll.setVisible(True)
         
         self.chip_container = QWidget()
-        self.chip_container.setObjectName("ChipContainer") # Ensure transparent background via CSS if needed
+        self.chip_container.setObjectName("ChipContainer")
         self.chip_layout = FlowLayout(self.chip_container, margin=4, hspacing=6, vspacing=6)
         self.chip_bay_scroll.setWidget(self.chip_container)
         
@@ -298,12 +324,18 @@ class FilterWidget(QFrame):
                 self._add_boolean_filter(field)
             elif field.strategy == "range":
                 self._add_range_filter(field)
-                
-        self.tree_view.collapseAll()
+
+        # T-71/Req 4: All Contributors (Virtual Filter)
+        # This aggregates all roles into one master list
+        self._add_all_contributors_filter()
+        
         self._block_signals = False
         
         # Restore saved expansion state
         self.restore_expansion_state()
+        
+        # Initialize Chip Bay (Show placeholder)
+        self._sync_chip_bay()
 
     def _add_list_filter(self, field: yellberus.FieldDef) -> None:
         values = self._get_field_values(field)
@@ -315,14 +347,60 @@ class FilterWidget(QFrame):
         root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
         root_item.setData("root", Qt.ItemDataRole.AccessibleTextRole)
 
-        grouper_fn = yellberus.GROUPERS.get(field.strategy)
-        if grouper_fn:
-            self._add_grouped_items(root_item, field, values, grouper_fn)
+        # T-70/User Req 3: Type Grouping for Performers
+        if field.name == 'performers':
+             self._add_type_grouped_items(root_item, field, values)
         else:
-            for value in values:
-                self._add_leaf_item(root_item, field, value)
+            grouper_fn = yellberus.GROUPERS.get(field.strategy)
+            if grouper_fn:
+                self._add_grouped_items(root_item, field, values, grouper_fn)
+            else:
+                for value in values:
+                    self._add_leaf_item(root_item, field, value)
         
         self.tree_model.appendRow(root_item)
+
+    def _add_type_grouped_items(self, root, field, values):
+        """Group items by Person/Group type."""
+        # Fetch types
+        # Note: values contains strings.
+        from src.core import logger
+        
+        try:
+             type_map = self.library_service.contributor_repository.get_types_for_names(values)
+        except Exception:
+             type_map = {}
+             
+        bins = {
+            'group': [],
+            'person': [], 
+            'unknown': []
+        }
+        
+        for val in values:
+            t = type_map.get(val, 'unknown')
+            bins[t].append(val)
+            
+        # Helper to create a branch
+        def add_branch(header, items):
+            if not items: return
+            branch = QStandardItem(header)
+            branch.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)
+            branch.setCheckState(Qt.CheckState.Unchecked)
+            branch.setData("branch", Qt.ItemDataRole.AccessibleTextRole)
+            items.sort(key=lambda x: str(x).lower())
+            
+            for item_val in items:
+                self._add_leaf_item(branch, field, item_val)
+            
+            root.appendRow(branch)
+
+        add_branch("Groups 👥", bins['group'])
+        add_branch("People 👤", bins['person'])
+        
+        # For unknown, add directly to root or branch? 
+        # "Unclassified" branch is cleaner.
+        add_branch("Unclassified / Aliases", bins['unknown'])
 
     def _add_grouped_items(self, root_item, field, values, grouper_fn):
         groups = {}
@@ -332,16 +410,69 @@ class FilterWidget(QFrame):
                 groups[group_name] = []
             groups[group_name].append(value)
         
-        for group_name in sorted(groups.keys(), reverse=True):
+        for group_name in sorted(groups.keys()):
             group_item = QStandardItem(group_name)
-            group_item.setFlags(group_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            group_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)
+            group_item.setCheckState(Qt.CheckState.Unchecked)
             group_item.setData("branch", Qt.ItemDataRole.AccessibleTextRole)
             group_item.setData(field.name, Qt.ItemDataRole.UserRole + 1) # Pass field down
 
-            for value in sorted(groups[group_name], reverse=True):
+            for value in sorted(groups[group_name]):
                 self._add_leaf_item(group_item, field, value)
             
             root_item.appendRow(group_item)
+
+    def _add_all_contributors_filter(self):
+        """Add virtual 'All Contributors' filter node."""
+        all_names = set()
+        
+        # Aggregate from actual Song metadata (Source of Truth for Filter)
+        # We scan the columns used by the relevant fields.
+        target_fields = ['performers', 'composers', 'producers', 'lyricists', 'album_artist']
+        
+        from src.core import logger
+        
+        try:
+            # We must use the Junction Table logic because columns like 'Performers' 
+            # are virtual aggregates, not real columns in the Songs table.
+            
+            with self.library_service.song_repository.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Fetch ALL contributors (Source of Truth)
+                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
+                for row in cursor.fetchall():
+                     all_names.add(row[0])
+
+                # Fetch ALL Aliases
+                cursor.execute("SELECT DISTINCT AliasName FROM ContributorAliases ORDER BY AliasName")
+                for row in cursor.fetchall():
+                     all_names.add(row[0])
+            
+        except Exception as e:
+            logger.error(f"Error populating All Contributors filter: {e}")
+            
+        values = sorted(list(all_names))
+
+        if not values: return
+
+        # Create pseudo-field
+        field = yellberus.FieldDef(
+            name='all_contributors',
+            ui_header='All Contributors',
+            db_column='Virtual',
+            strategy='list'
+        )
+        
+        root_item = QStandardItem(field.ui_header)
+        root_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable) # Root not checkable or editable
+        root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+        root_item.setData("root", Qt.ItemDataRole.AccessibleTextRole)
+
+        # Reuse Type Grouping logic
+        self._add_type_grouped_items(root_item, field, values)
+        
+        self.tree_model.appendRow(root_item)
 
     def _add_leaf_item(self, parent, field, value):
         item = QStandardItem(str(value))
@@ -408,7 +539,15 @@ class FilterWidget(QFrame):
         expression = field.query_expression or field.db_column
         if not expression: return []
         try:
-            return self.library_service.get_distinct_filter_values(field.name)
+            raw_values = self.library_service.get_distinct_filter_values(field.name)
+            # T-70: Strip Payload for UI display
+            cleaned_values = []
+            for v in raw_values:
+                if v and isinstance(v, str) and " ::: " in v:
+                    cleaned_values.append(v.split(" ::: ")[0].strip())
+                else:
+                    cleaned_values.append(v)
+            return sorted(list(set(cleaned_values))) # Unique and sorted
         except Exception:
             return []
 
@@ -418,17 +557,36 @@ class FilterWidget(QFrame):
         item = self.tree_model.itemFromIndex(index)
         if not item: return
 
+        is_branch = item.data(Qt.ItemDataRole.AccessibleTextRole) == "branch"
+
         # IMPORTANT: Click handling (The Switchboard)
-        # Even single clicks on the row (not just the checkbox) should toggle checkable items
-        if item.isCheckable():
+        # Even single clicks on the row (not just the checkbox) should toggle checkable items, BUT:
+        # If it's a BRANCH, users expect expansion on click, not check toggling (unless on the box).
+        # Since we can't easily detect "click on box" vs "click on text" here without QMouseEvent...
+        # We will prioritize EXPANSION for branches.
+        
+        if is_branch:
+             self.tree_view.user_interaction = True
+             try:
+                 if self.tree_view.isExpanded(index):
+                     self.tree_view.collapse(index)
+                 else:
+                     self.tree_view.expand(index)
+             finally:
+                 self.tree_view.user_interaction = False
+        elif item.isCheckable():
             new_state = Qt.CheckState.Checked if item.checkState() == Qt.CheckState.Unchecked else Qt.CheckState.Unchecked
             item.setCheckState(new_state)
         else:
-            # For non-checkable items (headers/branches), toggle expansion
-            if self.tree_view.isExpanded(index):
-                self.tree_view.collapse(index)
-            else:
-                self.tree_view.expand(index)
+            # Fallback for non-checkable non-branches (Roots?)
+            self.tree_view.user_interaction = True
+            try:
+                if self.tree_view.isExpanded(index):
+                    self.tree_view.collapse(index)
+                else:
+                    self.tree_view.expand(index)
+            finally:
+                self.tree_view.user_interaction = False
 
     def _on_tree_double_clicked(self, index) -> None:
         if not index.isValid(): return
@@ -438,22 +596,59 @@ class FilterWidget(QFrame):
         # Reset filter on root doubleclick if it's a root
         if item.parent() is None:
             self.reset_filter.emit()
+        # T-70: "Turbo Click" Fix
+        # If user clicks fast on a checkable item (leaf), Qt sees it as DoubleClick.
+        # We process this as a second toggle to support rapid-fire filtering.
+        elif item.isCheckable():
+             new_state = Qt.CheckState.Checked if item.checkState() == Qt.CheckState.Unchecked else Qt.CheckState.Unchecked
+             item.setCheckState(new_state)
 
     def _on_item_changed(self, item):
         if self._block_signals: return
         
         field_name = item.data(Qt.ItemDataRole.UserRole + 1)
         val = item.data(Qt.ItemDataRole.UserRole)
+        is_branch = item.data(Qt.ItemDataRole.AccessibleTextRole) == "branch"
         
-        if field_name and val is not None:
-             is_checked = item.checkState() == Qt.CheckState.Checked
+        is_checked = item.checkState() == Qt.CheckState.Checked
+        
+        # Branch Logic: Toggle children
+        if is_branch:
+            self._block_signals = True
+            try:
+                for i in range(item.rowCount()):
+                    child = item.child(i)
+                    if child.isCheckable():
+                        child.setCheckState(Qt.CheckState.Checked if is_checked else Qt.CheckState.Unchecked)
+            finally:
+                self._block_signals = False
+            # Branches themselves don't usually carry filter values, 
+            # OR they do if they represent a Group?
+            # In our case, branches are categorical containers (Groups, People), 
+            # they don't have a value to filter by in _active_filters.
+            # So we don't add them to _active_filters directly.
+            # But the recursive update of children will trigger _on_item_changed for THEM.
+            # Wait, self._block_signals = True prevents that.
+            
+            # We must manually update _active_filters for children
+            if field_name:
+                if field_name not in self._active_filters: self._active_filters[field_name] = set()
+                for i in range(item.rowCount()):
+                    child = item.child(i)
+                    c_val = child.data(Qt.ItemDataRole.UserRole)
+                    if c_val is not None:
+                        if is_checked: self._active_filters[field_name].add(c_val)
+                        else: self._active_filters[field_name].discard(c_val)
+
+        # Leaf Logic
+        elif field_name and val is not None:
              if field_name not in self._active_filters: self._active_filters[field_name] = set()
              
              if is_checked: self._active_filters[field_name].add(val)
              else: self._active_filters[field_name].discard(val)
              
-             self.multicheck_filter_changed.emit(self._active_filters)
-             self._sync_chip_bay()
+        self.multicheck_filter_changed.emit(self._active_filters)
+        self._sync_chip_bay()
 
     def _sync_chip_bay(self):
         # Clear
@@ -477,6 +672,8 @@ class FilterWidget(QFrame):
                     if val is False: display_val = "No"
                     elif val is True: display_val = "Yes"
                 
+                if field_name == 'all_contributors': header = 'Contributor'
+                
                 label = f"{header}: {display_val}"
                 chip = QPushButton(f"{label} \u00D7")
                 # Clean identifier for QSS without hardcoding style
@@ -490,7 +687,19 @@ class FilterWidget(QFrame):
                 self.chip_layout.addWidget(chip)
                 total_chips += 1
                 
-        self.chip_bay_scroll.setVisible(total_chips > 0)
+                self.chip_layout.addWidget(chip)
+                total_chips += 1
+                
+        # Always visible (Persistent Footer)
+        self.chip_bay_scroll.setVisible(True)
+        
+        # Add Placeholder if empty
+        if total_chips == 0:
+             from PyQt6.QtWidgets import QLabel
+             lbl = QLabel("No Active Filters")
+             lbl.setObjectName("ChipPlaceholder")
+             lbl.setStyleSheet("color: #666666; font-style: italic; margin-left: 4px;")
+             self.chip_layout.addWidget(lbl)
 
     def _on_chip_clicked(self):
         btn = self.sender()
@@ -534,27 +743,7 @@ class FilterWidget(QFrame):
 
     # ===== Expansion State Persistence =====
     
-    def _on_item_expanded(self, index):
-        """Save expansion state when user expands an item."""
-        if not self.settings_manager:
-            return
-        
-        item = self.tree_model.itemFromIndex(index)
-        if item and not item.isCheckable():  # Only save parent/branch state
-            state = self.settings_manager.get_filter_tree_expansion_state()
-            state[item.text()] = True
-            self.settings_manager.set_filter_tree_expansion_state(state)
-    
-    def _on_item_collapsed(self, index):
-        """Save expansion state when user collapses an item."""
-        if not self.settings_manager:
-            return
-        
-        item = self.tree_model.itemFromIndex(index)
-        if item and not item.isCheckable():
-            state = self.settings_manager.get_filter_tree_expansion_state()
-            state[item.text()] = False
-            self.settings_manager.set_filter_tree_expansion_state(state)
+
     
     def restore_expansion_state(self):
         """Restore saved expansion state after populating tree."""
@@ -575,20 +764,60 @@ class FilterWidget(QFrame):
         # Block signals during restore to avoid triggering saves
         self.tree_view.blockSignals(True)
         try:
+            # print(f"DEBUG: Restore State called. Saved: {len(saved_state)} items. Existing Tree Items: {len(existing_items)}")
             # Apply state only for items that exist
             for item_name, is_expanded in saved_state.items():
                 if item_name in existing_items:
+                    # print(f"DEBUG: Restoring {item_name} -> {is_expanded}")
                     self.tree_view.setExpanded(existing_items[item_name], is_expanded)
         finally:
             self.tree_view.blockSignals(False)
     
     def _collect_items(self, item, items_dict):
         """Recursively collect all parent/branch items in the tree."""
-        if not item.isCheckable():  # Only parents/branches
+        # Include if it IS a branch (checkable or not) or a root (not checkable)
+        is_branch = item.data(Qt.ItemDataRole.AccessibleTextRole) == "branch"
+        is_root = item.data(Qt.ItemDataRole.AccessibleTextRole) == "root"
+        
+        if is_branch or is_root:
+            key = self._get_item_key(item)
+            
+            # Save using the unique key
             index = self.tree_model.indexFromItem(item)
-            items_dict[item.text()] = index
+            items_dict[key] = index
+            # print(f"DEBUG: Collected Item Key: {key}")
         
         for child_row in range(item.rowCount()):
             child = item.child(child_row)
             if child:
                 self._collect_items(child, items_dict)
+
+    def _on_tree_expanded(self, index):
+        # Only save if user interaction is flagged
+        if self._block_signals or not self.tree_view.user_interaction: return
+        
+        item = self.tree_model.itemFromIndex(index)
+        if item:
+            key = self._get_item_key(item)
+            # print(f"DEBUG: Saving Expansion -> {key}: True")
+            self._save_expansion_state(key, True)
+
+    def _on_tree_collapsed(self, index):
+        # Only save if user interaction is flagged
+        if self._block_signals or not self.tree_view.user_interaction: return
+
+        item = self.tree_model.itemFromIndex(index)
+        if item:
+            key = self._get_item_key(item)
+            # print(f"DEBUG: Saving Collapse -> {key}: False")
+            self._save_expansion_state(key, False)
+
+    def _get_item_key(self, item) -> str:
+        """Get unique key for expansion state. Uses item text."""
+        return item.text()
+
+    def _save_expansion_state(self, key, is_expanded):
+        if not self.settings_manager: return
+        state = self.settings_manager.get_filter_tree_expansion_state()
+        state[key] = is_expanded
+        self.settings_manager.set_filter_tree_expansion_state(state)

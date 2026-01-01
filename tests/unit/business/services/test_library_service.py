@@ -32,11 +32,13 @@ class TestLibraryService:
     @pytest.fixture
     def service(self, temp_db):
         """Create a service instance with a clean DB"""
-        from src.data.repositories import SongRepository, ContributorRepository, AlbumRepository
+        from src.data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
         song_repo = SongRepository(temp_db)
         cont_repo = ContributorRepository(temp_db)
         alb_repo = AlbumRepository(temp_db)
-        return LibraryService(song_repo, cont_repo, alb_repo)
+        pub_repo = PublisherRepository(temp_db)
+        tag_repo = TagRepository(temp_db)
+        return LibraryService(song_repo, cont_repo, alb_repo, pub_repo, tag_repo)
 
     def test_add_file(self, service):
         """Test adding a file to the library"""
