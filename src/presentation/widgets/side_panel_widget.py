@@ -5,8 +5,10 @@ from PyQt6.QtWidgets import (
     QFrame, QSizePolicy, QPushButton, QMenu
 )
 from PyQt6.QtGui import QAction, QDesktopServices, QIcon, QPixmap, QPainter, QColor, QFont, QPen
-from PyQt6.QtCore import Qt, pyqtSignal, QUrl
-from .glow_factory import GlowLineEdit, GlowButton
+from PyQt6.QtCore import Qt, pyqtSignal, QUrl, QPoint
+from .glow_factory import GlowLineEdit, GlowButton, GlowLED
+from .chip_tray_widget import ChipTrayWidget
+from ..dialogs.artist_manager_dialog import ArtistDetailsDialog, ArtistPickerWidget, ArtistCreatorDialog
 import copy
 import os
 from ...core import yellberus
@@ -38,6 +40,9 @@ class SidePanelWidget(QFrame):
         # For strict DI, we should pass it, but for now we'll reach through library_service if needed
         # or assume library_service acts as the repository provider.
         self.album_repo = library_service.album_repo # Assuming exposed
+        self.publisher_repo = library_service.publisher_repo
+        self.tag_repo = library_service.tag_repo
+        self.contributor_repo = library_service.contributor_repository
         
         self.isrc_collision = False
         
@@ -54,6 +59,13 @@ class SidePanelWidget(QFrame):
         
         self._init_ui()
         
+    def showEvent(self, event):
+        """T-70: Ensure layout is correct when panel is first shown."""
+        super().showEvent(event)
+        # Force a refresh of visibility and layout for all trays
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, self._refresh_field_values)
+
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 0, 10, 0) # Slammed to the top
@@ -81,6 +93,7 @@ class SidePanelWidget(QFrame):
         self.scroll.setWidget(self.field_container)
         layout.addWidget(self.scroll, 1)
 
+
         # 4. Footer Actions (Save / Discard)
         footer_frame = QFrame()
         footer_frame.setObjectName("Footer")
@@ -93,7 +106,8 @@ class SidePanelWidget(QFrame):
         # 2. Workflow State (STATUS PILL) - Grouped with LED
         status_row = QWidget()
         status_layout = QHBoxLayout(status_row)
-        status_layout.setContentsMargins(0, 0, 0, 0)
+        # T-70: Add Left Margin (12) to prevent LED glow clipping
+        status_layout.setContentsMargins(12, 0, 0, 0) 
         status_layout.setSpacing(3) # Tighten LED to Button
 
         self.btn_status = GlowButton("PENDING")
@@ -107,9 +121,10 @@ class SidePanelWidget(QFrame):
         self.btn_status.installEventFilter(self)
 
         # The Status LED (indicates Rename/Move pending) - Moved next to READY
-        self.save_led = QFrame()
-        self.save_led.setObjectName("StatusLED")
-        self.save_led.setProperty("state", "off")
+        # The Status LED (indicates Rename/Move pending) - Moved next to READY
+        self.save_led = GlowLED(size=10, color="#FF4444") # Red default
+        self.save_led.setFixedSize(30, 30) # Ensure space for glow radius
+        self.save_led.setToolTip("Rename/Move detected")
         self.save_led.setToolTip("Rename/Move detected")
 
         # T-82: Split-Search Module (The Affinity)
@@ -285,26 +300,39 @@ class SidePanelWidget(QFrame):
         # We explicitly promote performers/groups to Core for better UX, even if technically optional
         all_visible = {f.name: f for f in yellberus.FIELDS if f.visible and f.editable}
         
-        # Define Explicit Core Layout (Order Matters)
-        core_ordered_names = [
-            'performers', 'title', 'album', 'composers', 'publisher', 
-            ['recording_year', 'genre'] # CLUSTER ROW
-        ]
+        # Define Explicit Layout Sections (Order Matters)
+        identity_names = ['title', 'performers', 'album', 'composers', 'publisher', ['recording_year', 'isrc']]
+        attribute_names = ['tags'] # Virtual field merging Genre & Mood
         
-        # Build Core List based on layout, filtering out any that might be invisible/disabled
-        core_layout_struct = []
-        core_names_flat = set()
+        core_names_flat = {'genre', 'mood'} # Mark as handled for Advanced section
         
-        for item in core_ordered_names:
-            if isinstance(item, list):
-                # Cluster
-                cluster = [all_visible[n] for n in item if n in all_visible]
-                if cluster:
-                    core_layout_struct.append(cluster)
-                    for c in cluster: core_names_flat.add(c.name)
-            elif item in all_visible:
-                core_layout_struct.append(all_visible[item])
-                core_names_flat.add(item)
+        def build_struct(names):
+            struct = []
+            for item in names:
+                if item == 'tags':
+                    # Create a virtual field definition for the Unified Tag Tray
+                    tags_def = yellberus.FieldDef(
+                        name='tags',
+                        ui_header='Tags',
+                        db_column='', # Virtual
+                        ui_search=False # Consolidated search is complex, skip for now
+                    )
+                    struct.append(tags_def)
+                    continue
+
+                if isinstance(item, list):
+                    # Cluster row
+                    cluster = [all_visible[n] for n in item if n in all_visible]
+                    if cluster:
+                        struct.append(cluster)
+                        for c in cluster: core_names_flat.add(c.name)
+                elif item in all_visible:
+                    struct.append(all_visible[item])
+                    core_names_flat.add(item)
+            return struct
+
+        identity_struct = build_struct(identity_names)
+        attribute_struct = build_struct(attribute_names)
                 
         # Advanced is everything else
         adv_fields = [f for f in yellberus.FIELDS if f.name in all_visible and f.name not in core_names_flat]
@@ -313,100 +341,199 @@ class SidePanelWidget(QFrame):
             if not fields: return
             
             if show_line:
-                self.field_layout.addSpacing(1) # Gap before line
-                # Replace Label with a 555555 Line (2px)
+                # Replace Label with a 333333 Line (1px)
+                # Spacing is now handled via QSS #FieldGroupLine { margin: ... }
                 line = QFrame()
-                line.setFixedHeight(2)
                 line.setObjectName("FieldGroupLine")
                 self.field_layout.addWidget(line)
-                self.field_layout.addSpacing(18) # Room before the next field (e.g. ISRC)
             
             for item in fields:
                 # Handle Cluster (List of Fields)
                 if isinstance(item, list):
-                    # Horizontal Row Container
-                    h_container = QWidget()
-                    h_layout = QHBoxLayout(h_container)
-                    h_layout.setContentsMargins(0, 0, 0, 4)
+                    # NEW: All clusters get the same Field Module chassis
+                    field_module = QWidget()
+                    field_module.setObjectName("FieldModule")
+                    module_layout = QVBoxLayout(field_module)
+                    module_layout.setContentsMargins(0, 0, 0, 0)
+                    module_layout.setSpacing(4)
+
+                    # Horizontal Row Container for the actual inputs
+                    h_row = QWidget()
+                    h_row.setObjectName("FieldRow")
+                    h_layout = QHBoxLayout(h_row)
+                    h_layout.setContentsMargins(0, 0, 0, 0)
                     h_layout.setSpacing(10) # Gutters between Clustered Fields (Year | Genre)
                     
                     for field in item:
-                        # Re-use creation logic (Inline for now to access self)
                         col = QWidget()
                         v_col = QVBoxLayout(col)
-                        v_col.setContentsMargins(0,0,0,0)
-                        v_col.setSpacing(0) # Slammed
+                        v_col.setContentsMargins(0, 0, 0, 0)
+                        v_col.setSpacing(2)
                         
-                        label_text = field.ui_header
-                        lbl = QLabel(label_text)
+                        lbl = QLabel(field.ui_header)
                         lbl.setObjectName("FieldLabel")
-                        # Styling via QSS: QLabel#FieldLabel
+                        if field.ui_search:
+                            lbl.setProperty("offset", "true")
+                        
+                        lbl.style().unpolish(lbl)
+                        lbl.style().polish(lbl)
                         
                         eff_val, is_mult = self._calculate_bulk_value(field)
                         widget = self._create_field_widget(field, eff_val, is_mult)
                         self._field_widgets[field.name] = widget
+
+                        # Row layout for Search + Input
+                        row_widget = QWidget()
+                        row_layout = QHBoxLayout(row_widget)
+                        row_layout.setContentsMargins(0, 0, 0, 0)
+                        row_layout.setSpacing(6)
+
+                        if field.ui_search:
+                            btn_search = GlowButton("🔍")
+                            btn_search.setObjectName("SearchInlineButton")
+                            btn_search.setFixedSize(32, 28)
+                            # T-82: Pass the button itself as origin for the dropdown
+                            btn_search.clicked.connect(lambda checked, f=field, b=btn_search: self._on_inline_search(f, origin=b))
+                            row_layout.addWidget(btn_search)
+                        
+                        row_layout.addWidget(widget, 1)
                         
                         v_col.addWidget(lbl)
-                        v_col.addWidget(widget)
+                        v_col.addWidget(row_widget)
                         
-                        # Set width ratios: Year narrower (1), Genre wider (2)
-                        if field.name == 'recording_year':
-                            h_layout.addWidget(col, 1)  # 1 part
-                        elif field.name == 'genre':
-                            h_layout.addWidget(col, 2)  # 2 parts (double width)
+                        # Add external + button if it's a chip tray
+                        if isinstance(widget, ChipTrayWidget):
+                            widget.is_add_visible = False # Sync state
+                            widget.btn_add.hide()
+                            btn_add_ext = GlowButton("+")
+                            btn_add_ext.setObjectName("AddInlineButton")
+                            btn_add_ext.setFixedSize(32, 28)
+                            # T-82: Pass field name AND the button itself to the handler
+                            btn_add_ext.clicked.connect(lambda checked, f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
+                            row_layout.addWidget(btn_add_ext)
                         else:
-                            h_layout.addWidget(col)  # Default equal
+                            row_layout.addStretch(0) # Keep tight for non-chip fields
                         
-                    self.field_layout.addWidget(h_container)
-                    self.field_layout.addSpacing(8) # Consistent gap
+                        stretch = 1 if field.name == 'recording_year' else 2
+                        h_layout.addWidget(col, stretch)
+                    
+                    module_layout.addWidget(h_row)
+                    self.field_layout.addWidget(field_module)
                     continue
 
                 # Handle Single Field (Normal)
                 field = item
                 
                 # Skip Title/Path in Bulk Mode (Spec Alpha)
-                if len(self.current_songs) > 1 and field.name in ["Title", "Path"]:
+                if len(self.current_songs) > 1 and field.name in ["title", "source"]:
                     continue
                 
                 # Skip 'is_done' (Status) because we have the big MARK DONE button
                 if field.name == "is_done":
                     continue
 
-                container = QWidget()
-                row = QVBoxLayout(container)
-                row.setContentsMargins(0, 0, 0, 4) # Tighter vertical rhythm
-                row.setSpacing(0) # Slammed to input
-                
-                # Label
-                label_text = field.ui_header
-                label = QLabel(label_text)
+                # NEW: All fields get the same Field Module chassis
+                field_module = QWidget()
+                field_module.setObjectName("FieldModule")
+                module_layout = QVBoxLayout(field_module)
+                module_layout.setContentsMargins(0, 0, 0, 0)
+                module_layout.setSpacing(4)
+
+                # 1. Label
+                label = QLabel(field.ui_header)
                 label.setObjectName("FieldLabel")
-                # Styling via QSS: QLabel#FieldLabel
+                if field.ui_search:
+                    label.setProperty("offset", "true")
+                
+                label.style().unpolish(label)
+                label.style().polish(label)
+                module_layout.addWidget(label)
                 
                 # Determine Current Effective Value
                 effective_val, is_multiple = self._calculate_bulk_value(field)
                 
-                # Create Widget
+                # 2. Field Row (Buttons + Input)
+                row_container = QWidget()
+                row_container.setObjectName("FieldRow")
+                row_layout = QHBoxLayout(row_container)
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(6)
+                
+                # 2a. Search Button (Added only ONCE here)
+                if field.ui_search:
+                    btn_search = GlowButton("🔍")
+                    btn_search.setObjectName("SearchInlineButton")
+                    btn_search.setFixedSize(32, 28)
+                    btn_search.setGlowRadius(4)
+                    btn_search.clicked.connect(lambda checked=False, f=field: self._on_inline_search(f))
+                    row_layout.addWidget(btn_search)
+                
+                # 2b. Edit Widget (The actual field)
                 edit_widget = self._create_field_widget(field, effective_val, is_multiple)
                 self._field_widgets[field.name] = edit_widget
+                row_layout.addWidget(edit_widget, 1) # Give it stretch
                 
-                row.addWidget(label)
-                row.addWidget(edit_widget)
-                self.field_layout.addWidget(container)
-                self.field_layout.addSpacing(8) # Consistent gap between fields
+                # NEW: Add Button outside if it's a chip field
+                actual = self._get_actual_widget(field.name)
+                from .chip_tray_widget import ChipTrayWidget # Local import to avoid circularity if needed
+                if isinstance(actual, ChipTrayWidget):
+                     actual.is_add_visible = False
+                     actual.btn_add.hide()
+                     btn_add_ext = GlowButton("+")
+                     btn_add_ext.setObjectName("AddInlineButton")
+                     btn_add_ext.setFixedSize(32, 28)
+                     btn_add_ext.clicked.connect(actual.add_requested.emit)
+                     row_layout.addWidget(btn_add_ext)
+                
+                # Visual Polish: Don't let the Year box stretch into infinity
+                if field.name == 'recording_year':
+                    inner = self._get_actual_widget('recording_year')
+                    if inner: inner.setMaximumWidth(140)
+                    else: edit_widget.setMaximumWidth(140)
 
-        add_group(core_layout_struct, "Core Metadata", show_line=False)
+                module_layout.addWidget(row_container)
+                self.field_layout.addWidget(field_module)
+                # Spacing handled via CSS margin-bottom
+
+        add_group(identity_struct, "Identity", show_line=False)
+        add_group(attribute_struct, "Tags", show_line=True)
         add_group(adv_fields, "Advanced Details", show_line=True)
+        
+        # T-70: Populate values for the first time after building the UI
+        self._refresh_field_values()
+
+    def _get_actual_widget(self, field_name):
+        """Unwrap a widget if it's inside a search container."""
+        w = self._field_widgets.get(field_name)
+        if not w: return None
+        
+        # Only unwrap if it's a dedicated search container (tagged in _create_field_widget)
+        if w.property("IsSearchContainer"):
+            layout = w.layout()
+            if layout:
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        # Skip the designated search button to find the actual input
+                        if not widget.property("IsSearchButton"):
+                            return widget
+        return w
 
     def _refresh_field_values(self):
         """Update existing widget values without rebuilding UI (performance optimization)."""
         if not self.current_songs:
             return
 
-        for field_name, widget in self._field_widgets.items():
-            # Find the field definition
-            field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
-            if not field_def:
+        # T-70: Include virtual fields (like 'tags') in the refresh queue
+        refresh_queue = list(yellberus.FIELDS)
+        # Create a lightweight FieldDef for virtual 'tags'
+        refresh_queue.append(yellberus.FieldDef(name='tags', ui_header='Tags', db_column=''))
+
+        for field_def in refresh_queue:
+            field_name = field_def.name
+            widget = self._get_actual_widget(field_name)
+            if not widget:
                 continue
 
             # Calculate new value
@@ -432,6 +559,84 @@ class SidePanelWidget(QFrame):
                         display_text = str(effective_val) if (effective_val and str(effective_val).strip()) else "(No Album)"
                         widget.setText(display_text)
 
+                elif isinstance(widget, ChipTrayWidget):
+                    if is_multiple and field_name != 'tags': # Tags handles its own mixed state
+                        # Show the Mixed selection chip
+                        widget.set_chips([(-1, f"{len(self.current_songs)} Mixed", "🔀", True, False, "", "gray")])
+                    else:
+                        # Convert to identities for the Chip Tray
+                        chips = []
+                        delimiters = r',|;| & '
+                        if field_name == 'composers':
+                            delimiters += r'|/'
+                            
+                        if field_name == 'tags':
+                            # effective_val for 'tags' already has some chip data
+                            # but we need to ensure the 7-tuple format for consistency if needed
+                            # actually _calculate_bulk_value already returns 4-tuples, let's enhance it.
+                            chips = effective_val
+                            widget.setObjectName("TagsTray")
+                        else:
+                            raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
+                            names = []
+                            for rn in raw_names:
+                                if isinstance(rn, str) and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
+                                    import re
+                                    split_parts = re.split(delimiters, rn)
+                                    names.extend([p.strip() for p in split_parts if p.strip()])
+                                else:
+                                    names.append(rn)
+
+                            chips = []
+                            for i, n in enumerate(names):
+                                # Convert to 8-tuple format (adding is_primary=True for first item)
+                                # (id, name, icon, is_ghost, is_inherited, tooltip, zone, is_primary)
+                                if field_name == 'genre':
+                                    # Genres now use the TagRepository
+                                    tag, created = self.tag_repo.get_or_create(str(n), category='Genre')
+                                    chips.append((tag.tag_id, tag.tag_name, "🏷️", False, False, "", field_def.zone or "amber", i == 0))
+                                elif field_name == 'mood':
+                                    tag, created = self.tag_repo.get_or_create(str(n), category='Mood')
+                                    chips.append((tag.tag_id, tag.tag_name, "✨", False, False, "", field_def.zone or "amber", i == 0))
+                                elif field_name == 'publisher':
+                                    # Lookup Publisher ID
+                                    pub, created = self.publisher_repo.get_or_create(str(n))
+                                    pid = pub.publisher_id if pub else 0
+                                    
+                                    # Ghost Chips Logic (T-63)
+                                    # Check if this publisher is inherited from the Primary Album
+                                    is_inherited = False
+                                    if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
+                                        alb_id = self.current_songs[0].album_id
+                                        # This might be expensive in a loop, but ok for UI count
+                                        alb_pub = self.library_service.album_repo.get_publisher(alb_id)
+                                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
+                                            is_inherited = True
+                                    
+                                    # Build display name with parent hierarchy
+                                    display_name = pub.publisher_name
+                                    if pub.parent_publisher_id:
+                                        parent = self.publisher_repo.get_by_id(pub.parent_publisher_id)
+                                        if parent:
+                                            display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
+                                    
+                                    if is_inherited:
+                                        # Use new is_inherited parameter with link icon
+                                        alb_name = self.current_songs[0].album or "Album"
+                                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", i == 0)) 
+                                    else:
+                                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", i == 0)) # Local/Editable
+                                elif field_name == 'album':
+                                    results = self.library_service.album_repo.search(str(n))
+                                    aid = results[0].album_id if results else 0
+                                    chips.append((aid, str(n), "💿", False, False, "", field_def.zone or "amber", i == 0))
+                                else:
+                                    # Standard Contributor (Artist)
+                                    artist, created = self.contributor_repo.get_or_create(str(n))
+                                    icon = "👤" if artist.type == "person" else "👥"
+                                    chips.append((artist.contributor_id, artist.name, icon, False, False, "", field_def.zone or "amber", i == 0))
+                        widget.set_chips(chips)
+
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
                     if is_multiple:
                         widget.setPlaceholderText("(Multiple Values)")
@@ -444,21 +649,233 @@ class SidePanelWidget(QFrame):
                             text_val = str(effective_val) if effective_val is not None else ""
                         widget.setText(text_val)
 
-                    # T-69: Publisher Feedback (Locked State)
-                    if field_name == 'publisher':
-                        alb_def = next((f for f in yellberus.FIELDS if f.name == 'album'), None)
-                        alb_val, alb_multi = self._calculate_bulk_value(alb_def)
-                        is_managed = (alb_val is not None) or alb_multi
-                        
-                        if is_managed:
-                            widget.setPlaceholderText("Managed by Album")
-                            widget.setToolTip("Publisher is locked to the selected Album.")
-                        else:
-                            widget.setPlaceholderText("Set Album to define Publisher")
-                            widget.setToolTip("Publishers are managed via the Album Manager.")
+                    # LineEdit logic (Cleaned)
+                    pass
             finally:
                 # Always restore signals
                 widget.blockSignals(False)
+
+    def _on_chip_clicked(self, field_name, entity_id, name):
+        """T-70: Handle chip click regarding the specific field context."""
+        if field_name == 'publisher':
+            self._handle_publisher_click(entity_id, name)
+        elif field_name == 'album':
+            self._handle_album_click(entity_id, name)
+        elif field_name in ['genre', 'mood', 'tags']: # 'tags' is virtual, no direct click action for now
+             pass # TODO: Tag Manager
+        else:
+             # Contributors
+             self._handle_contributor_click(entity_id, name)
+
+    def _handle_publisher_click(self, entity_id, name):
+        if not self.publisher_repo: return
+        pub = self.publisher_repo.get_by_id(entity_id)
+        if not pub: return
+
+        # Check Inherited Status for Deep Link
+        # Note: Use pub.publisher_name (raw) not 'name' param (display name with hierarchy)
+        is_inherited = False
+        if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
+                alb_id = self.current_songs[0].album_id
+                alb_pub_str = self.library_service.album_repo.get_publisher(alb_id) or ""
+                if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
+                    is_inherited = True
+        
+        if is_inherited:
+            alb = self.library_service.album_repo.get_by_id(alb_id)
+            if alb:
+                    self._open_album_manager(initial_album=alb, focus_publisher=True)
+            return
+        
+        from ..dialogs.publisher_manager_dialog import PublisherDetailsDialog
+        diag = PublisherDetailsDialog(pub, self.publisher_repo, parent=self)
+        if diag.exec():
+            self._refresh_field_values()
+
+    def _handle_album_click(self, entity_id, name):
+        if self.library_service.album_repo:
+            alb = self.library_service.album_repo.get_by_id(entity_id)
+            if alb:
+                self._open_album_manager(initial_album=alb)
+
+    def _handle_contributor_click(self, entity_id, name):
+         artist = self.contributor_repo.get_by_id(entity_id)
+         if artist:
+            old_name = artist.name
+            from ..dialogs.artist_manager_dialog import ArtistDetailsDialog
+            diag = ArtistDetailsDialog(artist, self.contributor_repo, parent=self)
+            if diag.exec():
+                new_name = artist.name
+                if old_name != new_name:
+                    # PROPAGATE RENAME: Update internal model and staged changes to match DB change
+                    for song in self.current_songs:
+                        # 1. Update Song Object (Stale memory snapshot)
+                        for field_attr in ['performers', 'composers', 'lyricists', 'producers', 'album_artist']:
+                            val = getattr(song, field_attr, [])
+                            if isinstance(val, list):
+                                if old_name in val:
+                                    setattr(song, field_attr, [new_name if n == old_name else n for n in val])
+                            elif isinstance(val, str) and val == old_name:
+                                setattr(song, field_attr, new_name)
+                        
+                        # 2. Update Staged Changes (The buffer that global Save writes)
+                        sid = song.source_id
+                        if sid in self._staged_changes:
+                            for staged_field in list(self._staged_changes[sid].keys()):
+                                staged_val = self._staged_changes[sid][staged_field]
+                                if isinstance(staged_val, list):
+                                    if old_name in staged_val:
+                                        self._staged_changes[sid][staged_field] = [new_name if n == old_name else n for n in staged_val]
+                                elif isinstance(staged_val, str) and staged_val == old_name:
+                                    self._staged_changes[sid][staged_field] = new_name
+                
+                self._refresh_field_values()
+
+    def _on_chip_removed(self, field_name, entity_id, name):
+        """T-70: Generic chip removal handling."""
+        if field_name == 'tags':
+            # Virtual field: parse the name "Category: Tag"
+            if ': ' in name:
+                cat, actual_name = name.split(': ', 1)
+                target_field = 'genre' if cat.lower() == 'genre' else 'mood'
+                self._on_chip_removed(target_field, entity_id, actual_name)
+                return
+            else:
+                # If no category, assume it's a genre (default behavior for add)
+                self._on_chip_removed('genre', entity_id, name)
+                return
+
+        for song in self.current_songs:
+            current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
+            # Normalize to list
+            if not isinstance(current, list):
+                delims = r',|;| & '
+                if field_name == 'composers': delims += r'|/'
+                import re
+                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+            
+            if name in current:
+                new_list = [p for p in current if p != name]
+                self._on_field_changed(field_name, new_list)
+        
+        self._refresh_field_values()
+
+    def _on_add_button_clicked(self, field_name, origin=None):
+        """T-70: Generic 'Add' button handler with Dropdown support."""
+        if field_name == 'publisher':
+            from ..dialogs.publisher_manager_dialog import PublisherPickerDialog
+            diag = PublisherPickerDialog(self.library_service.publisher_repo, parent=self)
+            if diag.exec():
+                selected = diag.get_selected()
+                if selected:
+                    self._add_name_to_selection(field_name, selected.publisher_name)
+        elif field_name == 'album':
+            self._open_album_manager()
+        elif field_name == 'tags':
+            # T-82: PRO DROPDOWN for Unified Tags
+            menu = QMenu(self)
+            
+            # Action: Add Genre
+            act_g = QAction("🏷️ Add Genre...", self)
+            act_g.triggered.connect(lambda: self._on_add_button_clicked('genre'))
+            menu.addAction(act_g)
+            
+            # Action: Add Mood
+            act_m = QAction("✨ Add Mood...", self)
+            act_m.triggered.connect(lambda: self._on_add_button_clicked('mood'))
+            menu.addAction(act_m)
+            
+            # QUICK LISTS
+            menu.addSeparator()
+            
+            # Top 10 Genres
+            genre_list = self.library_service.get_distinct_filter_values('genre')[:10]
+            if genre_list:
+                gm = menu.addMenu("Popular Genres")
+                for g in genre_list:
+                    act = gm.addAction(f"🏷️ {g}")
+                    act.triggered.connect(lambda chk, n=g: self._add_name_to_selection('genre', n))
+            
+            # Top 10 Moods
+            mood_list = self.library_service.get_distinct_filter_values('mood')[:10]
+            if mood_list:
+                mm = menu.addMenu("Popular Moods")
+                for m in mood_list:
+                    act = mm.addAction(f"✨ {m}")
+                    act.triggered.connect(lambda chk, n=m: self._add_name_to_selection('mood', n))
+
+            if origin:
+                menu.exec(origin.mapToGlobal(QPoint(0, origin.height())))
+            else:
+                menu.exec(self.cursor().pos())
+
+        elif field_name == 'genre':
+            from PyQt6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(self, "Add Genre", "Enter new Genre:")
+            if ok and text:
+                self._add_name_to_selection(field_name, text.strip())
+        elif field_name == 'mood':
+            from PyQt6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(self, "Add Mood", "Enter new Mood:")
+            if ok and text:
+                self._add_name_to_selection(field_name, text.strip())
+        else:
+            # Artists / Contributors
+            from ..dialogs.artist_manager_dialog import ArtistPickerDialog
+            diag = ArtistPickerDialog(self.contributor_repo, parent=self)
+            if diag.exec():
+                selected = diag.get_selected()
+                if selected:
+                    self._add_name_to_selection(field_name, selected.name)
+
+    def _add_name_to_selection(self, field_name, name):
+        """T-70: Add a name to the specified field for all selected songs."""
+        for song in self.current_songs:
+            current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
+            if not isinstance(current, list):
+                delims = r',|;| & '
+                if field_name == 'composers': delims += r'|/'
+                import re
+                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+            
+            if name not in current:
+                new_list = list(current)
+                new_list.append(name)
+                self._on_field_changed(field_name, new_list)
+        
+        self._refresh_field_values()
+
+    def _on_chip_context_menu(self, field_name, entity_id, name, global_pos):
+        """T-82: Direct Right-Click action (Skip Menu)."""
+        if field_name in ['genre', 'mood', 'tags']:
+            self._on_chip_primary_requested(field_name, entity_id, name)
+
+    def _on_chip_primary_requested(self, field_name, entity_id, name):
+        """T-82: Move a specific tag/genre to the front of the list."""
+        if field_name == 'tags':
+            if ': ' in name:
+                cat, actual_name = name.split(': ', 1)
+                target_field = 'genre' if cat.lower() == 'genre' else 'mood'
+                self._on_chip_primary_requested(target_field, entity_id, actual_name)
+                return
+            else:
+                self._on_chip_primary_requested('genre', entity_id, name)
+                return
+
+        for song in self.current_songs:
+            current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
+            if not isinstance(current, list):
+                delims = r',|;| & '
+                if field_name == 'composers': delims += r'|/'
+                import re
+                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+            
+            if name in current:
+                new_list = [p for p in current if p != name]
+                new_list.insert(0, name) # Move to front
+                self._on_field_changed(field_name, new_list)
+        
+        self._refresh_field_values()
 
     def _create_field_widget(self, field_def, value, is_multiple):
         # Determine strict type or strategy
@@ -475,53 +892,45 @@ class SidePanelWidget(QFrame):
             cb.stateChanged.connect(lambda state: self._on_field_changed(field_def.name, bool(state)))
             return cb
             
-        # T-46: Album Picker (Special Handling)
-        if field_def.name == 'album':
-            btn = GlowButton()
-            btn.setObjectName("AlbumPickerButton")  # Styling via QSS
-            btn.set_text_align(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            btn.set_font_weight("500")
-            btn.set_font_family("Consolas")
-            btn.set_font_size(12)
-            
-            # Display Value Logic
-            if is_multiple:
-                btn.setText("(Multiple Values)")
-            else:
-                # If value is numeric (ID), we need to resolve it to a name? 
-                # Or does 'value' come in as the name? 
-                # In current schema, song.album is a string name (Legacy) or ID?
-                # We assume we are transitioning. If it's a string, display it.
-                btn.setText(str(value) if value else "(No Album)")
+        if field_def.name == 'album_REMOVE_OLD_BUTTON_LOGIC':
+            pass # Removed
 
-            btn.clicked.connect(self._open_album_manager)
-            return btn
+        if field_def.name == 'tags':
+            tray = ChipTrayWidget(
+                confirm_template=f"Remove tag '{{label}}'?",
+                add_tooltip=f"Add Tag (Genre or Mood)",
+                show_add=False,
+                parent=self
+            )
+            tray.add_requested.connect(lambda: self._on_add_button_clicked('tags'))
+            tray.chip_remove_requested.connect(lambda eid, n: self._on_chip_removed('tags', eid, n))
+            tray.chip_context_menu_requested.connect(lambda eid, n, p, f='tags': self._on_chip_context_menu(f, eid, n, p))
+            tray.set_chips(value) # Value is already the list of chips
+            return tray
 
         # Default: Line Edit for Alpha
+        # T-70: Artist/Publisher/Genre/Album/Mood Chip Tray
+        if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'genre', 'album', 'mood']:
+            tray = ChipTrayWidget(
+                confirm_template=f"Unlink '{{label}}' from {field_def.name}?",
+                add_tooltip=f"Add {field_def.ui_header}",
+                show_add=False,
+                parent=self
+            )
+            # Use lambda to capture the field name for generic handlers
+            fname = field_def.name
+            tray.chip_clicked.connect(lambda eid, n, f=fname: self._on_chip_clicked(f, eid, n))
+            tray.chip_remove_requested.connect(lambda aid, n, f=fname: self._on_chip_removed(f, aid, n))
+            tray.chip_context_menu_requested.connect(lambda eid, n, p, f=fname: self._on_chip_context_menu(f, eid, n, p))
+            tray.add_requested.connect(lambda f=fname: self._on_add_button_clicked(f))
+            
+            return tray
+
         edit = GlowLineEdit()
         
         # User Req: Enable Multi-line Overlay for long fields
-        if field_def.name in ['composers', 'performers', 'producers', 'lyrics', 'comment']:
+        if field_def.name in ['lyrics', 'comment']:
             edit.enable_overlay()
-        
-        # T-69: Publisher is managed via Album, so it's read-only in the editor
-        if field_def.name == 'publisher':
-            btn = GlowButton()
-            btn.setObjectName("PublisherPickerButton") # Styling via QSS
-            btn.set_text_align(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            btn.set_font_weight("500")
-            btn.set_font_family("Consolas")
-            btn.set_font_size(12)
-            
-            # Display Logic
-            if is_multiple:
-                btn.setText("(Multiple Values)")
-            else:
-                btn.setText(str(value) if value else "(No Publisher)")
-                
-            # Connect to opening manager with focus flag
-            btn.clicked.connect(lambda: self._open_album_manager(focus_publisher=True))
-            return btn
             
         if is_multiple:
             edit.setPlaceholderText("(Multiple Values)")
@@ -538,16 +947,6 @@ class SidePanelWidget(QFrame):
             
         edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, text))
         
-        # Affinity: Inline Search Action
-        if isinstance(edit, GlowLineEdit) and field_def.name not in ["is_done", "publisher", "isrc"]:
-            icons = self._get_magnifier_icons()
-            edit.add_inline_tool(
-                icons[0], # Normal
-                lambda checked=False, f=field_def: self._on_inline_search(f),
-                f"Search Web for {field_def.ui_header}",
-                icons[1]  # Hover
-            )
-        
         # Add ISRC validation (real-time text color feedback)
         if field_def.name == 'isrc':
             edit.textChanged.connect(lambda text: self._validate_isrc_field(edit, text))
@@ -556,11 +955,22 @@ class SidePanelWidget(QFrame):
         edit.installEventFilter(self)
         return edit
 
-    def _open_album_manager(self, checked=False, focus_publisher=False):
+    def _open_album_manager(self, checked=False, focus_publisher=False, initial_album=None):
         """Open the T-46 Album Selector."""
         # Gather initial data from current selection to auto-populate "Create New"
         initial_data = {}
-        if self.current_songs:
+        
+        if initial_album:
+             initial_data = {
+                 'title': initial_album.title,
+                 'artist': initial_album.album_artist,
+                 'year': initial_album.release_year,
+                 'publisher': self.library_service.album_repo.get_publisher(initial_album.album_id),
+                 'album_id': initial_album.album_id,
+                 'song_display': "Deep Link Selection",
+                 'focus_publisher': focus_publisher
+             }
+        elif self.current_songs:
             song = self.current_songs[0]
             sid = song.source_id
             initial_data = {
@@ -664,9 +1074,13 @@ class SidePanelWidget(QFrame):
 
     def _on_album_picked(self, album_id, album_name):
         """Callback from Dialog."""
-        # Update the UI Button
+        # Update the UI
         if 'album' in self._field_widgets:
-            self._field_widgets['album'].setText(album_name)
+            w = self._field_widgets['album']
+            if hasattr(w, 'set_chips'):
+                w.set_chips([(album_id, album_name, "💿", False, False, "", "amber")])
+            elif hasattr(w, 'setText'):
+                w.setText(album_name)
             
         # Stage the changes
         # Note: We are staging the Name for display/legacy, but ideally should stage ID.
@@ -756,10 +1170,38 @@ class SidePanelWidget(QFrame):
     
     def _calculate_bulk_value(self, field_def):
         """Determine what to show when 1 or many songs are selected."""
-        attr = field_def.model_attr or field_def.name
-        
-        # Start with first song
+        if not self.current_songs: return None, False
+
+        if field_def.name == 'tags':
+            # Virtual field combining Genre and Mood
+            genres, g_is_mult = self._calculate_bulk_value(yellberus.get_field('genre'))
+            moods, m_is_mult = self._calculate_bulk_value(yellberus.get_field('mood'))
+            
+            # Convert to list of (id, label, icon) for ChipTray
+            chips = []
+            
+            # Helper to add tags with prefix
+            def add_tags(tag_list, prefix, icon, zone):
+                if not tag_list: return
+                names = tag_list if isinstance(tag_list, list) else [t.strip() for t in str(tag_list).split(',') if t.strip()]
+                for i, n in enumerate(names):
+                    # T-82: Mark the first one in the list as 'Primary'
+                    chips.append((0, f"{prefix}: {n}", icon, False, False, "", zone, i == 0))
+            
+            add_tags(genres, "Genre", "🏷️", "blue")
+            add_tags(moods, "Mood", "✨", "magenta")
+            
+            # T-82: Smart Visibility - Don't sort EVERYTHING.
+            # Keep the primary genre/mood (index 0 of each) at the top if possible.
+            # Since chips has them all, let's just sort the sub-lists if we wanted, 
+            # but for simplicity, let's just keep the insertion order which follows the Primary -> Others logic.
+            # chips.sort(key=lambda x: x[1]) # REMOVED: Allow Primary to stay at the front
+            
+            return chips, (g_is_mult or m_is_mult)
+
+        # Handle regular fields
         s0 = self.current_songs[0]
+        attr = field_def.model_attr or field_def.name
         v0 = self._get_effective_value(s0.source_id, field_def.name, getattr(s0, attr, ""))
         
         if len(self.current_songs) == 1:
@@ -1125,7 +1567,8 @@ class SidePanelWidget(QFrame):
         if is_error:
             self.lbl_projected_path.setText(target)
             self.lbl_projected_path.setProperty("conflict", "true")
-            self.save_led.setProperty("state", "alert")
+            self.save_led.setGlowColor("#FF0000")
+            self.save_led.setActive(True)
         else:
             # Clean display: normpath fixes the \ / mix
             display_path = os.path.normpath(target)
@@ -1136,22 +1579,19 @@ class SidePanelWidget(QFrame):
             
             # The path is now strictly HOVER-ONLY to reclaim vertical space
             self.lbl_projected_path.setVisible(False)
-            self.save_led.setToolTip(f"Pending Move: {display_path}") # Update tooltip for context
+            self.save_led.setToolTip(f"Pending Move: {display_path}") 
             
             if is_alert:
                  self.lbl_projected_path.setStyleSheet("color: #FF5555; font-weight: bold;")
-                 # If conflict, stay red. If just move, amber?
                  if has_conflict: 
-                     self.save_led.setProperty("state", "conflict")
+                     self.save_led.setGlowColor("#FF0000") # Red Failure
+                     self.save_led.setActive(True)
                  elif has_changed:
-                     # If ready, green blinking? No, amber solid
-                     self.save_led.setProperty("state", "alert")
+                     self.save_led.setGlowColor("#FF4444") # Red Warning
+                     self.save_led.setActive(True)
             else:
                  self.lbl_projected_path.setStyleSheet("color: #AAAAAA;")
-                 self.save_led.setProperty("state", "off")
-            
-            self.save_led.style().unpolish(self.save_led)
-            self.save_led.style().polish(self.save_led)
+                 self.save_led.setActive(False)
 
     def _show_search_menu_btn(self):
         """Handle Left-Click on the Menu Button."""
@@ -1217,12 +1657,23 @@ class SidePanelWidget(QFrame):
         artist = ""
         title = ""
         
-        # Fix T-81: Correct field lookups
-        if 'performers' in self._field_widgets:
-             artist = self._field_widgets['performers'].text()
-        elif 'unified_artist' in self._field_widgets:
-             artist = self._field_widgets['unified_artist'].text()
-        else: 
+        # Helper to extract text from various widget types
+        def get_widget_text(field_name):
+            w = self._field_widgets.get(field_name)
+            if not w: return ""
+            if hasattr(w, 'get_names'): # ChipTrayWidget
+                names = w.get_names()
+                return " ".join(names) if names else ""
+            if hasattr(w, 'text'): # QLineEdit / GlowLineEdit
+                return w.text()
+            return ""
+
+        artist_candidates = ['performers', 'unified_artist']
+        for cand in artist_candidates:
+            artist = get_widget_text(cand)
+            if artist: break
+            
+        if not artist:
              # Fallback to model
              p = getattr(song, 'performers', [])
              if p and isinstance(p, list) and p:
@@ -1230,9 +1681,8 @@ class SidePanelWidget(QFrame):
              else:
                  artist = getattr(song, 'unified_artist', "") or getattr(song, 'artist', "") or ""
              
-        if 'title' in self._field_widgets:
-             title = self._field_widgets['title'].text()
-        else:
+        title = get_widget_text('title')
+        if not title:
              title = getattr(song, 'title', "") or ""
              
         if not artist and not title:
@@ -1261,10 +1711,8 @@ class SidePanelWidget(QFrame):
              }
              
              # Attempt to grab Album if available
-             album = ""
-             if 'album' in self._field_widgets:
-                 album = self._field_widgets['album'].text()
-             elif hasattr(song, 'album'):
+             album = get_widget_text('album')
+             if not album and hasattr(song, 'album'):
                  album = song.album
              
              if album and album != "(No Album)" and album != "(Multiple Values)":
@@ -1302,19 +1750,89 @@ class SidePanelWidget(QFrame):
              return f"https://www.discogs.com/search/?q={q_clean}&type=release"
         return ""
 
-    def _on_inline_search(self, field_def):
-        """Handle click on inline magnifier."""
+    def _on_inline_search(self, field_def, origin=None):
+        """Handle click on inline magnifier with optional provider dropdown."""
+        if not self.current_songs: return
+        
+        # T-82: If Ctrl is held or Right Click requested this, or it's a 'Dropdown' request, show menu
+        # Actually, let's just make the single-click launch default, and provide a '▼' or long-press logic?
+        # User said "get a dropdown like the others", referring to the Global Search split-button.
+        # But for inline, we don't have space for a split button.
+        # Strategy: Single Click = Search. Long Click or special handler = Menu?
+        # Better: Since it's a GlowButton, we can just attach a QMenu to it if requested.
+        
+        # If origin is provided, we can do a long-press or just show the menu if that's the preferred 'dropdown' style.
+        # For now, let's stick to the prompt: Give it a dropdown. 
+        # I'll implement a 'Right Click for Providers' or 'Menu if origin' logic.
+        
+        # Check if we should show providers menu
+        show_menu = False
+        if origin:
+             # If user clicks the magnifier, we show the search result. 
+             # To act like "the others" (Global Search), we should ideally have a split button.
+             # Since we don't have a split button here, I'll make the magnifier open a menu if it's a context click 
+             # OR I can just make it show the menu on every click if that's what the user wants.
+             # BUT usually you want the search to happen. 
+             # Let's check the global button: it has a separate arrow. 
+             pass
+             
+        # ACTUALLY, I'll just implement the Provider Switcher as a QMenu on the 🔍 button.
+        # To avoid blocking the primary action, I'll use a Context Menu or a specific behavior.
+        # BUT the user said "get a dropdown", so I'll show the menu.
+        
+        menu = QMenu(self)
+        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
+        
+        # Get current
+        current = "Google"
+        if hasattr(self, 'settings_manager'):
+             current = self.settings_manager.get_search_provider()
+        
+        for p in providers:
+            act = QAction(p, self)
+            act.setCheckable(True)
+            act.setChecked(p == current)
+            def set_p(checked, name=p):
+                if hasattr(self, 'settings_manager'):
+                    self.settings_manager.set_search_provider(name)
+                    self._refresh_field_values() # Update tooltips etc
+            act.triggered.connect(set_p)
+            menu.addAction(act)
+            
+        menu.addSeparator()
+        act_search = QAction(f"Search {field_def.ui_header} ({current})", self)
+        act_search.triggered.connect(lambda: self._do_inline_search_launch(field_def))
+        menu.addAction(act_search)
+        
+        if origin:
+            menu.exec(origin.mapToGlobal(QPoint(0, origin.height())))
+        else:
+            self._do_inline_search_launch(field_def)
+
+    def _do_inline_search_launch(self, field_def):
+        """The actual launching logic (moved from _on_inline_search)."""
         if not self.current_songs: return
         song = self.current_songs[0]
         
-        # Get context from fields or model
-        artist = ""
-        if 'performers' in self._field_widgets: artist = self._field_widgets['performers'].text()
-        else: artist = getattr(song, 'performers', [""])[0] if getattr(song, 'performers', None) else ""
+        # Get context from fields (live edits) or model (saved data)
+        def get_val(fname):
+            w = self._field_widgets.get(fname)
+            if not w: return ""
+            if hasattr(w, 'get_names'): # ChipTray
+                return ", ".join(w.get_names())
+            if hasattr(w, 'text'): # LineEdit
+                return w.text()
+            if hasattr(w, 'currentText'): # ComboBox
+                return w.currentText()
+            return ""
+
+        artist = get_val('performers')
+        if not artist:
+            artist = getattr(song, 'performers', [""])[0] if getattr(song, 'performers', None) else ""
             
-        title = ""
-        if 'title' in self._field_widgets: title = self._field_widgets['title'].text()
-        else: title = getattr(song, 'title', "")
+        title = get_val('title')
+        if not title:
+            title = getattr(song, 'title', "")
 
         # 1. Determine Provider
         provider = "Google"
