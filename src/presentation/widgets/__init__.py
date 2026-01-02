@@ -10,3 +10,4 @@ from .history_drawer import HistoryDrawer
 from .system_island import SystemIsland
 from .chip_tray_widget import ChipTrayWidget
 from .flow_layout import FlowLayout
+from .glow import GlowButton

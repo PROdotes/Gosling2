@@ -1364,3 +1364,77 @@ QPushButton#SearchInlineButton, QPushButton#AddInlineButton {
     font-size: 14pt;
     font-weight: bold;
 }
+
+/* --- 11. UNIVERSAL IMPORT DIALOG (T-90) --- */
+#UniversalImportDialog {
+    background-color: #080808;
+    border: 1px solid #333;
+}
+
+#UniversalImportDialog #DialogHeader {
+    background-color: #111;
+    border-bottom: 2px solid #000;
+}
+
+#UniversalImportDialog #DialogTitleLarge {
+    color: #FFC66D;
+    font-family: 'Bahnschrift Condensed';
+    font-size: 18pt;
+    font-weight: bold;
+}
+
+#UniversalImportDialog #DialogHint {
+    color: #666;
+    font-family: 'Bahnschrift Condensed';
+    font-size: 9pt;
+    letter-spacing: 1px;
+}
+
+#ImportSidebar {
+    background-color: #111;
+    border-right: 1px solid #000;
+    color: #888;
+    font-family: 'Bahnschrift Condensed';
+    font-size: 11pt;
+}
+
+#ImportSidebar::item {
+    padding: 10px;
+    border-bottom: 1px solid #1a1a1a;
+}
+
+#ImportSidebar::item:selected {
+    background-color: #222;
+    color: #FFC66D;
+    border-left: 3px solid #FFC66D;
+}
+
+#ImportTreeView {
+    background-color: #050505;
+    border: 1px solid #222;
+    alternate-background-color: #0a0a0a;
+    color: #ccc;
+    font-family: 'Inter';
+    font-size: 11pt;
+}
+
+#ImportTreeView::item:selected {
+    background-color: rgba(255, 198, 109, 30);
+    border-left: 3px solid #FFC66D;
+    color: #FFC66D;
+}
+
+#ImportTreeView QHeaderView::section {
+    background-color: #111;
+    color: #888;
+    padding: 6px;
+    border: none;
+    border-right: 1px solid #222;
+    font-family: 'Bahnschrift Condensed';
+    text-transform: uppercase;
+}
+
+#UniversalImportDialog #DialogFooter {
+    background-color: #111;
+    border-top: 1px solid #000;
+}

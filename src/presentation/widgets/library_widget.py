@@ -2,6 +2,7 @@ import os
 import zipfile
 import weakref
 from typing import Optional, List, Set, Union
+from ..dialogs import SettingsDialog, UniversalImportDialog
 from ...data.models.song import Song
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -1415,20 +1416,39 @@ class LibraryWidget(QWidget):
 
     def _import_files(self) -> None:
         """
-        Unified Smart Intake: Defaults to Folder selection. 
-        As the user noted, a folder importer is the most robust way to handle 'Intake'.
+        Unified Smart Intake: Replaces the standard folder picker with a 
+        Universal Import Dialog that handles both files and folders.
         """
-        from PyQt6.QtWidgets import QFileDialog
-        
         last_dir = self.settings_manager.get_last_import_directory() or ""
         
-        folder = QFileDialog.getExistingDirectory(
-            self, "Select Folder to Import", last_dir
-        )
-        
-        if folder:
-            self.settings_manager.set_last_import_directory(folder)
-            self.scan_directory(folder)
+        dlg = UniversalImportDialog(start_dir=last_dir, parent=self)
+        if dlg.exec():
+            # Get selected paths from the selection model via a helper or signal
+            # Actually, I'll just reach into the tree in the dialog logic or 
+            # have the dialog emit a signal. For simplicity here, let's use the result.
+            indexes = dlg.tree.selectionModel().selectedRows()
+            paths = [dlg.model.filePath(idx) for idx in indexes]
+            
+            if paths:
+                # Save the first dir as last_dir
+                first_path = paths[0]
+                if os.path.isfile(first_path):
+                    self.settings_manager.set_last_import_directory(os.path.dirname(first_path))
+                else:
+                    self.settings_manager.set_last_import_directory(first_path)
+
+                self.status_lcd.show()
+                self.import_label.setText("DISCOVERING DATA...")
+                
+                # Discovery: Use ImportService to turn paths into a flat file list
+                files = self.import_service.collect_import_list(paths)
+                
+                if not files:
+                    self.status_lcd.hide()
+                    QMessageBox.information(self, "No Results", "No valid audio files found in targeted sectors.")
+                    return
+                    
+                self.import_files_list(files)
 
     def scan_directory(self, folder: str) -> None:
         """Discovery phase: Find files and then pass to worker."""
