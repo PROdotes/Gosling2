@@ -101,121 +101,89 @@ class SidePanelWidget(QFrame):
         layout.addWidget(self.scroll, 1)
 
 
-        # 4. Footer Actions (Save / Discard)
+        # 4. Footer Actions - Single Row: LED | Search | Discard | Save
         footer_frame = QFrame()
         footer_frame.setObjectName("Footer")
 
-        # We'll use a vertical layout for the footer to stack the status pill above the buttons
-        footer_main_layout = QVBoxLayout(footer_frame)
-        footer_main_layout.setContentsMargins(0, 10, 0, 0)
-        footer_main_layout.setSpacing(8)
+        footer_layout = QHBoxLayout(footer_frame)
+        footer_layout.setContentsMargins(8, 8, 8, 4)
+        footer_layout.setSpacing(8)
 
-        # 2. Workflow State (STATUS PILL) - Grouped with LED
-        status_row = QWidget()
-        status_layout = QHBoxLayout(status_row)
-        # T-70: Add Left Margin (12) to prevent LED glow clipping
-        status_layout.setContentsMargins(12, 0, 0, 0) 
-        status_layout.setSpacing(3) # Tighten LED to Button
-
-        self.btn_status = GlowButton("PENDING")
-        self.btn_status.setObjectName("StatusPill")
-        self.btn_status.setCheckable(True)
-        self.btn_status.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_status.setFixedHeight(32)
-        self.btn_status.setMinimumWidth(120) # Reduced from 180 to fit search button
-        self.btn_status.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.btn_status.clicked.connect(self._on_status_toggled)
-        self.btn_status.installEventFilter(self)
-
-        # The Status LED (indicates Rename/Move pending) - Moved next to READY
-        # The Status LED (indicates Rename/Move pending) - Moved next to READY
-        self.save_led = GlowLED(size=10, color="#FF4444") # Red default
-        self.save_led.setFixedSize(30, 30) # Ensure space for glow radius
+        # The Status LED (indicates Rename/Move pending)
+        # Hover shows projected path overlay
+        self.save_led = GlowLED(size=10, color="#FF4444")  # Red default
+        self.save_led.setFixedSize(30, 30)  # Ensure space for glow radius
         self.save_led.setToolTip("Rename/Move detected")
-        self.save_led.setToolTip("Rename/Move detected")
+        self.save_led.installEventFilter(self)  # For projected path hover
 
-        # T-82: Split-Search Module (The Affinity)
-        # Replaces single 'WEB' button with Action (Magnifier) | Gap | Menu (Arrow)
-        search_container = QWidget()
-        search_layout = QHBoxLayout(search_container)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(0) # Zero spacing for split-button look
-
-        # 1. Main Action Button (Magnifier) - Triggers Default Search
-        self.btn_search_action = GlowButton("🔍")
-        self.btn_search_action.setObjectName("WebSearchAction")
-        self.btn_search_action.setFixedWidth(42) 
-        self.btn_search_action.setFixedHeight(32)
-        # Split Pill: Flat Right Edge (small radius)
-        self.btn_search_action.set_radius_style(
-            "border-top-left-radius: 10px; border-bottom-left-radius: 10px; border-top-right-radius: 2px; border-bottom-right-radius: 2px;"
-        )
-        self.btn_search_action.setToolTip("Search Metadata") 
-        self.btn_search_action.clicked.connect(self._on_web_search)
-        # Allow right-click on main button to also switch provider (Power User feature)
-        self.btn_search_action.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.btn_search_action.customContextMenuRequested.connect(self._show_search_menu)
-        
-        # 2. Menu Button (Arrow) - Select Provider
-        self.btn_search_menu = GlowButton("▼") 
-        self.btn_search_menu.setObjectName("WebSearchMenu")
-        self.btn_search_menu.setFixedWidth(24) 
-        self.btn_search_menu.setFixedHeight(32)
-        # Split Pill: Flat Left Edge (small radius)
-        self.btn_search_menu.set_radius_style(
-            "border-top-left-radius: 2px; border-bottom-left-radius: 2px; border-top-right-radius: 10px; border-bottom-right-radius: 10px;"
-        )
-        self.btn_search_menu.setToolTip("Select Search Provider")
-        self.btn_search_menu.clicked.connect(self._show_search_menu_btn)
-        
-        search_layout.addWidget(self.btn_search_action)
-        search_layout.addWidget(self.btn_search_menu)
-
-        # T-81: Load saved provider
-        self._search_provider = "Google"
-        if hasattr(self.library_service, 'settings_manager'):
-             self._search_provider = self.library_service.settings_manager.get_search_provider()
-             self.btn_search_action.setToolTip(f"Search Metadata via {self._search_provider}")
-
-        # 1b. Projected Path Feedback (Hidden by default, reveal on hover)
-        self.lbl_projected_path = QLabel("", self) # Explicit parent to ensure overlay works (not top-level window)
+        # Projected Path Feedback (Hidden by default, reveal on LED hover)
+        self.lbl_projected_path = QLabel("", self)
         self.lbl_projected_path.setObjectName("SidePanelProjectedPath")
         self.lbl_projected_path.setWordWrap(True)
         self.lbl_projected_path.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_projected_path.setVisible(False)
-        
-        status_layout.addWidget(self.save_led)
-        status_layout.addWidget(self.btn_status, 1)
-        status_layout.addSpacing(20) # Significant gap to separate Workflow from Tools
-        status_layout.addWidget(search_container)
 
-        # Styling via QSS: QPushButton#StatusPill and QPushButton#StatusPill[state="ready"]
-        self.btn_status.setEnabled(False)
-        footer_main_layout.addWidget(status_row)
-        # lbl_projected_path is now an overlay managed in eventFilter, not added to layout
+        # Split-Search Module (Magnifier + Dropdown)
+        search_container = QWidget()
+        search_layout = QHBoxLayout(search_container)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(0)
 
+        self.btn_search_action = GlowButton("🔍")
+        self.btn_search_action.setObjectName("WebSearchAction")
+        self.btn_search_action.setFixedWidth(36)
+        self.btn_search_action.setFixedHeight(28)
+        self.btn_search_action.set_radius_style(
+            "border-top-left-radius: 8px; border-bottom-left-radius: 8px; border-top-right-radius: 2px; border-bottom-right-radius: 2px;"
+        )
+        self.btn_search_action.setToolTip("Search Metadata")
+        self.btn_search_action.clicked.connect(self._on_web_search)
+        self.btn_search_action.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.btn_search_action.customContextMenuRequested.connect(self._show_search_menu)
 
-        # Button Row (Discard / Save)
-        button_row = QWidget()
-        button_layout = QHBoxLayout(button_row)
-        button_layout.setContentsMargins(0, 0, 0, 0)
-        button_layout.setSpacing(10)
+        self.btn_search_menu = GlowButton("▼")
+        self.btn_search_menu.setObjectName("WebSearchMenu")
+        self.btn_search_menu.setFixedWidth(20)
+        self.btn_search_menu.setFixedHeight(28)
+        self.btn_search_menu.set_radius_style(
+            "border-top-left-radius: 2px; border-bottom-left-radius: 2px; border-top-right-radius: 8px; border-bottom-right-radius: 8px;"
+        )
+        self.btn_search_menu.setToolTip("Select Search Provider")
+        self.btn_search_menu.clicked.connect(self._show_search_menu_btn)
 
+        search_layout.addWidget(self.btn_search_action)
+        search_layout.addWidget(self.btn_search_menu)
+
+        # Load saved search provider
+        self._search_provider = "Google"
+        if hasattr(self.library_service, 'settings_manager'):
+            self._search_provider = self.library_service.settings_manager.get_search_provider()
+            self.btn_search_action.setToolTip(f"Search Metadata via {self._search_provider}")
+
+        # Discard button (compact)
         self.btn_discard = GlowButton("Discard")
         self.btn_discard.setObjectName("DiscardButton")
-        self.btn_discard.setFixedWidth(80)  # Keep discard small
+        self.btn_discard.setFixedHeight(28)
         self.btn_discard.clicked.connect(self._on_discard_clicked)
 
-        self.btn_save = GlowButton("SAVE")
+        # Save button (primary action, expands)
+        self.btn_save = GlowButton("Save")
         self.btn_save.setObjectName("SaveAllButton")
-        self.btn_save.setFixedHeight(32)
+        self.btn_save.setFixedHeight(28)
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
 
-        button_layout.addWidget(self.btn_discard)
-        button_layout.addWidget(self.btn_save)
+        # NOTE: btn_status removed - "Ready" functionality now handled via Unverified tag chip
+        # Create a dummy reference so old code doesn't break
+        self.btn_status = None
 
-        footer_main_layout.addWidget(button_row)
+        # Layout: LED | Discard | stretch | Search | Save
+        footer_layout.addWidget(self.save_led)
+        footer_layout.addWidget(self.btn_discard)
+        footer_layout.addStretch(1)
+        footer_layout.addWidget(search_container)
+        footer_layout.addWidget(self.btn_save)
+
         layout.addWidget(footer_frame)
 
         self._clear_fields()
@@ -269,15 +237,17 @@ class SidePanelWidget(QFrame):
     def _update_header(self):
         if not self.current_songs:
             self.header_label.setText("No Selection")
-            self.btn_status.setChecked(False)
-            self.btn_status.setEnabled(False)
+            if self.btn_status:
+                self.btn_status.setChecked(False)
+                self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
             return
 
         if len(self.current_songs) > 1:
             self.header_label.setText(f"{len(self.current_songs)} Songs Selected")
-            self.btn_status.setChecked(False)
-            self.btn_status.setEnabled(False)
+            if self.btn_status:
+                self.btn_status.setChecked(False)
+                self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
             return
 
@@ -311,14 +281,16 @@ class SidePanelWidget(QFrame):
             # Ready = No tags AND is_done bit set
             is_ready = (not has_status_tags) and is_done_bool
             
-            # Update Button State
-            self.btn_status.setEnabled(True)
-            self.btn_status.setChecked(is_ready)
+            # Update Button State (if it exists)
+            if self.btn_status:
+                self.btn_status.setEnabled(True)
+                self.btn_status.setChecked(is_ready)
             self._update_status_visuals(is_ready)
             
         except Exception as e:
             print(f"Error updating status button: {e}")
-            self.btn_status.setEnabled(False)
+            if self.btn_status:
+                self.btn_status.setEnabled(False)
 
     def _configure_micro_button(self, btn):
         """Helper to enforce styling on tiny 22x18 buttons."""
@@ -382,14 +354,15 @@ class SidePanelWidget(QFrame):
         # Advanced is everything else
         adv_fields = [f for f in yellberus.FIELDS if f.name in all_visible and f.name not in core_names_flat]
 
-        def add_group(fields, title, show_line=True):
+        def add_group(fields, title, show_line=True, compact=False):
+            """Build a section of fields. Compact mode reduces spacing for 'bonus' data."""
             if not fields: return
             
             if show_line:
                 # Replace Label with a 333333 Line (1px)
                 # Spacing is now handled via QSS #FieldGroupLine { margin: ... }
                 line = QFrame()
-                line.setObjectName("FieldGroupLine")
+                line.setObjectName("FieldGroupLineCompact" if compact else "FieldGroupLine")
                 self.field_layout.addWidget(line)
             
             for item in fields:
@@ -397,7 +370,7 @@ class SidePanelWidget(QFrame):
                 if isinstance(item, list):
                     # NEW: All clusters get the same Field Module chassis
                     field_module = QWidget()
-                    field_module.setObjectName("FieldModule")
+                    field_module.setObjectName("FieldModuleCompact" if compact else "FieldModule")
                     module_layout = QVBoxLayout(field_module)
                     module_layout.setContentsMargins(0, 0, 0, 0)
                     module_layout.setSpacing(0) # Tightened from 4
@@ -433,7 +406,7 @@ class SidePanelWidget(QFrame):
                             item_h_layout.addWidget(btn_search)
 
                         lbl = QLabel(field.ui_header)
-                        lbl.setObjectName("FieldLabel")
+                        lbl.setObjectName("FieldLabelCompact" if compact else "FieldLabel")
                         item_h_layout.addWidget(lbl, 1)
                         
                         v_col.addWidget(item_header)
@@ -504,7 +477,7 @@ class SidePanelWidget(QFrame):
 
                 # NEW: All fields get the same 'Unit Stack' chassis
                 field_module = QWidget()
-                field_module.setObjectName("FieldModule")
+                field_module.setObjectName("FieldModuleCompact" if compact else "FieldModule")
                 module_layout = QVBoxLayout(field_module) # Back to Vertical for responsiveness
                 module_layout.setContentsMargins(0, 0, 0, 0)
                 module_layout.setSpacing(0) # SLAMMED TIGHT
@@ -528,7 +501,7 @@ class SidePanelWidget(QFrame):
                     header_layout.addWidget(btn_search)
 
                 label = QLabel(field.ui_header)
-                label.setObjectName("FieldLabel")
+                label.setObjectName("FieldLabelCompact" if compact else "FieldLabel")
                 header_layout.addWidget(label, 1) # Expanding to handle long names
                 
                 module_layout.addWidget(header_row)
@@ -564,7 +537,7 @@ class SidePanelWidget(QFrame):
 
         add_group(identity_struct, "Identity", show_line=False)
         add_group(attribute_struct, "Tags", show_line=True)
-        add_group(adv_fields, "Advanced Details", show_line=True)
+        add_group(adv_fields, "Advanced Details", show_line=True, compact=True)
         
         # T-70: Populate values for the first time after building the UI
         self._refresh_field_values()
@@ -1393,6 +1366,8 @@ class SidePanelWidget(QFrame):
 
     def _on_status_toggled(self):
         """Toggle the ready/pending state using the unified Tags system."""
+        if not self.btn_status:
+            return
         is_ready = self.btn_status.isChecked()
         
         # 1. Update Tags in DB (Immediate effect for now)
@@ -1415,6 +1390,8 @@ class SidePanelWidget(QFrame):
 
     def _update_status_visuals(self, is_done):
         """Apply Pro Radio styling: Green for AIR, Gray for PENDING via QSS dynamic property."""
+        if not self.btn_status:
+            return
         if is_done:
             self.btn_status.setText("READY [AIR]")
             self.btn_status.setProperty("state", "ready")
@@ -1431,6 +1408,8 @@ class SidePanelWidget(QFrame):
 
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing, showing why in tooltip."""
+        if not self.btn_status:
+            return
         if not self.current_songs:
             self.btn_status.setEnabled(False)
             self.btn_status.setToolTip("")
@@ -1615,12 +1594,13 @@ class SidePanelWidget(QFrame):
 
     def eventFilter(self, source, event):
         from PyQt6.QtCore import QEvent, QPoint
-        if source == self.btn_status:
+        # Handle LED hover for projected path display
+        if source == self.save_led:
             if event.type() == QEvent.Type.Enter:
                 # Reveal path on hover as an Overlay (Absolute Position)
                 if self.lbl_projected_path.text():
-                    # Calculate coordinates
-                    btn_pos = self.btn_status.mapTo(self, QPoint(0, 0))
+                    # Calculate coordinates relative to LED
+                    led_pos = self.save_led.mapTo(self, QPoint(0, 0))
                     target_width = self.width() - 20
                     
                     self.lbl_projected_path.setFixedWidth(target_width)
@@ -1631,7 +1611,7 @@ class SidePanelWidget(QFrame):
                     if target_height < 30: target_height = 30
                     self.lbl_projected_path.setFixedHeight(target_height)
                     
-                    target_y = btn_pos.y() - target_height - 5
+                    target_y = led_pos.y() - target_height - 5
                     self.lbl_projected_path.move(10, target_y)
                     
                     self.lbl_projected_path.raise_()

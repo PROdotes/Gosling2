@@ -127,8 +127,8 @@ class ChipTrayWidget(QWidget):
         self.container = QWidget()
         self.container.setObjectName("ChipTrayContainer")
         
-        # Use our extracted FlowLayout with tighter 4px margin (Reclaim space/Remove float)
-        self.flow_layout = FlowLayout(self.container, margin=4, hspacing=6, vspacing=6)
+        # Use our extracted FlowLayout with comfortable margin (8px breathing room)
+        self.flow_layout = FlowLayout(self.container, margin=8, hspacing=6, vspacing=6)
         self.main_layout.addWidget(self.container)
         
         # Add Button - Using GlowButton for the hardware "outset" look
