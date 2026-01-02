@@ -109,27 +109,31 @@ class FilterTree(QTreeView):
 
 class FilterTreeDelegate(QStyledItemDelegate):
     """Delegate for drawing hierarchical filter tree items.
-    Reads colors from QPalette (controlled by QSS), falls back to constants.
+    Uses Pro Audio Console colors directly for consistency.
     """
 
-    # Zone to color constant mapping (fallbacks)
+    # Zone to color constant mapping
     ZONE_COLORS = {
         "amber": constants.COLOR_AMBER,
         "muted_amber": constants.COLOR_MUTED_AMBER,
         "magenta": constants.COLOR_MAGENTA,
         "gray": constants.COLOR_GRAY
     }
+    
+    # Pro Console colors (matching theme.qss)
+    COLOR_BG_TRANSPARENT = QColor(0, 0, 0, 0)
+    COLOR_BG_HOVER = QColor("#1A1A1A")
+    COLOR_BG_ROOT = QColor("#0A0A0A")
+    COLOR_BG_BRANCH = QColor("#111111")
+    COLOR_TEXT_ROOT = QColor("#9A8A70")  # Warm amber labels
+    COLOR_TEXT_BRANCH = QColor("#888888")
+    COLOR_TEXT_LEAF = QColor("#999999")
+    COLOR_TEXT_SELECTED = QColor("#FFC66D")  # Full amber
+    COLOR_DIVIDER = QColor("#1A1A1A")
 
     def paint(self, painter: QPainter, option, index):
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Read colors from palette (QSS-controlled)
-        palette = option.palette
-        text_color = palette.color(palette.ColorRole.Text)
-        base_color = palette.color(palette.ColorRole.Base)
-        alt_color = palette.color(palette.ColorRole.AlternateBase)
-        highlight_color = palette.color(palette.ColorRole.Highlight)
         
         hint = index.data(Qt.ItemDataRole.AccessibleTextRole)
         field_name = index.data(Qt.ItemDataRole.UserRole + 1)
@@ -145,72 +149,77 @@ class FilterTreeDelegate(QStyledItemDelegate):
         sig_color = QColor(self.ZONE_COLORS.get(zone, constants.COLOR_AMBER))
             
         full_row_rect = QRect(0, option.rect.y(), option.widget.width(), option.rect.height())
+        is_selected = option.state & QStyle.StateFlag.State_Selected
+        is_hovered = option.state & QStyle.StateFlag.State_MouseOver
         
-        # Backgrounds - use palette colors
-        if option.state & QStyle.StateFlag.State_MouseOver:
-            hover_color = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
-            painter.fillRect(full_row_rect, hover_color)
+        # Background painting (transparent by default)
+        if is_hovered:
+            painter.fillRect(full_row_rect, self.COLOR_BG_HOVER)
         elif hint == "root":
-            root_bg = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
-            painter.fillRect(full_row_rect, root_bg)
+            painter.fillRect(full_row_rect, self.COLOR_BG_ROOT)
         elif hint == "branch":
-            branch_bg = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
-            painter.fillRect(full_row_rect, branch_bg)
+            painter.fillRect(full_row_rect, self.COLOR_BG_BRANCH)
+        # Leaves get transparent background
             
-        strip_width = 4 if (option.state & QStyle.StateFlag.State_Selected) else 2
+        # Signal rail (left border) - wider when selected
+        strip_width = 4 if is_selected else 2
         painter.fillRect(0, option.rect.y(), strip_width, option.rect.height(), sig_color)
             
+        # Divider line under roots
         if hint == "root":
-            divider_color = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
-            painter.setPen(divider_color)
+            painter.setPen(self.COLOR_DIVIDER)
             painter.drawLine(full_row_rect.bottomLeft(), full_row_rect.bottomRight())
 
         painter.restore()
         
         root_x, branch_x, child_x = 30, 35, 55
         
+        # Root items (section headers)
         if hint == "root":
             painter.save()
             font = option.font
-            font.setBold(True); font.setPointSize(11)
+            font.setBold(True)
+            font.setPointSize(11)
             painter.setFont(font)
-            root_text = highlight_color if highlight_color.isValid() else QColor(constants.COLOR_WHITE)
-            painter.setPen(root_text)
+            text_color = self.COLOR_TEXT_SELECTED if is_selected else self.COLOR_TEXT_ROOT
+            painter.setPen(text_color)
             text_rect = option.rect.adjusted(root_x, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
+            
+        # Branch items (groups like "2020s", "People", etc.)
         elif hint == "branch":
             painter.save()
-            branch_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
-            painter.setPen(branch_text)
+            text_color = self.COLOR_TEXT_SELECTED if is_selected else self.COLOR_TEXT_BRANCH
+            painter.setPen(text_color)
             text_rect = option.rect.adjusted(branch_x, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()
+            
+        # Leaf items (actual filter values)
         else:
             painter.save()
             
             # Determine indent based on parent type
             parent_hint = index.parent().data(Qt.ItemDataRole.AccessibleTextRole) if index.parent().isValid() else None
             if parent_hint == "root":
-                # Direct child of root - use branch indentation
                 item_x = branch_x
             else:
-                # Child of branch - use deeper indentation
                 item_x = child_x
             
+            # LED indicator
             led_size = 8
             led_rect = QRect(item_x, option.rect.y() + (option.rect.height() - led_size)//2, led_size, led_size)
             check_val = index.data(Qt.ItemDataRole.CheckStateRole)
             is_checked = (check_val == Qt.CheckState.Checked or check_val == 2)
-            # T-70: Unified LED Rendering via GlowLED
-            # We pass the led_rect. Since it's exactly led_size x led_size, 
-            # centering logic in draw_led effectively fills it.
-            ring_col = alt_color if alt_color.isValid() else None
-            # Clamp glow to row height to prevent clipping
+            
+            ring_col = self.COLOR_BG_BRANCH
             max_r = min((option.rect.height() / 2) - 1, led_size * 2) 
             GlowLED.draw_led(painter, led_rect, sig_color, is_checked, led_size, ring_color=ring_col, max_radius=max_r)
-            child_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
-            painter.setPen(child_text)
+            
+            # Text
+            text_color = self.COLOR_TEXT_SELECTED if is_selected else self.COLOR_TEXT_LEAF
+            painter.setPen(text_color)
             text_rect = option.rect.adjusted(item_x + 18, 0, 0, 0)
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, index.data())
             painter.restore()

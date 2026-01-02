@@ -468,32 +468,134 @@ QRadioButton::indicator:pressed {
     background-color: #333333;
 }
 
-/* Data View Palette (QPalette colors for custom delegates) */
-#LibraryTable, #FilterTree, #PlaylistWidget {
-    background-color: transparent;
-    alternate-background-color: #111111;
-    color: #888888;
-    selection-background-color: #FFC66D;
-    selection-color: #000000;
-}
-#FilterTree {
-    qproperty-indentation: 0;
-}
+/* ==========================================================================
+   FILTER TREE & LIBRARY TABLE - PRO CONSOLE REFRESH
+   ========================================================================== */
 
-/* Invisible Containers */
-#HistoryTable, #EditorScroll, #FieldContainer, #ChipBayScroll, #ChipContainer,
-#AlbumManagerDialog QListWidget {
+/* --- FILTER TREE (Left Panel) --- */
+#FilterTree {
     background-color: transparent;
     border: none;
+    outline: none;
+    qproperty-indentation: 12;
+    selection-background-color: transparent;  /* Prevent Qt defaults */
 }
 
-/* Header Specifics */
+#FilterTree::item {
+    min-height: 24px;
+    padding: 3px 8px;
+    padding-left: 4px;
+    color: #888888;
+    background-color: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+}
+
+#FilterTree::item:hover {
+    background-color: #1A1A1A;
+    color: #CCCCCC;
+}
+
+#FilterTree::item:selected {
+    background-color: transparent;
+    color: #FFC66D;
+    border-left: 3px solid #FFC66D;
+}
+
+#FilterTree::item:selected:hover {
+    background-color: #1A1A1A;
+    color: #FFC66D;
+}
+
+/* Prevent any blue/default selection colors */
+#FilterTree::item:selected:active {
+    background-color: transparent;
+}
+
+/* Branch expand/collapse arrows */
+#FilterTree::branch {
+    background-color: transparent;
+}
+
+#FilterTree::branch:has-children:!has-siblings:closed,
+#FilterTree::branch:closed:has-children:has-siblings {
+    border-image: none;
+    image: url(src/resources/arrow_right_small.svg);
+}
+
+#FilterTree::branch:open:has-children:!has-siblings,
+#FilterTree::branch:open:has-children:has-siblings {
+    border-image: none;
+    image: url(src/resources/arrow_down_small.svg);
+}
+
+/* --- LIBRARY TABLE (Center Panel) --- */
+#LibraryTable {
+    background-color: transparent;
+    alternate-background-color: #0A0A0A;
+    gridline-color: #1A1A1A;
+    border: none;
+    outline: none;
+}
+
+#LibraryTable::item {
+    min-height: 26px;
+    padding: 4px 8px;
+    color: #BBBBBB;
+    background-color: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+}
+
+#LibraryTable::item:alternate {
+    background-color: #0A0A0A;
+}
+
+#LibraryTable::item:hover {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+}
+
+#LibraryTable::item:selected {
+    background-color: #151515;
+    color: #E0E0E0;
+    border-left: 3px solid #FFC66D;
+}
+
+#LibraryTable::item:selected:hover {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+}
+
+/* Table Headers */
 #LibraryHeader::section {
-    background-color: #111111;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #1A1A1A, 
+        stop:1 #0A0A0A);
+    color: #9A8A70;  /* Warm amber like side panel labels */
+    font-size: 10pt;
     font-weight: bold;
-    padding: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 10px;
     border: none;
     border-right: 1px solid #222222;
+    border-bottom: 2px solid #2A2A2A;
+}
+
+#LibraryHeader::section:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #2A2A2A, 
+        stop:1 #1A1A1A);
+    color: #FFC66D;
+}
+
+/* Playlist Widget (if used) */
+#PlaylistWidget {
+    background-color: transparent;
+    alternate-background-color: #0A0A0A;
+    color: #CCCCCC;
+    border: none;
 }
 
 /* --- 6. BUTTONS (Workstation Outset Style) --- */
@@ -626,18 +728,134 @@ QPushButton:checked {
     color: #666666;
 }
 
-/* History Table Item Specifics */
-#HistoryTable::item {
-    padding: 4px;
-    border-bottom: 1px solid #111111;
+/* --- HISTORY TABLE (Playback History) --- */
+#HistoryTable {
+    background-color: transparent;
+    border: none;
+    outline: none;
 }
 
-/* --- 4. SCROLLBARS --- */
-QScrollBar:vertical { border: none; background: transparent; width: 10px; }
+#HistoryTable::item {
+    min-height: 24px;
+    padding: 4px 8px;
+    color: #999999;
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid #0A0A0A;
+}
+
+#HistoryTable::item:hover {
+    background-color: #1A1A1A;
+    color: #CCCCCC;
+}
+
+#HistoryTable::item:selected {
+    background-color: #1A1A1A;
+    color: #FFC66D;
+}
+
+/* --- PLAYLIST WIDGET --- */
+#PlaylistWidget {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+
+#PlaylistWidget::item {
+    min-height: 26px;
+    padding: 4px 8px;
+    color: #AAAAAA;
+    background-color: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+}
+
+#PlaylistWidget::item:hover {
+    background-color: #1A1A1A;
+    color: #FFFFFF;
+}
+
+#PlaylistWidget::item:selected {
+    background-color: #151515;
+    color: #E0E0E0;
+    border-left: 3px solid #FFC66D;
+}
+
+/* Invisible Containers */
+#HistoryTable, #EditorScroll, #FieldContainer, #ChipBayScroll, #ChipContainer,
+#AlbumManagerDialog QListWidget {
+    background-color: transparent;
+    border: none;
+}
+
+/* --- 4. SCROLLBARS (Polished Console Style) --- */
+QScrollBar:vertical { 
+    border: none; 
+    background: #0A0A0A; 
+    width: 12px;
+    border-radius: 6px;
+    margin: 2px;
+}
+
 QScrollBar::handle:vertical {
-    background: #444444;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #3A3A3A, 
+        stop:0.5 #444444,
+        stop:1 #3A3A3A);
     border-radius: 5px; 
-    min-height: 20px;
+    min-height: 30px;
+    margin: 1px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #4A4A4A, 
+        stop:0.5 #555555,
+        stop:1 #4A4A4A);
+    border: 1px solid #FFC66D;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+/* Horizontal Scrollbar */
+QScrollBar:horizontal { 
+    border: none; 
+    background: #0A0A0A; 
+    height: 12px;
+    border-radius: 6px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #3A3A3A, 
+        stop:0.5 #444444,
+        stop:1 #3A3A3A);
+    border-radius: 5px; 
+    min-width: 30px;
+    margin: 1px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #4A4A4A, 
+        stop:0.5 #555555,
+        stop:1 #4A4A4A);
+    border: 1px solid #FFC66D;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
 }
 
 /* --- 5. SPLITTERS & SEPARATORS (Visual Void Between Panels) --- */
@@ -655,6 +873,85 @@ QSplitter::handle {
 }
 GlowButton#PlaybackPlayButton {
     qproperty-glowColor: #FFC66D;
+}
+
+/* --- PLAYBACK SLIDER (Progress Bar) --- */
+QSlider::groove:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #000000, 
+        stop:0.3 #0A0A0A,
+        stop:1 #151515);
+    border: 1px solid #222222;
+    border-radius: 4px;
+    height: 8px;
+}
+
+QSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #FFC66D, 
+        stop:0.5 #CC9E55,
+        stop:1 #997733);
+    border: 1px solid #333333;
+    border-radius: 4px;
+}
+
+QSlider::handle:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #555555, 
+        stop:0.08 #3D3D3D, 
+        stop:0.15 #2D2D2D,
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    width: 14px;
+    height: 14px;
+    margin: -4px 0;
+    border-radius: 7px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #666666, 
+        stop:0.08 #4D4D4D, 
+        stop:0.15 #3D3D3D,
+        stop:1 #2A2A2A);
+    border: 1px solid #FFC66D;
+}
+
+/* Volume Slider (if vertical) */
+QSlider::groove:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #000000, 
+        stop:0.3 #0A0A0A,
+        stop:1 #151515);
+    border: 1px solid #222222;
+    border-radius: 4px;
+    width: 8px;
+}
+
+QSlider::sub-page:vertical {
+    background: #222222;
+    border-radius: 4px;
+}
+
+QSlider::add-page:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #FFC66D, 
+        stop:0.5 #CC9E55,
+        stop:1 #997733);
+    border: 1px solid #333333;
+    border-radius: 4px;
+}
+
+QSlider::handle:vertical {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #555555, 
+        stop:0.5 #444444,
+        stop:1 #333333);
+    border: 1px solid #000000;
+    width: 14px;
+    height: 14px;
+    margin: 0 -4px;
+    border-radius: 7px;
 }
 
 /* --- 7. SPECIAL FIELDS --- */
