@@ -181,8 +181,8 @@ class RightPanelWidget(QWidget):
         self.layout.setContentsMargins(8, 6, 8, 8)  # Shifted top 2px up
         self.layout.setSpacing(5)
         
-        # Constraint: Prevent collapse of Command Deck (Corridor: 260px - 500px)
-        self.setMinimumWidth(300)
+        # Constraint: Prevent collapse of Command Deck (Corridor: 350px - 550px)
+        self.setMinimumWidth(350)
         self.setMaximumWidth(550)
         
         # 1. The Header
@@ -208,10 +208,9 @@ class RightPanelWidget(QWidget):
         
         # --- Zone 2: Editor ---
         self.editor_widget = SidePanelWidget(
-            library_service, metadata_service, renaming_service, duplicate_scanner
+            library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager
         )
-        # FIX: Inject SettingsManager manually since SidePanel doesn't take it in __init__
-        self.editor_widget.settings_manager = settings_manager
+        # settings_manager is now passed via constructor
         
         self.editor_widget.hide() # Default Hidden
         

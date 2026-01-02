@@ -25,9 +25,15 @@ class SidePanelWidget(QFrame):
     staging_changed = pyqtSignal(list) # list of song_ids in staging
     filter_refresh_requested = pyqtSignal() # Request rebuild of sidebar filters
     
-    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
+        self.settings_manager = settings_manager
+        
+        # Initialize search provider immediately so UI builds with correct tooltip/state
+        self._search_provider = "Google"
+        if self.settings_manager:
+            self._search_provider = self.settings_manager.get_search_provider()
         self.metadata_service = metadata_service
         self.renaming_service = renaming_service
         self.renaming_service = renaming_service
@@ -266,58 +272,68 @@ class SidePanelWidget(QFrame):
             self.btn_status.setChecked(False)
             self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
-        elif len(self.current_songs) == 1:
-            song = self.current_songs[0]
-            # Priority: Staged Performers > Staged Unified Artist > DB Unified Artist
-            p_val = self._get_effective_value(song.source_id, "performers", song.performers)
-            if isinstance(p_val, list) and p_val:
-                artist = p_val[0]
-            elif isinstance(p_val, str) and p_val:
-                artist = p_val
-            else:
-                artist = self._get_effective_value(song.source_id, "unified_artist", song.unified_artist)
-            
-            artist = artist or "Unknown Artist"
-            self.header_label.setText(f"{artist} - {song.title}")
-            
-            # Determine current state: READY if NO Status tags AND SongIsDone (staged or DB)
-            try:
-                # 1. Tags check (Source of truth for Status)
+            return
+
+        if len(self.current_songs) > 1:
+            self.header_label.setText(f"{len(self.current_songs)} Songs Selected")
+            self.btn_status.setChecked(False)
+            self.btn_status.setEnabled(False)
+            self._update_status_visuals(False)
+            return
+
+        # Single Song
+        song = self.current_songs[0]
+        # Priority: Staged Performers > Staged Unified Artist > DB Unified Artist
+        p_val = self._get_effective_value(song.source_id, "performers", song.performers)
+        if isinstance(p_val, list) and p_val:
+            artist = p_val[0]
+        elif isinstance(p_val, str) and p_val:
+            artist = p_val
+        else:
+            artist = self._get_effective_value(song.source_id, "unified_artist", song.unified_artist)
+        
+        artist = artist or "Unknown Artist"
+        self.header_label.setText(f"{artist} - {song.title}")
+        
+        # Determine current state: READY if NO Status tags AND SongIsDone (staged or DB)
+        try:
+            # 1. Tags check (Source of truth for Status)
+            if hasattr(self, 'tag_repo') and self.tag_repo:
                 all_status_tags = self.tag_repo.get_tags_for_source(song.source_id, category="Status")
                 has_status_tags = len(all_status_tags) > 0
-                
-                # 2. Boolean check (Legacy Bridge)
-                staged_is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
-                is_done_bool = bool(staged_is_done)
-                
-                # Ready = No tags AND is_done bit set
-                is_ready = (not has_status_tags) and is_done_bool
-                
-                self.btn_status.setChecked(is_ready)
-                self._update_status_visuals(is_ready)
-                self.btn_status.setEnabled(True)
-            except Exception as e:
-                import logging
-                logging.getLogger("gosling").error(f"Error updating status header: {e}")
-                self.btn_status.setEnabled(False)
-        else:
-            self.header_label.setText(f"Editing {len(self.current_songs)} Items")
+            else:
+                 has_status_tags = False
+
+            # 2. Boolean check (Legacy Bridge)
+            staged_is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
+            is_done_bool = bool(staged_is_done)
             
-            # For bulk, only show checked if ALL are done (effectively)
-            all_ready = True
-            for s in self.current_songs:
-                # Check tags
-                if self.tag_repo.get_tags_for_source(s.source_id, category="Status"):
-                    all_ready = False
-                    break
-                # Check is_done
-                if not self._get_effective_value(s.source_id, "is_done", s.is_done):
-                    all_ready = False
-                    break
+            # Ready = No tags AND is_done bit set
+            is_ready = (not has_status_tags) and is_done_bool
             
-            self.btn_status.setChecked(all_ready)
-            self._update_status_visuals(all_ready)
-            self.btn_status.setEnabled(True) # Allow bulk toggling status
+            # Update Button State
+            self.btn_status.setEnabled(True)
+            self.btn_status.setChecked(is_ready)
+            self._update_status_visuals(is_ready)
+            
+        except Exception as e:
+            print(f"Error updating status button: {e}")
+            self.btn_status.setEnabled(False)
+
+    def _configure_micro_button(self, btn):
+        """Helper to enforce styling on tiny 22x18 buttons."""
+        btn.setFixedSize(22, 18)
+        btn.setGlowRadius(2)
+        # Force padding/radius via Python to survive GlowButton's dynamic stylesheet updates
+        # 9px radius is mathematically perfect for 18px height (Pill Shape)
+        btn.set_radius_style("border-radius: 9px; padding: 0px;")
+
+    def _update_playback_state(self, is_playing):
+        if hasattr(self.parent(), 'playback_deck'):
+             self.parent().playback_deck.set_playing(is_playing)
+                
+
+
 
     def _build_fields(self):
         """Dynamic UI Factory driven by Yellberus with Grouping."""
@@ -384,7 +400,7 @@ class SidePanelWidget(QFrame):
                     field_module.setObjectName("FieldModule")
                     module_layout = QVBoxLayout(field_module)
                     module_layout.setContentsMargins(0, 0, 0, 0)
-                    module_layout.setSpacing(4)
+                    module_layout.setSpacing(0) # Tightened from 4
 
                     # Horizontal Row Container for the actual inputs
                     h_row = QWidget()
@@ -397,52 +413,77 @@ class SidePanelWidget(QFrame):
                         col = QWidget()
                         v_col = QVBoxLayout(col)
                         v_col.setContentsMargins(0, 0, 0, 0)
-                        v_col.setSpacing(2)
+                        v_col.setSpacing(0)
                         
-                        lbl = QLabel(field.ui_header)
-                        lbl.setObjectName("FieldLabel")
-                        if field.ui_search:
-                            lbl.setProperty("offset", "true")
-                        
-                        lbl.style().unpolish(lbl)
-                        lbl.style().polish(lbl)
-                        
-                        eff_val, is_mult = self._calculate_bulk_value(field)
-                        widget = self._create_field_widget(field, eff_val, is_mult)
-                        self._field_widgets[field.name] = widget
-
-                        # Row layout for Search + Input
-                        row_widget = QWidget()
-                        row_layout = QHBoxLayout(row_widget)
-                        row_layout.setContentsMargins(0, 0, 0, 0)
-                        row_layout.setSpacing(6)
+                        # 1. Header Row (Label + Search Icon)
+                        item_header = QWidget()
+                        item_h_layout = QHBoxLayout(item_header)
+                        item_h_layout.setContentsMargins(0, 0, 0, 0)
+                        item_h_layout.setSpacing(4)
 
                         if field.ui_search:
                             btn_search = GlowButton("🔍")
                             btn_search.setObjectName("SearchInlineButton")
-                            btn_search.setFixedSize(32, 28)
-                            # T-82: Pass the button itself as origin for the dropdown
-                            btn_search.clicked.connect(lambda checked, f=field, b=btn_search: self._on_inline_search(f, origin=b))
-                            row_layout.addWidget(btn_search)
+                            self._configure_micro_button(btn_search)
+                            # Left Click: Instant Search
+                            btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                            # Right Click: Provider Menu
+                            btn_search.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                            btn_search.customContextMenuRequested.connect(lambda pos, f=field, b=btn_search: self._show_search_menu_internal(b.mapToGlobal(pos), f))
+                            item_h_layout.addWidget(btn_search)
+
+                        lbl = QLabel(field.ui_header)
+                        lbl.setObjectName("FieldLabel")
+                        item_h_layout.addWidget(lbl, 1)
                         
-                        row_layout.addWidget(widget, 1)
-                        
-                        v_col.addWidget(lbl)
-                        v_col.addWidget(row_widget)
-                        
+                        v_col.addWidget(item_header)
+
+                        # 2. Input Row (Widget + optional Add button)
+                        eff_val, is_mult = self._calculate_bulk_value(field)
+                        widget = self._create_field_widget(field, eff_val, is_mult)
+                        self._field_widgets[field.name] = widget
+
+
+                        if is_mult:
+                            # Add Button
+                            btn_add = GlowButton("+")
+                            btn_add.setObjectName("AddInlineButton")
+                            self._configure_micro_button(btn_add)
+                            btn_add.setToolTip(f"Add new {field.ui_header}")
+                            btn_add.clicked.connect(lambda f=field: self._on_add_field_value(f))
+                            v_col.addWidget(btn_add, 0, Qt.AlignmentFlag.AlignRight)
+
+
+                        input_row = QWidget()
+                        input_layout = QHBoxLayout(input_row)
+                        input_layout.setContentsMargins(0, 0, 0, 0)
+                        input_layout.setSpacing(4)
+                        input_layout.addWidget(widget, 1)
+
                         # Add external + button if it's a chip tray
                         if isinstance(widget, ChipTrayWidget):
-                            widget.is_add_visible = False # Sync state
+                            widget.is_add_visible = False 
                             widget.btn_add.hide()
                             btn_add_ext = GlowButton("+")
                             btn_add_ext.setObjectName("AddInlineButton")
-                            btn_add_ext.setFixedSize(32, 28)
-                            # T-82: Pass field name AND the button itself to the handler
-                            btn_add_ext.clicked.connect(lambda checked, f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
-                            row_layout.addWidget(btn_add_ext)
-                        else:
-                            row_layout.addStretch(0) # Keep tight for non-chip fields
+                            self._configure_micro_button(btn_add_ext)
+                            # Slightly larger for chip trays, but micro style applies
+                            btn_add_ext.setFixedSize(26, 24) 
+                            btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
+                            input_layout.addWidget(btn_add_ext)
                         
+                        v_col.addWidget(input_row)
+                        
+                        # Alignment & Constraints
+                        if field.name == 'recording_year':
+                            widget.setFixedWidth(85)
+                            if hasattr(widget, 'setAlignment'):
+                                widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                        elif field.name == 'isrc':
+                            widget.setMinimumWidth(120)
+                            if hasattr(widget, 'setAlignment'):
+                                widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
                         stretch = 1 if field.name == 'recording_year' else 2
                         h_layout.addWidget(col, stretch)
                     
@@ -461,66 +502,63 @@ class SidePanelWidget(QFrame):
                 if field.name == "is_done":
                     continue
 
-                # NEW: All fields get the same Field Module chassis
+                # NEW: All fields get the same 'Unit Stack' chassis
                 field_module = QWidget()
                 field_module.setObjectName("FieldModule")
-                module_layout = QVBoxLayout(field_module)
+                module_layout = QVBoxLayout(field_module) # Back to Vertical for responsiveness
                 module_layout.setContentsMargins(0, 0, 0, 0)
-                module_layout.setSpacing(4)
+                module_layout.setSpacing(0) # SLAMMED TIGHT
 
-                # 1. Label
+                # Header Row (Label + Search Icon)
+                header_row = QWidget()
+                header_layout = QHBoxLayout(header_row)
+                header_layout.setContentsMargins(0, 0, 0, 0)
+                header_layout.setSpacing(4)
+
+                if field.ui_search:
+                    btn_search = GlowButton("🔍")
+                    btn_search.setObjectName("SearchInlineButton")
+                    btn_search.setObjectName("SearchInlineButton")
+                    self._configure_micro_button(btn_search)
+                    # Left Click: Instant Search
+                    btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                    # Right Click: Provider Menu
+                    btn_search.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+                    btn_search.customContextMenuRequested.connect(lambda pos, f=field, b=btn_search: self._show_search_menu_internal(b.mapToGlobal(pos), f))
+                    header_layout.addWidget(btn_search)
+
                 label = QLabel(field.ui_header)
                 label.setObjectName("FieldLabel")
-                if field.ui_search:
-                    label.setProperty("offset", "true")
+                header_layout.addWidget(label, 1) # Expanding to handle long names
                 
-                label.style().unpolish(label)
-                label.style().polish(label)
-                module_layout.addWidget(label)
+                module_layout.addWidget(header_row)
                 
                 # Determine Current Effective Value
                 effective_val, is_multiple = self._calculate_bulk_value(field)
                 
-                # 2. Field Row (Buttons + Input)
-                row_container = QWidget()
-                row_container.setObjectName("FieldRow")
-                row_layout = QHBoxLayout(row_container)
-                row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(6)
+                # Input Row (Input + Add Button)
+                input_row = QWidget()
+                input_row.setObjectName("FieldRow")
+                input_layout = QHBoxLayout(input_row)
+                input_layout.setContentsMargins(0, 0, 0, 0)
+                input_layout.setSpacing(6)
                 
-                # 2a. Search Button (Added only ONCE here)
-                if field.ui_search:
-                    btn_search = GlowButton("🔍")
-                    btn_search.setObjectName("SearchInlineButton")
-                    btn_search.setFixedSize(32, 28)
-                    btn_search.setGlowRadius(4)
-                    btn_search.clicked.connect(lambda checked=False, f=field: self._on_inline_search(f))
-                    row_layout.addWidget(btn_search)
-                
-                # 2b. Edit Widget (The actual field)
+                # Edit Widget (The actual field)
                 edit_widget = self._create_field_widget(field, effective_val, is_multiple)
                 self._field_widgets[field.name] = edit_widget
-                row_layout.addWidget(edit_widget, 1) # Give it stretch
+                input_layout.addWidget(edit_widget, 1) # Expanding
                 
-                # NEW: Add Button outside if it's a chip field
-                actual = self._get_actual_widget(field.name)
-                from .chip_tray_widget import ChipTrayWidget # Local import to avoid circularity if needed
-                if isinstance(actual, ChipTrayWidget):
-                     actual.is_add_visible = False
-                     actual.btn_add.hide()
-                     btn_add_ext = GlowButton("+")
-                     btn_add_ext.setObjectName("AddInlineButton")
-                     btn_add_ext.setFixedSize(32, 28)
-                     btn_add_ext.clicked.connect(actual.add_requested.emit)
-                     row_layout.addWidget(btn_add_ext)
-                
-                # Visual Polish: Don't let the Year box stretch into infinity
-                if field.name == 'recording_year':
-                    inner = self._get_actual_widget('recording_year')
-                    if inner: inner.setMaximumWidth(140)
-                    else: edit_widget.setMaximumWidth(140)
+                # Add Button (Only for multi-value trays)
+                if isinstance(edit_widget, ChipTrayWidget):
+                    edit_widget.is_add_visible = False
+                    edit_widget.btn_add.hide()
+                    btn_add_ext = GlowButton("+")
+                    btn_add_ext.setObjectName("AddInlineButton")
+                    btn_add_ext.setFixedSize(26, 24)
+                    btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
+                    input_layout.addWidget(btn_add_ext)
 
-                module_layout.addWidget(row_container)
+                module_layout.addWidget(input_row)
                 self.field_layout.addWidget(field_module)
                 # Spacing handled via CSS margin-bottom
 
@@ -664,7 +702,9 @@ class SidePanelWidget(QFrame):
                                     # Standard Contributor (Artist)
                                     artist, created = self.contributor_repo.get_or_create(str(n))
                                     icon = "👤" if artist.type == "person" else "👥"
-                                    chips.append((artist.contributor_id, artist.name, icon, False, False, "", field_def.zone or "amber", False))
+                                    # Fix: Display the specific credit text (str(n)) instead of canonical artist.name
+                                    # This preserves aliases like "Sonja Burić" instead of forcing "Trixy"
+                                    chips.append((artist.contributor_id, str(n), icon, False, False, "", field_def.zone or "amber", False))
                         widget.set_chips(chips)
 
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
@@ -780,7 +820,9 @@ class SidePanelWidget(QFrame):
                     # PROPAGATE RENAME: Update internal model and staged changes to match DB change
                     for song in self.current_songs:
                         # 1. Update Song Object (Stale memory snapshot)
-                        for field_attr in ['performers', 'composers', 'lyricists', 'producers', 'album_artist']:
+                        # T-Fix: Only propagate renames to Performers/AlbumArtist. 
+                        # Credits (Composers/Producers) often use specific aliases/legal names that should be preserved.
+                        for field_attr in ['performers', 'album_artist']:  
                             val = getattr(song, field_attr, [])
                             if isinstance(val, list):
                                 if old_name in val:
@@ -837,6 +879,9 @@ class SidePanelWidget(QFrame):
                 self._on_field_changed(field_name, new_list)
         
         self._refresh_field_values()
+        self.filter_refresh_requested.emit()
+        
+        self._refresh_field_values()
 
     def _on_add_button_clicked(self, field_name, origin=None):
         """T-70: Generic 'Add' button handler with Dropdown support."""
@@ -870,7 +915,12 @@ class SidePanelWidget(QFrame):
             if diag.exec():
                 selected = diag.get_selected()
                 if selected:
-                    self._add_name_to_selection(field_name, selected.name)
+                    # Support both List (Smart Split) and Single Item (Legacy)
+                    if isinstance(selected, list):
+                        for item in selected:
+                            self._add_name_to_selection(field_name, item.name)
+                    else:
+                        self._add_name_to_selection(field_name, selected.name)
 
     def _add_name_to_selection(self, field_name, name):
         """T-70: Add a name to the specified field for all selected songs."""
@@ -1023,13 +1073,26 @@ class SidePanelWidget(QFrame):
         elif self.current_songs:
             song = self.current_songs[0]
             sid = song.source_id
+            
+            # T-70: Use Effective Values (Staged or Persisted) to ensure we capture "Just Typed" edits
+            # This ensures "Create New Album" sees the corrected Artist/Title
+            eff_performers = self._get_effective_value(sid, 'performers', song.performers)
+            eff_title = self._get_effective_value(sid, 'title', song.name)
+            
+            # Helper: Get primary artist string
+            # Handle both list (normal) and string (fallback/bug) cases just to be safe
+            if isinstance(eff_performers, list):
+                d_artist = eff_performers[0] if eff_performers else "Unknown"
+            else:
+                d_artist = str(eff_performers) if eff_performers else "Unknown"
+            
             initial_data = {
                 'title': self._get_effective_value(sid, 'album', song.album) or "",
-                'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or (song.performers[0] if song.performers else ""),
+                'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or d_artist,
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
                 'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None)),
-                'song_display': f"{song.performers[0] if song.performers else 'Unknown'} - {song.title}",
+                'song_display': f"{d_artist} - {eff_title}",
                 'focus_publisher': focus_publisher
             }
 
@@ -1692,61 +1755,57 @@ class SidePanelWidget(QFrame):
         p = self.btn_search_action.mapToGlobal(pos)
         self._show_search_menu_internal(p)
 
-    def _show_search_menu_internal(self, global_pos):
-        """Shared Menu Builder."""
+    def _show_search_menu_internal(self, global_pos, field_def=None):
+        """Shared Menu Builder. field_def: if provided, adds 'Search [Field] on...' action."""
         menu = QMenu(self)
         providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
         
         # Get current provider dynamically
+        # Get current provider dynamically
+        s_mgr = self.settings_manager
         current = "Google"
-        # Check injected settings_manager first
-        if hasattr(self, 'settings_manager'):
-             current = self.settings_manager.get_search_provider()
-        elif hasattr(self.library_service, 'settings_manager'):
-             current = self.library_service.settings_manager.get_search_provider()
+        if s_mgr:
+             current = s_mgr.get_search_provider()
         
         for p in providers:
             action = QAction(p, self)
             action.setCheckable(True)
-            if p == current:
-                action.setChecked(True)
+            action.setChecked(p == current)
             
             def set_provider(checked, name=p):
-                # Update settings directly
-                if hasattr(self, 'settings_manager'):
-                    self.settings_manager.set_search_provider(name)
-                    self.settings_manager.sync()
-                elif hasattr(self.library_service, 'settings_manager'):
-                    self.library_service.settings_manager.set_search_provider(name)
-                    self.library_service.settings_manager.sync()
-                
-                # Update local variable and tooltip
+                if s_mgr:
+                    s_mgr.set_search_provider(name)
+                    s_mgr.sync()
                 self._search_provider = name
                 self.btn_search_action.setToolTip(f"Search Metadata via {name}")
+                # Update any open menus if needed? No, just close.
                 
             action.triggered.connect(set_provider)
             menu.addAction(action)
+        
+        if field_def:
+            menu.addSeparator()
+            act_search = QAction(f"Search {field_def.ui_header} on {current}", self)
+            act_search.triggered.connect(lambda: self._on_web_search(field_def))
+            menu.addAction(act_search)
             
         menu.exec(global_pos)
 
-    def _on_web_search(self):
+    def _on_web_search(self, field_def=None):
+        """Launch web search. If field_def is provided, adds it to context."""
         if not self.current_songs: return
         song = self.current_songs[0]
 
         # T-81: Always read latest provider from settings
-        # This handles updates from Settings Dialog or Context Menu
-        if hasattr(self, 'settings_manager'):
-             self._search_provider = self.settings_manager.get_search_provider()
-        elif hasattr(self.library_service, 'settings_manager'):
-             self._search_provider = self.library_service.settings_manager.get_search_provider()
-        
-        # Priority: Search what's in the EDITOR fields (what the user sees)
-        artist = ""
-        title = ""
+        # T-81: Always read latest provider from settings
+        # FIX: Check injected settings_manager first, falling back to library_service (legacy)
+        s_mgr = getattr(self, 'settings_manager', None) or getattr(self.library_service, 'settings_manager', None)
+        if s_mgr:
+             self._search_provider = s_mgr.get_search_provider()
         
         # Helper to extract text from various widget types
-        def get_widget_text(field_name):
-            w = self._field_widgets.get(field_name)
+        def get_widget_text(fname):
+            w = self._field_widgets.get(fname)
             if not w: return ""
             if hasattr(w, 'get_names'): # ChipTrayWidget
                 names = w.get_names()
@@ -1755,68 +1814,41 @@ class SidePanelWidget(QFrame):
                 return w.text()
             return ""
 
-        artist_candidates = ['performers', 'unified_artist']
-        for cand in artist_candidates:
-            artist = get_widget_text(cand)
-            if artist: break
-            
+        # Context Gathering
+        artist = get_widget_text('performers') or get_widget_text('unified_artist')
         if not artist:
-             # Fallback to model
              p = getattr(song, 'performers', [])
-             if p and isinstance(p, list) and p:
-                 artist = p[0]
-             else:
-                 artist = getattr(song, 'unified_artist', "") or getattr(song, 'artist', "") or ""
+             artist = p[0] if p and isinstance(p, list) else (getattr(song, 'unified_artist', "") or getattr(song, 'artist', ""))
              
-        title = get_widget_text('title')
-        if not title:
-             title = getattr(song, 'title', "") or ""
-             
+        title = get_widget_text('title') or getattr(song, 'title', "")
+
         if not artist and not title:
              return 
         
-        # URL Logic
-        import urllib.parse
-        q_clean = urllib.parse.quote(f"{artist} {title}")
+        base_query = ""
+        field_val = get_widget_text(field_def.name) if field_def else ""
         
-        url = ""
-        if self._search_provider == "Google":
-             url = f"https://www.google.com/search?q={q_clean}"
-        elif self._search_provider == "Spotify":
-             url = f"https://open.spotify.com/search/{q_clean}"
-        elif self._search_provider == "YouTube":
-             url = f"https://www.youtube.com/results?search_query={q_clean}"
-        elif self._search_provider == "Discogs":
-             url = f"https://www.discogs.com/search/?q={q_clean}&type=release"
-        elif self._search_provider == "MusicBrainz":
-             # T-81 Revised: Using Tag Lookup endpoint for accurate tagging
-             # https://musicbrainz.org/taglookup/index?tag-lookup.artist=...
-             
-             params = {
-                 'tag-lookup.artist': artist,
-                 'tag-lookup.track': title
-             }
-             
-             # Attempt to grab Album if available
-             album = get_widget_text('album')
-             if not album and hasattr(song, 'album'):
-                 album = song.album
-             
-             if album and album != "(No Album)" and album != "(Multiple Values)":
-                 params['tag-lookup.release'] = album
+        if field_val and field_def and field_def.name in ['isrc', 'recording_year']:
+             # Priority: Search the technical code directly (Verifying ISRC/Year)
+             base_query = field_val
+        else:
+             # Default: Artist + Title context
+             base_query = f"{artist} {title}".strip()
 
-             # Duration in ms (if available) - Helps disambiguate versions
-             if hasattr(song, 'duration') and song.duration:
-                 try:
-                     # song.duration usually in seconds (float)
-                     ms = int(float(song.duration) * 1000)
-                     params['tag-lookup.duration'] = str(ms)
-                 except:
-                     pass
+        # Logic: If field_def is present (Micro Button), we force Google.
+        # Rationale: Searching "Year" or "ISRC" on Spotify/Discogs is often useless.
+        eff_provider = self._search_provider
+        if field_def:
+            eff_provider = "Google"
 
-             query_string = urllib.parse.urlencode(params)
-             url = f"https://musicbrainz.org/taglookup/index?{query_string}"
-
+        if eff_provider == "Google" and field_def:
+             # Google searches get the header qualifier for better results
+             query = f"{base_query} {field_def.ui_header}"
+        else:
+             query = base_query
+        
+        # Launch
+        url = self._get_search_url(eff_provider, query)
         if url:
             QDesktopServices.openUrl(QUrl(url))
 
@@ -1837,106 +1869,7 @@ class SidePanelWidget(QFrame):
              return f"https://www.discogs.com/search/?q={q_clean}&type=release"
         return ""
 
-    def _on_inline_search(self, field_def, origin=None):
-        """Handle click on inline magnifier with optional provider dropdown."""
-        if not self.current_songs: return
-        
-        # T-82: If Ctrl is held or Right Click requested this, or it's a 'Dropdown' request, show menu
-        # Actually, let's just make the single-click launch default, and provide a '▼' or long-press logic?
-        # User said "get a dropdown like the others", referring to the Global Search split-button.
-        # But for inline, we don't have space for a split button.
-        # Strategy: Single Click = Search. Long Click or special handler = Menu?
-        # Better: Since it's a GlowButton, we can just attach a QMenu to it if requested.
-        
-        # If origin is provided, we can do a long-press or just show the menu if that's the preferred 'dropdown' style.
-        # For now, let's stick to the prompt: Give it a dropdown. 
-        # I'll implement a 'Right Click for Providers' or 'Menu if origin' logic.
-        
-        # Check if we should show providers menu
-        show_menu = False
-        if origin:
-             # If user clicks the magnifier, we show the search result. 
-             # To act like "the others" (Global Search), we should ideally have a split button.
-             # Since we don't have a split button here, I'll make the magnifier open a menu if it's a context click 
-             # OR I can just make it show the menu on every click if that's what the user wants.
-             # BUT usually you want the search to happen. 
-             # Let's check the global button: it has a separate arrow. 
-             pass
-             
-        # ACTUALLY, I'll just implement the Provider Switcher as a QMenu on the 🔍 button.
-        # To avoid blocking the primary action, I'll use a Context Menu or a specific behavior.
-        # BUT the user said "get a dropdown", so I'll show the menu.
-        
-        menu = QMenu(self)
-        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
-        
-        # Get current
-        current = "Google"
-        if hasattr(self, 'settings_manager'):
-             current = self.settings_manager.get_search_provider()
-        
-        for p in providers:
-            act = QAction(p, self)
-            act.setCheckable(True)
-            act.setChecked(p == current)
-            def set_p(checked, name=p):
-                if hasattr(self, 'settings_manager'):
-                    self.settings_manager.set_search_provider(name)
-                    self._refresh_field_values() # Update tooltips etc
-            act.triggered.connect(set_p)
-            menu.addAction(act)
-            
-        menu.addSeparator()
-        act_search = QAction(f"Search {field_def.ui_header} ({current})", self)
-        act_search.triggered.connect(lambda: self._do_inline_search_launch(field_def))
-        menu.addAction(act_search)
-        
-        if origin:
-            menu.exec(origin.mapToGlobal(QPoint(0, origin.height())))
-        else:
-            self._do_inline_search_launch(field_def)
 
-    def _do_inline_search_launch(self, field_def):
-        """The actual launching logic (moved from _on_inline_search)."""
-        if not self.current_songs: return
-        song = self.current_songs[0]
-        
-        # Get context from fields (live edits) or model (saved data)
-        def get_val(fname):
-            w = self._field_widgets.get(fname)
-            if not w: return ""
-            if hasattr(w, 'get_names'): # ChipTray
-                return ", ".join(w.get_names())
-            if hasattr(w, 'text'): # LineEdit
-                return w.text()
-            if hasattr(w, 'currentText'): # ComboBox
-                return w.currentText()
-            return ""
-
-        artist = get_val('performers')
-        if not artist:
-            artist = getattr(song, 'performers', [""])[0] if getattr(song, 'performers', None) else ""
-            
-        title = get_val('title')
-        if not title:
-            title = getattr(song, 'title', "")
-
-        # 1. Determine Provider
-        provider = "Google"
-        if hasattr(self.library_service, 'settings_manager'):
-             provider = self.library_service.settings_manager.get_search_provider()
-        
-        # 2. Add Context if Google
-        base = f"{artist} {title}"
-        if provider == "Google":
-            query = f"{base} {field_def.ui_header}"
-        else:
-            query = base
-            
-        # 3. Launch
-        url = self._get_search_url(provider, query)
-        if url:
-             QDesktopServices.openUrl(QUrl(url))
 
     def _get_magnifier_icons(self):
         """Lazy create Start/Hover magnifier icons."""

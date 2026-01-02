@@ -14,9 +14,13 @@
       - Investigate "something feels off" with renaming logic. Check separators, compilation handling, and path generation.
 - [ ] **T-87: Fix Ghost Hover**.
       - "Ghost amber bar" remains on table when mouse leaves. Need to clear `_hovered_row` on Viewport Leave event.
-- [ ] **T-88: Phantom Scroll Bug**.
-      - "Table sometimes scrolls right... mouse was still".
-      - Suspect stuck drag state or AutoScroll triggering falsely. Need to check `setAutoScroll(False)` toggle feasibility.
+- [ ] **T-88: Investigate Pending Status**.
+      - User reports "Pending Status might not be working". Verify Amber/Green logic for staged changes.
+- [ ] **T-89: Missing Data View**.
+      - "Opposite of pending": Show files that are missing required metadata (Artist, Title, etc.) - effectively an "Incomplete" filter.
+- **Refactoring Debt (v0.2 Candidates)**:
+  - **Dialog/Picker Duplication**: Consolidate `ArtistPickerDialog`, `PublisherPickerDialog`, etc. into a `DialogFactory`.
+  - **ChipTray Abstraction Leak**: `ChipTrayWidget` exposes internal tuple structure `(id, label, icon...)` to consumers. It should handle simple string lists internally (`set_strings(["A", "B"])`) to avoid boilerplate.
 
 ## ✅ Completed Today
 - (None)

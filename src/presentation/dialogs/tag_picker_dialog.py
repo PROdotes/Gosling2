@@ -107,7 +107,8 @@ class TagPickerDialog(QDialog):
     def _connect_signals(self):
         self.txt_search.textChanged.connect(self._on_search_changed)
         self.txt_search.returnPressed.connect(self._on_select)
-        self.list_results.itemDoubleClicked.connect(lambda item: self._on_select())
+        # Fix: Use itemActivated to catch Enter key on list items (as well as Double Click)
+        self.list_results.itemActivated.connect(lambda item: self._on_select())
         self.list_results.currentRowChanged.connect(self._on_selection_changed)
         
         # Install event filter to capture arrow keys while typing
@@ -126,6 +127,9 @@ class TagPickerDialog(QDialog):
                 current = self.list_results.currentRow()
                 if current < self.list_results.count() - 1:
                     self.list_results.setCurrentRow(current + 1)
+                    # Explicitly select
+                    it = self.list_results.item(current + 1)
+                    if it: it.setSelected(True)
                 return True  # Event handled
                 
             elif key == Qt.Key.Key_Up:
@@ -134,6 +138,11 @@ class TagPickerDialog(QDialog):
                 if current > 0:
                     self.list_results.setCurrentRow(current - 1)
                 return True  # Event handled
+                
+            elif key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
+                # Force selection of current item or fallback to logic
+                self._on_select()
+                return True
         
         return super().eventFilter(obj, event)
 
@@ -303,10 +312,23 @@ class TagPickerDialog(QDialog):
 
     def _on_select(self):
         """Handle selection/creation."""
-        item = self.list_results.currentItem()
+        # Robustness: Check selectedItems first, then currentItem
+        selected = self.list_results.selectedItems()
+        item = selected[0] if selected else self.list_results.currentItem()
+        
+        # Fix: If no item explicitly highlighted but list has items, assume user wants the top/best match
+        if not item and self.list_results.count() > 0:
+            self.list_results.setCurrentRow(0)
+            item = self.list_results.currentItem()
+            
         if not item:
             # No selection - try to create from search text
             text = self.txt_search.text().strip()
+            # If text is empty and list is empty, just close (Cancel)
+            if not text:
+                 self.reject()
+                 return
+
             _, tag_query = self._parse_prefix(text)
             if tag_query:
                 category = self._current_category_filter or self.default_category

@@ -497,6 +497,19 @@ class ContributorRepository(BaseRepository):
                 # 4. Update the alias record to hold the old primary name
                 cursor.execute("UPDATE ContributorAliases SET AliasName = ? WHERE AliasID = ?", (old_primary, alias_id))
                 
+                # 5. STABLE SWAP of Credits
+                # Songs that pointed to Primary (NULL) should now point to Alias (Old Primary Name).
+                # Songs that pointed to Alias should now point to Primary (New Primary Name).
+                cursor.execute("""
+                    UPDATE MediaSourceContributorRoles
+                    SET CreditedAliasID = CASE
+                        WHEN CreditedAliasID IS NULL THEN ?
+                        WHEN CreditedAliasID = ? THEN NULL
+                    END
+                    WHERE ContributorID = ? 
+                      AND (CreditedAliasID IS NULL OR CreditedAliasID = ?)
+                """, (alias_id, alias_id, contributor_id, alias_id))
+                
                 return True
         except Exception as e:
             from src.core import logger
@@ -504,10 +517,13 @@ class ContributorRepository(BaseRepository):
             return False
 
     def delete_alias(self, alias_id: int) -> bool:
-        """Delete an alias."""
+        """Delete an alias. Nullifies any specific credit references first."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                # 1. Nullify usage in credits (Reverts display to Primary Name)
+                cursor.execute("UPDATE MediaSourceContributorRoles SET CreditedAliasID = NULL WHERE CreditedAliasID = ?", (alias_id,))
+                # 2. Delete
                 cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
                 return cursor.rowcount > 0
         except Exception as e:

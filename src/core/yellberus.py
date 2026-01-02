@@ -243,6 +243,7 @@ FIELDS: List[FieldDef] = [
         db_column='S.ISRC',
         id3_tag='TSRC',
         searchable=False,
+        ui_search=True,
         validation_pattern='^[A-Z]{2}[A-Z0-9]{3}\\d{2}\\d{5}$',
     ),
     FieldDef(

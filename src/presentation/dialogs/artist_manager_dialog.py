@@ -93,6 +93,7 @@ class ArtistPickerDialog(QDialog):
         self.filter_type = filter_type # None, 'person', or 'group'
         self.exclude_ids = exclude_ids or set()
         self._selected_artist = None
+        self._selected_artists = [] # T-90: Multi-select support
         
         # Smart Type Tracking
         self._user_intended_type = 'person'  # What the user manually selected
@@ -286,32 +287,64 @@ class ArtistPickerDialog(QDialog):
         data = self.cmb.currentData()
         current_text = self.cmb.currentText().strip()
         
-        if not current_text:
-            return
+        if not current_text: return
 
-        # Case A: Existing Artist Selected
+        # 1. Existing Dropdown Selection
         if data:
             artist_id, name_to_use, _ = data
-            self._selected_artist = self.repo.get_by_id(artist_id) 
-            if name_to_use:
-                self._selected_artist.name = name_to_use
-            self.accept()
+            selected = self.repo.get_by_id(artist_id)
+            if selected:
+                if name_to_use: selected.name = name_to_use
+                self._selected_artists = [selected]
+                self.accept()
             return
+            
+        # 2. Smart Split Logic (T-90)
+        import re
+        
+        # T-Feature: Trailing Comma Heuristic (CamelSplit)
+        # Workflow: User types "BobJohnBill," -> Convert to "Bob, John, Bill"
+        if current_text.endswith(','):
+            raw = current_text.rstrip(',')
+            # Insert comma-space before Uppercase letters (unless at start)
+            # This splits "BobJohnBill" -> "Bob, John, Bill"
+            current_text = re.sub(r'(?<!^)(?=[A-Z])', ', ', raw)
 
-        # Case B: New Artist (Custom Text)
-        # Check if it actually exists but wasn't selected (Exact Match Check)
-        # (The search repository might have it)
+        # Delimiters: comma, semicolon, slash, or " & " (padded ampersand)
+        tokens = [t.strip() for t in re.split(r'[,;/]|\s+&+\s+', current_text) if t.strip()]
+        
+        if len(tokens) > 1:
+            msg = "Detected multiple contributors:\n" + "\n".join([f"• {t}" for t in tokens]) + "\n\nSplit into individual entries?"
+            if QMessageBox.question(self, "Split Input?", msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                self._selected_artists = []
+                target_type = "group" if self.radio_group.isChecked() else "person"
+                
+                for t in tokens:
+                    try:
+                        # Auto-create or Get
+                        # Note: We respect target_type for all, which is usually safe for "Prodigy, Pendulum" (Groups) or "A, B" (Persons)
+                        a, _ = self.repo.get_or_create(t, target_type)
+                        # Fix: Use the typed name 't' (alias) instead of forcing Primary Name
+                        a.name = t
+                        self._selected_artists.append(a)
+                    except Exception as e:
+                        print(f"Error creating '{t}': {e}")
+                
+                self.accept()
+                return
+
+        # 3. Fallback: Exact Name Match
         exact_match = self.repo.get_by_name(current_text)
         if exact_match:
-            # It exists! Just use it.
-            self._selected_artist = exact_match
+            # Fix: Use the typed name (alias) instead of forcing Primary Name
+            exact_match.name = current_text
+            self._selected_artists = [exact_match]
             self.accept()
             return
             
-        # Case C: Create New
+        # 4. Create New Single
         target_type = "group" if self.radio_group.isChecked() else "person"
         
-        # Quick Confirm
         reply = QMessageBox.question(
             self, 
             "Create Artist?", 
@@ -323,13 +356,14 @@ class ArtistPickerDialog(QDialog):
         if reply == QMessageBox.StandardButton.Yes:
             try:
                 new_artist = self.repo.create(current_text, target_type)
-                self._selected_artist = new_artist
+                self._selected_artists = [new_artist]
                 self.accept()
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to create artist: {e}")
 
     def get_selected(self):
-        return self._selected_artist
+        # Prefer list if populated
+        return self._selected_artists if self._selected_artists else self._selected_artist
 
 class ArtistPickerWidget(QWidget):
     """
@@ -454,7 +488,13 @@ class ArtistPickerWidget(QWidget):
         diag = ArtistPickerDialog(self.repo, exclude_ids=[source_id], parent=self)
         diag.setWindowTitle(f"Consolidate '{source_name}' into...")
         if diag.exec():
-            target = diag.get_selected()
+            # Handle List Return (take first)
+            result = diag.get_selected()
+            if isinstance(result, list):
+                target = result[0] if result else None
+            else:
+                target = result
+
             if target:
                 msg = f"This will move ALL songs, aliases, and relationships from '{source_name}' to '{target.name}'.\n\n"
                 msg += f"'{source_name}' will be DELETED and added as an alias for '{target.name}'.\n\n"
@@ -693,7 +733,11 @@ class ArtistDetailsDialog(QDialog):
         btn_cancel.clicked.connect(diag.reject)
         btn_add = GlowButton("ADD")
         btn_add.setObjectName("Primary")
+        btn_add.btn.setDefault(True) # Enable Enter Key
         btn_add.clicked.connect(diag.accept)
+        
+        # Connect Return Key from Line Edit
+        cmb.lineEdit().returnPressed.connect(diag.accept)
         
         btns.addWidget(btn_cancel)
         btns.addStretch()
@@ -829,12 +873,15 @@ class ArtistDetailsDialog(QDialog):
 
         diag = ArtistPickerDialog(self.repo, filter_type=target_type, exclude_ids=exclude, parent=self)
         if diag.exec():
-            selected = diag.get_selected()
-            if selected:
-                if self.radio_group.isChecked():
-                    self.repo.add_member(self.artist.contributor_id, selected.contributor_id)
-                else:
-                    self.repo.add_member(selected.contributor_id, self.artist.contributor_id)
+            result = diag.get_selected()
+            if result:
+                targets = result if isinstance(result, list) else [result]
+                
+                for selected in targets:
+                    if self.radio_group.isChecked():
+                        self.repo.add_member(self.artist.contributor_id, selected.contributor_id)
+                    else:
+                        self.repo.add_member(selected.contributor_id, self.artist.contributor_id)
                 self._refresh_data()
 
     def _show_member_menu(self, pos):

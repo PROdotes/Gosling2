@@ -909,3 +909,9 @@ QPushButton#AlbumActionButton:hover {
     font-size: 9pt;
     font-weight: bold;
 }
+
+/* Inline Action Buttons - Targeted Override */
+QPushButton#SearchInlineButton, QPushButton#AddInlineButton {
+    padding: 0px; 
+    /* Radius is handled by Python default (10px), Background by global QPushButton */
+}

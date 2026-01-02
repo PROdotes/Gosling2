@@ -105,6 +105,8 @@ class GlowLineEdit(GlowWidget):
         self.edit.style().unpolish(self.edit)
         self.edit.style().polish(self.edit)    
     def setFocusPolicy(self, p): self.edit.setFocusPolicy(p)
+    def setAlignment(self, a): self.edit.setAlignment(a)
+    def setCursor(self, c): self.edit.setCursor(c)
     def clear(self): self.edit.clear()
     
     # Expose signals

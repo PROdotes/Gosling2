@@ -444,6 +444,12 @@ class PublisherPickerWidget(QWidget):
         self.txt_search.textChanged.connect(lambda: self._refresh_list(self.txt_search.text()))
         layout.addWidget(self.txt_search)
 
+        # 5. Unified Action Button (Moved UP to decouple from Save button reflex)
+        # Position: Between Search and List
+        self.btn_action = GlowButton("Create New Label (+)")
+        self.btn_action.clicked.connect(self._on_action_clicked)
+        layout.addWidget(self.btn_action)
+
         # 3. List
         self.list_pubs = QListWidget()
         self.list_pubs.setObjectName("AlbumManagerList") 
@@ -452,12 +458,6 @@ class PublisherPickerWidget(QWidget):
         self.list_pubs.itemClicked.connect(self._on_item_clicked)
         self.list_pubs.itemDoubleClicked.connect(self._on_item_double_clicked)
         layout.addWidget(self.list_pubs)
-
-        # 5. Unified Action Button
-        self.btn_action = GlowButton("Create New Label (+)")
-        self.btn_action.clicked.connect(self._on_action_clicked)
-        # self.btn_edit.setEnabled(False) # Always enabled now!
-        layout.addWidget(self.btn_action)
 
     def _refresh_list(self, query=""):
         self.list_pubs.clear()

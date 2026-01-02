@@ -7,7 +7,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
-from .publisher_manager_dialog import PublisherPickerWidget
+from ..widgets.chip_tray_widget import ChipTrayWidget
+from .publisher_manager_dialog import PublisherPickerDialog
+from ..dialogs.artist_manager_dialog import ArtistPickerDialog
 from ...data.repositories.publisher_repository import PublisherRepository
 
 class AlbumManagerDialog(QDialog):
@@ -27,8 +29,6 @@ class AlbumManagerDialog(QDialog):
     # Geometry (The Workstation Dimensions)
     BASE_WIDTH = 950
     BASE_HEIGHT = 650
-    SIDECAR_WIDTH = 300
-    EXPANDED_WIDTH = BASE_WIDTH + SIDECAR_WIDTH
     PANE_MIN_WIDTH = 250
     
     def __init__(self, album_repository, initial_data=None, parent=None, staged_deletions=None):
@@ -70,11 +70,8 @@ class AlbumManagerDialog(QDialog):
             QTimer.singleShot(100, self._trigger_publisher_jump)
             
     def _trigger_publisher_jump(self):
-        if hasattr(self, 'btn_pub_trigger'):
-            self.btn_pub_trigger.setFocus()
-            # Optional: auto-expand the sidecar? 
-            # If we click it, it expands. User said "Selects the publisher".
-            self.btn_pub_trigger.click()
+        # Open Publisher Picker immediately (T-63)
+        self._on_search_publisher()
         
     def _init_ui(self):
         # ROOT LAYOUT: HBox [MainContainer] [SidecarContainer]
@@ -129,10 +126,6 @@ class AlbumManagerDialog(QDialog):
 
         header_layout.addStretch()
         
-        self.btn_create_new = GlowButton("Create New Album (+)")
-        self.btn_create_new.clicked.connect(self._toggle_create_mode)
-        header_layout.addWidget(self.btn_create_new)
-
         # T-46: View Toggle (Expert vs Focused)
         self.btn_view_toggle = GlowButton("View: Full")
         self.btn_view_toggle.setCheckable(True)
@@ -140,6 +133,11 @@ class AlbumManagerDialog(QDialog):
         self.btn_view_toggle.setFixedWidth(100)
         self.btn_view_toggle.toggled.connect(self._toggle_view_mode)
         header_layout.addWidget(self.btn_view_toggle)
+        
+        self.btn_create_new = GlowButton("Create New Album (+)")
+        self.btn_create_new.clicked.connect(self._toggle_create_mode)
+        self.btn_create_new.setFixedWidth(160) # Ensure text fits
+        header_layout.addWidget(self.btn_create_new)
         
         main_layout.addWidget(header)
         
@@ -180,30 +178,22 @@ class AlbumManagerDialog(QDialog):
         self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.clicked.connect(self.reject)
         
-        self.btn_save_inspector = GlowButton("Save Changes")
+        self.btn_save_inspector = GlowButton("Save & Assign")
         self.btn_save_inspector.setObjectName("Primary")
         self.btn_save_inspector.setEnabled(False) # Initially disabled
-        self.btn_save_inspector.clicked.connect(self._save_inspector)
+        self.btn_save_inspector.clicked.connect(lambda: self._save_inspector(close_on_success=True))
 
-        self.btn_select = GlowButton("Accept Changes")
-        self.btn_select.setObjectName("Primary")
-        self.btn_select.setEnabled(False)
-        self.btn_select.clicked.connect(self._on_select_clicked)
-        
         footer_layout.addWidget(self.btn_cancel)
         footer_layout.addStretch()
         footer_layout.addWidget(self.btn_save_inspector)
-        footer_layout.addWidget(self.btn_select)
         
         main_layout.addWidget(footer)
         
         # Add Main to Root
         self.root_layout.addWidget(self.main_container, 1) # Stretch factor 1
         
-        # --- RIGHT: SIDECAR CONTAINER ---
-        self.pane_sidecar = self._build_sidecar_pane()
-        self.pane_sidecar.hide() # Hidden by default
-        self.root_layout.addWidget(self.pane_sidecar, 0) # Fixed width
+        # --- RIGHT: SIDECAR CONTAINER (REMOVED) ---
+        # Sidecar logic refactored to Modal Dialog triggered by Processor ChipTray # Fixed width
         
         
         # Initial Load
@@ -274,9 +264,18 @@ class AlbumManagerDialog(QDialog):
         layout.setSpacing(0)  # Zero spacing - manual control like side panel
         
         # Form Fields (use FieldLabel for tight label-to-input proximity)
+        # Form Fields (use FieldLabel for tight label-to-input proximity)
         self.inp_title = self._add_field(layout, "Album Title *")
         layout.addSpacing(12)  # Consistent gap between field groups
-        self.inp_artist = self._add_field(layout, "Album Artist")
+        
+        # Artist Chip Tray
+        lbl_art = QLabel("ALBUM ARTIST")
+        lbl_art.setObjectName("FieldLabel")
+        layout.addWidget(lbl_art)
+        self.tray_artist = ChipTrayWidget(parent=self, add_tooltip="Add Artist")
+        self.tray_artist.add_requested.connect(self._on_search_artist)
+        layout.addWidget(self.tray_artist)
+        
         layout.addSpacing(12)
         self.inp_year = self._add_field(layout, "Release Year")
         layout.addSpacing(12)
@@ -286,10 +285,11 @@ class AlbumManagerDialog(QDialog):
         lbl_pub.setObjectName("FieldLabel")  # Use same class as side panel
         layout.addWidget(lbl_pub)
         
-        self.btn_pub_trigger = GlowButton("(None)")
-        self.btn_pub_trigger.setObjectName("PublisherPickerButton")
-        self.btn_pub_trigger.clicked.connect(self._toggle_sidecar)
-        layout.addWidget(self.btn_pub_trigger)
+        self.tray_publisher = ChipTrayWidget(parent=self, add_tooltip="Select Publisher")
+        self.tray_publisher.add_requested.connect(self._on_search_publisher)
+        # Note: We rely on _on_publisher_selected to populate this
+        layout.addWidget(self.tray_publisher)
+        
         layout.addSpacing(12)  # Consistent gap between field groups
         
         # Type Dropdown
@@ -309,22 +309,7 @@ class AlbumManagerDialog(QDialog):
         
         return container
         
-    def _build_sidecar_pane(self):
-        container = QFrame()
-        container.setObjectName("PublisherSidecar")
-        container.setFixedWidth(self.SIDECAR_WIDTH)
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0,0,0,0)
-        
-        # from ...data.repositories.publisher_repository import PublisherRepository
-        pub_repo = PublisherRepository(self.album_repo.db_path)
-        
-        self.publisher_picker = PublisherPickerWidget(pub_repo, self)
-        self.publisher_picker.publisher_selected.connect(self._on_publisher_selected)
-        
-        layout.addWidget(self.publisher_picker)
-        
-        return container
+    # _build_sidecar_pane REMOVED
 
     def _add_field(self, layout, label):
         lbl = QLabel(label.upper())
@@ -368,7 +353,7 @@ class AlbumManagerDialog(QDialog):
         self.pane_inspector.style().polish(self.pane_inspector)
         
         # Reset Fields Logic + Ghost Styling
-        inputs = [self.inp_title, self.inp_artist, self.inp_year]
+        inputs = [self.inp_title, self.inp_year] # Removed inp_artist as it's now a tray
         for inp in inputs:
             inp.clear()
             inp.edit.setStyleSheet("color: #666;") # Ghost color (Darker)
@@ -377,20 +362,28 @@ class AlbumManagerDialog(QDialog):
             except: pass
             inp.edit.textEdited.connect(self._ungrey_text)
 
+        # Clear trays
+        self.tray_artist.set_chips([])
+        self.tray_publisher.set_chips([])
+
         # Smart Fill
         if self.initial_data.get('title'):
             self.inp_title.setText(self.initial_data.get('title'))
+        elif self.initial_data.get('song_display'):
+            # Fallback: Use Song Title if Album Title is missing (Common for Singles)
+            parts = self.initial_data.get('song_display').split(" - ", 1)
+            # If parts has 2 (Artist - Title), take title. Else take whole string.
+            title_part = parts[1] if len(parts) == 2 else parts[0]
+            self.inp_title.setText(title_part)
         if self.initial_data.get('artist'):
-            self.inp_artist.setText(self.initial_data.get('artist'))
+            self.tray_artist.set_chips([(0, self.initial_data.get('artist'), "")])
         if self.initial_data.get('year'):
             self.inp_year.setText(str(self.initial_data.get('year')))
             
         self.cmb_type.setCurrentText("Single")
-        self.btn_pub_trigger.setText("(None)")
         self.selected_pub_name = ""
         
         self.inp_title.setFocus()
-        self.btn_select.setEnabled(False) 
         self.lbl_title.setText("CREATING ALBUM")
 
     def _cancel_create_new(self):
@@ -401,7 +394,7 @@ class AlbumManagerDialog(QDialog):
         self.btn_create_new.style().polish(self.btn_create_new)
         
         # Ungrey fields
-        inputs = [self.inp_title, self.inp_artist, self.inp_year]
+        inputs = [self.inp_title, self.inp_year] # Removed inp_artist
         for inp in inputs:
             inp.edit.setStyleSheet("")
             try: inp.edit.textEdited.disconnect(self._ungrey_text)
@@ -433,8 +426,9 @@ class AlbumManagerDialog(QDialog):
              self.is_creating_new = False
              self.btn_create_new.setText("Create New Album (+)")
              # Reset ghost styling
-             for inp in [self.inp_title, self.inp_artist, self.inp_year]:
-                 inp.edit.setStyleSheet("")
+             self.inp_title.edit.setStyleSheet("")
+             self.inp_year.edit.setStyleSheet("")
+             # self.inp_artist removed (now tray)
         
         album_id = item.data(Qt.ItemDataRole.UserRole)
         self.current_album = self.album_repo.get_by_id(album_id)
@@ -449,7 +443,10 @@ class AlbumManagerDialog(QDialog):
         db_artist = self.current_album.album_artist
         if not db_artist and self.initial_data.get('artist'):
             db_artist = self.initial_data.get('artist')
-        self.inp_artist.setText(db_artist or "")
+            
+        # Populate Tray (Fix: Pass list of tuples)
+        self.tray_artist.set_chips([(0, db_artist, "")] if db_artist else [])
+            
         # Smart Fill Year
         db_year = self.current_album.release_year
         if not db_year and self.initial_data.get('year'):
@@ -460,7 +457,7 @@ class AlbumManagerDialog(QDialog):
         # Publisher
         pub_name = self.album_repo.get_publisher(self.current_album.album_id)
         self.selected_pub_name = pub_name or ""
-        self.btn_pub_trigger.setText(pub_name if pub_name else "(None)")
+        self.tray_publisher.set_chips([(0, pub_name, "")] if pub_name else [])
         
         # 2. Populate Context (Songs)
         self._refresh_context(album_id)
@@ -471,7 +468,6 @@ class AlbumManagerDialog(QDialog):
         self.pane_inspector.setProperty("state", "") # Clear create cue
         self.pane_inspector.style().unpolish(self.pane_inspector)
         self.pane_inspector.style().polish(self.pane_inspector)
-        self.btn_select.setEnabled(True)
         self.lbl_title.setText("EDITING ALBUM")
 
     def _refresh_context(self, album_id):
@@ -557,33 +553,71 @@ class AlbumManagerDialog(QDialog):
     def _on_search_text_changed(self, text):
         self._refresh_vault(text)
         
-    def _toggle_sidecar(self):
-        if self.pane_sidecar.isVisible():
-            self.pane_sidecar.hide()
-            self.setMinimumWidth(self.BASE_WIDTH)
-            self.resize(self.BASE_WIDTH, self.height())
-        else:
-            self.pane_sidecar.show()
-            self.setMinimumWidth(self.EXPANDED_WIDTH)
-            self.resize(self.EXPANDED_WIDTH, self.height())
-            self.publisher_picker._refresh_list()
-            self.publisher_picker.select_publisher_by_name(self.selected_pub_name)
+    def _on_search_publisher(self):
+        # Modal Picker
+        from .publisher_manager_dialog import PublisherPickerDialog
+        from ...data.repositories.publisher_repository import PublisherRepository
+        repo = PublisherRepository(self.album_repo.db_path)
+        diag = PublisherPickerDialog(repo, parent=self)
+        if diag.exec():
+            pub = diag.get_selected()
+            if pub:
+                self.tray_publisher.set_chips([(0, pub.publisher_name, "")])
             
     def _on_publisher_selected(self, pub_id, pub_name):
+        # Used by deprecated sidecar, but might be called if we reused logic?
+        # Safe update
         self.selected_pub_name = pub_name
-        self.btn_pub_trigger.setText(pub_name)
+        self.tray_publisher.set_chips([(0, pub_name, "")])
         # Auto-save publisher? Or wait for save button?
         # Logic says: wait for save button for atomic commit.
 
-    def _save_inspector(self, silent=False):
+            
+    def _on_search_artist(self):
+        # Use Contributor Repository from Album Repo context? or Library Service?
+        # Assuming we have access to a contributor repository.
+        # But AlbumManager initialized with only AlbumRepository.
+        # We need to access ContributorRepository.
+        # HACK: Assume self.album_repo.db_path acts as common key, instantiate new repo if needed.
+        # Ideally passed in __init__, but for now:
+        from ...data.repositories.contributor_repository import ContributorRepository
+        repo = ContributorRepository(self.album_repo.db_path)
+        
+        diag = ArtistPickerDialog(repo, parent=self)
+        if diag.exec():
+            # Support Smart Split List Return
+            result = diag.get_selected()
+            new_names = []
+            if isinstance(result, list):
+                new_names = [a.name for a in result]
+            elif result:
+                 new_names = [result.name]
+
+            if new_names:
+                # Merge with existing (Union)
+                current = self.tray_artist.get_names()
+                merged = sorted(list(set(current + new_names)))
+                # Set chips as tuples
+                self.tray_artist.set_chips([(0, n, "") for n in merged])
+                 
+    def _save_inspector(self, silent=False, close_on_success=False):
         # Gather Data
         title = self.inp_title.text().strip()
         if not title:
             QMessageBox.warning(self, "Error", "Title cannot be empty")
             return False
             
-        artist = self.inp_artist.text().strip()
+        # Get Artist from Chip Tray (Fix: use get_names)
+        art_chips = self.tray_artist.get_names()
+        artist = art_chips[0] if art_chips else ""
+        
         year_str = self.inp_year.text().strip()
+        
+        # Default to current year if empty
+        if not year_str:
+            from datetime import datetime
+            year_str = str(datetime.now().year)
+            
         year = int(year_str) if year_str.isdigit() else None
         alb_type = self.cmb_type.currentText()
         
@@ -594,7 +628,12 @@ class AlbumManagerDialog(QDialog):
                 album, created = self.album_repo.get_or_create(title, artist, year)
                 album.album_type = alb_type
                 self.album_repo.update(album)
-                self.album_repo.set_publisher(album.album_id, self.selected_pub_name)
+                self.album_repo.update(album)
+                
+                # Get Publisher from Tray
+                pub_chips = self.tray_publisher.get_names()
+                pub_name = pub_chips[0] if pub_chips else None
+                self.album_repo.set_publisher(album.album_id, pub_name)
                 
                 self.current_album = album
                 self.is_creating_new = False
@@ -618,7 +657,12 @@ class AlbumManagerDialog(QDialog):
                 self.current_album.album_type = alb_type
                 
                 self.album_repo.update(self.current_album)
-                self.album_repo.set_publisher(self.current_album.album_id, self.selected_pub_name)
+                self.album_repo.update(self.current_album)
+                
+                # Get Publisher from Tray
+                pub_chips = self.tray_publisher.get_names()
+                pub_name = pub_chips[0] if pub_chips else None
+                self.album_repo.set_publisher(self.current_album.album_id, pub_name)
                 
                 # Clear search so we see the updated item (if renamed out of search scope)
                 self.txt_search.blockSignals(True)
@@ -626,14 +670,17 @@ class AlbumManagerDialog(QDialog):
                 self.txt_search.blockSignals(False)
 
                 self._refresh_vault() 
-                if not silent:
+                if not silent and not close_on_success: 
                     QMessageBox.information(self, "Success", "Album Updated")
                 success = True
                 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Save failed: {e}")
             success = False
-            
+
+        if success and close_on_success:
+             self._on_select_clicked()
+             
         return success
 
     def _on_select_clicked(self):

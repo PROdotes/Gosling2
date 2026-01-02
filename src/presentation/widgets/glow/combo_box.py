@@ -79,3 +79,6 @@ class GlowComboBox(GlowWidget):
     def itemText(self, i): return self.combo.itemText(i)
     def clearEditText(self): self.combo.clearEditText()
     def lineEdit(self): return self.combo.lineEdit()
+    def setAlignment(self, a): 
+        if self.combo.lineEdit():
+            self.combo.lineEdit().setAlignment(a)

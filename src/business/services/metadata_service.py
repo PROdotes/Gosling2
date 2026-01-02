@@ -6,7 +6,7 @@ from ...data.models.song import Song
 from ...core.yellberus import FIELDS
 from ...core import logger
 import mutagen.id3
-from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER
+from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER, TLEN
 import json
 import os
 
@@ -38,11 +38,21 @@ class MetadataService:
         """
         Generic entry point for metadata extraction.
         Supports MP3 (ID3) and WAV (RIFF).
+        Enforces a name (title) fallback to filename if retrieval fails.
         """
         ext = path.lower().split('.')[-1]
         if ext == 'wav':
-            return cls.extract_from_wav(path, source_id)
-        return cls.extract_from_mp3(path, source_id)
+            song = cls.extract_from_wav(path, source_id)
+        else:
+            song = cls.extract_from_mp3(path, source_id)
+            
+        # SAFETY: Ensure Name is never None (prevent DB NOT NULL crashes)
+        if not song.name or not song.name.strip():
+            base = os.path.basename(path)
+            # Remove extension for cleaner title
+            song.name = os.path.splitext(base)[0]
+            
+        return song
 
     @classmethod
     def extract_from_wav(cls, path: str, source_id: Optional[int] = None) -> Song:
@@ -93,6 +103,17 @@ class MetadataService:
             raise ValueError(f"Unable to read MP3 file: {path}") from e
 
         duration = audio.info.length if audio.info else None
+        
+        # FALLBACK: If duration is 0 (VBR glitch), try TLEN (Length in ms)
+        if (not duration or duration == 0) and audio.tags and 'TLEN' in audio.tags:
+             try:
+                 # TLEN is string in ms
+                 raw_tlen = str(audio.tags['TLEN'].text[0])
+                 ms = int(raw_tlen)
+                 if ms > 0: 
+                     duration = ms / 1000.0
+             except Exception: 
+                 pass
         
         # Use Cached ID3 Mapping
         id3_map = cls._get_id3_map()
@@ -464,6 +485,12 @@ class MetadataService:
                 audio.tags.add(TCOM(encoding=1, text=[LIST_SEP.join(union_list)]))
             else:
                  pass # TCOM cleared.
+
+            # 5. Duration (TLEN) - Backup for VBR glitches
+            if song.duration and song.duration > 0:
+                audio.tags.delall('TLEN')
+                tlen_ms = str(int(song.duration * 1000))
+                audio.tags.add(TLEN(encoding=1, text=[tlen_ms]))
 
             # Save
             # Save
