@@ -552,19 +552,17 @@ QRadioButton::indicator:pressed {
 }
 
 #LibraryTable::item:hover {
-    background-color: #1A1A1A;
-    color: #FFFFFF;
+    background-color: transparent; /* Handled by delegate for row-level hover */
 }
 
 #LibraryTable::item:selected {
-    background-color: #151515;
-    color: #E0E0E0;
-    border-left: 3px solid #FFC66D;
+    color: #FFFFFF; /* Force white text for selected items */
+    background-color: transparent;
+    border: none;
 }
 
 #LibraryTable::item:selected:hover {
-    background-color: #1A1A1A;
-    color: #FFFFFF;
+    background-color: transparent;
 }
 
 /* Table Headers */
@@ -1437,4 +1435,146 @@ QPushButton#SearchInlineButton, QPushButton#AddInlineButton {
 #UniversalImportDialog #DialogFooter {
     background-color: #111;
     border-top: 1px solid #000;
+}
+
+/* --- JINGLE TRAY (Tactical Sound Board) --- */
+#JingleHandle {
+    background: #0D0D0D;
+    color: #444444;
+    border: none;
+    border-top: 1px solid #1A1A1A;
+    border-bottom: 2px solid #000000;
+    font-family: "Bahnschrift Condensed", "Inter", sans-serif;
+    font-size: 7.5pt;
+    font-weight: bold;
+    letter-spacing: 3px;
+    padding: 2px;
+    min-height: 16px;
+    max-height: 16px;
+}
+
+#JingleHandle:hover {
+    color: #888888;
+    background: #111111;
+}
+
+#JingleHandle:checked {
+    background: #151515;
+    color: #FFC66D;
+    border-bottom: 2px solid #CC9900;
+}
+
+#JingleCurtain {
+    background-color: #030303;
+    border-top: 1px solid #111111;
+}
+
+#JingleCurtainTitle {
+    color: #333333;
+    font-family: "Bahnschrift Condensed", "Inter", sans-serif;
+    font-size: 9pt;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+}
+
+/* Jingle Buttons - Modern Sound Pad Style (Backlit Rubber) */
+QPushButton[objectName^="JingleButton_"] {
+    background: qradialgradient(cx:0.5, cy:0.5, radius:1.2, fx:0.5, fy:0.5, 
+        stop:0 #252525, 
+        stop:1 #151515);
+    border: 1px solid #000000;
+    border-top: 1px solid #353535; /* Top highlight (Rim) */
+    border-bottom: 2px solid #050505; /* Bottom shadow (Depth) */
+    border-radius: 6px; /* Soft rubber pad feel */
+}
+
+QPushButton[objectName^="JingleButton_"]:hover {
+    background: qradialgradient(cx:0.5, cy:0.5, radius:1.2, fx:0.5, fy:0.5, 
+        stop:0 #333333, 
+        stop:1 #1A1A1A);
+    border-top: 1px solid #444444;
+}
+
+/* The Active 'Burn-In' State */
+QPushButton[objectName^="JingleButton_"]:checked {
+    background: qradialgradient(cx:0.5, cy:0.2, radius:1.5, fx:0.5, fy:0.2, 
+        stop:0 #FFD18A, 
+        stop:0.6 #FFC66D,
+        stop:1 #996600);
+    border: 1px solid #FFC66D;
+    border-top: 1px solid #FFF1D4;
+}
+
+#JingleButtonTitle {
+    color: #FFFFFF; /* High contrast white */
+    font-family: "Bahnschrift Condensed", "Inter", sans-serif;
+    font-size: 10pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+QPushButton[objectName^="JingleButton_"]:checked #JingleButtonTitle {
+    color: #000000;
+    font-weight: 800;
+}
+
+#JingleButtonInfo {
+    color: #BBBBBB; /* Brighter gray for status info */
+    font-family: "Consolas", monospace;
+    font-size: 8pt;
+    background: transparent;
+    font-weight: bold;
+}
+
+QPushButton[objectName^="JingleButton_"]:checked #JingleButtonInfo {
+    color: #443300;
+}
+
+/* Under-Glow Indicators (Left edge LED bar) */
+QPushButton#JingleButton_id { border-left: 4px solid #0077BB; }
+QPushButton#JingleButton_transition { border-left: 4px solid #7700BB; }
+QPushButton#JingleButton_sweeper { border-left: 4px solid #BB7700; }
+QPushButton#JingleButton_voice { border-left: 4px solid #00BB77; }
+QPushButton#JingleButton_ads { border-left: 4px solid #BB2200; }
+QPushButton#JingleButton_legal { border-left: 4px solid #999999; }
+QPushButton#JingleButton_promo { border-left: 4px solid #00BB00; }
+
+/* When checked, the LED bar 'ignites' into the background */
+#JinglePip {
+    background-color: #1A1A1A;
+    border: 1px solid #333333;
+    border-radius: 7px; /* Circular */
+}
+
+#JinglePip:hover {
+    background-color: #333333;
+    border: 1px solid #555555;
+}
+
+#JinglePip:checked {
+    background-color: #FFC66D; /* Amber LED Active */
+    border: 1px solid #FFFFFF;
+    /* Simulated Glow */
+    border-radius: 7px;
+}
+
+#PresetUtilButton {
+    background: #111111;
+    color: #555555;
+    border: 1px solid #252525;
+    border-radius: 3px;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-size: 7pt;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+#PresetUtilButton:hover {
+    color: #FFFFFF;
+    border: 1px solid #444444;
+}
+
+QPushButton[objectName^="JingleButton_"]:checked {
+    border-left: 5px solid rgba(0,0,0,0.3);
 }

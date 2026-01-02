@@ -17,7 +17,7 @@ from ...core import yellberus
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint, QModelIndex, QRect, QLine
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint, QModelIndex, QRect, QLine, QSize
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QPen, QDrag, QFont
@@ -696,7 +696,25 @@ class LibraryWidget(QWidget):
         self.empty_label.hide()
         
         # Assemble Center Layout
-        center_layout.addWidget(self.table_view)
+        center_layout.addWidget(self.table_view, 1) # Table takes priority space
+        
+        # --- JINGLE TRAY HANDLING (T-90) ---
+        # The 'Handle' is an interactive border that slides the tray UP
+        self.jingle_handle = QPushButton("▼  QUICK-FIRE JINGLE BAYS  ▼")
+        self.jingle_handle.setObjectName("JingleHandle")
+        self.jingle_handle.setCheckable(True)
+        self.jingle_handle.setCursor(Qt.CursorShape.PointingHandCursor)
+        center_layout.addWidget(self.jingle_handle)
+        
+        self.jingle_curtain = JingleCurtain() # Initially 0 height
+        center_layout.addWidget(self.jingle_curtain)
+        
+        # Animation: Bottom-Up expansion
+        self.jingle_anim = QPropertyAnimation(self.jingle_curtain, b"curtainHeight")
+        self.jingle_anim.setDuration(400)
+        self.jingle_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
+        
+        self.jingle_handle.clicked.connect(self.toggle_jingle_curtain)
         
         # Finalize Splitter (Sidebar Container [1] | Center Widget [2])
         self.splitter.addWidget(center_widget)
@@ -1947,11 +1965,15 @@ class LibraryWidget(QWidget):
             print(f"[Save] Saved {saved} song(s); {len(errors)} failures")
 
     def toggle_jingle_curtain(self):
-        """Triggers the drop-down animation for the Jingle Bay."""
-        if self.jingle_toggle.isChecked():
+        """Triggers the bottom-up expansion of the Jingle Tray."""
+        is_opening = self.jingle_handle.isChecked()
+        
+        if is_opening:
+            self.jingle_handle.setText("▲  QUICK-FIRE JINGLE BAYS  ▲")
             self.jingle_anim.setStartValue(0)
-            self.jingle_anim.setEndValue(260) # Full Bay height
+            self.jingle_anim.setEndValue(220) # Tactical Height
         else:
+            self.jingle_handle.setText("▼  QUICK-FIRE JINGLE BAYS  ▼")
             self.jingle_anim.setStartValue(self.jingle_curtain.height())
             self.jingle_anim.setEndValue(0)
             

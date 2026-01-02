@@ -42,8 +42,10 @@ class WorkstationDelegate(QStyledItemDelegate):
         row = index.row()
         rect = option.rect
         
-        # Kill Focus Rect
+        # Kill Focus & Active State visuals (prevents fragmented boxes)
         option.state &= ~QStyle.StateFlag.State_HasFocus
+        option.state &= ~QStyle.StateFlag.State_Active
+        option.state &= ~QStyle.StateFlag.State_MouseOver
         
         # Determine Far Left Blade
         is_far_left = False
@@ -81,31 +83,46 @@ class WorkstationDelegate(QStyledItemDelegate):
             # T-87: Disable AA for borders to prevent sub-pixel bleed into adjacent rows
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
             
-            # Draw Selection Border (Pixel-Perfect)
-            painter.setPen(QPen(category_color, 1))
-            # Line 1: Top edge (Row 0 of cell)
-            painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top())
-            # Line 2: Bottom edge (Row H-2 of cell, leaving H-1 for the separator)
-            painter.drawLine(rect.left(), rect.bottom() - 1, rect.right(), rect.bottom() - 1)
+            # Fill the interior with a deep, neutral Onyx base (no colored bleed)
+            painter.fillRect(rect.adjusted(0, 1, 0, -1), QColor("#0D0D0D"))
             
-            highlight_fill = QColor(category_color)
-            highlight_fill.setAlpha(15)
-            # Fill the interior
-            painter.fillRect(rect.adjusted(0, 1, 0, -1), highlight_fill)
+            # Draw Selection Border (Surgical Horizontal Etching)
+            border_pen = QPen(category_color, 1)
+            edge_color = QColor(category_color)
+            edge_color.setAlpha(80) # Very fine, etched look (30% opacity)
+            border_pen.setColor(edge_color)
+            
+            painter.setPen(border_pen)
+            # Top edge: continuous across cells
+            painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top())
+            # Bottom edge: floor line
+            painter.drawLine(rect.left(), rect.bottom() - 1, rect.right(), rect.bottom() - 1)
             
             # Restore AA for text/badges
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         else:
+            # Determine base background
             is_alt = option.features & QStyleOptionViewItem.ViewItemFeature.Alternate
             bg = alt_color if (is_alt and alt_color.isValid()) else base_color
             if not bg.isValid():
                 bg = QColor(constants.COLOR_VOID if is_alt else constants.COLOR_BLACK)
-            painter.fillRect(rect, bg)
             
-            # Subtle Category Tint
-            tint = QColor(category_color)
-            tint.setAlpha(8) 
-            painter.fillRect(rect, tint)
+            # 1. Base Fill
+            painter.fillRect(rect, bg)
+
+            # 2. Row-Level Hover Handling
+            # T-90: Use the delegate's parent (LibraryWidget) for state tracking
+            hovered_row = getattr(self.parent(), '_hovered_row', -1)
+            if row == hovered_row:
+                # Ghostly Hover: A tactical lift (felt, not seen)
+                hover_fill = QColor("#FFFFFF")
+                hover_fill.setAlpha(18) 
+                painter.fillRect(rect, hover_fill)
+            else:
+                # Subtle Category Tint (Ambient Glow)
+                tint = QColor(category_color)
+                tint.setAlpha(5) 
+                painter.fillRect(rect, tint)
 
         # 5. PHYSICAL SEPARATION (Bottom Border)
         sep_color = base_color if base_color.isValid() else QColor(constants.COLOR_BLACK)
@@ -153,15 +170,14 @@ class WorkstationDelegate(QStyledItemDelegate):
             text_rect = rect.adjusted(18 if is_far_left else 10, 0, -4, 0)
 
             if option.state & QStyle.StateFlag.State_Selected:
-                sel_text = highlight_text if highlight_text.isValid() else QColor(constants.COLOR_WHITE)
-                painter.setPen(sel_text)
+                painter.setPen(QColor("#FFFFFF")) # Force crisp white on selection
             elif is_dirty:
-                # Dirty text glows Amber
                 painter.setPen(QColor(constants.COLOR_AMBER))
             else:
-                norm_text = text_color if text_color.isValid() else QColor(constants.COLOR_GRAY)
+                norm_text = text_color if text_color.isValid() else QColor("#BBBBBB")
                 painter.setPen(norm_text)
                 
+            # Use AlignVCenter with the full cell rect for perfect centering
             painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, text)
 
         painter.restore()
