@@ -263,7 +263,6 @@ class RightPanelWidget(QWidget):
         """Updates History Drawer"""
         # TODO: Implement history update logic once HistoryDrawer supports it
         pass
-
     def set_mode(self, mode: str):
         """Programmatic mode switch"""
         if mode == 'edit':

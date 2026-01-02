@@ -599,6 +599,13 @@ class FilterWidget(QFrame):
             item_ready.setData(field.name, Qt.ItemDataRole.UserRole + 1)
             root_item.appendRow(item_ready)
 
+            item_incomplete = QStandardItem("Incomplete")
+            item_incomplete.setFlags(item_incomplete.flags() & ~Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)
+            item_incomplete.setCheckState(Qt.CheckState.Unchecked)
+            item_incomplete.setData("INCOMPLETE", Qt.ItemDataRole.UserRole)
+            item_incomplete.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+            root_item.appendRow(item_incomplete)
+
         # True option
         item_true = QStandardItem(label_true)
         item_true.setFlags(item_true.flags() & ~Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)
@@ -753,6 +760,7 @@ class FilterWidget(QFrame):
                 display_val = str(val)
                 if field_name == "is_done":
                     if val == "READY": display_val = "Pending"
+                    elif val == "INCOMPLETE": display_val = "Incomplete"
                     elif val is False: display_val = "Not Done"
                     elif val is True: display_val = "Done"
                 elif "active" in field_name.lower():

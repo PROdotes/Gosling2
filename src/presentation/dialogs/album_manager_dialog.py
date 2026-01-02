@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-    QListWidget, QListWidgetItem, QSplitter,
+    QListWidget, QListWidgetItem, QSplitter, QScrollArea,
     QFrame, QMessageBox, QComboBox, QWidget, QMenu, QCheckBox,
     QSizePolicy
 )
@@ -158,6 +158,7 @@ class AlbumManagerDialog(QDialog):
         
         # 3. PANE B: Inspector (Editor)
         self.pane_inspector = self._build_inspector_pane()
+        self.pane_inspector.setMinimumWidth(self.PANE_MIN_WIDTH)
         self.splitter.addWidget(self.pane_inspector)
         
         self.splitter.setStretchFactor(0, 0)
@@ -259,50 +260,133 @@ class AlbumManagerDialog(QDialog):
     def _build_inspector_pane(self):
         container = QFrame()
         container.setObjectName("DialogInspector")
-        layout = QVBoxLayout(container)
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0,0,0,0)
+        container_layout.setSpacing(0)
+        
+        # Scroll Area (matching side panel structure for proper widget expansion)
+        scroll = QScrollArea()
+        scroll.setObjectName("EditorScroll")
+        scroll.setWidgetResizable(True)  # KEY: Forces child to expand to fill width
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        
+        # Content widget inside scroll
+        content = QFrame()
+        content.setObjectName("FieldContainer")
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(20,20,20,20)
         layout.setSpacing(0)  # Zero spacing - manual control like side panel
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
         # Form Fields (use FieldLabel for tight label-to-input proximity)
         # Form Fields (use FieldLabel for tight label-to-input proximity)
+        # Form Fields
         self.inp_title = self._add_field(layout, "Album Title *")
-        layout.addSpacing(12)  # Consistent gap between field groups
+        layout.addSpacing(12)
         
-        # Artist Chip Tray
+        # Artist Chip Tray - EXACT side panel structure
+        field_module_art = QWidget()
+        field_module_art.setObjectName("FieldModule")
+        module_layout_art = QVBoxLayout(field_module_art)
+        module_layout_art.setContentsMargins(0, 0, 0, 0)
+        module_layout_art.setSpacing(0)
+        
+        # Header Row (Label only for now)
+        header_row_art = QWidget()
+        header_layout_art = QHBoxLayout(header_row_art)
+        header_layout_art.setContentsMargins(0, 0, 0, 0)
+        header_layout_art.setSpacing(4)
         lbl_art = QLabel("ALBUM ARTIST")
         lbl_art.setObjectName("FieldLabel")
-        layout.addWidget(lbl_art)
-        self.tray_artist = ChipTrayWidget(parent=self, add_tooltip="Add Artist")
-        self.tray_artist.add_requested.connect(self._on_search_artist)
-        layout.addWidget(self.tray_artist)
+        header_layout_art.addWidget(lbl_art, 1)
+        module_layout_art.addWidget(header_row_art)
+        
+        # Input Row
+        input_row_art = QWidget()
+        input_row_art.setObjectName("FieldRow")
+        input_layout_art = QHBoxLayout(input_row_art)
+        input_layout_art.setContentsMargins(0, 0, 0, 0)
+        input_layout_art.setSpacing(6)
+        
+        self.tray_artist = ChipTrayWidget(parent=self, show_add=False)
+        self.tray_artist.is_add_visible = False
+        self.tray_artist.btn_add.hide()
+        self.tray_artist.chip_remove_requested.connect(
+            lambda eid, name: self._remove_chip_from_tray(self.tray_artist, name)
+        )
+        input_layout_art.addWidget(self.tray_artist, 1)
+        
+        btn_add_artist = GlowButton("+")
+        btn_add_artist.setObjectName("AddInlineButton")
+        btn_add_artist.setFixedSize(26, 24)
+        btn_add_artist.clicked.connect(self._on_search_artist)
+        input_layout_art.addWidget(btn_add_artist)
+        
+        module_layout_art.addWidget(input_row_art)
+        layout.addWidget(field_module_art)
         
         layout.addSpacing(12)
         self.inp_year = self._add_field(layout, "Release Year")
         layout.addSpacing(12)
         
-        # Publisher Trigger
+        # Publisher Chip Tray - EXACT side panel structure
+        field_module_pub = QWidget()
+        field_module_pub.setObjectName("FieldModule")
+        module_layout_pub = QVBoxLayout(field_module_pub)
+        module_layout_pub.setContentsMargins(0, 0, 0, 0)
+        module_layout_pub.setSpacing(0)
+        
+        # Header Row
+        header_row_pub = QWidget()
+        header_layout_pub = QHBoxLayout(header_row_pub)
+        header_layout_pub.setContentsMargins(0, 0, 0, 0)
+        header_layout_pub.setSpacing(4)
         lbl_pub = QLabel("PUBLISHER")
-        lbl_pub.setObjectName("FieldLabel")  # Use same class as side panel
-        layout.addWidget(lbl_pub)
+        lbl_pub.setObjectName("FieldLabel")
+        header_layout_pub.addWidget(lbl_pub, 1)
+        module_layout_pub.addWidget(header_row_pub)
         
-        self.tray_publisher = ChipTrayWidget(parent=self, add_tooltip="Select Publisher")
-        self.tray_publisher.add_requested.connect(self._on_search_publisher)
-        # Note: We rely on _on_publisher_selected to populate this
-        layout.addWidget(self.tray_publisher)
+        # Input Row
+        input_row_pub = QWidget()
+        input_row_pub.setObjectName("FieldRow")
+        input_layout_pub = QHBoxLayout(input_row_pub)
+        input_layout_pub.setContentsMargins(0, 0, 0, 0)
+        input_layout_pub.setSpacing(6)
         
-        layout.addSpacing(12)  # Consistent gap between field groups
+        self.tray_publisher = ChipTrayWidget(parent=self, show_add=False)
+        self.tray_publisher.is_add_visible = False
+        self.tray_publisher.btn_add.hide()
+        self.tray_publisher.chip_remove_requested.connect(
+            lambda eid, name: self._remove_chip_from_tray(self.tray_publisher, name)
+        )
+        input_layout_pub.addWidget(self.tray_publisher, 1)
+        
+        btn_add_pub = GlowButton("+")
+        btn_add_pub.setObjectName("AddInlineButton")
+        btn_add_pub.setFixedSize(26, 24)
+        btn_add_pub.clicked.connect(self._on_search_publisher)
+        input_layout_pub.addWidget(btn_add_pub)
+        
+        module_layout_pub.addWidget(input_row_pub)
+        layout.addWidget(field_module_pub)
+        
+        layout.addSpacing(12)
         
         # Type Dropdown
         lbl_type = QLabel("RELEASE TYPE")
-        lbl_type.setObjectName("FieldLabel")  # Use same class as side panel
+        lbl_type.setObjectName("FieldLabel")
         layout.addWidget(lbl_type)
         
         self.cmb_type = GlowComboBox()
-        self.cmb_type.setEditable(False)  # Fixed list, not searchable
+        self.cmb_type.setEditable(False)
         self.cmb_type.addItems(["Album", "EP", "Single", "Compilation", "Anthology"])
         layout.addWidget(self.cmb_type)
         
         layout.addStretch()
+        
+        # Complete scroll area setup
+        scroll.setWidget(content)
+        container_layout.addWidget(scroll)
         
         # Disable by default
         container.setEnabled(False)
@@ -599,6 +683,12 @@ class AlbumManagerDialog(QDialog):
                 merged = sorted(list(set(current + new_names)))
                 # Set chips as tuples
                 self.tray_artist.set_chips([(0, n, "") for n in merged])
+    
+    def _remove_chip_from_tray(self, tray, name):
+        """Remove a chip by name from the given tray."""
+        current = tray.get_names()
+        new_list = [n for n in current if n != name]
+        tray.set_chips([(0, n, "") for n in new_list])
                  
     def _save_inspector(self, silent=False, close_on_success=False):
         # Gather Data
@@ -628,7 +718,6 @@ class AlbumManagerDialog(QDialog):
                 album, created = self.album_repo.get_or_create(title, artist, year)
                 album.album_type = alb_type
                 self.album_repo.update(album)
-                self.album_repo.update(album)
                 
                 # Get Publisher from Tray
                 pub_chips = self.tray_publisher.get_names()
@@ -657,7 +746,6 @@ class AlbumManagerDialog(QDialog):
                 self.current_album.album_type = alb_type
                 
                 self.album_repo.update(self.current_album)
-                self.album_repo.update(self.current_album)
                 
                 # Get Publisher from Tray
                 pub_chips = self.tray_publisher.get_names()
@@ -679,13 +767,15 @@ class AlbumManagerDialog(QDialog):
             success = False
 
         if success and close_on_success:
-             self._on_select_clicked()
+             # Atomic Save: Tell Side Panel to commit everything immediately
+             self.save_and_select_requested.emit(self.current_album.album_id, self.current_album.title)
+             self.accept()
              
         return success
 
     def _on_select_clicked(self):
-        # Auto-save current edits if inspector is active
-        if self.pane_inspector.isEnabled():
+        # Auto-save current edits if inspector is active (but only if we aren't already returning from a save)
+        if self.pane_inspector.isEnabled() and self.is_creating_new:
             if not self._save_inspector(silent=True):
                 return # Abort if save failed (e.g. invalid title)
 

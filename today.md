@@ -1,32 +1,38 @@
-# 2026-01-01 - New Year Session
+# 2026-01-02 - The Status Enforcement & Audit Session
 
 ## 📌 Context
-- **Status**: Fresh start for the new year.
-- **Focus**: Accessibility and Core Workflows.
-
-## 📅 Pending Features for Today
-- [ ] **T-84: Primary Import Button** (UI Visibility).
-      - Add a dedicated button to Import/Add Files in the main UI (Header/TitleBar) to avoid relying solely on Drag&Drop or Context Menus.
-- [ ] **T-85: Mini Playlist Duration** (Polishing).
-      - Display total playlist duration at the bottom of the Mini Playlist.
-      - *Note*: Needs checking (design/feasibility).
-- [ ] **T-86: Rename Rules Audit**.
-      - Investigate "something feels off" with renaming logic. Check separators, compilation handling, and path generation.
-- [ ] **T-87: Fix Ghost Hover**.
-      - "Ghost amber bar" remains on table when mouse leaves. Need to clear `_hovered_row` on Viewport Leave event.
-- [ ] **T-88: Investigate Pending Status**.
-      - User reports "Pending Status might not be working". Verify Amber/Green logic for staged changes.
-- [ ] **T-89: Missing Data View**.
-      - "Opposite of pending": Show files that are missing required metadata (Artist, Title, etc.) - effectively an "Incomplete" filter.
-- **Refactoring Debt (v0.2 Candidates)**:
-  - **Dialog/Picker Duplication**: Consolidate `ArtistPickerDialog`, `PublisherPickerDialog`, etc. into a `DialogFactory`.
-  - **ChipTray Abstraction Leak**: `ChipTrayWidget` exposes internal tuple structure `(id, label, icon...)` to consumers. It should handle simple string lists internally (`set_strings(["A", "B"])`) to avoid boilerplate.
+- **Focus**: Hardening the "Status" workflow and preventing metadata-incomplete songs from being marked "Done".
+- **Standardization**: Converged on "Unprocessed" as the primary intake status, with a "Status" category-aware detection logic for future growth.
 
 ## ✅ Completed Today
-- (None)
 
-## 🚧 Next Steps
-- T-84 Planning.
+### 🛡️ Status Enforcement (T-89)
+- [x] **Tag Removal Validation (The Gate)**:
+    - Implemented a pre-flight check that blocks the removal of "Unprocessed" tags if `yellberus` validation fails.
+    - Added a detailed warning dialog showing exactly which fields are missing or invalid.
+- [x] **Metadata Audit Feature**:
+    - Changed chip-click behavior: Clicking a `Status` tag now opens a **Metadata Audit Report** instead of a rename dialog.
+    - Report displays failure reasons + current staged values for all required fields.
+- [x] **Universal Status Logic**:
+    - Updated `LibraryFilterProxyModel` to treat any tag in the `Status` category as "Not Done". 
+    - Future-proofs the system for "Unverified", "Unlicensed", etc.
 
-## ⚠️ Known Issues / Warnings
-- None currently active.
+### 🧹 Integrity & Cleanup
+- [x] **Legacy Bridge De-activation**:
+    - Removed legacy `is_done` staging pulse in `SidePanelWidget`.
+    - Set the `is_done` library column to read-only "Ghost Checkbox" mode.
+- [x] **Filter Visual Sync**:
+    - Fixed "Incomplete" chip labeling in the footer.
+    - Forced **Triage View** (revealing required columns) whenever "Pending" or "Incomplete" filters are active.
+- [x] **Bug Squashing**:
+    - Fixed `AttributeError` crash in `LibraryFilterProxyModel` (`window()` lookup on non-widget).
+    - Fixed stale filter cache by clearing `_tag_cache` on every library reload.
+
+## � Remaining / Next Steps
+- [ ] **T-84: Primary Import Button** (Intake Logic Fix).
+- [x] **T-87: Fix Filter Logic Divergence** (Synced Library/SidePanel Publishers & Lists).
+- [x] **T-86: Fix Metadata Audit / Funny Bug** (Fixed SidePanel passing empty lists).
+- [x] **T-89: Fix Album Save Corruption** (Fixed stringification of album lists).
+
+---
+*Historical Note: 2026-01-01 session documented Background Import (T-68) completion.*

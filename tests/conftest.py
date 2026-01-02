@@ -146,7 +146,8 @@ def mock_widget_deps():
         'metadata_service': MagicMock(),
         'settings_manager': MagicMock(),
         'renaming_service': MagicMock(),
-        'duplicate_scanner': MagicMock()
+        'duplicate_scanner': MagicMock(),
+        'import_service': MagicMock()
     }
     
     # Default settings to prevent common initialization crashes
@@ -205,7 +206,9 @@ def library_widget(qtbot, mock_widget_deps):
         deps['metadata_service'], 
         deps['settings_manager'],
         deps['renaming_service'],
-        deps['duplicate_scanner']
+        deps['duplicate_scanner'],
+        conversion_service=None,
+        import_service=deps['import_service']
     )
     qtbot.addWidget(widget)
     return widget

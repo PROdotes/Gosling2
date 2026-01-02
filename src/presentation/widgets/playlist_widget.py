@@ -23,8 +23,9 @@ class PlaylistItemDelegate(QStyledItemDelegate):
     ITEM_SPACING = 4
 
     def paint(self, painter, option, index) -> None:
-        """Custom paint for playlist items"""
+        """Custom paint for playlist items with live playback sweep"""
         painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         # Read colors from palette (QSS-controlled)
         palette = option.palette
@@ -41,11 +42,12 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             option.rect.height() - self.ITEM_SPACING
         )
 
-        # Colors with fallbacks
+        # Basic row background
+        is_selected = option.state & QStyle.StateFlag.State_Selected
         row_bg = alt_color if alt_color.isValid() else QColor(constants.COLOR_VOID)
         sel_bg = highlight_color if highlight_color.isValid() else QColor(constants.COLOR_AMBER)
-
-        if option.state & QStyle.StateFlag.State_Selected:
+        
+        if is_selected:
             painter.fillRect(visual_rect, sel_bg)
             txt_color = highlight_text if highlight_text.isValid() else QColor(constants.COLOR_BLACK)
         else:
@@ -55,7 +57,35 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             painter.setPen(divider)
             painter.drawLine(visual_rect.bottomLeft(), visual_rect.bottomRight())
         
-        # Text
+        # Metadata extraction
+        data = index.data(Qt.ItemDataRole.UserRole) or {}
+        duration_sec = data.get('duration', 0)
+        
+        # --- PLAYBACK SWEEP (User Request) ---
+        is_playing = (self.parent() and getattr(self.parent(), '_active_row', -1) == index.row())
+        current_dur_str = ""
+        
+        if is_playing and duration_sec > 0:
+            current_ms = getattr(self.parent(), '_current_pos_ms', 0)
+            progress = min(1.0, current_ms / (duration_sec * 1000.0))
+            
+            # Draw Progress Sweep (Darker Overlay)
+            sweep_width = int(visual_rect.width() * progress)
+            sweep_rect = QRect(visual_rect.left(), visual_rect.top(), sweep_width, visual_rect.height())
+            
+            overlay = QColor(0, 0, 0, 60) # 60 alpha dark wash
+            painter.fillRect(sweep_rect, overlay)
+            
+            # Format elapsed time
+            em, es = divmod(int(current_ms // 1000), 60)
+            current_dur_str = f"{em}:{es:02d}/"
+
+        # Format total duration
+        m, s = divmod(int(duration_sec), 60)
+        total_dur_str = f"{m}:{s:02d}"
+        display_duration = f"{current_dur_str}{total_dur_str}"
+
+        # Text Preparation
         display_text = index.data(Qt.ItemDataRole.DisplayRole) or ""
         if "|" in display_text:
             parts = [p.strip() for p in display_text.split("|", 1)]
@@ -70,10 +100,18 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             painter.setFont(self.mini_font)
             painter.setPen(txt_color)
             combined = f"{performer.upper()} - {title}" if title else performer.upper()
+            
+            # Left: Performer - Title
             painter.drawText(
                 visual_rect.adjusted(padding, 0, -padding, 0),
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 combined
+            )
+            # Right: Duration
+            painter.drawText(
+                visual_rect.adjusted(padding, 0, -padding, 0),
+                Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                display_duration
             )
         else:
             # Circle (semantic: always magenta)
@@ -96,13 +134,20 @@ class PlaylistItemDelegate(QStyledItemDelegate):
             performer_rect = QRect(text_rect.left(), text_rect.top(), text_rect.width(), text_rect.height() // 2)
             title_rect = QRect(text_rect.left(), text_rect.top() + text_rect.height() // 2, text_rect.width(), text_rect.height() // 2)
 
+            # Left side content
             painter.setFont(self.performer_font)
             painter.setPen(txt_color)
-            painter.drawText(performer_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, performer.strip())
+            painter.drawText(performer_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, performer.upper())
 
             painter.setFont(self.title_font)
             painter.setPen(txt_color)
             painter.drawText(title_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, title.strip())
+            
+            # Sub-Title Duration Readout (Right-aligned)
+            painter.setFont(self.mini_font)
+            painter.setPen(txt_color)
+            dur_rect = QRect(text_rect.left(), title_rect.top(), text_rect.width(), title_rect.height())
+            painter.drawText(dur_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, display_duration)
 
         painter.restore()
 
@@ -116,6 +161,7 @@ class PlaylistWidget(QListWidget):
     """Custom list widget for playlist."""
 
     itemDoubleClicked = pyqtSignal(object)
+    playlist_changed = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -133,6 +179,31 @@ class PlaylistWidget(QListWidget):
         self.setItemDelegate(self.delegate)
         self._preview_row = None
         self._preview_after = False
+        
+        # Playback Tracking (T-?? / User Request)
+        self._active_row = -1
+        self._current_pos_ms = 0
+        
+        # Connect model signals for automatic change detection
+        # Use weakref proxy or a safer lambda to avoid RuntimeError on deletion
+        self.model().rowsInserted.connect(self._safe_emit_changed)
+        self.model().rowsRemoved.connect(self._safe_emit_changed)
+        self.model().modelReset.connect(self._safe_emit_changed)
+
+    def _safe_emit_changed(self, *args):
+        """Safely emit signal, preventing 'object deleted' errors."""
+        try:
+            # Basic sanity check: if 'self' is still a valid Qt object
+            self.playlist_changed.emit()
+        except (RuntimeError, AttributeError):
+            pass
+    
+    def update_playback_progress(self, row: int, pos_ms: int):
+        """Update the progress of the currently playing item."""
+        self._active_row = row
+        self._current_pos_ms = pos_ms
+        # High-frequency trigger for visual sweep
+        self.viewport().update()
 
     # def _on_table_double_click(self, index):
     #     item = self.itemFromIndex(index)
@@ -243,11 +314,15 @@ class PlaylistWidget(QListWidget):
                      title_disp = s.get('title', 'Unknown Title')
                      perf_disp = s.get('performer', 'Unknown Artist')
                      path = s.get('path')
+                     duration = s.get('duration', 0)
                      
                      list_item = QListWidgetItem(f"{perf_disp} | {title_disp}")
-                     list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+                     list_item.setData(Qt.ItemDataRole.UserRole, {
+                         "path": path,
+                         "duration": duration
+                     })
                      self.insertItem(drop_row, list_item)
-                         
+                          
                 event.acceptProposedAction()
                 return
             except Exception as e:
@@ -281,10 +356,14 @@ class PlaylistWidget(QListWidget):
                     from PyQt6.QtWidgets import QListWidgetItem
                     for s in reversed(songs_to_insert):
                          list_item = QListWidgetItem(f"{s['performer']} | {s['title']}")
-                         list_item.setData(Qt.ItemDataRole.UserRole, {"path": s['path']})
+                         list_item.setData(Qt.ItemDataRole.UserRole, {
+                             "path": s['path'],
+                             "duration": s.get('duration', 0)
+                         })
                          self.insertItem(drop_row, list_item)
 
-            event.acceptProposedAction()
+                self.playlist_changed.emit()
+                event.acceptProposedAction()
         else: super().dropEvent(event)
 
     def paintEvent(self, event):

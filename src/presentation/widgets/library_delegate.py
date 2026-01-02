@@ -78,13 +78,23 @@ class WorkstationDelegate(QStyledItemDelegate):
 
         # 4. BACKGROUND RENDERING
         if option.state & QStyle.StateFlag.State_Selected:
+            # T-87: Disable AA for borders to prevent sub-pixel bleed into adjacent rows
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+            
+            # Draw Selection Border (Pixel-Perfect)
             painter.setPen(QPen(category_color, 1))
-            painter.drawLine(rect.topLeft(), rect.topRight())
-            painter.drawLine(rect.bottomLeft() + QPoint(0, -1), rect.bottomRight() + QPoint(0, -1))
+            # Line 1: Top edge (Row 0 of cell)
+            painter.drawLine(rect.left(), rect.top(), rect.right(), rect.top())
+            # Line 2: Bottom edge (Row H-2 of cell, leaving H-1 for the separator)
+            painter.drawLine(rect.left(), rect.bottom() - 1, rect.right(), rect.bottom() - 1)
             
             highlight_fill = QColor(category_color)
             highlight_fill.setAlpha(15)
-            painter.fillRect(rect, highlight_fill)
+            # Fill the interior
+            painter.fillRect(rect.adjusted(0, 1, 0, -1), highlight_fill)
+            
+            # Restore AA for text/badges
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         else:
             is_alt = option.features & QStyleOptionViewItem.ViewItemFeature.Alternate
             bg = alt_color if (is_alt and alt_color.isValid()) else base_color

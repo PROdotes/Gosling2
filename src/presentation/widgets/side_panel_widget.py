@@ -173,7 +173,7 @@ class SidePanelWidget(QFrame):
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
 
-        # NOTE: btn_status removed - "Ready" functionality now handled via Unverified tag chip
+        # NOTE: btn_status removed - "Ready" functionality now handled via Unprocessed tag chip
         # Create a dummy reference so old code doesn't break
         self.btn_status = None
 
@@ -722,6 +722,92 @@ class SidePanelWidget(QFrame):
         if field_name == 'tags' and ': ' in name:
             category, actual_name = name.split(': ', 1)
         
+        # T-89: Status Tags are locked and informational.
+        # Clicking them shows a Metadata Audit instead of Rename.
+        if category == "Status":
+            errors = self._get_validation_errors()
+            from PyQt6.QtWidgets import QMessageBox
+            
+            # Format a detailed data audit report
+            lines = []
+            
+            # T-89: Streamlined Workflow
+            # If validation passes, offer immediate action instead of just info.
+            if not errors:
+               # Prompt user to mark as ready
+                reply = QMessageBox.question(
+                    self, 
+                    "Validation Passed", 
+                    "✅ All metadata requirements are met.\n\nMark this item as READY now?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes
+                )
+                
+                if reply == QMessageBox.StandardButton.Yes:
+                    # Remove 'Unprocessed' status tag
+                    self.tag_repo.remove_tag_from_source(self.current_songs[0].source_id, tag_id)
+                    
+                    # Refresh UI
+                    self.filter_refresh_requested.emit()
+                    self._refresh_field_values()
+                    
+                return
+
+            else:
+                lines.append("❌ The following requirements are missing or invalid:")
+                for e in errors:
+                    lines.append(f"• {e}")
+            
+            lines.append("")
+            lines.append("Current Data used for Validation:")
+            
+            # Single song context is easiest for labels
+            if self.current_songs:
+                song = self.current_songs[0]
+                
+                # Re-run validation to get raw field names for UI matching
+                v_row = []
+                for field in yellberus.FIELDS:
+                    attr = field.model_attr or field.name
+                    val = self._get_effective_value(song.source_id, field.name, getattr(song, attr, ""))
+                    v_row.append(val)
+                
+                raw_failed = yellberus.validate_row(v_row)
+
+                for field in yellberus.FIELDS:
+                    if field.required:
+                        val = self._get_effective_value(song.source_id, field.name, getattr(song, field.model_attr or field.name, ""))
+                        
+                        is_field_error = field.name in raw_failed
+                        icon = "❌" if is_field_error else "✅"
+                        
+                        display_val = f"'{val}'" if val and str(val).strip() else "[EMPTY]"
+                        lines.append(f"  {icon} {field.ui_header}: {display_val}")
+
+            msg = "\n".join(lines)
+            
+            # T-89: Explain "Phantom Incomplete" status
+            # If valid in editor but invalid in DB, warn the user.
+            if not errors and self._staged_changes:
+                # Check purely DB-based validation
+                db_errors = []
+                if self.current_songs:
+                    song = self.current_songs[0]
+                    # Create a mock row from the song object (DB state)
+                    # This mimics what the LibraryFilter sees
+                    db_row = []
+                    for f in yellberus.FIELDS:
+                        db_val = getattr(song, f.model_attr or f.name, None)
+                        db_row.append(db_val)
+                    db_errors = yellberus.validate_row(db_row)
+                
+                if db_errors:
+                    db_reasons = ", ".join(sorted(list(db_errors)))
+                    msg += f"\n\n⚠️ Note: This item appears in 'Incomplete' because the Library sees these fields as missing:\n[{db_reasons}]\n\n(Save changes to fix this sync issue)"
+            
+            QMessageBox.information(self, f"Metadata Audit: {actual_name}", msg)
+            return
+        
         # If we have an entity ID (best case)
         if entity_id and entity_id > 0:
             tag = self.tag_repo.get_by_id(entity_id)
@@ -818,6 +904,20 @@ class SidePanelWidget(QFrame):
 
     def _on_chip_removed(self, field_name, entity_id, name):
         """T-70: Generic chip removal handling."""
+        
+        # T-89: Enforcement Gate for 'Status: Unprocessed'
+        # Blocks removal if metadata is incomplete according to Yellberus
+        if field_name == 'tags' and "Status: Unprocessed" in name:
+            errors = self._get_validation_errors()
+            if errors:
+                from PyQt6.QtWidgets import QMessageBox
+                reasons_list = "\n".join([f"• {e}" for e in errors])
+                QMessageBox.warning(
+                    self, "Metadata Incomplete",
+                    f"Cannot remove 'Unprocessed' tag until documentation is complete:\n\n{reasons_list}"
+                )
+                return
+
         if field_name == 'tags':
             # Tags use the entity_id which is the tag_id
             if entity_id and entity_id > 0:
@@ -1373,14 +1473,14 @@ class SidePanelWidget(QFrame):
         # 1. Update Tags in DB (Immediate effect for now)
         for song in self.current_songs:
             if is_ready:
-                # MARKING DONE -> Remove all Status tags (Unverified, etc.) via efficient bulk call
+                # MARKING DONE -> Remove all Status tags (Unprocessed, etc.) via efficient bulk call
                 self.tag_repo.remove_all_tags_from_source(song.source_id, category="Status")
             else:
-                # MARKING PENDING -> Add 'Unverified' Status tag
-                self.tag_repo.add_tag_to_source(song.source_id, "Unverified", category="Status")
+                # MARKING PENDING -> Add 'Unprocessed' Status tag
+                self.tag_repo.add_tag_to_source(song.source_id, "Unprocessed", category="Status")
 
-        # 2. Sync legacy column via staging (Updates all songs in one call)
-        self._on_field_changed("is_done", 1 if is_ready else 0)
+        # 2. Sync legacy column via staging (REMOVED - Field is Legacy)
+        # self._on_field_changed("is_done", 1 if is_ready else 0)
 
         # 3. Update UI
         self._update_status_visuals(is_ready)
@@ -1406,62 +1506,55 @@ class SidePanelWidget(QFrame):
         except:
             pass
 
+    def _get_validation_errors(self) -> List[str]:
+        """Centralized validation logic driven by Yellberus Registry."""
+        if not self.current_songs:
+            return []
+
+        missing_reasons = set()
+        
+        # Use Official Yellberus Validation (Single Source of Truth)
+        for song in self.current_songs:
+            # 1. Construct Row Data matching FIELDS order
+            validation_row = []
+            for field in yellberus.FIELDS:
+                attr = field.model_attr or field.name
+                val = self._get_effective_value(song.source_id, field.name, getattr(song, attr, ""))
+                validation_row.append(val)
+            
+            # 2. Call Validation
+            failed_fields = yellberus.validate_row(validation_row)
+            
+            # 3. Format Errors
+            for f_name in failed_fields:
+                field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
+                if not field_def: continue
+                
+                # Special phrasing for Groups
+                if f_name in ['performers', 'groups']:
+                    missing_reasons.add("Required: Performers / Groups")
+                elif field_def.ui_header:
+                    missing_reasons.add(f"Missing: {field_def.ui_header}")
+                else:
+                    missing_reasons.add(f"Invalid: {field_def.name}")
+            
+        # 4. ISRC Collision Check (Global state)
+        if getattr(self, 'isrc_collision', False):
+            missing_reasons.add("Duplicate ISRC Detected")
+            
+        return sorted(list(missing_reasons))
+
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing, showing why in tooltip."""
         if not self.btn_status:
             return
-        if not self.current_songs:
-            self.btn_status.setEnabled(False)
-            self.btn_status.setToolTip("")
-            return
-
-        missing_reasons = set()
-        
-        for song in self.current_songs:
-            # 1. Check Required Single Fields
-            for field in yellberus.FIELDS:
-                if field.required:
-                    val = self._get_effective_value(song.source_id, field.name, getattr(song, field.model_attr or field.name, ""))
-                    if val is None or str(val).strip() == "":
-                        # Add to set (deduplicates if multiple songs miss same field)
-                        missing_reasons.add(f"Missing: {field.ui_header}")
-
-            # 2. Check Validation Groups (e.g. Unified Artist)
-            for group in yellberus.VALIDATION_GROUPS:
-                if group.get("rule") == "at_least_one":
-                    fields = group.get("fields", [])
-                    has_any = False
-                    
-                    # Check each field in group
-                    for field_name in fields:
-                        field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
-                        if not field_def: continue
-                        
-                        attr = field_def.model_attr or field_def.name
-                        val = self._get_effective_value(song.source_id, field_name, getattr(song, attr, ""))
-                        
-                        if val:
-                            if isinstance(val, list) and len(val) > 0: has_any = True
-                            elif isinstance(val, str) and val.strip(): has_any = True
-                            elif isinstance(val, (int, float, bool)): has_any = True
-                        
-                        if has_any: break
-                    
-                    if not has_any:
-                        # Improve group naming if possible
-                        group_name = " / ".join([str(f).title() for f in fields[:2]])
-                        missing_reasons.add(f"Required: {group_name}...")
-
-        # 3. ISRC Collision Check (Global state)
-        if self.isrc_collision:
-            missing_reasons.add("Duplicate ISRC Detected")
             
-        valid = len(missing_reasons) == 0
+        errors = self._get_validation_errors()
+        valid = len(errors) == 0
         self.btn_status.setEnabled(valid)
         
         if not valid:
-             # Sort for stability
-             reasons_list = "\n".join([f"• {r}" for r in sorted(list(missing_reasons))])
+             reasons_list = "\n".join([f"• {r}" for r in errors])
              self.btn_status.setToolTip(f"Cannot Mark Ready:\n{reasons_list}")
         else:
              self.btn_status.setToolTip("Mark as Ready for Air")

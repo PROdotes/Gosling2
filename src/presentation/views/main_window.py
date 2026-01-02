@@ -170,6 +170,13 @@ class MainWindow(QMainWindow):
         self.duplicate_scanner = DuplicateScannerService(self.library_service)
         self.conversion_service = ConversionService(self.settings_manager)
 
+        from ...business.services.import_service import ImportService
+        self.import_service = ImportService(
+            self.library_service,
+            self.metadata_service,
+            self.duplicate_scanner
+        )
+
         # Initialize UI
         self._init_ui()
         self.setWindowFlags(
@@ -256,7 +263,8 @@ class MainWindow(QMainWindow):
             self.settings_manager,
             self.renaming_service,
             self.duplicate_scanner,
-            self.conversion_service
+            self.conversion_service,
+            self.import_service
         )
         self.lc_splitter.addWidget(self.library_widget)
         
@@ -350,9 +358,11 @@ class MainWindow(QMainWindow):
         
         # --- Media Status (Auto-Advance) ---
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
+        self.playback_service.position_changed.connect(self._on_playback_position_changed)
         
-        # --- Global Search Wiring ---
+        # --- Global Search & Intake Wiring ---
         self.title_bar.search_text_changed.connect(self.library_widget.set_search_text)
+        self.title_bar.import_requested.connect(self.library_widget._import_files)
         self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())
         
         # --- T-57: Global Settings Trigger ---
@@ -397,9 +407,13 @@ class MainWindow(QMainWindow):
             path = item_data["path"]
             performer = item_data["performer"]
             title = item_data["title"]
+            duration = item_data.get("duration", 0)
             
             list_item = QListWidgetItem(f"{performer} | {title}")
-            list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+            list_item.setData(Qt.ItemDataRole.UserRole, {
+                "path": path,
+                "duration": duration
+            })
             self.playlist_widget.addItem(list_item)
 
     def _remove_from_playlist(self, rows: list) -> None:
@@ -417,6 +431,8 @@ class MainWindow(QMainWindow):
             self.playback_service.load(path)
             self.playback_service.play()
             self._update_song_label(path)
+            # Sync active row for visual sweep
+            self.playlist_widget._active_row = self.playlist_widget.row(item)
 
     def _toggle_play_pause(self) -> None:
         """Toggle play/pause/resume"""
@@ -448,6 +464,8 @@ class MainWindow(QMainWindow):
                 self.playlist_widget.setCurrentRow(1)
                 item_to_delete = self.playlist_widget.takeItem(0)
                 del item_to_delete
+                # After deletion, the new top is row 0
+                self.playlist_widget._active_row = 0
 
     def _play_prev(self) -> None:
         """Play previous (Placeholder/Simple: Re-play current or top)"""
@@ -459,7 +477,15 @@ class MainWindow(QMainWindow):
 
     def _on_media_status_changed(self, status) -> None:
         if status == QMediaPlayer.MediaStatus.EndOfMedia:
+            # Reset visual sweep before moving to next
+            self.playlist_widget.update_playback_progress(-1, 0)
             self._play_next()
+
+    def _on_playback_position_changed(self, pos_ms: int) -> None:
+        """Relay playback position to playlist for visual sweep."""
+        active_row = getattr(self.playlist_widget, '_active_row', -1)
+        if active_row >= 0:
+            self.playlist_widget.update_playback_progress(active_row, pos_ms)
 
     def _update_song_label(self, path: str) -> None:
         try:
@@ -478,6 +504,7 @@ class MainWindow(QMainWindow):
         self.playback_service.load(path)
         self.playback_service.play()
         self._update_song_label(path)
+        self.playlist_widget._active_row = -1
 
     def closeEvent(self, event) -> None:
         """Handle window close"""
@@ -538,12 +565,17 @@ class MainWindow(QMainWindow):
         
         for path in playlist_data:
             display_text = os.path.basename(path)
+            duration = 0
             if path in song_map:
                 song = song_map[path]
                 display_text = f"{song.get_display_performers()} | {song.get_display_title()}"
+                duration = song.duration or 0
             
             list_item = QListWidgetItem(display_text)
-            list_item.setData(Qt.ItemDataRole.UserRole, {"path": path})
+            list_item.setData(Qt.ItemDataRole.UserRole, {
+                "path": path,
+                "duration": duration
+            })
             playlist_widget.addItem(list_item)
     
         self.playback_widget.set_playlist_count(self.right_panel.playlist_widget.count())
@@ -611,6 +643,7 @@ class MainWindow(QMainWindow):
                 
         elif cmd == 'stop':
             self.playback_service.stop()
+            self.playlist_widget.update_playback_progress(-1, 0)
         elif cmd == 'next':
             self._play_next()
         elif cmd == 'prev':

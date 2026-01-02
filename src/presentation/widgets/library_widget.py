@@ -6,7 +6,8 @@ from ...data.models.song import Song
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
-    QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget, QFrame
+    QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget, QFrame,
+    QAbstractItemView, QTableWidgetItem, QPushButton, QProgressBar
 )
 import json
 from ...resources import constants
@@ -15,12 +16,13 @@ from ...core import yellberus
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
-from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint, QModelIndex
+from PyQt6.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QEvent, QObject, QPropertyAnimation, QEasingCurve, pyqtProperty, QParallelAnimationGroup, QMimeData, QPoint, QModelIndex, QRect, QLine
 from PyQt6.QtGui import (
     QStandardItemModel, QStandardItem, QAction, 
     QPainter, QColor, QPixmap, QIcon, QImage, QPen, QDrag, QFont
 )
 from .glow_factory import GlowButton
+from ..workers.import_worker import ImportWorker
 
 
 class DropIndicatorHeaderView(QHeaderView):
@@ -210,26 +212,64 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
         for col_idx in target_indices:
             row_val = model.data(model.index(row, col_idx, parent), Qt.ItemDataRole.UserRole)
 
-            # A. Special Case: "is_done" Workflow (Only applies if field_name matches)
-            if field_name == 'is_done' and required_val == "READY":
-                 is_already_done = bool(row_val)
-                 if isinstance(row_val, str):
-                     if row_val == "1" or row_val.lower() == "true": is_already_done = True
-                     elif row_val == "0" or row_val.lower() == "false": is_already_done = False
-                 elif isinstance(row_val, (int, float)):
-                     is_already_done = bool(row_val)
+            # A. Special Case: Status Workflow (Done, Not Done, Pending, Incomplete)
+            if field_name == 'is_done':
+                 # T-89: "Done" is determined by the absence of ANY 'Status' category tags.
+                 # 1. Identify if item carries any 'Status' tags
+                 id_col = self._field_indices.get('file_id', -1)
+                 source_id_val = model.data(model.index(row, id_col, parent), Qt.ItemDataRole.UserRole)
+                 try: source_id = int(float(source_id_val)) if source_id_val is not None else None
+                 except: source_id = None
                  
-                 if is_already_done: return False # Ready means NOT Done.
+                 if source_id is None: return False
                  
-                 # Validate Row Completeness
+                 # Check tag cache
+                 if not hasattr(self, '_tag_cache'): self._tag_cache = {}
+                 cache_key = f"{source_id}"
+                 if cache_key not in self._tag_cache:
+                     source_widget = self.parent() # The LibraryWidget
+                     if source_widget and hasattr(source_widget, 'library_service'):
+                         tags = source_widget.library_service.tag_repo.get_tags_for_source(source_id)
+                         self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
+                     else:
+                         self._tag_cache[cache_key] = set()
+                 
+                 # Logic change: Check for ANY tag in the Status category
+                 has_status_tag = any(t.startswith("Status:") for t in self._tag_cache[cache_key])
+                 
+                 # 2. Match based on required_val
+                 if required_val is True: # "Done"
+                     return not has_status_tag
+                 elif required_val is False: # "Not Done"
+                     return has_status_tag
+                 
+                 # 3. Handle Procedural states (Pending/Incomplete) - both require a Status tag
+                 if not has_status_tag: return False # If it's done, it can't be Pending or Incomplete
+                 
+                 # Validate Row Completeness for Pending/Incomplete
                  validation_row = []
                  for f in yellberus.FIELDS:
                      f_idx = self._field_indices.get(f.name, -1)
                      val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole) if f_idx >= 0 else None
                      validation_row.append(val)
                      
-                 # Pass if validation returns no errors
-                 return len(yellberus.validate_row(validation_row)) == 0
+                 error_count = len(yellberus.validate_row(validation_row))
+                 
+                 # DEBUG: Trace why specific items are failing
+                 if required_val == "INCOMPLETE" and error_count > 0 and not has_status_tag:
+                     # Only log if it's "Done" physically (no tag) but logically Incomplete? 
+                     # No, logic is: Pending/Incomplete REQUIRE status tag.
+                     pass 
+                 
+                 if required_val == "INCOMPLETE" and has_status_tag:
+                     # It has the tag, so it's a candidate. If errors > 0, it matches.
+                     if error_count > 0:
+                         pass # Match found
+
+                 if required_val == "READY": # "Pending"
+                     return error_count == 0
+                 elif required_val == "INCOMPLETE":
+                     return error_count > 0
 
             # B. Normalize Row Data (Handle Lists and CSV Strings)
             if isinstance(row_val, str) and ',' in row_val:
@@ -390,7 +430,7 @@ class LibraryWidget(QWidget):
     play_immediately = pyqtSignal(str) # Path to play
     focus_search_requested = pyqtSignal()
 
-    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, import_service=None, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
@@ -398,6 +438,7 @@ class LibraryWidget(QWidget):
         self.renaming_service = renaming_service
         self.duplicate_scanner = duplicate_scanner
         self.conversion_service = conversion_service
+        self.import_service = import_service
         
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
@@ -411,6 +452,9 @@ class LibraryWidget(QWidget):
         
         # Proxy for event filtering to avoid reference cycles
         self._event_filter_proxy = EventFilterProxy(self)
+        
+        # Threading (T-68)
+        self._import_worker = None
         
         self._init_ui()
         self._setup_connections()
@@ -548,6 +592,35 @@ class LibraryWidget(QWidget):
             header_layout.addWidget(btn)
 
         header_layout.addStretch()
+        
+        # T-68: LCD for background operations
+        self.status_lcd = QFrame()
+        self.status_lcd.setObjectName("ImportStatusLCD")
+        self.status_lcd.setFixedHeight(30)
+        lcd_layout = QHBoxLayout(self.status_lcd)
+        lcd_layout.setContentsMargins(10, 0, 10, 0)
+        lcd_layout.setSpacing(10)
+        
+        self.import_label = QLabel("READY")
+        self.import_label.setObjectName("LCDLabel")
+        self.import_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.import_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        
+        self.import_progress = QProgressBar()
+        self.import_progress.setObjectName("ImportProgressBar")
+        self.import_progress.setTextVisible(False)
+        self.import_progress.setFixedSize(100, 10)
+        
+        self.import_count_label = QLabel("0/0")
+        self.import_count_label.setObjectName("LCDLabelCompact")
+        self.import_count_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        
+        lcd_layout.addWidget(self.import_label)
+        lcd_layout.addWidget(self.import_progress)
+        lcd_layout.addWidget(self.import_count_label)
+        
+        self.status_lcd.hide() # Initially hidden
+        header_layout.addWidget(self.status_lcd)
         
         header_layout.addStretch()
         
@@ -713,12 +786,14 @@ class LibraryWidget(QWidget):
         path_col = self.field_indices.get('path', -1)
         performer_col = self.field_indices.get('performers', -1)
         title_col = self.field_indices.get('title', -1)
+        duration_col = self.field_indices.get('duration', -1)
         
         for idx in indexes:
             source_row = self.proxy_model.mapToSource(idx).row()
             item_path = self.library_model.item(source_row, path_col)
             item_perf = self.library_model.item(source_row, performer_col)
             item_title = self.library_model.item(source_row, title_col)
+            item_duration = self.library_model.item(source_row, duration_col)
             
             if not item_path: continue
             
@@ -726,13 +801,23 @@ class LibraryWidget(QWidget):
             performer = item_perf.data(Qt.ItemDataRole.DisplayRole) if item_perf else ""
             title = item_title.data(Qt.ItemDataRole.DisplayRole) if item_title else ""
             
+            # Extract raw duration (seconds) if available, otherwise 0
+            duration = 0
+            if item_duration:
+                # IMPORTANT: In _populate_table, we store the raw numeric duration 
+                # in UserRole. Use that instead of EditRole.
+                raw_dur = item_duration.data(Qt.ItemDataRole.UserRole)
+                if isinstance(raw_dur, (int, float)):
+                    duration = raw_dur
+
             if isinstance(performer, (list, tuple)):
                 performer = ", ".join(performer)
             
             songs_to_drag.append({
                 'path': path,
                 'performer': performer or "Unknown Artist",
-                'title': title or "Unknown Title"
+                'title': title or "Unknown Title",
+                'duration': duration
             })
 
         if not songs_to_drag:
@@ -951,16 +1036,9 @@ class LibraryWidget(QWidget):
             event.acceptProposedAction()
             count = 0
             if final_import_list:
-                count = self.import_files_list(final_import_list)
+                self.import_files_list(final_import_list) # Call the new background import method
             
-            msg = f"Imported {count} file(s)."
-            if failed_conversions > 0:
-                msg += f"\n\nWARNING: {failed_conversions} WAV file(s) failed to convert.\nCheck FFmpeg settings."
-            
-            if failed_conversions > 0:
-                 QMessageBox.warning(self, "Import Result", msg)
-            else:
-                 QMessageBox.information(self, "Import Result", msg)
+            # The message box will be handled by _on_import_finished now
         else:
             event.ignore()
 
@@ -978,6 +1056,9 @@ class LibraryWidget(QWidget):
         
         self.table_view.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table_view.doubleClicked.connect(self._on_table_double_click)
+        
+        # T-87: Force viewport update on selection change to purge render artifacts (Ghost Hover)
+        self.table_view.selectionModel().selectionChanged.connect(lambda: self.table_view.viewport().update())
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
 
@@ -1005,6 +1086,11 @@ class LibraryWidget(QWidget):
 
         # 2. Load Data (Pure Loading, filtering happens in Proxy)
         headers, data = self.library_service.get_all_songs()
+        
+        # T-89: Clear Proxy Cache to ensure tag filters are fresh
+        if hasattr(self.proxy_model, '_tag_cache'):
+            self.proxy_model._tag_cache.clear()
+            
         self._populate_table(headers, data)
 
         if refresh_filters:
@@ -1167,9 +1253,8 @@ class LibraryWidget(QWidget):
                         item.setCheckState(Qt.CheckState.Checked if is_active_bool else Qt.CheckState.Unchecked)
                         item.setText("")
 
-                    # Checkbox for IsDone
                     if col_idx == self.field_indices['is_done']:
-                        item.setCheckable(True)
+                        item.setCheckable(False) # Legacy Field: View Only
                         item.setEditable(False) 
                         
                         # Determine Flags: Selectable always, Enabled only if complete
@@ -1228,7 +1313,7 @@ class LibraryWidget(QWidget):
         # we shift to Incomplete/Triage mode to show the required columns.
         status_filters = active_filters.get('is_done', set())
         needs_triage_view = False
-        if False in status_filters or "READY" in status_filters:
+        if False in status_filters or "READY" in status_filters or "INCOMPLETE" in status_filters:
             needs_triage_view = True
             
         if needs_triage_view != self._show_incomplete:
@@ -1275,9 +1360,9 @@ class LibraryWidget(QWidget):
                 # Save full metadata
                 self.library_service.update_song(temp_song)
 
-                # T-83: Primary Migration Point - Mark new imports as Unverified
+                # T-83: Primary Migration Point - Mark new imports as Unprocessed
                 if hasattr(self.library_service, 'tag_repo'):
-                    self.library_service.tag_repo.add_tag_to_source(file_id, "Unverified", category="Status")
+                    self.library_service.tag_repo.add_tag_to_source(file_id, "Unprocessed", category="Status")
                 
                 return True
         except Exception as e:
@@ -1285,47 +1370,83 @@ class LibraryWidget(QWidget):
             logger.error(f"Error importing {file_path}: {e}", exc_info=True)
         return False
 
-    def import_files_list(self, files: list) -> int:
-        """Import a list of files and return the count of successfully imported ones."""
-        imported_count = sum(1 for file_path in files if self._import_file(file_path))
-        if imported_count > 0:
-            self.load_library()
-        return imported_count
+    def import_files_list(self, files: list) -> None:
+        """Start a background worker to import a list of files."""
+        if not files or not self.import_service:
+            return
+
+        # If a worker is already running, block new import
+        if self._import_worker and self._import_worker.isRunning():
+            QMessageBox.warning(self, "Terminal Busy", "A background operation is currently active.")
+            return
+
+        # Initialize LCD UI
+        self.status_lcd.show()
+        self.import_label.setText("INITIALIZING...")
+        self.import_progress.setValue(0)
+        self.import_count_label.setText(f"0/{len(files)}")
+
+        # Create and start worker
+        self._import_worker = ImportWorker(self.import_service, files)
+        self._import_worker.progress.connect(self._on_import_progress)
+        self._import_worker.finished_batch.connect(self._on_import_finished)
+        self._import_worker.error.connect(lambda err: QMessageBox.critical(self, "Critial Import Error", err))
+        self._import_worker.start()
+
+    def _on_import_progress(self, current: int, total: int, file_path: str, success: bool) -> None:
+        """Update LCD UI with background progress."""
+        file_name = os.path.basename(file_path)
+        self.import_progress.setValue(int((current / total) * 100))
+        self.import_count_label.setText(f"{current}/{total}")
+        
+        status_text = "IMPORTING: " + file_name
+        if not success:
+            status_text = "SKIPPED: " + file_name
+        self.import_label.setText(status_text[:50])
+
+    def _on_import_finished(self, success_count: int, error_count: int) -> None:
+        """Cleanup LCD and refresh library after background import."""
+        self.status_lcd.hide()
+        self.load_library()
+        
+        if success_count > 0 or error_count > 0:
+            msg = f"Import Finished.\nSuccess: {success_count}\nDuplicates Skipped: {error_count}"
+            QMessageBox.information(self, "Operation Complete", msg)
 
     def _import_files(self) -> None:
-        # Get last used directory or default to empty string
+        """
+        Unified Smart Intake: Defaults to Folder selection. 
+        As the user noted, a folder importer is the most robust way to handle 'Intake'.
+        """
+        from PyQt6.QtWidgets import QFileDialog
+        
         last_dir = self.settings_manager.get_last_import_directory() or ""
         
-        files, _ = QFileDialog.getOpenFileNames(
-            self, "Select Audio Files", last_dir, "Audio Files (*.mp3 *.flac *.wav *.m4a)"
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select Folder to Import", last_dir
         )
-        if not files:
-            return
         
-        # Save the directory for next time
-        self.settings_manager.set_last_import_directory(os.path.dirname(files[0]))
-            
-        imported_count = self.import_files_list(files)
-                
-        QMessageBox.information(
-            self, 
-            "Import Result", 
-            f"Imported {imported_count} file(s)"
-        )
+        if folder:
+            self.settings_manager.set_last_import_directory(folder)
+            self.scan_directory(folder)
 
-    def scan_directory(self, folder: str) -> int:
-        """Scan a directory recursively and import audio files."""
-        imported_count = 0
-        for root, dirs, files in os.walk(folder):
-            for file in files:
-                if file.lower().endswith(('.mp3', '.flac', '.wav', '.m4a')):
-                    file_path = os.path.join(root, file)
-                    if self._import_file(file_path):
-                        imported_count += 1
+    def scan_directory(self, folder: str) -> None:
+        """Discovery phase: Find files and then pass to worker."""
+        if not self.import_service:
+            return
+            
+        self.status_lcd.show()
+        self.import_label.setText("DISCOVERING DATA...")
         
-        if imported_count > 0:
-            self.load_library()
-        return imported_count
+        # Discovery remains on UI thread as it's typically very fast (os.walk)
+        files = self.import_service.scan_directory_recursive(folder)
+        
+        if not files:
+            self.status_lcd.hide()
+            QMessageBox.information(self, "No Results", "No valid audio files found in targeted sector.")
+            return
+            
+        self.import_files_list(files)
 
     def _scan_folder(self) -> None:
         # Get last used directory or default to empty string
@@ -1338,13 +1459,7 @@ class LibraryWidget(QWidget):
         # Save the directory for next time
         self.settings_manager.set_last_import_directory(folder)
             
-        imported_count = self.scan_directory(folder)
-                        
-        QMessageBox.information(
-            self, 
-            "Scan Result", 
-            f"Imported {imported_count} file(s)"
-        )
+        self.scan_directory(folder)
 
     def _on_pill_clicked(self, index: int) -> None:
         """Handle pill button click"""
@@ -2094,12 +2209,22 @@ class LibraryWidget(QWidget):
             path_item = self.library_model.item(row, self.field_indices['path'])
             perf_item = self.library_model.item(row, self.field_indices['performers'])
             title_item = self.library_model.item(row, self.field_indices['title'])
+            dur_item = self.library_model.item(row, self.field_indices['duration'])
             
             if path_item:
+                duration = 0
+                if dur_item:
+                    # IMPORTANT: In _populate_table, we store the raw numeric duration 
+                    # in UserRole. Use that instead of EditRole.
+                    raw_dur = dur_item.data(Qt.ItemDataRole.UserRole)
+                    if isinstance(raw_dur, (int, float)):
+                        duration = raw_dur
+
                 items.append({
                     "path": path_item.text(),
                     "performer": perf_item.text() if perf_item else "Unknown",
-                    "title": title_item.text() if title_item else "Unknown"
+                    "title": title_item.text() if title_item else "Unknown",
+                    "duration": duration
                 })
         
         if items:

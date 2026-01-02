@@ -12,6 +12,7 @@ class CustomTitleBar(QWidget):
     search_text_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
     maximize_requested = pyqtSignal()
+    import_requested = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -71,6 +72,13 @@ class CustomTitleBar(QWidget):
         self.draggable_area.setObjectName("SystemDraggableArea")
         self.draggable_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
+        # 4. Import Button (T-84) - Right Aligned with Safety Buffer
+        self.btn_import = GlowButton("IMPORT")
+        self.btn_import.setObjectName("PrimaryImportButton")
+        self.btn_import.setFixedWidth(80)
+        self.btn_import.setContentsMargins(0, 3, 0, 4)
+        self.btn_import.clicked.connect(self.import_requested.emit)
+        
         # Assemble Left-to-Right
         layout.addWidget(self.btn_logo_icon)
         layout.addSpacing(10)
@@ -78,6 +86,8 @@ class CustomTitleBar(QWidget):
         layout.addSpacing(20)
         layout.addWidget(self.search_box)
         layout.addWidget(self.draggable_area, 1) # Force it to swallow the rest with stretch factor 1
+        layout.addWidget(self.btn_import)
+        layout.addSpacing(40) # Safety buffer against SystemIsland (X button)
 
     # Draggable logic
     def mousePressEvent(self, event):

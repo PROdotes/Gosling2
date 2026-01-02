@@ -255,6 +255,7 @@ class ChipTrayWidget(QWidget):
             self.btn_add.hide()
         self.container.updateGeometry()
         self.flow_layout.activate()
+
     def get_names(self) -> list[str]:
         """Return a simple list of names for all current chips."""
         names = []

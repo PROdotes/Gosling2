@@ -64,3 +64,15 @@ Files that must eventually be deleted or emptied:
 *   `yellberus.py` (Its logic moves to `src/core/validation` and `src/data/models`)
 *   `library_widget.py` (Too large. Split into `src/presentation/components/`)
 *   The old `app.py` (Replaced by a clean `main.py` entry point)
+## 7. REFACTORING BACKLOG (v0.2 CANDIDATES)
+These are targeted refactors to improve abstraction and reduce boilerplate, scheduled for the v0.2 transition.
+
+*   **Dialog/Picker Consolidation**:
+    *   **Issue**: `ArtistPickerDialog`, `PublisherPickerDialog`, etc. share high logic overlap.
+    *   **Goal**: Consolidate into a `DialogFactory` or a generic `EntityPickerDialog`.
+*   **ChipTray Abstraction Leak**:
+    *   **Issue**: `ChipTrayWidget` exposes internal tuple structure `(id, label, icon...)` to consumers.
+    *   **Goal**: Encapsulate internals. Consumers should handle simple lists or objects; `ChipTray` should manage its own mapping and display logic.
+*   **Smart Playlist Infrastructure**:
+    - **Issue**: String-based JSON/MIME payloads for Drag & Drop are heavy and brittle.
+    - **Goal**: Shift to **Identity-Based Intake**. Store full data dictionaries or DB references per item. This is the prerequisite for Cue In/Out, Album Art, and advanced playback marker support.

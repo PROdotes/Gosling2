@@ -207,6 +207,13 @@ class SongRepository(BaseRepository):
         """
         cursor = conn.cursor()
         
+        # Normalize Album Title (Handle List from UI)
+        effective_title = None
+        if isinstance(song.album, list):
+            effective_title = str(song.album[0]).strip() if song.album else None
+        elif song.album:
+             effective_title = str(song.album).strip()
+
         # Determine the Target Album ID
         target_album_id = None
         
@@ -214,21 +221,22 @@ class SongRepository(BaseRepository):
         # CRITICAL: If song.album is provided, it might mean the user edited the text!
         use_precise_id = False
         if getattr(song, 'album_id', None) is not None:
-             if not song.album:
+             if not effective_title:
                  use_precise_id = True
              else:
                  # Check if name matches existing ID to see if it's stale
                  cursor.execute("SELECT AlbumTitle FROM Albums WHERE AlbumID = ?", (song.album_id,))
                  id_row = cursor.fetchone()
-                 if id_row and id_row[0].lower() == song.album.strip().lower():
+                 
+                 if id_row and id_row[0].lower() == effective_title.lower():
                      use_precise_id = True
 
         if use_precise_id:
              target_album_id = song.album_id
 
-        elif song.album and song.album.strip():
+        elif effective_title:
             # 2. Get/Create Album using (Title, AlbumArtist, Year) for disambiguation
-            album_title = song.album.strip()
+            album_title = effective_title
             album_artist = getattr(song, 'album_artist', None)
             if album_artist:
                 album_artist = album_artist.strip() or None
@@ -287,7 +295,7 @@ class SongRepository(BaseRepository):
         # Or do we clear the Primary flag from existing?
         # Legacy behavior was "Unlink". 
         # If song.album is explicitly empty string, maybe we should unlink primary?
-        if song.album is not None and not song.album.strip() and not use_precise_id:
+        if effective_title is not None and not effective_title.strip() and not use_precise_id:
              # User cleared the field. Unset Primary on everything?
              # Or leave it? "Clear Album" usually means "Remove from Album".
              # Let's unlink the current Primary.
@@ -337,35 +345,15 @@ class SongRepository(BaseRepository):
         album_ids = [r[0] for r in rows]
         
         if not album_ids:
-            # --- SINGLE PARADOX ---
-            # If no album exists but we have a publisher, allow "Single" creation.
-            # Only do this if we actually have a publisher to link.
-            if publisher_ids:
-                 single_title = song.name or "No Album"
-                 # Deduplicate: Check if a "Single" album implies the Release logic
-                 # For now, simplistic check for existing album of same name
-                 cursor.execute("SELECT AlbumID FROM Albums WHERE AlbumTitle = ? AND AlbumType = 'Single'", (single_title,))
-                 alb_row = cursor.fetchone()
-                 
-                 if alb_row:
-                     new_alb_id = alb_row[0]
-                 else:
-                     cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumType) VALUES (?, 'Single')", (single_title,))
-                     new_alb_id = cursor.lastrowid
-                 
-                 # Link Song -> Single
-                 cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, 1)", (song.source_id, new_alb_id))
-                 
-                 # Since it's a Single, the Album Publisher IS the Track Publisher.
-                 # We can write to AlbumPublishers (Level 2) safely here.
-                 cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (new_alb_id,))
-                 for pid in publisher_ids:
-                     cursor.execute("INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (new_alb_id, pid))
-                 
-                 # Also set Level 1 just to be consistent with override logic
-                 cursor.execute("UPDATE SongAlbums SET TrackPublisherID = ? WHERE SourceID = ? AND AlbumID = ?", (publisher_ids[0], song.source_id, new_alb_id))
-
+            # --- SINGLE PARADOX (DEPRECATED) ---
+            # We used to auto-create "Single" albums here to house the publisher.
+            # But now we support RecordingPublishers (Level 3) which links to SourceID directly.
+            # So we don't need to force an album.
+            # If the user cleared the album, let it be cleared.
+            pass
         else:
+            # --- TRACK OVERRIDE ---
+
             # --- TRACK OVERRIDE ---
             # Song is on an Album. We DO NOT touch AlbumPublishers (Level 2).
             # We set Level 1 (TrackPublisherID) to override Level 2 for this song only.

@@ -1216,6 +1216,11 @@ QPushButton#AlbumActionButton:hover {
     min-width: 140px;
 }
 
+/* Exclude inline add buttons from the 140px rule */
+#AlbumManagerDialog #AddInlineButton {
+    min-width: 0px;
+}
+
 /* --- PUBLISHER PARENT SELECTOR (T-63) --- */
 #PublisherParentCombo {
     padding-right: 20px;
@@ -1258,4 +1263,104 @@ QPushButton#AlbumActionButton:hover {
 QPushButton#SearchInlineButton, QPushButton#AddInlineButton {
     padding: 0px; 
     /* Radius is handled by Python default (10px), Background by global QPushButton */
+}
+
+/* --- 9. IMPORT STATUS LCD (T-68) --- */
+#ImportStatusLCD {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #000000, 
+        stop:0.15 #0A0A0A, 
+        stop:1 #151515);
+    border-top: 1px solid #222222;
+    border-bottom: 2px solid #444444; /* Bottom lip highlight */
+    margin: 5px;
+    border-radius: 8px;
+}
+
+#LCDLabel {
+    color: #9A8A70; /* Warm Amber */
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+#LCDLabelCompact {
+    color: #FFC66D; /* Amber Accent */
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+    font-size: 10pt;
+}
+
+#ImportProgressBar {
+    background: #080808;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    text-align: center;
+    color: transparent; /* Hide default percentage text */
+}
+
+#ImportProgressBar::chunk {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, 
+        stop:0 #4A3D25, 
+        stop:1 #FFC66D);
+    border-radius: 3px;
+}
+
+#PrimaryImportButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #4D4D4D, 
+        stop:0.4 #3D3D3D, 
+        stop:0.5 #2A2A2A, 
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    border-radius: 4px;
+    color: #FFC66D; /* Amber text */
+    font-weight: bold;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    letter-spacing: 1px;
+}
+
+#PrimaryImportButton:hover {
+    border: 1px solid #FFC66D;
+}
+
+#ImportMenu {
+    background-color: #1A1A1A;
+    border: 1px solid #333333;
+    padding: 2px;
+}
+
+#ImportMenu::item {
+    color: #E0E0E0;
+    padding: 6px 20px;
+    border-radius: 2px;
+}
+
+#ImportMenu::item:selected {
+    background-color: #2A2A2A;
+    color: #FFC66D;
+}
+/* --- 10. SHOW LENGTH LCD (T-85) --- */
+#DurationLCD {
+    background: #000000;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    min-width: 80px;
+}
+
+#LCDLabelSmall {
+    color: #666666;
+    font-family: "Bahnschrift Condensed", sans-serif;
+    font-size: 8pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+#LCDLabelLarge {
+    color: #FFC66D; /* Amber Digital Readout */
+    font-family: "Consolas", monospace;
+    font-size: 14pt;
+    font-weight: bold;
 }

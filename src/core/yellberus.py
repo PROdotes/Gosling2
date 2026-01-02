@@ -75,6 +75,9 @@ QUERY_FROM = """
     LEFT JOIN Tags TG_G ON MST_G.TagID = TG_G.TagID AND TG_G.TagCategory = 'Genre'
     LEFT JOIN MediaSourceTags MST_M ON MS.SourceID = MST_M.SourceID
     LEFT JOIN Tags TG_M ON MST_M.TagID = TG_M.TagID AND TG_M.TagCategory = 'Mood'
+    LEFT JOIN Publishers P_TRK ON SA.TrackPublisherID = P_TRK.PublisherID
+    LEFT JOIN RecordingPublishers RP ON MS.SourceID = RP.SourceID
+    LEFT JOIN Publishers P_REC ON RP.PublisherID = P_REC.PublisherID
 """
 
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
@@ -153,6 +156,7 @@ FIELDS: List[FieldDef] = [
         name='album',
         ui_header='Album',
         db_column='AlbumTitle',
+        field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TALB',
         query_expression='GROUP_CONCAT(DISTINCT A.AlbumTitle) AS AlbumTitle',
@@ -192,7 +196,8 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TPUB',
-        query_expression='GROUP_CONCAT(DISTINCT P.PublisherName) AS Publisher',
+        # Logic: Track Override > Album Publisher > Recording/Archival Publisher
+        query_expression='COALESCE(P_TRK.PublisherName, GROUP_CONCAT(DISTINCT P.PublisherName), GROUP_CONCAT(DISTINCT P_REC.PublisherName)) AS Publisher',
         required=True,
         strategy='list',
         ui_search=True,
@@ -453,7 +458,11 @@ def validate_row(row_data: list) -> set:
         
         # Check required
         if field_def.required:
-            if cell_value is None or (isinstance(cell_value, str) and not cell_value.strip()):
+            if cell_value is None:
+                is_valid = False
+            elif isinstance(cell_value, str) and not cell_value.strip():
+                is_valid = False
+            elif isinstance(cell_value, (list, tuple)) and len(cell_value) == 0:
                 is_valid = False
         
         # Check list min_length
