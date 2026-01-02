@@ -94,6 +94,10 @@ class ArtistPickerDialog(QDialog):
         self.exclude_ids = exclude_ids or set()
         self._selected_artist = None
         
+        # Smart Type Tracking
+        self._user_intended_type = 'person'  # What the user manually selected
+        self._is_type_locked = False  # Whether we have an exact match lock
+        
         self.setWindowTitle("Select or Add Artist")
         self.setFixedSize(380, 240) # Increased height for Toggles
         self.setObjectName("ArtistPickerDialog")
@@ -113,16 +117,15 @@ class ArtistPickerDialog(QDialog):
         self.cmb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.cmb.completer().setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
         self.cmb.completer().setFilterMode(Qt.MatchFlag.MatchContains)
-        # Connect to auto-update type toggle
+        # Connect to auto-update type toggle (for dropdown selection)
         self.cmb.currentIndexChanged.connect(self._on_index_changed)
+        # Connect text changes to check for exact matches (for typing)
+        self.cmb.lineEdit().textChanged.connect(self._on_text_changed)
         
         h_row.addWidget(self.cmb)
         layout.addLayout(h_row)
         
         # --- 2. TYPE TOGGLES (Person/Group) ---
-        # Only show if not forced to a specific filter_type (or always show but disable?)
-        # User requested: "selector gor person or group that auto togles"
-        
         type_layout = QHBoxLayout()
         type_layout.setSpacing(4)
         self.btn_group = QButtonGroup(self)
@@ -133,23 +136,29 @@ class ArtistPickerDialog(QDialog):
         self.radio_person.setChecked(True)
         self.radio_person.setFixedSize(110, 32)
         self.btn_group.addButton(self.radio_person.btn, 0)
+        # Track user's manual selection
+        self.radio_person.clicked.connect(lambda: self._on_user_type_clicked('person'))
         
         self.radio_group = GlowButton("GROUP 👥")
         self.radio_group.setCheckable(True)
         self.radio_group.setFixedSize(110, 32)
         self.btn_group.addButton(self.radio_group.btn, 1)
+        # Track user's manual selection  
+        self.radio_group.clicked.connect(lambda: self._on_user_type_clicked('group'))
         
         type_layout.addWidget(self.radio_person)
         type_layout.addWidget(self.radio_group)
         type_layout.addStretch()
         
-        # If filter_type is strict, maybe lock these?
+        # If filter_type is strict, lock these permanently
         if self.filter_type == 'person':
             self.radio_person.setChecked(True)
             self.radio_group.setEnabled(False)
+            self._user_intended_type = 'person'
         elif self.filter_type == 'group':
             self.radio_group.setChecked(True)
             self.radio_person.setEnabled(False)
+            self._user_intended_type = 'group'
             
         layout.addLayout(type_layout)
         
@@ -176,6 +185,69 @@ class ArtistPickerDialog(QDialog):
         self._populate()
         self.cmb.setFocus() # Focus search
 
+    def _on_user_type_clicked(self, type_str):
+        """User manually clicked a type button - remember their intent."""
+        if not self._is_type_locked:
+            self._user_intended_type = type_str
+
+    def _on_text_changed(self, text):
+        """Check if typed text exactly matches an existing artist."""
+        text = text.strip()
+        if not text:
+            self._unlock_type()
+            return
+            
+        # Check for exact match
+        exact_match = self.repo.get_by_name(text)
+        if exact_match:
+            self._lock_to_type(exact_match.type)
+        else:
+            self._unlock_type()
+
+    def _lock_to_type(self, type_str):
+        """Lock the type toggle to match an existing artist."""
+        if self._is_type_locked and self._get_current_type() == type_str:
+            return  # Already locked to this type
+            
+        self._is_type_locked = True
+        
+        # Switch to the matched type
+        if type_str == 'group':
+            self.radio_group.setChecked(True)
+        else:
+            self.radio_person.setChecked(True)
+        
+        # Disable both buttons to show "locked" state (unless filter_type is set)
+        if not self.filter_type:
+            self.radio_person.setEnabled(False)
+            self.radio_group.setEnabled(False)
+
+    def _unlock_type(self):
+        """Unlock the type toggle and restore user's intended type."""
+        if not self._is_type_locked:
+            return  # Already unlocked
+            
+        self._is_type_locked = False
+        
+        # Re-enable buttons (unless filter_type restricts them)
+        if not self.filter_type:
+            self.radio_person.setEnabled(True)
+            self.radio_group.setEnabled(True)
+        elif self.filter_type == 'person':
+            self.radio_person.setEnabled(True)
+        elif self.filter_type == 'group':
+            self.radio_group.setEnabled(True)
+        
+        # Restore user's original intended type
+        if self._user_intended_type == 'group':
+            self.radio_group.setChecked(True)
+        else:
+            self.radio_person.setChecked(True)
+
+    def _get_current_type(self):
+        """Get the currently selected type."""
+        return 'group' if self.radio_group.isChecked() else 'person'
+
     def _populate(self):
         self.cmb.blockSignals(True)
         self.cmb.clear()
@@ -201,15 +273,14 @@ class ArtistPickerDialog(QDialog):
         self.cmb.blockSignals(False)
 
     def _on_index_changed(self, index):
-        """Auto-toggle Person/Group based on selection."""
-        if index < 0: return
+        """Auto-toggle and lock Person/Group based on dropdown selection."""
+        if index < 0: 
+            self._unlock_type()
+            return
         data = self.cmb.itemData(index)
         if data:
             _, _, c_type = data
-            if c_type == 'group':
-                self.radio_group.setChecked(True)
-            else:
-                self.radio_person.setChecked(True)
+            self._lock_to_type(c_type)
 
     def _on_select(self):
         data = self.cmb.currentData()

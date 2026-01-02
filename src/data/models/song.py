@@ -29,6 +29,7 @@ class Song(MediaSource):
     lyricists: List[str] = field(default_factory=list)
     producers: List[str] = field(default_factory=list)
     groups: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)  # Unified Tags: ["Category:Name", ...]
     
     # Multi-Album Support (T-22)
     # List of dicts: {album_id, title, year, track_number, is_primary}

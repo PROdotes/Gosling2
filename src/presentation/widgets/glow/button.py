@@ -146,7 +146,8 @@ class GlowButton(GlowWidget):
         self._update_text_styles()
 
     def _hide_glow(self):
-        if not self.btn.isChecked():
+        # Disable glow if hidden, unchecked, OR disabled
+        if not self.btn.isEnabled() or not self.btn.isChecked():
             super()._hide_glow()
             self.lbl_glow.hide()
         self._update_text_styles()
@@ -158,7 +159,7 @@ class GlowButton(GlowWidget):
     def setText(self, text):
         self.lbl_glow.setText(text)
         self.lbl_main.setText(text)
-        self.btn.setText("")
+        self.btn.setText("") # Native text always hidden
         self._update_text_styles()
 
     def setFont(self, f): 
@@ -223,6 +224,7 @@ class GlowButton(GlowWidget):
             super().setSizePolicy(args[0], args[1])
             self.btn.setSizePolicy(args[0], args[1])
     def setEnabled(self, e): 
+        super().setEnabled(e) # Essential for wrapper state
         self.btn.setEnabled(e)
         if not e:
             self._hide_glow()

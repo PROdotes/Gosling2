@@ -336,16 +336,13 @@ class MetadataService:
         try:
             # Use Cached ID3 Mapping from JSON (Spec T-38)
             id3_map = cls._get_id3_map()
+            LIST_SEP = " / " # Radio-safe separator (No nulls)
             
             field_to_frame = {}
             for frame, info in id3_map.items():
                 if isinstance(info, dict) and 'field' in info:
                     field_to_frame[info['field']] = frame
             
-            # Alias mapping (JSON uses "title", Song uses "name" but field def uses "title")
-            # yellberus.FIELDS uses "title" as name, so we are good.
-            # But just in case, Yellberus field.name should match JSON field.
-
             # Open File
             audio = MP3(song.path, ID3=ID3)
             if audio.tags is None: audio.add_tags()
@@ -371,14 +368,10 @@ class MetadataService:
                     continue
 
                 # Determine Frame ID
-                # 1. Try Yellberus definition (Source of Truth)
                 frame_id = field.id3_tag
-                
-                # 2. Fallback to JSON map if Yellberus is None (Legacy compatibility)
                 if not frame_id:
                      frame_id = field_to_frame.get(field.name)
                 
-                # 3. If still no frame, skip
                 if not frame_id:
                      continue
                 
@@ -398,18 +391,20 @@ class MetadataService:
                 # Handle TXXX generic
                 if not FrameClass and frame_id.startswith("TXXX:"):
                     desc = frame_id.split(":", 1)[1]
-                    audio.tags.add(TXXX(encoding=1, desc=desc, text=str(val)))
+                    # Join lists for TXXX too
+                    txt_val = LIST_SEP.join(val) if isinstance(val, list) else str(val)
+                    audio.tags.add(TXXX(encoding=1, desc=desc, text=[txt_val]))
                     continue
                 
                 if not FrameClass:
                     logger.warning(f"Unknown Mutagen class for {frame_id}")
                     continue
                 
-                # Write
+                # Write: Explicitly join lists with ' / ' to prevent Null Separators in v2.4
                 if isinstance(val, list):
-                    audio.tags.add(FrameClass(encoding=1, text=val))
+                    audio.tags.add(FrameClass(encoding=1, text=[LIST_SEP.join(val)]))
                 else:
-                    audio.tags.add(FrameClass(encoding=1, text=str(val)))
+                    audio.tags.add(FrameClass(encoding=1, text=[str(val)]))
 
             # --- COMPLEX FIELDS (Dual Mode / Legacy) ---
 
@@ -418,20 +413,20 @@ class MetadataService:
                 audio.tags.delall('TDRC')
                 audio.tags.delall('TYER')
                 s_year = str(song.recording_year)
-                audio.tags.add(TDRC(encoding=1, text=s_year))
-                audio.tags.add(TYER(encoding=1, text=s_year))
+                audio.tags.add(TDRC(encoding=1, text=[s_year]))
+                audio.tags.add(TYER(encoding=1, text=[s_year]))
 
             # 2. Producers (Dual: TIPL + TXXX:PRODUCER)
             if song.producers:
                 audio.tags.delall('TIPL')
                 audio.tags.delall('TXXX:PRODUCER')
                 
-                # TIPL
+                # TIPL (Mutagen handles this specifically via 'people' list)
                 people_list = [(role, name) for name in song.producers for role in ['producer']]
                 audio.tags.add(TIPL(encoding=1, people=people_list))
                 
-                # TXXX
-                audio.tags.add(TXXX(encoding=1, desc='PRODUCER', text=song.producers))
+                # TXXX Fallback (Joined string for Radio software)
+                audio.tags.add(TXXX(encoding=1, desc='PRODUCER', text=[LIST_SEP.join(song.producers)]))
             else:
                  audio.tags.delall('TIPL')
                  audio.tags.delall('TXXX:PRODUCER')
@@ -447,12 +442,13 @@ class MetadataService:
             audio.tags.delall('TEXT')
             audio.tags.delall('TOLY')
             
-            # Write Modern Lyricists
+            # Write Modern Lyricists (Joined for Radio)
             if song.lyricists:
-                audio.tags.add(TEXT(encoding=1, text=song.lyricists))
-                audio.tags.add(TOLY(encoding=1, text=song.lyricists))
+                lyr_str = LIST_SEP.join(song.lyricists)
+                audio.tags.add(TEXT(encoding=1, text=[lyr_str]))
+                audio.tags.add(TOLY(encoding=1, text=[lyr_str]))
 
-            # Write TCOM Union (Jazler Hack)
+            # Write TCOM Union (Jazler Hack - Joined for Radio)
             union_list = []
             seen = set()
             for c in (song.composers or []):
@@ -465,7 +461,7 @@ class MetadataService:
                     seen.add(l)
             
             if union_list:
-                audio.tags.add(TCOM(encoding=1, text=union_list))
+                audio.tags.add(TCOM(encoding=1, text=[LIST_SEP.join(union_list)]))
             else:
                  pass # TCOM cleared.
 

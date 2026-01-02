@@ -104,6 +104,9 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
         # Clear high-frequency caches
         if hasattr(self, '_filter_cache'):
             self._filter_cache = {}
+        # T-83: Clear tag cache when filters change
+        if hasattr(self, '_tag_cache'):
+            self._tag_cache = {}
 
         # T-70 Identity Awareness: Expand performers to include aliases/related names
         processed_filters = filters.copy()
@@ -129,6 +132,45 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
     def _check_value_match(self, model, row, parent, field_name, required_val) -> bool:
         """Surgical Match: Handles metadata, lists, procedural commands, and virtual filters."""
+        
+        # T-83: Special handling for unified Tags filter
+        if field_name == 'tags':
+            # required_val is "Category:TagName" e.g. "Instrument:Guitar"
+            if ':' not in str(required_val):
+                return False
+            
+            category, tag_name = str(required_val).split(':', 1)
+            
+            # Get source_id from the row
+            id_col = self._field_indices.get('file_id', -1)
+            if id_col < 0:
+                return False
+            
+            source_id_val = model.data(model.index(row, id_col, parent), Qt.ItemDataRole.UserRole)
+            try:
+                source_id = int(float(source_id_val)) if source_id_val is not None else None
+            except (ValueError, TypeError):
+                source_id = None
+            
+            if source_id is None:
+                return False
+            
+            # Check tag cache first, build if needed
+            if not hasattr(self, '_tag_cache'):
+                self._tag_cache = {}
+            
+            cache_key = f"{source_id}"
+            if cache_key not in self._tag_cache:
+                # Query TagRepository for this song's tags
+                source_widget = self.parent()
+                if hasattr(source_widget, 'library_service'):
+                    tag_repo = source_widget.library_service.tag_repo
+                    tags = tag_repo.get_tags_for_source(source_id)
+                    self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
+                else:
+                    self._tag_cache[cache_key] = set()
+            
+            return required_val in self._tag_cache[cache_key]
         
         # 1. Identify Target Columns
         target_indices = []
@@ -278,8 +320,48 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                     if not match_found:
                         return False
         
-        # 5. Search Text (Standard behavior)
-        return super().filterAcceptsRow(source_row, source_parent)
+        # 5. Search Text (Extended to include tags)
+        # Check if standard column search matches first
+        standard_match = super().filterAcceptsRow(source_row, source_parent)
+        if standard_match:
+            return True
+        
+        # T-83: Also search tags if search text is set
+        search_text = self.filterRegularExpression().pattern()
+        if search_text:
+            # Check tag cache
+            if not hasattr(self, '_tag_cache'):
+                self._tag_cache = {}
+
+            # Get source_id for this row (Field name is 'file_id' in Yellberus)
+            id_col = self._field_indices.get('file_id', -1)
+            if id_col >= 0:
+                source_id_val = model.data(model.index(source_row, id_col, source_parent), Qt.ItemDataRole.UserRole)
+                try:
+                    source_id = int(float(source_id_val)) if source_id_val is not None else None
+                except (ValueError, TypeError):
+                    source_id = None
+                
+                if source_id is not None:
+                    
+                    cache_key = f"{source_id}"
+                    if cache_key not in self._tag_cache:
+                        source_widget = self.parent()
+                        if hasattr(source_widget, 'library_service'):
+                            tag_repo = source_widget.library_service.tag_repo
+                            tags = tag_repo.get_tags_for_source(source_id)
+                            # Use consistent format {Category}:{TagName}
+                            self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
+                        else:
+                            self._tag_cache[cache_key] = set()
+                    
+                    # Check if any tag matches search text (check full Category:Tag for fuzzy matching)
+                    search_lower = search_text.lower()
+                    for tag_full in self._tag_cache[cache_key]:
+                        if search_lower in tag_full.lower():
+                            return True
+        
+        return False
 
 
 class EventFilterProxy(QObject):
@@ -474,6 +556,7 @@ class LibraryWidget(QWidget):
         # Digital Filter Brain
         self.library_model = QStandardItemModel()
         self.proxy_model = LibraryFilterProxyModel(self.library_service.contributor_repository, parent=self)
+        self.proxy_model._field_indices = self.field_indices # Crucial for Tag Search
         self.proxy_model.setSourceModel(self.library_model)
         self.proxy_model.setFilterKeyColumn(-1) # Search all columns
         self.proxy_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -1191,6 +1274,11 @@ class LibraryWidget(QWidget):
                 
                 # Save full metadata
                 self.library_service.update_song(temp_song)
+
+                # T-83: Primary Migration Point - Mark new imports as Unverified
+                if hasattr(self.library_service, 'tag_repo'):
+                    self.library_service.tag_repo.add_tag_to_source(file_id, "Unverified", category="Status")
+                
                 return True
         except Exception as e:
             from ...core import logger
@@ -1846,15 +1934,9 @@ class LibraryWidget(QWidget):
     
     def _filter_tree_item_recursive(self, item, search_text, tree_view, model) -> bool:
         """Recursively filter tree items. Returns True if item or any child matches."""
-        # For leaf items (checkable), check if text matches
-        if item.isCheckable():
-            item_text = item.text().lower()
-            matches = not search_text or search_text in item_text
-            index = model.indexFromItem(item)
-            tree_view.setRowHidden(index.row(), index.parent(), not matches)
-            return matches
+        item_text = item.text().lower()
+        self_matches = not search_text or search_text in item_text
         
-        # For parent/branch items, check children first
         has_visible_child = False
         for child_row in range(item.rowCount()):
             child_item = item.child(child_row)
@@ -1862,11 +1944,16 @@ class LibraryWidget(QWidget):
                 if self._filter_tree_item_recursive(child_item, search_text, tree_view, model):
                     has_visible_child = True
         
-        # Hide parent if no visible children
-        index = model.indexFromItem(item)
-        tree_view.setRowHidden(index.row(), index.parent(), not has_visible_child)
+        should_show = self_matches or has_visible_child
         
-        return has_visible_child
+        # Apply visibility
+        index = model.indexFromItem(item)
+        if index.isValid():
+            tree_view.setRowHidden(index.row(), index.parent(), not should_show)
+            if should_show and search_text:
+                tree_view.setExpanded(index, True)
+        
+        return should_show
 
     def focus_search(self) -> None:
         """Request focus for the global search box."""

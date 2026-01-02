@@ -318,6 +318,10 @@ class FilterWidget(QFrame):
         sorted_fields = sorted(filterable_fields, key=lambda f: f.ui_header)
         
         for field in sorted_fields:
+            # T-83: Skip genre/mood - now handled by unified Tags filter
+            if field.name in ('genre', 'mood'):
+                continue
+                
             if field.strategy in ("list", "decade_grouper", "first_letter_grouper"):
                 self._add_list_filter(field)
             elif field.strategy == "boolean":
@@ -328,6 +332,9 @@ class FilterWidget(QFrame):
         # T-71/Req 4: All Contributors (Virtual Filter)
         # This aggregates all roles into one master list
         self._add_all_contributors_filter()
+        
+        # T-83: Unified Tags Filter (Dynamic Categories)
+        self._add_unified_tags_filter()
         
         self._block_signals = False
         
@@ -473,6 +480,77 @@ class FilterWidget(QFrame):
         self._add_type_grouped_items(root_item, field, values)
         
         self.tree_model.appendRow(root_item)
+
+    def _add_unified_tags_filter(self):
+        """T-83: Add dynamic Tags filter with categories from database."""
+        from src.core import logger
+        
+        try:
+            # Query all tags grouped by category
+            categories = {}  # {category: [tag_name, ...]}
+            
+            with self.library_service.song_repository.get_connection() as conn:
+                cursor = conn.cursor()
+                # Get all tags that are actually in use (linked to songs)
+                cursor.execute("""
+                    SELECT DISTINCT t.TagCategory, t.TagName
+                    FROM Tags t
+                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                    WHERE t.TagCategory IS NOT NULL
+                    ORDER BY t.TagCategory, t.TagName
+                """)
+                for row in cursor.fetchall():
+                    cat = row[0] or "Other"
+                    tag_name = row[1]
+                    if cat not in categories:
+                        categories[cat] = []
+                    categories[cat].append(tag_name)
+            
+            if not categories:
+                return  # No tags in use
+            
+            # Create root: "Tags"
+            root_item = QStandardItem("🏷️ Tags")
+            root_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            root_item.setData('tags', Qt.ItemDataRole.UserRole + 1)
+            root_item.setData("root", Qt.ItemDataRole.AccessibleTextRole)
+            
+            # Category icons
+            cat_icons = {
+                "Genre": "🏷️",
+                "Mood": "✨",
+                "Instrument": "🎸", 
+                "Theme": "📚",
+                "Status": "📋",
+            }
+            
+            # Create branches for each category
+            for cat_name in sorted(categories.keys()):
+                tag_list = categories[cat_name]
+                icon = cat_icons.get(cat_name, "📦")
+                
+                branch = QStandardItem(f"{icon} {cat_name}")
+                branch.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)
+                branch.setCheckState(Qt.CheckState.Unchecked)
+                branch.setData("branch", Qt.ItemDataRole.AccessibleTextRole)
+                branch.setData('tags', Qt.ItemDataRole.UserRole + 1)
+                
+                # Add leaf items for each tag
+                for tag_name in sorted(tag_list):
+                    leaf = QStandardItem(tag_name)
+                    leaf.setFlags(leaf.flags() & ~Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)
+                    leaf.setCheckState(Qt.CheckState.Unchecked)
+                    # Store: "Category:TagName" for filtering
+                    leaf.setData(f"{cat_name}:{tag_name}", Qt.ItemDataRole.UserRole)
+                    leaf.setData('tags', Qt.ItemDataRole.UserRole + 1)
+                    branch.appendRow(leaf)
+                
+                root_item.appendRow(branch)
+            
+            self.tree_model.appendRow(root_item)
+            
+        except Exception as e:
+            logger.error(f"Error populating unified tags filter: {e}")
 
     def _add_leaf_item(self, parent, field, value):
         item = QStandardItem(str(value))

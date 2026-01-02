@@ -21,19 +21,19 @@ class ContributorRepository(BaseRepository):
             return None
 
     def get_by_name(self, name: str) -> Optional[Contributor]:
-        """Fetch single contributor by primary name or alias. (Case-sensitive exact match)"""
+        """Fetch single contributor by primary name or alias. (Case-insensitive exact match)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Try primary name match
-                cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ?", (name,))
+                # Try primary name match (case-insensitive)
+                cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
                 row = cursor.fetchone()
                 if row:
                     return self.get_by_id(row[0], conn=conn)
                 
-                # try alias match
-                cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ?", (name,))
+                # try alias match (case-insensitive)
+                cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE NOCASE", (name,))
                 row = cursor.fetchone()
                 if row:
                     return self.get_by_id(row[0], conn=conn)

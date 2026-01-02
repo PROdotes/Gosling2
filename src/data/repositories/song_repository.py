@@ -562,7 +562,13 @@ class SongRepository(BaseRepository):
                             JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
                             WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
                             LIMIT 1
-                        ) as AlbumArtist
+                        ) as AlbumArtist,
+                        (
+                            SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
+                            FROM MediaSourceTags MST
+                            JOIN Tags TG ON MST.TagID = TG.TagID
+                            WHERE MST.SourceID = MS.SourceID
+                        ) as AllTags
                     FROM MediaSources MS
                     JOIN Songs S ON MS.SourceID = S.SourceID
                     WHERE MS.SourceID IN ({placeholders})
@@ -573,9 +579,10 @@ class SongRepository(BaseRepository):
                 for row in cursor.fetchall():
                     (source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, 
                      notes, is_active_int, album_title, album_id, publisher_name, genre_str, 
-                     mood_str, album_artist) = row
+                     mood_str, album_artist, all_tags_str) = row
                     
                     groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+                    tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
                     
                     song = Song(
                         source_id=source_id,
@@ -594,7 +601,8 @@ class SongRepository(BaseRepository):
                         publisher=[p.strip() for p in publisher_name.split(',')] if publisher_name else [],
                         genre=genre_str,
                         mood=mood_str,
-                        groups=groups
+                        groups=groups,
+                        tags=tags
                     )
                     songs_map[source_id] = song
 

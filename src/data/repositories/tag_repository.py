@@ -1,4 +1,4 @@
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from src.data.database import BaseRepository
 from src.data.models.tag import Tag
 
@@ -34,14 +34,26 @@ class TagRepository(BaseRepository):
                 return Tag.from_row(row)
         return None
 
+    def update(self, tag: Tag) -> bool:
+        """Update an existing tag."""
+        query = "UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?"
+        with self.get_connection() as conn:
+            conn.execute(query, (tag.tag_name, tag.category, tag.tag_id))
+        return True
+
     def create(self, name: str, category: Optional[str] = None) -> Tag:
-        """Create a new tag."""
+        """Create a new tag with automatic sentence casing."""
+        # T-83: Auto-format to Sentence Case (e.g., "pop" -> "Pop")
+        formatted_name = name.strip()
+        if formatted_name:
+            formatted_name = formatted_name[0].upper() + formatted_name[1:]
+        
         query = "INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)"
         with self.get_connection() as conn:
-            cursor = conn.execute(query, (name, category))
+            cursor = conn.execute(query, (formatted_name, category))
             tag_id = cursor.lastrowid
             
-        return Tag(tag_id=tag_id, tag_name=name, category=category)
+        return Tag(tag_id=tag_id, tag_name=formatted_name, category=category)
 
     def get_or_create(self, name: str, category: Optional[str] = None) -> Tuple[Tag, bool]:
         """
@@ -54,8 +66,16 @@ class TagRepository(BaseRepository):
         
         return self.create(name, category), True
 
-    def add_tag_to_source(self, source_id: int, tag_id: int) -> None:
-        """Link a tag to a source item (song)."""
+    def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None) -> None:
+        """
+        Link a tag to a source item (song).
+        If tag_id is a string, it's treated as a TagName and will be resolved/created
+        within the optional category.
+        """
+        if isinstance(tag_id, str):
+            tag_obj, _ = self.get_or_create(tag_id, category)
+            tag_id = tag_obj.tag_id
+
         query = "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)"
         with self.get_connection() as conn:
             conn.execute(query, (source_id, tag_id))

@@ -336,6 +336,7 @@ class MainWindow(QMainWindow):
         editor = self.right_panel.editor_widget
         editor.save_requested.connect(self._on_side_panel_save_requested)
         editor.staging_changed.connect(self.library_widget.update_dirty_rows)
+        editor.filter_refresh_requested.connect(lambda: self.library_widget.load_library(refresh_filters=True))
         
         # --- Playlist Signals (Transient Wiring) ---
         # Access inner Playlist widget

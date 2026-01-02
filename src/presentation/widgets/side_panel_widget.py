@@ -23,6 +23,7 @@ class SidePanelWidget(QFrame):
     # Signalling (dict = changes, set = album_deletions)
     save_requested = pyqtSignal(dict, set) 
     staging_changed = pyqtSignal(list) # list of song_ids in staging
+    filter_refresh_requested = pyqtSignal() # Request rebuild of sidebar filters
     
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, parent=None) -> None:
         super().__init__(parent)
@@ -279,16 +280,44 @@ class SidePanelWidget(QFrame):
             artist = artist or "Unknown Artist"
             self.header_label.setText(f"{artist} - {song.title}")
             
-            # Sync Done state
-            is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
-            self.btn_status.setChecked(bool(is_done))
-            self._update_status_visuals(bool(is_done))
-            self.btn_status.setEnabled(True)
+            # Determine current state: READY if NO Status tags AND SongIsDone (staged or DB)
+            try:
+                # 1. Tags check (Source of truth for Status)
+                all_status_tags = self.tag_repo.get_tags_for_source(song.source_id, category="Status")
+                has_status_tags = len(all_status_tags) > 0
+                
+                # 2. Boolean check (Legacy Bridge)
+                staged_is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
+                is_done_bool = bool(staged_is_done)
+                
+                # Ready = No tags AND is_done bit set
+                is_ready = (not has_status_tags) and is_done_bool
+                
+                self.btn_status.setChecked(is_ready)
+                self._update_status_visuals(is_ready)
+                self.btn_status.setEnabled(True)
+            except Exception as e:
+                import logging
+                logging.getLogger("gosling").error(f"Error updating status header: {e}")
+                self.btn_status.setEnabled(False)
         else:
             self.header_label.setText(f"Editing {len(self.current_songs)} Items")
-            self.btn_status.setChecked(False)
-            self.btn_status.setEnabled(True) # In Bulk, MARK DONE applies to all
-            self._update_status_visuals(False) # Default look for bulk
+            
+            # For bulk, only show checked if ALL are done (effectively)
+            all_ready = True
+            for s in self.current_songs:
+                # Check tags
+                if self.tag_repo.get_tags_for_source(s.source_id, category="Status"):
+                    all_ready = False
+                    break
+                # Check is_done
+                if not self._get_effective_value(s.source_id, "is_done", s.is_done):
+                    all_ready = False
+                    break
+            
+            self.btn_status.setChecked(all_ready)
+            self._update_status_visuals(all_ready)
+            self.btn_status.setEnabled(True) # Allow bulk toggling status
 
     def _build_fields(self):
         """Dynamic UI Factory driven by Yellberus with Grouping."""
@@ -589,15 +618,16 @@ class SidePanelWidget(QFrame):
 
                             chips = []
                             for i, n in enumerate(names):
-                                # Convert to 8-tuple format (adding is_primary=True for first item)
+                                # Convert to 8-tuple format
                                 # (id, name, icon, is_ghost, is_inherited, tooltip, zone, is_primary)
+                                # NOTE: is_primary star only shown for Genre (first item)
                                 if field_name == 'genre':
                                     # Genres now use the TagRepository
                                     tag, created = self.tag_repo.get_or_create(str(n), category='Genre')
                                     chips.append((tag.tag_id, tag.tag_name, "🏷️", False, False, "", field_def.zone or "amber", i == 0))
                                 elif field_name == 'mood':
                                     tag, created = self.tag_repo.get_or_create(str(n), category='Mood')
-                                    chips.append((tag.tag_id, tag.tag_name, "✨", False, False, "", field_def.zone or "amber", i == 0))
+                                    chips.append((tag.tag_id, tag.tag_name, "✨", False, False, "", field_def.zone or "amber", False))
                                 elif field_name == 'publisher':
                                     # Lookup Publisher ID
                                     pub, created = self.publisher_repo.get_or_create(str(n))
@@ -623,18 +653,18 @@ class SidePanelWidget(QFrame):
                                     if is_inherited:
                                         # Use new is_inherited parameter with link icon
                                         alb_name = self.current_songs[0].album or "Album"
-                                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", i == 0)) 
+                                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
                                     else:
-                                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", i == 0)) # Local/Editable
+                                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))  # Local/Editable
                                 elif field_name == 'album':
                                     results = self.library_service.album_repo.search(str(n))
                                     aid = results[0].album_id if results else 0
-                                    chips.append((aid, str(n), "💿", False, False, "", field_def.zone or "amber", i == 0))
+                                    chips.append((aid, str(n), "💿", False, False, "", field_def.zone or "amber", False))
                                 else:
                                     # Standard Contributor (Artist)
                                     artist, created = self.contributor_repo.get_or_create(str(n))
                                     icon = "👤" if artist.type == "person" else "👥"
-                                    chips.append((artist.contributor_id, artist.name, icon, False, False, "", field_def.zone or "amber", i == 0))
+                                    chips.append((artist.contributor_id, artist.name, icon, False, False, "", field_def.zone or "amber", False))
                         widget.set_chips(chips)
 
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
@@ -661,11 +691,51 @@ class SidePanelWidget(QFrame):
             self._handle_publisher_click(entity_id, name)
         elif field_name == 'album':
             self._handle_album_click(entity_id, name)
-        elif field_name in ['genre', 'mood', 'tags']: # 'tags' is virtual, no direct click action for now
-             pass # TODO: Tag Manager
+        elif field_name in ['genre', 'mood', 'tags']:
+             self._handle_tag_click(field_name, entity_id, name)
         else:
              # Contributors
              self._handle_contributor_click(entity_id, name)
+
+    def _handle_tag_click(self, field_name, entity_id, name):
+        """Open editor to rename a tag globally."""
+        from PyQt6.QtWidgets import QInputDialog
+        
+        # Parse display name if it's from the unified tray (e.g. "Genre: Pop")
+        display_name = name
+        actual_name = name
+        category = None
+        
+        if field_name == 'tags' and ': ' in name:
+            category, actual_name = name.split(': ', 1)
+        
+        # If we have an entity ID (best case)
+        if entity_id and entity_id > 0:
+            tag = self.tag_repo.get_by_id(entity_id)
+        else:
+            # Fallback to name search
+            tag = self.tag_repo.find_by_name(actual_name, category)
+            
+        if not tag:
+            return
+
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Tag", 
+            f"Rename tag '{tag.tag_name}' globally:", 
+            text=tag.tag_name
+        )
+        
+        if ok and new_name and new_name != tag.tag_name:
+            # T-83: Auto-Sentence Case for renames too
+            new_name = new_name.strip()
+            if new_name:
+                new_name = new_name[0].upper() + new_name[1:]
+                
+            tag.tag_name = new_name
+            if self.tag_repo.update(tag):
+                # Refresh everything
+                self._refresh_field_values()
+                self.filter_refresh_requested.emit()
 
     def _handle_publisher_click(self, entity_id, name):
         if not self.publisher_repo: return
@@ -734,15 +804,23 @@ class SidePanelWidget(QFrame):
     def _on_chip_removed(self, field_name, entity_id, name):
         """T-70: Generic chip removal handling."""
         if field_name == 'tags':
-            # Virtual field: parse the name "Category: Tag"
-            if ': ' in name:
-                cat, actual_name = name.split(': ', 1)
-                target_field = 'genre' if cat.lower() == 'genre' else 'mood'
-                self._on_chip_removed(target_field, entity_id, actual_name)
+            # Tags use the entity_id which is the tag_id
+            if entity_id and entity_id > 0:
+                for song in self.current_songs:
+                    self.tag_repo.remove_tag_from_source(song.source_id, entity_id)
+                self._refresh_field_values()
+                self.filter_refresh_requested.emit()
                 return
             else:
-                # If no category, assume it's a genre (default behavior for add)
-                self._on_chip_removed('genre', entity_id, name)
+                # Fallback: parse the name "Category: Tag" and find the tag ID
+                if ': ' in name:
+                    cat, actual_name = name.split(': ', 1)
+                    tag = self.tag_repo.find_by_name(actual_name, cat)
+                    if tag:
+                        for song in self.current_songs:
+                            self.tag_repo.remove_tag_from_source(song.source_id, tag.tag_id)
+                        self._refresh_field_values()
+                        self.filter_refresh_requested.emit()
                 return
 
         for song in self.current_songs:
@@ -771,54 +849,20 @@ class SidePanelWidget(QFrame):
                     self._add_name_to_selection(field_name, selected.publisher_name)
         elif field_name == 'album':
             self._open_album_manager()
-        elif field_name == 'tags':
-            # T-82: PRO DROPDOWN for Unified Tags
-            menu = QMenu(self)
-            
-            # Action: Add Genre
-            act_g = QAction("🏷️ Add Genre...", self)
-            act_g.triggered.connect(lambda: self._on_add_button_clicked('genre'))
-            menu.addAction(act_g)
-            
-            # Action: Add Mood
-            act_m = QAction("✨ Add Mood...", self)
-            act_m.triggered.connect(lambda: self._on_add_button_clicked('mood'))
-            menu.addAction(act_m)
-            
-            # QUICK LISTS
-            menu.addSeparator()
-            
-            # Top 10 Genres
-            genre_list = self.library_service.get_distinct_filter_values('genre')[:10]
-            if genre_list:
-                gm = menu.addMenu("Popular Genres")
-                for g in genre_list:
-                    act = gm.addAction(f"🏷️ {g}")
-                    act.triggered.connect(lambda chk, n=g: self._add_name_to_selection('genre', n))
-            
-            # Top 10 Moods
-            mood_list = self.library_service.get_distinct_filter_values('mood')[:10]
-            if mood_list:
-                mm = menu.addMenu("Popular Moods")
-                for m in mood_list:
-                    act = mm.addAction(f"✨ {m}")
-                    act.triggered.connect(lambda chk, n=m: self._add_name_to_selection('mood', n))
-
-            if origin:
-                menu.exec(origin.mapToGlobal(QPoint(0, origin.height())))
-            else:
-                menu.exec(self.cursor().pos())
-
-        elif field_name == 'genre':
-            from PyQt6.QtWidgets import QInputDialog
-            text, ok = QInputDialog.getText(self, "Add Genre", "Enter new Genre:")
-            if ok and text:
-                self._add_name_to_selection(field_name, text.strip())
-        elif field_name == 'mood':
-            from PyQt6.QtWidgets import QInputDialog
-            text, ok = QInputDialog.getText(self, "Add Mood", "Enter new Mood:")
-            if ok and text:
-                self._add_name_to_selection(field_name, text.strip())
+        elif field_name in ['tags', 'genre', 'mood']:
+            # Unified tag picker - use TagRepository for all categories
+            from ..dialogs.tag_picker_dialog import TagPickerDialog
+            default_cat = 'Mood' if field_name == 'mood' else 'Genre'
+            diag = TagPickerDialog(self.tag_repo, default_category=default_cat, parent=self)
+            if diag.exec():
+                selected = diag.get_selected()
+                if selected:
+                    # Add tag to all selected songs via TagRepository
+                    for song in self.current_songs:
+                        self.tag_repo.add_tag_to_source(song.source_id, selected.tag_id)
+                    # Refresh to show new tag
+                    self._refresh_field_values()
+                    self.filter_refresh_requested.emit()
         else:
             # Artists / Contributors
             from ..dialogs.artist_manager_dialog import ArtistPickerDialog
@@ -846,9 +890,14 @@ class SidePanelWidget(QFrame):
         self._refresh_field_values()
 
     def _on_chip_context_menu(self, field_name, entity_id, name, global_pos):
-        """T-82: Direct Right-Click action (Skip Menu)."""
-        if field_name in ['genre', 'mood', 'tags']:
+        """T-82: Direct Right-Click action (Skip Menu) - ONLY for Genre."""
+        if field_name == 'genre':
             self._on_chip_primary_requested(field_name, entity_id, name)
+        elif field_name == 'tags' and ': ' in name:
+            # Virtual 'tags' field - only act if it's a Genre tag
+            cat, _ = name.split(': ', 1)
+            if cat.lower() == 'genre':
+                self._on_chip_primary_requested(field_name, entity_id, name)
 
     def _on_chip_primary_requested(self, field_name, entity_id, name):
         """T-82: Move a specific tag/genre to the front of the list."""
@@ -903,6 +952,7 @@ class SidePanelWidget(QFrame):
                 parent=self
             )
             tray.add_requested.connect(lambda: self._on_add_button_clicked('tags'))
+            tray.chip_clicked.connect(lambda eid, n: self._on_chip_clicked('tags', eid, n))
             tray.chip_remove_requested.connect(lambda eid, n: self._on_chip_removed('tags', eid, n))
             tray.chip_context_menu_requested.connect(lambda eid, n, p, f='tags': self._on_chip_context_menu(f, eid, n, p))
             tray.set_chips(value) # Value is already the list of chips
@@ -1173,31 +1223,35 @@ class SidePanelWidget(QFrame):
         if not self.current_songs: return None, False
 
         if field_def.name == 'tags':
-            # Virtual field combining Genre and Mood
-            genres, g_is_mult = self._calculate_bulk_value(yellberus.get_field('genre'))
-            moods, m_is_mult = self._calculate_bulk_value(yellberus.get_field('mood'))
-            
-            # Convert to list of (id, label, icon) for ChipTray
+            # Unified Tags: Read ALL tags from TagRepository for current song(s)
             chips = []
             
-            # Helper to add tags with prefix
-            def add_tags(tag_list, prefix, icon, zone):
-                if not tag_list: return
-                names = tag_list if isinstance(tag_list, list) else [t.strip() for t in str(tag_list).split(',') if t.strip()]
-                for i, n in enumerate(names):
-                    # T-82: Mark the first one in the list as 'Primary'
-                    chips.append((0, f"{prefix}: {n}", icon, False, False, "", zone, i == 0))
+            if len(self.current_songs) == 1:
+                # Single song - get all its tags
+                source_id = self.current_songs[0].source_id
+                all_tags = self.tag_repo.get_tags_for_source(source_id)
+                
+                # Group by category to identify primary (first in each category)
+                by_category = {}
+                for tag in all_tags:
+                    cat = tag.category or "Other"
+                    if cat not in by_category:
+                        by_category[cat] = []
+                    by_category[cat].append(tag)
+                
+                # Build chips for each category
+                for category, tags in by_category.items():
+                    icon = self._get_tag_category_icon(category)
+                    zone = self._get_tag_category_zone(category)
+                    for i, tag in enumerate(tags):
+                        # Only Genre gets primary star (first item)
+                        is_primary = (i == 0 and category == "Genre")
+                        chips.append((tag.tag_id, f"{category}: {tag.tag_name}", icon, False, False, "", zone, is_primary))
+            else:
+                # Multiple songs - show mixed indicator
+                chips.append((-1, f"{len(self.current_songs)} Songs Selected", "🔀", True, False, "", "gray", False))
             
-            add_tags(genres, "Genre", "🏷️", "blue")
-            add_tags(moods, "Mood", "✨", "magenta")
-            
-            # T-82: Smart Visibility - Don't sort EVERYTHING.
-            # Keep the primary genre/mood (index 0 of each) at the top if possible.
-            # Since chips has them all, let's just sort the sub-lists if we wanted, 
-            # but for simplicity, let's just keep the insertion order which follows the Primary -> Others logic.
-            # chips.sort(key=lambda x: x[1]) # REMOVED: Allow Primary to stay at the front
-            
-            return chips, (g_is_mult or m_is_mult)
+            return chips, False
 
         # Handle regular fields
         s0 = self.current_songs[0]
@@ -1239,6 +1293,28 @@ class SidePanelWidget(QFrame):
             return self._staged_changes[song_id][field_name]
         return db_value
 
+    def _get_tag_category_icon(self, category):
+        """Get icon emoji for a tag category."""
+        icons = {
+            "Genre": "🏷️",
+            "Mood": "✨",
+            "Instrument": "🎸",
+            "Theme": "📚",
+            "Status": "📋",
+        }
+        return icons.get(category, "📦")
+
+    def _get_tag_category_zone(self, category):
+        """Get color zone for a tag category."""
+        zones = {
+            "Genre": "blue",
+            "Mood": "magenta",
+            "Instrument": "orange",
+            "Theme": "green",
+            "Status": "yellow",
+        }
+        return zones.get(category, "gray")
+
     def _on_field_changed(self, field_name, value):
         """Stage the change for the current selection."""
         for song in self.current_songs:
@@ -1252,19 +1328,27 @@ class SidePanelWidget(QFrame):
         self._projected_timer.start(500)
         self.staging_changed.emit(list(self._staged_changes.keys()))
 
-    def _on_status_toggled(self, checked):
-        val = 1 if checked else 0
-        self._on_field_changed("is_done", val)
-        self._update_status_visuals(checked)
-
-    def _on_status_toggled(self, checked=False):
-        """Toggle the ready/pending state."""
-        # Fix: GlowButton signal might drop arg, check state directly
+    def _on_status_toggled(self):
+        """Toggle the ready/pending state using the unified Tags system."""
         is_ready = self.btn_status.isChecked()
-        # Value 1 = Done, 0 = Pending
-        val = 1 if is_ready else 0
-        self._on_field_changed("is_done", val)
+        
+        # 1. Update Tags in DB (Immediate effect for now)
+        for song in self.current_songs:
+            if is_ready:
+                # MARKING DONE -> Remove all Status tags (Unverified, etc.) via efficient bulk call
+                self.tag_repo.remove_all_tags_from_source(song.source_id, category="Status")
+            else:
+                # MARKING PENDING -> Add 'Unverified' Status tag
+                self.tag_repo.add_tag_to_source(song.source_id, "Unverified", category="Status")
+
+        # 2. Sync legacy column via staging (Updates all songs in one call)
+        self._on_field_changed("is_done", 1 if is_ready else 0)
+
+        # 3. Update UI
         self._update_status_visuals(is_ready)
+        self._refresh_field_values() # Update the tag tray
+        self._validate_done_gate()   # Re-check if it can be marked done again (safety)
+        self.filter_refresh_requested.emit()
 
     def _update_status_visuals(self, is_done):
         """Apply Pro Radio styling: Green for AIR, Gray for PENDING via QSS dynamic property."""
@@ -1276,8 +1360,11 @@ class SidePanelWidget(QFrame):
             self.btn_status.setProperty("state", "pending")
         
         # Force style refresh for dynamic property change
-        self.btn_status.style().unpolish(self.btn_status)
-        self.btn_status.style().polish(self.btn_status)
+        try:
+            self.btn_status.style().unpolish(self.btn_status)
+            self.btn_status.style().polish(self.btn_status)
+        except:
+            pass
 
     def _validate_done_gate(self):
         """Disable MARK DONE if required fields are missing, showing why in tooltip."""
