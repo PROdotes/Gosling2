@@ -67,20 +67,7 @@ class Chip(QFrame):
             self.btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
             
             # Sub-styling for the X button
-            self.btn_remove.setStyleSheet("""
-                QPushButton#ChipRemoveButton {
-                    background: transparent;
-                    border: none;
-                    color: #888;
-                    font-size: 14pt;
-                    font-weight: bold;
-                    padding: 0;
-                    margin: 0;
-                }
-                QPushButton#ChipRemoveButton:hover {
-                    color: #FF5555;
-                }
-            """)
+
             self.btn_remove.clicked.connect(lambda: self.remove_requested.emit(self.entity_id, self.label_text))
             layout.addWidget(self.btn_remove)
         
@@ -155,7 +142,7 @@ class ChipTrayWidget(QWidget):
             chip.setProperty("state", "inherited")
             if hasattr(chip, 'btn_remove'):
                 chip.btn_remove.hide() # Locked
-            chip.lbl.setStyleSheet("color: #777; font-style: italic;") # Inline fallback
+            # chip.lbl.setStyleSheet("color: #777; font-style: italic;") # Handled by QSS [state="inherited"]
             if tooltip:
                 chip.setToolTip(tooltip)
         

@@ -793,7 +793,7 @@ class FilterWidget(QFrame):
              from PyQt6.QtWidgets import QLabel
              lbl = QLabel("No Active Filters")
              lbl.setObjectName("ChipPlaceholder")
-             lbl.setStyleSheet("color: #666666; font-style: italic; margin-left: 4px;")
+             # lbl.setStyleSheet("color: #666666; font-style: italic; margin-left: 4px;") # QSS: #ChipPlaceholder
              self.chip_layout.addWidget(lbl)
 
     def _on_chip_clicked(self):

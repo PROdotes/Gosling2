@@ -1805,7 +1805,7 @@ class SidePanelWidget(QFrame):
             self.save_led.setToolTip(f"Pending Move: {display_path}") 
             
             if is_alert:
-                 self.lbl_projected_path.setStyleSheet("color: #FF5555; font-weight: bold;")
+                 self.lbl_projected_path.setProperty("alert", True)
                  if has_conflict: 
                      self.save_led.setGlowColor("#FF0000") # Red Failure
                      self.save_led.setActive(True)
@@ -1813,7 +1813,7 @@ class SidePanelWidget(QFrame):
                      self.save_led.setGlowColor("#FF4444") # Red Warning
                      self.save_led.setActive(True)
             else:
-                 self.lbl_projected_path.setStyleSheet("color: #AAAAAA;")
+                 self.lbl_projected_path.setProperty("alert", False)
                  self.save_led.setActive(False)
 
     def _show_search_menu_btn(self):

@@ -8,17 +8,7 @@ class ReviewTooltip(QLabel):
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         
         self.setWordWrap(True)
-        self.setStyleSheet("""
-            QLabel {
-                background-color: #0c0c0c;
-                color: #C0C0C0;
-                border: 1px solid #FFC66D;
-                border-radius: 4px;
-                padding: 6px;
-                font-family: 'Segoe UI';
-                font-size: 10pt;
-            }
-        """)
+
         self.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.linkActivated.connect(self._on_link_clicked)
         self._current_indices = [] 

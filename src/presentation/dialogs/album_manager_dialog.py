@@ -440,7 +440,7 @@ class AlbumManagerDialog(QDialog):
         inputs = [self.inp_title, self.inp_year] # Removed inp_artist as it's now a tray
         for inp in inputs:
             inp.clear()
-            inp.edit.setStyleSheet("color: #666;") # Ghost color (Darker)
+            inp.edit.setProperty("ghost", True)
             # Disconnect previous temporary slots if any (complex in PyQt, simple approach: unique connection)
             try: inp.edit.textEdited.disconnect(self._ungrey_text)
             except: pass
@@ -480,7 +480,7 @@ class AlbumManagerDialog(QDialog):
         # Ungrey fields
         inputs = [self.inp_title, self.inp_year] # Removed inp_artist
         for inp in inputs:
-            inp.edit.setStyleSheet("")
+            inp.edit.setProperty("ghost", False)
             try: inp.edit.textEdited.disconnect(self._ungrey_text)
             except: pass
 
@@ -502,7 +502,7 @@ class AlbumManagerDialog(QDialog):
     def _ungrey_text(self):
         sender = self.sender()
         if sender:
-            sender.setStyleSheet("")
+            sender.setProperty("ghost", False)
 
     def _on_vault_item_clicked(self, item):
         # Reset Create Button if we were creating
@@ -510,8 +510,8 @@ class AlbumManagerDialog(QDialog):
              self.is_creating_new = False
              self.btn_create_new.setText("Create New Album (+)")
              # Reset ghost styling
-             self.inp_title.edit.setStyleSheet("")
-             self.inp_year.edit.setStyleSheet("")
+             self.inp_title.edit.setProperty("ghost", False)
+             self.inp_year.edit.setProperty("ghost", False)
              # self.inp_artist removed (now tray)
         
         album_id = item.data(Qt.ItemDataRole.UserRole)

@@ -1572,3 +1572,42 @@ QPushButton#JingleButton_promo { border-left: 4px solid #00BB00; }
 }
 
 
+
+/* --- 12. REFACTORED HARDCODED STYLES (T-Clean) --- */
+
+#ReviewTooltip {
+    background-color: #0c0c0c;
+    color: #C0C0C0;
+    border: 1px solid #FFC66D;
+    border-radius: 4px;
+    padding: 6px;
+    font-family: 'Segoe UI';
+    font-size: 10pt;
+}
+
+#ChipPlaceholder {
+    color: #666666;
+    font-style: italic;
+    margin-left: 4px;
+}
+
+#SidePanelProjectedPath {
+    /* Base logic already exists above, ensuring alert logic uses properties */
+}
+
+/* Ensure 'alert' property triggers specific colors if not already covered */
+#SidePanelProjectedPath[alert='true'] { 
+    color: #FF5555; 
+    font-weight: bold; 
+}
+
+/* Ghost text for Dialog inputs */
+QLineEdit[ghost='true'] {
+    color: #666666;
+}
+
+/* Ensure Inherited Chip Label gets italic */
+[objectName^='Chip_'][state='inherited'] #ChipLabel {
+    font-style: italic;
+}
+
