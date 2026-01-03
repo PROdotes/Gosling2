@@ -11,6 +11,29 @@ from PyQt6.QtGui import QIcon, QFont
 from .flow_layout import FlowLayout
 from .glow_factory import GlowButton
 
+class ElidingLabel(QLabel):
+    """
+    A QLabel that automatically elides text to fit within its width.
+    """
+    def __init__(self, text="", parent=None, mode=Qt.TextElideMode.ElideRight):
+        super().__init__(text, parent)
+        self.elide_mode = mode
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+    def paintEvent(self, event):
+        painter = tile = None
+        from PyQt6.QtGui import QPainter
+        painter = QPainter(self)
+        
+        metrics = self.fontMetrics()
+        elided = metrics.elidedText(self.text(), self.elide_mode, self.width())
+        
+        # Center vertically, align left (or follow alignment)
+        # Using basic drawText for simplicity and speed
+        rect = self.rect()
+        painter.drawText(rect, self.alignment(), elided)
+
 class Chip(QFrame):
     """
     A single interactive chip with an icon, label, and removal button.
@@ -40,44 +63,42 @@ class Chip(QFrame):
 
     def _init_ui(self, icon_char):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(6, 0, 10, 0) # Increased right margin to 10 (was 2) to prevent clipping
+        layout.setContentsMargins(6, 0, 4, 0) # Reduced right margin to 4px
         layout.setSpacing(2)
         
         display_text = self.label_text
         if self.is_primary and not self.is_mixed:
              display_text = f"★ {display_text}"
              
-        self.lbl = QLabel(display_text)
+        self.lbl = ElidingLabel(display_text)
         self.lbl.setObjectName("ChipLabel")
+        self.lbl.setToolTip(f"{display_text} (Ctrl+Click to remove)") # Always tooltip full text with hint
+        
+        # Remove artificial width limit so chips can expand
+        # self.lbl.setMaximumWidth(140) 
         
         if icon_char:
             self.icon_lbl = QLabel(icon_char)
             self.icon_lbl.setObjectName("ChipIcon")
             layout.addWidget(self.icon_lbl)
             
-        self.lbl.setMinimumWidth(20)
-        self.lbl.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Preferred)
         layout.addWidget(self.lbl)
         
-        # 3. Remove Button
-        if not self.is_mixed:
-            self.btn_remove = QPushButton("\u00D7")
-            self.btn_remove.setFixedSize(20, 20)
-            self.btn_remove.setObjectName("ChipRemoveButton")
-            self.btn_remove.setCursor(Qt.CursorShape.PointingHandCursor)
-            
-            # Sub-styling for the X button
-
-            self.btn_remove.clicked.connect(lambda: self.remove_requested.emit(self.entity_id, self.label_text))
-            layout.addWidget(self.btn_remove)
+        # 3. Remove Button -> REMOVED in favor of Ctrl+Click
+        # (This keeps layout simple and prevents accidental deletions)
         
         self.setCursor(Qt.CursorShape.PointingHandCursor)
 
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            # Check if we clicked the remove button area (approximate)
-            # Actually, standard layout handles this, but let's be safe.
-            self.clicked.emit(self.entity_id, self.label_text)
+            modifiers = event.modifiers()
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                # Ctrl+Click = Remove
+                self.remove_requested.emit(self.entity_id, self.label_text)
+            else:
+                # Normal Click = Action/Expand
+                self.clicked.emit(self.entity_id, self.label_text)
         super().mousePressEvent(event)
 
     def contextMenuEvent(self, event):
@@ -105,6 +126,25 @@ class ChipTrayWidget(QWidget):
         
         self._init_ui(add_tooltip)
 
+    def resizeEvent(self, event):
+        """
+        T-Overflow: Constrain chips to the available width to force elision.
+        FlowLayout uses sizeHint() which is huge for long text. 
+        We must enforce maximumWidth on the chips so setGeometry() clamps them.
+        """
+        super().resizeEvent(event)
+        
+        # Calculate max width for a single chip (container width - margins)
+        # Margin 8 * 2 = 16. Buffer 20 for safety.
+        max_w = self.width() - 20
+        if max_w < 50: max_w = 50 # Minimum sanity
+        
+        for i in range(self.flow_layout.count()):
+            item = self.flow_layout.itemAt(i)
+            widget = item.widget()
+            if widget:
+                widget.setMaximumWidth(max_w)
+                
     def _init_ui(self, add_tooltip):
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -161,6 +201,11 @@ class ChipTrayWidget(QWidget):
         chip.style().unpolish(chip)
         chip.style().polish(chip)
         
+        # Initial constraint (in case we are already visible)
+        current_max = self.width() - 20
+        if current_max > 50:
+            chip.setMaximumWidth(current_max)
+        
         self.container.updateGeometry()
         self.flow_layout.activate()
 
@@ -207,15 +252,16 @@ class ChipTrayWidget(QWidget):
         self.container.update()
 
     def _on_remove_requested(self, entity_id, label):
-        if self.confirm_removal:
-            msg = self.confirm_template.format(label=label)
-            reply = QMessageBox.question(
-                self, "Confirm Removal", msg,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply != QMessageBox.StandardButton.Yes:
-                return
+        # T-User: Removed confirmation prompt since Ctrl+Click is explicit enough
+        # if self.confirm_removal:
+        #     msg = self.confirm_template.format(label=label)
+        #     reply = QMessageBox.question(
+        #         self, "Confirm Removal", msg,
+        #         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        #         QMessageBox.StandardButton.No
+        #     )
+        #     if reply != QMessageBox.StandardButton.Yes:
+        #         return
         
         self.chip_remove_requested.emit(entity_id, label)
 

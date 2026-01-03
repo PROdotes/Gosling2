@@ -620,7 +620,7 @@ class SidePanelWidget(QFrame):
                             raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
                             names = []
                             for rn in raw_names:
-                                if isinstance(rn, str) and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
+                                if isinstance(rn, str) and field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
                                     import re
                                     split_parts = re.split(delimiters, rn)
                                     names.extend([p.strip() for p in split_parts if p.strip()])
@@ -942,10 +942,14 @@ class SidePanelWidget(QFrame):
             current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
             # Normalize to list
             if not isinstance(current, list):
-                delims = r',|;| & '
-                if field_name == 'composers': delims += r'|/'
-                import re
-                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+                # T-Policy: Prevent splitting for atomic fields like Album/Publisher
+                if field_name in ['album', 'publisher']:
+                    current = [str(current)] if current else []
+                else:
+                    delims = r',|;| & '
+                    if field_name == 'composers': delims += r'|/'
+                    import re
+                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
             
             if name in current:
                 new_list = [p for p in current if p != name]
@@ -1000,10 +1004,13 @@ class SidePanelWidget(QFrame):
         for song in self.current_songs:
             current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
             if not isinstance(current, list):
-                delims = r',|;| & '
-                if field_name == 'composers': delims += r'|/'
-                import re
-                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+                if field_name in ['album', 'publisher']:
+                    current = [str(current)] if current else []
+                else:
+                    delims = r',|;| & '
+                    if field_name == 'composers': delims += r'|/'
+                    import re
+                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
             
             if name not in current:
                 new_list = list(current)
@@ -1037,10 +1044,13 @@ class SidePanelWidget(QFrame):
         for song in self.current_songs:
             current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
             if not isinstance(current, list):
-                delims = r',|;| & '
-                if field_name == 'composers': delims += r'|/'
-                import re
-                current = [p.strip() for p in re.split(delims, str(current))] if current else []
+                if field_name in ['album', 'publisher']:
+                    current = [str(current)] if current else []
+                else:
+                    delims = r',|;| & '
+                    if field_name == 'composers': delims += r'|/'
+                    import re
+                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
             
             if name in current:
                 new_list = [p for p in current if p != name]
@@ -1086,7 +1096,7 @@ class SidePanelWidget(QFrame):
         if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'genre', 'album', 'mood']:
             tray = ChipTrayWidget(
                 confirm_template=f"Unlink '{{label}}' from {field_def.name}?",
-                add_tooltip=f"Add {field_def.ui_header}",
+                add_tooltip=f"Add {field_def.ui_header} (Ctrl+Click chip to remove)",
                 show_add=False,
                 parent=self
             )
@@ -1403,15 +1413,18 @@ class SidePanelWidget(QFrame):
             for song in self.current_songs:
                 val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
                 if val:
-                    # Split comma-separated list from DB and add to set
-                    parts = [p.strip() for p in str(val).split(',')]
-                    all_pubs.update(p for p in parts if p)
+                    # T-Policy: Do NOT split publishers by comma anymore. Treat as whole entities.
+                    # This respects "Sony / ATV" or "Smith, Jones & Co" as single units.
+                    all_pubs.add(str(val).strip())
             
             if not all_pubs:
                 return "", False
             
-            # Return sorted union
-            return ", ".join(sorted(list(all_pubs))), False
+            # Return sorted union (joined with a safe delimiter, though display logic handles lists)
+            # Actually, _calculate_bulk_value expects a single value if not multiple...
+            # But wait, publisher is now a ChipTray, so it expects a LIST for multi-value fields?
+            # Let's check _refresh_field_values... it handles lists.
+            return list(sorted(all_pubs)), False
 
         # Bulk Mode: Compare values
         is_multiple = False
