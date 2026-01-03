@@ -91,17 +91,19 @@ class TagPickerDialog(QDialog):
         btn_layout = QHBoxLayout()
         
         self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.setObjectName("ActionPill")
+        self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
         
         self.btn_select = GlowButton("Select / Create")
-        self.btn_select.setObjectName("Primary")
+        self.btn_select.setObjectName("ActionPill")
+        self.btn_select.setProperty("action_role", "primary")
         self.btn_select.btn.setDefault(True)
         self.btn_select.clicked.connect(self._on_select)
         
         btn_layout.addStretch()
         btn_layout.addWidget(self.btn_cancel)
         btn_layout.addWidget(self.btn_select)
-        btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
     def _connect_signals(self):

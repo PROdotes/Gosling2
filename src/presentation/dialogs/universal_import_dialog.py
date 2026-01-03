@@ -101,11 +101,14 @@ class UniversalImportDialog(QDialog):
         footer_layout.setContentsMargins(20, 15, 20, 20)
         
         self.btn_cancel = GlowButton("CANCEL")
+        self.btn_cancel.setObjectName("ActionPill")
+        self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.setFixedSize(110, 36)
         self.btn_cancel.clicked.connect(self.reject)
         
         self.btn_import = GlowButton("IMPORT SELECTION")
-        self.btn_import.setObjectName("ActionPillPrimary")
+        self.btn_import.setObjectName("ActionPill")
+        self.btn_import.setProperty("action_role", "primary")
         self.btn_import.setFixedSize(180, 36)
         self.btn_import.clicked.connect(self._on_import_clicked)
         

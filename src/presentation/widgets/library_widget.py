@@ -2174,6 +2174,10 @@ class LibraryWidget(QWidget):
         )
         
         if reply == QMessageBox.StandardButton.Yes:
+            # Explicitly clear selection to notify listeners (SidePanel) that these items are gone.
+            # This prevents the Editor from showing stale data while we process the deletion.
+            self.table_view.selectionModel().clearSelection()
+
             for index in indexes:
                 source_index = self.proxy_model.mapToSource(index)
                 file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])

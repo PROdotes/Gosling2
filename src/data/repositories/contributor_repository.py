@@ -58,24 +58,52 @@ class ContributorRepository(BaseRepository):
         return None
 
     def get_by_role(self, role_name: str) -> List[Tuple[int, str]]:
-        """Get all contributors for a specific role"""
+        """Fetch all contributors who have a specific role assigned at least once"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                query = """
-                    SELECT DISTINCT C.ContributorID, C.ContributorName
-                    FROM Contributors C
-                    JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
-                    JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    WHERE R.RoleName = ?
-                    ORDER BY C.SortName ASC
-                """
-                cursor.execute(query, (role_name,))
+                cursor.execute("""
+                    SELECT DISTINCT c.ContributorID, c.ContributorName 
+                    FROM Contributors c
+                    JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
+                    JOIN Roles r ON mscr.RoleID = r.RoleID
+                    WHERE r.RoleName = ?
+                    ORDER BY c.SortName ASC
+                """, (role_name,))
+
                 return cursor.fetchall()
         except Exception as e:
             from src.core import logger
-            logger.error(f"Error fetching contributors: {e}")
+            logger.error(f"Error fetching contributors by role: {e}")
             return []
+
+    def get_usage_count(self, contributor_id: int) -> int:
+        """Return the number of songs this contributor is linked to."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM MediaSourceContributorRoles WHERE ContributorID = ?", (contributor_id,))
+                return cursor.fetchone()[0]
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error getting usage count for {contributor_id}: {e}")
+            return 0
+
+    def swap_song_contributor(self, song_id: int, old_id: int, new_id: int) -> bool:
+        """Replace one contributor link with another for a single song."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE MediaSourceContributorRoles 
+                    SET ContributorID = ?, CreditedAliasID = NULL
+                    WHERE SourceID = ? AND ContributorID = ?
+                """, (new_id, song_id, old_id))
+                return cursor.rowcount > 0
+        except Exception:
+            return False
+
+
 
     def get_all_aliases(self) -> List[str]:
         """Get all alias names"""
@@ -271,7 +299,7 @@ class ContributorRepository(BaseRepository):
                 cursor = conn.cursor()
                 
                 # Check Name Conflict
-                query = "SELECT ContributorID, ContributorName FROM Contributors WHERE ContributorName = ?"
+                query = "SELECT ContributorID, ContributorName FROM Contributors WHERE ContributorName = ? COLLATE NOCASE"
                 params = [name]
                 if exclude_id:
                     query += " AND ContributorID != ?"
@@ -287,7 +315,7 @@ class ContributorRepository(BaseRepository):
                     SELECT C.ContributorID, C.ContributorName 
                     FROM ContributorAliases CA
                     JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                    WHERE CA.AliasName = ?
+                    WHERE CA.AliasName = ? COLLATE NOCASE
                 """
                 params = [name]
                 if exclude_id:
@@ -303,10 +331,11 @@ class ContributorRepository(BaseRepository):
         except Exception as e:
             return None, str(e)
 
-    def merge(self, source_id: int, target_id: int) -> bool:
+    def merge(self, source_id: int, target_id: int, create_alias: bool = True) -> bool:
         """
         Consolidate source identity into target.
         Transfers all songs, aliases, and relationships.
+        :param create_alias: If True, the source primary name is preserved as an alias for the target.
         """
         try:
             with self.get_connection() as conn:
@@ -314,15 +343,18 @@ class ContributorRepository(BaseRepository):
                 
                 # 1. Get Source Primary Name
                 cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (source_id,))
-                s_name = cursor.fetchone()[0]
+                res = cursor.fetchone()
+                if not res: return False
+                s_name = res[0]
                 
-                # 2. Source Name becomes an alias for target
-                cursor.execute("INSERT OR IGNORE INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_id, s_name))
-                
-                # Retrieve the AliasID for this name (newly created or existing) to preserve credit
-                cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ?", (target_id, s_name))
-                row = cursor.fetchone()
-                source_name_alias_id = row[0] if row else None
+                # 2. Source Name becomes an alias for target (Optional)
+                source_name_alias_id = None
+                if create_alias:
+                    cursor.execute("INSERT OR IGNORE INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_id, s_name))
+                    # Retrieve the AliasID for this name to preserve credit
+                    cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ?", (target_id, s_name))
+                    row = cursor.fetchone()
+                    source_name_alias_id = row[0] if row else None
                 
                 # 3. Transfer existing Aliases
                 cursor.execute("UPDATE OR IGNORE ContributorAliases SET ContributorID = ? WHERE ContributorID = ?", (target_id, source_id))
@@ -336,8 +368,9 @@ class ContributorRepository(BaseRepository):
                     )
                 """, (source_id, target_id))
                 
-                # Update links: Point to TargetID, and record the Source Name as the Credited Alias (if none was set)
-                # This ensures that songs previously credited to "Pink" (Primary) are now credited to "P!nk" (Master) as "Pink" (Alias)
+                # Update links: Point to TargetID.
+                # If create_alias is True, we preserve the specific Source Name as an Alias credit.
+                # If False, we leave CreditedAliasID as NULL so it defaults to the Target Primary Name.
                 if source_name_alias_id:
                      cursor.execute("""
                         UPDATE MediaSourceContributorRoles 
@@ -346,7 +379,12 @@ class ContributorRepository(BaseRepository):
                         WHERE ContributorID = ?
                      """, (target_id, source_name_alias_id, source_id))
                 else:
-                     cursor.execute("UPDATE MediaSourceContributorRoles SET ContributorID = ? WHERE ContributorID = ?", (target_id, source_id))
+                     cursor.execute("""
+                        UPDATE MediaSourceContributorRoles 
+                        SET ContributorID = ?,
+                            CreditedAliasID = NULL
+                        WHERE ContributorID = ?
+                     """, (target_id, source_id))
                 
                 # 5. Transfer Group Memberships
                 # Cleanup duplicates where source and target were already in the same relationship

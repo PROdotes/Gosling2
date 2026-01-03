@@ -182,7 +182,9 @@ class GlowButton(GlowWidget):
     def setIcon(self, i): self.btn.setIcon(i)
     def setIconSize(self, s): self.btn.setIconSize(s)
     def setToolTip(self, t): self.btn.setToolTip(t)
+    def setDefault(self, d): self.btn.setDefault(d)
     def setObjectName(self, n):
+
         super().setObjectName(n)
         self.btn.setObjectName(n)
         

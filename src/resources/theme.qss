@@ -617,6 +617,12 @@ GlowButton#CategoryPill[category="Commercials"] { qproperty-glowColor: #4DFFB8; 
 GlowButton#CategoryPill[category="Speech"] { qproperty-glowColor: #AAAAAA; }
 GlowButton#CategoryPill[category="Streams"] { qproperty-glowColor: #00FFFF; }
 
+/* Dialog Action Pills (Standardized Footer Buttons) */
+GlowButton#ActionPill[action_role="primary"] { qproperty-glowColor: #26E28C; }
+GlowButton#ActionPill[action_role="secondary"] { qproperty-glowColor: #FFC66D; }
+GlowButton#ActionPill[action_role="destructive"] { qproperty-glowColor: #E53935; }
+GlowButton#ActionPill[action_role="ghost"] { qproperty-glowColor: #444444; }
+
 GlowButton#StatusPill { 
     qproperty-glowColor: #26E28C; /* Station Green */
 }
@@ -1610,4 +1616,74 @@ QLineEdit[ghost='true'] {
 [objectName^='Chip_'][state='inherited'] #ChipLabel {
     font-style: italic;
 }
+
+
+/* --- 13. COLLISION RESOLVER (THE HUMAN MODULE) --- */
+#CollisionDialog {
+    background: #1A1A1A; 
+    min-width: 360px;
+    qproperty-minimumSize: 360px 280px;
+}
+
+#CollisionHeader {
+    color: #FFC66D; 
+    font-size: 9pt;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-bottom: 2px;
+}
+
+#CollisionMessage {
+    font-size: 13pt;
+    color: #FFFFFF;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+#CollisionDescription {
+    color: #AAAAAA;
+    font-size: 11pt;
+    margin-bottom: 25px;
+}
+
+/* Spacer for the button group */
+#CollisionButtonLayout {
+    qproperty-spacing: 12;
+}
+
+#ArtistCreatorDialog, #ArtistPickerDialog, #ArtistDetailsDialog {
+    min-width: 380px;
+    qproperty-minimumSize: 380px 220px;
+}
+
+#ArtistDetailsDialog {
+    qproperty-minimumSize: 380px 480px;
+}
+
+#ArtistCreatorLayout, #ArtistPickerLayout, #ArtistDetailsLayout {
+    qproperty-spacing: 12;
+}
+
+#MicroAddButton {
+    min-width: 50px;
+    max-width: 50px;
+    min-height: 24px;
+    max-height: 24px;
+}
+
+#ArtistSubList {
+    min-height: 80px;
+}
+
+#IdentityTypeButton {
+    min-width: 100px;
+    min-height: 32px;
+}
+
+#PickerTypeButton {
+    min-width: 110px;
+    min-height: 32px;
+}
+
+
 

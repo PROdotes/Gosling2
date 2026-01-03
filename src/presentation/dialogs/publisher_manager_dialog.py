@@ -26,13 +26,17 @@ class PublisherCreatorDialog(QDialog):
         
         btns = QHBoxLayout()
         self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.setObjectName("ActionPill")
+        self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
+        
         self.btn_save = GlowButton(button_text)
-        self.btn_save.setObjectName("Primary")
+        self.btn_save.setObjectName("ActionPill")
+        self.btn_save.setProperty("action_role", "primary")
         self.btn_save.clicked.connect(self.accept)
         
-        btns.addWidget(self.btn_cancel)
         btns.addStretch()
+        btns.addWidget(self.btn_cancel)
         btns.addWidget(self.btn_save)
         layout.addLayout(btns)
         self.inp_name.setFocus()
@@ -84,18 +88,20 @@ class PublisherPickerDialog(QDialog):
         btns = QHBoxLayout()
         btns.addStretch()
         self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.setObjectName("ActionPill")
+        self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
         btns.addWidget(self.btn_cancel)
         
         self.btn_select = GlowButton("Select / Create")
-        self.btn_select.setObjectName("Primary")
+        self.btn_select.setObjectName("ActionPill")
+        self.btn_select.setProperty("action_role", "primary")
         self.btn_select.btn.setDefault(True) # Make Enter trigger this button
         self.btn_select.clicked.connect(self._on_select)
         
         # Connect Enter key in the editable line edit to submission
         self.cmb.lineEdit().returnPressed.connect(self._on_select)
         btns.addWidget(self.btn_select)
-        btns.addStretch()
         
         layout.addLayout(btns)
         
@@ -158,10 +164,11 @@ class PublisherDetailsDialog(QDialog):
     T-63: Publisher Relationship Editor.
     Small modal to manage Parent/Child relationships.
     """
-    def __init__(self, publisher, repo, parent=None):
+    def __init__(self, publisher, repo, allow_remove_from_context=False, parent=None):
         super().__init__(parent)
         self.pub = publisher
         self.repo = repo
+        self.allow_remove = allow_remove_from_context
         self.setWindowTitle(f"Manager: {publisher.publisher_name}")
         self.setFixedSize(360, 450)
         
@@ -241,17 +248,31 @@ class PublisherDetailsDialog(QDialog):
         
         # 4. Actions (centered)
         btn_box = QHBoxLayout()
-        btn_save = GlowButton("Save Changes")
-        btn_save.setObjectName("Primary")
-        btn_save.clicked.connect(self._save)
         
-        btn_cancel = GlowButton("Close")
-        btn_cancel.clicked.connect(self.reject)
+        # Context Aware Remove Button
+        if self.allow_remove:
+            self.btn_delete = GlowButton("Remove")
+            self.btn_delete.setObjectName("ActionPill")
+            self.btn_delete.setProperty("action_role", "destructive")
+            self.btn_delete.setFixedWidth(80)
+            self.btn_delete.clicked.connect(lambda: self.done(2)) # Code 2 = Remove Request
+            self.btn_delete.setToolTip("Remove this publisher from the song/album")
+            btn_box.addWidget(self.btn_delete)
         
         btn_box.addStretch()
+        
+        btn_cancel = GlowButton("Close")
+        btn_cancel.setObjectName("ActionPill")
+        btn_cancel.setProperty("action_role", "secondary")
+        btn_cancel.clicked.connect(self.reject)
+        
+        btn_save = GlowButton("Save Changes")
+        btn_save.setObjectName("ActionPill")
+        btn_save.setProperty("action_role", "primary")
+        btn_save.clicked.connect(self._save)
+        
         btn_box.addWidget(btn_cancel)
         btn_box.addWidget(btn_save)
-        btn_box.addStretch()  # Center the buttons
         self.layout.addLayout(btn_box)
 
     def _refresh_data(self):
