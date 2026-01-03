@@ -177,6 +177,12 @@ class MainWindow(QMainWindow):
             self.duplicate_scanner
         )
 
+        from ...business.services.export_service import ExportService
+        self.export_service = ExportService(
+            self.metadata_service,
+            self.library_service
+        )
+
         # Initialize UI
         self._init_ui()
         self.setWindowFlags(
@@ -746,31 +752,15 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         logger.error(f"Error applying change {field_name}: {e}")
                 
-                # Save to ID3
-                if self.metadata_service.write_tags(song):
-                    # Save to DB
-                    if self.library_service.update_song(song):
-                        successful_ids.append(song_id)
-                        songs_to_check.append(song)
+                # Export to ID3 and DB via ExportService
+                result = self.export_service.export_song(song)
+                if result.success:
+                    successful_ids.append(song_id)
+                    songs_to_check.append(song)
                 else:
-                    QMessageBox.warning(self, "Save Failed", f"Could not write tags to file:\n{song.source}")
+                    QMessageBox.warning(self, "Save Failed", f"Could not save song:\n{result.error}")
             
-            # Check for Orphaned Albums (T-46)
-            for alb_id in albums_to_check:
-                try:
-                    count = self.library_service.album_repo.get_song_count(alb_id)
-                    if count == 0:
-                        alb = self.library_service.album_repo.get_by_id(alb_id)
-                        name = alb.title if alb else "Unknown Album"
-                        reply = QMessageBox.question(
-                            self, "Empty Album Detected", 
-                            f"The album '{name}' is now empty.\nDo you want to delete it?",
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                        )
-                        if reply == QMessageBox.StandardButton.Yes:
-                            self.library_service.album_repo.delete_album(alb_id)
-                except Exception as e:
-                    logger.error(f"Error checking orphan album {alb_id}: {e}")
+            # NOTE: Orphan album handling removed - belongs in Album Editor, not save flow
                     
             if successful_ids:
                 # Capture current selection by SourceID
@@ -786,8 +776,11 @@ class MainWindow(QMainWindow):
                 
                 # Check for Auto-Rename BEFORE refresh so we can batch the UI update
                 rename_needed = False
+                tag_repo = self.library_service.tag_repo if hasattr(self.library_service, 'tag_repo') else None
                 for song in songs_to_check:
-                    if song.is_done:
+                    # Permission to rename = NOT unprocessed
+                    is_unprocessed = tag_repo.is_unprocessed(song.source_id) if tag_repo else True
+                    if not is_unprocessed:
                         try:
                             target = self.renaming_service.calculate_target_path(song)
                             if song.path:
@@ -796,6 +789,7 @@ class MainWindow(QMainWindow):
                                      break
                         except Exception as e:
                             logger.error(f"Rename check failed: {e}")
+
                 
                 if rename_needed:
                     # Trigger rename (which handles its own confirmation)

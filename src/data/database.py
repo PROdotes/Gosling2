@@ -71,7 +71,6 @@ class BaseRepository:
                     RecordingYear INTEGER,
                     ISRC TEXT,
                     SongGroups TEXT,
-                    SongIsDone BOOLEAN DEFAULT 0,
                     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
                 )
             """)

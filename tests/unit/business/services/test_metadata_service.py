@@ -68,14 +68,12 @@ class TestMetadataWriteLogic:
             source=test_mp3,
             name="New Title",
             performers=["Artist 1"],
-            bpm=120,
-            is_done=True
+            bpm=120
         )
         assert MetadataService.write_tags(song) is True
         
         audio = MP3(test_mp3, ID3=ID3)
         assert str(audio.tags['TIT2']) == "New Title"
-        assert str(audio.tags['TKEY']) == "true"
 
     def test_dual_mode_writing(self, mock_mp3, mock_id3):
         """Requirement: Year writes to both TYER and TDRC"""
@@ -323,8 +321,9 @@ class TestMetadataExtractionComprehensive:
         assert song.groups == ["Group"]
 
 
+@pytest.mark.skip(reason="is_done is now tag-driven, not a Song property")
 class TestMetadataDoneFlag:
-    """Logic tests for the 'Done' flag (TKEY/TXXX migration)."""
+    """DEPRECATED: Done flag tests - status is now tag-driven via TagRepository."""
 
 
     def test_read_done_flag_primary_txxx_true(self, mock_mp3):
@@ -395,8 +394,7 @@ class TestWriteTagsIntegration:
             groups=["Group 1"],
             bpm=120,
             recording_year=2023,
-            isrc="USRC12345678",
-            is_done=True
+            isrc="USRC12345678"
         )
         
         result = MetadataService.write_tags(song)
@@ -410,8 +408,6 @@ class TestWriteTagsIntegration:
         assert str(audio.tags['TBPM']) == "120"
         assert "2023" in str(audio.tags['TDRC'])
         assert str(audio.tags['TSRC']) == "USRC12345678"
-        assert str(audio.tags['TKEY']) == "true"
-        assert "1" in str(audio.tags['TXXX:GOSLING_DONE'])
     
     def test_write_tags_preserves_album_art(self, test_mp3_with_album_art):
         """Album art (APIC) is not deleted when writing tags"""
@@ -482,25 +478,15 @@ class TestWriteTagsIntegration:
         assert 'TBPM' in audio.tags
         assert "100" in str(audio.tags['TBPM'])
     
+    @pytest.mark.skip(reason="is_done is now tag-driven")
     def test_write_tags_is_done_true(self, test_mp3):
-        """is_done=True writes TKEY='true' and TXXX:GOSLING_DONE='1'"""
-        song = Song(source=test_mp3, name="Test", is_done=True)
-        
-        MetadataService.write_tags(song)
-        
-        audio = MP3(test_mp3, ID3=ID3)
-        assert str(audio.tags['TKEY']) == "true"
-        assert "1" in str(audio.tags['TXXX:GOSLING_DONE'])
+        """DEPRECATED: is_done is now tag-driven"""
+        pass
     
+    @pytest.mark.skip(reason="is_done is now tag-driven")
     def test_write_tags_is_done_false(self, test_mp3):
-        """is_done=False writes TKEY=' ' and TXXX:GOSLING_DONE='0'"""
-        song = Song(source=test_mp3, name="Test", is_done=False)
-        
-        MetadataService.write_tags(song)
-        
-        audio = MP3(test_mp3, ID3=ID3)
-        assert str(audio.tags['TKEY']) == " "
-        assert "0" in str(audio.tags['TXXX:GOSLING_DONE'])
+        """DEPRECATED: is_done is now tag-driven"""
+        pass
     
     def test_write_tags_roundtrip(self, test_mp3):
         """Write then read, data matches"""
@@ -511,8 +497,7 @@ class TestWriteTagsIntegration:
             composers=["Composer X"],
             bpm=140,
             recording_year=2024,
-            isrc="TEST12345678",
-            is_done=True
+            isrc="TEST12345678"
         )
         
         # Write
@@ -529,7 +514,6 @@ class TestWriteTagsIntegration:
         assert read_song.bpm == original_song.bpm
         assert read_song.recording_year == original_song.recording_year
         assert read_song.isrc == original_song.isrc
-        assert read_song.is_done == original_song.is_done
     
     def test_write_tags_invalid_file(self, tmp_path):
         """Returns False for non-MP3 file"""
@@ -680,7 +664,6 @@ class TestDynamicID3Write:
             lyricists=["Schiller"],
             producers=["Quincy"],
             recording_year=2025,
-            is_done=True,
             bpm=120
         )
     

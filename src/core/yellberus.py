@@ -75,6 +75,8 @@ QUERY_FROM = """
     LEFT JOIN Tags TG_G ON MST_G.TagID = TG_G.TagID AND TG_G.TagCategory = 'Genre'
     LEFT JOIN MediaSourceTags MST_M ON MS.SourceID = MST_M.SourceID
     LEFT JOIN Tags TG_M ON MST_M.TagID = TG_M.TagID AND TG_M.TagCategory = 'Mood'
+    LEFT JOIN MediaSourceTags MST_S ON MS.SourceID = MST_S.SourceID
+    LEFT JOIN Tags TG_S ON MST_S.TagID = TG_S.TagID AND TG_S.TagCategory = 'Status' AND TG_S.TagName = 'Unprocessed'
     LEFT JOIN Publishers P_TRK ON SA.TrackPublisherID = P_TRK.PublisherID
     LEFT JOIN RecordingPublishers RP ON MS.SourceID = RP.SourceID
     LEFT JOIN Publishers P_REC ON RP.PublisherID = P_REC.PublisherID
@@ -307,10 +309,11 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='is_done',
         ui_header='Status',
-        db_column='S.SongIsDone',
+        db_column='is_done',
         field_type=FieldType.BOOLEAN,
         filterable=True,
         portable=False,
+        query_expression="(CASE WHEN COUNT(DISTINCT TG_S.TagID) > 0 THEN 0 ELSE 1 END) AS is_done",
         searchable=False,
         strategy='boolean',
         zone='magenta', # Console Magenta (Matches Surgical Highlights)

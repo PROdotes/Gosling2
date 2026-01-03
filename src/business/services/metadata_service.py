@@ -240,20 +240,9 @@ class MetadataService:
             
         song_data['producers'] = list(dict.fromkeys(producers)) # Dedupe
 
-        # --- IS DONE (Legacy TKEY / New TXXX) ---
-        is_done = False
-        # 1. Check TXXX:GOSLING_DONE
-        if "TXXX:GOSLING_DONE" in tags:
-            raw = get_values(tags["TXXX:GOSLING_DONE"])
-            if raw and raw[0].lower() in ["1", "true"]:
-                is_done = True
-        # 2. Fallback TKEY
-        elif "TKEY" in tags:
-            raw = get_values(tags["TKEY"])
-            if raw and raw[0] == "true": # strict "true", not "Am"
-                is_done = True
-                
-        song_data['is_done'] = is_done
+        # STATUS: No longer extracted here. The TagRepository is the source of truth.
+        # The Yellberus query calculates is_done as a virtual column from tag presence.
+        
         song_data['duration'] = duration
 
         # --- FALLBACK: COMPOSERS / LYRICISTS (Union Logic for TCOM) ---
@@ -452,11 +441,22 @@ class MetadataService:
                  audio.tags.delall('TIPL')
                  audio.tags.delall('TXXX:PRODUCER')
 
-            # 3. Is Done (Dual: TKEY + TXXX:GOSLING_DONE)
+            # 3. Status Tag (Truth) + Legacy Compatibility
+            # NOTE: Status is now managed by TagRepository. The caller must pass
+            # is_unprocessed if they want to bake the status into ID3.
+            # If song has 'is_unprocessed' attr (set by caller), use it.
+            audio.tags.delall('TXXX:STATUS')
             audio.tags.delall('TKEY')
-            audio.tags.delall('TXXX:GOSLING_DONE')
-            audio.tags.add(TKEY(encoding=1, text=['true' if song.is_done else ' ']))
-            audio.tags.add(TXXX(encoding=1, desc='GOSLING_DONE', text=['1' if song.is_done else '0']))
+            audio.tags.delall('TXXX:GOSLING_DONE') # Cleanup legacy
+
+            is_unprocessed = getattr(song, 'is_unprocessed', None)
+            if is_unprocessed is True:
+                # Permission NOT granted. Mark as Unprocessed.
+                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Unprocessed']))
+            elif is_unprocessed is False:
+                # Permission GRANTED (Done). Write Legacy code for compatibility.
+                audio.tags.add(TKEY(encoding=1, text=['true']))
+            # If is_unprocessed is None, we don't touch the status tags (sparse update)
 
             # 4. Author Union (Legacy: TCOM = Composers + Lyricists)
             audio.tags.delall('TCOM')

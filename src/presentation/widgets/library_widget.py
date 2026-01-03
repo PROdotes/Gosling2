@@ -1953,7 +1953,7 @@ class LibraryWidget(QWidget):
                 # 2) Persist to ID3
                 self.metadata_service.write_tags(song)
 
-                # 3) TODO: When RenamingService exists, rename if song.is_done is True
+                # 3) TODO: When RenamingService exists, rename if song is NOT unprocessed (tag absent)
                 saved += 1
             except Exception as e:
                 errors.append((path, str(e)))
@@ -2403,9 +2403,11 @@ class LibraryWidget(QWidget):
                         song = self.library_service.get_song_by_id(sid)
                         if not song: continue
 
-                        # Gate 1: Completeness
-                        if not song.is_done: 
-                            errors.append(f"{song.title}: Not marked as Done")
+                        # Gate 1: Status Check (The Tag is the Law)
+                        tag_repo = self.library_service.tag_repo if hasattr(self.library_service, 'tag_repo') else None
+                        is_unprocessed = tag_repo.is_unprocessed(sid) if tag_repo else True
+                        if is_unprocessed: 
+                            errors.append(f"{song.title}: Not marked as Ready (has Unprocessed tag)")
                             error_count += 1
                             continue
 

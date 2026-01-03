@@ -63,14 +63,16 @@ class ImportService:
                 # Update ID and Hash on the song object
                 temp_song.source_id = file_id
                 temp_song.audio_hash = audio_hash
-                
+
                 # Save full metadata to DB
                 self.library_service.update_song(temp_song)
-
-                # 6. Apply Initial Status Tag: "Unprocessed"
-                # This replaces the previous "Unverified" as per the new workflow
+                
+                # 6. Apply Initial Status Tag: "Unprocessed" (The Truth)
                 if self.tag_repo:
-                    self.tag_repo.add_tag_to_source(file_id, "Unprocessed", category="Status")
+                    self.tag_repo.set_unprocessed(file_id, True)
+                
+                # Bake it into the ID3
+                self.metadata_service.write_tags(temp_song)
                 
                 return True, file_id, None
             else:

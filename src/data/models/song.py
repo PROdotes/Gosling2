@@ -8,7 +8,6 @@ class Song(MediaSource):
     """Represents a song with its metadata"""
 
     # Specific fields
-    is_done: bool = False
     isrc: Optional[str] = None
     bpm: Optional[int] = None
 

@@ -267,19 +267,11 @@ class SidePanelWidget(QFrame):
         
         # Determine current state: READY if NO Status tags AND SongIsDone (staged or DB)
         try:
-            # 1. Tags check (Source of truth for Status)
+            # Status check: The Tag is the Law
+            # Ready = No 'Status:Unprocessed' tag
+            is_ready = True
             if hasattr(self, 'tag_repo') and self.tag_repo:
-                all_status_tags = self.tag_repo.get_tags_for_source(song.source_id, category="Status")
-                has_status_tags = len(all_status_tags) > 0
-            else:
-                 has_status_tags = False
-
-            # 2. Boolean check (Legacy Bridge)
-            staged_is_done = self._get_effective_value(song.source_id, "is_done", song.is_done)
-            is_done_bool = bool(staged_is_done)
-            
-            # Ready = No tags AND is_done bit set
-            is_ready = (not has_status_tags) and is_done_bool
+                is_ready = not self.tag_repo.is_unprocessed(song.source_id)
             
             # Update Button State (if it exists)
             if self.btn_status:
@@ -978,6 +970,7 @@ class SidePanelWidget(QFrame):
         if field_name == 'tags':
             # Tags use the entity_id which is the tag_id
             if entity_id and entity_id > 0:
+                is_status_tag = "Status: Unprocessed" in name
                 for song in self.current_songs:
                     self.tag_repo.remove_tag_from_source(song.source_id, entity_id)
                 self._refresh_field_values()

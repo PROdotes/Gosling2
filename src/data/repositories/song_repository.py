@@ -100,9 +100,9 @@ class SongRepository(BaseRepository):
                 # Note: Groups is TIT1 (Content Group Description)
                 cursor.execute("""
                     UPDATE Songs
-                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, SongIsDone = ?, SongGroups = ?
+                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, SongGroups = ?
                     WHERE SourceID = ?
-                """, (song.bpm, song.recording_year, song.isrc, 1 if song.is_done else 0, 
+                """, (song.bpm, song.recording_year, song.isrc, 
                       ", ".join(song.groups) if song.groups else None, song.source_id))
 
                 # 3. Clear existing contributor roles
@@ -128,21 +128,42 @@ class SongRepository(BaseRepository):
                 if song.mood is not None:
                      self._sync_tags(song, conn, 'mood', 'Mood')
 
+                # Status is now managed by TagRepository directly, not here.
+
                 return True
         except Exception as e:
             logger.error(f"Error updating song: {e}")
             return False
 
     def update_status(self, file_id: int, is_done: bool) -> bool:
-        """Update just the IsDone status of a song"""
+        """Update the status of a song (Tag-Driven, Flag-Synced)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE Songs SET SongIsDone = ? WHERE SourceID = ?",
-                    (1 if is_done else 0, file_id)
-                )
-                return cursor.rowcount > 0
+                
+                # 1. Sync Tag (The New Truth)
+                if not is_done:
+                    # Add 'Unprocessed' status tag
+                    cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'")
+                    row = cursor.fetchone()
+                    if not row:
+                        cursor.execute("INSERT INTO Tags (TagCategory, TagName) VALUES ('Status', 'Unprocessed')")
+                        tag_id = cursor.lastrowid
+                    else:
+                        tag_id = row[0]
+                    cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (file_id, tag_id))
+                else:
+                    # Remove 'Unprocessed' status tag
+                    cursor.execute("""
+                        DELETE FROM MediaSourceTags 
+                        WHERE SourceID = ? AND TagID IN (
+                            SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'
+                        )
+                    """, (file_id,))
+
+                # 2. Sync LEGACY (Skip - DB cleanup in progress)
+                # (The column likely still exists but we don't write to it)
+                return True
         except Exception as e:
             logger.error(f"Error updating song status: {e}")
             return False
@@ -376,27 +397,26 @@ class SongRepository(BaseRepository):
             AND TagID IN (SELECT TagID FROM Tags WHERE TagCategory = ?)
         """, (song.source_id, category))
         
-        # 2. Parse tags (List or Comma separated string)
+        # 2. Add new links
+        tags = []
         if isinstance(val, list):
-            tags = [str(t).strip() for t in val if t]
-        else:
-            tags = [t.strip() for t in str(val).split(',') if t.strip()]
+            tags = val
+        elif isinstance(val, str):
+            tags = [t.strip() for t in val.split(',') if t.strip()]
             
-        if not tags: return
-        
-        for t_name in tags:
-            # 3. Find or Create Tag
-            cursor.execute("SELECT TagID FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory=?", (t_name, category))
+        for tag_name in tags:
+            # Find or create tag
+            cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = ? AND TagName = ?", (category, tag_name))
             row = cursor.fetchone()
-            
             if row:
                 tag_id = row[0]
             else:
-                cursor.execute("INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)", (t_name, category))
+                cursor.execute("INSERT INTO Tags (TagCategory, TagName) VALUES (?, ?)", (category, tag_name))
                 tag_id = cursor.lastrowid
             
-            # 4. Link
             cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (song.source_id, tag_id))
+
+    # _sync_status_tag removed: Status is now managed by TagRepository.is_unprocessed/set_unprocessed
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific performer"""
@@ -497,7 +517,7 @@ class SongRepository(BaseRepository):
                 query = f"""
                     SELECT 
                         MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
-                        S.TempoBPM, S.RecordingYear, S.ISRC, S.SongIsDone, S.SongGroups,
+                        S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
                         MS.SourceNotes, MS.IsActive,
                         (
                             SELECT GROUP_CONCAT(A.AlbumTitle)
@@ -565,7 +585,7 @@ class SongRepository(BaseRepository):
                 
                 songs_map = {}
                 for row in cursor.fetchall():
-                    (source_id, path, name, duration, bpm, recording_year, isrc, is_done_int, groups_str, 
+                    (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
                      notes, is_active_int, album_title, album_id, publisher_name, genre_str, 
                      mood_str, album_artist, all_tags_str) = row
                     
@@ -580,7 +600,6 @@ class SongRepository(BaseRepository):
                         bpm=bpm,
                         recording_year=recording_year,
                         isrc=isrc,
-                        is_done=bool(is_done_int),
                         notes=notes,
                         is_active=bool(is_active_int),
                         album=album_title,

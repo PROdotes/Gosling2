@@ -34,8 +34,7 @@ def sample_song():
         duration=180,
         bpm=120,
         source_id=None,  # Was file_id
-        is_active=True,
-        is_done=False
+        is_active=True
     )
 
 class TestSongRepoCRUD:
@@ -85,14 +84,17 @@ class TestSongRepoCRUD:
         assert updated.bpm == 125
 
     def test_update_song_status(self, song_repo, sample_song):
-        """Test updating the is_done status efficiently."""
+        """Test updating the status via tag system."""
         file_id = self._create_song(song_repo, sample_song)
         
-        # Update just status
-        song_repo.update_status(file_id, True)
+        # Update status (adds/removes Status:Unprocessed tag)
+        song_repo.update_status(file_id, True)  # Done = remove tag
         
-        updated = song_repo.get_by_path(sample_song.path)
-        assert updated.is_done is True
+        # Status is now derived from tag presence, not a flag on Song object
+        # Verify via get_by_status query which uses the virtual is_done column
+        headers, data = song_repo.get_by_status(True)
+        source_ids = [row[0] for row in data]  # Assuming SourceID is first column
+        assert file_id in source_ids
 
     def test_delete_song(self, song_repo, sample_song):
         """Test deleting a song."""
@@ -175,15 +177,20 @@ class TestSongRepoLookups:
         assert len(data) == 1
         
     def test_get_by_status(self, song_repo):
-        """Test retrieval by IsDone status."""
+        """Test retrieval by status (tag-driven)."""
         path = os.path.normcase(os.path.abspath("C:/Music/status.mp3"))
-        s = Song(name="StatusTest", source=path, is_done=True, source_id=None)
+        s = Song(name="StatusTest", source=path, source_id=None)
         
         crud = TestSongRepoCRUD()
-        crud._create_song(song_repo, s)
+        file_id = crud._create_song(song_repo, s)
         
-        headers, data = song_repo.get_by_status("Done")
-        assert len(data) == 1
+        # Mark as done (remove Unprocessed tag if present)
+        song_repo.update_status(file_id, True)
+        
+        headers, data = song_repo.get_by_status(True)  # get_by_status(is_done=True)
+        # Verify our song is in the results
+        source_ids = [row[0] for row in data]
+        assert file_id in source_ids
 
 
 class TestSongRepoEdgeCases:
