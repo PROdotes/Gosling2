@@ -1003,6 +1003,11 @@ class SidePanelWidget(QFrame):
             
             if name in current:
                 new_list = [p for p in current if p != name]
+                
+                # Special Case: Clearing Album must also clear AlbumID to prevent auto-relink
+                if field_name == 'album' and not new_list:
+                    self._on_field_changed('album_id', None)
+                    
                 self._on_field_changed(field_name, new_list)
         
         self._refresh_field_values()
@@ -1336,7 +1341,8 @@ class SidePanelWidget(QFrame):
         
         # We will stage BOTH to be safe during transition
         # 'album' (str) -> For legacy string field
-        self._on_field_changed("album", album_name)
+        print(f"DEBUG: Staging Album Pick: {album_name} (ID: {album_id})")
+        self._on_field_changed("album", [album_name]) # Force list to prevent string merging ambiguity
         # 'album_id' (int) -> For new relation
         self._on_field_changed("album_id", album_id) 
         

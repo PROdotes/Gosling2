@@ -231,7 +231,7 @@ class SongRepository(BaseRepository):
         # Normalize Album Title (Handle List from UI)
         effective_title = None
         if isinstance(song.album, list):
-            effective_title = str(song.album[0]).strip() if song.album else None
+            effective_title = str(song.album[0]).strip() if song.album else ""
         elif song.album:
              effective_title = str(song.album).strip()
 
@@ -293,23 +293,12 @@ class SongRepository(BaseRepository):
 
         # 3. Apply Link logic (Primary Switch)
         if target_album_id:
-            # Check if link exists
-            cursor.execute("SELECT IsPrimary FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (song.source_id, target_album_id))
-            link_row = cursor.fetchone()
+            # Enforce 1:1 Relationship (Nuclear Option to prevent Zombie Links)
+            # Remove ALL existing links for this song
+            cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
             
-            if link_row:
-                # Link exists. Is it already primary?
-                if not link_row[0]:
-                    # Demote others
-                    cursor.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (song.source_id,))
-                    # Promote this one
-                    cursor.execute("UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?", (song.source_id, target_album_id))
-            else:
-                # New Link
-                # Demote others
-                cursor.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (song.source_id,))
-                # Insert as Primary
-                cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, 1)", (song.source_id, target_album_id))
+            # Insert the new album as Primary
+            cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, 1)", (song.source_id, target_album_id))
         
         # Note: If no target_album derived (user cleared album), we do ??
         # In a non-destructive world, maybe we just don't add a new primary?
@@ -320,7 +309,8 @@ class SongRepository(BaseRepository):
              # User cleared the field. Unset Primary on everything?
              # Or leave it? "Clear Album" usually means "Remove from Album".
              # Let's unlink the current Primary.
-             cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1", (song.source_id,))
+             print(f"DEBUG: Clearing album links for source {song.source_id}")
+             cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
 
 
     def _sync_publisher(self, song: Song, conn) -> None:

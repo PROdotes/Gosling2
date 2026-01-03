@@ -161,7 +161,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TALB',
-        query_expression='GROUP_CONCAT(DISTINCT A.AlbumTitle) AS AlbumTitle',
+        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN SA.IsPrimary = 1 THEN A.AlbumTitle ELSE NULL END) AS AlbumTitle",
         required=True,
         strategy='list',
         ui_search=True,
