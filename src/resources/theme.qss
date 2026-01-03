@@ -77,7 +77,7 @@ QPushButton#CloseButton:hover {
 /* --- 2. THE AMBER GROUP (#FFC66D) --- */
 
 /* Amber Borders */
-/* Amber Borders */
+
 QLineEdit:focus, QTextEdit:focus, #GlowInput:focus, QComboBox[glowing="true"] {
     border: 1px solid #FFC66D;
 }
@@ -611,15 +611,15 @@ QPushButton {
     font-weight: bold;
 }
  
- GlowButton#CategoryPill[category="Music"] { qproperty-glowColor: #32A8FF; }
- GlowButton#CategoryPill[category="Jingles"] { qproperty-glowColor: #FF4DFF; }
- GlowButton#CategoryPill[category="Commercials"] { qproperty-glowColor: #4DFFB8; }
- GlowButton#CategoryPill[category="Speech"] { qproperty-glowColor: #AAAAAA; }
- GlowButton#CategoryPill[category="Streams"] { qproperty-glowColor: #00FFFF; }
+GlowButton#CategoryPill[category="Music"] { qproperty-glowColor: #32A8FF; }
+GlowButton#CategoryPill[category="Jingles"] { qproperty-glowColor: #FF4DFF; }
+GlowButton#CategoryPill[category="Commercials"] { qproperty-glowColor: #4DFFB8; }
+GlowButton#CategoryPill[category="Speech"] { qproperty-glowColor: #AAAAAA; }
+GlowButton#CategoryPill[category="Streams"] { qproperty-glowColor: #00FFFF; }
 
- GlowButton#StatusPill { 
-     qproperty-glowColor: #26E28C; /* Station Green */
- }
+GlowButton#StatusPill { 
+    qproperty-glowColor: #26E28C; /* Station Green */
+}
 
 QPushButton:hover {
     border: 1px solid #111111;
@@ -1020,8 +1020,9 @@ QPushButton#AlbumActionButton:hover {
 /* --- ALBUM MANAGER PRO CONSOLE (T-46) --- */
 
 #AlbumManagerDialog {
-    /* Removed overrides to inherit global 'Satin Metal' theme */
-    /* Removed border-radius to prevent ugly corner clipping on OS window */
+    /* Refinement v2.1 */
+    min-width: 950px;
+    min-height: 650px;
 }
 
 #DialogHeader {
@@ -1185,12 +1186,6 @@ QPushButton#AlbumActionButton:hover {
     border-left: 2px solid #FFC66D;
 }
 
-/* --- ALBUM MANAGER REFINEMENT (v2.1) --- */
-
-#AlbumManagerDialog {
-    min-width: 950px;
-    min-height: 650px;
-}
 
 #PaneHeaderLabel {
     color: #666;
@@ -1504,6 +1499,7 @@ QPushButton[objectName^="JingleButton_"]:checked {
         stop:1 #996600);
     border: 1px solid #FFC66D;
     border-top: 1px solid #FFF1D4;
+    border-left: 5px solid rgba(0,0,0,0.3);
 }
 
 #JingleButtonTitle {
@@ -1575,6 +1571,4 @@ QPushButton#JingleButton_promo { border-left: 4px solid #00BB00; }
     border: 1px solid #444444;
 }
 
-QPushButton[objectName^="JingleButton_"]:checked {
-    border-left: 5px solid rgba(0,0,0,0.3);
-}
+
