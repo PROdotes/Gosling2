@@ -12,6 +12,7 @@ from ..dialogs.artist_manager_dialog import ArtistDetailsDialog, ArtistPickerWid
 import copy
 import os
 from ...core import yellberus
+from ..dialogs.tag_picker_dialog import TagPickerDialog
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
 
 class SidePanelWidget(QFrame):
@@ -411,7 +412,7 @@ class SidePanelWidget(QFrame):
 
                         if is_mult:
                             # Add Button
-                            btn_add = GlowButton("+")
+                            btn_add = GlowButton("")
                             btn_add.setObjectName("AddInlineButton")
                             self._configure_micro_button(btn_add)
                             btn_add.setToolTip(f"Add new {field.ui_header}")
@@ -429,11 +430,10 @@ class SidePanelWidget(QFrame):
                         if isinstance(widget, ChipTrayWidget):
                             widget.is_add_visible = False 
                             widget.btn_add.hide()
-                            btn_add_ext = GlowButton("+")
+                            btn_add_ext = GlowButton("")
                             btn_add_ext.setObjectName("AddInlineButton")
                             self._configure_micro_button(btn_add_ext)
-                            # Slightly larger for chip trays, but micro style applies
-                            btn_add_ext.setFixedSize(26, 24) 
+                            # Size handled by QSS
                             btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
                             input_layout.addWidget(btn_add_ext)
                         
@@ -481,7 +481,7 @@ class SidePanelWidget(QFrame):
                 header_layout.setSpacing(4)
 
                 if field.ui_search:
-                    btn_search = GlowButton("🔍")
+                    btn_search = GlowButton("")
                     btn_search.setObjectName("SearchInlineButton")
                     btn_search.setObjectName("SearchInlineButton")
                     self._configure_micro_button(btn_search)
@@ -517,9 +517,9 @@ class SidePanelWidget(QFrame):
                 if isinstance(edit_widget, ChipTrayWidget):
                     edit_widget.is_add_visible = False
                     edit_widget.btn_add.hide()
-                    btn_add_ext = GlowButton("+")
+                    btn_add_ext = GlowButton("")
                     btn_add_ext.setObjectName("AddInlineButton")
-                    btn_add_ext.setFixedSize(26, 24)
+                    # Size handled by QSS
                     btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
                     input_layout.addWidget(btn_add_ext)
 
@@ -641,8 +641,13 @@ class SidePanelWidget(QFrame):
                                     is_inherited = False
                                     if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
                                         alb_id = self.current_songs[0].album_id
-                                        # This might be expensive in a loop, but ok for UI count
-                                        alb_pub = self.library_service.album_repo.get_publisher(alb_id)
+                                        # Handle Multi-Album: Link against Primary (First) Album Only
+                                        if isinstance(alb_id, list):
+                                            alb_id = alb_id[0] if alb_id else None
+                                        
+                                        if alb_id:
+                                            # This might be expensive in a loop, but ok for UI count
+                                            alb_pub = self.library_service.album_repo.get_publisher(alb_id)
                                         if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
                                             is_inherited = True
                                     
@@ -655,14 +660,42 @@ class SidePanelWidget(QFrame):
                                     
                                     if is_inherited:
                                         # Use new is_inherited parameter with link icon
-                                        alb_name = self.current_songs[0].album or "Album"
+                                        raw_alb_name = self.current_songs[0].album
+                                        alb_name = "Album"
+                                        if isinstance(raw_alb_name, list):
+                                             alb_name = raw_alb_name[0] if raw_alb_name else "Album"
+                                        else:
+                                             alb_name = raw_alb_name or "Album"
+                                             
                                         chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
                                     else:
                                         chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))  # Local/Editable
                                 elif field_name == 'album':
-                                    results = self.library_service.album_repo.search(str(n))
-                                    aid = results[0].album_id if results else 0
-                                    chips.append((aid, str(n), "💿", False, False, "", field_def.zone or "amber", False))
+                                    aid = 0
+                                    is_p = (i == 0)
+                                    label = str(n)
+                                    
+                                    # Smart Lookup via Releases (Accuracy)
+                                    src = self.current_songs[0]
+                                    if hasattr(src, 'releases'):
+                                        for r in src.releases:
+                                            # Relaxed matching (titles might vary slightly?) No, should be exact.
+                                            if r['title'] == label:
+                                                aid = r['album_id']
+                                                # Trust list order for primary status (live editing), not stale DB flag
+                                                # is_p = r.get('is_primary', False) 
+                                                break
+                                    
+                                    if not aid:
+                                        # Fallback Search
+                                        results = self.album_repo.search(label)
+                                        aid = results[0].album_id if results else 0
+                                    
+                                    # Visual Primary Indicator
+                                    if len(names) > 1 and is_p:
+                                        label = f"★ {label}"
+                                        
+                                    chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
                                 else:
                                     # Standard Contributor (Artist)
                                     artist, created = self.contributor_repo.get_or_create(str(n))
@@ -810,19 +843,85 @@ class SidePanelWidget(QFrame):
         if not tag:
             return
 
-        new_name, ok = QInputDialog.getText(
-            self, "Rename Tag", 
-            f"Rename tag '{tag.tag_name}' globally:", 
-            text=tag.tag_name
+        diag = TagPickerDialog(
+            tag_repo=self.tag_repo,
+            target_tag=tag,
+            parent=self
         )
+        res = diag.exec()
+        if res == 1:
+            selected_tag = diag.get_selected()
+            if selected_tag:
+                new_name = selected_tag.tag_name
+                new_category = selected_tag.category
+            else:
+                new_name = diag.get_new_name()
+                new_category = diag.get_target_category()
+            ok = True
+        elif res == 2:
+            # REMOVE REQUEST (Contextual Unlink)
+            # Standardize category to field name (e.g., 'Genre' -> 'genre')
+            cat_lower = tag.category.lower()
+            
+            # Remove from all selected songs
+            for song in self.current_songs:
+                self._handle_chip_removal(song, cat_lower, tag.tag_name)
+            
+            self._refresh_field_values()
+            return
+        else:
+            new_name = None
+            new_category = None
+            ok = False
         
-        if ok and new_name and new_name != tag.tag_name:
-            # T-83: Auto-Sentence Case for renames too
+        # Check if Name OR Category changed
+        has_change = False
+        if ok and new_name:
             new_name = new_name.strip()
             if new_name:
-                new_name = new_name[0].upper() + new_name[1:]
+                new_name = new_name[0].upper() + new_name[1:] # Sentence Case
                 
+            if new_name != tag.tag_name: has_change = True
+            if new_category != tag.category: has_change = True
+            
+        if has_change:
+            # Check for conflict in TARGET category
+            conflict = self.tag_repo.find_by_name(new_name, new_category)
+            if conflict and conflict.tag_id != tag.tag_id:
+                # Count affected songs for user-friendly message
+                affected_count = self.tag_repo.count_sources_for_tag(tag.tag_id)
+                conflict_count = self.tag_repo.count_sources_for_tag(conflict.tag_id)
+                
+                from ..dialogs.resolver_dialog import ResolverDialog
+                resolver = ResolverDialog(
+                    conflict_name=f"{new_name} ({new_category})",
+                    current_count=affected_count,
+                    target_count=conflict_count,
+                    parent=self
+                )
+                res = resolver.exec()
+                
+                if res == 0:  # Cancel
+                    return
+                
+                if res == 3:  # Switch Just This Song (local tag swap)
+                    for song in self.current_songs:
+                        # Remove old tag, add new tag
+                        self.tag_repo.remove_tag_from_source(song.source_id, tag.tag_id)
+                        self.tag_repo.add_tag_to_source(song.source_id, conflict.tag_id)
+                    self._refresh_field_values()
+                    self.filter_refresh_requested.emit()
+                    return
+                
+                if res == 1:  # Replace Everywhere (global merge)
+                    if self.tag_repo.merge_tags(tag.tag_id, conflict.tag_id):
+                        self._refresh_field_values()
+                        self.filter_refresh_requested.emit()
+                return
+
+            # No Conflict - Perform Rename / Move
             tag.tag_name = new_name
+            tag.category = new_category
             if self.tag_repo.update(tag):
                 # Refresh everything
                 self._refresh_field_values()
@@ -838,9 +937,14 @@ class SidePanelWidget(QFrame):
         is_inherited = False
         if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
                 alb_id = self.current_songs[0].album_id
-                alb_pub_str = self.library_service.album_repo.get_publisher(alb_id) or ""
-                if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
-                    is_inherited = True
+                # Handle Multi-Album List
+                if isinstance(alb_id, list):
+                     alb_id = alb_id[0] if alb_id else None
+                
+                if alb_id:
+                    alb_pub_str = self.library_service.album_repo.get_publisher(alb_id) or ""
+                    if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
+                        is_inherited = True
         
         if is_inherited:
             alb = self.library_service.album_repo.get_by_id(alb_id)
@@ -858,7 +962,15 @@ class SidePanelWidget(QFrame):
             return
             
         if result:
-            self._refresh_field_values()
+            # T-70: Re-fetch current selection to reflect DB changes (Renames/Hierarchy)
+            if self.current_songs:
+                 refreshed = []
+                 for s in self.current_songs:
+                      song_data = self.library_service.song_repository.get_by_id(s.source_id)
+                      if song_data: refreshed.append(song_data)
+                 self.current_songs = refreshed
+                 self._refresh_field_values()
+                 self.filter_refresh_requested.emit() # Sync Table View
 
     def _handle_album_click(self, entity_id, name):
         if self.library_service.album_repo:
@@ -922,33 +1034,13 @@ class SidePanelWidget(QFrame):
                      self.filter_refresh_requested.emit() # Force table to reload fresh DB values
                 return
 
-            if result:
-                new_name = artist.name
-                if old_name != new_name:
-                    # PROPAGATE RENAME: Update internal model and staged changes to match DB change
-                    for song in self.current_songs:
-                        # 1. Update Song Object (Stale memory snapshot)
-                        # T-Fix: Only propagate renames to Performers/AlbumArtist. 
-                        # Credits (Composers/Producers) often use specific aliases/legal names that should be preserved.
-                        for field_attr in ['performers', 'album_artist']:  
-                            val = getattr(song, field_attr, [])
-                            if isinstance(val, list):
-                                if old_name in val:
-                                    setattr(song, field_attr, [new_name if n == old_name else n for n in val])
-                            elif isinstance(val, str) and val == old_name:
-                                setattr(song, field_attr, new_name)
-                        
-                        # 2. Update Staged Changes (The buffer that global Save writes)
-                        sid = song.source_id
-                        if sid in self._staged_changes:
-                            for staged_field in list(self._staged_changes[sid].keys()):
-                                staged_val = self._staged_changes[sid][staged_field]
-                                if isinstance(staged_val, list):
-                                    if old_name in staged_val:
-                                        self._staged_changes[sid][staged_field] = [new_name if n == old_name else n for n in staged_val]
-                                elif isinstance(staged_val, str) and staged_val == old_name:
-                                    self._staged_changes[sid][staged_field] = new_name
-                
+            if result == 1 or result is True: # Legacy/Fallback updates
+                # Re-fetch anyway just in case
+                fresh = []
+                for s in self.current_songs:
+                    s_f = self.library_service.get_song_by_id(s.source_id)
+                    if s_f: fresh.append(s_f)
+                self.current_songs = fresh
                 self._refresh_field_values()
 
     def _on_chip_removed(self, field_name, entity_id, name):
@@ -1004,9 +1096,17 @@ class SidePanelWidget(QFrame):
             if name in current:
                 new_list = [p for p in current if p != name]
                 
-                # Special Case: Clearing Album must also clear AlbumID to prevent auto-relink
-                if field_name == 'album' and not new_list:
-                    self._on_field_changed('album_id', None)
+                # Special Case: Album IDs must stay in sync with Names
+                if field_name == 'album':
+                    curr_ids = self._get_effective_value(song.source_id, 'album_id', getattr(song, 'album_id', []))
+                    if isinstance(curr_ids, int): curr_ids = [curr_ids]
+                    if not curr_ids: curr_ids = []
+                    
+                    if entity_id in curr_ids:
+                        new_ids = [x for x in curr_ids if x != entity_id]
+                        # Consistent storage: Int if single, List if multiple, None if empty
+                        final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
+                        self._on_field_changed('album_id', final_ids)
                     
                 self._on_field_changed(field_name, new_list)
         
@@ -1025,7 +1125,8 @@ class SidePanelWidget(QFrame):
                 if selected:
                     self._add_name_to_selection(field_name, selected.publisher_name)
         elif field_name == 'album':
-            self._open_album_manager()
+            # Clean Slate for Add, Merge logic handled in callback
+            self._open_album_manager(clean_slate=True, mode='add')
         elif field_name in ['tags', 'genre', 'mood']:
             # Unified tag picker - use TagRepository for all categories
             from ..dialogs.tag_picker_dialog import TagPickerDialog
@@ -1078,6 +1179,8 @@ class SidePanelWidget(QFrame):
         """T-82: Direct Right-Click action (Skip Menu) - ONLY for Genre."""
         if field_name == 'genre':
             self._on_chip_primary_requested(field_name, entity_id, name)
+        elif field_name == 'album':
+            self._on_chip_primary_requested(field_name, entity_id, name)
         elif field_name == 'tags' and ': ' in name:
             # Virtual 'tags' field - only act if it's a Genre tag
             cat, _ = name.split(': ', 1)
@@ -1110,6 +1213,19 @@ class SidePanelWidget(QFrame):
             if name in current:
                 new_list = [p for p in current if p != name]
                 new_list.insert(0, name) # Move to front
+                
+                # Special Case: Album IDs (Sync Order)
+                if field_name == 'album':
+                    curr_ids = self._get_effective_value(song.source_id, 'album_id', getattr(song, 'album_id', []))
+                    if isinstance(curr_ids, int): curr_ids = [curr_ids]
+                    if not curr_ids: curr_ids = []
+                    
+                    if entity_id in curr_ids:
+                        new_ids = [x for x in curr_ids if x != entity_id]
+                        new_ids.insert(0, entity_id)
+                        final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
+                        self._on_field_changed('album_id', final_ids)
+
                 self._on_field_changed(field_name, new_list)
         
         self._refresh_field_values()
@@ -1149,10 +1265,13 @@ class SidePanelWidget(QFrame):
         # Default: Line Edit for Alpha
         # T-70: Artist/Publisher/Genre/Album/Mood Chip Tray
         if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'genre', 'album', 'mood']:
+            # T-Multi: Enable Add button for Album to allow explicit "Add" workflow
+            can_add = (field_def.name == 'album')
+            
             tray = ChipTrayWidget(
                 confirm_template=f"Unlink '{{label}}' from {field_def.name}?",
                 add_tooltip=f"Add {field_def.ui_header} (Ctrl+Click chip to remove)",
-                show_add=False,
+                show_add=can_add,
                 parent=self
             )
             # Use lambda to capture the field name for generic handlers
@@ -1193,7 +1312,7 @@ class SidePanelWidget(QFrame):
         edit.installEventFilter(self)
         return edit
 
-    def _open_album_manager(self, checked=False, focus_publisher=False, initial_album=None):
+    def _open_album_manager(self, checked=False, focus_publisher=False, initial_album=None, clean_slate=False, mode='edit'):
         """Open the T-46 Album Selector."""
         # Gather initial data from current selection to auto-populate "Create New"
         initial_data = {}
@@ -1224,25 +1343,40 @@ class SidePanelWidget(QFrame):
             else:
                 d_artist = str(eff_performers) if eff_performers else "Unknown"
             
+            # Determine initial values based on Clean Slate request
+            init_title = "" if clean_slate else (self._get_effective_value(sid, 'album', song.album) or "")
+            init_id = None if clean_slate else self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None))
+            
             initial_data = {
-                'title': self._get_effective_value(sid, 'album', song.album) or "",
+                'title': init_title,
                 'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or d_artist,
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
-                'album_id': self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None)),
+                'album_id': init_id,
                 'song_display': f"{d_artist} - {eff_title}",
                 'focus_publisher': focus_publisher
             }
-
+            
+        initial_data['mode'] = mode
+        
         from ..dialogs.album_manager_dialog import AlbumManagerDialog
         dlg = AlbumManagerDialog(
             self.album_repo, initial_data, self, 
             staged_deletions=self._hidden_album_ids
         )
-        dlg.album_selected.connect(self._on_album_picked)
-        dlg.save_and_select_requested.connect(self._on_save_select_picked)
+        # Context-Aware Callback
+        target_id = initial_album.album_id if initial_album else None
+        dlg.album_selected.connect(lambda data: self._on_album_picked_context(data, mode, target_id))
+        
+        dlg.save_and_select_requested.connect(lambda data: self._on_album_picked_context(data, mode, target_id))
         dlg.album_deleted.connect(self._on_album_deleted_externally)
-        dlg.exec()
+        
+        res = dlg.exec()
+        if res == 2:
+            # T-Fix: Handle 'Remove Link' request (Matched to Artist workflow)
+            if initial_album:
+                self._on_chip_removed('album', initial_album.album_id, initial_album.title)
+            return
         
         # Sync: Re-fetch current selection to ensure memory matches DB (e.g. if album was deleted)
         if self.current_songs:
@@ -1323,52 +1457,119 @@ class SidePanelWidget(QFrame):
         self._update_save_state()
         self._refresh_field_values()
 
-    def _on_album_picked(self, album_id, album_name):
-        """Callback from Dialog."""
-        # Update the UI
+    def _on_album_picked(self, album_data):
+        """Called when user selects albums from the manager.
+        Expecting list of dicts: [{'id': int, 'title': str, 'primary': bool}]
+        """
+        # Safety / Legacy Fallback
+        if not album_data: return
+        if isinstance(album_data, int): return # Should not occur with new signal signature
+
+        # 1. Parse Data
+        # Ensure we treat it as a list
+        if not isinstance(album_data, list): album_data = [album_data]
+        
+        primary = album_data[0] # First is Primary by convention
+        names = [x['title'] for x in album_data]
+        ids = [x['id'] for x in album_data]
+        
+        # 2. Update Hidden Set (If we picked them, they shouldn't be hidden)
+        for x in album_data:
+            self._hidden_album_ids.discard(x['id'])
+            
+        # 3. Update UI Chips
         if 'album' in self._field_widgets:
             w = self._field_widgets['album']
             if hasattr(w, 'set_chips'):
-                w.set_chips([(album_id, album_name, "💿", False, False, "", "amber")])
+                 # Chip Tuple: (id, label, icon, is_user, is_inherit, tooltip, color)
+                 chips = []
+                 for x in album_data:
+                     is_p = x.get('primary', False)
+                     color = "amber" if is_p else ""
+                     label = x['title']
+                     # Visual indicator for primary if multiple
+                     if len(album_data) > 1 and is_p:
+                         label = f"★ {label}"
+                         
+                     chips.append((x['id'], label, "💿", False, False, "", color, is_p))
+                 w.set_chips(chips)
             elif hasattr(w, 'setText'):
-                w.setText(album_name)
-            
-        # Stage the changes
-        # Note: We are staging the Name for display/legacy, but ideally should stage ID.
-        # But for now, let's stage the 'album' field as the NAMe (to match current schema behavior)
-        # AND stage a hidden 'album_id' if the model supports it?
-        # Re-reading constraints: spec says "App updates Song.AlbumID".
-        
-        # We will stage BOTH to be safe during transition
-        # 'album' (str) -> For legacy string field
-        print(f"DEBUG: Staging Album Pick: {album_name} (ID: {album_id})")
-        self._on_field_changed("album", [album_name]) # Force list to prevent string merging ambiguity
-        # 'album_id' (int) -> For new relation
-        self._on_field_changed("album_id", album_id) 
-        
-        # T-69: Auto-Fill Publisher from Album
-        pub_name = self.album_repo.get_publisher(album_id)
-        if pub_name:
-            self._on_field_changed("publisher", pub_name)
-        else:
-            self._on_field_changed("publisher", None)
+                 w.setText(", ".join(names))
 
-        # T-46: Auto-Fill Album Artist & Year (Sync ID3 to DB Source of Truth)
-        # We must update these so the ID3 write logic (which reads from Song object) 
-        # gets the NEW values, not the old stale ones.
-        full_album = self.album_repo.get_by_id(album_id)
+        # 4. Stage Changes
+        print(f"DEBUG: Staging Multi-Album Pick: {names} (IDs: {ids})")
+        self._on_field_changed("album", names)
+        # Store complex objects? No, just names for display. IDs for link.
+        self._on_field_changed("album_id", ids)
+        
+    def _on_album_picked_context(self, data, mode, target_id=None):
+        if not data: return
+
+        # 1. Extract Selection
+        new_ids = [item['id'] for item in data]
+        
+        # 2. Get Current State
+        sid = self.current_songs[0].source_id
+        curr_ids = self._get_effective_value(sid, 'album_id', getattr(self.current_songs[0], 'album_id', []))
+        if isinstance(curr_ids, int): curr_ids = [curr_ids]
+        if not curr_ids: curr_ids = []
+        
+        # 3. Merge Logic
+        final_ids = []
+        if mode == 'add':
+             # Append new unique IDs
+             final_ids = list(curr_ids)
+             for nid in new_ids:
+                 if nid not in final_ids: final_ids.append(nid)
+                 
+        elif mode == 'edit':
+             if target_id and target_id in curr_ids:
+                 # Replace target_id with new_ids
+                 idx = curr_ids.index(target_id)
+                 final_ids = curr_ids[:idx] + new_ids + curr_ids[idx+1:]
+             else:
+                 # Standard Replace All (or fallthrough)
+                 final_ids = new_ids
+        
+        else:
+             final_ids = new_ids
+             
+        # 4. Sync Names (Rebuild derived list)
+        all_names = []
+        for xid in final_ids:
+            found = False
+            for item in data:
+                if item['id'] == xid:
+                    all_names.append(item['title'])
+                    found = True
+                    break
+            if not found:
+                alb = self.library_service.album_repo.get_by_id(xid)
+                all_names.append(alb.title if alb else "Unknown")
+                
+        self._on_field_changed('album_id', final_ids)
+        self._on_field_changed('album', all_names)
+        self._refresh_field_values()
+        
+        # 5. Metadata Auto-Fill (From PRIMARY Only)
+        # T-69: Publisher
+        primary = data[0] # First is Primary by convention
+        pub_name = self.album_repo.get_publisher(primary['id'])
+        self._on_field_changed("publisher", pub_name if pub_name else None)
+
+        # T-46: Artist & Year
+        full_album = self.album_repo.get_by_id(primary['id'])
         if full_album:
              if full_album.album_artist:
                  self._on_field_changed("album_artist", full_album.album_artist)
-             if full_album.release_year:
-                 self._on_field_changed("recording_year", full_album.release_year)
+
             
         # Ensure UI reflects the new managed state (Enabling/Disabling)
         self._refresh_field_values()
 
-    def _on_save_select_picked(self, album_id, album_name):
+    def _on_save_select_picked(self, album_data):
         """Callback from Dialog requesting an immediate atomic save."""
-        self._on_album_picked(album_id, album_name)
+        self._on_album_picked(album_data)
         # Surgical Shortcut: Just commit metadata
         self.trigger_save() # ensure save logic reads staged album_id
 
@@ -1652,6 +1853,27 @@ class SidePanelWidget(QFrame):
         # Allow saving even if no fields changed (e.g. to trigger rename)
         changes_to_emit = self._staged_changes.copy()
         
+        # T-Integrity: Validate all staged changes against Yellberus before saving
+        # This catches "202" (invalid year) or bad ISRC patterns
+        errors = []
+        for song_id, changes in changes_to_emit.items():
+            for field_name, raw_val in changes.items():
+                 if field_name in ('album', 'album_id'): continue # Skip logic fields
+                 
+                 field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
+                 if field_def:
+                      try:
+                          # Verify cast works (raises ValueError if bad)
+                          yellberus.cast_from_string(field_def, raw_val)
+                      except ValueError as e:
+                          errors.append(str(e))
+        
+        if errors:
+             from PyQt6.QtWidgets import QMessageBox
+             QMessageBox.warning(self, "Invalid Data", "\n".join(set(errors)))
+             self.btn_save.setChecked(False) # Unlatch if checkable
+             return
+
         if not changes_to_emit and self.current_songs:
             # Force inclusion of current songs if button was clicked but no edits made
             for song in self.current_songs:
@@ -1660,40 +1882,49 @@ class SidePanelWidget(QFrame):
         # Auto-fill Year logic (User Request)
         from datetime import datetime
         import re
-        current_year = datetime.now().year
+        from datetime import datetime
         
-        for song_id in list(changes_to_emit.keys()):
-            # Ensure sub-dict exists
-            if song_id not in changes_to_emit:
-                 changes_to_emit[song_id] = {}
-                 
-            changes = changes_to_emit[song_id]
+        # Determine Default Year (Configurable via Settings)
+        default_year_setting = 0
+        if self.settings_manager:
+            default_year_setting = self.settings_manager.get_default_year()
             
-            # Check if year is valid
-            has_year_change = 'recording_year' in changes
-            effective_year = None
+        # Only apply auto-fill if a default year is explicitly configured (User Request)
+        if default_year_setting > 0:
+            current_year = default_year_setting
             
-            if has_year_change:
-                val = changes['recording_year']
-                # Treating 0, "", None as empty
-                if val:
-                    try:
-                        effective_year = int(val)
-                    except:
-                        effective_year = 0
-            else:
-                # Check current selection first (Performance: Avoid DB hit during save loop)
-                song = next((s for s in self.current_songs if s.source_id == song_id), None)
-                if not song:
-                    # Fallback to DB if song not in current view (unlikely but safe)
-                    song = self.library_service.get_song_by_id(song_id)
+            for song_id in list(changes_to_emit.keys()):
+                # Ensure sub-dict exists
+                if song_id not in changes_to_emit:
+                     changes_to_emit[song_id] = {}
+                     
+                changes = changes_to_emit[song_id]
                 
-                if song:
-                     effective_year = song.recording_year
-            
-            # If effectively empty, force it
-            if not effective_year:
-                changes['recording_year'] = current_year
+                # Check if year is valid
+                has_year_change = 'recording_year' in changes
+                effective_year = None
+                
+                if has_year_change:
+                    val = changes['recording_year']
+                    # Treating 0, "", None as empty
+                    if val:
+                        try:
+                            effective_year = int(val)
+                        except:
+                            effective_year = 0
+                else:
+                    # Check current selection first (Performance: Avoid DB hit during save loop)
+                    song = next((s for s in self.current_songs if s.source_id == song_id), None)
+                    if not song:
+                        # Fallback to DB if song not in current view (unlikely but safe)
+                        song = self.library_service.get_song_by_id(song_id)
+                    
+                    if song:
+                         effective_year = song.recording_year
+                
+                # If effectively empty, force it
+                if not effective_year:
+                    changes['recording_year'] = current_year
 
             # --- Composer Logic (Hardcoded Splitter) ---
             if 'composers' in changes:
@@ -1799,10 +2030,14 @@ class SidePanelWidget(QFrame):
                      
                 field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
                 if field_def:
-                    attr = field_def.model_attr or field_def.name
-                    # NEW: Cast string from UI to proper Python type (e.g. List, Int)
-                    casted_value = yellberus.cast_from_string(field_def, value)
-                    setattr(song, attr, casted_value)
+                    try:
+                        attr = field_def.model_attr or field_def.name
+                        # NEW: Cast string from UI to proper Python type (e.g. List, Int)
+                        # Wrap in try/except to prevent Preview Crash on invalid input ("202")
+                        casted_value = yellberus.cast_from_string(field_def, value)
+                        setattr(song, attr, casted_value)
+                    except ValueError:
+                        pass # Ignore invalid values for path preview
         return song
 
     def _do_update_projected_path(self):
@@ -1871,7 +2106,6 @@ class SidePanelWidget(QFrame):
             
             # The path is now strictly HOVER-ONLY to reclaim vertical space
             self.lbl_projected_path.setVisible(False)
-            self.save_led.setToolTip(f"Pending Move: {display_path}") 
             
             if is_alert:
                  self.lbl_projected_path.setProperty("alert", True)

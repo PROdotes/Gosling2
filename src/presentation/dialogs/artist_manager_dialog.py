@@ -60,7 +60,8 @@ class IdentityCollisionDialog(QDialog):
             btns.addWidget(self.btn_this)
             
         # OPTION B: Merge
-        show_all = (song_count > 1) or (song_count == 1 and not has_context_song)
+        # Show if multiple songs exist, OR if we are in a Global context (no specific song to link)
+        show_all = (song_count > 1) or (not has_context_song)
         if show_all:
             label = f"ALL {song_count} SONGS" if song_count > 1 else "MERGE GLOBALLY"
             self.btn_all = GlowButton(label)
@@ -82,10 +83,8 @@ class IdentityCollisionDialog(QDialog):
         # Initial Focus
         if has_context_song:
             self.btn_this.setFocus()
-        elif show_all:
-            self.btn_all.setFocus()
         else:
-            self.btn_cancel.setFocus()
+            self.btn_all.setFocus()
 
 
 
@@ -95,7 +94,7 @@ class ArtistCreatorDialog(QDialog):
     """
     Quick dialog for creating a new artist with Name and Type.
     """
-    def __init__(self, initial_name="", parent=None):
+    def __init__(self, initial_name="", button_text="Create Artist", parent=None):
         super().__init__(parent)
         self.setWindowTitle("New Artist")
         self.setObjectName("ArtistCreatorDialog")
@@ -133,6 +132,7 @@ class ArtistCreatorDialog(QDialog):
         self.radio_group.setCheckable(True)
         self.btn_group.addButton(self.radio_group.btn, 1)
         
+        type_layout.addStretch()
         type_layout.addWidget(self.radio_person)
         type_layout.addWidget(self.radio_group)
         type_layout.addStretch()
@@ -147,7 +147,7 @@ class ArtistCreatorDialog(QDialog):
         self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
         
-        self.btn_save = GlowButton("Create Artist")
+        self.btn_save = GlowButton(button_text)
         self.btn_save.setObjectName("ActionPill")
         self.btn_save.setProperty("action_role", "primary")
         self.btn_save.setDefault(True) # Snappy: Press Enter to create
@@ -156,6 +156,9 @@ class ArtistCreatorDialog(QDialog):
         btns.addStretch()
         btns.addWidget(self.btn_cancel)
         btns.addWidget(self.btn_save)
+        btns.addStretch()
+        
+        layout.addStretch(1) # Anchor to bottom
         layout.addLayout(btns)
         
         self.inp_name.setFocus()
@@ -234,6 +237,7 @@ class ArtistPickerDialog(QDialog):
         # Track user's manual selection  
         self.radio_group.clicked.connect(lambda: self._on_user_type_clicked('group'))
         
+        type_layout.addStretch()
         type_layout.addWidget(self.radio_person)
         type_layout.addWidget(self.radio_group)
         type_layout.addStretch()
@@ -270,6 +274,7 @@ class ArtistPickerDialog(QDialog):
         btns.addStretch()
         btns.addWidget(self.btn_cancel)
         btns.addWidget(self.btn_select)
+        btns.addStretch()
         layout.addLayout(btns)
         
         self._populate()
@@ -635,7 +640,6 @@ class ArtistDetailsDialog(QDialog):
         self._refresh_data()
 
     def _init_ui(self, layout):
-        # ... (Previous UI code unchanged until Actions)
         # 1. Identity
         lbl_name = QLabel("ARTIST NAME")
         lbl_name.setObjectName("DialogFieldLabel")
@@ -691,8 +695,9 @@ class ArtistDetailsDialog(QDialog):
         
         h_alias.addStretch()
         
-        btn_add_alias = GlowButton("ADD")
-        btn_add_alias.setObjectName("MicroAddButton") 
+        btn_add_alias = GlowButton("")
+        btn_add_alias.setObjectName("AddInlineButton")
+        # Size handled by QSS relative to icon
         btn_add_alias.clicked.connect(self._add_alias)
         h_alias.addWidget(btn_add_alias)
         layout.addLayout(h_alias)
@@ -711,8 +716,9 @@ class ArtistDetailsDialog(QDialog):
         
         h_member.addStretch()
         
-        self.btn_add_member = GlowButton("ADD")
-        self.btn_add_member.setObjectName("MicroAddButton")
+        self.btn_add_member = GlowButton("")
+        self.btn_add_member.setObjectName("AddInlineButton")
+        # Size handled by QSS
         self.btn_add_member.clicked.connect(self._add_member)
         h_member.addWidget(self.btn_add_member)
         
@@ -725,41 +731,33 @@ class ArtistDetailsDialog(QDialog):
         layout.addWidget(self.list_members)
         
         btns = QHBoxLayout()
-        
-        # Delete/Remove Button (Left)
-        # Context Aware: If opened from a Chip, show "Remove Link"
-        if self.allow_remove:
-            # T-Fix: Be explicit. "Remove" can mean "Delete from Library". 
-            # We want "Remove from this song context".
-            self.btn_delete = GlowButton("Remove from song")
-            self.btn_delete.setObjectName("ActionPill")
-            self.btn_delete.setProperty("action_role", "destructive")
-            self.btn_delete.clicked.connect(lambda: self.done(2)) # Return Code 2 = Remove Request
-            self.btn_delete.setToolTip("Unlink this artist from the current song(s)")
-            btns.addWidget(self.btn_delete)
-
-        else:
-            # Global Manager Mode: Show "Delete Artist" (Or hide if dangerous)
-            # User explicit instruction: "stop... you are not deleting... you are removing the link"
-            # So we hide the GLOBAL delete button here to avoid confusion.
-            pass
-        
         btns.addStretch()
         
-        btn_cancel = GlowButton("Close")
+        # 1. Destructive (Left) - ONLY if in a context where unlinking makes sense
+        if self.allow_remove:
+            self.btn_delete = GlowButton("Remove")
+            self.btn_delete.setObjectName("ActionPill")
+            self.btn_delete.setProperty("action_role", "destructive")
+            self.btn_delete.setToolTip("Unlink this artist from the current song(s)")
+            self.btn_delete.clicked.connect(lambda: self.done(2)) # Code 2 = Remove Request
+            btns.addWidget(self.btn_delete)
+        
+        # 2. Neutral (Middle)
+        btn_cancel = GlowButton("Cancel")
         btn_cancel.setObjectName("ActionPill")
         btn_cancel.setProperty("action_role", "secondary")
         btn_cancel.clicked.connect(self.reject)
+        btns.addWidget(btn_cancel)
         
+        # 3. Primary (Right)
         btn_save = GlowButton("UPDATE")
         btn_save.setObjectName("ActionPill")
         btn_save.setProperty("action_role", "primary")
-        btn_save.setDefault(True) # Snappy: Press Enter to save changes
+        btn_save.setDefault(True)
         btn_save.clicked.connect(self._save)
-
-        
-        btns.addWidget(btn_cancel)
         btns.addWidget(btn_save)
+
+        btns.addStretch()
         layout.addLayout(btns)
 
     def _refresh_data(self):
@@ -955,7 +953,7 @@ class ArtistDetailsDialog(QDialog):
                 self._refresh_data()
 
     def _edit_alias(self, alias_id, old_name):
-        diag = ArtistCreatorDialog(initial_name=old_name, parent=self)
+        diag = ArtistCreatorDialog(initial_name=old_name, button_text="UPDATE", parent=self)
         diag.setWindowTitle("Rename Alias")
         diag.radio_person.hide(); diag.radio_group.hide()
         if diag.exec():
@@ -1046,13 +1044,6 @@ class ArtistDetailsDialog(QDialog):
                         QMessageBox.warning(self, "Error", "Merge failed.")
                         return
 
-                if res == 2: # Merge Identity (Alias Merge)
-                    if self.repo.merge(self.artist.contributor_id, conflict_id, create_alias=True):
-                        self.done(3) # Signal 3: Data Changed (Sync Required)
-                        return
-                    else:
-                        QMessageBox.warning(self, "Error", "Merge failed.")
-                        return
 
                 if res == 3 and self.context_song: # Fix This Song Only
                     if self.repo.swap_song_contributor(self.context_song.source_id, self.artist.contributor_id, conflict_id):
@@ -1063,7 +1054,7 @@ class ArtistDetailsDialog(QDialog):
                         QMessageBox.warning(self, "Error", "Local link failed.")
                         return
                 
-                return
+                return # Halt save, merge/swap handled it.
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:

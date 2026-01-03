@@ -25,7 +25,7 @@ Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompa
 
 ## ✅ Completeness Criteria (IsDone Flag)
 
-A song can only be marked as "Done" (`SongIsDone = true`) if it passes validation defined in the **Yellberus Field Registry**.
+A song is considered "Done" if it has no **Unprocessed** tag. This status is calculated dynamically based on tags, not stored as a flag.
 
 ### Mandatory Fields (All Types)
 | Field | Requirement | Notes |
@@ -117,7 +117,7 @@ erDiagram
         INTEGER RecordingYear
         TEXT ISRC
         TEXT SongGroups
-        BOOLEAN SongIsDone
+
         REAL CueIn
         REAL CueOut
         REAL Intro
@@ -409,7 +409,7 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 | `RecordingYear` | INTEGER | - | Original recording year |
 | `ISRC` | TEXT | - | International Standard Recording Code |
 | `SongGroups` | TEXT | - | Content group description (TIT1) |
-| `SongIsDone` | BOOLEAN | DEFAULT 0 | Marked as complete/processed |
+
 | `CueIn` | REAL | DEFAULT 0 | ❌ Playback start trim (seconds) |
 | `CueOut` | REAL | - | ❌ Playback end trim (seconds) |
 | `Intro` | REAL | - | ❌ End of talk-over zone at start |

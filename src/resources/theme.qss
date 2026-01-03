@@ -627,6 +627,50 @@ GlowButton#StatusPill {
     qproperty-glowColor: #26E28C; /* Station Green */
 }
 
+/* TagPickerDialog Compact Pills */
+GlowButton#TagPickerPill[action_role="primary"] { qproperty-glowColor: #26E28C; }
+GlowButton#TagPickerPill[action_role="secondary"] { qproperty-glowColor: #FFC66D; }
+GlowButton#TagPickerPill[action_role="destructive"] { qproperty-glowColor: #E53935; }
+
+QPushButton#TagPickerPill {
+    min-width: 80px;
+    max-width: 80px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 4px 6px;
+    border-radius: 8px;
+}
+
+/* Inline Add/Search Buttons (Wrapper Size) */
+GlowButton#AddInlineButton, GlowButton#SearchInlineButton {
+    min-width: 36px;
+    max-width: 36px;
+    min-height: 34px;
+    max-height: 34px;
+    qproperty-glowMargin: 5;
+    qproperty-glowBlur: 4;
+    qproperty-glowRadius: 7;
+}
+
+/* Inner Button Specifics */
+QPushButton#AddInlineButton, QPushButton#SearchInlineButton {
+    min-width: 26px;
+    max-width: 26px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0px;
+    border-radius: 6px;
+    qproperty-iconSize: 14px 14px;
+}
+
+#AddInlineButton {
+    qproperty-icon: url(src/resources/plus.svg);
+}
+
+#SearchInlineButton {
+    qproperty-icon: url(src/resources/search.svg);
+}
+
 QPushButton:hover {
     border: 1px solid #111111;
 }
@@ -1676,14 +1720,73 @@ QLineEdit[ghost='true'] {
 }
 
 #IdentityTypeButton {
-    min-width: 100px;
+    min-width: 120px;
     min-height: 32px;
 }
 
 #PickerTypeButton {
-    min-width: 110px;
+    min-width: 140px;
     min-height: 32px;
 }
 
+/* ActionPill sizing handled above in section 6 */
+/* --- 14. PUBLISHER DIALOG COMPACT ACTIONS --- */
+GlowButton#PublisherActionPill {
+    min-width: 90px;
+}
+QPushButton#PublisherActionPill {
+    min-width: 80px;
+    padding: 6px 4px;
+    font-size: 10pt;
+}
 
+/* Explicit Glow Mapping for the custom ID */
+GlowButton#PublisherActionPill[action_role="primary"] { qproperty-glowColor: #26E28C; }
+GlowButton#PublisherActionPill[action_role="destructive"] { qproperty-glowColor: #E53935; }
+GlowButton#PublisherActionPill[action_role="ghost"] { qproperty-glowColor: #444444; }
 
+#ActionPill {
+    min-width: 130px;
+}
+
+/* --- 15. SETTINGS DIALOG ELEMENTS --- */
+QSpinBox#SettingsSpin {
+    background-color: #0A0A0A; /* Deep Inset */
+    color: #E0E0E0;
+    font-family: "Consolas", monospace; /* Tech feel */
+    font-size: 11pt;
+    border: 1px solid #333333; /* Chiseled Edge */
+    border-bottom: 2px solid #444444; /* Lighting from top */
+    border-right: 2px solid #444444; 
+    border-top: 2px solid #111111; /* Shadow */
+    border-left: 2px solid #111111;
+    border-radius: 4px;
+    padding: 4px;
+    min-height: 20px;
+    selection-background-color: #FFC66D;
+    selection-color: #000000;
+}
+
+QSpinBox#SettingsSpin:focus {
+    border: 1px solid #FFC66D; /* Amber Focus */
+    background-color: #111111;
+}
+
+QSpinBox#SettingsSpin::up-button, QSpinBox#SettingsSpin::down-button {
+    background-color: transparent;
+    border: none;
+    width: 24px;
+    margin: 2px;
+    border-radius: 2px;
+}
+
+QSpinBox#SettingsSpin::up-button:hover, QSpinBox#SettingsSpin::down-button:hover {
+    background-color: #333333;
+}
+
+QSpinBox#SettingsSpin::up-arrow, QSpinBox#SettingsSpin::down-arrow {
+    width: 10px;
+    height: 10px;
+    /* We rely on system arrow or can define custom image. 
+       For now, let system draw arrow but style button. */
+}

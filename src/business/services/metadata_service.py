@@ -301,11 +301,8 @@ class MetadataService:
         from datetime import datetime
         current_year = datetime.now().year
         
-        # Validate Year
-        if song.recording_year is not None:
-            if song.recording_year < 1860 or song.recording_year > current_year + 1:
-                print(f"Warning: Invalid year {song.recording_year}, skipping year write")
-                song.recording_year = None
+        # Validate Year is handled by Yellberus casting logic before getting here
+
 
         # Validate ISRC
         if song.isrc:

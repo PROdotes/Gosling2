@@ -90,17 +90,30 @@ class ContributorRepository(BaseRepository):
             return 0
 
     def swap_song_contributor(self, song_id: int, old_id: int, new_id: int) -> bool:
-        """Replace one contributor link with another for a single song."""
+        """Replace one contributor link with another for a single song. (Deduplication aware)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # 1. Deduplicate: Find roles that BOTH already have for this song
+                # If both have the same role, we must delete the OLD one to avoiding breaking the PK (Source, Contributor, Role)
+                cursor.execute("""
+                    DELETE FROM MediaSourceContributorRoles 
+                    WHERE SourceID = ? AND ContributorID = ? AND RoleID IN (
+                        SELECT RoleID FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ?
+                    )
+                """, (song_id, old_id, song_id, new_id))
+                
+                # 2. Update remaining roles from OLD to NEW
                 cursor.execute("""
                     UPDATE MediaSourceContributorRoles 
                     SET ContributorID = ?, CreditedAliasID = NULL
                     WHERE SourceID = ? AND ContributorID = ?
                 """, (new_id, song_id, old_id))
-                return cursor.rowcount > 0
-        except Exception:
+                return True # If we deleted or updated, it's a success
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error swapping contributor {old_id} -> {new_id} on song {song_id}: {e}")
             return False
 
 

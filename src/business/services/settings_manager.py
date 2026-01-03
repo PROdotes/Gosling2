@@ -15,6 +15,8 @@ class SettingsManager:
     KEY_RIGHT_PANEL_SPLITTER_STATE = "window/rightPanelSplitterState"
     KEY_RIGHT_PANEL_TOGGLES = "window/rightPanelToggles" # JSON: {history: bool, editor: bool, compact: bool}
     KEY_RIGHT_PANEL_TAB = "window/rightPanelTab"
+    KEY_RIGHT_PANEL_WIDTH_EDITOR = "window/rightPanelWidthEditor"
+    KEY_RIGHT_PANEL_WIDTH_NORMAL = "window/rightPanelWidthNormal"
     
     # Library settings
 
@@ -23,6 +25,7 @@ class SettingsManager:
     KEY_TYPE_FILTER = "library/typeFilter"
     KEY_ROOT_DIRECTORY = "library/rootDirectory"
     KEY_DATABASE_PATH = "library/databasePath"
+    KEY_DEFAULT_YEAR = "library/defaultYear"
     
     # Renaming/Moving settings
     KEY_RENAME_PATTERN = "rules/renamePattern"
@@ -63,6 +66,7 @@ class SettingsManager:
     DEFAULT_CONVERSION_BITRATE = "320k"
     DEFAULT_FFMPEG_PATH = "ffmpeg"
     DEFAULT_SEARCH_PROVIDER = "Google"
+    DEFAULT_YEAR = 0 # 0 = Dynamic (Current Year)
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -121,8 +125,20 @@ class SettingsManager:
         return self._settings.value(self.KEY_RIGHT_PANEL_SPLITTER_STATE)
 
     def set_right_panel_splitter_state(self, state: QByteArray) -> None:
-        """Save right panel splitter state"""
+        """Save right panel vertical splitter state"""
         self._settings.setValue(self.KEY_RIGHT_PANEL_SPLITTER_STATE, state)
+        
+    def get_right_panel_width_editor(self) -> int:
+        return int(self._settings.value(self.KEY_RIGHT_PANEL_WIDTH_EDITOR, 500))
+        
+    def set_right_panel_width_editor(self, width: int) -> None:
+        self._settings.setValue(self.KEY_RIGHT_PANEL_WIDTH_EDITOR, width)
+        
+    def get_right_panel_width_normal(self) -> int:
+        return int(self._settings.value(self.KEY_RIGHT_PANEL_WIDTH_NORMAL, 350))
+        
+    def set_right_panel_width_normal(self, width: int) -> None:
+        self._settings.setValue(self.KEY_RIGHT_PANEL_WIDTH_NORMAL, width)
 
     def get_right_panel_toggles(self) -> dict:
         """Get visibility states: {'history': bool, 'editor': bool, 'compact': bool}"""
@@ -171,6 +187,14 @@ class SettingsManager:
     def set_database_path(self, path: str) -> None:
         """Set a custom database path."""
         self._settings.setValue(self.KEY_DATABASE_PATH, path)
+
+    def get_default_year(self) -> int:
+        """Get default year for auto-fill (0 = Dynamic/Current)."""
+        return int(self._settings.value(self.KEY_DEFAULT_YEAR, self.DEFAULT_YEAR))
+
+    def set_default_year(self, year: int) -> None:
+        """Set default year for auto-fill."""
+        self._settings.setValue(self.KEY_DEFAULT_YEAR, year)
 
     # ===== Renaming Rules =====
     
@@ -305,6 +329,12 @@ class SettingsManager:
         self._settings.setValue(self.KEY_CROSSFADE_DURATION, duration)
 
     # ===== Conversion Settings =====
+
+    def get_conversion_enabled(self) -> bool:
+        return self._settings.value(self.KEY_CONVERSION_ENABLED, False, type=bool)
+
+    def set_conversion_enabled(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_CONVERSION_ENABLED, enabled)
 
     def get_conversion_bitrate(self) -> str:
         return self._settings.value(self.KEY_CONVERSION_BITRATE, self.DEFAULT_CONVERSION_BITRATE, type=str)

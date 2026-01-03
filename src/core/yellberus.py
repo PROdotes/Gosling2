@@ -32,6 +32,7 @@ class FieldDef:
     # Validation
     required: bool = False
     min_value: Optional[float] = None
+    max_value: Optional[float] = None
     min_length: Optional[int] = None
     validation_pattern: Optional[str] = None  # Regex pattern for format validation (e.g., ISRC)
     
@@ -161,7 +162,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TALB',
-        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN SA.IsPrimary = 1 THEN A.AlbumTitle ELSE NULL END) AS AlbumTitle",
+        query_expression="GROUP_CONCAT(A.AlbumTitle, ', ') AS AlbumTitle",
         required=True,
         strategy='list',
         ui_search=True,
@@ -213,9 +214,11 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.INTEGER,
         filterable=True,
         id3_tag='TDRC',
+        min_value=1860,
         required=True,
-        strategy='decade_grouper',
+        strategy='list',  # Flat list, not grouped by decade
         ui_search=True,
+        validation_pattern=r'^\d{4}$', # Enforce 4 digits (e.g. 1999) to catch typos like "199"
         zone='amber', # ATTRIBUTE
     ),
     FieldDef(
@@ -295,7 +298,7 @@ FIELDS: List[FieldDef] = [
         ui_header='Album Artist',
         db_column='AlbumArtist',
         id3_tag='TPE2',
-        query_expression='GROUP_CONCAT(DISTINCT A.AlbumArtist) AS AlbumArtist',
+        query_expression="GROUP_CONCAT(A.AlbumArtist, ', ') AS AlbumArtist",
         strategy='list',
         visible=False,
     ),
@@ -483,14 +486,27 @@ def validate_row(row_data: list) -> set:
                 if len(str(cell_value).strip()) < field_def.min_length:
                     is_valid = False
         
-        # Check numeric min_value
+        # Check numeric range (min/max)
         elif is_valid and field_def.field_type in (FieldType.INTEGER, FieldType.REAL, FieldType.DURATION):
-            if cell_value is not None and field_def.min_value is not None:
+            if cell_value is not None:
                 try:
-                    if float(cell_value) < field_def.min_value:
+                    val_num = float(cell_value)
+                    
+                    if field_def.min_value is not None and val_num < field_def.min_value:
                         is_valid = False
+                        
+                    if field_def.max_value is not None and val_num > field_def.max_value:
+                        is_valid = False
+                        
+                    # Dynamic Cap for Years
+                    if field_def.name == 'recording_year':
+                        from datetime import datetime
+                        max_year = datetime.now().year + 1
+                        if val_num > max_year:
+                             is_valid = False
+                             
                 except (ValueError, TypeError):
-                    pass
+                    pass # logic elsewhere might catch type errors, but here we just skip check
         
         if not is_valid:
             failed_fields.add(field_def.name)
@@ -704,27 +720,67 @@ def cast_from_string(field_def: FieldDef, value: Any) -> Any:
     if value is None:
         return None
         
+    # 0. Pass-through for Lists
+    if isinstance(value, (list, tuple)) and field_def.field_type == FieldType.LIST:
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    # 1. Normalize to String
+    s_val = str(value).strip() if value is not None else ""
+    if not s_val:
+        return None
+
+    # 2. Pattern Validation (Global)
+    if field_def.validation_pattern:
+        import re
+        if not re.match(field_def.validation_pattern, s_val):
+             raise ValueError(f"'{s_val}' does not match format for {field_def.ui_header}")
+
+    # 3. Min Length Check (Text/String based)
+    if field_def.min_length is not None:
+        if len(s_val) < field_def.min_length:
+             raise ValueError(f"'{s_val}' is too short for {field_def.ui_header} (Min: {field_def.min_length})")
+
+    # 4. Type Casting & Range Check
     if field_def.field_type == FieldType.LIST:
-        if isinstance(value, str):
-            return [v.strip() for v in value.split(',') if v.strip()]
-        return value # Already a list?
+        # Check size of list items? (min_length usually applies to list count OR item length?)
+        # Yellberus validate_row checks LIST COUNT.
+        items = [v.strip() for v in s_val.split(',') if v.strip()]
+        if field_def.min_length is not None and len(items) < field_def.min_length:
+             raise ValueError(f"{field_def.ui_header} requires at least {field_def.min_length} items")
+        return items
         
     elif field_def.field_type == FieldType.INTEGER:
         try:
-            return int(value) if str(value).strip() else None
+            i_val = int(s_val)
+            if field_def.min_value is not None and i_val < field_def.min_value:
+                 raise ValueError(f"{field_def.ui_header} must be at least {field_def.min_value}")
+            if field_def.max_value is not None and i_val > field_def.max_value:
+                 raise ValueError(f"{field_def.ui_header} cannot be greater than {field_def.max_value}")
+                 
+            # Dynamic Cap for Years (Future-Proofing Logic)
+            if field_def.name == 'recording_year':
+                from datetime import datetime
+                max_year = datetime.now().year + 1
+                if i_val > max_year:
+                     raise ValueError(f"{field_def.ui_header} cannot be in the future (Max: {max_year})")
+
+            return i_val
         except (ValueError, TypeError):
-            return None
+            raise ValueError(f"'{value}' is not a valid number for {field_def.ui_header}")
             
     elif field_def.field_type == FieldType.REAL:
         try:
-            return float(value) if str(value).strip() else None
+            f_val = float(s_val)
+            if field_def.min_value is not None and f_val < field_def.min_value:
+                 raise ValueError(f"{field_def.ui_header} must be at least {field_def.min_value}")
+            if field_def.max_value is not None and f_val > field_def.max_value:
+                 raise ValueError(f"{field_def.ui_header} cannot be greater than {field_def.max_value}")
+            return f_val
         except (ValueError, TypeError):
-            return None
+            raise ValueError(f"'{value}' is not a valid number for {field_def.ui_header}")
             
     elif field_def.field_type == FieldType.BOOLEAN:
-        if isinstance(value, str):
-            return value.lower() in ("true", "1", "yes", "on")
-        return bool(value)
+        return s_val.lower() in ("true", "1", "yes", "on")
         
     # Default: Text
-    return str(value) if value is not None else None
+    return s_val

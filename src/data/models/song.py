@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 from dataclasses import dataclass, field
 from .media_source import MediaSource
 
@@ -13,8 +13,8 @@ class Song(MediaSource):
 
     recording_year: Optional[int] = None
     unified_artist: Optional[str] = None
-    album: Optional[str] = None
-    album_id: Optional[int] = None # Added for precise linking (T-46)
+    album: Union[str, List[str], None] = None
+    album_id: Union[int, List[int], None] = None # Added for precise linking (T-46)
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
     publisher: Optional[object] = None # Union[str, List[str]]
     genre: Optional[str] = None

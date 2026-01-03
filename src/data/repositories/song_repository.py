@@ -229,11 +229,17 @@ class SongRepository(BaseRepository):
         cursor = conn.cursor()
         
         # Normalize Album Title (Handle List from UI)
+        # Normalize Album Title (Handle List from UI)
         effective_title = None
+        all_titles = []
         if isinstance(song.album, list):
-            effective_title = str(song.album[0]).strip() if song.album else ""
+            all_titles = [str(t).strip() for t in song.album if t]
+            effective_title = all_titles[0] if all_titles else ""
         elif song.album:
-             effective_title = str(song.album).strip()
+             t = str(song.album).strip()
+             if t:
+                 all_titles = [t]
+                 effective_title = t
 
         # Determine the Target Album ID
         target_album_id = None
@@ -246,7 +252,12 @@ class SongRepository(BaseRepository):
                  use_precise_id = True
              else:
                  # Check if name matches existing ID to see if it's stale
-                 cursor.execute("SELECT AlbumTitle FROM Albums WHERE AlbumID = ?", (song.album_id,))
+                 # Handle List of IDs (Multi-Album): Validation checks PRIMARY only
+                 check_id = song.album_id
+                 if isinstance(check_id, list):
+                     check_id = check_id[0] if check_id else None
+                     
+                 cursor.execute("SELECT AlbumTitle FROM Albums WHERE AlbumID = ?", (check_id,))
                  id_row = cursor.fetchone()
                  
                  if id_row and id_row[0].lower() == effective_title.lower():
@@ -255,50 +266,61 @@ class SongRepository(BaseRepository):
         if use_precise_id:
              target_album_id = song.album_id
 
-        elif effective_title:
-            # 2. Get/Create Album using (Title, AlbumArtist, Year) for disambiguation
-            album_title = effective_title
+        elif all_titles:
+            # 2. Get/Create Albums by Name (Supports Multi-Album)
+            target_ids = []
+            
             album_artist = getattr(song, 'album_artist', None)
             if album_artist:
                 album_artist = album_artist.strip() or None
             release_year = getattr(song, 'recording_year', None)
             
-            # Build query dynamically based on what's provided
-            conditions = ["AlbumTitle = ? COLLATE NOCASE"]
-            params = [album_title]
+            for album_title in all_titles:
+                # Build query dynamically based on what's provided
+                conditions = ["AlbumTitle = ? COLLATE NOCASE"]
+                params = [album_title]
+                
+                if album_artist:
+                    conditions.append("AlbumArtist = ? COLLATE NOCASE")
+                    params.append(album_artist)
+                else:
+                    conditions.append("(AlbumArtist IS NULL OR AlbumArtist = '')")
+                
+                if release_year:
+                    conditions.append("ReleaseYear = ?")
+                    params.append(release_year)
+                
+                query = f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}"
+                cursor.execute(query, params)
+                row = cursor.fetchone()
+                
+                if row:
+                    target_ids.append(row[0])
+                else:
+                    # Create new album
+                    cursor.execute(
+                        "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", 
+                        (album_title, album_artist, release_year)
+                    )
+                    target_ids.append(cursor.lastrowid)
             
-            if album_artist:
-                conditions.append("AlbumArtist = ? COLLATE NOCASE")
-                params.append(album_artist)
-            else:
-                conditions.append("(AlbumArtist IS NULL OR AlbumArtist = '')")
-            
-            if release_year:
-                conditions.append("ReleaseYear = ?")
-                params.append(release_year)
-            
-            query = f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}"
-            cursor.execute(query, params)
-            row = cursor.fetchone()
-            
-            if row:
-                target_album_id = row[0]
-            else:
-                # Create new album
-                cursor.execute(
-                    "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", 
-                    (album_title, album_artist, release_year)
-                )
-                target_album_id = cursor.lastrowid
+            target_album_id = target_ids
 
-        # 3. Apply Link logic (Primary Switch)
-        if target_album_id:
-            # Enforce 1:1 Relationship (Nuclear Option to prevent Zombie Links)
-            # Remove ALL existing links for this song
+        # 3. Apply Link logic (Primary Switch & Multi-Album)
+        targets = []
+        if isinstance(target_album_id, list):
+             targets = target_album_id
+        elif target_album_id:
+             targets = [target_album_id]
+             
+        if targets:
+            # Enforce Exact State (Nuclear Option)
             cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
             
-            # Insert the new album as Primary
-            cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, 1)", (song.source_id, target_album_id))
+            for idx, alb_id in enumerate(targets):
+                # First item is Primary
+                is_p = 1 if idx == 0 else 0
+                cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, ?)", (song.source_id, alb_id, is_p))
         
         # Note: If no target_album derived (user cleared album), we do ??
         # In a non-destructive world, maybe we just don't add a new primary?
@@ -647,7 +669,27 @@ class SongRepository(BaseRepository):
                          })
 
                 # Maintain original order of requested IDs
-                return [songs_map[sid] for sid in source_ids if sid in songs_map]
+                final_list = []
+                for sid in source_ids:
+                    if sid in songs_map:
+                        song = songs_map[sid]
+                        # T-Fix: Re-hydrate album/album_id from structured releases to prevent
+                        # "GROUP_CONCAT" merging (e.g. "Album A, Album B" becoming one title).
+                        if song.releases:
+                            # Releases are already sorted by IsPrimary DESC
+                            titles = [r['title'] for r in song.releases]
+                            ids = [r['album_id'] for r in song.releases]
+                            
+                            if len(titles) > 1:
+                                song.album = titles
+                                song.album_id = ids
+                            elif titles:
+                                song.album = titles[0]
+                                song.album_id = ids[0]
+                        
+                        final_list.append(song)
+                
+                return final_list
                 
         except Exception as e:
             logger.error(f"Error bulk fetching songs: {e}")
@@ -715,8 +757,9 @@ class SongRepository(BaseRepository):
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE S.SongIsDone = ? AND MS.IsActive = 1
+                    WHERE MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
+                    HAVING is_done = ?
                     ORDER BY MS.SourceID DESC
                 """
                 # Convert bool to int (0/1) for SQLite

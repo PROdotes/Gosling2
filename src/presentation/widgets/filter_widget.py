@@ -342,6 +342,9 @@ class FilterWidget(QFrame):
         # This aggregates all roles into one master list
         self._add_all_contributors_filter()
         
+        # Virtual Decade Filter (derived from years)
+        self._add_decade_filter()
+        
         # T-83: Unified Tags Filter (Dynamic Categories)
         self._add_unified_tags_filter()
         
@@ -489,6 +492,50 @@ class FilterWidget(QFrame):
         self._add_type_grouped_items(root_item, field, values)
         
         self.tree_model.appendRow(root_item)
+
+    def _add_decade_filter(self):
+        """Add virtual Decade filter derived from years."""
+        from src.core import logger
+        
+        try:
+            decades = set()
+            
+            with self.library_service.song_repository.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT RecordingYear FROM Songs WHERE RecordingYear IS NOT NULL")
+                for row in cursor.fetchall():
+                    year = row[0]
+                    if year:
+                        try:
+                            decade = (int(year) // 10) * 10
+                            decades.add(f"{decade}s")
+                        except (ValueError, TypeError):
+                            pass
+            
+            if not decades:
+                return
+            
+            # Create pseudo-field
+            field = yellberus.FieldDef(
+                name='decade',
+                ui_header='📅 Decade',
+                db_column='Virtual',
+                strategy='list'
+            )
+            
+            root_item = QStandardItem(field.ui_header)
+            root_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            root_item.setData(field.name, Qt.ItemDataRole.UserRole + 1)
+            root_item.setData("root", Qt.ItemDataRole.AccessibleTextRole)
+            
+            # Add decades in reverse order (newest first)
+            for decade in sorted(decades, reverse=True):
+                self._add_leaf_item(root_item, field, decade)
+            
+            self.tree_model.appendRow(root_item)
+            
+        except Exception as e:
+            logger.error(f"Error populating decade filter: {e}")
 
     def _add_unified_tags_filter(self):
         """T-83: Add dynamic Tags filter with categories from database."""

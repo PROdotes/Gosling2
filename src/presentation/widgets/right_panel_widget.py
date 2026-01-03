@@ -170,6 +170,7 @@ class RightPanelWidget(QWidget):
     # Public Signals (Facade)
     transport_command = pyqtSignal(str)
     transition_command = pyqtSignal(str, int)
+    editor_mode_changed = pyqtSignal(bool)
     
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None):
         super().__init__(parent)
@@ -277,6 +278,7 @@ class RightPanelWidget(QWidget):
         
     def _on_toggle_editor(self, checked):
         self.editor_widget.setVisible(checked)
+        self.editor_mode_changed.emit(checked)
 
     def _on_toggle_compact(self, checked):
         # Trigger mini mode on the playlist

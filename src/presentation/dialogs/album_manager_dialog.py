@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
     QListWidget, QListWidgetItem, QSplitter, QScrollArea,
     QFrame, QMessageBox, QComboBox, QWidget, QMenu, QCheckBox,
-    QSizePolicy
+    QSizePolicy, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
@@ -21,9 +21,10 @@ class AlbumManagerDialog(QDialog):
     Refactor T-63: Layout split into HBox[MainContainer, Sidecar] to prevent button jumping.
     """
     
-    # Returns the selected/created Album ID and Name
-    album_selected = pyqtSignal(int, str) 
-    save_and_select_requested = pyqtSignal(int, str)
+    # Returns the selected/created Album(s) as a list of dicts:
+    # [{'id': int, 'title': str, 'primary': bool}, ...]
+    album_selected = pyqtSignal(list) 
+    save_and_select_requested = pyqtSignal(list)
     album_deleted = pyqtSignal(int)
     
     # Geometry (The Workstation Dimensions)
@@ -52,6 +53,16 @@ class AlbumManagerDialog(QDialog):
         # State
         if not hasattr(self, 'current_album'):
             self.current_album = None # The album object currently loaded in Inspector
+            
+        # T-Multi: Persistence for Search Refreshes
+        init_ids = initial_data.get('album_id')
+        if isinstance(init_ids, list):
+             self.selected_ids = set(init_ids)
+        elif init_ids:
+             self.selected_ids = {init_ids}
+        else:
+             self.selected_ids = set()
+             
         self.is_creating_new = False # Flag for "Create New" mode
         self.selected_pub_name = "" 
         
@@ -172,22 +183,36 @@ class AlbumManagerDialog(QDialog):
         footer.setObjectName("DialogFooter")
         footer.setFixedHeight(60)
         footer.setMaximumWidth(self.BASE_WIDTH) # Lock width to prevent jump
-        footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(20,10,20,10)
-        footer_layout.setSpacing(10) 
+        btns = QHBoxLayout(footer)
+        btns.setContentsMargins(20,10,20,10)
+        btns.setSpacing(10)
+        btns.addStretch()
         
+        # 1. Destructive (Left)
+        self.btn_remove = GlowButton("Remove Link")
+        self.btn_remove.setObjectName("ActionPill")
+        self.btn_remove.setProperty("action_role", "destructive")
+        self.btn_remove.setToolTip("Unlink this album from the current song(s)")
+        self.btn_remove.clicked.connect(self._on_remove_clicked)
+        self.btn_remove.setEnabled(False) # Only if an actual link exists
+        btns.addWidget(self.btn_remove)
+        
+        # 2. Neutral (Middle)
         self.btn_cancel = GlowButton("Cancel")
+        self.btn_cancel.setObjectName("ActionPill")
+        self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
+        btns.addWidget(self.btn_cancel)
         
+        # 3. Primary (Right)
         self.btn_save_inspector = GlowButton("Save & Assign")
-        self.btn_save_inspector.setObjectName("Primary")
+        self.btn_save_inspector.setObjectName("ActionPill")
+        self.btn_save_inspector.setProperty("action_role", "primary")
         self.btn_save_inspector.setEnabled(False) # Initially disabled
         self.btn_save_inspector.clicked.connect(lambda: self._save_inspector(close_on_success=True))
+        btns.addWidget(self.btn_save_inspector)
 
-        footer_layout.addWidget(self.btn_cancel)
-        footer_layout.addStretch()
-        footer_layout.addWidget(self.btn_save_inspector)
-        
+        btns.addStretch()
         main_layout.addWidget(footer)
         
         # Add Main to Root
@@ -249,10 +274,15 @@ class AlbumManagerDialog(QDialog):
         
         self.list_vault = QListWidget()
         self.list_vault.setObjectName("DialogVaultList") # Will inherit QListWidget styles
+        # Mode-based Selection Logic
+        mode = self.initial_data.get('mode', 'edit')
+        sel_mode = QAbstractItemView.SelectionMode.MultiSelection if mode == 'add' else QAbstractItemView.SelectionMode.ExtendedSelection
+        self.list_vault.setSelectionMode(sel_mode)
         self.list_vault.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_vault.customContextMenuRequested.connect(self._show_vault_context_menu)
         self.list_vault.itemClicked.connect(self._on_vault_item_clicked)
         self.list_vault.itemDoubleClicked.connect(self._on_select_clicked)
+        self.list_vault.itemSelectionChanged.connect(self._on_vault_selection_changed)
         
         layout.addWidget(self.list_vault)
         return container
@@ -316,9 +346,8 @@ class AlbumManagerDialog(QDialog):
         )
         input_layout_art.addWidget(self.tray_artist, 1)
         
-        btn_add_artist = GlowButton("+")
+        btn_add_artist = GlowButton("")
         btn_add_artist.setObjectName("AddInlineButton")
-        btn_add_artist.setFixedSize(26, 24)
         btn_add_artist.clicked.connect(self._on_search_artist)
         input_layout_art.addWidget(btn_add_artist)
         
@@ -361,9 +390,8 @@ class AlbumManagerDialog(QDialog):
         )
         input_layout_pub.addWidget(self.tray_publisher, 1)
         
-        btn_add_pub = GlowButton("+")
+        btn_add_pub = GlowButton("")
         btn_add_pub.setObjectName("AddInlineButton")
-        btn_add_pub.setFixedSize(26, 24)
         btn_add_pub.clicked.connect(self._on_search_publisher)
         input_layout_pub.addWidget(btn_add_pub)
         
@@ -423,7 +451,9 @@ class AlbumManagerDialog(QDialog):
         self.btn_create_new.style().unpolish(self.btn_create_new)
         self.btn_create_new.style().polish(self.btn_create_new)
         
-        # Clear Selection
+        self.btn_create_new.style().polish(self.btn_create_new)
+        
+        # Clean Slate restored
         self.list_vault.clearSelection()
         
         # Clear Context
@@ -549,6 +579,8 @@ class AlbumManagerDialog(QDialog):
         # 3. Enable UI
         self.pane_inspector.setEnabled(True)
         self.btn_save_inspector.setEnabled(True)
+        # Update Remove button state
+        self.btn_remove.setEnabled(album_id in self.selected_ids)
         self.pane_inspector.setProperty("state", "") # Clear create cue
         self.pane_inspector.style().unpolish(self.pane_inspector)
         self.pane_inspector.style().polish(self.pane_inspector)
@@ -602,19 +634,39 @@ class AlbumManagerDialog(QDialog):
         self.album_repo.set_primary_album(source_id, self.current_album.album_id)
         self._refresh_context(self.current_album.album_id)
 
+    def _on_vault_selection_changed(self):
+        # T-Multi: Capture state to persist across searches
+        self.selected_ids.clear()
+        for item in self.list_vault.selectedItems():
+            self.selected_ids.add(item.data(Qt.ItemDataRole.UserRole))
+
     def _refresh_vault(self, query=None):
         if query is None:
             query = self.txt_search.text()
-            
+        
+        # T-Multi: Block signals to prevent clearing our persistent set during rebuild
+        self.list_vault.blockSignals(True)
         self.list_vault.clear()
+        
         results = self.album_repo.search(query)
         
-        target_id = None
-        if self.current_album:
-            target_id = self.current_album.album_id
-        elif self.initial_data.get('album_id'):
-            # Fallback: If we have an ID but haven't loaded the object yet
-            target_id = self.initial_data.get('album_id')
+        # Ensure targets are present in the list (Preserve existing selection)
+        if self.selected_ids:
+            result_ids = {r.album_id for r in results}
+            missing_ids = [tid for tid in self.selected_ids if tid not in result_ids]
+            
+            for mid in missing_ids:
+                obj = self.album_repo.get_by_id(mid)
+                if obj: results.append(obj)
+                
+            # Optional: Sort purely to keep order sanity?
+            # results.sort(key=lambda x: x.title or "")
+
+        target_set = self.selected_ids
+        # Primary focus: Keep current if selected, else pick arbitrary
+        primary_id = self.current_album.album_id if self.current_album else None
+        if not primary_id and target_set:
+             primary_id = next(iter(target_set))
         
         for alb in results:
             if alb.album_id in self.staged_deletions: continue
@@ -628,11 +680,23 @@ class AlbumManagerDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, alb.album_id)
             self.list_vault.addItem(item)
             
-            if target_id and alb.album_id == target_id:
+            if alb.album_id in target_set:
                 item.setSelected(True)
-                self.list_vault.setCurrentItem(item)
-                # Manually trigger the click logic to populate the Inspector!
-                self._on_vault_item_clicked(item)
+                
+                # Focus Primary to populate Inspector
+                # (Inspector logic is triggered by Click. If we just setSelected(True), 
+                # signal handler handles persistence. CurrentItem handles focus.)
+                if alb.album_id == primary_id:
+                    self.list_vault.setCurrentItem(item)
+                    # We might need to manually trigger inspector update if this is initial load?
+                    # But _on_vault_item_clicked is connected to Click.
+                    # setCurrentItem does NOT trigger ItemClicked.
+                    # It changes CurrentRow.
+                    # So we might need explicit call if we want Inspector to load.
+                    # But calling it here inside loop is OK if only once.
+                    self._on_vault_item_clicked(item)
+        
+        self.list_vault.blockSignals(False)
 
     def _on_search_text_changed(self, text):
         self._refresh_vault(text)
@@ -703,10 +767,15 @@ class AlbumManagerDialog(QDialog):
         
         year_str = self.inp_year.text().strip()
         
-        # Default to current year if empty
+        # Default to configured year if empty
         if not year_str:
-            from datetime import datetime
-            year_str = str(datetime.now().year)
+            from ...business.services.settings_manager import SettingsManager
+            
+            sm = SettingsManager()
+            def_year = sm.get_default_year()
+            if def_year > 0:
+                year_str = str(def_year)
+            # Else leave empty (No default year)
             
         year = int(year_str) if year_str.isdigit() else None
         alb_type = self.cmb_type.currentText()
@@ -768,7 +837,8 @@ class AlbumManagerDialog(QDialog):
 
         if success and close_on_success:
              # Atomic Save: Tell Side Panel to commit everything immediately
-             self.save_and_select_requested.emit(self.current_album.album_id, self.current_album.title)
+             data = self._gather_selection()
+             self.save_and_select_requested.emit(data)
              self.accept()
              
         return success
@@ -779,9 +849,47 @@ class AlbumManagerDialog(QDialog):
             if not self._save_inspector(silent=True):
                 return # Abort if save failed (e.g. invalid title)
 
-        if not self.current_album: return
-        self.album_selected.emit(self.current_album.album_id, self.current_album.title)
+        data = self._gather_selection()
+        if not data: return
+        self.album_selected.emit(data)
         self.accept()
+
+    def _gather_selection(self):
+        """Collects all selected albums from the vault list as objects."""
+        selection = []
+        seen_ids = set()
+        
+        # 1. Gather from List (Legacy/Multi)
+        items = self.list_vault.selectedItems()
+        for idx, item in enumerate(items):
+            aid = item.data(Qt.ItemDataRole.UserRole)
+            if aid in seen_ids: continue
+            
+            alb = self.album_repo.get_by_id(aid)
+            if alb:
+                selection.append({
+                    'id': alb.album_id,
+                    'title': alb.title,
+                    'primary': False # Set later
+                })
+                seen_ids.add(alb.album_id)
+                
+        # 2. Add Current (New/Edited) if not present
+        if self.current_album:
+             aid = self.current_album.album_id
+             if aid and aid not in seen_ids:
+                 selection.append({
+                    'id': aid,
+                    'title': self.current_album.title,
+                    'primary': False
+                 })
+                 seen_ids.add(aid)
+                 
+        # 3. Determine Primary (First in list = Primary)
+        if selection:
+            selection[0]['primary'] = True
+            
+        return selection
 
     def _show_vault_context_menu(self, pos):
         item = self.list_vault.itemAt(pos)
@@ -817,11 +925,19 @@ class AlbumManagerDialog(QDialog):
                 
                 self._refresh_vault()
 
+    def _on_remove_clicked(self):
+        """Unlink selected album from current song(s). (Returns Code 2 to caller)"""
+        # If we have a current album, we are asking to remove the link to THIS specific identity.
+        if self.current_album:
+            self.done(2)
+        else:
+            # Fallback for general unlinking if no specific one is targeted?
+            # For now, matching Artist: requires a target.
+            pass
+
     def _toggle_view_mode(self, checked):
         """Toggle between Full (Expert) and Focused (Editor) modes."""
-        # Checked = Full Mode (Show Vault/Context)
-        # Unchecked = Focused Mode (Hide Vault/Context)
-        
+        # ... (rest of method) ...
         if checked:
             self.btn_view_toggle.setText("View: Full")
             self.pane_context.show()

@@ -350,7 +350,11 @@ class MainWindow(QMainWindow):
         editor = self.right_panel.editor_widget
         editor.save_requested.connect(self._on_side_panel_save_requested)
         editor.staging_changed.connect(self.library_widget.update_dirty_rows)
+
         editor.filter_refresh_requested.connect(lambda: self.library_widget.load_library(refresh_filters=True))
+        
+        # T-Feature: Dynamic Width Persistence
+        self.right_panel.editor_mode_changed.connect(self._on_editor_mode_changed)
         
         # --- Playlist Signals (Transient Wiring) ---
         # Access inner Playlist widget
@@ -703,11 +707,43 @@ class MainWindow(QMainWindow):
         sizes[0] = 250 if enabled else 0
         self.right_splitter.setSizes(sizes)
 
-    def _toggle_history_log(self, enabled: bool) -> None:
-        """Reveal the Historical 'As Played' Log."""
-        sizes = self.right_splitter.sizes()
-        sizes[2] = 400 if enabled else 0
-        self.right_splitter.setSizes(sizes)
+    def _on_editor_mode_changed(self, enabled: bool) -> None:
+        """
+        Resize right panel based on mode, saving/restoring width for each state.
+        Normal: Compact (e.g. 350px)
+        Editor: Wide (e.g. 500-700px)
+        """
+        # Unlock constraints for Editor Mode
+        self.right_panel.setMaximumWidth(900 if enabled else 550)
+        self.right_panel.setMinimumWidth(350)
+        
+        sizes = self.main_splitter.sizes()
+        if len(sizes) < 2: return
+        
+        current_width = sizes[1]
+        
+        if enabled:
+            # Switching TO Editor Mode
+            # Save the width we are leaving (Normal Mode)
+            self.settings_manager.set_right_panel_width_normal(current_width)
+            
+            # Load Editor Width
+            target = self.settings_manager.get_right_panel_width_editor()
+        else:
+            # Switching FROM Editor Mode
+            # Save the width we are leaving (Editor Mode)
+            self.settings_manager.set_right_panel_width_editor(current_width)
+            
+            # Load Normal Width
+            target = self.settings_manager.get_right_panel_width_normal()
+            
+        # Apply Logic
+        total = sum(sizes)
+        # Safety clamp
+        if target < 350: target = 350
+        
+        new_sizes = [total - target, target]
+        self.main_splitter.setSizes(new_sizes)
 
     def _on_side_panel_save_requested(self, staged_changes: dict, staged_album_deletions: set = None) -> None:
         """Commit all staged changes to DB and ID3 tags."""
@@ -736,12 +772,52 @@ class MainWindow(QMainWindow):
                 
                 # Metadata Editing Logic (T-46): Tracking Orphans
                 if 'album_id' in changes or 'album' in changes:
-                    if song.album_id: albums_to_check.add(song.album_id)
+                    if song.album_id:
+                        if isinstance(song.album_id, list):
+                            albums_to_check.update(song.album_id)
+                        else:
+                            albums_to_check.add(song.album_id)
                 
                 # Apply changes with type coercion
                 for field_name, value in changes.items():
                     if field_name in filter_triggers:
                         needs_filter_refresh = True
+                    
+                    # T-Fix: Explicitly handle album_id (not in Yellberus)
+                    if field_name == 'album_id':
+                        song.album_id = value
+                        # If we are clearing the ID, we MUST also clear the album title (to [])
+                        # to ensure SongRepository.update triggers _sync_album (which skips None).
+                        if value is None and 'album' not in changes:
+                            song.album = []
+                        
+                        # T-Fix: Update album_artist for ID3 export (TPE2) based on new Primary Album
+                        # If we changed the album, the old album_artist on 'song' is stale.
+                        # We must fetch the artist of the new primary album.
+                        try:
+                            primary_id = None
+                            if isinstance(value, list) and value:
+                                primary_id = value[0]
+                            elif isinstance(value, int):
+                                primary_id = value
+                            
+                            if primary_id:
+                                # We need access to AlbumRepo
+                                # self.library_service.album_repo is available
+                                album_obj = self.library_service.album_repo.get_by_id(primary_id)
+                                if album_obj and album_obj.album_artist:
+                                    song.album_artist = album_obj.album_artist
+                                else:
+                                    # Fallback: If no AlbumArtist set on album, maybe clear it?
+                                    # Or keep existing? Usually clearing is safer if explicit change.
+                                    # But let's assume if it returns None, we might fallback to Performer?
+                                    # For now, let's just update if we found one.
+                                    pass
+                        except Exception as e:
+                            logger.error(f"Failed to update album_artist for ID3: {e}")
+
+                        continue
+
                     try:
                         field_def = self._get_yellberus_field(field_name)
                         if not field_def: continue

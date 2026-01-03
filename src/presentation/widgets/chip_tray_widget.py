@@ -159,9 +159,9 @@ class ChipTrayWidget(QWidget):
         self.main_layout.addWidget(self.container)
         
         # Add Button - Using GlowButton for the hardware "outset" look
-        self.btn_add = GlowButton("+")
+        self.btn_add = GlowButton("")
         self.btn_add.setParent(self.container)
-        self.btn_add.setFixedSize(32, 28)
+        self.btn_add.setObjectName("AddInlineButton")
         self.btn_add.setToolTip(add_tooltip)
         self.btn_add.clicked.connect(self.add_requested.emit)
         

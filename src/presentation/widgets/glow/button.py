@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import QPushButton, QGridLayout, QLabel, QGraphicsBlurEffect
-from PyQt6.QtCore import Qt, pyqtSignal, QEvent
+from PyQt6.QtCore import Qt, pyqtSignal, QEvent, pyqtProperty
+from PyQt6.QtGui import QIcon
 from .base import GlowWidget
 
 class GlowButton(GlowWidget):
@@ -10,12 +11,17 @@ class GlowButton(GlowWidget):
     clicked = pyqtSignal()
     toggled = pyqtSignal(bool)
     
+    @pyqtProperty(QIcon)
+    def icon(self): return self.btn.icon()
+    @icon.setter
+    def icon(self, arg): self.btn.setIcon(arg)
+    
     def __init__(self, text="", parent=None):
         self.btn = QPushButton()
         self.btn.setText("") # Ensure native text is never shown
         
         super().__init__(self.btn, trigger_mode="hover", parent=parent)
-        self.glow_blur.setBlurRadius(4) # Boost glow for buttons (opaque body blocks more light)
+        self._glow_margin = self.glowMargin
         policy = self.btn.sizePolicy()
         self.setSizePolicy(policy.horizontalPolicy(), policy.verticalPolicy())
         
@@ -156,9 +162,17 @@ class GlowButton(GlowWidget):
         super().setGlowColor(color)
         self._update_text_styles()
 
+    # Proxy methods for Dialog behavior
+    def setAutoDefault(self, auto):
+        self.btn.setAutoDefault(auto)
+
+    def setDefault(self, default):
+        self.btn.setDefault(default)
+
     def setText(self, text):
         self.lbl_glow.setText(text)
         self.lbl_main.setText(text)
+        self.btn.setToolTip(text) # Tooltip fallback if clipped?den
         self.btn.setText("") # Native text always hidden
         self._update_text_styles()
 
@@ -197,27 +211,34 @@ class GlowButton(GlowWidget):
     def setStyleSheet(self, s):
         super().setStyleSheet(s)
         self.btn.setStyleSheet(s)
+    def setGlowBlur(self, b):
+        super().setGlowBlur(b)
+
+    def setGlowMargin(self, m):
+        self._glow_margin = m
+        super().setGlowMargin(m)
+
     def setMinimumWidth(self, w): 
         self.btn.setMinimumWidth(w)
-        super().setMinimumWidth(w + (self.glow_margin * 2))
+        super().setMinimumWidth(w + (self._glow_margin * 2))
     def setMinimumHeight(self, h):
         self.btn.setMinimumHeight(h)
-        super().setMinimumHeight(h + (self.glow_margin * 2))
+        super().setMinimumHeight(h + (self._glow_margin * 2))
     def setMaximumWidth(self, w):
         self.btn.setMaximumWidth(w)
-        super().setMaximumWidth(w + (self.glow_margin * 2))
+        super().setMaximumWidth(w + (self._glow_margin * 2))
     def setMaximumHeight(self, h):
         self.btn.setMaximumHeight(h)
-        super().setMaximumHeight(h + (self.glow_margin * 2))
+        super().setMaximumHeight(h + (self._glow_margin * 2))
     def setFixedSize(self, w, h):
         self.btn.setFixedSize(w, h)
-        super().setFixedSize(w + (self.glow_margin * 2), h + (self.glow_margin * 2))
+        super().setFixedSize(w + (self._glow_margin * 2), h + (self._glow_margin * 2))
     def setFixedWidth(self, w): 
         self.btn.setFixedWidth(w)
-        super().setFixedWidth(w + (self.glow_margin * 2))
+        super().setFixedWidth(w + (self._glow_margin * 2))
     def setFixedHeight(self, h): 
         self.btn.setFixedHeight(h)
-        super().setFixedHeight(h + (self.glow_margin * 2))
+        super().setFixedHeight(h + (self._glow_margin * 2))
     def setSizePolicy(self, *args):
         if len(args) == 1:
             super().setSizePolicy(args[0])

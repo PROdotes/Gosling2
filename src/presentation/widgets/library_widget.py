@@ -136,6 +136,32 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
     def _check_value_match(self, model, row, parent, field_name, required_val) -> bool:
         """Surgical Match: Handles metadata, lists, procedural commands, and virtual filters."""
         
+        # Virtual Decade Filter: Match year against decade range
+        if field_name == 'decade':
+            # required_val is like "1990s" - extract the decade start
+            decade_str = str(required_val).replace('s', '')
+            try:
+                decade_start = int(decade_str)
+                decade_end = decade_start + 9
+            except (ValueError, TypeError):
+                return False
+            
+            # Get the year from the row
+            year_col = self._field_indices.get('recording_year', -1)
+            if year_col < 0:
+                return False
+            
+            year_val = model.data(model.index(row, year_col, parent), Qt.ItemDataRole.UserRole)
+            try:
+                year = int(float(year_val)) if year_val is not None else None
+            except (ValueError, TypeError):
+                return False
+            
+            if year is None:
+                return False
+            
+            return decade_start <= year <= decade_end
+        
         # T-83: Special handling for unified Tags filter
         if field_name == 'tags':
             # required_val is "Category:TagName" e.g. "Instrument:Guitar"
@@ -401,6 +427,38 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                     for tag_full in self._tag_cache[cache_key]:
                         if search_lower in tag_full.lower():
                             return True
+                            
+        # Smart Decade Search (T-83 follow-up)
+        # If user searches "1990s" or "90s", we should match years in that range
+        if search_text:
+            import re
+            # Match 1990s, 90s, 1990's, 90's (Require 's' to distinguish from specific year)
+            match = re.match(r'^((?:19|20)?(\d)0)\'?[sS]$', search_text.strip())
+            if match:
+                # Group 1 is usually the full prefix part, e.g. 1990 or 90
+                # But cleaner to parse the full match for logic
+                try:
+                    raw_str = search_text.strip().lower().replace("'", "").replace("s", "")
+                    if len(raw_str) == 2:
+                        raw_str = "19" + raw_str if int(raw_str) >= 30 else "20" + raw_str
+                    
+                    decade_start = int(raw_str)
+                    # Round down to nearest 10 just in case
+                    decade_start = (decade_start // 10) * 10
+                    decade_end = decade_start + 9
+                    
+                    year_col = self._field_indices.get('recording_year', -1)
+                    if year_col >= 0:
+                        year_val = model.data(model.index(source_row, year_col, source_parent), Qt.ItemDataRole.UserRole)
+                        if year_val:
+                            try:
+                                year = int(float(year_val))
+                                if decade_start <= year <= decade_end:
+                                    return True
+                            except (ValueError, TypeError):
+                                pass
+                except Exception:
+                    pass
         
         return False
 

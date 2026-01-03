@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QFileDialog, QFrame, QCheckBox, QComboBox
+    QPushButton, QFileDialog, QFrame, QCheckBox, QComboBox, QSpinBox, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from ..widgets.glow_factory import GlowButton, GlowLineEdit
@@ -31,18 +31,18 @@ class SettingsDialog(QDialog):
         layout.setSpacing(15)
         
         # --- HEADER ---
-        header = QLabel("SYSTEM SETTINGS")
-        header.setObjectName("SidePanelHeader") # Reuse side panel header style
+        header = QLabel("SYSTEM CONFIGURATION")
+        header.setObjectName("SidePanelHeader")
         layout.addWidget(header)
         
         # --- SEPARATOR ---
         line = QFrame()
-        line.setObjectName("FieldGroupLine") # Reuse shared separator
+        line.setObjectName("FieldGroupLine")
         layout.addWidget(line)
         
-        # --- SECTION: LIBRARY ---
+        # --- 1. LIBRARY ORGANIZATION ---
         lib_label = QLabel("LIBRARY ORGANIZATION")
-        lib_label.setObjectName("FieldLabel") # Reuse field label style
+        lib_label.setObjectName("FieldLabel")
         layout.addWidget(lib_label)
         
         # Root Directory Row
@@ -51,12 +51,86 @@ class SettingsDialog(QDialog):
         self.txt_root_dir.setPlaceholderText("Select root directory...")
         
         self.btn_browse = GlowButton("BROWSE")
+        self.btn_browse.setAutoDefault(False)
         self.btn_browse.setFixedWidth(80)
         self.btn_browse.clicked.connect(self._on_browse_clicked)
         
         root_layout.addWidget(self.txt_root_dir, 1)
         root_layout.addWidget(self.btn_browse)
+
         layout.addLayout(root_layout)
+
+        # Database Path Row (Advanced)
+        db_layout = QHBoxLayout()
+        self.txt_db_path = GlowLineEdit()
+        self.txt_db_path.setPlaceholderText("Default (.gosling2.db)")
+        self.txt_db_path.setToolTip("Custom location for the library database. Requires restart.")
+        
+        self.btn_db_browse = GlowButton("DB PATH")
+        self.btn_db_browse.setAutoDefault(False)
+        self.btn_db_browse.setFixedWidth(80)
+        self.btn_db_browse.clicked.connect(self._on_db_browse_clicked)
+        
+        db_layout.addWidget(self.txt_db_path, 1)
+        db_layout.addWidget(self.btn_db_browse)
+        layout.addLayout(db_layout)
+
+        # --- 2. FILE MANAGEMENT (T-52) ---
+        line_ren = QFrame()
+        line_ren.setObjectName("FieldGroupLine")
+        layout.addWidget(line_ren)
+
+        ren_label = QLabel("FILE MANAGEMENT")
+        ren_label.setObjectName("FieldLabel")
+        layout.addWidget(ren_label)
+
+        # Checkboxes
+        self.chk_rename_enabled = QCheckBox("Enable Auto-Renaming")
+        self.chk_move_done = QCheckBox("Move Files to Root on 'Mark Done'")
+        
+        layout.addWidget(self.chk_rename_enabled)
+        layout.addWidget(self.chk_move_done)
+        
+        # Pattern (Conditional)
+        # Check for Rules JSON (T-52 Conflict Resolution)
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        rules_path = os.path.join(base_dir, "docs", "configs", "rules.json")
+        has_rules = os.path.exists(rules_path)
+
+        if has_rules:
+             # External Rules Detected - Hide Pattern Input to prevent confusion
+             rules_label = QLabel("✨ Renaming Logic Managed by rules.json")
+             rules_label.setStyleSheet("color: #FFC66D; font-style: italic;")
+             rules_label.setToolTip(f"Rules found at: {rules_path}")
+             layout.addWidget(rules_label)
+             # We still need self.txt_pattern for _load_settings/save to not crash
+             self.txt_pattern = GlowLineEdit() 
+             self.txt_pattern.setVisible(False)
+        else:
+             # Standard Pattern Input
+             pat_layout = QHBoxLayout()
+             pat_label = QLabel("PATTERN")
+             pat_label.setFixedWidth(120)
+             self.txt_pattern = GlowLineEdit()
+             self.txt_pattern.setPlaceholderText("{Artist}/{Album}/{Title}")
+             
+             pat_layout.addWidget(pat_label)
+             pat_layout.addWidget(self.txt_pattern, 1)
+             layout.addLayout(pat_layout)
+
+        # --- 3. TRANSCODING ---
+        line_trans = QFrame()
+        line_trans.setObjectName("FieldGroupLine")
+        layout.addWidget(line_trans)
+        
+        trans_label = QLabel("TRANSCODING")
+        trans_label.setObjectName("FieldLabel")
+        layout.addWidget(trans_label)
+
+        # Conversion Toggle
+        self.chk_conversion_enabled = QCheckBox("Enable Conversion on Import (or Export)")
+        self.chk_conversion_enabled.setObjectName("FieldLabel")
+        layout.addWidget(self.chk_conversion_enabled)
 
         # Quality Row
         bitrate_layout = QHBoxLayout()
@@ -64,41 +138,37 @@ class SettingsDialog(QDialog):
         bitrate_label.setFixedWidth(120)
         
         self.cmb_bitrate = QComboBox()
-        self.cmb_bitrate.addItems([
-            "VBR (V0)",
-            "320k",
-            "256k",
-            "192k",
-            "128k"
-        ])
-        self.cmb_bitrate.setObjectName("SidePanelCombo") # Reuse combo styling
+        self.cmb_bitrate.addItems(["VBR (V0)", "320k", "256k", "192k", "128k"])
+        self.cmb_bitrate.setObjectName("SidePanelCombo")
         
         bitrate_layout.addWidget(bitrate_label)
         bitrate_layout.addWidget(self.cmb_bitrate, 1)
         layout.addLayout(bitrate_layout)
 
         # FFmpeg Path Row
-        ffmpeg_label = QLabel("FFMPEG PATH")
-        ffmpeg_label.setObjectName("FieldLabel")
-        layout.addWidget(ffmpeg_label)
-
         ffmpeg_row = QHBoxLayout()
+        ffmpeg_label = QLabel("FFMPEG PATH")
+        ffmpeg_label.setFixedWidth(120)
+        
         self.txt_ffmpeg_path = GlowLineEdit()
         self.btn_ffmpeg_browse = GlowButton("PATH")
+        self.btn_ffmpeg_browse.setAutoDefault(False)
         self.btn_ffmpeg_browse.setFixedWidth(80)
         self.btn_ffmpeg_browse.clicked.connect(self._on_ffmpeg_browse_clicked)
+        
+        ffmpeg_row.addWidget(ffmpeg_label)
         ffmpeg_row.addWidget(self.txt_ffmpeg_path, 1)
         ffmpeg_row.addWidget(self.btn_ffmpeg_browse)
         layout.addLayout(ffmpeg_row)
-        
-        # --- SECTION: WORKFLOW ---
-        line2 = QFrame()
-        line2.setObjectName("FieldGroupLine")
-        layout.addWidget(line2)
 
-        workflow_label = QLabel("WORKFLOW")
-        workflow_label.setObjectName("FieldLabel")
-        layout.addWidget(workflow_label)
+        # --- 4. METADATA ---
+        line_meta = QFrame()
+        line_meta.setObjectName("FieldGroupLine")
+        layout.addWidget(line_meta)
+
+        meta_label = QLabel("METADATA SOURCES")
+        meta_label.setObjectName("FieldLabel")
+        layout.addWidget(meta_label)
         
         # Search Provider Row
         search_layout = QHBoxLayout()
@@ -106,18 +176,31 @@ class SettingsDialog(QDialog):
         search_label.setFixedWidth(120)
         
         self.cmb_search_provider = QComboBox()
-        self.cmb_search_provider.addItems([
-            "Google",
-            "Spotify",
-            "YouTube",
-            "MusicBrainz",
-            "Discogs"
-        ])
+        self.cmb_search_provider.addItems(["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"])
         self.cmb_search_provider.setObjectName("SidePanelCombo")
         
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.cmb_search_provider, 1)
         layout.addLayout(search_layout)
+
+        # Default Year Row
+        year_layout = QHBoxLayout()
+
+        # Checkbox for Default Year
+        self.chk_default_year = QCheckBox("DEFAULT YEAR")
+        self.chk_default_year.setFixedWidth(120)
+        self.chk_default_year.setObjectName("FieldLabel")
+        self.chk_default_year.toggled.connect(self._on_year_toggled)
+        
+        self.spin_default_year = QSpinBox()
+        self.spin_default_year.setRange(1860, 9999) 
+        self.spin_default_year.setFixedHeight(30)
+        self.spin_default_year.setObjectName("SettingsSpin")
+        self.spin_default_year.setEnabled(False) 
+        
+        year_layout.addWidget(self.chk_default_year)
+        year_layout.addWidget(self.spin_default_year, 1)
+        layout.addLayout(year_layout)
         
         layout.addStretch()
         
@@ -131,7 +214,8 @@ class SettingsDialog(QDialog):
         
         self.btn_save = GlowButton("APPLY")
         self.btn_save.setFixedWidth(100)
-        self.btn_save.setObjectName("SaveAllButton") # Reuse save button flair
+        self.btn_save.setObjectName("SaveAllButton")
+        self.btn_save.setDefault(True)
         self.btn_save.clicked.connect(self._on_save_clicked)
         
         button_row.addWidget(self.btn_cancel)
@@ -140,7 +224,16 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self):
         self.txt_root_dir.setText(self.settings_manager.get_root_directory())
+        self.txt_db_path.setText(self.settings_manager.get_database_path() or "")
         
+        # File Management
+        self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
+        self.chk_move_done.setChecked(self.settings_manager.get_move_after_done())
+        self.txt_pattern.setText(self.settings_manager.get_rename_pattern())
+
+        # Conversion
+        self.chk_conversion_enabled.setChecked(self.settings_manager.get_conversion_enabled())
+
         # Match bitrate to combo
         current_bitrate = self.settings_manager.get_conversion_bitrate()
         index = self.cmb_bitrate.findText(current_bitrate)
@@ -161,6 +254,20 @@ class SettingsDialog(QDialog):
         if idx >= 0:
             self.cmb_search_provider.setCurrentIndex(idx)
 
+        # Default Year
+        val = self.settings_manager.get_default_year()
+        if val > 0:
+            self.chk_default_year.setChecked(True)
+            self.spin_default_year.setValue(val)
+            self.spin_default_year.setEnabled(True)
+        else:
+            self.chk_default_year.setChecked(False)
+            self.spin_default_year.setValue(2000) # User requested default
+            self.spin_default_year.setEnabled(False)
+            
+    def _on_year_toggled(self, checked):
+        self.spin_default_year.setEnabled(checked)
+
     def _on_browse_clicked(self):
         current = self.txt_root_dir.text() or "."
         path = QFileDialog.getExistingDirectory(self, "Select Root Directory", current)
@@ -173,7 +280,26 @@ class SettingsDialog(QDialog):
         if path:
             self.txt_ffmpeg_path.setText(os.path.normpath(path))
 
+    def _on_db_browse_clicked(self):
+        current = self.txt_db_path.text() or "."
+        path, _ = QFileDialog.getSaveFileName(self, "Select Database Location", current, "SQLite Database (*.db);;All Files (*)")
+        if path:
+            self.txt_db_path.setText(os.path.normpath(path))
+            
     def _on_save_clicked(self):
+        # Validate Default Year against Yellberus Schema
+        def_year = 0
+        if self.chk_default_year.isChecked():
+            def_year = self.spin_default_year.value()
+            
+            # Additional Safety Check against Yellberus
+            from ...core import yellberus
+            fdef = next((f for f in yellberus.FIELDS if f.name == 'recording_year'), None)
+            if fdef and fdef.min_value is not None and def_year < fdef.min_value:
+                 QMessageBox.warning(self, "Invalid configuration", f"Default Year must be at least {fdef.min_value}.")
+                 return
+
+
         # Library
         root = self.txt_root_dir.text().strip()
         if root:
@@ -182,12 +308,35 @@ class SettingsDialog(QDialog):
             self.settings_manager.set_root_directory(normalized_root)
             self.txt_root_dir.setText(normalized_root) # Update UI to show normalized path
             
+        # Database
+        db_path = self.txt_db_path.text().strip()
+        if db_path:
+             # Check if changed to warn user?
+             old_path = self.settings_manager.get_database_path() or ""
+             if db_path != old_path:
+                 QMessageBox.information(self, "Restart Required", "Database path changed. Please restart the application to apply.")
+             self.settings_manager.set_database_path(db_path)
+        else:
+             self.settings_manager.set_database_path("") # Reset to default
+            
+        # File Management
+        self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())
+        self.settings_manager.set_move_after_done(self.chk_move_done.isChecked())
+        self.settings_manager.set_rename_pattern(self.txt_pattern.text().strip())
+
         # Conversion
+        self.settings_manager.set_conversion_enabled(self.chk_conversion_enabled.isChecked())
         self.settings_manager.set_conversion_bitrate(self.cmb_bitrate.currentText())
         self.settings_manager.set_ffmpeg_path(self.txt_ffmpeg_path.text().strip())
         
-        # Search
+        # Metadata
         self.settings_manager.set_search_provider(self.cmb_search_provider.currentText())
+        
+        # Default Year
+        if self.chk_default_year.isChecked():
+            self.settings_manager.set_default_year(self.spin_default_year.value())
+        else:
+            self.settings_manager.set_default_year(0)
 
         self.settings_manager.sync()
         self.accept()

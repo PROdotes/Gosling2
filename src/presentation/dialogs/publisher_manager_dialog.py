@@ -38,6 +38,8 @@ class PublisherCreatorDialog(QDialog):
         btns.addStretch()
         btns.addWidget(self.btn_cancel)
         btns.addWidget(self.btn_save)
+        
+        layout.addStretch(1) # Anchor to bottom
         layout.addLayout(btns)
         self.inp_name.setFocus()
         if initial_name:
@@ -206,8 +208,8 @@ class PublisherDetailsDialog(QDialog):
         h_parent.addWidget(self.cmb_parent)
         
         # Use GlowButton for consistent workstation look
-        self.btn_new_parent = GlowButton("NEW")
-        self.btn_new_parent.setFixedSize(60, 26)
+        self.btn_new_parent = GlowButton("")
+        self.btn_new_parent.setObjectName("AddInlineButton")
         self.btn_new_parent.setToolTip("Create New Parent")
         self.btn_new_parent.clicked.connect(self._create_new_parent)
         h_parent.addWidget(self.btn_new_parent)
@@ -231,8 +233,8 @@ class PublisherDetailsDialog(QDialog):
         h_children_header.addWidget(lbl_children)
         h_children_header.addStretch()
         
-        btn_add_child = GlowButton("ADD")
-        btn_add_child.setFixedSize(60, 26)
+        btn_add_child = GlowButton("")
+        btn_add_child.setObjectName("AddInlineButton")
         btn_add_child.setToolTip("Link existing publisher as child")
         btn_add_child.clicked.connect(self._add_child)
         h_children_header.addWidget(btn_add_child)
@@ -246,32 +248,31 @@ class PublisherDetailsDialog(QDialog):
         self.list_children.itemDoubleClicked.connect(self._on_child_double_clicked)
         self.layout.addWidget(self.list_children)
         
-        # 4. Actions (centered)
+        self.layout.addStretch(1) # Pin actions to bottom
+        
+        # 4. Actions (Horizontal Row)
         btn_box = QHBoxLayout()
+        btn_box.setSpacing(10)
+        btn_box.setContentsMargins(10, 0, 10, 15)
         
         # Context Aware Remove Button
         if self.allow_remove:
             self.btn_delete = GlowButton("Remove")
-            self.btn_delete.setObjectName("ActionPill")
+            self.btn_delete.setObjectName("PublisherActionPill")
             self.btn_delete.setProperty("action_role", "destructive")
-            self.btn_delete.setFixedWidth(80)
-            self.btn_delete.clicked.connect(lambda: self.done(2)) # Code 2 = Remove Request
-            self.btn_delete.setToolTip("Remove this publisher from the song/album")
+            self.btn_delete.clicked.connect(lambda: self.done(2)) 
             btn_box.addWidget(self.btn_delete)
         
-        btn_box.addStretch()
-        
-        btn_cancel = GlowButton("Close")
-        btn_cancel.setObjectName("ActionPill")
+        btn_cancel = GlowButton("Cancel")
+        btn_cancel.setObjectName("PublisherActionPill")
         btn_cancel.setProperty("action_role", "secondary")
         btn_cancel.clicked.connect(self.reject)
-        
-        btn_save = GlowButton("Save Changes")
-        btn_save.setObjectName("ActionPill")
+        btn_box.addWidget(btn_cancel)
+
+        btn_save = GlowButton("UPDATE")
+        btn_save.setObjectName("PublisherActionPill")
         btn_save.setProperty("action_role", "primary")
         btn_save.clicked.connect(self._save)
-        
-        btn_box.addWidget(btn_cancel)
         btn_box.addWidget(btn_save)
         self.layout.addLayout(btn_box)
 
@@ -324,7 +325,7 @@ class PublisherDetailsDialog(QDialog):
         diag = PublisherCreatorDialog(
             initial_name=child_pub.publisher_name,
             title=f"Rename: {child_pub.publisher_name}",
-            button_text="Rename",
+            button_text="UPDATE",
             parent=self
         )
         if diag.exec():

@@ -141,6 +141,27 @@ class TagRepository(BaseRepository):
                 tags.append(Tag.from_row(row))
         return tags
 
+    def get_all_tags(self) -> List[Tag]:
+        """Retrieve all tags from the database."""
+        query = "SELECT TagID, TagName, TagCategory FROM Tags ORDER BY TagName"
+        tags = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            for row in cursor.fetchall():
+                tags.append(Tag.from_row(row))
+        return tags
+
+    def get_distinct_categories(self) -> List[str]:
+        """Get all distinct tag categories that exist in the database."""
+        query = "SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL ORDER BY TagCategory"
+        categories = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            for row in cursor.fetchall():
+                if row[0]:  # Skip NULL
+                    categories.append(row[0])
+        return categories
+
     def is_unprocessed(self, source_id: int) -> bool:
         """
         Check if a source has the 'Status:Unprocessed' tag.
@@ -170,3 +191,26 @@ class TagRepository(BaseRepository):
             tag = self.find_by_name("Unprocessed", "Status")
             if tag:
                 self.remove_tag_from_source(source_id, tag.tag_id)
+
+    def merge_tags(self, source_id: int, target_id: int) -> bool:
+        """
+        Merge source_id into target_id.
+        1. Reassign all MediaSourceTags
+        2. Delete source_id
+        """
+        try:
+            with self.get_connection() as conn:
+                # 1. Reassign links, ignore duplicates
+                conn.execute(
+                    "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) "
+                    "SELECT SourceID, ? FROM MediaSourceTags WHERE TagID = ?",
+                    (target_id, source_id)
+                )
+                # 2. Cleanup old links
+                conn.execute("DELETE FROM MediaSourceTags WHERE TagID = ?", (source_id,))
+                # 3. Delete tag
+                conn.execute("DELETE FROM Tags WHERE TagID = ?", (source_id,))
+            return True
+        except Exception as e:
+            print(f"Merge error: {e}")
+            return False

@@ -81,15 +81,22 @@ tags:
 *   [x] **Filter Tree Search & State Persistence** (~2.0 h)
     *   *Task*: Main search filters both table and filter tree; expansion state persists across restarts.
     *   *Status*: **Done** - Implemented recursive tree filtering with QSettings persistence.
-*   [ ] **T-61 Universal Tag Picker** (Search/Tree Dialog)
+*   [x] **Decade Filtering** (Filter Tree & Search)
+    *   *Task*: Ungrouped years in tree + Virtual Decade nodes + Smart "1990s" search logic.
+    *   *Status*: **Done**.
+*   [x] **T-61 Universal Tag Picker** (Search/Tree Dialog)
+    *   *Status*: **Done** - Implemented "Speed Mode", Global Search, and Auto-Context Switching.
 *   [x] [**T-70 Artist Selector**](tasks/T-70_artist_manager_plan.md) (Database-backed Picker)
 *   [x] **Multi-Album Infrastructure** (T-22/T-63)
     *   *Status*: **Core Schema & Logic Done**.
     *   *Ref*: `PROPOSAL_MULTI_ALBUM_INFRASTRUCTURE.md`.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events.
-*   [ ] **Settings UI** (T-52) (~1.5 h)
-    *   *Task*: UI for Root Directory & Rules.
+    *   *Blocker*: Requires Generic Repository (CRUD Refactor).
+*   [ ] **Advanced Rule Editor** (T-82) (~2.0 h)
+    *   *Task*: UI for managing `rules.json` (Genre Routing, Profiles) inside Settings.
+*   [x] **Settings UI** (T-52) (~1.5 h)
+    *   *Task*: UI for Root Directory, Renaming Rules, Transcoding, and Metadata defaults.
 *   [x] **Dynamic Renaming Rules** (T-50) (~2.0 h)
     *   *Task*: Externalize hardcoded 'Patriotic/Cro' logic to config file.
 *   [x] **UI Polish & Icon (T-53)**
