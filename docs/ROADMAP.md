@@ -97,9 +97,10 @@ tags:
 *   [x] **Tag Verification** (T-51) (~1.0 h)
     *   *Task*: Verify `TXXX:GOSLING_DONE` and ID3 writes.
     *   *Status*: **Done** - Verified dual-write (TKEY legacy + TXXX modern) working correctly.
-*   [ ] **Background Import** (T-68) (~2.0 h)
+*   [x] **Background Import** (T-68) (~2.0 h)
     *   *Task*: Move file operations to worker thread to prevent UI freeze.
     *   *Why*: Required for Release Criteria #1 (Import 1k songs).
+    *   *Status*: **Done** - Implemented via `ImportWorker(QThread)` in `library_widget.py`.
 
 ---
 
@@ -107,12 +108,11 @@ tags:
 *Non-blocking, but beneficial.*
 
 *   [ ] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
-*   [ ] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
--   [ ] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
-- [ ] [**T-80 Smart Preview Pattern**](tasks/T-80_smart_preview_pattern.md): Generalize the "Passive Preview" (tooltip with list view + click-to-jump) to all linked DB fields.
-- [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
-*   [ ] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
-*   [ ] **UX Issue**: "Create New Album" button in Album Manager is confusing for users. Redesign needed.
+*   [x] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
+-   [x] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
+-   [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
+*   [x] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
+*   [x] **UX Issue**: "Create New Album" button in Album Manager is confusing for users. Redesign needed.
 
 ---
 
