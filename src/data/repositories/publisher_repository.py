@@ -33,7 +33,7 @@ class PublisherRepository(GenericRepository[Publisher]):
                 return Publisher.from_row(row)
         return None
 
-    def _insert_db(self, cursor: sqlite3.Cursor, publisher: Publisher) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, publisher: Publisher, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute(
             "INSERT INTO Publishers (PublisherName, ParentPublisherID) VALUES (?, ?)",
@@ -41,15 +41,22 @@ class PublisherRepository(GenericRepository[Publisher]):
         )
         return cursor.lastrowid
 
-    def _update_db(self, cursor: sqlite3.Cursor, publisher: Publisher) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, publisher: Publisher, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
         cursor.execute(
             "UPDATE Publishers SET PublisherName = ?, ParentPublisherID = ? WHERE PublisherID = ?", 
             (publisher.publisher_name, publisher.parent_publisher_id, publisher.publisher_id)
         )
 
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
+        auditor = kwargs.get('auditor')
+        # Audit link removals
+        if auditor:
+            cursor.execute("SELECT AlbumID FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
+            for (a_id,) in cursor.fetchall():
+                 auditor.log_delete("AlbumPublishers", f"{a_id}-{record_id}", {"AlbumID": a_id, "PublisherID": record_id})
+
         cursor.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
         cursor.execute("DELETE FROM Publishers WHERE PublisherID = ?", (record_id,))
 
@@ -78,18 +85,29 @@ class PublisherRepository(GenericRepository[Publisher]):
 
     def add_publisher_to_album(self, album_id: int, publisher_id: int) -> None:
         """Link a publisher to an album."""
-        query = """
-            INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
-            VALUES (?, ?)
-        """
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            conn.execute(query, (album_id, publisher_id))
+            # Check if link exists
+            cursor = conn.execute("SELECT 1 FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
+            if cursor.fetchone(): return
+
+            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, publisher_id))
+            AuditLogger(conn).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
+                "AlbumID": album_id, "PublisherID": publisher_id
+            })
 
     def remove_publisher_from_album(self, album_id: int, publisher_id: int) -> None:
         """Unlink a publisher from an album."""
-        query = "DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?"
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            conn.execute(query, (album_id, publisher_id))
+            # Snapshot for audit
+            cursor = conn.execute("SELECT AlbumID, PublisherID FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
+            row = cursor.fetchone()
+            if not row: return
+            snapshot = {"AlbumID": row[0], "PublisherID": row[1]}
+
+            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
+            AuditLogger(conn).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
 
     def get_publishers_for_album(self, album_id: int) -> List[Publisher]:
         """Get all publishers associated with an album."""

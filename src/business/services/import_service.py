@@ -28,8 +28,6 @@ class ImportService:
         self.library_service = library_service
         self.metadata_service = metadata_service
         self.duplicate_scanner = duplicate_scanner
-        # Bridge to tag repository for status tagging
-        self.tag_repo = library_service.tag_repo if hasattr(library_service, 'tag_repo') else None
 
     def import_single_file(self, file_path: str) -> Tuple[bool, Optional[int], Optional[str]]:
         """
@@ -57,20 +55,23 @@ class ImportService:
                 if existing_by_isrc:
                     return False, None, f"Duplicate ISRC found: {temp_song.isrc}"
 
-            # 5. Create Database Record
-            file_id = self.library_service.add_file(file_path)
+            # 5. Create Database Record (Consolidated Insert)
+            temp_song.audio_hash = audio_hash
+            file_id = self.library_service.add_song(temp_song)
+            
             if file_id:
-                # Update ID and Hash on the song object
+                # Update local ID for subsequent steps
                 temp_song.source_id = file_id
-                temp_song.audio_hash = audio_hash
 
-                # Save full metadata to DB
-                self.library_service.update_song(temp_song)
-                
                 # 6. Apply Initial Status Tag: "Unprocessed" (The Truth)
-                if self.tag_repo:
-                    self.tag_repo.set_unprocessed(file_id, True)
+                self.library_service.set_song_unprocessed(file_id, True)
                 
+                # 7. Log high-level action
+                self.library_service.log_action(
+                    "IMPORT", "Songs", file_id, 
+                    {"path": file_path, "title": temp_song.name}
+                )
+
                 # Bake it into the ID3
                 self.metadata_service.write_tags(temp_song)
                 

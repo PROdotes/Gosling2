@@ -1,146 +1,490 @@
 ============================= test session starts =============================
-platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\.venv\Scripts\python.exe
-cachedir: .pytest_cache
+platform win32 -- Python 3.14.0, pytest-9.0.2, pluggy-1.6.0
 PyQt6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.0
 rootdir: C:\Users\prodo\Antigrav projects\Gosling2\Gosling2
 configfile: pyproject.toml
 plugins: cov-7.0.0, qt-4.5.0
-collecting ... collected 135 items
+collected 516 items
 
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogInsert::test_log_insert_creates_change_logs PASSED [  0%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogInsert::test_log_insert_skips_none_values PASSED [  1%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogInsert::test_log_insert_handles_empty_data PASSED [  2%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogInsert::test_log_insert_normalizes_lists PASSED [  2%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_detects_changes PASSED [  3%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_skips_if_no_changes PASSED [  4%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_handles_empty_data PASSED [  5%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_detects_list_changes PASSED [  5%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_detects_field_addition PASSED [  6%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogUpdate::test_log_update_detects_field_removal PASSED [  7%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogDelete::test_log_delete_archives_snapshot PASSED [  8%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogDelete::test_log_delete_handles_empty_data PASSED [  8%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogDelete::test_log_delete_serializes_complex_data PASSED [  9%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogAction::test_log_action_with_all_params PASSED [ 10%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogAction::test_log_action_with_minimal_params PASSED [ 11%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestLogAction::test_log_action_with_none_details PASSED [ 11%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestNormalization::test_normalize_primitives PASSED [ 12%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestNormalization::test_normalize_booleans PASSED [ 13%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestNormalization::test_normalize_lists PASSED [ 14%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestNormalization::test_normalize_none_values PASSED [ 14%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_detects_simple_changes PASSED [ 15%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_detects_field_addition PASSED [ 16%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_detects_field_removal PASSED [ 17%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_returns_empty_for_identical PASSED [ 17%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_handles_list_order_changes PASSED [ 18%]
-tests/unit/core/test_audit_logger.py::TestAuditLogger::TestDiffCalculation::test_diff_detects_boolean_changes PASSED [ 19%]
-tests/unit/core/test_logger.py::TestLogger::TestLoggerCore::test_setup_singleton PASSED [ 20%]
-tests/unit/core/test_logger.py::TestLogger::TestLoggerCore::test_dev_warning PASSED [ 20%]
-tests/unit/core/test_logger.py::TestLogger::TestLoggerCore::test_formatted_methods PASSED [ 21%]
-tests/unit/core/test_logger.py::TestLogger::TestObserverLogic::test_user_warning_notification PASSED [ 22%]
-tests/unit/core/test_logger.py::TestLogger::TestObserverLogic::test_duplicate_subscription_prevented PASSED [ 22%]
-tests/unit/core/test_logger.py::TestLogger::TestObserverLogic::test_unsubscribe PASSED [ 23%]
-tests/unit/core/test_logger.py::TestLogger::TestObserverLogic::test_observer_exception_safety PASSED [ 24%]
-tests/unit/core/test_logger.py::TestLogger::TestThreadSafety::test_concurrent_subscription PASSED [ 25%]
-tests/unit/core/test_yellberus.py::test_registry_has_fields PASSED       [ 25%]
-tests/unit/core/test_yellberus.py::test_get_field_lookup PASSED          [ 26%]
-tests/unit/core/test_yellberus.py::test_visible_fields PASSED            [ 27%]
-tests/unit/core/test_yellberus.py::test_filterable_fields PASSED         [ 28%]
-tests/unit/core/test_yellberus.py::test_decade_grouper PASSED            [ 28%]
-tests/unit/core/test_yellberus.py::test_field_properties PASSED          [ 29%]
-tests/unit/core/test_yellberus.py::test_validate_schema PASSED           [ 30%]
-tests/unit/core/test_yellberus.py::test_portable_flag PASSED             [ 31%]
-tests/unit/core/test_yellberus.py::test_row_to_tagged_tuples PASSED      [ 31%]
-tests/unit/core/test_yellberus.py::test_song_from_row PASSED             [ 32%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_null_bytes PASSED [ 33%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_exhaustion PASSED [ 34%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_sql_injection_attempt PASSED [ 34%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_unicode_emoji PASSED [ 35%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_none_handling PASSED [ 36%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_isrc_empty_handling PASSED [ 37%]
-tests/unit/core/test_yellberus_mutation.py::TestISRCValidationMutation::test_yellberus_pattern_fallback PASSED [ 37%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestBasicCRUD::test_find_by_title_case_insensitive PASSED [ 38%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestBasicCRUD::test_update_album PASSED [ 39%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestBasicCRUD::test_get_or_create PASSED [ 40%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestBasicCRUD::test_create_with_album_artist PASSED [ 40%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestBasicCRUD::test_delete_album_integrity PASSED [ 41%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestMultiAlbumSupport::test_song_on_multiple_albums PASSED [ 42%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestMultiAlbumSupport::test_remove_song_from_album PASSED [ 42%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestMultiAlbumSupport::test_sync_album_replacement PASSED [ 43%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_greatest_hits_different_artists PASSED [ 44%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_same_artist_different_years PASSED [ 45%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_same_artist_same_year_reuses PASSED [ 45%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_null_artist_handling PASSED [ 46%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_artist_case_insensitive PASSED [ 47%]
-tests/unit/data/repositories/test_album_repository.py::TestAlbumRepository::TestAlbumDisambiguation::test_find_by_key_with_all_fields PASSED [ 48%]
-tests/unit/data/repositories/test_album_repository_mutation.py::TestAlbumRepositorySecurity::test_bobby_tables_album_artist PASSED [ 48%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestChangeLogOperations::test_insert_single_change_log PASSED [ 49%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestChangeLogOperations::test_insert_bulk_change_logs PASSED [ 50%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestChangeLogOperations::test_insert_empty_change_logs PASSED [ 51%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestChangeLogOperations::test_insert_change_log_with_null_values PASSED [ 51%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestDeletedRecordOperations::test_insert_deleted_record PASSED [ 52%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestDeletedRecordOperations::test_insert_multiple_deleted_records PASSED [ 53%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestDeletedRecordOperations::test_deleted_record_preserves_snapshot PASSED [ 54%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestActionLogOperations::test_insert_action_log_full_params PASSED [ 54%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestActionLogOperations::test_insert_action_log_minimal_params PASSED [ 55%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestActionLogOperations::test_insert_multiple_action_logs PASSED [ 56%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestFailSecureBehavior::test_change_log_propagates_errors PASSED [ 57%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestFailSecureBehavior::test_deleted_record_propagates_errors PASSED [ 57%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestFailSecureBehavior::test_action_log_propagates_errors PASSED [ 58%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestTransactionalIntegrity::test_change_logs_in_transaction PASSED [ 59%]
-tests/unit/data/repositories/test_audit_repository.py::TestAuditRepository::TestTransactionalIntegrity::test_rollback_includes_audit_logs PASSED [ 60%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetById::test_get_by_id_success PASSED [ 60%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetById::test_get_by_id_not_found PASSED [ 61%]
-tests/unit/data/repositories/test_contributor_repository.py::TestCreateContributor::test_create_person PASSED [ 62%]
-tests/unit/data/repositories/test_contributor_repository.py::TestCreateContributor::test_create_group PASSED [ 62%]
-tests/unit/data/repositories/test_contributor_repository.py::TestCreateContributor::test_create_auto_generates_sort_name PASSED [ 63%]
-tests/unit/data/repositories/test_contributor_repository.py::TestSearch::test_search_returns_contributors PASSED [ 64%]
-tests/unit/data/repositories/test_contributor_repository.py::TestSearch::test_search_empty_string_returns_all PASSED [ 65%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetOrCreate::test_get_or_create_existing PASSED [ 65%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetOrCreate::test_get_or_create_new PASSED [ 66%]
-tests/unit/data/repositories/test_contributor_repository.py::TestAliasManagement::test_get_aliases PASSED [ 67%]
-tests/unit/data/repositories/test_contributor_repository.py::TestAliasManagement::test_add_alias PASSED [ 68%]
-tests/unit/data/repositories/test_contributor_repository.py::TestAliasManagement::test_delete_alias PASSED [ 68%]
-tests/unit/data/repositories/test_contributor_repository.py::TestMembership::test_get_members PASSED [ 69%]
-tests/unit/data/repositories/test_contributor_repository.py::TestMembership::test_get_groups PASSED [ 70%]
-tests/unit/data/repositories/test_contributor_repository.py::TestMembership::test_add_member PASSED [ 71%]
-tests/unit/data/repositories/test_contributor_repository.py::TestMembership::test_remove_member PASSED [ 71%]
-tests/unit/data/repositories/test_contributor_repository.py::TestMembership::test_get_member_count PASSED [ 72%]
-tests/unit/data/repositories/test_contributor_repository.py::TestValidateIdentity::test_validate_identity_no_conflict PASSED [ 73%]
-tests/unit/data/repositories/test_contributor_repository.py::TestValidateIdentity::test_validate_identity_conflict_with_primary PASSED [ 74%]
-tests/unit/data/repositories/test_contributor_repository.py::TestResolveIdentityGraph::test_resolve_identity_graph_direct_match PASSED [ 74%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetByRole::test_get_by_role_success PASSED [ 75%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetByRole::test_get_by_role_error PASSED [ 76%]
-tests/unit/data/repositories/test_contributor_repository.py::TestGetByRole::test_get_all_aliases PASSED [ 77%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_create_and_get PASSED [ 77%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_search PASSED [ 78%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_update PASSED [ 79%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_delete PASSED [ 80%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_get_or_create PASSED [ 80%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_hierarchy_descendants PASSED [ 81%]
-tests/unit/data/repositories/test_publisher_repository.py::TestPublisherRepository::test_album_linking PASSED [ 82%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoCRUD::test_insert_and_get_by_path PASSED [ 82%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoCRUD::test_update_song PASSED [ 83%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoCRUD::test_delete_song PASSED [ 84%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoCRUD::test_get_all PASSED [ 85%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoLookups::test_get_by_path_found PASSED [ 85%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoLookups::test_get_by_path_not_found PASSED [ 86%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoLookups::test_get_by_performer PASSED [ 87%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoLookups::test_get_by_composer PASSED [ 88%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoLookups::test_get_by_year PASSED [ 88%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoEdgeCases::test_insert_duplicate_path PASSED [ 89%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoEdgeCases::test_song_object_mapping_integrity PASSED [ 90%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoEdgeCases::test_duplicate_paths_different_separators PASSED [ 91%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoEdgeCases::test_duplicate_paths_different_case PASSED [ 91%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoMultiAlbum::test_sync_album_non_destructive PASSED [ 92%]
-tests/unit/data/repositories/test_song_repository.py::TestSongRepoMultiAlbum::test_sync_publisher_track_override PASSED [ 93%]
-tests/unit/data/repositories/test_song_repository_mutation.py::TestSongRepositoryMutation::test_get_all_headers_integrity PASSED [ 94%]
-tests/unit/data/repositories/test_song_repository_mutation.py::TestSongRepositoryMutation::test_get_by_performer_headers_integrity PASSED [ 94%]
-tests/unit/data/repositories/test_song_repository_mutation.py::TestSongRepoSecurity::test_insert_malicious_filename PASSED [ 95%]
-tests/unit/data/repositories/test_song_repository_mutation.py::TestSongRepoSecurity::test_update_malicious_artist_name PASSED [ 96%]
-tests/unit/data/repositories/test_song_repository_mutation.py::TestSongRepoSecurity::test_unicode_and_international_characters PASSED [ 97%]
-tests/unit/data/repositories/test_tag_repository.py::TestTagRepository::test_create_and_find PASSED [ 97%]
-tests/unit/data/repositories/test_tag_repository.py::TestTagRepository::test_get_or_create PASSED [ 98%]
-tests/unit/data/repositories/test_tag_repository.py::TestTagRepository::test_source_tagging PASSED [ 99%]
-tests/unit/data/repositories/test_tag_repository.py::TestTagRepository::test_get_all_by_category PASSED [100%]
+tests\integration\test_identity_audit_safety.py ....                     [  0%]
+tests\integration\test_import_workflow.py .....                          [  1%]
+tests\integration\test_isrc_flow.py ...                                  [  2%]
+tests\integration\test_main_window_integration.py ....                   [  3%]
+tests\integration\test_song_audit_cascades.py ..                         [  3%]
+tests\integration\test_t06_albums.py .                                   [  3%]
+tests\integration\test_t06_publishers.py .F                              [  4%]
+tests\integration\test_t06_tags.py .FFF                                  [  4%]
+tests\integration\test_unified_artist_logic.py ....                      [  5%]
+tests\unit\business\services\test_conversion_service.py .....F           [  6%]
+tests\unit\business\services\test_conversion_service_mutation.py ....    [  7%]
+tests\unit\business\services\test_duplicate_scanner.py ...........       [  9%]
+tests\unit\business\services\test_export_service.py .........            [ 11%]
+tests\unit\business\services\test_import_service.py F..F                 [ 12%]
+tests\unit\business\services\test_import_service_mutation.py ..F.        [ 12%]
+tests\unit\business\services\test_library_service.py FFFFFF              [ 14%]
+tests\unit\business\services\test_metadata_service.py .................. [ 17%]
+...sssss....ss...........F.F                                             [ 23%]
+tests\unit\business\services\test_metadata_service_mutation.py ......... [ 24%]
+...FF..                                                                  [ 26%]
+tests\unit\business\services\test_playback_service.py ..............     [ 28%]
+tests\unit\business\services\test_playback_service_mutation.py ...       [ 29%]
+tests\unit\business\services\test_renaming_service.py .......            [ 30%]
+tests\unit\business\services\test_settings_manager.py .................. [ 34%]
+........                                                                 [ 35%]
+tests\unit\core\test_audit_logger.py ..................F.......          [ 40%]
+tests\unit\core\test_logger.py ........                                  [ 42%]
+tests\unit\core\test_yellberus.py ..........                             [ 44%]
+tests\unit\core\test_yellberus_mutation.py .......                       [ 45%]
+tests\unit\data\models\test_album_model.py ...                           [ 46%]
+tests\unit\data\models\test_contributor_model.py ....                    [ 47%]
+tests\unit\data\models\test_role_model.py ...                            [ 47%]
+tests\unit\data\models\test_song_model.py ..........                     [ 49%]
+tests\unit\data\repositories\test_album_repository.py ..............     [ 52%]
+tests\unit\data\repositories\test_album_repository_mutation.py .         [ 52%]
+tests\unit\data\repositories\test_audit_repository.py .................  [ 55%]
+tests\unit\data\repositories\test_contributor_repository.py ............ [ 58%]
+...........                                                              [ 60%]
+tests\unit\data\repositories\test_publisher_repository.py .......        [ 61%]
+tests\unit\data\repositories\test_song_repository.py ...............     [ 64%]
+tests\unit\data\repositories\test_song_repository_mutation.py .....      [ 65%]
+tests\unit\data\repositories\test_tag_repository.py ....                 [ 66%]
+tests\unit\data\test_database.py ..                                      [ 66%]
+tests\unit\data\test_database_config.py .                                [ 66%]
+tests\unit\integrity\test_ironclad_integrity.py .F...                    [ 67%]
+tests\unit\presentation\dialogs\test_album_manager_dialog.py EEEEE       [ 68%]
+tests\unit\presentation\dialogs\test_album_manager_dialog_mutation.py EE [ 69%]
+E                                                                        [ 69%]
+tests\unit\presentation\dialogs\test_artist_manager_dialog.py .....F.... [ 71%]
+.F...                                                                    [ 72%]
+tests\unit\presentation\dialogs\test_audit_history_dialog.py FFFF        [ 73%]
+tests\unit\presentation\dialogs\test_publisher_manager_dialog.py ....... [ 74%]
+                                                                         [ 74%]
+tests\unit\presentation\dialogs\test_publisher_manager_dialog_mutation.py F [ 74%]
+F.F                                                                      [ 75%]
+tests\unit\presentation\dialogs\test_settings_dialog.py F                [ 75%]
+tests\unit\presentation\views\test_main_window.py .....F.                [ 76%]
+tests\unit\presentation\widgets\test_chip_tray_widget.py ...........F.   [ 79%]
+tests\unit\presentation\widgets\test_filter_widget.py ..                 [ 79%]
+tests\unit\presentation\widgets\test_library_widget.py .F.........       [ 81%]
+tests\unit\presentation\widgets\test_library_widget_drag_drop.py ......  [ 82%]
+tests\unit\presentation\widgets\test_playback_control_widget.py .....    [ 83%]
+tests\unit\presentation\widgets\test_playback_control_widget_mutation.py . [ 84%]
+..                                                                       [ 84%]
+tests\unit\presentation\widgets\test_playlist_widget.py ..........       [ 86%]
+tests\unit\presentation\widgets\test_seek_slider.py ........             [ 87%]
+tests\unit\presentation\widgets\test_side_panel_ux_flows.py EEE          [ 88%]
+tests\unit\presentation\widgets\test_side_panel_widget.py EEEEEE         [ 89%]
+tests\unit\presentation\widgets\test_type_tabs.py ........               [ 91%]
+tests\unit\presentation\workers\test_export_worker.py ......             [ 92%]
+tests\unit\presentation\workers\test_import_worker.py ...                [ 93%]
+tests\unit\utils\test_audio_hash.py .........                            [ 94%]
+tests\unit\utils\test_audio_hash_mutation.py .......                     [ 96%]
+tests\unit\utils\test_validation.py ....................                 [100%]
 
-============================= 135 passed in 1.76s =============================
+=================================== ERRORS ====================================
+______________ ERROR at setup of test_album_manager_init_with_id ______________
+tests\unit\presentation\dialogs\test_album_manager_dialog.py:11: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+___________ ERROR at setup of test_album_manager_search_and_select ____________
+tests\unit\presentation\dialogs\test_album_manager_dialog.py:11: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+_____________ ERROR at setup of test_album_manager_save_existing ______________
+tests\unit\presentation\dialogs\test_album_manager_dialog.py:11: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+_______________ ERROR at setup of test_album_manager_create_new _______________
+tests\unit\presentation\dialogs\test_album_manager_dialog.py:11: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+_________________ ERROR at setup of test_album_manager_delete _________________
+tests\unit\presentation\dialogs\test_album_manager_dialog.py:11: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+___________ ERROR at setup of test_album_mutation_field_exhaustion ____________
+tests\unit\presentation\dialogs\test_album_manager_dialog_mutation.py:10: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+_________ ERROR at setup of test_album_mutation_sql_injection_search __________
+tests\unit\presentation\dialogs\test_album_manager_dialog_mutation.py:10: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+______________ ERROR at setup of test_album_mutation_empty_save _______________
+tests\unit\presentation\dialogs\test_album_manager_dialog_mutation.py:10: in mock_pub_repo_instantiation
+    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1503: in __enter__
+    original, local = self.get_original()
+                      ^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:1473: in get_original
+    raise AttributeError(
+E   AttributeError: <module 'src.presentation.dialogs.album_manager_dialog' from 'C:\\Users\\prodo\\Antigrav projects\\Gosling2\\Gosling2\\src\\presentation\\dialogs\\album_manager_dialog.py'> does not have the attribute 'PublisherRepository'
+_ ERROR at setup of TestSidePanelUXFlows.test_album_add_button_opens_manager __
+tests\unit\presentation\widgets\test_side_panel_ux_flows.py:17: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+_ ERROR at setup of TestSidePanelUXFlows.test_publisher_add_button_opens_manager _
+tests\unit\presentation\widgets\test_side_panel_ux_flows.py:17: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+_ ERROR at setup of TestSidePanelUXFlows.test_artist_add_button_opens_manager _
+tests\unit\presentation\widgets\test_side_panel_ux_flows.py:17: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+___ ERROR at setup of TestSidePanelLogic.test_validate_isrc_format_invalid ____
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+__ ERROR at setup of TestSidePanelLogic.test_validate_isrc_duplicate_warning __
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+_ ERROR at setup of TestSidePanelLogic.test_validate_isrc_duplicate_self_ignored _
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+____ ERROR at setup of TestSidePanelLogic.test_save_button_collision_state ____
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+_______ ERROR at setup of TestSidePanelLogic.test_autofill_year_on_save _______
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+_________ ERROR at setup of TestSidePanelLogic.test_composer_splitter _________
+tests\unit\presentation\widgets\test_side_panel_widget.py:14: in side_panel
+    widget = SidePanelWidget(
+E   TypeError: SidePanelWidget.__init__() missing 1 required positional argument: 'settings_manager'
+================================== FAILURES ===================================
+_________________ TestT06Publishers.test_publisher_on_single __________________
+tests\integration\test_t06_publishers.py:76: in test_publisher_on_single
+    self.assertEqual(song_fresh.album, expected_album_title)
+E   AssertionError: None != 't06_publisher_song.mp3'
+______________________ TestT06Tags.test_case_sensitivity ______________________
+tests\integration\test_t06_tags.py:119: in test_case_sensitivity
+    self.assertEqual(len(tags), 1)
+E   AssertionError: 0 != 1
+____________________ TestT06Tags.test_sync_genre_creation _____________________
+tests\integration\test_t06_tags.py:70: in test_sync_genre_creation
+    self.assertIsNotNone(rock)
+E   AssertionError: unexpectedly None
+___________________ TestT06Tags.test_sync_genre_replacement ___________________
+tests\integration\test_t06_tags.py:90: in test_sync_genre_replacement
+    self.assertEqual(tags[0].tag_name, "T06_Old")
+                     ^^^^^^^
+E   IndexError: list index out of range
+____________________ TestConversionService.test_sync_tags _____________________
+tests\unit\business\services\test_conversion_service.py:91: in test_sync_tags
+    song = Song(
+E   TypeError: Song.__init__() got an unexpected keyword argument 'genre'
+___________ TestImportServiceLogic.test_import_single_file_success ____________
+tests\unit\business\services\test_import_service.py:44: in test_import_single_file_success
+    assert sid == 101
+E   AssertionError: assert <MagicMock name='mock.add_song()' id='2167978763536'> == 101
+____________ TestImportServiceLogic.test_scan_directory_recursive _____________
+tests\unit\business\services\test_import_service.py:86: in test_scan_directory_recursive
+    assert len(files) == 2
+E   assert 0 == 2
+E    +  where 0 = len([])
+___________ TestImportServiceMutation.test_database_insert_failure ____________
+tests\unit\business\services\test_import_service_mutation.py:51: in test_database_insert_failure
+    assert success is False
+E   assert True is False
+______________________ TestLibraryService.test_add_file _______________________
+tests\unit\business\services\test_library_service.py:45: in test_add_file
+    file_id = service.add_file("/path/to/test.mp3")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+____________________ TestLibraryService.test_get_all_songs ____________________
+tests\unit\business\services\test_library_service.py:50: in test_get_all_songs
+    service.add_file("/path/to/song1.mp3")
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+_____________________ TestLibraryService.test_delete_song _____________________
+tests\unit\business\services\test_library_service.py:58: in test_delete_song
+    file_id = service.add_file("/path/to/test.mp3")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+_____________________ TestLibraryService.test_update_song _____________________
+tests\unit\business\services\test_library_service.py:69: in test_update_song
+    file_id = service.add_file("/path/to/test.mp3")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+______________ TestLibraryService.test_get_contributors_by_role _______________
+tests\unit\business\services\test_library_service.py:83: in test_get_contributors_by_role
+    file_id = service.add_file("/path/to/test.mp3")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+_______________ TestLibraryService.test_get_songs_by_performer ________________
+tests\unit\business\services\test_library_service.py:96: in test_get_songs_by_performer
+    file_id = service.add_file("/path/to/test.mp3")
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\business\services\library_service.py:32: in add_file
+    return self.song_service._repo.insert(file_path)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: 'SongRepository' object has no attribute '_repo'
+________________ TestDynamicID3Write.test_legacy_author_union _________________
+tests\unit\business\services\test_metadata_service.py:724: in test_legacy_author_union
+    assert "Mozart" in text_list
+E   AssertionError: assert 'Mozart' in ['Mozart / Beethoven / Schiller']
+_____________ TestMetadataMultiAlbum.test_write_multi_value_tpub ______________
+tests\unit\business\services\test_metadata_service.py:792: in test_write_multi_value_tpub
+    assert found_tpub, "TPUB did not receive multi-value list ['Label A', 'Label B']"
+E   AssertionError: TPUB did not receive multi-value list ['Label A', 'Label B']
+E   assert False
+___________ TestMetadataServiceRobustness.test_garbage_list_inputs ____________
+tests\unit\business\services\test_metadata_service_mutation.py:190: in test_garbage_list_inputs
+    assert "Artist 1" in text
+E   AssertionError: assert 'Artist 1' in ['Artist 1 / 123 / Artist 2']
+_______ TestMetadataServiceRobustness.test_invalid_year_bpm_not_written _______
+tests\unit\business\services\test_metadata_service_mutation.py:206: in test_invalid_year_bpm_not_written
+    assert not isinstance(frame, (TBPM, TDRC, TYER))
+E   AssertionError: assert not True
+E    +  where True = isinstance(TDRC(encoding=<Encoding.UTF16: 1>, text=['2500']), (<class 'mutagen.id3.TBPM'>, <class 'mutagen.id3.TDRC'>, <class 'mutagen.id3.TYER'>))
+---------------------------- Captured stdout call -----------------------------
+Warning: Invalid BPM -10, skipping BPM write
+___________ TestAuditLogger.TestNormalization.test_normalize_lists ____________
+tests\unit\core\test_audit_logger.py:379: in test_normalize_lists
+    assert result["empty_list"] == ""
+E   AssertionError: assert None == ''
+_______________________ test_song_model_field_alignment _______________________
+tests\unit\integrity\test_ironclad_integrity.py:45: in test_song_model_field_alignment
+    assert attr in model_fields or hasattr(Song, attr), \
+E   AssertionError: Yellberus field 'genre' has no matching attribute 'genre' in Song model.
+E   assert ('genre' in {'album', 'album_artist', 'album_id', 'audio_hash', 'bpm', 'composers', ...} or False)
+E    +  where False = hasattr(Song, 'genre')
+_________________ TestArtistPickerDialog.test_initialization __________________
+tests\unit\presentation\dialogs\test_artist_manager_dialog.py:92: in test_initialization
+    assert dialog.windowTitle() == "Select Artist"
+E   AssertionError: assert 'Select or Add Artist' == 'Select Artist'
+E     
+E     - Select Artist
+E     + Select or Add Artist
+E     ?        +++++++
+___________________ TestArtistDetailsDialog.test_add_alias ____________________
+tests\unit\presentation\dialogs\test_artist_manager_dialog.py:187: in test_add_alias
+    mock_repo.add_alias.assert_called_once()
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:964: in assert_called_once
+    raise AssertionError(msg)
+E   AssertionError: Expected 'add_alias' to have been called once. Called 0 times.
+_____________________________ test_initialization _____________________________
+tests\unit\presentation\dialogs\test_audit_history_dialog.py:63: in test_initialization
+    mock_service.get_recent_changes.assert_called()
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:954: in assert_called
+    raise AssertionError(msg)
+E   AssertionError: Expected 'get_recent_changes' to have been called.
+_______________________________ test_filtering ________________________________
+tests\unit\presentation\dialogs\test_audit_history_dialog.py:73: in test_filtering
+    assert dialog.model.rowCount() == 1
+E   assert 0 == 1
+E    +  where 0 = rowCount()
+E    +    where rowCount = <src.presentation.dialogs.audit_history_dialog.AuditTableModel object at 0x000001F8C8DE62B0>.rowCount
+E    +      where <src.presentation.dialogs.audit_history_dialog.AuditTableModel object at 0x000001F8C8DE62B0> = <src.presentation.dialogs.audit_history_dialog.AuditHistoryDialog object at 0x000001F8C8E1DDB0>.model
+_______________________________ test_view_logic _______________________________
+tests\unit\presentation\dialogs\test_audit_history_dialog.py:91: in test_view_logic
+    assert model.data(idx_type, Qt.ItemDataRole.DisplayRole) == "UPDATE"
+E   AssertionError: assert None == 'UPDATE'
+E    +  where None = data(<PyQt6.QtCore.QModelIndex object at 0x000001F8C7A538D0>, <ItemDataRole.DisplayRole: 0>)
+E    +    where data = <src.presentation.dialogs.audit_history_dialog.AuditTableModel object at 0x000001F8C8DE7070>.data
+E    +    and   <ItemDataRole.DisplayRole: 0> = <enum 'ItemDataRole'>.DisplayRole
+E    +      where <enum 'ItemDataRole'> = Qt.ItemDataRole
+_____________________________ test_refresh_button _____________________________
+tests\unit\presentation\dialogs\test_audit_history_dialog.py:108: in test_refresh_button
+    mock_service.get_recent_changes.assert_called()
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\unittest\mock.py:954: in assert_called
+    raise AssertionError(msg)
+E   AssertionError: Expected 'get_recent_changes' to have been called.
+______________________ test_publisher_mutation_long_name ______________________
+tests\unit\presentation\dialogs\test_publisher_manager_dialog_mutation.py:27: in test_publisher_mutation_long_name
+    assert sample_pub.publisher_name == long_name
+E   AssertionError: assert 'Test' == 'AAAAAAAAAAAA...AAAAAAAAAAAAA'
+E     
+E     - AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...
+E     
+E     ...Full output truncated (2 lines hidden), use '-vv' to show
+____________________ test_publisher_mutation_sql_injection ____________________
+tests\unit\presentation\dialogs\test_publisher_manager_dialog_mutation.py:41: in test_publisher_mutation_sql_injection
+    assert sample_pub.publisher_name == injection
+E   assert 'Test' == "Publisher');...ublishers; --"
+E     
+E     - Publisher'); DROP TABLE Publishers; --
+E     + Test
+____________________ test_publisher_mutation_special_chars ____________________
+tests\unit\presentation\dialogs\test_publisher_manager_dialog_mutation.py:67: in test_publisher_mutation_special_chars
+    assert sample_pub.publisher_name == special
+E   AssertionError: assert 'Test' == '\U0001f3e2 Publisher \\x00 \u65e5\u672c\u8a9e'
+E     
+E     - \U0001f3e2 Publisher \x00 \u65e5\u672c\u8a9e
+E     + Test
+_______________________ test_settings_dialog_load_save ________________________
+tests\unit\presentation\dialogs\test_settings_dialog.py:17: in test_settings_dialog_load_save
+    dialog = SettingsDialog(mock_settings)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\presentation\dialogs\settings_dialog.py:26: in __init__
+    self._load_settings()
+src\presentation\dialogs\settings_dialog.py:242: in _load_settings
+    self.txt_db_path.setText(self.settings_manager.get_database_path() or "")
+src\presentation\widgets\glow\line_edit.py:97: in setText
+    def setText(self, t): self.edit.setText(t)
+                          ^^^^^^^^^^^^^^^^^^^^
+E   TypeError: setText(self, a0: Optional[str]): argument 1 has unexpected type 'MagicMock'
+_____________________ TestMainWindow.test_delete_selected _____________________
+CALL ERROR: Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\views\main_window.py", line 656, in _on_library_selection_changed
+    self.right_panel.update_selection(songs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\right_panel_widget.py", line 261, in update_selection
+    self.editor_widget.set_songs(songs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 222, in set_songs
+    self._build_fields()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 532, in _build_fields
+    self._refresh_field_values()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 698, in _refresh_field_values
+    artist, created = self.contributor_service.get_or_create(str(n))
+    ^^^^^^^^^^^^^^^
+ValueError: not enough values to unpack (expected 2, got 0)
+________________________________________________________________________________
+
+---------------------------- Captured stderr call -----------------------------
+Exceptions caught in Qt event loop:
+________________________________________________________________________________
+Traceback (most recent call last):
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\views\main_window.py", line 656, in _on_library_selection_changed
+    self.right_panel.update_selection(songs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\right_panel_widget.py", line 261, in update_selection
+    self.editor_widget.set_songs(songs)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 222, in set_songs
+    self._build_fields()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 532, in _build_fields
+    self._refresh_field_values()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\prodo\Antigrav projects\Gosling2\Gosling2\src\presentation\widgets\side_panel_widget.py", line 698, in _refresh_field_values
+    artist, created = self.contributor_service.get_or_create(str(n))
+    ^^^^^^^^^^^^^^^
+ValueError: not enough values to unpack (expected 2, got 0)
+________________________________________________________________________________
+__________________ TestChipTrayWidget.test_remove_cancelled ___________________
+tests\unit\presentation\widgets\test_chip_tray_widget.py:157: in test_remove_cancelled
+    assert not signal_emitted
+E   assert not True
+______________ TestLibraryWidgetLogic.test_import_files_success _______________
+tests\unit\presentation\widgets\test_library_widget.py:82: in test_import_files_success
+    assert count == 1
+E   assert None == 1
+=========================== short test summary info ===========================
+FAILED tests/integration/test_t06_publishers.py::TestT06Publishers::test_publisher_on_single
+FAILED tests/integration/test_t06_tags.py::TestT06Tags::test_case_sensitivity
+FAILED tests/integration/test_t06_tags.py::TestT06Tags::test_sync_genre_creation
+FAILED tests/integration/test_t06_tags.py::TestT06Tags::test_sync_genre_replacement
+FAILED tests/unit/business/services/test_conversion_service.py::TestConversionService::test_sync_tags
+FAILED tests/unit/business/services/test_import_service.py::TestImportServiceLogic::test_import_single_file_success
+FAILED tests/unit/business/services/test_import_service.py::TestImportServiceLogic::test_scan_directory_recursive
+FAILED tests/unit/business/services/test_import_service_mutation.py::TestImportServiceMutation::test_database_insert_failure
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_add_file
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_get_all_songs
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_delete_song
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_update_song
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_get_contributors_by_role
+FAILED tests/unit/business/services/test_library_service.py::TestLibraryService::test_get_songs_by_performer
+FAILED tests/unit/business/services/test_metadata_service.py::TestDynamicID3Write::test_legacy_author_union
+FAILED tests/unit/business/services/test_metadata_service.py::TestMetadataMultiAlbum::test_write_multi_value_tpub
+FAILED tests/unit/business/services/test_metadata_service_mutation.py::TestMetadataServiceRobustness::test_garbage_list_inputs
+FAILED tests/unit/business/services/test_metadata_service_mutation.py::TestMetadataServiceRobustness::test_invalid_year_bpm_not_written
+FAILED tests/unit/core/test_audit_logger.py::TestAuditLogger::TestNormalization::test_normalize_lists
+FAILED tests/unit/integrity/test_ironclad_integrity.py::test_song_model_field_alignment
+FAILED tests/unit/presentation/dialogs/test_artist_manager_dialog.py::TestArtistPickerDialog::test_initialization
+FAILED tests/unit/presentation/dialogs/test_artist_manager_dialog.py::TestArtistDetailsDialog::test_add_alias
+FAILED tests/unit/presentation/dialogs/test_audit_history_dialog.py::test_initialization
+FAILED tests/unit/presentation/dialogs/test_audit_history_dialog.py::test_filtering
+FAILED tests/unit/presentation/dialogs/test_audit_history_dialog.py::test_view_logic
+FAILED tests/unit/presentation/dialogs/test_audit_history_dialog.py::test_refresh_button
+FAILED tests/unit/presentation/dialogs/test_publisher_manager_dialog_mutation.py::test_publisher_mutation_long_name
+FAILED tests/unit/presentation/dialogs/test_publisher_manager_dialog_mutation.py::test_publisher_mutation_sql_injection
+FAILED tests/unit/presentation/dialogs/test_publisher_manager_dialog_mutation.py::test_publisher_mutation_special_chars
+FAILED tests/unit/presentation/dialogs/test_settings_dialog.py::test_settings_dialog_load_save
+FAILED tests/unit/presentation/views/test_main_window.py::TestMainWindow::test_delete_selected
+FAILED tests/unit/presentation/widgets/test_chip_tray_widget.py::TestChipTrayWidget::test_remove_cancelled
+FAILED tests/unit/presentation/widgets/test_library_widget.py::TestLibraryWidgetLogic::test_import_files_success
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog.py::test_album_manager_init_with_id
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog.py::test_album_manager_search_and_select
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog.py::test_album_manager_save_existing
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog.py::test_album_manager_create_new
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog.py::test_album_manager_delete
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog_mutation.py::test_album_mutation_field_exhaustion
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog_mutation.py::test_album_mutation_sql_injection_search
+ERROR tests/unit/presentation/dialogs/test_album_manager_dialog_mutation.py::test_album_mutation_empty_save
+ERROR tests/unit/presentation/widgets/test_side_panel_ux_flows.py::TestSidePanelUXFlows::test_album_add_button_opens_manager
+ERROR tests/unit/presentation/widgets/test_side_panel_ux_flows.py::TestSidePanelUXFlows::test_publisher_add_button_opens_manager
+ERROR tests/unit/presentation/widgets/test_side_panel_ux_flows.py::TestSidePanelUXFlows::test_artist_add_button_opens_manager
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_validate_isrc_format_invalid
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_validate_isrc_duplicate_warning
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_validate_isrc_duplicate_self_ignored
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_save_button_collision_state
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_autofill_year_on_save
+ERROR tests/unit/presentation/widgets/test_side_panel_widget.py::TestSidePanelLogic::test_composer_splitter
+============ 33 failed, 459 passed, 7 skipped, 17 errors in 12.23s ============

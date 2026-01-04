@@ -33,7 +33,7 @@ class AlbumRepository(GenericRepository[Album]):
                 return Album.from_row(row)
         return None
 
-    def _insert_db(self, cursor: sqlite3.Cursor, album: Album) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute(
             "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
@@ -41,16 +41,27 @@ class AlbumRepository(GenericRepository[Album]):
         )
         return cursor.lastrowid
 
-    def _update_db(self, cursor: sqlite3.Cursor, album: Album) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
         cursor.execute(
             "UPDATE Albums SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
             (album.title, album.album_artist, album.album_type, album.release_year, album.album_id)
         )
 
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
-        # Cleanup links first
+        auditor = kwargs.get('auditor')
+        # 1. Audit side-effect link removals
+        if auditor:
+            cursor.execute("SELECT SourceID, TrackNumber, IsPrimary FROM SongAlbums WHERE AlbumID = ?", (record_id,))
+            for s_id, t_num, is_p in cursor.fetchall():
+                 auditor.log_delete("SongAlbums", f"{s_id}-{record_id}", {"SourceID": s_id, "AlbumID": record_id, "TrackNumber": t_num, "IsPrimary": is_p})
+                 
+            cursor.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (record_id,))
+            for (p_id,) in cursor.fetchall():
+                 auditor.log_delete("AlbumPublishers", f"{record_id}-{p_id}", {"AlbumID": record_id, "PublisherID": p_id})
+
+        # 2. Cleanup links
         cursor.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (record_id,))
         cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (record_id,))
         cursor.execute("DELETE FROM Albums WHERE AlbumID = ?", (record_id,))
@@ -167,7 +178,12 @@ class AlbumRepository(GenericRepository[Album]):
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:
         """Link a song to an album. First link is Primary."""
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
+            # Check if link exists
+            cur = conn.execute("SELECT 1 FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id))
+            if cur.fetchone(): return # Already linked
+
             # Check if any primary link exists
             cur = conn.execute("SELECT 1 FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1", (source_id,))
             has_primary = cur.fetchone() is not None
@@ -175,16 +191,30 @@ class AlbumRepository(GenericRepository[Album]):
             is_primary = 0 if has_primary else 1
             
             query = """
-                INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary)
+                INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary)
                 VALUES (?, ?, ?, ?)
             """
             conn.execute(query, (source_id, album_id, track_number, is_primary))
+            
+            AuditLogger(conn).log_insert("SongAlbums", f"{source_id}-{album_id}", {
+                "SourceID": source_id,
+                "AlbumID": album_id,
+                "TrackNumber": track_number,
+                "IsPrimary": is_primary
+            })
 
     def remove_song_from_album(self, source_id: int, album_id: int) -> None:
         """Unlink a song from an album."""
-        query = "DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?"
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            conn.execute(query, (source_id, album_id))
+            # Snapshot for audit
+            cur = conn.execute("SELECT SourceID, AlbumID, TrackNumber, IsPrimary FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id))
+            row = cur.fetchone()
+            if not row: return
+            snapshot = {"SourceID": row[0], "AlbumID": row[1], "TrackNumber": row[2], "IsPrimary": row[3]}
+
+            conn.execute("DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id))
+            AuditLogger(conn).log_delete("SongAlbums", f"{source_id}-{album_id}", snapshot)
 
     def get_albums_for_song(self, source_id: int) -> List[Album]:
         """Get all albums a song appears on."""
@@ -295,14 +325,22 @@ class AlbumRepository(GenericRepository[Album]):
 
     def set_publisher(self, album_id: int, publisher_name: str) -> None:
         """Set the publisher for an album (Replace existing)."""
+        from src.core.audit_logger import AuditLogger
+        
+        # 1. Handle Unsetting
         if not publisher_name or not publisher_name.strip():
-             # Handle Unsetting
              with self.get_connection() as conn:
+                 auditor = AuditLogger(conn)
+                 # Snapshot existing for audit
+                 cursor = conn.execute("SELECT AlbumID, PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+                 for row in cursor.fetchall():
+                     auditor.log_delete("AlbumPublishers", f"{row[0]}-{row[1]}", {"AlbumID": row[0], "PublisherID": row[1]})
                  conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
              return
              
         pub_name = publisher_name.strip()
         with self.get_connection() as conn:
+            auditor = AuditLogger(conn)
             # Ensure Publisher exists
             conn.execute("INSERT OR IGNORE INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
             # Get ID
@@ -312,7 +350,18 @@ class AlbumRepository(GenericRepository[Album]):
             pub_id = pub_row[0]
             
             # Link to Album (Replace old)
-            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
-            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
+            # Snapshot existing for audit
+            cursor = conn.execute("SELECT AlbumID, PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+            for row in cursor.fetchall():
+                 if row[1] == pub_id: continue # No change
+                 auditor.log_delete("AlbumPublishers", f"{row[0]}-{row[1]}", {"AlbumID": row[0], "PublisherID": row[1]})
+            
+            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID != ?", (album_id, pub_id))
+            
+            # Add new link
+            cursor = conn.execute("SELECT 1 FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, pub_id))
+            if not cursor.fetchone():
+                conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
+                auditor.log_insert("AlbumPublishers", f"{album_id}-{pub_id}", {"AlbumID": album_id, "PublisherID": pub_id})
 
 

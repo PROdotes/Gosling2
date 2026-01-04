@@ -12,37 +12,46 @@ def mock_pub_repo_instantiation():
         yield mock
 
 @pytest.fixture
-def mock_album_repo():
-    repo = MagicMock()
-    repo.db_path = ":memory:" # Provide a path string even if mocked
-    # Default search return empty list
-    repo.search.return_value = []
-    repo.get_by_id.return_value = None
-    repo.get_publisher.return_value = "Test Publisher"
-    return repo
+def mock_album_service():
+    service = MagicMock()
+    service.search.return_value = []
+    service.get_by_id.return_value = None
+    service.get_publisher_name.return_value = "Test Publisher"
+    # Service specific methods
+    service.get_songs_in_album.return_value = [] 
+    return service
+
+@pytest.fixture
+def mock_publisher_service():
+    return MagicMock()
+
+@pytest.fixture
+def mock_contributor_service():
+    return MagicMock()
 
 @pytest.fixture
 def sample_album():
     return Album(album_id=50, title="Highway to Heck", album_artist="AC/BC", release_year=1979, album_type="Album")
 
-def test_album_manager_init_with_id(qtbot, mock_album_repo, sample_album):
-    mock_album_repo.get_by_id.return_value = sample_album
-    mock_album_repo.search.return_value = [sample_album]
+def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+    mock_album_service.get_by_id.return_value = sample_album
+    mock_album_service.search.return_value = [sample_album]
     
     initial_data = {'album_id': 50, 'title': 'Highway to Heck'}
-    dialog = AlbumManagerDialog(mock_album_repo, initial_data=initial_data)
+    dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data=initial_data)
     qtbot.addWidget(dialog)
     
     assert dialog.inp_title.text() == "Highway to Heck"
-    assert dialog.inp_artist.text() == "AC/BC"
+    # assert dialog.inp_artist.text() == "AC/BC" # Removed field, now tray
+    assert dialog.tray_artist.get_names() == ["AC/BC"]
     assert dialog.inp_year.text() == "1979"
     assert dialog.cmb_type.currentText() == "Album"
 
-def test_album_manager_search_and_select(qtbot, mock_album_repo, sample_album):
-    mock_album_repo.search.return_value = [sample_album]
-    mock_album_repo.get_by_id.return_value = sample_album # Ensure select works
+def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+    mock_album_service.search.return_value = [sample_album]
+    mock_album_service.get_by_id.return_value = sample_album # Ensure select works
     
-    dialog = AlbumManagerDialog(mock_album_repo)
+    dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service)
     qtbot.addWidget(dialog)
     
     # Simulate typing in search
@@ -60,26 +69,27 @@ def test_album_manager_search_and_select(qtbot, mock_album_repo, sample_album):
     assert dialog.inp_title.text() == "Highway to Heck"
     assert dialog.current_album == sample_album
 
-def test_album_manager_save_existing(qtbot, mock_album_repo, sample_album):
-    mock_album_repo.get_by_id.return_value = sample_album
-    mock_album_repo.search.return_value = [sample_album]
-    dialog = AlbumManagerDialog(mock_album_repo, initial_data={'album_id': 50})
+def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+    mock_album_service.get_by_id.return_value = sample_album
+    mock_album_service.search.return_value = [sample_album]
+    dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data={'album_id': 50})
     qtbot.addWidget(dialog)
     
     dialog.inp_title.setText("Highway to Heaven")
-    dialog.inp_artist.setText("Angels")
+    # dialog.inp_artist.setText("Angels") -> Use tray
+    dialog.tray_artist.set_chips([(0, "Angels", "")])
     
-    mock_album_repo.update.return_value = True
+    mock_album_service.update.return_value = True
     
     with patch.object(dialog, 'accept') as mock_accept:
         dialog._save_inspector()
         
         assert sample_album.title == "Highway to Heaven"
         assert sample_album.album_artist == "Angels"
-        mock_album_repo.update.assert_called_with(sample_album)
+        mock_album_service.update.assert_called_with(sample_album)
     
-def test_album_manager_create_new(qtbot, mock_album_repo):
-    dialog = AlbumManagerDialog(mock_album_repo)
+def test_album_manager_create_new(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service):
+    dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service)
     qtbot.addWidget(dialog)
     
     # Click "Create New"
@@ -90,23 +100,23 @@ def test_album_manager_create_new(qtbot, mock_album_repo):
     dialog.inp_title.setText("New Album")
     
     new_album = Album(album_id=99, title="New Album")
-    mock_album_repo.get_or_create.return_value = (new_album, True)
+    mock_album_service.get_or_create.return_value = (new_album, True)
     
     with patch.object(dialog, 'accept') as mock_accept:
         dialog._save_inspector()
-        mock_album_repo.get_or_create.assert_called()
-        mock_accept.assert_not_called() # because it stays in inspector after create unless select is clicked
+        mock_album_service.get_or_create.assert_called()
+        mock_accept.assert_not_called() 
 
-def test_album_manager_delete(qtbot, mock_album_repo, sample_album):
-    mock_album_repo.get_by_id.return_value = sample_album
-    mock_album_repo.search.return_value = [sample_album]
-    dialog = AlbumManagerDialog(mock_album_repo, initial_data={'album_id': 50})
+def test_album_manager_delete(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+    mock_album_service.get_by_id.return_value = sample_album
+    mock_album_service.search.return_value = [sample_album]
+    dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data={'album_id': 50})
     qtbot.addWidget(dialog)
     
     # Must select the item first
     item = dialog.list_vault.item(0)
     dialog.list_vault.setCurrentItem(item)
     
-    mock_album_repo.delete_album.return_value = True
+    mock_album_service.delete.return_value = True 
     dialog._on_delete()
-    mock_album_repo.delete_album.assert_called_with(50)
+    mock_album_service.delete.assert_called_with(50)

@@ -47,7 +47,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         pass
 
     @abstractmethod
-    def _insert_db(self, cursor: sqlite3.Cursor, entity: T) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, entity: T, **kwargs) -> int:
         """
         Execute the SQL INSERT statement.
         Must return the new Record ID.
@@ -55,7 +55,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         pass
         
     @abstractmethod
-    def _update_db(self, cursor: sqlite3.Cursor, entity: T) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, entity: T, **kwargs) -> None:
         """
         Execute the SQL UPDATE statement.
         Should raise sqlite3.Error on failure.
@@ -63,7 +63,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         pass
 
     @abstractmethod
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """
         Execute the SQL DELETE statement.
         Should raise sqlite3.Error on failure.
@@ -83,13 +83,14 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                auditor = AuditLogger(conn)
                 
                 # 1. Write Data
-                new_id = self._insert_db(cursor, entity)
+                new_id = self._insert_db(cursor, entity, auditor=auditor)
                 
                 # 2. Write Audit (Snapshots the entity as provided)
-                if hasattr(entity, 'to_dict'):
-                    AuditLogger(conn).log_insert(self.table_name, new_id, entity.to_dict())
+                if hasattr(entity, 'to_dict') and new_id:
+                    auditor.log_insert(self.table_name, new_id, entity.to_dict())
                 
                 return new_id
                 
@@ -122,11 +123,12 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             # 2. Write Data & Audit (Snapshot T1)
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                auditor = AuditLogger(conn)
                 
-                self._update_db(cursor, entity)
+                self._update_db(cursor, entity, auditor=auditor)
                 
                 if hasattr(entity, 'to_dict'):
-                    AuditLogger(conn).log_update(self.table_name, record_id, old_snapshot, entity.to_dict())
+                    auditor.log_update(self.table_name, record_id, old_snapshot, entity.to_dict())
                 
                 return True
                 
@@ -152,10 +154,11 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             # 2. Delete Data & Audit
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                auditor = AuditLogger(conn)
                 
-                self._delete_db(cursor, record_id)
+                self._delete_db(cursor, record_id, auditor=auditor)
                 
-                AuditLogger(conn).log_delete(self.table_name, record_id, old_snapshot)
+                auditor.log_delete(self.table_name, record_id, old_snapshot)
                 
                 return True
                 

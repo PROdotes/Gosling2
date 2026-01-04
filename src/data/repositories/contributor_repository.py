@@ -160,7 +160,7 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error fetching contributor names: {e}")
             return []
 
-    def _insert_db(self, cursor: sqlite3.Cursor, contributor: Contributor) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, contributor: Contributor, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute(
             "INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, ?)",
@@ -168,8 +168,9 @@ class ContributorRepository(GenericRepository[Contributor]):
         )
         return cursor.lastrowid
 
-    def _update_db(self, cursor: sqlite3.Cursor, contributor: Contributor) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, contributor: Contributor, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
+        auditor = kwargs.get('auditor')
         # Get existing type to check for change
         cursor.execute("SELECT ContributorType FROM Contributors WHERE ContributorID = ?", (contributor.contributor_id,))
         row = cursor.fetchone()
@@ -181,15 +182,32 @@ class ContributorRepository(GenericRepository[Contributor]):
             (contributor.name, contributor.sort_name, contributor.type, contributor.contributor_id)
         )
         
-        # 2. Cleanup relationships if type changed
+        # 2. Cleanup relationships if type changed (Audited)
         if old_type and old_type != contributor.type:
+            if auditor:
+                # Find links that will be deleted
+                if contributor.type == "person":
+                    cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
+                else:
+                    cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
+                
+                for g_id, m_id in cursor.fetchall():
+                     auditor.log_delete("GroupMembers", f"{g_id}-{m_id}", {"GroupID": g_id, "MemberID": m_id})
+
             if contributor.type == "person":
                 cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
             else:
                 cursor.execute("DELETE FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
 
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
+        auditor = kwargs.get('auditor')
+        # Audit Cascades
+        if auditor:
+            cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
+            for g_id, m_id in cursor.fetchall():
+                auditor.log_delete("GroupMembers", f"{g_id}-{m_id}", {"GroupID": g_id, "MemberID": m_id})
+
         # Manual Cascade for GroupMembers (Not enforced by Schema)
         cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
         cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (record_id,))
@@ -263,6 +281,48 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error searching contributors: {e}")
             return []
 
+    def search_identities(self, query: str) -> List[Tuple[int, str, str, str]]:
+        """
+        Search for ANY matching name (Primary or Alias) and return flat results.
+        Returns list of (ContributorID, DisplayName, Type, MatchSource)
+        MatchSource is 'Primary' or 'Alias'.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                q = f"%{query}%" if query else "%"
+                
+                # We want a UNION of Primary matches and Alias matches
+                # If query is empty (%), it returns EVERYTHING.
+                cursor.execute("""
+                    SELECT 
+                        ContributorID, 
+                        ContributorName as Name, 
+                        ContributorType, 
+                        'Primary' as MatchSource
+                    FROM Contributors 
+                    WHERE ContributorName LIKE ?
+                    
+                    UNION
+                    
+                    SELECT 
+                        C.ContributorID, 
+                        CA.AliasName as Name, 
+                        C.ContributorType, 
+                        'Alias' as MatchSource
+                    FROM ContributorAliases CA 
+                    JOIN Contributors C ON CA.ContributorID = C.ContributorID
+                    WHERE CA.AliasName LIKE ?
+                    
+                    ORDER BY Name ASC
+                """, (q, q))
+                
+                return cursor.fetchall()
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error searching identities: {e}")
+            return []
+
     def get_types_for_names(self, names: List[str]) -> dict:
         """
         Get type ('person' or 'group') for a list of names.
@@ -315,14 +375,14 @@ class ContributorRepository(GenericRepository[Contributor]):
 
     def _get_or_create_logic(self, name: str, type: str, conn) -> Tuple[Contributor, bool]:
         cursor = conn.cursor()
-        # 1. Check direct name match
-        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ?", (name,))
+        # 1. Check direct name match (NOCASE)
+        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
         row = cursor.fetchone()
         if row:
             return self.get_by_id(row[0], conn=conn), False
         
-        # 2. Check alias match
-        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ?", (name,))
+        # 2. Check alias match (NOCASE)
+        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE NOCASE", (name,))
         row = cursor.fetchone()
         if row:
             return self.get_by_id(row[0], conn=conn), False
@@ -393,20 +453,46 @@ class ContributorRepository(GenericRepository[Contributor]):
                 if not res: return False
                 s_name = res[0]
                 
+                # Initialize Logger once for Batching
+                auditor = AuditLogger(conn)
+
                 # 2. Source Name becomes an alias for target (Optional)
                 source_name_alias_id = None
                 if create_alias:
                     cursor.execute("INSERT OR IGNORE INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_id, s_name))
-                    # Retrieve the AliasID for this name to preserve credit
+                    new_alias_id = cursor.lastrowid
+                    if new_alias_id:
+                        auditor.log_insert("ContributorAliases", new_alias_id, {"ContributorID": target_id, "AliasName": s_name})
+                    
+                    # Retrieve the AliasID for this name for song credit migration
                     cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ?", (target_id, s_name))
                     row = cursor.fetchone()
                     source_name_alias_id = row[0] if row else None
                 
-                # 3. Transfer existing Aliases
+                # 3. Transfer existing Aliases (Audited)
+                cursor.execute("SELECT AliasID, AliasName FROM ContributorAliases WHERE ContributorID = ?", (source_id,))
+                moving_aliases = cursor.fetchall()
+                for a_id, a_name in moving_aliases:
+                    auditor.log_update("ContributorAliases", a_id, 
+                        {"ContributorID": source_id, "AliasName": a_name},
+                        {"ContributorID": target_id, "AliasName": a_name}
+                    )
                 cursor.execute("UPDATE OR IGNORE ContributorAliases SET ContributorID = ? WHERE ContributorID = ?", (target_id, source_id))
                 
                 # 4. Transfer Song Roles (MediaSourceContributorRoles)
                 # Deduplicate before updating to avoid primary key violations
+                cursor.execute("""
+                    SELECT SourceID, RoleID FROM MediaSourceContributorRoles 
+                    WHERE ContributorID = ? AND (SourceID, RoleID) IN (
+                        SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?
+                    )
+                """, (source_id, target_id))
+                duplicates = cursor.fetchall()
+                for s_id, r_id in duplicates:
+                     # Log the deletion of the redundant link (Virtual Composite ID)
+                     auditor.log_delete("MediaSourceContributorRoles", f"{s_id}-{source_id}-{r_id}", 
+                         {"SourceID": s_id, "ContributorID": source_id, "RoleID": r_id})
+
                 cursor.execute("""
                     DELETE FROM MediaSourceContributorRoles 
                     WHERE ContributorID = ? AND (SourceID, RoleID) IN (
@@ -414,6 +500,13 @@ class ContributorRepository(GenericRepository[Contributor]):
                     )
                 """, (source_id, target_id))
                 
+                # Audit Migration
+                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?", (source_id,))
+                moving_roles = cursor.fetchall()
+                for s_id, r_id in moving_roles:
+                     auditor.log_update("MediaSourceContributorRoles", f"{s_id}-{source_id}-{r_id}", 
+                         {"ContributorID": source_id}, {"ContributorID": target_id})
+
                 # Update links: Point to TargetID.
                 if source_name_alias_id:
                      cursor.execute("""
@@ -430,7 +523,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                         WHERE ContributorID = ?
                      """, (target_id, source_id))
                 
-                # 5. Transfer Group Memberships
+                # 5. Transfer Group Memberships (Audited)
                 # Cleanup duplicates where source and target were already in the same relationship
                 cursor.execute("""
                     DELETE FROM GroupMembers 
@@ -438,6 +531,14 @@ class ContributorRepository(GenericRepository[Contributor]):
                         SELECT GroupID FROM GroupMembers WHERE MemberID = ?
                     )
                 """, (source_id, target_id))
+                
+                # Audit Member Transfer
+                cursor.execute("SELECT GroupID FROM GroupMembers WHERE MemberID = ?", (source_id,))
+                for (g_id,) in cursor.fetchall():
+                    auditor.log_update("GroupMembers", f"{g_id}-{source_id}", 
+                        {"MemberID": source_id}, 
+                        {"MemberID": target_id}
+                    )
                 cursor.execute("UPDATE GroupMembers SET MemberID = ? WHERE MemberID = ?", (target_id, source_id))
                 
                 cursor.execute("""
@@ -446,6 +547,14 @@ class ContributorRepository(GenericRepository[Contributor]):
                         SELECT MemberID FROM GroupMembers WHERE GroupID = ?
                     )
                 """, (source_id, target_id))
+                
+                # Audit Group Owner Transfer
+                cursor.execute("SELECT MemberID FROM GroupMembers WHERE GroupID = ?", (source_id,))
+                for (m_id,) in cursor.fetchall():
+                    auditor.log_update("GroupMembers", f"{source_id}-{m_id}", 
+                        {"GroupID": source_id}, 
+                        {"GroupID": target_id}
+                    )
                 cursor.execute("UPDATE GroupMembers SET GroupID = ? WHERE GroupID = ?", (target_id, source_id))
                 
                 # SAFETY: Remove any resulting self-references
@@ -455,7 +564,13 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (source_id,))
                 
                 # 7. Audit Log
-                AuditLogger(conn).log_delete("Contributors", source_id, old_snapshot)
+                auditor.log_delete("Contributors", source_id, old_snapshot)
+                
+                # High-level Merge Action (shares the same BatchID)
+                auditor.log_action(
+                    "MERGE", "Contributors", target_id, 
+                    {"absorbed_id": source_id, "absorbed_name": s_name, "alias_created": create_alias}
+                )
                 
                 return True
         except Exception as e:
@@ -511,9 +626,16 @@ class ContributorRepository(GenericRepository[Contributor]):
     def add_member(self, group_id: int, person_id: int) -> bool:
         """Add a member to a group."""
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("INSERT OR IGNORE INTO GroupMembers (GroupID, MemberID) VALUES (?, ?)", (group_id, person_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn).log_insert("GroupMembers", f"{group_id}-{person_id}", {
+                        "GroupID": group_id,
+                        "MemberID": person_id
+                    })
                 return cursor.rowcount > 0
         except Exception as e:
             return False
@@ -521,9 +643,20 @@ class ContributorRepository(GenericRepository[Contributor]):
     def remove_member(self, group_id: int, person_id: int) -> bool:
         """Remove a member from a group."""
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # Snapshot for Audit
+                cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ? AND MemberID = ?", (group_id, person_id))
+                row = cursor.fetchone()
+                if not row: return False
+                snapshot = {"GroupID": row[0], "MemberID": row[1]}
+
                 cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? AND MemberID = ?", (group_id, person_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn).log_delete("GroupMembers", f"{group_id}-{person_id}", snapshot)
                 return cursor.rowcount > 0
         except Exception as e:
             return False
@@ -544,7 +677,16 @@ class ContributorRepository(GenericRepository[Contributor]):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("INSERT INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (contributor_id, alias_name))
-                return cursor.lastrowid
+                new_id = cursor.lastrowid
+                
+                # Audit Aliases
+                from src.core.audit_logger import AuditLogger
+                AuditLogger(conn).log_insert("ContributorAliases", new_id, {
+                    "ContributorID": contributor_id,
+                    "AliasName": alias_name
+                })
+                
+                return new_id
         except Exception as e:
             return -1
 
@@ -564,6 +706,7 @@ class ContributorRepository(GenericRepository[Contributor]):
         The current primary name becomes a new alias.
         """
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
@@ -582,8 +725,6 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor.execute("UPDATE ContributorAliases SET AliasName = ? WHERE AliasID = ?", (old_primary, alias_id))
                 
                 # 5. STABLE SWAP of Credits
-                # Songs that pointed to Primary (NULL) should now point to Alias (Old Primary Name).
-                # Songs that pointed to Alias should now point to Primary (New Primary Name).
                 cursor.execute("""
                     UPDATE MediaSourceContributorRoles
                     SET CreditedAliasID = CASE
@@ -593,6 +734,15 @@ class ContributorRepository(GenericRepository[Contributor]):
                     WHERE ContributorID = ? 
                       AND (CreditedAliasID IS NULL OR CreditedAliasID = ?)
                 """, (alias_id, alias_id, contributor_id, alias_id))
+
+                # Auditor
+                auditor = AuditLogger(conn)
+
+                # 6. Audit Log
+                auditor.log_action(
+                    "PROMOTE_ALIAS", "Contributors", contributor_id, 
+                    {"new_primary": new_primary, "old_primary": old_primary}
+                )
                 
                 return True
         except Exception as e:
@@ -603,12 +753,28 @@ class ContributorRepository(GenericRepository[Contributor]):
     def delete_alias(self, alias_id: int) -> bool:
         """Delete an alias. Nullifies any specific credit references first."""
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # Snapshot for Audit
+                cursor.execute("SELECT AliasName, ContributorID FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
+                row = cursor.fetchone()
+                if not row: return False
+                snapshot = {"AliasName": row[0], "ContributorID": row[1]}
+
                 # 1. Nullify usage in credits (Reverts display to Primary Name)
                 cursor.execute("UPDATE MediaSourceContributorRoles SET CreditedAliasID = NULL WHERE CreditedAliasID = ?", (alias_id,))
+                
                 # 2. Delete
                 cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
+                
+                # Auditor
+                auditor = AuditLogger(conn)
+
+                # 3. Audit Log
+                auditor.log_delete("ContributorAliases", alias_id, snapshot)
+                
                 return cursor.rowcount > 0
         except Exception as e:
             return False

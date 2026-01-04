@@ -21,13 +21,14 @@ class TestAuditRepository:
         
         # Return a connection for AuditRepository
         conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
         yield conn
         conn.close()
     
     @pytest.fixture
     def repo(self, db_connection):
         """Fixture providing AuditRepository instance."""
-        return AuditRepository(db_connection)
+        return AuditRepository(connection=db_connection)
     
     class TestChangeLogOperations:
         """Tests for ChangeLog table operations."""
@@ -99,6 +100,20 @@ class TestAuditRepository:
             cursor.execute("SELECT COUNT(*) FROM ChangeLog WHERE BatchID = 'batch-003'")
             count = cursor.fetchone()[0]
             assert count == 2
+
+        def test_get_change_log(self, repo, db_connection):
+            """Test retrieving recent change log entries."""
+            rows = [
+                ("Songs", 1, "Title", "Old1", "New1", "batch-get-1"),
+                ("Songs", 2, "Artist", "Old2", "New2", "batch-get-1")
+            ]
+            repo.insert_change_logs(rows)
+            
+            logs = repo.get_change_log(limit=10)
+            assert len(logs) == 2
+            assert logs[0]['LogTableName'] == "Songs"
+            assert logs[0]['BatchID'] == "batch-get-1"
+            assert 'LogTimestamp' in logs[0]
     
     class TestDeletedRecordOperations:
         """Tests for DeletedRecords table operations."""
@@ -221,6 +236,16 @@ class TestAuditRepository:
             cursor.execute("SELECT COUNT(*) FROM ActionLog")
             count = cursor.fetchone()[0]
             assert count == 3
+
+        def test_get_action_log(self, repo, db_connection):
+            """Test retrieving recent action log entries."""
+            repo.insert_action_log("TEST_ACTION", "Table", 1, '{"key": "val"}', "user")
+            
+            logs = repo.get_action_log(limit=5)
+            assert len(logs) == 1
+            assert logs[0]['ActionLogType'] == "TEST_ACTION"
+            assert logs[0]['UserID'] == "user"
+            assert json.loads(logs[0]['ActionDetails'])['key'] == "val"
     
     class TestFailSecureBehavior:
         """Tests for fail-secure error handling."""

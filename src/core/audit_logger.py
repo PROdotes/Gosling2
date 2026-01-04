@@ -19,25 +19,21 @@ class AuditLogger:
     def __init__(self, connection):
         # Local import to avoid circular dependency if repositories import core
         from src.data.repositories.audit_repository import AuditRepository
-        self.audit_repo = AuditRepository(connection)
+        self.audit_repo = AuditRepository(connection=connection)
+        self.batch_id = str(uuid.uuid4())
 
     def log_insert(self, table_name: str, record_id: int, new_data: Dict[str, Any]) -> None:
-        """
-        Log a newly inserted record.
-        Practically, this writes all fields as 'NewValue' with 'OldValue' as None.
-        """
+        """Log a newly inserted record."""
         if not new_data:
             return
 
-        batch_id = str(uuid.uuid4())
-        
         # Flatten/normalize data before logging
         normalized = self._normalize_dict(new_data)
         
         rows = []
         for field, value in normalized.items():
             if value is not None:
-                rows.append((table_name, record_id, field, None, value, batch_id))
+                rows.append((table_name, record_id, field, None, value, self.batch_id))
         
         self.audit_repo.insert_change_logs(rows)
 
@@ -53,8 +49,6 @@ class AuditLogger:
         if not diffs:
             return # No actual changes
 
-        batch_id = str(uuid.uuid4())
-        
         rows = []
         for field, change in diffs.items():
             rows.append((
@@ -63,7 +57,7 @@ class AuditLogger:
                 field, 
                 change['old'], 
                 change['new'], 
-                batch_id
+                self.batch_id
             ))
         
         self.audit_repo.insert_change_logs(rows)
@@ -72,22 +66,31 @@ class AuditLogger:
         """
         Log deletion of a record.
         1. Writes full snapshot to DeletedRecords (Recycle Bin).
+        2. Writes field-level markers to ChangeLog for visibility.
         """
         if not old_data:
             return
 
-        batch_id = str(uuid.uuid4())
-        
         # 1. Archive to DeletedRecords
         serialized_snapshot = json.dumps(old_data, default=str)
-        self.audit_repo.insert_deleted_record(table_name, record_id, serialized_snapshot, batch_id)
+        self.audit_repo.insert_deleted_record(table_name, record_id, serialized_snapshot, self.batch_id)
+
+        # 2. Add to ChangeLog so it shows up in "Data History"
+        normalized = self._normalize_dict(old_data)
+        rows = []
+        for field, value in normalized.items():
+            if value is not None:
+                rows.append((table_name, record_id, field, value, None, self.batch_id))
+        
+        if rows:
+            self.audit_repo.insert_change_logs(rows)
 
     def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None, user_id: str = None) -> None:
         """
         Log a high-level user action (e.g. "Imported File", "Added to Playlist").
         """
         details_json = json.dumps(details, default=str) if details else None
-        self.audit_repo.insert_action_log(action_type, target_table, target_id, details_json, user_id)
+        self.audit_repo.insert_action_log(action_type, target_table, target_id, details_json, user_id, self.batch_id)
 
 
     # --- INTERNAL HELPERS ---
@@ -104,16 +107,17 @@ class AuditLogger:
             if isinstance(v, list):
                 # Filter None/Empty, convert to string, sort
                 items = sorted([str(x).strip() for x in v if x])
-                normalized[k] = ", ".join(items)
+                val = ", ".join(items)
+                normalized[k] = val if val else None # Normalize empty list to None
                 
-            # Bool Handling: explicit 0/1 or True/False string? 
-            # Database usually stores 1/0. Let's standarize to '1'/'0' or 'True'/'False'
+            # Bool Handling: explicit 0/1 
             elif isinstance(v, bool):
                 normalized[k] = "1" if v else "0"
                 
-            # Primitives: Convert to string
+            # Primitives: Convert to string, normalize empty to None
             else:
-                normalized[k] = str(v)
+                s_val = str(v).strip()
+                normalized[k] = s_val if s_val else None
                 
         return normalized
 

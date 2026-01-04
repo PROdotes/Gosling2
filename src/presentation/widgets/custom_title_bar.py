@@ -15,6 +15,7 @@ class CustomTitleBar(QWidget):
     maximize_requested = pyqtSignal()
     import_requested = pyqtSignal()
     logs_requested = pyqtSignal()
+    history_requested = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -50,9 +51,13 @@ class CustomTitleBar(QWidget):
         act_logs = QAction("📋 DIAGNOSTIC CONSOLE", self)
         act_logs.triggered.connect(self.logs_requested.emit)
         
+        act_history = QAction("🕰️ LOG HISTORY (AUDIT)", self)
+        act_history.triggered.connect(self.history_requested.emit)
+        
         self.system_menu.addAction(act_settings)
         self.system_menu.addSeparator()
         self.system_menu.addAction(act_logs)
+        self.system_menu.addAction(act_history)
         
         self.btn_logo_icon.clicked.connect(self._show_system_menu)
         

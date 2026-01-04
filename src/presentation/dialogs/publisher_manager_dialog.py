@@ -54,9 +54,9 @@ class PublisherPickerDialog(QDialog):
     Searchable combo dialog for selecting an existing publisher.
     Now supports Smart Creation (matching Artist workflow).
     """
-    def __init__(self, repo, exclude_ids=None, parent=None):
+    def __init__(self, service, exclude_ids=None, parent=None):
         super().__init__(parent)
-        self.repo = repo
+        self.service = service
         self.exclude_ids = exclude_ids or set()
         self.selected_pub = None
         
@@ -113,7 +113,7 @@ class PublisherPickerDialog(QDialog):
     def _populate(self):
         self.cmb.blockSignals(True)
         self.cmb.clear()
-        all_pubs = self.repo.search("")
+        all_pubs = self.service.search("")
         for p in all_pubs:
             if p.publisher_id not in self.exclude_ids:
                 self.cmb.addItem(p.publisher_name, p.publisher_id)
@@ -130,12 +130,12 @@ class PublisherPickerDialog(QDialog):
 
         # Case A: Selection from list
         if pub_id:
-            self.selected_pub = self.repo.get_by_id(pub_id)
+            self.selected_pub = self.service.get_by_id(pub_id)
             self.accept()
             return
 
         # Case B: Direct typed but matches existing?
-        existing = self.repo.find_by_name(current_text)
+        existing = self.service.find_by_name(current_text)
         if existing:
             self.selected_pub = existing
             self.accept()
@@ -152,7 +152,7 @@ class PublisherPickerDialog(QDialog):
 
         if reply == QMessageBox.StandardButton.Yes:
             try:
-                new_pub, _ = self.repo.get_or_create(current_text)
+                new_pub, _ = self.service.get_or_create(current_text)
                 self.selected_pub = new_pub
                 self.accept()
             except Exception as e:
@@ -166,10 +166,10 @@ class PublisherDetailsDialog(QDialog):
     T-63: Publisher Relationship Editor.
     Small modal to manage Parent/Child relationships.
     """
-    def __init__(self, publisher, repo, allow_remove_from_context=False, parent=None):
+    def __init__(self, publisher, service, allow_remove_from_context=False, parent=None):
         super().__init__(parent)
         self.pub = publisher
-        self.repo = repo
+        self.service = service
         self.allow_remove = allow_remove_from_context
         self.setWindowTitle(f"Manager: {publisher.publisher_name}")
         self.setFixedSize(360, 450)
@@ -278,7 +278,7 @@ class PublisherDetailsDialog(QDialog):
 
     def _refresh_data(self):
         # Load all publishers for Parent Combo (except self)
-        all_pubs = self.repo.search("")
+        all_pubs = self.service.search("")
         self.cmb_parent.blockSignals(True)
         self.cmb_parent.clear()
         self.cmb_parent.addItem("(None)", None)
@@ -308,7 +308,7 @@ class PublisherDetailsDialog(QDialog):
         if diag.exec():
             name = diag.get_name()
             if name:
-                new_pub, created = self.repo.get_or_create(name)
+                new_pub, created = self.service.get_or_create(name)
                 self._refresh_data()
                 # Auto-select the newly created parent
                 idx = self.cmb_parent.findData(new_pub.publisher_id)
@@ -319,7 +319,7 @@ class PublisherDetailsDialog(QDialog):
     def _on_child_double_clicked(self, item):
         """Rename the double-clicked child."""
         child_id = item.data(Qt.ItemDataRole.UserRole)
-        child_pub = self.repo.get_by_id(child_id)
+        child_pub = self.service.get_by_id(child_id)
         if not child_pub: return
         
         diag = PublisherCreatorDialog(
@@ -332,7 +332,7 @@ class PublisherDetailsDialog(QDialog):
             new_name = diag.get_name()
             if new_name and new_name != child_pub.publisher_name:
                 child_pub.publisher_name = new_name
-                if self.repo.update(child_pub):
+                if self.service.update(child_pub):
                     self._refresh_data()
 
     def _show_child_context_menu(self, pos):
@@ -354,13 +354,13 @@ class PublisherDetailsDialog(QDialog):
     def _remove_child_link(self, item):
         """Sever the parent->child relationship."""
         child_id = item.data(Qt.ItemDataRole.UserRole)
-        child_pub = self.repo.get_by_id(child_id)
+        child_pub = self.service.get_by_id(child_id)
         if not child_pub: return
         
         if QMessageBox.question(self, "Remove Link", 
                                 f"Are you sure you want to remove '{child_pub.publisher_name}' from being a subsidiary?") == QMessageBox.StandardButton.Yes:
             child_pub.parent_publisher_id = None
-            if self.repo.update(child_pub):
+            if self.service.update(child_pub):
                 self._refresh_data()
 
     def _add_child(self):
@@ -372,50 +372,28 @@ class PublisherDetailsDialog(QDialog):
         current = self.pub
         while current.parent_publisher_id:
             exclude.add(current.parent_publisher_id)
-            current = self.repo.get_by_id(current.parent_publisher_id)
+            current = self.service.get_by_id(current.parent_publisher_id)
             if not current:
                 break
         
-        diag = PublisherPickerDialog(self.repo, exclude_ids=exclude, parent=self)
+        diag = PublisherPickerDialog(self.service, exclude_ids=exclude, parent=self)
         if diag.exec():
             child_pub = diag.get_selected()
             if child_pub:
                 # Double-check: would this create a cycle?
-                # (child becoming parent of self via its descendants)
-                if self._would_create_cycle(child_pub.publisher_id, self.pub.publisher_id):
+                if self.service.would_create_cycle(child_pub.publisher_id, self.pub.publisher_id):
                     QMessageBox.warning(self, "Circular Link Detected",
                                        "Cannot add this publisher - it would create a circular relationship.")
                     return
                 
                 # Set its parent to this publisher
                 child_pub.parent_publisher_id = self.pub.publisher_id
-                self.repo.update(child_pub)
+                self.service.update(child_pub)
                 
                 # Refresh the children list
                 self._refresh_data()
 
-    def _would_create_cycle(self, child_id, proposed_parent_id):
-        """Check if setting proposed_parent_id as parent of child_id would create a cycle."""
-        if not proposed_parent_id:
-            return False
-        if proposed_parent_id == child_id:
-            return True  # Can't be your own parent
-        
-        # Walk up the parent chain from proposed_parent
-        visited = {child_id}
-        current_id = proposed_parent_id
-        
-        while current_id:
-            if current_id in visited:
-                return True  # Found a cycle!
-            visited.add(current_id)
-            
-            parent_obj = self.repo.get_by_id(current_id)
-            if not parent_obj:
-                break
-            current_id = parent_obj.parent_publisher_id
-        
-        return False
+
 
     def _save(self):
         new_name = self.txt_name.text().strip()
@@ -424,7 +402,7 @@ class PublisherDetailsDialog(QDialog):
         parent_id = self.cmb_parent.currentData()
         
         # Full circularity check (walks entire parent chain)
-        if self._would_create_cycle(self.pub.publisher_id, parent_id):
+        if self.service.would_create_cycle(self.pub.publisher_id, parent_id):
             QMessageBox.warning(self, "Circular Link Detected", 
                                "Cannot set this parent - it would create a circular relationship.")
             return
@@ -432,7 +410,7 @@ class PublisherDetailsDialog(QDialog):
         self.pub.publisher_name = new_name
         self.pub.parent_publisher_id = parent_id
         
-        if self.repo.update(self.pub):
+        if self.service.update(self.pub):
             self.accept()
         else:
             QMessageBox.warning(self, "Error", "Failed to update publisher.")
@@ -445,9 +423,9 @@ class PublisherPickerWidget(QWidget):
     """
     publisher_selected = pyqtSignal(int, str)
 
-    def __init__(self, publisher_repository, parent=None):
+    def __init__(self, publisher_service, parent=None):
         super().__init__(parent)
-        self.pub_repo = publisher_repository
+        self.service = publisher_service
         self._init_ui()
         self._refresh_list() # Initial load
 
@@ -488,7 +466,7 @@ class PublisherPickerWidget(QWidget):
         self.btn_action.setText("Create New Label (+)")
         self.btn_action.setProperty("mode", "create")
         
-        results = self.pub_repo.search(query)
+        results = self.service.search(query)
         
         for pub in results:
             item = QListWidgetItem(pub.publisher_name)
@@ -540,7 +518,7 @@ class PublisherPickerWidget(QWidget):
         if diag.exec():
             new_name = diag.get_name()
             if new_name:
-                pub, created = self.pub_repo.get_or_create(new_name)
+                pub, created = self.service.get_or_create(new_name)
                 self._refresh_list(new_name)
                 # Auto-select the new item!
                 for i in range(self.list_pubs.count()):
@@ -577,14 +555,15 @@ class PublisherPickerWidget(QWidget):
 
     def _delete_publisher(self, pub_id, pub_name):
         # Safety Check
-        album_count = self.pub_repo.get_album_count(pub_id)
-        child_count = self.pub_repo.get_child_count(pub_id)
+        stats = self.service.get_usage_stats(pub_id)
+        album_count = stats['album_count']
+        child_count = stats['child_count']
         
         # Check Parent Status
-        pub = self.pub_repo.get_by_id(pub_id)
+        pub = self.service.get_by_id(pub_id)
         parent_name = None
         if pub and pub.parent_publisher_id:
-            parent = self.pub_repo.get_by_id(pub.parent_publisher_id)
+            parent = self.service.get_by_id(pub.parent_publisher_id)
             if parent: parent_name = parent.publisher_name
 
         msg = f"Are you sure you want to delete '{pub_name}'?"
@@ -601,7 +580,7 @@ class PublisherPickerWidget(QWidget):
             
         rv = QMessageBox.question(self, "Confirm Delete", msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if rv == QMessageBox.StandardButton.Yes:
-            if self.pub_repo.delete(pub_id):
+            if self.service.delete(pub_id):
                 self.btn_action.setText("Create New Label (+)") # Reset UI state
                 self.btn_action.setProperty("mode", "create")
                 self.publisher_selected.emit(0, "") # Signal clear
@@ -615,10 +594,10 @@ class PublisherPickerWidget(QWidget):
         pass
 
     def _open_manager(self, pub_id):
-        pub = self.pub_repo.get_by_id(pub_id)
+        pub = self.service.get_by_id(pub_id)
         if not pub: return
         
-        diag = PublisherDetailsDialog(pub, self.pub_repo, self)
+        diag = PublisherDetailsDialog(pub, self.service, self)
         if diag.exec():
             # Refresh list to show changes (like renames)
             self._refresh_list(self.txt_search.text()) 
@@ -626,10 +605,10 @@ class PublisherPickerWidget(QWidget):
 
 class PublisherManagerDialog(QDialog):
     """Refactored legacy bridge (Optional)."""
-    def __init__(self, repo, parent=None):
+    def __init__(self, service, parent=None):
         super().__init__(parent)
         self.setFixedSize(400, 500)
         layout = QVBoxLayout(self)
-        self.picker = PublisherPickerWidget(repo, self)
+        self.picker = PublisherPickerWidget(service, self)
         layout.addWidget(self.picker)
         self.picker.publisher_selected.connect(lambda i, n: self.accept())

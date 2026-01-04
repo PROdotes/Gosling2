@@ -157,12 +157,30 @@ class MainWindow(QMainWindow):
         self.tag_repository = TagRepository(db_path)
 
         # 3. Initialize Business Services
+        from ...business.services.song_service import SongService
+        from ...business.services.contributor_service import ContributorService
+        from ...business.services.album_service import AlbumService
+        from ...business.services.publisher_service import PublisherService
+        from ...business.services.tag_service import TagService
+        from ...business.services.audit_service import AuditService
+
+        self.song_service = SongService(self.song_repository)
+        self.contributor_service = ContributorService(self.contributor_repository)
+        self.album_service = AlbumService(self.album_repository)
+        self.publisher_service = PublisherService(self.publisher_repository)
+        self.tag_service = TagService(self.tag_repository)
+        
+        # Initialize Audit Repository and Service
+        from ...data.repositories.audit_repository import AuditRepository
+        self.audit_repository = AuditRepository(db_path)
+        self.audit_service = AuditService(self.audit_repository)
+
         self.library_service = LibraryService(
-            self.song_repository, 
-            self.contributor_repository, 
-            self.album_repository,
-            self.publisher_repository,
-            self.tag_repository
+            self.song_service, 
+            self.contributor_service, 
+            self.album_service,
+            self.publisher_service,
+            self.tag_service
         )
         self.metadata_service = MetadataService()
         self.playback_service = PlaybackService(self.settings_manager)
@@ -378,6 +396,7 @@ class MainWindow(QMainWindow):
         # --- T-57: Global Settings Trigger ---
         self.title_bar.settings_requested.connect(self._open_settings)
         self.title_bar.logs_requested.connect(self._open_logs)
+        self.title_bar.history_requested.connect(self._open_audit_history)
 
 
     def _setup_shortcuts(self) -> None:
@@ -768,7 +787,7 @@ class MainWindow(QMainWindow):
         
         try:
             for song_id, changes in staged_changes.items():
-                song = self.library_service.song_repository.get_by_id(song_id)
+                song = self.library_service.get_song_by_id(song_id)
                 if not song: continue
                 
                 # Metadata Editing Logic (T-46): Tracking Orphans
@@ -804,8 +823,7 @@ class MainWindow(QMainWindow):
                             
                             if primary_id:
                                 # We need access to AlbumRepo
-                                # self.library_service.album_repo is available
-                                album_obj = self.library_service.album_repo.get_by_id(primary_id)
+                                album_obj = self.library_service.get_album_by_id(primary_id)
                                 if album_obj and album_obj.album_artist:
                                     song.album_artist = album_obj.album_artist
                                 else:
@@ -853,10 +871,9 @@ class MainWindow(QMainWindow):
                 
                 # Check for Auto-Rename BEFORE refresh so we can batch the UI update
                 rename_needed = False
-                tag_repo = self.library_service.tag_repo if hasattr(self.library_service, 'tag_repo') else None
                 for song in songs_to_check:
                     # Permission to rename = NOT unprocessed
-                    is_unprocessed = tag_repo.is_unprocessed(song.source_id) if tag_repo else True
+                    is_unprocessed = self.library_service.is_song_unprocessed(song.source_id)
                     if not is_unprocessed:
                         try:
                             target = self.renaming_service.calculate_target_path(song)
@@ -935,6 +952,16 @@ class MainWindow(QMainWindow):
     def _open_logs(self):
         """Open the Diagnostic Log Viewer."""
         dlg = LogViewerDialog(self.settings_manager, self)
+        dlg.exec()
+
+    def _open_audit_history(self):
+        """Open the Audit History Flight Recorder."""
+        from ..dialogs.audit_history_dialog import AuditHistoryDialog
+        dlg = AuditHistoryDialog(
+            self.audit_service, 
+            resolver=self.library_service.get_human_name,
+            parent=self
+        )
         dlg.exec()
 
     def changeEvent(self, event):

@@ -86,7 +86,7 @@ class TestArtistPickerDialog:
 
     def test_initialization(self, qtbot, mock_repo):
         """Test picker initializes and populates list."""
-        dialog = ArtistPickerDialog(repo=mock_repo)
+        dialog = ArtistPickerDialog(service=mock_repo)
         qtbot.addWidget(dialog)
         
         assert dialog.windowTitle() == "Select Artist"
@@ -95,7 +95,7 @@ class TestArtistPickerDialog:
 
     def test_filter_by_type(self, qtbot, mock_repo):
         """Test picker can filter by artist type."""
-        dialog = ArtistPickerDialog(repo=mock_repo, filter_type="person")
+        dialog = ArtistPickerDialog(service=mock_repo, filter_type="person")
         qtbot.addWidget(dialog)
         
         # The repo.search is called; filtering happens client-side
@@ -104,14 +104,14 @@ class TestArtistPickerDialog:
     def test_exclude_ids(self, qtbot, mock_repo):
         """Test picker excludes specified IDs."""
         exclude = {1, 2}
-        dialog = ArtistPickerDialog(repo=mock_repo, exclude_ids=exclude)
+        dialog = ArtistPickerDialog(service=mock_repo, exclude_ids=exclude)
         qtbot.addWidget(dialog)
         
         assert dialog.exclude_ids == exclude
 
     def test_get_selected_returns_none_before_selection(self, qtbot, mock_repo):
         """Test get_selected returns None when nothing selected."""
-        dialog = ArtistPickerDialog(repo=mock_repo)
+        dialog = ArtistPickerDialog(service=mock_repo)
         qtbot.addWidget(dialog)
         
         # Verified Fix: Should return None, not raise AttributeError
@@ -144,7 +144,7 @@ class TestArtistDetailsDialog:
 
     def test_initialization(self, qtbot, mock_artist, mock_repo):
         """Test details dialog initializes correctly."""
-        dialog = ArtistDetailsDialog(artist=mock_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         assert dialog.artist == mock_artist
@@ -160,7 +160,7 @@ class TestArtistDetailsDialog:
             type="group"
         )
         
-        dialog = ArtistDetailsDialog(artist=group_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=group_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         assert dialog.txt_name.text() == "The Band"
@@ -169,7 +169,7 @@ class TestArtistDetailsDialog:
 
     def test_add_alias(self, qtbot, mock_artist, mock_repo):
         """Test adding an alias to artist."""
-        dialog = ArtistDetailsDialog(artist=mock_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         # Mock the ArtistCreatorDialog to return name without showing
@@ -188,7 +188,7 @@ class TestArtistDetailsDialog:
 
     def test_add_alias_cancelled(self, qtbot, mock_artist, mock_repo):
         """Test cancelling alias addition."""
-        dialog = ArtistDetailsDialog(artist=mock_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         # Mock the ArtistCreatorDialog to simulate cancel
@@ -203,7 +203,7 @@ class TestArtistDetailsDialog:
 
     def test_save_updates_name(self, qtbot, mock_artist, mock_repo):
         """Test saving updates the artist name."""
-        dialog = ArtistDetailsDialog(artist=mock_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         # Change the name
@@ -222,7 +222,7 @@ class TestArtistDetailsDialog:
 
     def test_person_shows_belongs_to_groups_label(self, qtbot, mock_artist, mock_repo):
         """Test person type shows correct membership label."""
-        dialog = ArtistDetailsDialog(artist=mock_artist, repo=mock_repo)
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
         assert dialog.lbl_member.text() == "BELONGS TO GROUPS"

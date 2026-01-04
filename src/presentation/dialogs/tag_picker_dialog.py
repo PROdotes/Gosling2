@@ -100,9 +100,9 @@ class TagPickerDialog(QDialog):
     - Create-on-the-fly for new tags
     """
     
-    def __init__(self, tag_repo, default_category="Genre", target_tag=None, parent=None):
+    def __init__(self, tag_service, default_category="Genre", target_tag=None, parent=None):
         super().__init__(parent)
-        self.tag_repo = tag_repo
+        self.tag_service = tag_service
         self.default_category = default_category
         self.target_tag = target_tag
         self._selected_tag = None
@@ -166,8 +166,8 @@ class TagPickerDialog(QDialog):
             "Energy": "⚡",
         }
         
-        # Query distinct categories from DB
-        categories = self.tag_repo.get_distinct_categories()
+        # Query distinct categories from Service
+        categories = self.tag_service.get_distinct_categories()
         
         # Glow colors for tag categories
         category_colors = {
@@ -369,7 +369,7 @@ class TagPickerDialog(QDialog):
         # Add any custom categories from DB
         # Add any custom categories from DB
         try:
-            db_cats = self.tag_repo.get_distinct_categories()
+            db_cats = self.tag_service.get_distinct_categories()
             for c in db_cats:
                 categories.add(c)
         except Exception:
@@ -400,7 +400,7 @@ class TagPickerDialog(QDialog):
             if query:
                 # Global Search (Speed Mode)
                 # Fetch all tags if query is present, regardless of category filter
-                tags = self.tag_repo.get_all_tags()
+                tags = self.tag_service.get_all_tags()
                 tags = [t for t in tags if query in t.tag_name.lower()]
                 
                 # Prioritize matches in current category filter (if active)
@@ -409,9 +409,9 @@ class TagPickerDialog(QDialog):
             else:
                 # Lazy Mode: Filter by category
                 if self._current_category_filter:
-                    tags = self.tag_repo.get_all_by_category(self._current_category_filter)
+                    tags = self.tag_service.get_all_by_category(self._current_category_filter)
                 else:
-                    tags = self.tag_repo.get_all_tags()
+                    tags = self.tag_service.get_all_tags()
             
             # Add "Create new" option FIRST if query doesn't exactly match IN THIS CATEGORY
             # This prioritizes CREATION (Speed) over selection of partial matches
@@ -490,7 +490,7 @@ class TagPickerDialog(QDialog):
             _, tag_query = self._parse_prefix(text)
             if tag_query:
                 category = self._current_category_filter or self.default_category
-                self._selected_tag, _ = self.tag_repo.get_or_create(tag_query, category)
+                self._selected_tag, _ = self.tag_service.get_or_create(tag_query, category)
                 self.accept()
             return
         
@@ -499,7 +499,7 @@ class TagPickerDialog(QDialog):
         if isinstance(data, tuple) and data[0] == "CREATE":
             # Create new tag
             _, name, category = data
-            self._selected_tag, _ = self.tag_repo.get_or_create(name, category)
+            self._selected_tag, _ = self.tag_service.get_or_create(name, category)
         else:
             # Select existing tag
             self._selected_tag = data

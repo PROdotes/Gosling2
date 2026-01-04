@@ -42,19 +42,25 @@ class TagRepository(GenericRepository[Tag]):
                 return Tag.from_row(row)
         return None
 
-    def _insert_db(self, cursor: sqlite3.Cursor, tag: Tag) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, tag: Tag, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute("INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)", (tag.tag_name, tag.category))
         return cursor.lastrowid
 
-    def _update_db(self, cursor: sqlite3.Cursor, tag: Tag) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, tag: Tag, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
         cursor.execute("UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?", 
                       (tag.tag_name, tag.category, tag.tag_id))
 
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
-        # Cleanup links first (Manual Cascade)
+        auditor = kwargs.get('auditor')
+        # Cleanup links first (Manual Cascade, Audited)
+        if auditor:
+            cursor.execute("SELECT SourceID FROM MediaSourceTags WHERE TagID = ?", (record_id,))
+            for (s_id,) in cursor.fetchall():
+                 auditor.log_delete("MediaSourceTags", f"{s_id}-{record_id}", {"SourceID": s_id, "TagID": record_id})
+
         cursor.execute("DELETE FROM MediaSourceTags WHERE TagID = ?", (record_id,))
         cursor.execute("DELETE FROM Tags WHERE TagID = ?", (record_id,))
 
@@ -98,15 +104,30 @@ class TagRepository(GenericRepository[Tag]):
             tag_obj, _ = self.get_or_create(tag_id, category)
             tag_id = tag_obj.tag_id
 
-        query = "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)"
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            conn.execute(query, (source_id, tag_id))
+            # Check if link already exists
+            cur = conn.execute("SELECT 1 FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
+            if cur.fetchone(): return
+
+            conn.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (source_id, tag_id))
+            AuditLogger(conn).log_insert("MediaSourceTags", f"{source_id}-{tag_id}", {
+                "SourceID": source_id,
+                "TagID": tag_id
+            })
 
     def remove_tag_from_source(self, source_id: int, tag_id: int) -> None:
         """Unlink a tag from a source item."""
-        query = "DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?"
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            conn.execute(query, (source_id, tag_id))
+            # Snapshot for audit
+            cur = conn.execute("SELECT SourceID, TagID FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
+            row = cur.fetchone()
+            if not row: return
+            snapshot = {"SourceID": row[0], "TagID": row[1]}
+
+            conn.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
+            AuditLogger(conn).log_delete("MediaSourceTags", f"{source_id}-{tag_id}", snapshot)
             
     def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None) -> None:
         """
@@ -124,7 +145,18 @@ class TagRepository(GenericRepository[Tag]):
             query = "DELETE FROM MediaSourceTags WHERE SourceID = ?"
             params = (source_id,)
             
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
+            auditor = AuditLogger(conn)
+            # Find all tags being removed for auditing
+            if category:
+                cursor = conn.execute("SELECT SourceID, T.TagID FROM MediaSourceTags MT JOIN Tags T ON MT.TagID = T.TagID WHERE SourceID = ? AND TagCategory = ?", (source_id, category))
+            else:
+                cursor = conn.execute("SELECT SourceID, TagID FROM MediaSourceTags WHERE SourceID = ?", (source_id,))
+            
+            for row in cursor.fetchall():
+                 auditor.log_delete("MediaSourceTags", f"{row[0]}-{row[1]}", {"SourceID": row[0], "TagID": row[1]})
+
             conn.execute(query, params)
 
     def get_tags_for_source(self, source_id: int, category: Optional[str] = None) -> List[Tag]:
@@ -229,20 +261,30 @@ class TagRepository(GenericRepository[Tag]):
                 old_tag = self.get_by_id(source_id)
                 old_snapshot = old_tag.to_dict() if old_tag else {}
 
-                # 1. Reassign links, ignore duplicates
-                cursor.execute(
-                    "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) "
-                    "SELECT SourceID, ? FROM MediaSourceTags WHERE TagID = ?",
-                    (target_id, source_id)
-                )
-                # 2. Cleanup old links
+                # Auditor for Batching
+                auditor = AuditLogger(conn)
+
+                # 1. Audit Migration: Find all links that will move
+                cursor.execute("SELECT SourceID, TagID FROM MediaSourceTags WHERE TagID = ?", (source_id,))
+                for s_id, t_id in cursor.fetchall():
+                     # If target already exists, this is a delete
+                     cursor.execute("SELECT 1 FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (s_id, target_id))
+                     if cursor.fetchone():
+                          auditor.log_delete("MediaSourceTags", f"{s_id}-{source_id}", {"SourceID": s_id, "TagID": source_id})
+                     else:
+                          auditor.log_update("MediaSourceTags", f"{s_id}-{source_id}", {"TagID": source_id}, {"TagID": target_id})
+
+                # Move tags (Deduplicate)
+                cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) SELECT SourceID, ? FROM MediaSourceTags WHERE TagID = ?", (target_id, source_id))
                 cursor.execute("DELETE FROM MediaSourceTags WHERE TagID = ?", (source_id,))
                 
                 # 3. Delete tag
                 cursor.execute("DELETE FROM Tags WHERE TagID = ?", (source_id,))
                 
                 # 4. Log Audit
-                AuditLogger(conn).log_delete("Tags", source_id, old_snapshot)
+                auditor.log_delete("Tags", source_id, old_snapshot)
+                
+                auditor.log_action("MERGE_TAGS", "Tags", target_id, {"absorbed_id": source_id})
                 
             return True
         except Exception as e:

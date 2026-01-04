@@ -91,7 +91,8 @@ tags:
     *   *Status*: **Core Schema & Logic Done**.
     *   *Ref*: `PROPOSAL_MULTI_ALBUM_INFRASTRUCTURE.md`.
 *   [ ] **Audit Log (History)** (T-05) (~1.0 h)
-    *   *Task*: Record INSERT/UPDATE events.
+    *   *Task*: Record INSERT/UPDATE events and expose via UI.
+    *   *Status*: **In Progress** - Added retrieval logic to AuditRepository; building AuditService.
     *   *Blocker*: Requires Generic Repository (CRUD Refactor).
 *   [ ] **Advanced Rule Editor** (T-82) (~2.0 h)
     *   *Task*: UI for managing `rules.json` (Genre Routing, Profiles) inside Settings.
@@ -114,7 +115,8 @@ tags:
 ## 📉 Technician's Corner (Tech Debt)
 *Non-blocking, but beneficial.*
 
-*   [ ] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
+*   [x] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
+    *   *Status*: **Done** - Core ABC and SongRepository integration complete.
 *   [x] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
 *   [ ] **Unified Input Dialog** (T-85): Extract `TagRenameDialog` logic to reusable module; replace all `QInputDialog`s.
 -   [x] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
@@ -131,4 +133,42 @@ tags:
 4.  Writes all ID3 tags (including custom ones) verified.
 5.  Persists all changes to DB with History log.
 
-test multi edit:
+
+
+### 🚀 Milestone 6: Post-Alpha Refinements (Tomorrow/Future)
+*   [ ] **Fix & Silence Test Suite (TOP PRIORITY)**
+    *   *Task*: Fix 33 Failures / 17 Errors caused by recent refactors.
+    *   *Task*: Silence interactive popups (e.g. `add_alias`) to restore "Law of Silence".
+*   [ ] **Album Artist M2M Schema** (T-91)
+    *   *Task*: Upgrade `Albums.AlbumArtist` from text to `AlbumContributors` (M2M) table.
+    *   *Why*: Fixes "Existential Dread" - allows linking multiple identities to an album properly.
+*   [ ] **Album Publisher Backend catch-up**
+    *   *Task*: Ensure Album Manager "Tags" UI correctly writes multiple rows to `AlbumPublishers`.
+*   [ ] **Wire up Chips inside Album Manager**
+    *   *Task*: Make clicking Artist/Publisher chips *inside* the Album Editor open their respective Managers (currently does nothing).
+    *   *Bug*: Clicking Inherited Publisher on Side Panel incorrectly triggers "Add New" dialog instead of just focusing the Album Editor.
+*   [ ] **Safe Save Logic (Tag/DB Sync)**
+    *   *Observation*: Currently tags are written *before* DB commit. If DB fails (encoding crash), tags remain written but DB rolls back -> Desync.
+    *   *Task*: Move Tag Writing to *after* successful DB commit, OR wrap both in a revertable transaction (hard for files). Best strategy: DB Commit -> Then Write Tags.
+*   [ ] **UX: "Active" Toggle Styling**
+    *   *Task*: Replace ugly "Active" checkbox (bottom of Side Panel) with a Pro "Toggle Button" or switch.
+    *   *Why*: Critical control (Airplay Gate) looks like a debug checkbox. Needs visual weight.
+*   [ ] **Tag Editing Improvements**
+    *   *Bug*: "Ghost Conflict" - Renaming tag seems to create the new tag *before* checking for conflict, triggering false positive "Exists".
+    *   *Feature*: **True Rename** - Renaming "Rock" -> "Rockk" currently creates new "Rockk" tag (link swap) instead of renaming the ID itself. Need "Rename vs Create New" logic.
+    *   *Feature*: **Category Mutability** - Allow changing a tag's category (e.g. Mood:Jazz -> Genre:Jazz) directly in the UI.
+*   [ ] **Bug: Duration Import Zero**
+    *   *Observation*: "Duration isn't getting imported from the song."
+    *   *Hypothesis*: New `ImportService` or `GenericRepository` mapping might be missing the `Duration` field or calculating it wrong (int vs float, ms vs sec).
+*   [ ] **UX: Chip Instant Save?**
+    *   *Observation*: Users expect removing a chip to be "final/instant". Current "Save" button flow feels disconnected for Chips.
+    *   *Task*: Discuss/Implement instant-save or better dirty state feedback for Chip actions in Album Manager.
+*   [ ] **UX: Chip Sorting Stability**
+    *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
+    *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.
+*   [ ] **Verify Multi-Edit Logic & Tech Debt Audit**
+    *   *Task*: Test adding/removing tags in multi-select mode.
+    *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
+*   [ ] **Universal "Data Editor" Refactor** (T-85)
+    *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
+    *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.

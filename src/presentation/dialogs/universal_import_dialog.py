@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex, QDir, QSize
 from PyQt6.QtGui import QColor, QFont, QFileSystemModel
 
-from ..widgets.glow import GlowButton
+from ..widgets.glow_factory import GlowButton
 
 class UniversalImportDialog(QDialog):
     """

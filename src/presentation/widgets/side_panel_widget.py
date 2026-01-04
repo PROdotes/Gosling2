@@ -44,13 +44,10 @@ class SidePanelWidget(QFrame):
         self.setObjectName("SidePanelEditor")
         
         # Dependency Injection for Dialogs
-        # We need access to the album repository. Assuming library service has access or can provide it.
-        # For strict DI, we should pass it, but for now we'll reach through library_service if needed
-        # or assume library_service acts as the repository provider.
-        self.album_repo = library_service.album_repo # Assuming exposed
-        self.publisher_repo = library_service.publisher_repo
-        self.tag_repo = library_service.tag_repo
-        self.contributor_repo = library_service.contributor_repository
+        self.album_service = library_service.album_service
+        self.publisher_service = library_service.publisher_service
+        self.tag_service = library_service.tag_service
+        self.contributor_service = library_service.contributor_service
         
         self.isrc_collision = False
         
@@ -271,8 +268,8 @@ class SidePanelWidget(QFrame):
             # Status check: The Tag is the Law
             # Ready = No 'Status:Unprocessed' tag
             is_ready = True
-            if hasattr(self, 'tag_repo') and self.tag_repo:
-                is_ready = not self.tag_repo.is_unprocessed(song.source_id)
+            if hasattr(self, 'tag_service') and self.tag_service:
+                is_ready = not self.tag_service.is_unprocessed(song.source_id)
             
             # Update Button State (if it exists)
             if self.btn_status:
@@ -625,15 +622,15 @@ class SidePanelWidget(QFrame):
                                 # (id, name, icon, is_ghost, is_inherited, tooltip, zone, is_primary)
                                 # NOTE: is_primary star only shown for Genre (first item)
                                 if field_name == 'genre':
-                                    # Genres now use the TagRepository
-                                    tag, created = self.tag_repo.get_or_create(str(n), category='Genre')
+                                    # Genres now use the TagService
+                                    tag, created = self.tag_service.get_or_create(str(n), category='Genre')
                                     chips.append((tag.tag_id, tag.tag_name, "🏷️", False, False, "", field_def.zone or "amber", i == 0))
                                 elif field_name == 'mood':
-                                    tag, created = self.tag_repo.get_or_create(str(n), category='Mood')
+                                    tag, created = self.tag_service.get_or_create(str(n), category='Mood')
                                     chips.append((tag.tag_id, tag.tag_name, "✨", False, False, "", field_def.zone or "amber", False))
                                 elif field_name == 'publisher':
-                                    # Lookup Publisher ID
-                                    pub, created = self.publisher_repo.get_or_create(str(n))
+                                    # Lookup Publisher ID via Service
+                                    pub, created = self.publisher_service.get_or_create(str(n))
                                     pid = pub.publisher_id if pub else 0
                                     
                                     # Ghost Chips Logic (T-63)
@@ -646,30 +643,30 @@ class SidePanelWidget(QFrame):
                                             alb_id = alb_id[0] if alb_id else None
                                         
                                         if alb_id:
-                                            # This might be expensive in a loop, but ok for UI count
-                                            alb_pub = self.library_service.album_repo.get_publisher(alb_id)
+                                            # Use AlbumService for publisher lookup
+                                            alb_pub = self.album_service.get_publisher(alb_id)
                                         if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
                                             is_inherited = True
                                     
-                                    # Build display name with parent hierarchy
-                                    display_name = pub.publisher_name
-                                    if pub.parent_publisher_id:
-                                        parent = self.publisher_repo.get_by_id(pub.parent_publisher_id)
-                                        if parent:
-                                            display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
-                                    
-                                    if is_inherited:
-                                        # Use new is_inherited parameter with link icon
-                                        raw_alb_name = self.current_songs[0].album
-                                        alb_name = "Album"
-                                        if isinstance(raw_alb_name, list):
-                                             alb_name = raw_alb_name[0] if raw_alb_name else "Album"
+                                    if pub:
+                                        display_name = pub.publisher_name
+                                        if pub.parent_publisher_id:
+                                            parent = self.publisher_service.get_by_id(pub.parent_publisher_id)
+                                            if parent:
+                                                display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
+                                        
+                                        if is_inherited:
+                                            # Use new is_inherited parameter with link icon
+                                            raw_alb_name = self.current_songs[0].album
+                                            alb_name = "Album"
+                                            if isinstance(raw_alb_name, list):
+                                                 alb_name = raw_alb_name[0] if raw_alb_name else "Album"
+                                            else:
+                                                 alb_name = raw_alb_name or "Album"
+                                                 
+                                            chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
                                         else:
-                                             alb_name = raw_alb_name or "Album"
-                                             
-                                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
-                                    else:
-                                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))  # Local/Editable
+                                            chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))  # Local/Editable
                                 elif field_name == 'album':
                                     aid = 0
                                     is_p = (i == 0)
@@ -687,8 +684,8 @@ class SidePanelWidget(QFrame):
                                                 break
                                     
                                     if not aid:
-                                        # Fallback Search
-                                        results = self.album_repo.search(label)
+                                    # Fallback Search via Service
+                                        results = self.album_service.search(label)
                                         aid = results[0].album_id if results else 0
                                     
                                     # Visual Primary Indicator
@@ -697,8 +694,8 @@ class SidePanelWidget(QFrame):
                                         
                                     chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
                                 else:
-                                    # Standard Contributor (Artist)
-                                    artist, created = self.contributor_repo.get_or_create(str(n))
+                                    # Standard Contributor (Artist) via Service
+                                    artist, created = self.contributor_service.get_or_create(str(n))
                                     icon = "👤" if artist.type == "person" else "👥"
                                     # Fix: Display the specific credit text (str(n)) instead of canonical artist.name
                                     # This preserves aliases like "Sonja Burić" instead of forcing "Trixy"
@@ -769,8 +766,8 @@ class SidePanelWidget(QFrame):
                 )
                 
                 if reply == QMessageBox.StandardButton.Yes:
-                    # Remove 'Unprocessed' status tag
-                    self.tag_repo.remove_tag_from_source(self.current_songs[0].source_id, tag_id)
+                    # Remove 'Unprocessed' status tag via Service
+                    self.tag_service.remove_tag_from_source(self.current_songs[0].source_id, tag_id)
                     
                     # Refresh UI
                     self.filter_refresh_requested.emit()
@@ -835,16 +832,16 @@ class SidePanelWidget(QFrame):
         
         # If we have an entity ID (best case)
         if entity_id and entity_id > 0:
-            tag = self.tag_repo.get_by_id(entity_id)
+            tag = self.tag_service.get_by_id(entity_id)
         else:
-            # Fallback to name search
-            tag = self.tag_repo.find_by_name(actual_name, category)
+            # Fallback to name search via Service
+            tag = self.tag_service.find_by_name(actual_name, category)
             
         if not tag:
             return
 
         diag = TagPickerDialog(
-            tag_repo=self.tag_repo,
+            tag_service=self.tag_service,
             target_tag=tag,
             parent=self
         )
@@ -885,18 +882,19 @@ class SidePanelWidget(QFrame):
             if new_category != tag.category: has_change = True
             
         if has_change:
-            # Check for conflict in TARGET category
-            conflict = self.tag_repo.find_by_name(new_name, new_category)
+            # Check for conflict in TARGET category via Service
+            conflict = self.tag_service.find_by_name(new_name, new_category)
             if conflict and conflict.tag_id != tag.tag_id:
                 # Count affected songs for user-friendly message
-                affected_count = self.tag_repo.count_sources_for_tag(tag.tag_id)
-                conflict_count = self.tag_repo.count_sources_for_tag(conflict.tag_id)
+                affected_count = self.tag_service.count_sources_for_tag(tag.tag_id)
+                conflict_count = self.tag_service.count_sources_for_tag(conflict.tag_id)
                 
-                from ..dialogs.resolver_dialog import ResolverDialog
-                resolver = ResolverDialog(
-                    conflict_name=f"{new_name} ({new_category})",
-                    current_count=affected_count,
-                    target_count=conflict_count,
+                # Reuse the standard collision resolver
+                from ..dialogs.artist_manager_dialog import IdentityCollisionDialog
+                resolver = IdentityCollisionDialog(
+                    target_name=f"{new_name} ({new_category})",
+                    song_count=affected_count,
+                    has_context_song=True,
                     parent=self
                 )
                 res = resolver.exec()
@@ -906,30 +904,30 @@ class SidePanelWidget(QFrame):
                 
                 if res == 3:  # Switch Just This Song (local tag swap)
                     for song in self.current_songs:
-                        # Remove old tag, add new tag
-                        self.tag_repo.remove_tag_from_source(song.source_id, tag.tag_id)
-                        self.tag_repo.add_tag_to_source(song.source_id, conflict.tag_id)
+                        # Remove old tag, add new tag via Service
+                        self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
+                        self.tag_service.add_tag_to_source(song.source_id, conflict.tag_id)
                     self._refresh_field_values()
                     self.filter_refresh_requested.emit()
                     return
                 
-                if res == 1:  # Replace Everywhere (global merge)
-                    if self.tag_repo.merge_tags(tag.tag_id, conflict.tag_id):
+                if res == 1:  # Replace Everywhere (global merge) via Service
+                    if self.tag_service.merge_tags(tag.tag_id, conflict.tag_id):
                         self._refresh_field_values()
                         self.filter_refresh_requested.emit()
                 return
 
-            # No Conflict - Perform Rename / Move
+            # No Conflict - Perform Rename / Move via Service
             tag.tag_name = new_name
             tag.category = new_category
-            if self.tag_repo.update(tag):
+            if self.tag_service.update(tag):
                 # Refresh everything
                 self._refresh_field_values()
                 self.filter_refresh_requested.emit()
 
     def _handle_publisher_click(self, entity_id, name):
-        if not self.publisher_repo: return
-        pub = self.publisher_repo.get_by_id(entity_id)
+        if not self.publisher_service: return
+        pub = self.publisher_service.get_by_id(entity_id)
         if not pub: return
 
         # Check Inherited Status for Deep Link
@@ -942,18 +940,18 @@ class SidePanelWidget(QFrame):
                      alb_id = alb_id[0] if alb_id else None
                 
                 if alb_id:
-                    alb_pub_str = self.library_service.album_repo.get_publisher(alb_id) or ""
+                    alb_pub_str = self.album_service.get_publisher(alb_id) or ""
                     if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
                         is_inherited = True
         
         if is_inherited:
-            alb = self.library_service.album_repo.get_by_id(alb_id)
+            alb = self.album_service.get_by_id(alb_id)
             if alb:
                     self._open_album_manager(initial_album=alb, focus_publisher=True)
             return
         
         from ..dialogs.publisher_manager_dialog import PublisherDetailsDialog
-        diag = PublisherDetailsDialog(pub, self.publisher_repo, allow_remove_from_context=True, parent=self)
+        diag = PublisherDetailsDialog(pub, self.publisher_service, allow_remove_from_context=True, parent=self)
         
         result = diag.exec()
         
@@ -966,26 +964,26 @@ class SidePanelWidget(QFrame):
             if self.current_songs:
                  refreshed = []
                  for s in self.current_songs:
-                      song_data = self.library_service.song_repository.get_by_id(s.source_id)
+                      song_data = self.library_service.get_song_by_id(s.source_id)
                       if song_data: refreshed.append(song_data)
                  self.current_songs = refreshed
                  self._refresh_field_values()
                  self.filter_refresh_requested.emit() # Sync Table View
 
     def _handle_album_click(self, entity_id, name):
-        if self.library_service.album_repo:
-            alb = self.library_service.album_repo.get_by_id(entity_id)
+        if self.album_service:
+            alb = self.album_service.get_by_id(entity_id)
             if alb:
                 self._open_album_manager(initial_album=alb)
 
     def _handle_contributor_click(self, entity_id, name, field_name=None):
-         artist = self.contributor_repo.get_by_id(entity_id)
+         artist = self.contributor_service.get_by_id(entity_id)
          if artist:
             old_name = artist.name
             from ..dialogs.artist_manager_dialog import ArtistDetailsDialog
             # T-90: Provide current song for "Fix This Song Only" collision resolution
             context_song = self.current_songs[0] if len(self.current_songs) == 1 else None
-            diag = ArtistDetailsDialog(artist, self.contributor_repo, 
+            diag = ArtistDetailsDialog(artist, self.contributor_service, 
                                      context_song=context_song,
                                      allow_remove_from_context=(field_name is not None), 
                                      parent=self)
@@ -1064,7 +1062,7 @@ class SidePanelWidget(QFrame):
             if entity_id and entity_id > 0:
                 is_status_tag = "Status: Unprocessed" in name
                 for song in self.current_songs:
-                    self.tag_repo.remove_tag_from_source(song.source_id, entity_id)
+                    self.tag_service.remove_tag_from_source(song.source_id, entity_id)
                 self._refresh_field_values()
                 self.filter_refresh_requested.emit()
                 return
@@ -1072,10 +1070,10 @@ class SidePanelWidget(QFrame):
                 # Fallback: parse the name "Category: Tag" and find the tag ID
                 if ': ' in name:
                     cat, actual_name = name.split(': ', 1)
-                    tag = self.tag_repo.find_by_name(actual_name, cat)
+                    tag = self.tag_service.find_by_name(actual_name, cat)
                     if tag:
                         for song in self.current_songs:
-                            self.tag_repo.remove_tag_from_source(song.source_id, tag.tag_id)
+                            self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
                         self._refresh_field_values()
                         self.filter_refresh_requested.emit()
                 return
@@ -1119,7 +1117,7 @@ class SidePanelWidget(QFrame):
         """T-70: Generic 'Add' button handler with Dropdown support."""
         if field_name == 'publisher':
             from ..dialogs.publisher_manager_dialog import PublisherPickerDialog
-            diag = PublisherPickerDialog(self.library_service.publisher_repo, parent=self)
+            diag = PublisherPickerDialog(self.publisher_service, parent=self)
             if diag.exec():
                 selected = diag.get_selected()
                 if selected:
@@ -1131,20 +1129,20 @@ class SidePanelWidget(QFrame):
             # Unified tag picker - use TagRepository for all categories
             from ..dialogs.tag_picker_dialog import TagPickerDialog
             default_cat = 'Mood' if field_name == 'mood' else 'Genre'
-            diag = TagPickerDialog(self.tag_repo, default_category=default_cat, parent=self)
+            diag = TagPickerDialog(self.tag_service, default_category=default_cat, parent=self)
             if diag.exec():
                 selected = diag.get_selected()
                 if selected:
-                    # Add tag to all selected songs via TagRepository
+                    # Add tag to all selected songs via TagService
                     for song in self.current_songs:
-                        self.tag_repo.add_tag_to_source(song.source_id, selected.tag_id)
+                        self.tag_service.add_tag_to_source(song.source_id, selected.tag_id)
                     # Refresh to show new tag
                     self._refresh_field_values()
                     self.filter_refresh_requested.emit()
         else:
             # Artists / Contributors
             from ..dialogs.artist_manager_dialog import ArtistPickerDialog
-            diag = ArtistPickerDialog(self.contributor_repo, parent=self)
+            diag = ArtistPickerDialog(self.contributor_service, parent=self)
             if diag.exec():
                 selected = diag.get_selected()
                 if selected:
@@ -1322,7 +1320,7 @@ class SidePanelWidget(QFrame):
                  'title': initial_album.title,
                  'artist': initial_album.album_artist,
                  'year': initial_album.release_year,
-                 'publisher': self.library_service.album_repo.get_publisher(initial_album.album_id),
+                 'publisher': self.album_service.get_publisher(initial_album.album_id),
                  'album_id': initial_album.album_id,
                  'song_display': "Deep Link Selection",
                  'focus_publisher': focus_publisher
@@ -1361,7 +1359,11 @@ class SidePanelWidget(QFrame):
         
         from ..dialogs.album_manager_dialog import AlbumManagerDialog
         dlg = AlbumManagerDialog(
-            self.album_repo, initial_data, self, 
+            self.album_service, 
+            self.publisher_service,
+            self.contributor_service,
+            initial_data, 
+            self, 
             staged_deletions=self._hidden_album_ids
         )
         # Context-Aware Callback
@@ -1385,7 +1387,7 @@ class SidePanelWidget(QFrame):
              dirty_found = False
              for s in self.current_songs:
                   old_album_id = getattr(s, 'album_id', None)
-                  song_data = self.library_service.song_repository.get_by_id(s.source_id)
+                  song_data = self.library_service.get_song_by_id(s.source_id)
                   if song_data:
                        # If DB album is now different (e.g. deleted), STAGE the change to trip the Amber Alert
                        new_album_id = getattr(song_data, 'album_id', None)
@@ -1413,8 +1415,8 @@ class SidePanelWidget(QFrame):
         if not self.library_service:
             return
             
-        # 1. Find every song in the library that belongs to this album
-        headers, data = self.library_service.song_repository.get_all()
+        # 1. Find every song in the library that belongs to this album via Service
+        headers, data = self.library_service.song_service.get_all()
         try:
              alb_id_idx = -1
              for i, h in enumerate(headers):
@@ -1544,21 +1546,21 @@ class SidePanelWidget(QFrame):
                     found = True
                     break
             if not found:
-                alb = self.library_service.album_repo.get_by_id(xid)
+                alb = self.album_service.get_by_id(xid)
                 all_names.append(alb.title if alb else "Unknown")
                 
         self._on_field_changed('album_id', final_ids)
         self._on_field_changed('album', all_names)
         self._refresh_field_values()
         
-        # 5. Metadata Auto-Fill (From PRIMARY Only)
+        # 5. Metadata Auto-Fill (From PRIMARY Only) via Services
         # T-69: Publisher
         primary = data[0] # First is Primary by convention
-        pub_name = self.album_repo.get_publisher(primary['id'])
+        pub_name = self.album_service.get_publisher(primary['id'])
         self._on_field_changed("publisher", pub_name if pub_name else None)
 
         # T-46: Artist & Year
-        full_album = self.album_repo.get_by_id(primary['id'])
+        full_album = self.album_service.get_by_id(primary['id'])
         if full_album:
              if full_album.album_artist:
                  self._on_field_changed("album_artist", full_album.album_artist)
@@ -1630,9 +1632,9 @@ class SidePanelWidget(QFrame):
             chips = []
             
             if len(self.current_songs) == 1:
-                # Single song - get all its tags
+                # Single song - get all its tags via Service
                 source_id = self.current_songs[0].source_id
-                all_tags = self.tag_repo.get_tags_for_source(source_id)
+                all_tags = self.tag_service.get_tags_for_source(source_id)
                 
                 # Group by category to identify primary (first in each category)
                 by_category = {}
@@ -1740,14 +1742,14 @@ class SidePanelWidget(QFrame):
             return
         is_ready = self.btn_status.isChecked()
         
-        # 1. Update Tags in DB (Immediate effect for now)
+        # 1. Update Tags via Service (Immediate effect for now)
         for song in self.current_songs:
             if is_ready:
-                # MARKING DONE -> Remove all Status tags (Unprocessed, etc.) via efficient bulk call
-                self.tag_repo.remove_all_tags_from_source(song.source_id, category="Status")
+                # MARKING DONE -> Remove all Status tags via Service
+                self.tag_service.remove_all_tags_from_source(song.source_id, category="Status")
             else:
-                # MARKING PENDING -> Add 'Unprocessed' Status tag
-                self.tag_repo.add_tag_to_source(song.source_id, "Unprocessed", category="Status")
+                # MARKING PENDING -> Add 'Unprocessed' Status tag via Service
+                self.tag_service.add_tag_to_source(song.source_id, "Unprocessed", category="Status")
 
         # 2. Sync legacy column via staging (REMOVED - Field is Legacy)
         # self._on_field_changed("is_done", 1 if is_ready else 0)

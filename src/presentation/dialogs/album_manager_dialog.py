@@ -9,8 +9,8 @@ from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
 from ..widgets.chip_tray_widget import ChipTrayWidget
 from .publisher_manager_dialog import PublisherPickerDialog
-from ..dialogs.artist_manager_dialog import ArtistPickerDialog
-from ...data.repositories.publisher_repository import PublisherRepository
+from .artist_manager_dialog import ArtistPickerDialog
+
 
 class AlbumManagerDialog(QDialog):
     """
@@ -32,30 +32,32 @@ class AlbumManagerDialog(QDialog):
     BASE_HEIGHT = 650
     PANE_MIN_WIDTH = 250
     
-    def __init__(self, album_repository, initial_data=None, parent=None, staged_deletions=None):
+    def __init__(self, album_service, publisher_service, contributor_service, initial_data=None, parent=None, staged_deletions=None):
         super().__init__(parent)
-        self.album_repo = album_repository
+        self.album_service = album_service
+        self.publisher_service = publisher_service
+        self.contributor_service = contributor_service
         self.initial_data = initial_data or {}
         self.staged_deletions = staged_deletions or set()
         
         # Determine if the initial title is valid (exists in DB)
         aid = self.initial_data.get('album_id')
         if aid:
-             fresh_album = self.album_repo.get_by_id(aid)
+             fresh_album = self.album_service.get_by_id(aid)
              if fresh_album:
                   self.initial_data['title'] = fresh_album.title
                   self.current_album = fresh_album
 
         target = self.initial_data.get('title', '')
         if target:
-             hits = self.album_repo.search(target)
+             hits = self.album_service.search(target)
 
         # State
         if not hasattr(self, 'current_album'):
             self.current_album = None # The album object currently loaded in Inspector
             
         # T-Multi: Persistence for Search Refreshes
-        init_ids = initial_data.get('album_id')
+        init_ids = self.initial_data.get('album_id')
         if isinstance(init_ids, list):
              self.selected_ids = set(init_ids)
         elif init_ids:
@@ -545,7 +547,7 @@ class AlbumManagerDialog(QDialog):
              # self.inp_artist removed (now tray)
         
         album_id = item.data(Qt.ItemDataRole.UserRole)
-        self.current_album = self.album_repo.get_by_id(album_id)
+        self.current_album = self.album_service.get_by_id(album_id)
         
         if not self.current_album:
             return
@@ -569,7 +571,7 @@ class AlbumManagerDialog(QDialog):
         self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
         
         # Publisher
-        pub_name = self.album_repo.get_publisher(self.current_album.album_id)
+        pub_name = self.album_service.get_publisher_name(self.current_album.album_id)
         self.selected_pub_name = pub_name or ""
         self.tray_publisher.set_chips([(0, pub_name, "")] if pub_name else [])
         
@@ -588,7 +590,7 @@ class AlbumManagerDialog(QDialog):
 
     def _refresh_context(self, album_id):
         self.list_context.clear()
-        songs = self.album_repo.get_songs_in_album(album_id)
+        songs = self.album_service.get_songs_in_album(album_id)
         
         if not songs:
             item = QListWidgetItem(" (No Songs) ")
@@ -631,7 +633,7 @@ class AlbumManagerDialog(QDialog):
 
     def _set_as_primary(self, source_id):
         if not self.current_album: return
-        self.album_repo.set_primary_album(source_id, self.current_album.album_id)
+        self.album_service.set_primary_album(source_id, self.current_album.album_id)
         self._refresh_context(self.current_album.album_id)
 
     def _on_vault_selection_changed(self):
@@ -648,7 +650,7 @@ class AlbumManagerDialog(QDialog):
         self.list_vault.blockSignals(True)
         self.list_vault.clear()
         
-        results = self.album_repo.search(query)
+        results = self.album_service.search(query)
         
         # Ensure targets are present in the list (Preserve existing selection)
         if self.selected_ids:
@@ -656,7 +658,7 @@ class AlbumManagerDialog(QDialog):
             missing_ids = [tid for tid in self.selected_ids if tid not in result_ids]
             
             for mid in missing_ids:
-                obj = self.album_repo.get_by_id(mid)
+                obj = self.album_service.get_by_id(mid)
                 if obj: results.append(obj)
                 
             # Optional: Sort purely to keep order sanity?
@@ -704,9 +706,7 @@ class AlbumManagerDialog(QDialog):
     def _on_search_publisher(self):
         # Modal Picker
         from .publisher_manager_dialog import PublisherPickerDialog
-        from ...data.repositories.publisher_repository import PublisherRepository
-        repo = PublisherRepository(self.album_repo.db_path)
-        diag = PublisherPickerDialog(repo, parent=self)
+        diag = PublisherPickerDialog(self.publisher_service, parent=self)
         if diag.exec():
             pub = diag.get_selected()
             if pub:
@@ -722,16 +722,8 @@ class AlbumManagerDialog(QDialog):
 
             
     def _on_search_artist(self):
-        # Use Contributor Repository from Album Repo context? or Library Service?
-        # Assuming we have access to a contributor repository.
-        # But AlbumManager initialized with only AlbumRepository.
-        # We need to access ContributorRepository.
-        # HACK: Assume self.album_repo.db_path acts as common key, instantiate new repo if needed.
-        # Ideally passed in __init__, but for now:
-        from ...data.repositories.contributor_repository import ContributorRepository
-        repo = ContributorRepository(self.album_repo.db_path)
-        
-        diag = ArtistPickerDialog(repo, parent=self)
+        # Use injected service
+        diag = ArtistPickerDialog(self.contributor_service, parent=self)
         if diag.exec():
             # Support Smart Split List Return
             result = diag.get_selected()
@@ -784,14 +776,14 @@ class AlbumManagerDialog(QDialog):
         try:
             if self.is_creating_new:
                 # Create
-                album, created = self.album_repo.get_or_create(title, artist, year)
+                album, created = self.album_service.get_or_create(title, artist, year)
                 album.album_type = alb_type
-                self.album_repo.update(album)
+                self.album_service.update(album)
                 
                 # Get Publisher from Tray
                 pub_chips = self.tray_publisher.get_names()
                 pub_name = pub_chips[0] if pub_chips else None
-                self.album_repo.set_publisher(album.album_id, pub_name)
+                self.album_service.set_publisher(album.album_id, pub_name)
                 
                 self.current_album = album
                 self.is_creating_new = False
@@ -814,12 +806,12 @@ class AlbumManagerDialog(QDialog):
                 self.current_album.release_year = year
                 self.current_album.album_type = alb_type
                 
-                self.album_repo.update(self.current_album)
+                self.album_service.update(self.current_album)
                 
                 # Get Publisher from Tray
                 pub_chips = self.tray_publisher.get_names()
                 pub_name = pub_chips[0] if pub_chips else None
-                self.album_repo.set_publisher(self.current_album.album_id, pub_name)
+                self.album_service.set_publisher(self.current_album.album_id, pub_name)
                 
                 # Clear search so we see the updated item (if renamed out of search scope)
                 self.txt_search.blockSignals(True)
@@ -865,7 +857,7 @@ class AlbumManagerDialog(QDialog):
             aid = item.data(Qt.ItemDataRole.UserRole)
             if aid in seen_ids: continue
             
-            alb = self.album_repo.get_by_id(aid)
+            alb = self.album_service.get_by_id(aid)
             if alb:
                 selection.append({
                     'id': alb.album_id,
@@ -907,12 +899,12 @@ class AlbumManagerDialog(QDialog):
         if not item: return
         
         album_id = item.data(Qt.ItemDataRole.UserRole)
-        album = self.album_repo.get_by_id(album_id)
+        album = self.album_service.get_by_id(album_id)
         if not album: return
         
         if QMessageBox.question(self, "Delete Album", 
                                 f"Are you sure you want to delete '{album.title}'?\nThis will unlink all songs.") == QMessageBox.StandardButton.Yes:
-            if self.album_repo.delete_album(album_id):
+            if self.album_service.delete(album_id):
                 # If we deleted the current one, clear inspector
                 if self.current_album and self.current_album.album_id == album_id:
                     self.current_album = None

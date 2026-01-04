@@ -178,9 +178,9 @@ class ArtistPickerDialog(QDialog):
     Smart Search & Create dialog for Artists.
     Allows selecting existing OR creating new on the fly.
     """
-    def __init__(self, repo, filter_type=None, exclude_ids=None, parent=None):
+    def __init__(self, service, filter_type=None, exclude_ids=None, parent=None):
         super().__init__(parent)
-        self.repo = repo
+        self.service = service
         self.filter_type = filter_type # None, 'person', or 'group'
         self.exclude_ids = exclude_ids or set()
         self._selected_artist = None
@@ -293,7 +293,7 @@ class ArtistPickerDialog(QDialog):
             return
             
         # Check for exact match
-        exact_match = self.repo.get_by_name(text)
+        exact_match = self.service.get_by_name(text)
         if exact_match:
             self._lock_to_type(exact_match.type)
         else:
@@ -346,22 +346,21 @@ class ArtistPickerDialog(QDialog):
     def _populate(self):
         self.cmb.blockSignals(True)
         self.cmb.clear()
-        results = self.repo.search("")
-        for a in results:
-            if self.filter_type and a.type != self.filter_type:
+        results = self.service.search_identities("")
+        for c_id, name, c_type, source in results:
+            if self.filter_type and c_type != self.filter_type:
                 continue
-            if a.contributor_id in self.exclude_ids:
+            if c_id in self.exclude_ids:
                 continue
             
-            display_name = a.name
-            target_name = a.name
-            if a.matched_alias:
-                display_name += f" (AKA: {a.matched_alias})"
-                target_name = a.matched_alias
+            display_name = name
+            target_name = name
+            if source == 'Alias':
+                display_name += " (Alias)"
                 
             # Store tuple of (ID, SpecificName, Type) to help logic
             # Note: We append Type to helping auto-toggle
-            self.cmb.addItem(display_name, (a.contributor_id, target_name, a.type))
+            self.cmb.addItem(display_name, (c_id, target_name, c_type))
         
         # Clear any selection initially so user can type
         self.cmb.setCurrentIndex(-1)
@@ -386,7 +385,7 @@ class ArtistPickerDialog(QDialog):
         # 1. Existing Dropdown Selection
         if data:
             artist_id, name_to_use, _ = data
-            selected = self.repo.get_by_id(artist_id)
+            selected = self.service.get_by_id(artist_id)
             if selected:
                 if name_to_use: selected.name = name_to_use
                 self._selected_artists = [selected]
@@ -417,7 +416,7 @@ class ArtistPickerDialog(QDialog):
                     try:
                         # Auto-create or Get
                         # Note: We respect target_type for all, which is usually safe for "Prodigy, Pendulum" (Groups) or "A, B" (Persons)
-                        a, _ = self.repo.get_or_create(t, target_type)
+                        a, _ = self.service.get_or_create(t, target_type)
                         # Fix: Use the typed name 't' (alias) instead of forcing Primary Name
                         a.name = t
                         self._selected_artists.append(a)
@@ -428,7 +427,7 @@ class ArtistPickerDialog(QDialog):
                 return
 
         # 3. Fallback: Exact Name Match
-        exact_match = self.repo.get_by_name(current_text)
+        exact_match = self.service.get_by_name(current_text)
         if exact_match:
             # Fix: Use the typed name (alias) instead of forcing Primary Name
             exact_match.name = current_text
@@ -439,7 +438,7 @@ class ArtistPickerDialog(QDialog):
         # 4. Create New Single
         target_type = "group" if self.radio_group.isChecked() else "person"
         try:
-            new_artist = self.repo.create(current_text, target_type)
+            new_artist, created = self.service.get_or_create(current_text, target_type)
             self._selected_artists = [new_artist]
             self.accept()
         except Exception as e:
@@ -456,9 +455,9 @@ class ArtistPickerWidget(QWidget):
     """
     artist_selected = pyqtSignal(int, str)
 
-    def __init__(self, contributor_repository, parent=None):
+    def __init__(self, service, parent=None):
         super().__init__(parent)
-        self.repo = contributor_repository
+        self.service = service
         self._init_ui()
         self._refresh_list()
 
@@ -492,7 +491,7 @@ class ArtistPickerWidget(QWidget):
         self.btn_action.setText("Create New Artist (+)")
         self.btn_action.setProperty("mode", "create")
         
-        results = self.repo.search(query)
+        results = self.service.search(query)
         for artist in results:
             display_name = artist.name
             if artist.matched_alias:
@@ -533,7 +532,7 @@ class ArtistPickerWidget(QWidget):
         if diag.exec():
             new_name, new_type = diag.get_data()
             if new_name:
-                artist, created = self.repo.get_or_create(new_name, new_type)
+                artist, created = self.service.get_or_create(new_name, new_type)
                 self._refresh_list(new_name)
                 # Select the new artist
                 for i in range(self.list_artists.count()):
@@ -570,7 +569,7 @@ class ArtistPickerWidget(QWidget):
         menu.exec(self.list_artists.mapToGlobal(pos))
 
     def _on_merge_clicked(self, source_id, source_name):
-        diag = ArtistPickerDialog(self.repo, exclude_ids=[source_id], parent=self)
+        diag = ArtistPickerDialog(self.service, exclude_ids=[source_id], parent=self)
         diag.setWindowTitle(f"Consolidate '{source_name}' into...")
         if diag.exec():
             # Handle List Return (take first)
@@ -581,22 +580,15 @@ class ArtistPickerWidget(QWidget):
                 target = result
 
             if target:
-                msg = f"This will move ALL songs, aliases, and relationships from '{source_name}' to '{target.name}'.\n\n"
-                msg += f"'{source_name}' will be DELETED and added as an alias for '{target.name}'.\n\n"
-                msg += "Are you sure you want to perform this heavy-lifting merge?"
-                
-                if QMessageBox.question(self, "Confirm Consolidation", msg,
-                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-                    if self.repo.merge(source_id, target.contributor_id):
-                        self._refresh_list(self.txt_search.text())
-                        self.artist_selected.emit(target.contributor_id, target.name)
-                    else:
-                        QMessageBox.warning(self, "Error", "Consolidation failed.")
+                if self.service.merge_contributors(source_id, target.contributor_id):
+                    self._refresh_list(self.txt_search.text())
+                    self.artist_selected.emit(target.contributor_id, target.name)
+                else:
+                    QMessageBox.warning(self, "Error", "Consolidation failed.")
 
     def _delete_artist(self, artist_id, name):
         # 1. Check for usage/impact
-        # Since ContributorRepository doesn't have a direct get_song_count, we can look at member counts
-        impact_count = self.repo.get_member_count(artist_id)
+        impact_count = self.service.get_member_count(artist_id)
         
         msg = f"Are you sure you want to PERMANENTLY delete '{name}'?\n\n"
         msg += "This will:\n"
@@ -606,29 +598,28 @@ class ArtistPickerWidget(QWidget):
         
         if QMessageBox.question(self, "Confirm Full Delete", msg, 
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-            if self.repo.delete(artist_id):
+            if self.service.delete(artist_id):
                 self._refresh_list(self.txt_search.text())
                 self.artist_selected.emit(0, "") # Signal clear
 
     def _open_details(self, artist_id):
-        artist = self.repo.get_by_id(artist_id)
+        artist = self.service.get_by_id(artist_id)
         if not artist: return
         # Global Manager: No specific context song
-        diag = ArtistDetailsDialog(artist, self.repo, context_song=None, parent=self)
+        diag = ArtistDetailsDialog(artist, self.service, context_song=None, parent=self)
         if diag.exec():
-
             self._refresh_list(self.txt_search.text())
 
 class ArtistDetailsDialog(QDialog):
     """
     Full Artist Editor with Memberships, Aliases, etc.
     """
-    def __init__(self, artist, repo, context_song=None, allow_remove_from_context=False, parent=None):
+    def __init__(self, artist, service, context_song=None, allow_remove_from_context=False, parent=None):
         super().__init__(parent)
         self.artist = artist
         self.context_song = context_song
         self.original_type = artist.type
-        self.repo = repo
+        self.service = service
         self.allow_remove = allow_remove_from_context
         self.setWindowTitle(f"Manager: {artist.name}")
         self.setObjectName("ArtistDetailsDialog")
@@ -781,7 +772,7 @@ class ArtistDetailsDialog(QDialog):
             
         # Aliases
         self.list_aliases.clear()
-        for alias_id, alias_name in self.repo.get_aliases(self.artist.contributor_id):
+        for alias_id, alias_name in self.service.get_aliases(self.artist.contributor_id):
             item = QListWidgetItem(alias_name)
             item.setData(Qt.ItemDataRole.UserRole, alias_id)
             self.list_aliases.addItem(item)
@@ -789,9 +780,9 @@ class ArtistDetailsDialog(QDialog):
         # Memberships
         self.list_members.clear()
         if self.artist.type == "group":
-            members = self.repo.get_members(self.artist.contributor_id)
+            members = self.service.get_members(self.artist.contributor_id)
         else:
-            members = self.repo.get_groups(self.artist.contributor_id)
+            members = self.service.get_groups(self.artist.contributor_id)
             
         for m in members:
             item = QListWidgetItem(m.name)
@@ -821,7 +812,7 @@ class ArtistDetailsDialog(QDialog):
         cmb.setEditable(True)
         cmb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         # Populate with existing artists to help "claiming" identities
-        all_artists = self.repo.search("")
+        all_artists = self.service.search("")
         for a in all_artists:
             # Filter: Strict Type Matching
             # "Groups shouldn't even be in that list" when editing a Person.
@@ -852,7 +843,7 @@ class ArtistDetailsDialog(QDialog):
         if diag.exec():
             name = cmb.currentText().strip()
             if name:
-                conflict_id, msg = self.repo.validate_identity(name, exclude_id=self.artist.contributor_id)
+                conflict_id, msg = self.service.validate_identity(name, exclude_id=self.artist.contributor_id)
                 if conflict_id:
                     # Smart Linking Logic:
                     # 1. Tracing the "Real" Owner
@@ -870,7 +861,7 @@ class ArtistDetailsDialog(QDialog):
 
                     # Proceed with Auto-Merge Logic
                     # SAFETY CHECK: Do types match?
-                    real_owner = self.repo.get_by_id(real_owner_id)
+                    real_owner = self.service.get_by_id(real_owner_id)
                     if real_owner and real_owner.type != self.artist.type:
                          QMessageBox.warning(self, "Type Mismatch", 
                                            f"Cannot auto-merge '{self.artist.name}' ({self.artist.type}) into '{real_owner.name}' ({real_owner.type}).\n\n"
@@ -886,7 +877,7 @@ class ArtistDetailsDialog(QDialog):
                     
                     if is_absorbing:
                         # Absorb: Merge THE OTHER GUY into ME.
-                        if self.repo.merge(real_owner_id, self.artist.contributor_id):
+                        if self.service.merge(real_owner_id, self.artist.contributor_id):
                             from src.core import logger
                             logger.info(f"Identity Absorbed: '{real_owner.name}' merged into '{self.artist.name}'.")
                             self._refresh_data() # I am still alive, just richer.
@@ -895,7 +886,7 @@ class ArtistDetailsDialog(QDialog):
                             QMessageBox.warning(self, "Error", "Failed to absorb identity.")
                     else:
                         # Consolidate: Merge ME into THEM.
-                        if self.repo.merge(self.artist.contributor_id, real_owner_id):
+                        if self.service.merge(self.artist.contributor_id, real_owner_id):
                             # CRITICAL: We just merged OURSELF into someone else.
                             # Signal merge (Code 3) to prompt UI refresh of the NEW ID.
                             self.merged_target = real_owner
@@ -907,7 +898,7 @@ class ArtistDetailsDialog(QDialog):
                             QMessageBox.warning(self, "Error", "Failed to link identities.")
                     return
 
-                self.repo.add_alias(self.artist.contributor_id, name)
+                self.service.add_alias(self.artist.contributor_id, name)
                 self._refresh_data()
                 cmb.clearEditText()
 
@@ -929,15 +920,15 @@ class ArtistDetailsDialog(QDialog):
         edit_act.triggered.connect(lambda: self._edit_alias(alias_id, alias_name))
         menu.addAction(edit_act)
         
-        del_act = QAction("Delete Alias", self)
+        del_act = QAction("Unlink Name", self)
         del_act.triggered.connect(lambda: self._confirm_delete_alias(alias_id, alias_name))
         menu.addAction(del_act)
         menu.exec(self.list_aliases.mapToGlobal(pos))
 
     def _confirm_delete_alias(self, alias_id, name):
-        if QMessageBox.question(self, "Remove Alias", f"Are you sure you want to remove the alias '{name}'?") == QMessageBox.StandardButton.Yes:
-            if self.repo.delete_alias(alias_id):
-                self._refresh_data()
+        # Simplified: Just do it. Audit log handles the safety.
+        if self.service.delete_alias(alias_id):
+            self._refresh_data()
 
     def _promote_alias(self, alias_id, name):
         msg = f"This will swap the primary identity '{self.artist.name}' with the alias '{name}'.\n\n"
@@ -946,9 +937,9 @@ class ArtistDetailsDialog(QDialog):
         
         if QMessageBox.question(self, "Promote to Primary", msg,
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-            if self.repo.promote_alias(self.artist.contributor_id, alias_id):
+            if self.service.promote_alias(self.artist.contributor_id, alias_id):
                 # We need to reload the whole artist object because the name changed
-                self.artist = self.repo.get_by_id(self.artist.contributor_id)
+                self.artist = self.service.get_by_id(self.artist.contributor_id)
                 self.setWindowTitle(f"Manager: {self.artist.name}")
                 self._refresh_data()
 
@@ -959,7 +950,7 @@ class ArtistDetailsDialog(QDialog):
         if diag.exec():
             new_name, _ = diag.get_data()
             if new_name and new_name != old_name:
-                self.repo.update_alias(alias_id, new_name)
+                self.service.update_alias(alias_id, new_name)
                 self._refresh_data()
 
     def _delete_alias(self, alias_id):
@@ -976,7 +967,7 @@ class ArtistDetailsDialog(QDialog):
         for i in range(self.list_members.count()):
             exclude.add(self.list_members.item(i).data(Qt.ItemDataRole.UserRole))
 
-        diag = ArtistPickerDialog(self.repo, filter_type=target_type, exclude_ids=exclude, parent=self)
+        diag = ArtistPickerDialog(self.service, filter_type=target_type, exclude_ids=exclude, parent=self)
         if diag.exec():
             result = diag.get_selected()
             if result:
@@ -984,9 +975,9 @@ class ArtistDetailsDialog(QDialog):
                 
                 for selected in targets:
                     if self.radio_group.isChecked():
-                        self.repo.add_member(self.artist.contributor_id, selected.contributor_id)
+                        self.service.add_member(self.artist.contributor_id, selected.contributor_id)
                     else:
-                        self.repo.add_member(selected.contributor_id, self.artist.contributor_id)
+                        self.service.add_member(selected.contributor_id, self.artist.contributor_id)
                 self._refresh_data()
 
     def _show_member_menu(self, pos):
@@ -1001,16 +992,12 @@ class ArtistDetailsDialog(QDialog):
         menu.exec(self.list_members.mapToGlobal(pos))
 
     def _remove_member(self, other_id):
-        # Get name for the prompt
-        item = self.list_members.currentItem()
-        name = item.text() if item else "this artist"
-        
-        if QMessageBox.question(self, "Remove Relationship", f"Are you sure you want to remove the link between {self.artist.name} and {name}?") == QMessageBox.StandardButton.Yes:
-            if self.radio_group.isChecked():
-                self.repo.remove_member(self.artist.contributor_id, other_id)
-            else:
-                self.repo.remove_member(other_id, self.artist.contributor_id)
-            self._refresh_data()
+        # Relationship removal is non-destructive (label management)
+        if self.radio_group.isChecked():
+            self.service.remove_member(self.artist.contributor_id, other_id)
+        else:
+            self.service.remove_member(other_id, self.artist.contributor_id)
+        self._refresh_data()
 
     def _save(self):
         new_name = self.txt_name.text().strip()
@@ -1020,10 +1007,10 @@ class ArtistDetailsDialog(QDialog):
         
         # Validation for name change
         if new_name != self.artist.name:
-            conflict_id, msg = self.repo.validate_identity(new_name, exclude_id=self.artist.contributor_id)
+            conflict_id, msg = self.service.validate_identity(new_name, exclude_id=self.artist.contributor_id)
             if conflict_id:
                 # HUMAN RESOLVER: Just ask the simple question
-                usage_count = self.repo.get_usage_count(self.artist.contributor_id)
+                usage_count = self.service.get_usage_count(self.artist.contributor_id)
                 resolver = IdentityCollisionDialog(
                     target_name=new_name,
                     song_count=usage_count,
@@ -1037,7 +1024,7 @@ class ArtistDetailsDialog(QDialog):
                     return
 
                 if res == 1: # Fix Typo (Clean Merge)
-                    if self.repo.merge(self.artist.contributor_id, conflict_id, create_alias=False):
+                    if self.service.merge_contributors(self.artist.contributor_id, conflict_id, create_alias=False):
                         self.done(3) # Signal 3: Data Changed (Sync Required)
                         return
                     else:
@@ -1046,7 +1033,7 @@ class ArtistDetailsDialog(QDialog):
 
 
                 if res == 3 and self.context_song: # Fix This Song Only
-                    if self.repo.swap_song_contributor(self.context_song.source_id, self.artist.contributor_id, conflict_id):
+                    if self.service.swap_song_contributor(self.context_song.source_id, self.artist.contributor_id, conflict_id):
                         # Signal Code 3 to trigger UI refresh for the new ID
                         self.done(3)
                         return
@@ -1060,11 +1047,11 @@ class ArtistDetailsDialog(QDialog):
         if self.original_type != new_type:
             if self.original_type == "group":
                 # Losing 'Children'
-                count = len(self.repo.get_members(self.artist.contributor_id))
+                count = len(self.service.get_members(self.artist.contributor_id))
                 relation = "member"
             else:
                 # Losing 'Parents'
-                count = len(self.repo.get_groups(self.artist.contributor_id))
+                count = len(self.service.get_groups(self.artist.contributor_id))
                 relation = "group membership"
 
             if count > 0:
@@ -1077,7 +1064,7 @@ class ArtistDetailsDialog(QDialog):
         self.artist.sort_name = self.txt_sort.text().strip()
         self.artist.type = new_type
         
-        if self.repo.update(self.artist):
+        if self.service.update(self.artist):
             self.done(3) # Signal 3: Data Changed (Sync Required)
         else:
             QMessageBox.warning(self, "Error", "Failed to save artist changes.")

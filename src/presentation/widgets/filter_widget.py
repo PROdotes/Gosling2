@@ -386,7 +386,7 @@ class FilterWidget(QFrame):
         from src.core import logger
         
         try:
-             type_map = self.library_service.contributor_repository.get_types_for_names(values)
+             type_map = self.library_service.get_types_for_names(values)
         except Exception:
              type_map = {}
              
@@ -455,15 +455,8 @@ class FilterWidget(QFrame):
             # We must use the Junction Table logic because columns like 'Performers' 
             # are virtual aggregates, not real columns in the Songs table.
             
-            # Use Repository Access to fetch contributors and aliases
-            if self.library_service.contributor_repository:
-                # 1. Fetch Primary Names
-                primary_names = self.library_service.contributor_repository.get_all_names()
-                for n in primary_names: all_names.add(n)
-                
-                # 2. Fetch Aliases
-                aliases = self.library_service.contributor_repository.get_all_aliases()
-                for n in aliases: all_names.add(n)
+            # Use Service methods to fetch contributors and aliases
+            all_names = set(self.library_service.get_all_contributor_names())
             
         except Exception as e:
             logger.error(f"Error populating All Contributors filter: {e}")
@@ -497,7 +490,7 @@ class FilterWidget(QFrame):
         try:
             decades = set()
             
-            years = self.library_service.song_repository.get_all_years()
+            years = self.library_service.get_all_years()
             for year in years:
                 if year:
                     try:
@@ -537,9 +530,9 @@ class FilterWidget(QFrame):
         
         try:
             # Query all tags grouped by category
-            # Query all tags grouped by category via Repository
-            if self.library_service.tag_repository:
-                categories = self.library_service.tag_repository.get_active_tags()
+            # Query all tags grouped by category via Service
+            if hasattr(self.library_service, 'tag_service') and self.library_service.tag_service:
+                categories = self.library_service.tag_service.get_active_tags()
             else:
                 categories = {}
             

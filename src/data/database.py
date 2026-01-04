@@ -28,6 +28,12 @@ class BaseRepository:
         finally:
             conn.close()
 
+    def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None) -> None:
+        """Log a high-level systemic or user action."""
+        from src.core.audit_logger import AuditLogger
+        with self.get_connection() as conn:
+            AuditLogger(conn).log_action(action_type, target_table, target_id, details)
+
     def _ensure_schema(self) -> None:
         """Create database schema if it doesn't exist"""
         with self.get_connection() as conn:
@@ -251,7 +257,8 @@ class BaseRepository:
                     ActionTargetID INTEGER,
                     ActionDetails TEXT,
                     ActionTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UserID TEXT
+                    UserID TEXT,
+                    BatchID TEXT
                 )
             """)
 

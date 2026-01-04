@@ -86,7 +86,6 @@ class MetadataService:
         if 'ICRD' in tags: 
             try: song.recording_year = int(str(tags['ICRD'])[:4])
             except: pass
-        if 'IGNR' in tags: song.genre = str(tags['IGNR']).strip()
         
         return song
 
@@ -160,7 +159,7 @@ class MetadataService:
         
         # Map of "Special" fields that we calculate manually later
         # We exclude them from the generic loop to avoid overwriting with raw data
-        COMPLEX_FIELDS = {'recording_year', 'is_done', 'producers'} 
+        COMPLEX_FIELDS = {'recording_year', 'is_done', 'producers', 'genre', 'mood'} 
 
         for frame_key in tags.keys():
             # Handle generic frames (TIT2) and TXXX (TXXX:Description)

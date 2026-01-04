@@ -2,7 +2,6 @@ import os
 import zipfile
 import weakref
 from typing import Optional, List, Set, Union
-from ..dialogs import SettingsDialog, UniversalImportDialog
 from ...data.models.song import Song
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
@@ -86,9 +85,9 @@ class DropIndicatorHeaderView(QHeaderView):
 class LibraryFilterProxyModel(QSortFilterProxyModel):
     """Proxy model that supports search, type, and advanced multicheck filtering."""
     
-    def __init__(self, contributor_repo=None, parent=None):
+    def __init__(self, contributor_service=None, parent=None):
         super().__init__(parent)
-        self.contributor_repo = contributor_repo
+        self.contributor_service = contributor_service
         self._type_filter_id_list = []
         self._type_column = -1
         
@@ -113,13 +112,13 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
         # T-70 Identity Awareness: Expand performers to include aliases/related names
         processed_filters = filters.copy()
-        if self.contributor_repo and 'performers' in processed_filters:
+        if self.contributor_service and 'performers' in processed_filters:
             perf_set = processed_filters['performers']
             if perf_set:
                 expanded = set()
                 for name in perf_set:
-                    # Resolve identity graph (e.g. Robert -> Bob, Bobby)
-                    expanded.update(self.contributor_repo.resolve_identity_graph(name))
+                    # Resolve identity graph via Service
+                    expanded.update(self.contributor_service.resolve_identity_graph(name))
                 processed_filters['performers'] = expanded
 
         self._active_filters = processed_filters
@@ -190,11 +189,11 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
             
             cache_key = f"{source_id}"
             if cache_key not in self._tag_cache:
-                # Query TagRepository for this song's tags
+                # Query TagService for this song's tags
                 source_widget = self.parent()
                 if hasattr(source_widget, 'library_service'):
-                    tag_repo = source_widget.library_service.tag_repo
-                    tags = tag_repo.get_tags_for_source(source_id)
+                    svc = source_widget.library_service
+                    tags = svc.tag_service.get_tags_for_source(source_id)
                     self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
                 else:
                     self._tag_cache[cache_key] = set()
@@ -228,8 +227,8 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                 source_widget = self.parent()
                 if hasattr(source_widget, 'library_service'):
                     # Find all identities (Aliases + Groups)
-                    # Use resolve_identity_graph to get aliases and group memberships
-                    expanded = source_widget.library_service.contributor_repository.resolve_identity_graph(str(required_val))
+                    # Use resolve_identity_graph to get aliases and group memberships via service
+                    expanded = source_widget.library_service.contributor_service.resolve_identity_graph(str(required_val))
                     self._group_membership_cache[req_str] = {e.lower() for e in expanded}
                 else:
                     self._group_membership_cache[req_str] = set()
@@ -256,7 +255,7 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                  if cache_key not in self._tag_cache:
                      source_widget = self.parent() # The LibraryWidget
                      if source_widget and hasattr(source_widget, 'library_service'):
-                         tags = source_widget.library_service.tag_repo.get_tags_for_source(source_id)
+                         tags = source_widget.library_service.tag_service.get_tags_for_source(source_id)
                          self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
                      else:
                          self._tag_cache[cache_key] = set()
@@ -339,8 +338,9 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                         source_widget = self.parent()
                         if hasattr(source_widget, 'library_service'):
                              svc = source_widget.library_service
-                             pub, _ = svc.publisher_repo.get_or_create(str(required_val))
-                             descendants = svc.publisher_repo.get_with_descendants(pub.publisher_id)
+                             pub, _ = svc.publisher_service.get_or_create(str(required_val))
+                             # Usage: Delegated through Service Layer (Correct SOA)
+                             descendants = svc.publisher_service.get_with_descendants(pub.publisher_id)
                              self._filter_cache[cache_key] = {d.publisher_name.lower() for d in descendants}
                          
                     valid_names = self._filter_cache.get(cache_key, set())
@@ -415,8 +415,8 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                     if cache_key not in self._tag_cache:
                         source_widget = self.parent()
                         if hasattr(source_widget, 'library_service'):
-                            tag_repo = source_widget.library_service.tag_repo
-                            tags = tag_repo.get_tags_for_source(source_id)
+                            svc = source_widget.library_service
+                            tags = svc.tag_service.get_tags_for_source(source_id)
                             # Use consistent format {Category}:{TagName}
                             self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
                         else:
@@ -687,7 +687,7 @@ class LibraryWidget(QWidget):
         
         # Digital Filter Brain
         self.library_model = QStandardItemModel()
-        self.proxy_model = LibraryFilterProxyModel(self.library_service.contributor_repository, parent=self)
+        self.proxy_model = LibraryFilterProxyModel(self.library_service.contributor_service, parent=self)
         self.proxy_model._field_indices = self.field_indices # Crucial for Tag Search
         self.proxy_model.setSourceModel(self.library_model)
         self.proxy_model.setFilterKeyColumn(-1) # Search all columns
@@ -1437,9 +1437,9 @@ class LibraryWidget(QWidget):
                 # Save full metadata
                 self.library_service.update_song(temp_song)
 
-                # T-83: Primary Migration Point - Mark new imports as Unprocessed
-                if hasattr(self.library_service, 'tag_repo'):
-                    self.library_service.tag_repo.add_tag_to_source(file_id, "Unprocessed", category="Status")
+                # T-83: Primary Migration Point - Mark new imports as Unprocessed via Service
+                if hasattr(self.library_service, 'tag_service'):
+                    self.library_service.tag_service.add_tag_to_source(file_id, "Unprocessed", category="Status")
                 
                 return True
         except Exception as e:
@@ -2461,9 +2461,9 @@ class LibraryWidget(QWidget):
                         song = self.library_service.get_song_by_id(sid)
                         if not song: continue
 
-                        # Gate 1: Status Check (The Tag is the Law)
-                        tag_repo = self.library_service.tag_repo if hasattr(self.library_service, 'tag_repo') else None
-                        is_unprocessed = tag_repo.is_unprocessed(sid) if tag_repo else True
+                        # Gate 1: Status Check (The Tag is the Law) via Service
+                        tag_service = self.library_service.tag_service if hasattr(self.library_service, 'tag_service') else None
+                        is_unprocessed = tag_service.is_unprocessed(sid) if tag_service else True
                         if is_unprocessed: 
                             errors.append(f"{song.title}: Not marked as Ready (has Unprocessed tag)")
                             error_count += 1

@@ -1,0 +1,78 @@
+"""
+Publisher Service
+
+Handles business logic for Publisher management.
+"""
+from typing import List, Optional, Tuple
+from ...data.models.publisher import Publisher
+from ...data.repositories.publisher_repository import PublisherRepository
+
+class PublisherService:
+    """Service for managing publishers and their hierarchical relationships."""
+    
+    def __init__(self, publisher_repository: Optional[PublisherRepository] = None):
+        self._repo = publisher_repository or PublisherRepository()
+
+    def search(self, query: str = "") -> List[Publisher]:
+        """Search for publishers by name or part of name."""
+        return self._repo.search(query)
+
+    def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
+        """Fetch a specific publisher by its ID."""
+        return self._repo.get_by_id(publisher_id)
+
+    def find_by_name(self, name: str) -> Optional[Publisher]:
+        """Fetch a specific publisher by its exact name."""
+        return self._repo.find_by_name(name)
+
+    def get_or_create(self, name: str) -> Tuple[Publisher, bool]:
+        """Find an existing publisher or create a new one."""
+        return self._repo.get_or_create(name)
+
+    def update(self, publisher: Publisher) -> bool:
+        """Update an existing publisher record."""
+        # Safety Check: Prevent circular parent-child relationships
+        if publisher.publisher_id and publisher.parent_publisher_id:
+            if self.would_create_cycle(publisher.publisher_id, publisher.parent_publisher_id):
+                return False
+        return self._repo.update(publisher)
+
+    def delete(self, publisher_id: int) -> bool:
+        """Delete a publisher record."""
+        return self._repo.delete(publisher_id)
+
+    def get_usage_stats(self, publisher_id: int) -> dict:
+        """Retrieve usage statistics (referenced albums, dependencies) for safety checks."""
+        return {
+            'album_count': self._repo.get_album_count(publisher_id),
+            'child_count': self._repo.get_child_count(publisher_id)
+        }
+
+    def would_create_cycle(self, child_id: int, proposed_parent_id: Optional[int]) -> bool:
+        """
+        Detect if setting proposed_parent_id as the parent of child_id would create a circular loop.
+        """
+        if not proposed_parent_id:
+            return False
+            
+        if proposed_parent_id == child_id:
+            return True # Can't be your own parent
+            
+        # Walk up the chain from the proposed parent to see if we ever hit the child
+        visited = {child_id}
+        current_id = proposed_parent_id
+        
+        while current_id:
+            if current_id in visited:
+                return True
+            visited.add(current_id)
+            
+            p = self._repo.get_by_id(current_id)
+            if not p:
+                break
+            current_id = p.parent_publisher_id
+            
+        return False
+    def get_with_descendants(self, publisher_id: int) -> List[Publisher]:
+        """Fetch a publisher and all its recursive descendants."""
+        return self._repo.get_with_descendants(publisher_id)

@@ -28,8 +28,9 @@ class SongRepository(GenericRepository[Song]):
             # Don't crash startup on integrity check error
             logger.error(f"Non-fatal integrity check error: {e}")
 
-    def _insert_db(self, cursor: sqlite3.Cursor, song: Song) -> int:
+    def _insert_db(self, cursor: sqlite3.Cursor, song: Song, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
+        auditor = kwargs.get('auditor')
         # Normalize path
         file_path = os.path.normcase(os.path.abspath(song.source))
         file_title = song.name or os.path.basename(file_path)
@@ -54,9 +55,9 @@ class SongRepository(GenericRepository[Song]):
         # 3. Handle Relationships (if provided)
         # Temporarily set ID on object so helpers can use it
         song.source_id = source_id 
-        if song.publisher: self._sync_publisher(song, cursor)
-        if song.album: self._sync_album(song, cursor)
-        self._sync_contributor_roles(song, cursor)
+        if song.album: self._sync_album(song, cursor, auditor=auditor)
+        if song.publisher: self._sync_publisher(song, cursor, auditor=auditor)
+        self._sync_contributor_roles(song, cursor, auditor=auditor)
         
         return source_id
 
@@ -95,8 +96,29 @@ class SongRepository(GenericRepository[Song]):
             logger.error(f"Error fetching library data: {e}")
             return [], []
 
-    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
+        auditor = kwargs.get('auditor')
+        # Audit cascaded deletes for junctions
+        if auditor:
+            cursor.execute("SELECT ContributorID, RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ?", (record_id,))
+            for c_id, r_id, a_id in cursor.fetchall():
+                 auditor.log_delete("MediaSourceContributorRoles", f"{record_id}-{c_id}-{r_id}", {
+                     "SourceID": record_id, "ContributorID": c_id, "RoleID": r_id, "CreditedAliasID": a_id
+                 })
+            
+            cursor.execute("SELECT AlbumID, TrackNumber, IsPrimary FROM SongAlbums WHERE SourceID = ?", (record_id,))
+            for a_id, t_num, isp in cursor.fetchall():
+                 auditor.log_delete("SongAlbums", f"{record_id}-{a_id}", {
+                     "SourceID": record_id, "AlbumID": a_id, "TrackNumber": t_num, "IsPrimary": isp
+                 })
+
+            cursor.execute("SELECT PublisherID FROM RecordingPublishers WHERE SourceID = ?", (record_id,))
+            for p_id in cursor.fetchall():
+                 auditor.log_delete("RecordingPublishers", f"{record_id}-{p_id[0]}", {
+                     "SourceID": record_id, "PublisherID": p_id[0]
+                 })
+
         cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (record_id,))
 
     def get_by_id(self, source_id: int) -> Optional[Song]:
@@ -104,8 +126,10 @@ class SongRepository(GenericRepository[Song]):
         songs = self.get_songs_by_ids([source_id])
         return songs[0] if songs else None
 
-    def _update_db(self, cursor: sqlite3.Cursor, song: Song) -> None:
+    def _update_db(self, cursor: sqlite3.Cursor, song: Song, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
+        auditor = kwargs.get('auditor')
+
         # 1. Update MediaSources
         normalized_path = os.path.normcase(os.path.abspath(song.source))
         cursor.execute("""
@@ -122,22 +146,19 @@ class SongRepository(GenericRepository[Song]):
             WHERE SourceID = ?
         """, (song.bpm, song.recording_year, song.isrc, groups_str, song.source_id))
 
-        # 3. Clear existing contributor roles
-        cursor.execute(
-            "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ?",
-            (song.source_id,)
-        )
-
-        # 4. Sync new contributor roles
-        self._sync_contributor_roles(song, cursor)
+        # 3. Cleanup handled by Sync methods now (Diff-based)
+        # (Blocks 3 and 4 merged logically into smart syncs)
+        
+        # 4. Sync contributor roles (Handle Inserts and Deletes internally)
+        self._sync_contributor_roles(song, cursor, auditor=auditor)
 
         # 5. Sync Album
         if song.album is not None:
-             self._sync_album(song, cursor)
+             self._sync_album(song, cursor, auditor=auditor)
 
         # 6. Sync Publisher
         if song.publisher is not None:
-             self._sync_publisher(song, cursor)
+             self._sync_publisher(song, cursor, auditor=auditor)
 
     def update_status(self, file_id: int, is_done: bool) -> bool:
         """Update the status of a song (Tag-Driven, Flag-Synced)"""
@@ -172,68 +193,96 @@ class SongRepository(GenericRepository[Song]):
             logger.error(f"Error updating song status: {e}")
             return False
 
-    def _sync_contributor_roles(self, song: Song, cursor) -> None:
-        """Sync contributors and their roles"""
+    def _sync_contributor_roles(self, song: Song, cursor, auditor=None) -> None:
+        """Sync contributors by calculating diff between DB and Object model."""
         conn = cursor.connection
+        
+        # 1. Calculate Desired State
         role_map = {
             'performers': 'Performer',
             'composers': 'Composer',
             'lyricists': 'Lyricist',
             'producers': 'Producer'
         }
-
+        
+        desired_links = set() # Set of (ContributorID, RoleID, CreditedAliasID)
+        
         for attr, role_name in role_map.items():
             contributors = getattr(song, attr, [])
-            if not contributors:
-                continue
+            if not contributors: continue
 
-            # Get RoleID
+             # Get RoleID
             cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
             role_row = cursor.fetchone()
-            if not role_row:
-                continue
+            if not role_row: continue
             role_id = role_row[0]
 
-            # Process each contributor
             for contributor_name in contributors:
-                if not contributor_name.strip():
-                    continue
+                if not contributor_name.strip(): continue
 
-                # T-70: Use ContributorRepository for identity-aware syncing
-                artist, created = self.contributor_repository.get_or_create(contributor_name, conn=conn)
+                # Resolve Identity
+                artist, _ = self.contributor_repository.get_or_create(contributor_name, conn=conn)
                 contributor_id = artist.contributor_id
                 
-                # Check if the name we used ("Pink") is actually the matched alias (or if we can find it)
+                # Resolve Alias
                 credited_alias_id = None
                 if artist.matched_alias and artist.matched_alias.lower() == contributor_name.lower():
-                     # If the repository search/lookup already told us this is an alias match
-                     # Wait, get_or_create doesn't return matched_alias in the object usually?
-                     # We need to look it up to be sure.
-                     pass
+                     pass # (Logic TBD if we stash matched_alias in object)
                 else:
-                     # Check if 'contributor_name' is an alias for this artist
-                     # (Don't do this if name matches primary name)
                      if contributor_name.lower() != artist.name.lower():
-                         cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ?", (contributor_id, contributor_name))
-                         alias_row = cursor.fetchone()
-                         if alias_row:
-                             credited_alias_id = alias_row[0]
+                         cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ? COLLATE NOCASE", (contributor_id, contributor_name))
+                         arow = cursor.fetchone()
+                         if arow: credited_alias_id = arow[0]
+                
+                desired_links.add((contributor_id, role_id, credited_alias_id))
 
-                # Link source, contributor, and role (with Credit Preservation)
-                cursor.execute("""
-                    INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID, CreditedAliasID)
-                    VALUES (?, ?, ?, ?)
-                """, (song.source_id, contributor_id, role_id, credited_alias_id))
+        # 2. Get Current State
+        cursor.execute("SELECT ContributorID, RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ?", (song.source_id,))
+        current_links_raw = cursor.fetchall()
+        # Convert tuple to (c_id, r_id, a_id) - handle NULL alias
+        current_links = set()
+        for c, r, a in current_links_raw:
+            current_links.add((c, r, a))
+            
+        # 3. Calculate Diff
+        to_add = desired_links - current_links
+        to_remove = current_links - desired_links
+        
+        # 4. Execute Changes
+        # DELETE
+        for c_id, r_id, a_id in to_remove:
+            cursor.execute(
+                "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?",
+                (song.source_id, c_id, r_id)
+            )
+            if auditor:
+                auditor.log_delete("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                    "SourceID": song.source_id,
+                    "ContributorID": c_id,
+                    "RoleID": r_id,
+                    "CreditedAliasID": a_id
+                })
+                
+        # INSERT
+        for c_id, r_id, a_id in to_add:
+            cursor.execute(
+                "INSERT INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID, CreditedAliasID) VALUES (?, ?, ?, ?)",
+                (song.source_id, c_id, r_id, a_id)
+            )
+            if auditor:
+                auditor.log_insert("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                    "SourceID": song.source_id,
+                    "ContributorID": c_id,
+                    "RoleID": r_id,
+                    "CreditedAliasID": a_id
+                })
 
-    def _sync_album(self, song: Song, cursor) -> None:
+    def _sync_album(self, song: Song, cursor, auditor=None) -> None:
         """
         Sync album relationship (Find or Create with Artist Disambiguation).
-        Non-Destructive Update: Existing links are kept; new target becomes Primary.
+        Diff-Based Update: Preserves TrackNumbers and prevents unnecessary deletions.
         """
-        # cursor = conn.cursor() -> Using passed cursor
-        
-        # Normalize Album Title (Handle List from UI)
-        # Normalize Album Title (Handle List from UI)
+        # 0. Normalize Inputs -> Determine Target IDs
         effective_title = None
         all_titles = []
         if isinstance(song.album, list):
@@ -245,45 +294,35 @@ class SongRepository(GenericRepository[Song]):
                  all_titles = [t]
                  effective_title = t
 
-        # Determine the Target Album ID
-        target_album_id = None
+        target_ids = []
         
-        # 1. Use Precise ID if trustworthy (and no text override)
-        # CRITICAL: If song.album is provided, it might mean the user edited the text!
+        # A. Attempt Precise ID Match
         use_precise_id = False
         if getattr(song, 'album_id', None) is not None:
              if not effective_title:
                  use_precise_id = True
              else:
-                 # Check if name matches existing ID to see if it's stale
-                 # Handle List of IDs (Multi-Album): Validation checks PRIMARY only
                  check_id = song.album_id
-                 if isinstance(check_id, list):
-                     check_id = check_id[0] if check_id else None
-                     
+                 if isinstance(check_id, list): check_id = check_id[0] if check_id else None
                  cursor.execute("SELECT AlbumTitle FROM Albums WHERE AlbumID = ?", (check_id,))
                  id_row = cursor.fetchone()
-                 
                  if id_row and id_row[0].lower() == effective_title.lower():
                      use_precise_id = True
 
         if use_precise_id:
-             target_album_id = song.album_id
-
+             ids = song.album_id
+             if isinstance(ids, list): target_ids = ids
+             elif ids: target_ids = [ids]
+             
         elif all_titles:
-            # 2. Get/Create Albums by Name (Supports Multi-Album)
-            target_ids = []
-            
+            # B. Get/Create by Name
             album_artist = getattr(song, 'album_artist', None)
-            if album_artist:
-                album_artist = album_artist.strip() or None
+            if album_artist: album_artist = album_artist.strip() or None
             release_year = getattr(song, 'recording_year', None)
             
             for album_title in all_titles:
-                # Build query dynamically based on what's provided
                 conditions = ["AlbumTitle = ? COLLATE NOCASE"]
                 params = [album_title]
-                
                 if album_artist:
                     conditions.append("AlbumArtist = ? COLLATE NOCASE")
                     params.append(album_artist)
@@ -294,63 +333,71 @@ class SongRepository(GenericRepository[Song]):
                     conditions.append("ReleaseYear = ?")
                     params.append(release_year)
                 
-                query = f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}"
-                cursor.execute(query, params)
+                cursor.execute(f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}", params)
                 row = cursor.fetchone()
-                
                 if row:
                     target_ids.append(row[0])
                 else:
-                    # Create new album
-                    cursor.execute(
-                        "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", 
-                        (album_title, album_artist, release_year)
-                    )
+                    cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", (album_title, album_artist, release_year))
                     target_ids.append(cursor.lastrowid)
-            
-            target_album_id = target_ids
 
-        # 3. Apply Link logic (Primary Switch & Multi-Album)
-        targets = []
-        if isinstance(target_album_id, list):
-             targets = target_album_id
-        elif target_album_id:
-             targets = [target_album_id]
-             
-        if targets:
-            # Enforce Exact State (Nuclear Option)
-            cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
-            
-            for idx, alb_id in enumerate(targets):
-                # First item is Primary
-                is_p = 1 if idx == 0 else 0
-                cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, ?)", (song.source_id, alb_id, is_p))
-        
-        # Note: If no target_album derived (user cleared album), we do ??
-        # In a non-destructive world, maybe we just don't add a new primary?
-        # Or do we clear the Primary flag from existing?
-        # Legacy behavior was "Unlink". 
-        # If song.album is explicitly empty string, maybe we should unlink primary?
+        # Handle 'Clear Album' scenario (Explicit empty string)
         if effective_title is not None and not effective_title.strip() and not use_precise_id:
-             # User cleared the field. Unset Primary on everything?
-             # Or leave it? "Clear Album" usually means "Remove from Album".
-             # Let's unlink the current Primary.
-             print(f"DEBUG: Clearing album links for source {song.source_id}")
-             cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+            target_ids = [] 
+            
+        # 1. Get Current State: {AlbumID: {'IsPrimary': bool, 'TrackNumber': int}}
+        cursor.execute("SELECT AlbumID, TrackNumber, IsPrimary FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+        current_map = {}
+        for a_id, t_num, is_p in cursor.fetchall():
+            current_map[a_id] = {'IsPrimary': is_p, 'TrackNumber': t_num}
+            
+        # 2. Build Desired State: {AlbumID: IsPrimary} (List order determines primary)
+        desired_map = {}
+        for idx, a_id in enumerate(target_ids):
+            desired_map[a_id] = (1 if idx == 0 else 0)
+            
+        # 3. Calculate Diffs
+        current_ids = set(current_map.keys())
+        desired_ids = set(desired_map.keys())
+        
+        to_delete = current_ids - desired_ids
+        to_add = desired_ids - current_ids
+        to_check = current_ids.intersection(desired_ids)
+        
+        # 4. Execute Changes
+        # DELETE
+        for a_id in to_delete:
+            snap = current_map[a_id]
+            cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (song.source_id, a_id))
+            if auditor:
+                auditor.log_delete("SongAlbums", f"{song.source_id}-{a_id}", {
+                     "SourceID": song.source_id, "AlbumID": a_id, "TrackNumber": snap['TrackNumber'], "IsPrimary": snap['IsPrimary']
+                })
+
+        # INSERT
+        for a_id in to_add:
+            is_p = desired_map[a_id]
+            cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, ?)", (song.source_id, a_id, is_p))
+            if auditor:
+                auditor.log_insert("SongAlbums", f"{song.source_id}-{a_id}", {
+                    "SourceID": song.source_id, "AlbumID": a_id, "IsPrimary": is_p
+                })
+                
+        # UPDATE (Only if IsPrimary Changed)
+        for a_id in to_check:
+            cur_p = current_map[a_id]['IsPrimary']
+            new_p = desired_map[a_id]
+            if cur_p != new_p:
+                cursor.execute("UPDATE SongAlbums SET IsPrimary = ? WHERE SourceID = ? AND AlbumID = ?", (new_p, song.source_id, a_id))
+                if auditor:
+                    auditor.log_update("SongAlbums", f"{song.source_id}-{a_id}", {"IsPrimary": cur_p}, {"IsPrimary": new_p})
 
 
-    def _sync_publisher(self, song: Song, cursor) -> None:
+    def _sync_publisher(self, song: Song, cursor, auditor=None) -> None:
         """
-        Sync publisher relationship (Find or Create).
-        Policy: Side Panel edits are "Track Overrides" (Level 1).
-        Schema Constraint: Level 1 (TrackPublisherID) is 1:1. Level 3 (RecordingPublishers) is M:M.
-        Strategy:
-        1. Write ALL publishers to RecordingPublishers (Level 3) for archival.
-        2. Write PRIMARY publisher to TrackPublisherID (Level 1) to force override of Album Label.
-        3. If "Single Paradox" (No Album), create/link Album and set AlbumPublishers (Level 2).
+        Sync publisher relationship (RecordingPublishers - M:M).
+        Diff-Based Update: Only adds/removes links that changed.
         """
-        # cursor = conn.cursor() -> Using passed cursor
-
         # 1. Parse Publishers
         if isinstance(song.publisher, list):
             publisher_names = [str(p).strip() for p in song.publisher if p]
@@ -359,23 +406,51 @@ class SongRepository(GenericRepository[Song]):
             publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
 
         # Resolve Publisher IDs
-        publisher_ids = []
+        desired_ids = set()
+        publisher_ids = [] # Ordered list for Primary Override logic
+        
         for pub_name in publisher_names:
             cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
             row = cursor.fetchone()
             if row:
                 pid = row[0]
             else:
+                # Insert missing publisher
                 cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
                 pid = cursor.lastrowid
-            publisher_ids.append(pid)
+            
+            desired_ids.add(pid)
+            publisher_ids.append(pid) # Keep order
 
-        # 2. Update RecordingPublishers (Level 3 - M:M Archival)
-        cursor.execute("DELETE FROM RecordingPublishers WHERE SourceID = ?", (song.source_id,))
-        for pid in publisher_ids:
-            cursor.execute("INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)", (song.source_id, pid))
+        # 2. Get Current IDs
+        cursor.execute("SELECT PublisherID FROM RecordingPublishers WHERE SourceID = ?", (song.source_id,))
+        # Fetchall returns list of tuples [(1,), (2,)]
+        current_ids = set(r[0] for r in cursor.fetchall())
+        
+        # 3. Calculate Diff
+        to_add = desired_ids - current_ids
+        to_remove = current_ids - desired_ids
+        
+        # 4. Execute Changes
+        # DELETE
+        for pid in to_remove:
+            cursor.execute("DELETE FROM RecordingPublishers WHERE SourceID = ? AND PublisherID = ?", (song.source_id, pid))
+            if auditor:
+                auditor.log_delete("RecordingPublishers", f"{song.source_id}-{pid}", {
+                     "SourceID": song.source_id, "PublisherID": pid
+                })
+                
+        # INSERT
+        for pid in to_add:
+            cursor.execute("INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)", (song.source_id, pid))
+            if auditor:
+                auditor.log_insert("RecordingPublishers", f"{song.source_id}-{pid}", {
+                    "SourceID": song.source_id, "PublisherID": pid
+                })
 
-        # 3. Handle Album Links & Overrides
+        # 5. Handle Album Links & Overrides (TrackPublisherID)
+        # Note: This logic seems to depend on Album links being established.
+        # It updates existing SongAlbums rows.
         cursor.execute("SELECT AlbumID, IsPrimary FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
         rows = cursor.fetchall()
         
@@ -398,6 +473,13 @@ class SongRepository(GenericRepository[Song]):
             primary_pid = publisher_ids[0] if publisher_ids else None
             
             # Update all links for this song (or just Primary? Let's do all to be safe overrides)
+            if auditor:
+                # TrackPublisherID is technically a field in SongAlbums, so this is log_update
+                cursor.execute("SELECT AlbumID, TrackPublisherID FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
+                for a_id, old_tp_id in cursor.fetchall():
+                     if old_tp_id != primary_pid:
+                         auditor.log_update("SongAlbums", f"{song.source_id}-{a_id}", {"TrackPublisherID": old_tp_id}, {"TrackPublisherID": primary_pid})
+
             cursor.execute("UPDATE SongAlbums SET TrackPublisherID = ? WHERE SourceID = ?", (primary_pid, song.source_id))
 
     # _sync_tags removed (Legacy)

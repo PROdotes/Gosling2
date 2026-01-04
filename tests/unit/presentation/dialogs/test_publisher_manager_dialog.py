@@ -8,7 +8,7 @@ from src.presentation.dialogs.publisher_manager_dialog import (
 from src.data.models.publisher import Publisher
 
 @pytest.fixture
-def mock_pub_repo():
+def mock_service():
     repo = MagicMock()
     return repo
 
@@ -24,15 +24,15 @@ def test_publisher_creator_dialog_init(qtbot):
     assert dialog.inp_name.text() == "Existing"
     assert dialog.btn_save.text() == "RenameBtn"
 
-def test_publisher_picker_dialog_populate(qtbot, mock_pub_repo):
+def test_publisher_picker_dialog_populate(qtbot, mock_service):
     pubs = [
         Publisher(1, "Pub 1", None),
         Publisher(2, "Pub 2", None),
         Publisher(3, "Exclude Me", None)
     ]
-    mock_pub_repo.search.return_value = pubs
+    mock_service.search.return_value = pubs
     
-    dialog = PublisherPickerDialog(mock_pub_repo, exclude_ids={3})
+    dialog = PublisherPickerDialog(mock_service, exclude_ids={3})
     qtbot.addWidget(dialog)
     
     # GlowComboBox.count() should return 2
@@ -40,29 +40,34 @@ def test_publisher_picker_dialog_populate(qtbot, mock_pub_repo):
     assert dialog.cmb.itemText(0) == "Pub 1"
     assert dialog.cmb.itemText(1) == "Pub 2"
 
-def test_publisher_details_dialog_save_rename(qtbot, mock_pub_repo, sample_publisher):
-    mock_pub_repo.search.return_value = []
-    dialog = PublisherDetailsDialog(sample_publisher, mock_pub_repo)
+def test_publisher_details_dialog_save_rename(qtbot, mock_service, sample_publisher):
+    mock_service.search.return_value = []
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
     dialog.txt_name.setText("New Named Publisher")
-    mock_pub_repo.update.return_value = True
+    mock_service.update.return_value = True
+    # Make sure cycle check passes (False means no cycle)
+    mock_service.would_create_cycle.return_value = False
     
     with patch.object(dialog, 'accept') as mock_accept:
         # Trigger save directly to avoid UI lookup issues in tests
         dialog._save()
         
         assert sample_publisher.publisher_name == "New Named Publisher"
-        mock_pub_repo.update.assert_called_with(sample_publisher)
+        mock_service.update.assert_called_with(sample_publisher)
         mock_accept.assert_called_once()
 
-def test_publisher_details_dialog_circular_check(qtbot, mock_pub_repo, sample_publisher):
+def test_publisher_details_dialog_circular_check(qtbot, mock_service, sample_publisher):
     # Setup: sample(200) -> parent(100) -> grandparent(200) [Cycle!]
     parent = Publisher(100, "Parent", 200)
-    mock_pub_repo.get_by_id.side_effect = lambda id: parent if id == 100 else None
-    mock_pub_repo.search.return_value = [parent]
+    mock_service.get_by_id.side_effect = lambda id: parent if id == 100 else None
+    mock_service.search.return_value = [parent]
     
-    dialog = PublisherDetailsDialog(sample_publisher, mock_pub_repo)
+    # Set cycle check to True
+    mock_service.would_create_cycle.return_value = True
+
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
     # Try to set parent to 100
@@ -72,10 +77,10 @@ def test_publisher_details_dialog_circular_check(qtbot, mock_pub_repo, sample_pu
     with patch('PyQt6.QtWidgets.QMessageBox.warning') as mock_warn:
         dialog._save()
         mock_warn.assert_called_once()
-        # Verify repo.update was NOT called
-        mock_pub_repo.update.assert_not_called()
+        # Verify update was NOT called
+        mock_service.update.assert_not_called()
 
-def test_publisher_details_dialog_add_child_cycle_prevention(qtbot, mock_pub_repo, sample_publisher):
+def test_publisher_details_dialog_add_child_cycle_prevention(qtbot, mock_service, sample_publisher):
     # Setup: 300 -> 200 (sample)
     # We want to prevent adding 300 as a child of 200 if 300 is already an ancestor.
     sample_publisher.parent_publisher_id = 300
@@ -86,10 +91,12 @@ def test_publisher_details_dialog_add_child_cycle_prevention(qtbot, mock_pub_rep
         if id == 200: return sample_publisher
         return None
         
-    mock_pub_repo.get_by_id.side_effect = mock_get
-    mock_pub_repo.search.return_value = [ancestor]
+    mock_service.get_by_id.side_effect = mock_get
+    mock_service.search.return_value = [ancestor]
+    # Simulate cycle detection when trying to add child
+    mock_service.would_create_cycle.return_value = True
     
-    dialog = PublisherDetailsDialog(sample_publisher, mock_pub_repo)
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
     with patch('src.presentation.dialogs.publisher_manager_dialog.PublisherPickerDialog.exec', return_value=True), \
@@ -98,15 +105,15 @@ def test_publisher_details_dialog_add_child_cycle_prevention(qtbot, mock_pub_rep
         
         dialog._add_child()
         mock_warn.assert_called_once()
-        mock_pub_repo.update.assert_not_called()
+        mock_service.update.assert_not_called()
 
-def test_publisher_details_dialog_remove_child(qtbot, mock_pub_repo, sample_publisher):
+def test_publisher_details_dialog_remove_child(qtbot, mock_service, sample_publisher):
     child = Publisher(500, "Son", 200)
-    mock_pub_repo.search.return_value = [child]
+    mock_service.search.return_value = [child]
     # Critical: ensure repo returns the SAME object we are checking
-    mock_pub_repo.get_by_id.return_value = child 
+    mock_service.get_by_id.return_value = child 
     
-    dialog = PublisherDetailsDialog(sample_publisher, mock_pub_repo)
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
     # Find child item in list
@@ -116,14 +123,14 @@ def test_publisher_details_dialog_remove_child(qtbot, mock_pub_repo, sample_publ
     dialog._remove_child_link(item)
     
     assert child.parent_publisher_id is None
-    mock_pub_repo.update.assert_called_with(child)
+    mock_service.update.assert_called_with(child)
 
-def test_publisher_details_dialog_rename_child(qtbot, mock_pub_repo, sample_publisher):
+def test_publisher_details_dialog_rename_child(qtbot, mock_service, sample_publisher):
     child = Publisher(500, "Son", 200)
-    mock_pub_repo.search.return_value = [child]
-    mock_pub_repo.get_by_id.return_value = child
+    mock_service.search.return_value = [child]
+    mock_service.get_by_id.return_value = child
     
-    dialog = PublisherDetailsDialog(sample_publisher, mock_pub_repo)
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     item = dialog.list_children.item(0)
     
@@ -133,4 +140,4 @@ def test_publisher_details_dialog_rename_child(qtbot, mock_pub_repo, sample_publ
         dialog._on_child_double_clicked(item)
         
         assert child.publisher_name == "New Son"
-        mock_pub_repo.update.assert_called_with(child)
+        mock_service.update.assert_called_with(child)
