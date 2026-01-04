@@ -17,8 +17,6 @@ class Song(MediaSource):
     album_id: Union[int, List[int], None] = None # Added for precise linking (T-46)
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
     publisher: Optional[object] = None # Union[str, List[str]]
-    genre: Optional[str] = None
-    mood: Optional[str] = None
     notes: Optional[str] = None
     is_active: bool = True
     
@@ -84,7 +82,9 @@ class Song(MediaSource):
             if value is not None and hasattr(song, attr):
                 setattr(song, attr, value)
             elif value is not None:
-                yellberus.yell(f"Song model missing attribute '{attr}' for tag '{tag}'")
+                # Only yell if it's not a known virtual/unified field
+                if attr not in ('genre', 'mood', 'is_done'):
+                    yellberus.yell(f"Song model missing attribute '{attr}' for tag '{tag}'")
         
         return song
 
@@ -96,6 +96,7 @@ class Song(MediaSource):
         if self.lyricists is None: self.lyricists = []
         if self.producers is None: self.producers = []
         if self.groups is None: self.groups = []
+        if self.tags is None: self.tags = []
 
     @property
     def title(self) -> Optional[str]:
@@ -158,3 +159,39 @@ class Song(MediaSource):
         minutes, seconds = divmod(int(self.duration), 60)
         return f"{minutes:02d}:{seconds:02d}"
 
+    def to_dict(self) -> dict:
+        """
+        Convert to dictionary for Audit Logging (View Snapshot).
+        Crucial for 'Smart Logger' diffing.
+        """
+        # Base MediaSource fields
+        base = {
+            'source_id': self.source_id,
+            'media_name': self.name,
+            'source_path': self.source,
+            'duration': self.duration,
+            'audio_hash': self.audio_hash,
+            'is_active': self.is_active,
+            'notes': self.notes
+        }
+        
+        # Song Specifics
+        song_data = {
+            'bpm': self.bpm,
+            'recording_year': self.recording_year,
+            'isrc': self.isrc,
+            'unified_artist': self.unified_artist,
+            # Flatten lists? AuditLogger._normalize_dict handles lists, 
+            # so we just pass them raw.
+            'album': self.album,  # Might be string or list
+            'album_id': self.album_id, 
+            'publisher': self.publisher,
+            'performers': self.performers,
+            'composers': self.composers,
+            'lyricists': self.lyricists,
+            'producers': self.producers,
+            'tags': self.tags,
+            'releases': self.releases # List of complex dicts
+        }
+        
+        return {**base, **song_data}

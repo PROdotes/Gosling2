@@ -29,3 +29,12 @@ class Album:
             song_count=row[5] if len(row) > 5 else 0
         )
 
+    def to_dict(self):
+        return {
+            "album_id": self.album_id,
+            "title": self.title,
+            "album_artist": self.album_artist,
+            "album_type": self.album_type,
+            "release_year": self.release_year
+        }
+

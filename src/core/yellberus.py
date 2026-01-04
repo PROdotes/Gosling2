@@ -609,13 +609,23 @@ def validate_schema() -> None:
                 
                 # Check 2: JSON field maps to Song attribute
                 attr = attr_map.get(json_field, json_field)
+                
+                # Unified fields (Genre, Mood) don't have direct attributes
+                if json_field in ('genre', 'mood'):
+                    continue
+                    
                 if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
                     errors.append(f"❌ JSON field '{json_field}' → Song missing attribute '{attr}'")
         
-        # For local fields, check Song has the attribute
+        # For local fields, check Song has the attribute (unless virtual/unified)
         if not field.portable:
             attr = field.model_attr or field.name
             attr = attr_map.get(attr, attr)
+            
+            # Unified fields live in the 'tags' list, not as direct attributes
+            if field.name in ('genre', 'mood', 'is_done'):
+                continue
+                
             if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
                 errors.append(f"❌ Local field '{field.name}' → Song missing attribute '{attr}'")
     

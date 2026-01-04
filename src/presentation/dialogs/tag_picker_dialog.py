@@ -4,10 +4,26 @@ Supports both mouse users (category buttons) and keyboard users (prefix syntax).
 """
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QFrame, QSizePolicy
+    QFrame, QSizePolicy, QScrollArea, QWidget
 )
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QWheelEvent
 from ..widgets.glow_factory import GlowLineEdit, GlowButton
+
+
+class HorizontalScrollArea(QScrollArea):
+    """QScrollArea that converts vertical mouse wheel to horizontal scrolling."""
+    
+    def wheelEvent(self, event: QWheelEvent):
+        # Get the scroll delta (positive = scroll up/left, negative = scroll down/right)
+        delta = event.angleDelta().y()
+        delta = int(delta / 2)
+        
+        # Apply to horizontal scrollbar instead of vertical
+        h_bar = self.horizontalScrollBar()
+        h_bar.setValue(h_bar.value() - delta)
+        
+        event.accept()
 
 
 class TagCollisionDialog(QDialog):
@@ -99,7 +115,7 @@ class TagPickerDialog(QDialog):
             self.setWindowTitle("Add Tag")
             self._current_category_filter = self.default_category
             
-        self.setFixedSize(420, 380)
+        self.setFixedSize(420, 410)
         self.setObjectName("TagPickerDialog")
         
         self._init_ui()
@@ -120,8 +136,20 @@ class TagPickerDialog(QDialog):
         lbl.setObjectName("DialogFieldLabel")
         layout.addWidget(lbl)
         
-        # --- Dynamic Category Buttons ---
-        cat_layout = QHBoxLayout()
+        # --- Dynamic Category Buttons (Scrollable) ---
+        # Create scroll area for horizontal scrolling
+        cat_scroll = HorizontalScrollArea()
+        cat_scroll.setObjectName("TagCategoryScroll")
+        cat_scroll.setWidgetResizable(True)
+        cat_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        cat_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        cat_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        cat_scroll.setFixedHeight(50)  # Fixed height for single row of buttons
+        
+        # Inner widget to hold the buttons
+        cat_container = QWidget()
+        cat_container.setObjectName("TagCategoryContainer")
+        cat_layout = QHBoxLayout(cat_container)
         cat_layout.setSpacing(4)
         cat_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -155,6 +183,8 @@ class TagPickerDialog(QDialog):
             emoji = category_emoji.get(cat, "📌")
             btn = GlowButton(f"{emoji} {cat}")
             btn.setCheckable(True)
+            # Prevent button from shrinking - keep fixed size based on content
+            btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             if cat == self._current_category_filter:
                 btn.setChecked(True)
             # Set glow color for this category (fallback to amber)
@@ -165,7 +195,8 @@ class TagPickerDialog(QDialog):
             self.category_buttons[cat] = btn
         
         cat_layout.addStretch()
-        layout.addLayout(cat_layout)
+        cat_scroll.setWidget(cat_container)
+        layout.addWidget(cat_scroll)
         
         # --- Search Box ---
         self.txt_search = GlowLineEdit()
@@ -336,14 +367,12 @@ class TagPickerDialog(QDialog):
         categories = {"Genre", "Mood"}
         
         # Add any custom categories from DB
+        # Add any custom categories from DB
         try:
-            # Query for distinct categories
-            with self.tag_repo.get_connection() as conn:
-                cursor = conn.execute("SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL")
-                for row in cursor.fetchall():
-                    if row[0]:
-                        categories.add(row[0])
-        except:
+            db_cats = self.tag_repo.get_distinct_categories()
+            for c in db_cats:
+                categories.add(c)
+        except Exception:
             pass
         
         return sorted(categories)

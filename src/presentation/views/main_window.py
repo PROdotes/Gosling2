@@ -13,7 +13,7 @@ from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
     SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland
 )
-from ..dialogs import SettingsDialog
+from ..dialogs import SettingsDialog, LogViewerDialog
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService
 from ...resources import constants
 from PyQt6.QtWidgets import (
@@ -377,6 +377,7 @@ class MainWindow(QMainWindow):
         
         # --- T-57: Global Settings Trigger ---
         self.title_bar.settings_requested.connect(self._open_settings)
+        self.title_bar.logs_requested.connect(self._open_logs)
 
 
     def _setup_shortcuts(self) -> None:
@@ -930,6 +931,11 @@ class MainWindow(QMainWindow):
             # Refresh components that might depend on root path or rules
             self.library_widget.load_library()
             # Renaming service is already linked to settings_manager
+
+    def _open_logs(self):
+        """Open the Diagnostic Log Viewer."""
+        dlg = LogViewerDialog(self.settings_manager, self)
+        dlg.exec()
 
     def changeEvent(self, event):
         """Handle window state changes (Maximize/Restore) from OS or Buttons."""

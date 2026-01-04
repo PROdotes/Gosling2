@@ -25,6 +25,7 @@ class SettingsManager:
     KEY_TYPE_FILTER = "library/typeFilter"
     KEY_ROOT_DIRECTORY = "library/rootDirectory"
     KEY_DATABASE_PATH = "library/databasePath"
+    KEY_LOG_PATH = "library/logPath"
     KEY_DEFAULT_YEAR = "library/defaultYear"
     
     # Renaming/Moving settings
@@ -187,6 +188,14 @@ class SettingsManager:
     def set_database_path(self, path: str) -> None:
         """Set a custom database path."""
         self._settings.setValue(self.KEY_DATABASE_PATH, path)
+
+    def get_log_path(self) -> Optional[str]:
+        """Get the custom log path. Returns None if default should be used."""
+        return self._settings.value(self.KEY_LOG_PATH)
+        
+    def set_log_path(self, path: str) -> None:
+        """Set a custom log path."""
+        self._settings.setValue(self.KEY_LOG_PATH, path)
 
     def get_default_year(self) -> int:
         """Get default year for auto-fill (0 = Dynamic/Current)."""

@@ -1,11 +1,17 @@
-"""Contributor Repository for database operations"""
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any, Union
+import sqlite3
 from src.data.database import BaseRepository
 from ..models.contributor import Contributor
+from .generic_repository import GenericRepository
 
+class ContributorRepository(GenericRepository[Contributor]):
+    """
+    Repository for Contributor data access.
+    Inherits GenericRepository for automatic Audit Logging.
+    """
 
-class ContributorRepository(BaseRepository):
-    """Repository for Contributor data access"""
+    def __init__(self, db_path: Optional[str] = None):
+        super().__init__(db_path, "Contributors", "contributor_id")
 
     def get_by_id(self, contributor_id: int, conn=None) -> Optional[Contributor]:
         """Fetch single contributor by ID. (Connection Aware)"""
@@ -130,75 +136,97 @@ class ContributorRepository(BaseRepository):
             logger.error(f"Error fetching aliases: {e}")
             return []
 
+    def get_all_names(self) -> List[str]:
+        """Fetch all unique contributor primary names (Ordered by SortName)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error fetching contributor names: {e}")
+            return []
+
+    def get_all_names(self) -> List[str]:
+        """Fetch all unique contributor primary names (Ordered by SortName)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
+                return [row[0] for row in cursor.fetchall()]
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error fetching contributor names: {e}")
+            return []
+
+    def _insert_db(self, cursor: sqlite3.Cursor, contributor: Contributor) -> int:
+        """Execute SQL INSERT for GenericRepository"""
+        cursor.execute(
+            "INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, ?)",
+            (contributor.name, contributor.sort_name, contributor.type)
+        )
+        return cursor.lastrowid
+
+    def _update_db(self, cursor: sqlite3.Cursor, contributor: Contributor) -> None:
+        """Execute SQL UPDATE for GenericRepository"""
+        # Get existing type to check for change
+        cursor.execute("SELECT ContributorType FROM Contributors WHERE ContributorID = ?", (contributor.contributor_id,))
+        row = cursor.fetchone()
+        old_type = row[0] if row else None
+        
+        # 1. Update Core Identity
+        cursor.execute(
+            "UPDATE Contributors SET ContributorName = ?, SortName = ?, ContributorType = ? WHERE ContributorID = ?",
+            (contributor.name, contributor.sort_name, contributor.type, contributor.contributor_id)
+        )
+        
+        # 2. Cleanup relationships if type changed
+        if old_type and old_type != contributor.type:
+            if contributor.type == "person":
+                cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
+            else:
+                cursor.execute("DELETE FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
+
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+        """Execute SQL DELETE for GenericRepository"""
+        # Manual Cascade for GroupMembers (Not enforced by Schema)
+        cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
+        cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (record_id,))
+
     def create(self, name: str, type: str = 'person', sort_name: str = None, conn=None) -> Contributor:
         """Create new contributor. Auto-generates sort_name if not provided. (Connection Aware)"""
         if not sort_name:
             sort_name = self._generate_sort_name(name)
         
+        # Helper: Construct Object
+        c = Contributor(None, name, sort_name, type)
+
         if conn:
-            return self._create_logic(name, type, sort_name, conn)
+            # Connection Passed: Manual Audit to preserve transaction context
+            cursor = conn.cursor()
+            new_id = self._insert_db(cursor, c)
+            c.contributor_id = new_id
+            
+            from src.core.audit_logger import AuditLogger
+            try:
+                AuditLogger(conn).log_insert("Contributors", new_id, c.to_dict())
+            except Exception:
+                pass # Don't fail create if audit fails in legacy path? 
+            return c
 
-        try:
-            with self.get_connection() as conn:
-                return self._create_logic(name, type, sort_name, conn)
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error creating contributor: {e}")
-            raise
+        else:
+            # No Connection: Use GenericRepository.insert (Auto Transaction + Audit)
+            new_id = self.insert(c)
+            if new_id:
+                c.contributor_id = new_id
+                return c
+            else:
+                 raise Exception("Failed to insert contributor")
 
-    def _create_logic(self, name: str, type: str, sort_name: str, conn) -> Contributor:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, ?)",
-            (name, sort_name, type)
-        )
-        new_id = cursor.lastrowid
-        return Contributor(contributor_id=new_id, name=name, sort_name=sort_name, type=type)
 
-    def update(self, contributor: Contributor) -> bool:
-        """Update name, sort_name, type. (Automatically severs invalid membership links on type change)."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Get existing type to check for change
-                cursor.execute("SELECT ContributorType FROM Contributors WHERE ContributorID = ?", (contributor.contributor_id,))
-                row = cursor.fetchone()
-                old_type = row[0] if row else None
-                
-                # 1. Update Core Identity
-                cursor.execute(
-                    "UPDATE Contributors SET ContributorName = ?, SortName = ?, ContributorType = ? WHERE ContributorID = ?",
-                    (contributor.name, contributor.sort_name, contributor.type, contributor.contributor_id)
-                )
-                success = cursor.rowcount > 0
-                
-                # 2. Cleanup relationships if type changed
-                if old_type and old_type != contributor.type:
-                    if contributor.type == "person":
-                        # Was a Group, now a Person: Can't have members anymore.
-                        cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
-                    else:
-                        # Was a Person, now a Group: Can't belong to other groups anymore.
-                        cursor.execute("DELETE FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
-                
-                return success
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error updating contributor: {e}")
-            return False
 
-    def delete(self, contributor_id: int) -> bool:
-        """Delete contributor and cascade to aliases, memberships, roles."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (contributor_id,))
-                return cursor.rowcount > 0
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error deleting contributor: {e}")
-            return False
+
 
     def search(self, query: str) -> List[Contributor]:
         """Search by name or alias (case-insensitive, partial match)."""
@@ -347,13 +375,18 @@ class ContributorRepository(BaseRepository):
     def merge(self, source_id: int, target_id: int, create_alias: bool = True) -> bool:
         """
         Consolidate source identity into target.
-        Transfers all songs, aliases, and relationships.
+        Transfers all songs, aliases, and relationships. (Audited Manually)
         :param create_alias: If True, the source primary name is preserved as an alias for the target.
         """
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 
+                # Snapshot for Audit (Deleted Source)
+                old_c = self.get_by_id(source_id)
+                old_snapshot = old_c.to_dict() if old_c else {}
+
                 # 1. Get Source Primary Name
                 cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (source_id,))
                 res = cursor.fetchone()
@@ -382,8 +415,6 @@ class ContributorRepository(BaseRepository):
                 """, (source_id, target_id))
                 
                 # Update links: Point to TargetID.
-                # If create_alias is True, we preserve the specific Source Name as an Alias credit.
-                # If False, we leave CreditedAliasID as NULL so it defaults to the Target Primary Name.
                 if source_name_alias_id:
                      cursor.execute("""
                         UPDATE MediaSourceContributorRoles 
@@ -417,12 +448,14 @@ class ContributorRepository(BaseRepository):
                 """, (source_id, target_id))
                 cursor.execute("UPDATE GroupMembers SET GroupID = ? WHERE GroupID = ?", (target_id, source_id))
                 
-                # SAFETY: Remove any resulting self-references (e.g. if A was member of B, now B is member of B)
-                # This handles circular merges (Parent A merging into Child B)
+                # SAFETY: Remove any resulting self-references
                 cursor.execute("DELETE FROM GroupMembers WHERE GroupID = MemberID")
                 
                 # 6. Delete Source
                 cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (source_id,))
+                
+                # 7. Audit Log
+                AuditLogger(conn).log_delete("Contributors", source_id, old_snapshot)
                 
                 return True
         except Exception as e:

@@ -75,6 +75,21 @@ class SettingsDialog(QDialog):
         db_layout.addWidget(self.btn_db_browse)
         layout.addLayout(db_layout)
 
+        # Log Path Row (Advanced)
+        log_layout = QHBoxLayout()
+        self.txt_log_path = GlowLineEdit()
+        self.txt_log_path.setPlaceholderText("Default (gosling.log)")
+        self.txt_log_path.setToolTip("Path to the diagnostic log file. Requires restart.")
+        
+        self.btn_log_browse = GlowButton("LOG PATH")
+        self.btn_log_browse.setAutoDefault(False)
+        self.btn_log_browse.setFixedWidth(80)
+        self.btn_log_browse.clicked.connect(self._on_log_browse_clicked)
+        
+        log_layout.addWidget(self.txt_log_path, 1)
+        log_layout.addWidget(self.btn_log_browse)
+        layout.addLayout(log_layout)
+
         # --- 2. FILE MANAGEMENT (T-52) ---
         line_ren = QFrame()
         line_ren.setObjectName("FieldGroupLine")
@@ -225,6 +240,7 @@ class SettingsDialog(QDialog):
     def _load_settings(self):
         self.txt_root_dir.setText(self.settings_manager.get_root_directory())
         self.txt_db_path.setText(self.settings_manager.get_database_path() or "")
+        self.txt_log_path.setText(self.settings_manager.get_log_path() or "")
         
         # File Management
         self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
@@ -282,9 +298,15 @@ class SettingsDialog(QDialog):
 
     def _on_db_browse_clicked(self):
         current = self.txt_db_path.text() or "."
-        path, _ = QFileDialog.getSaveFileName(self, "Select Database Location", current, "SQLite Database (*.db);;All Files (*)")
+        path, _ = QFileDialog.getOpenFileName(self, "Select Database Location", current, "SQLite Database (*.db);;All Files (*)")
         if path:
             self.txt_db_path.setText(os.path.normpath(path))
+
+    def _on_log_browse_clicked(self):
+        current = self.txt_log_path.text() or "."
+        path, _ = QFileDialog.getOpenFileName(self, "Select Log Location", current, "Log Files (*.log);;All Files (*)")
+        if path:
+            self.txt_log_path.setText(os.path.normpath(path))
             
     def _on_save_clicked(self):
         # Validate Default Year against Yellberus Schema
@@ -318,6 +340,16 @@ class SettingsDialog(QDialog):
              self.settings_manager.set_database_path(db_path)
         else:
              self.settings_manager.set_database_path("") # Reset to default
+
+        # Log
+        log_path = self.txt_log_path.text().strip()
+        if log_path:
+             old_log = self.settings_manager.get_log_path() or ""
+             if log_path != old_log:
+                 QMessageBox.information(self, "Restart Required", "Log path changed. Please restart the application to apply.")
+             self.settings_manager.set_log_path(log_path)
+        else:
+             self.settings_manager.set_log_path("")
             
         # File Management
         self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())

@@ -14,3 +14,10 @@ class Publisher:
             publisher_name=row['PublisherName'],
             parent_publisher_id=row['ParentPublisherID']
         )
+
+    def to_dict(self):
+        return {
+            "publisher_id": self.publisher_id,
+            "publisher_name": self.publisher_name,
+            "parent_publisher_id": self.parent_publisher_id
+        }

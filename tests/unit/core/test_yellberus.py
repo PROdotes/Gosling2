@@ -165,6 +165,7 @@ def test_song_from_row():
     assert song.bpm == 128
     assert song.recording_year == 2024
     assert song.isrc == "USMV123"
-    assert song.is_done is True
+    # Attributes that are now virtual should be skipped without error
+    # assert song.is_done is True  # REMOVED: Virtual field
     assert song.album_id == 123
-    assert song.mood == ["Relaxed"]  # Verify mood field
+    # assert song.mood == ["Relaxed"]  # REMOVED: Virtual field

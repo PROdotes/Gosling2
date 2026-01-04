@@ -1790,3 +1790,83 @@ QSpinBox#SettingsSpin::up-arrow, QSpinBox#SettingsSpin::down-arrow {
     /* We rely on system arrow or can define custom image. 
        For now, let system draw arrow but style button. */
 }
+
+/* --- 9. DIAGNOSTIC & CONSOLE UTILITIES --- */
+QPushButton#SecondaryHeaderButton {
+    background: #111111;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    font-size: 8pt;
+    color: #666666;
+    font-family: "Consolas", monospace;
+    font-weight: bold;
+}
+
+QPushButton#SecondaryHeaderButton:hover {
+    border-color: #FFC66D;
+    color: #FFC66D;
+}
+
+#LogTable {
+    background-color: #080808;
+    alternate-background-color: #0d0d0d;
+    color: #BBBBBB;
+    border: 1px solid #1A1A1A;
+    gridline-color: transparent;
+    font-family: "Consolas", monospace;
+    font-size: 10pt;
+}
+
+#LogTable::item {
+    padding: 4px;
+}
+
+#LogTable::item:selected {
+    background-color: #222222;
+    color: #FFC66D;
+}
+
+#LogTable QHeaderView::section {
+    background-color: #111111;
+    color: #666666;
+    padding: 6px;
+    border: none;
+    border-right: 1px solid #222222;
+    border-bottom: 2px solid #222222;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+#LogConsolePath {
+    font-size: 9pt; 
+    color: #666666;
+    font-style: italic;
+}
+
+/* --- 10. SYSTEM DROPDOWN MENU --- */
+QMenu#SystemDropdownMenu {
+    background-color: #111111;
+    border: 1px solid #333333;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QMenu#SystemDropdownMenu::item {
+    font-family: "Bahnschrift Condensed", "Segoe UI", sans-serif;
+    font-size: 13pt; /* Large and readable */
+    font-weight: bold;
+    color: #AAAAAA;
+    padding: 12px 24px; /* Generous hit area */
+    border-radius: 4px;
+}
+
+QMenu#SystemDropdownMenu::item:selected {
+    background-color: #222222;
+    color: #FFC66D; /* Amber highlight */
+}
+
+QMenu#SystemDropdownMenu::separator {
+    height: 1px;
+    background: #222222;
+    margin: 4px 12px;
+}

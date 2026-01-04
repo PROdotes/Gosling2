@@ -1,17 +1,22 @@
 """Song Repository for database operations"""
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
+import sqlite3
 from src.data.database import BaseRepository
 from ..models.song import Song
 from ...core import yellberus, logger
+from .generic_repository import GenericRepository
 from .album_repository import AlbumRepository
 
 
-class SongRepository(BaseRepository):
-    """Repository for Song data access"""
+class SongRepository(GenericRepository[Song]):
+    """
+    Repository for Song management.
+    Inherits GenericRepository for automatic Audit Logging.
+    """
 
     def __init__(self, db_path: Optional[str] = None):
-        super().__init__(db_path)
+        super().__init__(db_path, "Songs", "source_id")
         self.album_repository = AlbumRepository(db_path)
         from .contributor_repository import ContributorRepository
         self.contributor_repository = ContributorRepository(db_path)
@@ -23,35 +28,56 @@ class SongRepository(BaseRepository):
             # Don't crash startup on integrity check error
             logger.error(f"Non-fatal integrity check error: {e}")
 
-    def insert(self, file_path: str) -> Optional[int]:
-        """Insert a new file record"""
-        # Normalize path to ensure uniqueness across case/separator differences
-        file_path = os.path.normcase(os.path.abspath(file_path))
-        file_title = os.path.basename(file_path)
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 1. Insert into MediaSources
-                cursor.execute(
-                    """
-                    INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) 
-                    VALUES (1, ?, ?, 1)
-                    """,
-                    (file_title, file_path)
-                )
-                source_id = cursor.lastrowid
-                
-                # 2. Insert into Songs
-                cursor.execute(
-                    "INSERT INTO Songs (SourceID) VALUES (?)",
-                    (source_id,)
-                )
-                
-                return source_id
-        except Exception as e:
-            logger.error(f"Error inserting song: {e}")
-            return None
+    def _insert_db(self, cursor: sqlite3.Cursor, song: Song) -> int:
+        """Execute SQL INSERT for GenericRepository"""
+        # Normalize path
+        file_path = os.path.normcase(os.path.abspath(song.source))
+        file_title = song.name or os.path.basename(file_path)
+
+        # 1. Insert into MediaSources
+        cursor.execute(
+            """
+            INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) 
+            VALUES (1, ?, ?, ?)
+            """,
+            (file_title, file_path, 1 if song.is_active else 0)
+        )
+        source_id = cursor.lastrowid
+        
+        # 2. Insert into Songs
+        groups_str = ", ".join(song.groups) if song.groups else None
+        cursor.execute(
+            "INSERT INTO Songs (SourceID, TempoBPM, RecordingYear, ISRC, SongGroups) VALUES (?, ?, ?, ?, ?)",
+            (source_id, song.bpm, song.recording_year, song.isrc, groups_str)
+        )
+        
+        # 3. Handle Relationships (if provided)
+        # Temporarily set ID on object so helpers can use it
+        song.source_id = source_id 
+        if song.publisher: self._sync_publisher(song, cursor)
+        if song.album: self._sync_album(song, cursor)
+        self._sync_contributor_roles(song, cursor)
+        
+        return source_id
+
+    def insert(self, entity_or_path: Union[Song, str]) -> Optional[int]:
+        """
+        Overridden insert to support legacy path-string argument.
+        Delegates to GenericRepository.insert(Song).
+        """
+        if isinstance(entity_or_path, str):
+            # Legacy: Create Stub Song
+            path = entity_or_path
+            # We create a stub song. Helpers won't run because fields are None/Empty.
+            song = Song(
+                source_id=0, # Placeholder
+                source=path,
+                name=os.path.basename(path),
+                is_active=True
+            )
+            return super().insert(song)
+        else:
+            return super().insert(entity_or_path)
 
     def get_all(self) -> Tuple[List[str], List[Tuple]]:
         """Get all songs from the library"""
@@ -69,71 +95,49 @@ class SongRepository(BaseRepository):
             logger.error(f"Error fetching library data: {e}")
             return [], []
 
-    def delete(self, file_id: int) -> bool:
-        """Delete a song by its ID"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                # Deleting from MediaSources cascades to Songs and Roles
-                cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (file_id,))
-                return cursor.rowcount > 0
-        except Exception as e:
-            logger.error(f"Error deleting song: {e}")
-            return False
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+        """Execute SQL DELETE for GenericRepository"""
+        cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (record_id,))
 
-    def update(self, song: Song) -> bool:
-        """Update song metadata"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
+    def get_by_id(self, source_id: int) -> Optional[Song]:
+        """Fetch a single song by ID. Wrapper for get_songs_by_ids."""
+        songs = self.get_songs_by_ids([source_id])
+        return songs[0] if songs else None
 
-                # 1. Update MediaSources (Base info) including Path (Source)
-                # Note: Normalize path before saving
-                normalized_path = os.path.normcase(os.path.abspath(song.path))
-                cursor.execute("""
-                    UPDATE MediaSources
-                    SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, AudioHash = ?
-                    WHERE SourceID = ?
-                """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, song.audio_hash, song.source_id))
+    def _update_db(self, cursor: sqlite3.Cursor, song: Song) -> None:
+        """Execute SQL UPDATE for GenericRepository"""
+        # 1. Update MediaSources
+        normalized_path = os.path.normcase(os.path.abspath(song.source))
+        cursor.execute("""
+            UPDATE MediaSources
+            SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, AudioHash = ?
+            WHERE SourceID = ?
+        """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, song.audio_hash, song.source_id))
 
-                # 2. Update Songs (Extended info)
-                # Note: Groups is TIT1 (Content Group Description)
-                cursor.execute("""
-                    UPDATE Songs
-                    SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, SongGroups = ?
-                    WHERE SourceID = ?
-                """, (song.bpm, song.recording_year, song.isrc, 
-                      ", ".join(song.groups) if song.groups else None, song.source_id))
+        # 2. Update Songs
+        groups_str = ", ".join(song.groups) if song.groups else None
+        cursor.execute("""
+            UPDATE Songs
+            SET TempoBPM = ?, RecordingYear = ?, ISRC = ?, SongGroups = ?
+            WHERE SourceID = ?
+        """, (song.bpm, song.recording_year, song.isrc, groups_str, song.source_id))
 
-                # 3. Clear existing contributor roles
-                cursor.execute(
-                    "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ?",
-                    (song.source_id,)
-                )
+        # 3. Clear existing contributor roles
+        cursor.execute(
+            "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ?",
+            (song.source_id,)
+        )
 
-                # 4. Sync new contributor roles
-                self._sync_contributor_roles(song, conn)
+        # 4. Sync new contributor roles
+        self._sync_contributor_roles(song, cursor)
 
-                # 5. Sync Album
-                if song.album is not None:
-                     self._sync_album(song, conn)
+        # 5. Sync Album
+        if song.album is not None:
+             self._sync_album(song, cursor)
 
-                # 6. Sync Publisher
-                if song.publisher is not None:
-                     self._sync_publisher(song, conn)
-
-                # 7. Sync Tags (Genre & Mood)
-                if song.genre is not None:
-                     self._sync_tags(song, conn, 'genre', 'Genre')
-                if song.mood is not None:
-                     self._sync_tags(song, conn, 'mood', 'Mood')
-
-                # Status is now managed by TagRepository directly, not here.
-
-                return True
-        except Exception as e:
-            logger.error(f"Error updating song: {e}")
-            return False
+        # 6. Sync Publisher
+        if song.publisher is not None:
+             self._sync_publisher(song, cursor)
 
     def update_status(self, file_id: int, is_done: bool) -> bool:
         """Update the status of a song (Tag-Driven, Flag-Synced)"""
@@ -168,9 +172,9 @@ class SongRepository(BaseRepository):
             logger.error(f"Error updating song status: {e}")
             return False
 
-    def _sync_contributor_roles(self, song: Song, conn) -> None:
+    def _sync_contributor_roles(self, song: Song, cursor) -> None:
         """Sync contributors and their roles"""
-        cursor = conn.cursor()
+        conn = cursor.connection
         role_map = {
             'performers': 'Performer',
             'composers': 'Composer',
@@ -221,12 +225,12 @@ class SongRepository(BaseRepository):
                     VALUES (?, ?, ?, ?)
                 """, (song.source_id, contributor_id, role_id, credited_alias_id))
 
-    def _sync_album(self, song: Song, conn) -> None:
+    def _sync_album(self, song: Song, cursor) -> None:
         """
         Sync album relationship (Find or Create with Artist Disambiguation).
         Non-Destructive Update: Existing links are kept; new target becomes Primary.
         """
-        cursor = conn.cursor()
+        # cursor = conn.cursor() -> Using passed cursor
         
         # Normalize Album Title (Handle List from UI)
         # Normalize Album Title (Handle List from UI)
@@ -335,7 +339,7 @@ class SongRepository(BaseRepository):
              cursor.execute("DELETE FROM SongAlbums WHERE SourceID = ?", (song.source_id,))
 
 
-    def _sync_publisher(self, song: Song, conn) -> None:
+    def _sync_publisher(self, song: Song, cursor) -> None:
         """
         Sync publisher relationship (Find or Create).
         Policy: Side Panel edits are "Track Overrides" (Level 1).
@@ -345,7 +349,7 @@ class SongRepository(BaseRepository):
         2. Write PRIMARY publisher to TrackPublisherID (Level 1) to force override of Album Label.
         3. If "Single Paradox" (No Album), create/link Album and set AlbumPublishers (Level 2).
         """
-        cursor = conn.cursor()
+        # cursor = conn.cursor() -> Using passed cursor
 
         # 1. Parse Publishers
         if isinstance(song.publisher, list):
@@ -396,37 +400,7 @@ class SongRepository(BaseRepository):
             # Update all links for this song (or just Primary? Let's do all to be safe overrides)
             cursor.execute("UPDATE SongAlbums SET TrackPublisherID = ? WHERE SourceID = ?", (primary_pid, song.source_id))
 
-    def _sync_tags(self, song: Song, conn, field_name: str, category: str) -> None:
-        """Dynamic Tag Sync (Generic for Genre, Mood, etc.)"""
-        cursor = conn.cursor()
-        val = getattr(song, field_name)
-        if val is None: return
-
-        # 1. Clear existing links for this category
-        cursor.execute("""
-            DELETE FROM MediaSourceTags 
-            WHERE SourceID = ? 
-            AND TagID IN (SELECT TagID FROM Tags WHERE TagCategory = ?)
-        """, (song.source_id, category))
-        
-        # 2. Add new links
-        tags = []
-        if isinstance(val, list):
-            tags = val
-        elif isinstance(val, str):
-            tags = [t.strip() for t in val.split(',') if t.strip()]
-            
-        for tag_name in tags:
-            # Find or create tag
-            cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = ? AND TagName = ?", (category, tag_name))
-            row = cursor.fetchone()
-            if row:
-                tag_id = row[0]
-            else:
-                cursor.execute("INSERT INTO Tags (TagCategory, TagName) VALUES (?, ?)", (category, tag_name))
-                tag_id = cursor.lastrowid
-            
-            cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (song.source_id, tag_id))
+    # _sync_tags removed (Legacy)
 
     # _sync_status_tag removed: Status is now managed by TagRepository.is_unprocessed/set_unprocessed
 
@@ -604,6 +578,17 @@ class SongRepository(BaseRepository):
                     groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
                     tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
                     
+                    # Migration: Fold Legacy Genre/Mood into Tags
+                    if genre_str:
+                        # Split by comma if multiple legacy genres
+                        for g in genre_str.split(','):
+                             g_clean = g.strip()
+                             if g_clean: tags.append(f"Genre:{g_clean}")
+                    if mood_str:
+                        for m in mood_str.split(','):
+                             m_clean = m.strip()
+                             if m_clean: tags.append(f"Mood:{m_clean}")
+                    
                     song = Song(
                         source_id=source_id,
                         source=path,
@@ -618,8 +603,7 @@ class SongRepository(BaseRepository):
                         album_id=album_id,
                         album_artist=album_artist,
                         publisher=[p.strip() for p in publisher_name.split(',')] if publisher_name else [],
-                        genre=genre_str,
-                        mood=mood_str,
+                        # genre/mood arguments removed
                         groups=groups,
                         tags=tags
                     )
@@ -805,4 +789,73 @@ class SongRepository(BaseRepository):
         except Exception as e:
             logger.error(f"Error getting song by audio hash: {e}")
             return None
+
+    def get_distinct_values(self, field_name: str) -> List[Any]:
+        """
+        Get distinct values for a field to populate filters.
+        Logic moved from LibraryService to centralize SQL access.
+        """
+        from src.core import yellberus
+        
+        # 1. OPTIMIZED PATH: Direct queries for common fields
+        query = None
+        if field_name == "recording_year":
+             return self.get_all_years()
+        elif field_name == "performers":
+            query = """
+                SELECT DISTINCT C.ContributorName 
+                FROM Contributors C
+                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                WHERE R.RoleName = 'Performer'
+            """
+        elif field_name == "composers":
+            query = """
+                SELECT DISTINCT C.ContributorName 
+                FROM Contributors C
+                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
+                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                WHERE R.RoleName = 'Composer'
+            """
+        elif field_name == "publisher":
+            query = "SELECT DISTINCT PublisherName FROM Publishers"
+        elif field_name == "genre":
+            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Genre'"
+        elif field_name == "mood":
+            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Mood'"
+        elif field_name == "album":
+            query = "SELECT DISTINCT AlbumTitle FROM Albums"
+        elif field_name == "album_artist":
+            query = "SELECT DISTINCT AlbumArtist FROM Albums WHERE AlbumArtist IS NOT NULL"
+
+        if query:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query)
+                results = [row[0] for row in cursor.fetchall() if row[0]]
+                return sorted(results, key=lambda x: str(x).lower() if isinstance(x, str) else x)
+
+        # 2. FALLBACK PATH for generic fields
+        field_def = yellberus.get_field(field_name)
+        if not field_def:
+            return []
+            
+        expr = field_def.query_expression or field_def.db_column
+        if " AS " in expr.upper():
+            expr = expr.split(" AS ")[0].strip()
+            
+        query = f"SELECT DISTINCT {expr} {yellberus.QUERY_FROM} {yellberus.QUERY_BASE_WHERE}"
+        
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            results = set()
+            for row in cursor.fetchall():
+                val = row[0]
+                if val:
+                    if isinstance(val, str) and ',' in val:
+                        for item in val.split(','):
+                            item = item.strip()
+                            if item: results.add(item)
+                    else:
+                        results.add(val)
+            return sorted(list(results), key=lambda x: str(x).lower() if isinstance(x, str) else x)
             

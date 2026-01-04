@@ -130,3 +130,5 @@ tags:
 3.  Renames files to correct folder structure on Save.
 4.  Writes all ID3 tags (including custom ones) verified.
 5.  Persists all changes to DB with History log.
+
+test multi edit:

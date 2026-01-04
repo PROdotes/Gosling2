@@ -30,3 +30,10 @@ class Tag:
                 tag_name=row[1],
                 category=row[2] if len(row) > 2 else None
             )
+
+    def to_dict(self):
+        return {
+            "tag_id": self.tag_id,
+            "tag_name": self.tag_name,
+            "category": self.category
+        }

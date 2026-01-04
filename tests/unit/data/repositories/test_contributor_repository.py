@@ -160,8 +160,8 @@ class TestSearch:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [
-            (1, "John Lennon", "Lennon, John", "person"),
-            (2, "John Mayer", "Mayer, John", "person"),
+            (1, "John Lennon", "Lennon, John", "person", None),  # matched_alias = None
+            (2, "John Mayer", "Mayer, John", "person", None),
         ]
         
         @contextmanager
@@ -181,9 +181,9 @@ class TestSearch:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [
-            (1, "Artist 1", "Artist 1", "person"),
-            (2, "Artist 2", "Artist 2", "person"),
-            (3, "Band 1", "Band 1", "group"),
+            (1, "Artist 1", "Artist 1", "person", None),
+            (2, "Artist 2", "Artist 2", "person", None),
+            (3, "Band 1", "Band 1", "group", None),
         ]
         
         @contextmanager
@@ -420,7 +420,8 @@ class TestValidateIdentity:
         with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
             is_conflict, msg = repo.validate_identity("Unique Name")
             
-            assert is_conflict is False
+            assert is_conflict is None  # No conflict returns None
+            assert msg == ""
     
     def test_validate_identity_conflict_with_primary(self, repo):
         """Test validation detects conflict with primary name."""
@@ -438,7 +439,7 @@ class TestValidateIdentity:
         with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
             is_conflict, msg = repo.validate_identity("John Doe")
             
-            assert is_conflict is True
+            assert is_conflict == 1  # Returns conflict ID
             assert "already exists" in msg.lower() or "John Doe" in msg
 
 

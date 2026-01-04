@@ -215,6 +215,46 @@ class BaseRepository:
                 )
             """)
 
+            # 17. ChangeLog (Audit)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ChangeLog (
+                    LogID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    LogTableName TEXT NOT NULL,
+                    RecordID INTEGER NOT NULL,
+                    LogFieldName TEXT NOT NULL,
+                    OldValue TEXT,
+                    NewValue TEXT,
+                    LogTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    BatchID TEXT
+                )
+            """)
+
+            # 18. DeletedRecords (Audit)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS DeletedRecords (
+                    DeleteID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    DeletedFromTable TEXT NOT NULL,
+                    RecordID INTEGER NOT NULL,
+                    FullSnapshot TEXT NOT NULL,
+                    DeletedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    RestoredAt DATETIME,
+                    BatchID TEXT
+                )
+            """)
+
+            # 20. ActionLog (Audit)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ActionLog (
+                    ActionID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ActionLogType TEXT NOT NULL,
+                    TargetTable TEXT,
+                    ActionTargetID INTEGER,
+                    ActionDetails TEXT,
+                    ActionTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UserID TEXT
+                )
+            """)
+
 
             # Schema Migrations (Add columns that might not exist in older databases)
             # Add AudioHash column to MediaSources if it doesn't exist

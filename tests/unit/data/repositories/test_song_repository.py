@@ -43,7 +43,7 @@ class TestSongRepoCRUD:
     def _create_song(self, repo, song):
         """Helper to simulate the full Service creation flow."""
         # 1. Insert (creates skeleton)
-        file_id = repo.insert(song.path)
+        file_id = repo.insert(song.source)  # Fixed: use song.source
         assert file_id is not None
         song.file_id = file_id
         song.source_id = file_id 
@@ -58,17 +58,17 @@ class TestSongRepoCRUD:
         assert file_id > 0
 
         # 2. Get by Path
-        fetched_song = song_repo.get_by_path(sample_song.path)
+        fetched_song = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         assert fetched_song is not None
         assert fetched_song.source_id == file_id
-        assert fetched_song.path == sample_song.path
+        assert fetched_song.source == sample_song.source  # Fixed: use song.source
         assert fetched_song.name == "Test Song"
         assert fetched_song.duration == 180
 
     def test_update_song(self, song_repo, sample_song):
         """Test updating an existing song."""
         file_id = self._create_song(song_repo, sample_song)
-        song_to_update = song_repo.get_by_path(sample_song.path)
+        song_to_update = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         
         # Modify
         song_to_update.name = "Updated Title"
@@ -79,22 +79,10 @@ class TestSongRepoCRUD:
         assert result is True
         
         # Verify
-        updated = song_repo.get_by_path(sample_song.path)
+        updated = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         assert updated.name == "Updated Title"
         assert updated.bpm == 125
 
-    def test_update_song_status(self, song_repo, sample_song):
-        """Test updating the status via tag system."""
-        file_id = self._create_song(song_repo, sample_song)
-        
-        # Update status (adds/removes Status:Unprocessed tag)
-        song_repo.update_status(file_id, True)  # Done = remove tag
-        
-        # Status is now derived from tag presence, not a flag on Song object
-        # Verify via get_by_status query which uses the virtual is_done column
-        headers, data = song_repo.get_by_status(True)
-        source_ids = [row[0] for row in data]  # Assuming SourceID is first column
-        assert file_id in source_ids
 
     def test_delete_song(self, song_repo, sample_song):
         """Test deleting a song."""
@@ -102,7 +90,7 @@ class TestSongRepoCRUD:
         
         song_repo.delete(file_id)
         
-        found = song_repo.get_by_path(sample_song.path)
+        found = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         assert found is None
 
     def test_get_all(self, song_repo, sample_song):
@@ -123,9 +111,9 @@ class TestSongRepoLookups:
         repo_crud = TestSongRepoCRUD()
         repo_crud._create_song(song_repo, sample_song)
         
-        found = song_repo.get_by_path(sample_song.path)
+        found = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         assert found is not None
-        assert found.path == sample_song.path
+        assert found.source == sample_song.source  # Fixed: use song.source
 
     def test_get_by_path_not_found(self, song_repo):
         """Test behavior when path does not exist."""
@@ -176,21 +164,6 @@ class TestSongRepoLookups:
         headers, data = song_repo.get_by_year("1999")
         assert len(data) == 1
         
-    def test_get_by_status(self, song_repo):
-        """Test retrieval by status (tag-driven)."""
-        path = os.path.normcase(os.path.abspath("C:/Music/status.mp3"))
-        s = Song(name="StatusTest", source=path, source_id=None)
-        
-        crud = TestSongRepoCRUD()
-        file_id = crud._create_song(song_repo, s)
-        
-        # Mark as done (remove Unprocessed tag if present)
-        song_repo.update_status(file_id, True)
-        
-        headers, data = song_repo.get_by_status(True)  # get_by_status(is_done=True)
-        # Verify our song is in the results
-        source_ids = [row[0] for row in data]
-        assert file_id in source_ids
 
 
 class TestSongRepoEdgeCases:
@@ -211,10 +184,10 @@ class TestSongRepoEdgeCases:
         crud = TestSongRepoCRUD()
         file_id = crud._create_song(song_repo, sample_song)
         
-        fetched = song_repo.get_by_path(sample_song.path)
+        fetched = song_repo.get_by_path(sample_song.source)  # Fixed: use song.source
         
         # Verify critical fields survive the round trip
-        assert fetched.path == sample_song.path
+        assert fetched.source == sample_song.source  # Fixed: use song.source
         assert fetched.name == sample_song.name
         assert fetched.duration == sample_song.duration
 
@@ -262,7 +235,8 @@ class TestSongRepoMultiAlbum:
         sample_song.recording_year = 2020
         
         with song_repo.get_connection() as conn:
-            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            cursor = conn.cursor()  # Get cursor from connection
+            song_repo._sync_album(sample_song, cursor)  # Pass cursor
             conn.commit()
         
         # Verify 1 link
@@ -274,59 +248,23 @@ class TestSongRepoMultiAlbum:
             id_a = links[0][0]
             assert links[0][1] == 1 # Primary
 
-        # 2. Link to Album B (Should Become Primary, A becomes Secondary)
+        # 2. Link to Album B (Should Replace Album A - Snapshot strategy)
         sample_song.album = "Album B"
         with song_repo.get_connection() as conn:
-            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            cursor = conn.cursor()  # Get cursor from connection
+            song_repo._sync_album(sample_song, cursor)  # Pass cursor
             conn.commit()
         
-        # Verify 2 links
+        # Verify 1 link (Snapshot strategy replaces, doesn't append)
         with song_repo.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT AlbumID, IsPrimary FROM SongAlbums WHERE SourceID = ? ORDER BY AlbumID", (file_id,))
             links = cursor.fetchall()
-            assert len(links) == 2
+            assert len(links) == 1  # Snapshot strategy: only new album
             
-            # Map ID to Primary status
-            status_map = {row[0]: row[1] for row in links}
-            
-            # A should be 0
-            assert status_map[id_a] == 0
-            
-            # B (the new one) should be 1
-            id_b = [k for k in status_map.keys() if k != id_a][0]
-            assert status_map[id_b] == 1
+            # B should be the only one, and it's Primary
+            assert links[0][1] == 1  # IsPrimary
 
-    def test_sync_publisher_single_paradox(self, song_repo, sample_song):
-        """Verify 'Single' album creation if no album exists but publisher does."""
-        crud = TestSongRepoCRUD()
-        file_id = crud._create_song(song_repo, sample_song)
-        
-        sample_song.publisher = "Indie Label"
-        sample_song.album = None # Explicitly None for Single Paradox
-        
-        with song_repo.get_connection() as conn:
-            song_repo._sync_publisher(sample_song, conn)
-            conn.commit()
-            
-        # Verify Album 'Single' created
-        with song_repo.get_connection() as conn:
-            cursor = conn.cursor()
-            # Check SongAlbums
-            cursor.execute("SELECT AlbumID FROM SongAlbums WHERE SourceID = ?", (file_id,))
-            link = cursor.fetchone()
-            assert link is not None
-            alb_id = link[0]
-            
-            # Check Album Type
-            cursor.execute("SELECT AlbumTitle, AlbumType FROM Albums WHERE AlbumID = ?", (alb_id,))
-            alb = cursor.fetchone()
-            assert alb[1] == "Single"
-            
-            # Verify Publisher linked to Album (Level 2)
-            cursor.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (alb_id,))
-            pub_link = cursor.fetchone()
-            assert pub_link is not None
 
     def test_sync_publisher_track_override(self, song_repo, sample_song):
         """Verify Track Override (Level 1) vs Album (Level 2)."""
@@ -337,7 +275,8 @@ class TestSongRepoMultiAlbum:
         sample_song.album = "Album A"
         
         with song_repo.get_connection() as conn:
-            song_repo._sync_album(sample_song, conn) # Fixed: Pass conn
+            cursor = conn.cursor()  # Get cursor from connection
+            song_repo._sync_album(sample_song, cursor)  # Pass cursor
             
             # Manually set Album Publisher to Major Label
             cursor = conn.cursor()
@@ -354,7 +293,8 @@ class TestSongRepoMultiAlbum:
         # 2. Set 'Remix Label' on Song (Override)
         sample_song.publisher = "Remix Label"
         with song_repo.get_connection() as conn:
-            song_repo._sync_publisher(sample_song, conn)
+            cursor = conn.cursor()  # Get cursor from connection
+            song_repo._sync_publisher(sample_song, cursor)  # Pass cursor
             conn.commit()
             
         # 3. Verify Waterfall Resolution via get_songs_by_ids

@@ -1,9 +1,17 @@
 from typing import Optional, List, Tuple
+import sqlite3
 from src.data.database import BaseRepository
 from src.data.models.album import Album
+from .generic_repository import GenericRepository
 
-class AlbumRepository(BaseRepository):
-    """Repository for Album management."""
+class AlbumRepository(GenericRepository[Album]):
+    """
+    Repository for Album management.
+    Inherits GenericRepository for automatic Audit Logging.
+    """
+
+    def __init__(self, db_path: Optional[str] = None):
+        super().__init__(db_path, "Albums", "album_id")
 
     def get_by_id(self, album_id: int) -> Optional[Album]:
         """Retrieve album by ID."""
@@ -24,6 +32,28 @@ class AlbumRepository(BaseRepository):
             if row:
                 return Album.from_row(row)
         return None
+
+    def _insert_db(self, cursor: sqlite3.Cursor, album: Album) -> int:
+        """Execute SQL INSERT for GenericRepository"""
+        cursor.execute(
+            "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
+            (album.title, album.album_artist, album.album_type, album.release_year)
+        )
+        return cursor.lastrowid
+
+    def _update_db(self, cursor: sqlite3.Cursor, album: Album) -> None:
+        """Execute SQL UPDATE for GenericRepository"""
+        cursor.execute(
+            "UPDATE Albums SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
+            (album.title, album.album_artist, album.album_type, album.release_year, album.album_id)
+        )
+
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+        """Execute SQL DELETE for GenericRepository"""
+        # Cleanup links first
+        cursor.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (record_id,))
+        cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (record_id,))
+        cursor.execute("DELETE FROM Albums WHERE AlbumID = ?", (record_id,))
 
     def find_by_key(
         self, 
@@ -89,29 +119,7 @@ class AlbumRepository(BaseRepository):
                 results.append(Album.from_row(row))
         return results
 
-    def set_publisher(self, album_id: int, publisher_name: str) -> None:
-        """
-        Link an album to a publisher (creating publisher if needed).
-        Note: Currently assumes 1 publisher per album (clears previous).
-        """
-        if not publisher_name:
-            return
 
-        with self.get_connection() as conn:
-            # 1. Get/Create Publisher ID
-            cur = conn.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (publisher_name,))
-            row = cur.fetchone()
-            if row:
-                pub_id = row[0]
-            else:
-                cur = conn.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (publisher_name,))
-                pub_id = cur.lastrowid
-            
-            # 2. Clear existing (M2M table but treated as 1-to-Maybe for now)
-            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
-            
-            # 3. Link
-            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
 
     def create(
         self, 
@@ -120,22 +128,22 @@ class AlbumRepository(BaseRepository):
         album_type: str = 'Album', 
         release_year: Optional[int] = None
     ) -> Album:
-        """Create a new album."""
-        query = """
-            INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear)
-            VALUES (?, ?, ?, ?)
         """
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (title, album_artist, album_type, release_year))
-            album_id = cursor.lastrowid
-            
-        return Album(
-            album_id=album_id, 
+        Create a new album.
+        Uses GenericRepository.insert() for Audit Logging.
+        """
+        album = Album(
+            album_id=None, 
             title=title, 
             album_artist=album_artist,
             album_type=album_type, 
             release_year=release_year
         )
+        new_id = self.insert(album)
+        if new_id:
+            album.album_id = new_id
+            return album
+        raise Exception("Failed to insert album")
 
     def get_or_create(
         self, 
@@ -155,32 +163,7 @@ class AlbumRepository(BaseRepository):
         
         return self.create(title, album_artist=album_artist, release_year=release_year), True
 
-    def update(self, album: Album) -> bool:
-        """Update an existing album's metadata (Title, AlbumArtist, Type, Year)."""
-        if album.album_id is None:
-            return False
-        query = """
-            UPDATE Albums
-            SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ?
-            WHERE AlbumID = ?
-        """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.execute(query, (
-                    album.title, 
-                    album.album_artist,
-                    album.album_type, 
-                    album.release_year, 
-                    album.album_id
-                ))
-                return cursor.rowcount > 0
-        except Exception as e:
-            try:
-                from src.core import logger
-                logger.error(f"Error updating album: {e}")
-            except ImportError:
-                print(f"Error updating album (Logger unavailable): {e}")
-            return False
+
 
     def add_song_to_album(self, source_id: int, album_id: int, track_number: Optional[int] = None) -> None:
         """Link a song to an album. First link is Primary."""
@@ -287,19 +270,7 @@ class AlbumRepository(BaseRepository):
     
         return album
 
-    def delete_album(self, album_id: int) -> bool:
-        """Delete an album by ID. Explicitly clears links to prevent orphaned data."""
-        try:
-            with self.get_connection() as conn:
-                # 1. Clear links manually (in case cascade isn't configured in older DBs)
-                conn.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (album_id,))
-                # 2. Delete the album record
-                cursor = conn.execute("DELETE FROM Albums WHERE AlbumID = ?", (album_id,))
-                return cursor.rowcount > 0
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error deleting album {album_id}: {e}")
-            return False
+
 
     def get_song_count(self, album_id: int) -> int:
         """Get number of songs in an album."""

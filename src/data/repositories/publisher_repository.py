@@ -1,9 +1,17 @@
 from typing import Optional, List, Tuple
+import sqlite3
 from src.data.database import BaseRepository
 from src.data.models.publisher import Publisher
+from .generic_repository import GenericRepository
 
-class PublisherRepository(BaseRepository):
-    """Repository for Publisher management."""
+class PublisherRepository(GenericRepository[Publisher]):
+    """
+    Repository for Publisher management.
+    Inherits GenericRepository for automatic Audit Logging.
+    """
+
+    def __init__(self, db_path: Optional[str] = None):
+        super().__init__(db_path, "Publishers", "publisher_id")
 
     def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
         """Retrieve publisher by ID."""
@@ -25,17 +33,37 @@ class PublisherRepository(BaseRepository):
                 return Publisher.from_row(row)
         return None
 
+    def _insert_db(self, cursor: sqlite3.Cursor, publisher: Publisher) -> int:
+        """Execute SQL INSERT for GenericRepository"""
+        cursor.execute(
+            "INSERT INTO Publishers (PublisherName, ParentPublisherID) VALUES (?, ?)",
+            (publisher.publisher_name, publisher.parent_publisher_id)
+        )
+        return cursor.lastrowid
+
+    def _update_db(self, cursor: sqlite3.Cursor, publisher: Publisher) -> None:
+        """Execute SQL UPDATE for GenericRepository"""
+        cursor.execute(
+            "UPDATE Publishers SET PublisherName = ?, ParentPublisherID = ? WHERE PublisherID = ?", 
+            (publisher.publisher_name, publisher.parent_publisher_id, publisher.publisher_id)
+        )
+
+    def _delete_db(self, cursor: sqlite3.Cursor, record_id: int) -> None:
+        """Execute SQL DELETE for GenericRepository"""
+        cursor.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
+        cursor.execute("DELETE FROM Publishers WHERE PublisherID = ?", (record_id,))
+
     def create(self, name: str, parent_id: Optional[int] = None) -> Publisher:
-        """Create a new publisher."""
-        query = """
-            INSERT INTO Publishers (PublisherName, ParentPublisherID)
-            VALUES (?, ?)
         """
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (name, parent_id))
-            publisher_id = cursor.lastrowid
-            
-        return Publisher(publisher_id=publisher_id, publisher_name=name, parent_publisher_id=parent_id)
+        Create a new publisher.
+        Uses GenericRepository.insert() for Audit Logging.
+        """
+        pub = Publisher(publisher_id=None, publisher_name=name, parent_publisher_id=parent_id)
+        new_id = self.insert(pub)
+        if new_id:
+            pub.publisher_id = new_id
+            return pub
+        raise Exception("Failed to insert publisher")
 
     def get_or_create(self, name: str) -> Tuple[Publisher, bool]:
         """
@@ -95,28 +123,9 @@ class PublisherRepository(BaseRepository):
                 publishers.append(Publisher.from_row(row))
         return publishers
 
-    def update(self, publisher: Publisher) -> bool:
-        """Update an existing publisher."""
-        query = """
-            UPDATE Publishers
-            SET PublisherName = ?, ParentPublisherID = ?
-            WHERE PublisherID = ?
-        """
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (
-                publisher.publisher_name,
-                publisher.parent_publisher_id,
-                publisher.publisher_id
-            ))
-            return cursor.rowcount > 0
 
-    def delete(self, publisher_id: int) -> bool:
-        """Delete a publisher from the database."""
-        with self.get_connection() as conn:
-            # Also clean up links
-            conn.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (publisher_id,))
-            cursor = conn.execute("DELETE FROM Publishers WHERE PublisherID = ?", (publisher_id,))
-            return cursor.rowcount > 0
+
+
 
     def get_with_descendants(self, publisher_id: int) -> List[Publisher]:
         """

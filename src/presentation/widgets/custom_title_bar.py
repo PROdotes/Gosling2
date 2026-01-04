@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QLineEdit, QSizePolicy, QMenu
+from PyQt6.QtGui import QAction
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QSize
 import os
@@ -13,6 +14,7 @@ class CustomTitleBar(QWidget):
     settings_requested = pyqtSignal()
     maximize_requested = pyqtSignal()
     import_requested = pyqtSignal()
+    logs_requested = pyqtSignal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -37,7 +39,22 @@ class CustomTitleBar(QWidget):
         self.btn_logo_icon.setIcon(QIcon(icon_path))
         self.btn_logo_icon.setIconSize(QSize(22, 28))
         self.btn_logo_icon.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_logo_icon.clicked.connect(self.settings_requested.emit)
+        
+        # Setup System Menu
+        self.system_menu = QMenu(self)
+        self.system_menu.setObjectName("SystemDropdownMenu")
+        
+        act_settings = QAction("⚙️ SYSTEM SETTINGS", self)
+        act_settings.triggered.connect(self.settings_requested.emit)
+        
+        act_logs = QAction("📋 DIAGNOSTIC CONSOLE", self)
+        act_logs.triggered.connect(self.logs_requested.emit)
+        
+        self.system_menu.addAction(act_settings)
+        self.system_menu.addSeparator()
+        self.system_menu.addAction(act_logs)
+        
+        self.btn_logo_icon.clicked.connect(self._show_system_menu)
         
         # 1b. Title (Stacked Labels for Glow)
         from PyQt6.QtWidgets import QGraphicsBlurEffect
@@ -104,3 +121,9 @@ class CustomTitleBar(QWidget):
         if event.buttons() == Qt.MouseButton.LeftButton:
             self.window().move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
+
+    def _show_system_menu(self):
+        """Display the system menu below the logo button."""
+        # Calculate position to show the menu aligned with the button
+        pos = self.btn_logo_icon.mapToGlobal(self.btn_logo_icon.rect().bottomLeft())
+        self.system_menu.exec(pos)

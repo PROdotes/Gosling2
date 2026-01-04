@@ -455,18 +455,15 @@ class FilterWidget(QFrame):
             # We must use the Junction Table logic because columns like 'Performers' 
             # are virtual aggregates, not real columns in the Songs table.
             
-            with self.library_service.song_repository.get_connection() as conn:
-                cursor = conn.cursor()
+            # Use Repository Access to fetch contributors and aliases
+            if self.library_service.contributor_repository:
+                # 1. Fetch Primary Names
+                primary_names = self.library_service.contributor_repository.get_all_names()
+                for n in primary_names: all_names.add(n)
                 
-                # Fetch ALL contributors (Source of Truth)
-                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
-                for row in cursor.fetchall():
-                     all_names.add(row[0])
-
-                # Fetch ALL Aliases
-                cursor.execute("SELECT DISTINCT AliasName FROM ContributorAliases ORDER BY AliasName")
-                for row in cursor.fetchall():
-                     all_names.add(row[0])
+                # 2. Fetch Aliases
+                aliases = self.library_service.contributor_repository.get_all_aliases()
+                for n in aliases: all_names.add(n)
             
         except Exception as e:
             logger.error(f"Error populating All Contributors filter: {e}")
@@ -500,17 +497,14 @@ class FilterWidget(QFrame):
         try:
             decades = set()
             
-            with self.library_service.song_repository.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT RecordingYear FROM Songs WHERE RecordingYear IS NOT NULL")
-                for row in cursor.fetchall():
-                    year = row[0]
-                    if year:
-                        try:
-                            decade = (int(year) // 10) * 10
-                            decades.add(f"{decade}s")
-                        except (ValueError, TypeError):
-                            pass
+            years = self.library_service.song_repository.get_all_years()
+            for year in years:
+                if year:
+                    try:
+                        decade = (int(year) // 10) * 10
+                        decades.add(f"{decade}s")
+                    except (ValueError, TypeError):
+                        pass
             
             if not decades:
                 return
@@ -543,24 +537,11 @@ class FilterWidget(QFrame):
         
         try:
             # Query all tags grouped by category
-            categories = {}  # {category: [tag_name, ...]}
-            
-            with self.library_service.song_repository.get_connection() as conn:
-                cursor = conn.cursor()
-                # Get all tags that are actually in use (linked to songs)
-                cursor.execute("""
-                    SELECT DISTINCT t.TagCategory, t.TagName
-                    FROM Tags t
-                    JOIN MediaSourceTags mst ON t.TagID = mst.TagID
-                    WHERE t.TagCategory IS NOT NULL
-                    ORDER BY t.TagCategory, t.TagName
-                """)
-                for row in cursor.fetchall():
-                    cat = row[0] or "Other"
-                    tag_name = row[1]
-                    if cat not in categories:
-                        categories[cat] = []
-                    categories[cat].append(tag_name)
+            # Query all tags grouped by category via Repository
+            if self.library_service.tag_repository:
+                categories = self.library_service.tag_repository.get_active_tags()
+            else:
+                categories = {}
             
             if not categories:
                 return  # No tags in use
@@ -816,6 +797,18 @@ class FilterWidget(QFrame):
                 
                 if field_name == 'all_contributors': header = 'Contributor'
                 
+                # T-83: Unified Tags Display Logic
+                if field_name == 'tags' and ':' in display_val:
+                    try:
+                        cat, name = display_val.split(':', 1)
+                        header = cat.strip()
+                        display_val = name.strip()
+                        # Optional: Add icon based on category?
+                        cat_icons = {"Genre": "🏷️", "Mood": "✨", "Status": "📋"}
+                        if header in cat_icons: header = f"{cat_icons[header]} {header}"
+                    except ValueError:
+                        pass
+                
                 label = f"{header}: {display_val}"
                 chip = QPushButton(f"{label} \u00D7")
                 # Clean identifier for QSS without hardcoding style
@@ -826,9 +819,6 @@ class FilterWidget(QFrame):
                 chip.setProperty("zone", zone)
                 
                 chip.clicked.connect(self._on_chip_clicked)
-                self.chip_layout.addWidget(chip)
-                total_chips += 1
-                
                 self.chip_layout.addWidget(chip)
                 total_chips += 1
                 

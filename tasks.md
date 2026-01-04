@@ -175,3 +175,7 @@ links: []
 | [docs/proposals/MODULARIZATION_MASTER_PLAN.md](docs/proposals/MODULARIZATION_MASTER_PLAN.md) | Big File Refactoring Plan (T-28) |
 | [docs/TEST_REMEDIATION_PLAN.md](docs/TEST_REMEDIATION_PLAN.md) | Test Suite Status (430 tests) |
 | [docs/STRATEGY_v0.2.md](docs/STRATEGY_v0.2.md) | Strangler Fig Refactor Strategy |
+
+
+language options... extract all text into a file so languages can easily be implemented...
+custom icon picker for tags, and maybe other stuff

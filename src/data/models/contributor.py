@@ -18,3 +18,11 @@ class Contributor:
         if self.sort_name is None:
             self.sort_name = self.name
 
+    def to_dict(self):
+        return {
+            "contributor_id": self.contributor_id,
+            "name": self.name,
+            "sort_name": self.sort_name,
+            "type": self.type
+        }
+
