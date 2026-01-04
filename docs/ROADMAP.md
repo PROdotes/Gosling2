@@ -116,6 +116,7 @@ tags:
 
 *   [ ] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
 *   [x] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
+*   [ ] **Unified Input Dialog** (T-85): Extract `TagRenameDialog` logic to reusable module; replace all `QInputDialog`s.
 -   [x] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
 -   [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
 *   [x] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.

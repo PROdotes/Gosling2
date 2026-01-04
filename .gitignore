@@ -70,3 +70,5 @@ settings.ini
 
 .idea/workspace.xml
 tests/unit/tools/bin/ffmpeg.exe
+tests/fixtures/bananas.mp3
+tests/fixtures/test.mp3
