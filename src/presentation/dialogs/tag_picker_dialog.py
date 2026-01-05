@@ -170,6 +170,8 @@ class TagPickerDialog(QDialog):
             btn.setCheckable(True)
             # Prevent button from shrinking - keep fixed size based on content
             btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            # Make buttons mouse-only - arrow keys should always control the list
+            btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
             if cat == self._current_category_filter:
                 btn.setChecked(True)
             # Set glow color for this category
@@ -289,6 +291,9 @@ class TagPickerDialog(QDialog):
         
         self._current_category_filter = category
         self._refresh_list()
+        
+        # Return focus to search box so arrow keys control the list
+        self.txt_search.edit.setFocus()
 
     def _on_search_changed(self, text):
         """Handle search text changes - parse prefix and filter."""

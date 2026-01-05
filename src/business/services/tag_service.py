@@ -21,6 +21,14 @@ class TagService:
         """Get all tags."""
         return self._repo.get_all_tags()
 
+    def search(self, query: str) -> List[Any]:
+        """Search for tags."""
+        return self._repo.search(query)
+
+    def get_all(self) -> List[Any]:
+        """Alias for get_all_tags to support universal picker."""
+        return self.get_all_tags()
+
     def get_all_by_category(self, category: str) -> List[Any]:
         """Get all tags in a specific category."""
         return self._repo.get_all_by_category(category)

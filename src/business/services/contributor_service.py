@@ -13,9 +13,17 @@ class ContributorService:
     def __init__(self, contributor_repository: Optional[ContributorRepository] = None):
         self._repo = contributor_repository or ContributorRepository()
 
+    def get_all(self) -> List[Contributor]:
+        """Fetch all contributors."""
+        return self._repo.get_all()
+
     def search(self, query: str) -> List[Contributor]:
         """Search for contributors by name or alias."""
         return self._repo.search(query)
+
+    def get_all_by_type(self, type_name: str) -> List[Contributor]:
+        """Fetch all contributors of a specific type (Person, Group, Alias)."""
+        return self._repo.get_all_by_type(type_name)
 
     def search_identities(self, query: str) -> List[Tuple[int, str, str, str]]:
         """Search for ANY matching name (Primary or Alias) and return flat results."""

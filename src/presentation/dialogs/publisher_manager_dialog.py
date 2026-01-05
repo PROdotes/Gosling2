@@ -7,6 +7,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
+from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
+from src.core.entity_registry import EntityType
+from src.core.context_adapters import PublisherChildAdapter
 
 class PublisherCreatorDialog(QDialog):
     """Tiny nested window for creating/naming a publisher."""
@@ -175,7 +178,11 @@ class PublisherDetailsDialog(QDialog):
         self.setFixedSize(360, 450)
         
         self.layout = QVBoxLayout(self)
-        self.layout.setSpacing(0)  # Zero spacing - manual control like side panel
+        # Create a mock service provider for the EntityListWidget
+        class _ServiceAdapter:
+            def __init__(self, service):
+                self.publisher_service = service
+        self.service_provider = _ServiceAdapter(self.service)
         
         self._init_ui()
         self._refresh_data()
@@ -224,28 +231,29 @@ class PublisherDetailsDialog(QDialog):
         self.layout.addWidget(line)
         self.layout.addSpacing(20)
         
-        # 3. Children List (Subsidiaries) with Add button
-        h_children_header = QHBoxLayout()
-        h_children_header.setContentsMargins(0, 0, 0, 0)
-        
+        # 3. Children List (Subsidiaries)
         lbl_children = QLabel("SUBSIDIARIES (CHILDREN)")
         lbl_children.setObjectName("FieldLabel")
-        h_children_header.addWidget(lbl_children)
-        h_children_header.addStretch()
+        self.layout.addWidget(lbl_children)
         
-        btn_add_child = GlowButton("")
-        btn_add_child.setObjectName("AddInlineButton")
-        btn_add_child.setToolTip("Link existing publisher as child")
-        btn_add_child.clicked.connect(self._add_child)
-        h_children_header.addWidget(btn_add_child)
         
-        self.layout.addLayout(h_children_header)
-        
-        self.list_children = QListWidget()
-        self.list_children.setObjectName("AlbumManagerList") # Reuse style
-        self.list_children.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_children.customContextMenuRequested.connect(self._show_child_context_menu)
-        self.list_children.itemDoubleClicked.connect(self._on_child_double_clicked)
+        # Subsisiaries - NOW USES EntityListWidget!
+        self.list_children = EntityListWidget(
+            service_provider=self.service_provider,
+            entity_type=EntityType.PUBLISHER,
+            layout_mode=LayoutMode.CLOUD,  # Chips instead of list
+            context_adapter=PublisherChildAdapter(
+                self.pub, 
+                self.service, 
+                refresh_fn=self._refresh_data
+            ),
+            allow_add=True,
+            allow_remove=True,
+            allow_edit=True,
+            add_tooltip="Link Subsidiary",
+            parent=self
+        )
+        self.list_children.setObjectName("ArtistSubList") # Reuse style
         self.layout.addWidget(self.list_children)
         
         self.layout.addStretch(1) # Pin actions to bottom
@@ -294,14 +302,8 @@ class PublisherDetailsDialog(QDialog):
             idx = self.cmb_parent.findData(self.pub.parent_publisher_id)
             if idx >= 0: self.cmb_parent.setCurrentIndex(idx)
             
-        # Load Children
-        self.list_children.clear()
-        for p in all_pubs:
-            if p.parent_publisher_id == self.pub.publisher_id:
-                item = QListWidgetItem(p.publisher_name)
-                item.setText(f"↳ {p.publisher_name}")
-                item.setData(Qt.ItemDataRole.UserRole, p.publisher_id)
-                self.list_children.addItem(item)
+        # Subsidiaries - now uses EntityListWidget!
+        self.list_children.refresh_from_adapter()
 
     def _create_new_parent(self):
         diag = PublisherCreatorDialog(parent=self)
@@ -315,85 +317,6 @@ class PublisherDetailsDialog(QDialog):
                 if idx >= 0: 
                     self.cmb_parent.setCurrentIndex(idx)
                     self.cmb_parent.setFocus() # Focus on the selected parent
-
-    def _on_child_double_clicked(self, item):
-        """Rename the double-clicked child."""
-        child_id = item.data(Qt.ItemDataRole.UserRole)
-        child_pub = self.service.get_by_id(child_id)
-        if not child_pub: return
-        
-        diag = PublisherCreatorDialog(
-            initial_name=child_pub.publisher_name,
-            title=f"Rename: {child_pub.publisher_name}",
-            button_text="UPDATE",
-            parent=self
-        )
-        if diag.exec():
-            new_name = diag.get_name()
-            if new_name and new_name != child_pub.publisher_name:
-                child_pub.publisher_name = new_name
-                if self.service.update(child_pub):
-                    self._refresh_data()
-
-    def _show_child_context_menu(self, pos):
-        item = self.list_children.itemAt(pos)
-        if not item: return
-        
-        menu = QMenu(self)
-        
-        rename_act = QAction("Rename", self)
-        rename_act.triggered.connect(lambda: self._on_child_double_clicked(item))
-        menu.addAction(rename_act)
-        
-        remove_act = QAction("Remove Child Link", self)
-        remove_act.triggered.connect(lambda: self._remove_child_link(item))
-        menu.addAction(remove_act)
-        
-        menu.exec(self.list_children.mapToGlobal(pos))
-
-    def _remove_child_link(self, item):
-        """Sever the parent->child relationship."""
-        child_id = item.data(Qt.ItemDataRole.UserRole)
-        child_pub = self.service.get_by_id(child_id)
-        if not child_pub: return
-        
-        if QMessageBox.question(self, "Remove Link", 
-                                f"Are you sure you want to remove '{child_pub.publisher_name}' from being a subsidiary?") == QMessageBox.StandardButton.Yes:
-            child_pub.parent_publisher_id = None
-            if self.service.update(child_pub):
-                self._refresh_data()
-
-    def _add_child(self):
-        """Link an existing publisher as a child of this one."""
-        # Exclude self and all ancestors to prevent circularity
-        exclude = {self.pub.publisher_id}
-        
-        # Walk up to get all ancestors
-        current = self.pub
-        while current.parent_publisher_id:
-            exclude.add(current.parent_publisher_id)
-            current = self.service.get_by_id(current.parent_publisher_id)
-            if not current:
-                break
-        
-        diag = PublisherPickerDialog(self.service, exclude_ids=exclude, parent=self)
-        if diag.exec():
-            child_pub = diag.get_selected()
-            if child_pub:
-                # Double-check: would this create a cycle?
-                if self.service.would_create_cycle(child_pub.publisher_id, self.pub.publisher_id):
-                    QMessageBox.warning(self, "Circular Link Detected",
-                                       "Cannot add this publisher - it would create a circular relationship.")
-                    return
-                
-                # Set its parent to this publisher
-                child_pub.parent_publisher_id = self.pub.publisher_id
-                self.service.update(child_pub)
-                
-                # Refresh the children list
-                self._refresh_data()
-
-
 
     def _save(self):
         new_name = self.txt_name.text().strip()

@@ -63,6 +63,7 @@ class EntityListWidget(QWidget):
     """
     
     data_changed = pyqtSignal()
+    chip_context_menu_requested = pyqtSignal(int, str, object) # entity_id, label, global_pos
     
     def __init__(
         self,
@@ -116,6 +117,16 @@ class EntityListWidget(QWidget):
         
         self._init_ui(add_tooltip)
     
+    @property
+    def tray(self) -> Optional['ChipTrayWidget']:
+        """
+        Public accessor for the internal ChipTrayWidget (Cloud Mode).
+        Returns None if in Stack Mode.
+        """
+        if self.layout_mode == LayoutMode.CLOUD:
+            return self._inner_widget
+        return None
+
     def set_picker_filter(self, filter_fn: Callable[[], str]):
         """
         Set a callback to determine filter_type for the picker dialog.
@@ -147,7 +158,8 @@ class EntityListWidget(QWidget):
         
         # Connect signals
         if self.allow_edit:
-            self._inner_widget.chip_clicked.connect(self._on_item_clicked)
+            self._inner_widget.chip_clicked.connect(self._on_item_clicked, Qt.ConnectionType.UniqueConnection)
+            self._inner_widget.chip_context_menu_requested.connect(self.chip_context_menu_requested.emit)
         if self.allow_remove:
             self._inner_widget.chip_remove_requested.connect(self._on_item_remove_requested)
         if self.allow_add:
@@ -236,11 +248,19 @@ class EntityListWidget(QWidget):
             list_item.setData(Qt.ItemDataRole.UserRole, entity_id)
             self._inner_widget.addItem(list_item)
     
+    def set_context_adapter(self, adapter: ContextAdapter):
+        """Update the context adapter dynamically."""
+        self.context_adapter = adapter
+        self.refresh_from_adapter()
+
     def refresh_from_adapter(self):
         """Refresh items from the context adapter."""
         if self.context_adapter:
             data = self.context_adapter.get_child_data()
             self.set_items(data)
+        else:
+            # Clear if no adapter
+            self.set_items([])
     
     def _on_item_clicked(self, entity_id: int, label: str):
         """Handle click on an item - open editor dialog."""
@@ -279,6 +299,10 @@ class EntityListWidget(QWidget):
                 self.refresh_from_adapter()
                 self.data_changed.emit()
     
+    def add_item_interactive(self):
+        """Public slot to trigger the add item flow (picker)."""
+        self._on_add_clicked()
+
     def _on_add_clicked(self):
         """Handle add button click - open picker dialog."""
         if not self.allow_add:
@@ -287,7 +311,7 @@ class EntityListWidget(QWidget):
         # Get current IDs to exclude
         exclude_ids = set()
         if self.context_adapter:
-            exclude_ids = set(self.context_adapter.get_children())
+            exclude_ids = self.context_adapter.get_excluded_ids()
         
         # Get filter type if callback is set
         filter_type = None

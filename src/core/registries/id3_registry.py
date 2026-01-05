@@ -88,33 +88,19 @@ class ID3Registry:
     
     @classmethod
     def get_category_icon(cls, category: str, default: str = "📦") -> str:
-        """
-        Get icon emoji for a tag category.
-        
-        Args:
-            category: Category name (e.g., "Genre", "Mood")
-            default: Default icon if category not found
-            
-        Returns:
-            Icon emoji string
-        """
+        """Get icon emoji for a tag category (Case-insensitive)."""
         cats = cls.get_tag_categories()
-        return cats.get(category, {}).get('icon', default)
+        # Case-insensitive lookup
+        cat_map = {k.lower(): v for k, v in cats.items()}
+        return cat_map.get(category.lower(), {}).get('icon', default)
     
     @classmethod
     def get_category_color(cls, category: str, default: str = "#888888") -> str:
-        """
-        Get hex color for a tag category.
-        
-        Args:
-            category: Category name (e.g., "Genre", "Mood")
-            default: Default color if category not found
-            
-        Returns:
-            Hex color string (e.g., "#FFB84D")
-        """
+        """Get hex color for a tag category (Case-insensitive)."""
         cats = cls.get_tag_categories()
-        return cats.get(category, {}).get('color', default)
+        # Case-insensitive lookup
+        cat_map = {k.lower(): v for k, v in cats.items()}
+        return cat_map.get(category.lower(), {}).get('color', default)
     
     @classmethod
     def get_id3_frame(cls, category: str) -> Optional[str]:

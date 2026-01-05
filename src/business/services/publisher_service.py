@@ -17,6 +17,10 @@ class PublisherService:
         """Search for publishers by name or part of name."""
         return self._repo.search(query)
 
+    def get_all(self) -> List[Publisher]:
+        """Alias for search("") to support universal picker."""
+        return self.search("")
+
     def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
         """Fetch a specific publisher by its ID."""
         return self._repo.get_by_id(publisher_id)
@@ -25,7 +29,7 @@ class PublisherService:
         """Fetch a specific publisher by its exact name."""
         return self._repo.find_by_name(name)
 
-    def get_or_create(self, name: str) -> Tuple[Publisher, bool]:
+    def get_or_create(self, name: str, _type: str = None) -> Tuple[Publisher, bool]:
         """Find an existing publisher or create a new one."""
         return self._repo.get_or_create(name)
 

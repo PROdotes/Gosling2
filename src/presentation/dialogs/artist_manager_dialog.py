@@ -8,16 +8,21 @@ from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
 from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
 from src.core.entity_registry import EntityType
-from src.core.context_adapters import ArtistMemberAdapter
+from src.core.context_adapters import ArtistMemberAdapter, ArtistAliasAdapter
 
 class IdentityCollisionDialog(QDialog):
     """
     Human-friendly resolver for name conflicts. 
     No technical jargon, no scary boxes.
     """
-    def __init__(self, target_name, song_count=0, has_context_song=False, parent=None):
+    def __init__(
+        self, target_name, song_count=0, has_context_song=False,
+        title="Conflict Detected", header="IDENTITY CONFLICT", 
+        primary_label=None, secondary_label=None, description=None,
+        parent=None
+    ):
         super().__init__(parent)
-        self.setWindowTitle("Artist Exists")
+        self.setWindowTitle(title)
         self.setObjectName("CollisionDialog")
         
         layout = QVBoxLayout(self)
@@ -26,7 +31,7 @@ class IdentityCollisionDialog(QDialog):
         # 1. Human-Readable Explanation
         layout.addStretch(1)
         
-        self.lbl_header = QLabel("IDENTITY CONFLICT")
+        self.lbl_header = QLabel(header)
         self.lbl_header.setObjectName("CollisionHeader")
         self.lbl_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_header)
@@ -36,7 +41,9 @@ class IdentityCollisionDialog(QDialog):
         self.lbl_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_msg)
         
-        if has_context_song:
+        if description:
+            desc = description
+        elif has_context_song:
             desc = f"Link this song to the existing entry or all {song_count} songs?" if song_count > 1 else "Link this song to the existing entry?"
         else:
             desc = f"Merge all {song_count} songs into the existing identity?" if song_count > 1 else "Merge into the existing identity?"
@@ -55,7 +62,8 @@ class IdentityCollisionDialog(QDialog):
         
         # OPTION A: Link
         if has_context_song:
-            self.btn_this = GlowButton("LINK THIS SONG")
+            label = primary_label or "LINK THIS SONG"
+            self.btn_this = GlowButton(label)
             self.btn_this.setObjectName("ActionPill")
             self.btn_this.setProperty("action_role", "primary")
             self.btn_this.clicked.connect(lambda: self.done(3))
@@ -66,7 +74,10 @@ class IdentityCollisionDialog(QDialog):
         # Show if multiple songs exist, OR if we are in a Global context (no specific song to link)
         show_all = (song_count > 1) or (not has_context_song)
         if show_all:
-            label = f"ALL {song_count} SONGS" if song_count > 1 else "MERGE GLOBALLY"
+            if secondary_label:
+                label = secondary_label
+            else:
+                label = f"ALL {song_count} SONGS" if song_count > 1 else "MERGE GLOBALLY"
             self.btn_all = GlowButton(label)
             self.btn_all.setObjectName("ActionPill")
             self.btn_all.setProperty("action_role", "secondary")
@@ -93,87 +104,6 @@ class IdentityCollisionDialog(QDialog):
 
 
 
-class ArtistCreatorDialog(QDialog):
-    """
-    Quick dialog for creating a new artist with Name and Type.
-    """
-    def __init__(self, initial_name="", button_text="Create Artist", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("New Artist")
-        self.setObjectName("ArtistCreatorDialog")
-        
-        layout = QVBoxLayout(self)
-        layout.setObjectName("ArtistCreatorLayout")
-        
-        # 1. Name Field
-        lbl_name = QLabel("ARTIST NAME")
-        lbl_name.setObjectName("DialogFieldLabel")
-        self.inp_name = GlowLineEdit()
-        self.inp_name.setText(initial_name)
-        
-        layout.addWidget(lbl_name)
-        layout.addWidget(self.inp_name)
-        
-        # 2. Type Selection (Person/Group Buttons)
-        lbl_type = QLabel("ARTIST TYPE")
-        lbl_type.setObjectName("DialogFieldLabel")
-        layout.addWidget(lbl_type)
-        
-        type_layout = QHBoxLayout()
-        type_layout.setSpacing(4)
-        self.btn_group = QButtonGroup(self)
-        self.btn_group.setExclusive(True)
-        
-        self.radio_person = GlowButton("PERSON")
-        self.radio_person.setObjectName("IdentityTypeButton")
-        self.radio_person.setCheckable(True)
-        self.radio_person.setChecked(True)
-        self.btn_group.addButton(self.radio_person.btn, 0)
-        
-        self.radio_group = GlowButton("GROUP")
-        self.radio_group.setObjectName("IdentityTypeButton")
-        self.radio_group.setCheckable(True)
-        self.btn_group.addButton(self.radio_group.btn, 1)
-        
-        type_layout.addStretch()
-        type_layout.addWidget(self.radio_person)
-        type_layout.addWidget(self.radio_group)
-        type_layout.addStretch()
-        layout.addLayout(type_layout)
-        
-        layout.addStretch()
-        
-        # 3. Actions
-        btns = QHBoxLayout()
-        self.btn_cancel = GlowButton("Cancel")
-        self.btn_cancel.setObjectName("ActionPill")
-        self.btn_cancel.setProperty("action_role", "secondary")
-        self.btn_cancel.clicked.connect(self.reject)
-        
-        self.btn_save = GlowButton(button_text)
-        self.btn_save.setObjectName("ActionPill")
-        self.btn_save.setProperty("action_role", "primary")
-        self.btn_save.setDefault(True) # Snappy: Press Enter to create
-        self.btn_save.clicked.connect(self.accept)
-        
-        btns.addStretch()
-        btns.addWidget(self.btn_cancel)
-        btns.addWidget(self.btn_save)
-        btns.addStretch()
-        
-        layout.addStretch(1) # Anchor to bottom
-        layout.addLayout(btns)
-        
-        self.inp_name.setFocus()
-        self.inp_name.edit.returnPressed.connect(self.accept) # Snappy: Enter to Create
-        if initial_name:
-            self.inp_name.edit.selectAll()
-
-    def get_data(self):
-        """Returns (name, type_string)"""
-        name = self.inp_name.text().strip()
-        type_str = "group" if self.radio_group.isChecked() else "person"
-        return name, type_str
 
 
 class ArtistPickerDialog(QDialog):
@@ -572,15 +502,26 @@ class ArtistPickerWidget(QWidget):
         menu.exec(self.list_artists.mapToGlobal(pos))
 
     def _on_merge_clicked(self, source_id, source_name):
-        diag = ArtistPickerDialog(self.service, exclude_ids=[source_id], parent=self)
-        diag.setWindowTitle(f"Consolidate '{source_name}' into...")
+        from .entity_picker_dialog import EntityPickerDialog
+        from src.core.picker_config import get_artist_picker_config
+        
+        # Get service provider (need to wrap service for EntityPickerDialog)
+        class _ServiceProvider:
+            def __init__(self, service):
+                self.contributor_service = service
+        
+        config = get_artist_picker_config()
+        config.title_add = f"Consolidate '{source_name}' into..."
+        
+        diag = EntityPickerDialog(
+            service_provider=_ServiceProvider(self.service),
+            config=config,
+            exclude_ids={source_id},
+            parent=self
+        )
+        
         if diag.exec():
-            # Handle List Return (take first)
-            result = diag.get_selected()
-            if isinstance(result, list):
-                target = result[0] if result else None
-            else:
-                target = result
+            target = diag.get_selected()
 
             if target:
                 if self.service.merge_contributors(source_id, target.contributor_id):
@@ -653,18 +594,21 @@ class ArtistDetailsDialog(QDialog):
         
         # Type (Buttons)
         t_row = QHBoxLayout()
-        t_row.setSpacing(4)
+        t_row.setSpacing(20)  # Extra space for glow margins
+        t_row.setContentsMargins(0, 8, 10, 0)  # Removed bottom margin - let the glow breathe
         self.btn_group = QButtonGroup(self)
         self.btn_group.setExclusive(True)
         
         self.radio_person = GlowButton("PERSON")
         self.radio_person.setObjectName("IdentityTypeButton")
         self.radio_person.setCheckable(True)
+        self.radio_person.setMinimumHeight(48)  # Extra height for glow
         self.btn_group.addButton(self.radio_person.btn, 0)
         
         self.radio_group = GlowButton("GROUP")
         self.radio_group.setObjectName("IdentityTypeButton")
         self.radio_group.setCheckable(True)
+        self.radio_group.setMinimumHeight(48)  # Extra height for glow
         self.btn_group.addButton(self.radio_group.btn, 1)
         
         # UI Refresh logic (Safe-Toggle)
@@ -676,30 +620,56 @@ class ArtistDetailsDialog(QDialog):
         t_row.addStretch()
         layout.addLayout(t_row)
         
+        # Spacer for glow to render without clipping
+        layout.addSpacing(8)
+        
         line = QFrame()
         line.setObjectName("FieldGroupLine")
         line.setFixedHeight(2)
         layout.addWidget(line)
         
-        # Aliases
+        # Aliases - NOW USES EntityListWidget with chips!
         h_alias = QHBoxLayout()
         lbl_alias = QLabel("ALIASES")
         lbl_alias.setObjectName("DialogFieldLabel")
         h_alias.addWidget(lbl_alias)
-        
         h_alias.addStretch()
-        
-        btn_add_alias = GlowButton("")
-        btn_add_alias.setObjectName("AddInlineButton")
-        # Size handled by QSS relative to icon
-        btn_add_alias.clicked.connect(self._add_alias)
-        h_alias.addWidget(btn_add_alias)
         layout.addLayout(h_alias)
         
-        self.list_aliases = QListWidget()
-        self.list_aliases.setObjectName("ArtistSubList")
-        self.list_aliases.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_aliases.customContextMenuRequested.connect(self._show_alias_menu)
+        # Create a mock service provider for EntityListWidgets
+        # This is a temporary adapter until we have a real ServiceProvider
+        class _ServiceAdapter:
+            def __init__(self, service):
+                self.contributor_service = service
+        
+        self._service_adapter = _ServiceAdapter(self.service)
+        
+        # Create alias adapter
+        self._alias_adapter = ArtistAliasAdapter(
+            self.artist,
+            self.service,
+            refresh_fn=self._refresh_data
+        )
+        
+        self.list_aliases = EntityListWidget(
+            service_provider=self._service_adapter,
+            entity_type=EntityType.ALIAS,
+            layout_mode=LayoutMode.CLOUD,  # Chips!
+            context_adapter=self._alias_adapter,
+            allow_add=True,  # Show the (+) button
+            allow_remove=True,
+            allow_edit=False,  # Custom context menu instead
+            add_tooltip="Add Alias",
+            confirm_removal=False,  # Simplified removal
+            parent=self
+        )
+        # Override the add handler to use our custom merge-based alias add
+        if self.list_aliases.tray:
+            # Disconnect default and connect our custom handler
+            self.list_aliases.tray.add_requested.disconnect()
+            self.list_aliases.tray.add_requested.connect(self._add_alias)
+        # Connect to custom context menu for Promote/Rename actions
+        self.list_aliases.chip_context_menu_requested.connect(self._show_alias_chip_menu)
         layout.addWidget(self.list_aliases)
         
         # Membership - NOW USES EntityListWidget!
@@ -709,14 +679,6 @@ class ArtistDetailsDialog(QDialog):
         h_member.addWidget(self.lbl_member)
         h_member.addStretch()
         layout.addLayout(h_member)
-        
-        # Create a mock service provider for the EntityListWidget
-        # This is a temporary adapter until we have a real ServiceProvider
-        class _ServiceAdapter:
-            def __init__(self, service):
-                self.contributor_service = service
-        
-        self._service_adapter = _ServiceAdapter(self.service)
         
         # Create the member adapter (will be recreated on type toggle)
         self._member_adapter = ArtistMemberAdapter(
@@ -728,7 +690,7 @@ class ArtistDetailsDialog(QDialog):
         self.list_members = EntityListWidget(
             service_provider=self._service_adapter,
             entity_type=EntityType.GROUP_MEMBER,
-            layout_mode=LayoutMode.STACK,
+            layout_mode=LayoutMode.CLOUD,  # Chips instead of list
             context_adapter=self._member_adapter,
             allow_add=True,
             allow_remove=True,
@@ -794,12 +756,15 @@ class ArtistDetailsDialog(QDialog):
         self.radio_person.blockSignals(False)
         self.radio_group.blockSignals(False)
             
-        # Aliases (still manual - complex merge logic)
-        self.list_aliases.clear()
-        for alias_id, alias_name in self.service.get_aliases(self.artist.contributor_id):
-            item = QListWidgetItem(alias_name)
-            item.setData(Qt.ItemDataRole.UserRole, alias_id)
-            self.list_aliases.addItem(item)
+        # Aliases - now uses EntityListWidget!
+        # Update the adapter with current artist
+        self._alias_adapter = ArtistAliasAdapter(
+            self.artist,
+            self.service,
+            refresh_fn=self._refresh_data
+        )
+        self.list_aliases.context_adapter = self._alias_adapter
+        self.list_aliases.refresh_from_adapter()
             
         # Memberships - now uses EntityListWidget!
         # Update the adapter with current artist (type may have changed)
@@ -819,120 +784,85 @@ class ArtistDetailsDialog(QDialog):
         self._refresh_data()
 
     def _add_alias(self):
-        # UNIFY: Use an editable combo so user can either type a new name
-        # OR pick an existing artist to "claim" them as an alias (merging them).
-        diag = QDialog(self)
-        diag.setWindowTitle("Add Alias")
-        diag.setFixedSize(380, 160)
+        # UNIFY: Use the modern EntityPickerDialog (matching "add person" flow)
+        # BUT filter to only show same-type artists (person for person, group for group)
+        from .entity_picker_dialog import EntityPickerDialog
+        from src.core.picker_config import get_artist_picker_config
         
-        vbox = QVBoxLayout(diag)
-        lbl = QLabel("ENTER ALIAS OR SELECT EXISTING ARTIST")
-        lbl.setObjectName("DialogFieldLabel")
-        vbox.addWidget(lbl)
+        # Get service provider (need to wrap service for EntityPickerDialog)
+        class _ServiceProvider:
+            def __init__(self, service):
+                self.contributor_service = service
         
-        cmb = GlowComboBox()
-        cmb.setEditable(True)
-        cmb.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        # Populate with existing artists to help "claiming" identities
-        all_artists = self.service.search("")
-        for a in all_artists:
-            # Filter: Strict Type Matching
-            # "Groups shouldn't even be in that list" when editing a Person.
-            if a.contributor_id != self.artist.contributor_id and a.type == self.artist.type:
-                cmb.addItem(a.name, a.contributor_id)
-        cmb.clearEditText()
-        vbox.addWidget(cmb)
+        # Get base config and customize for alias-adding
+        config = get_artist_picker_config()
+        config.title_add = f"Add Alias for {self.artist.name}"
         
-        vbox.addStretch()
-        btns = QHBoxLayout()
-        btn_cancel = GlowButton("Cancel")
-        btn_cancel.clicked.connect(diag.reject)
-        btn_add = GlowButton("ADD")
-        btn_add.setObjectName("Primary")
-        btn_add.btn.setDefault(True) # Enable Enter Key
-        btn_add.clicked.connect(diag.accept)
+        # FILTER: Show same type + Alias, but NOT the opposite type
+        # e.g., for Person: show Person + Alias, hide Group
+        # e.g., for Group: show Group + Alias, hide Person
+        artist_type = self.artist.type.title()  # "person" -> "Person"
+        opposite_type = "Group" if artist_type == "Person" else "Person"
         
-        # Connect Return Key from Line Edit
-        cmb.lineEdit().returnPressed.connect(diag.accept)
+        # Remove the opposite type from buttons
+        config.type_buttons = [t for t in config.type_buttons if t != opposite_type]
+        config.type_icons = {k: v for k, v in config.type_icons.items() if k != opposite_type}
+        config.type_colors = {k: v for k, v in config.type_colors.items() if k != opposite_type}
+        config.default_type = artist_type
         
-        btns.addWidget(btn_cancel)
-        btns.addStretch()
-        btns.addWidget(btn_add)
-        vbox.addLayout(btns)
-        
-        cmb.setFocus()
+        diag = EntityPickerDialog(
+            service_provider=_ServiceProvider(self.service),
+            config=config,
+            exclude_ids={self.artist.contributor_id},
+            parent=self
+        )
         
         if diag.exec():
-            name = cmb.currentText().strip()
-            if name:
-                conflict_id, msg = self.service.validate_identity(name, exclude_id=self.artist.contributor_id)
-                if conflict_id:
-                    # Smart Linking Logic:
-                    # 1. Tracing the "Real" Owner
-                    # If 'name' is an alias for someone else, we want to merge into THAT owner.
-                    # e.g. Adding "Sasha Fierce" (owned by Beyonce) to "Queen B" -> Merge Queen B into Beyonce.
-                    
-                    real_owner_id = conflict_id
-                    
-                    # Check if conflict_id is actually the same as self (already owned).
-                    # validate_identity returns conflict ID which IS the owner ID for aliases.
-                    if real_owner_id == self.artist.contributor_id:
-                         # It's already yours, do nothing.
-                         cmb.clearEditText()
-                         return
+            target = diag.get_selected()
+            
+            if not target:
+                return
+                
+            # Check for Self (should be excluded by Picker but safe check)
+            if target.contributor_id == self.artist.contributor_id:
+                return
+            
+            # It's an independent artist entity.
+            # Since an alias in our schema IS a contributor link, 
+            # we are effectively saying "This independent entity IS actually me."
+            # This requires a MERGE operation (Absorb).
+            
+            # Double Check Type Safety
+            if target.type != self.artist.type:
+                 QMessageBox.warning(self, "Type Mismatch", 
+                                   f"Cannot use '{target.name}' ({target.type}) as alias for '{self.artist.name}' ({self.artist.type}).\n\n"
+                                   "Aliases must be of the same type.")
+                 return
+            
+            # MERGE: Absorb 'target' into 'self.artist'
+            # This moves all of target's songs/roles to self.artist, and deletes target.
+            # It also usually adds 'target.name' as an alias of 'self.artist' implicitly via the merge service logic.
+            
+            confirm_msg = f"'{target.name}' exists as a separate artist.\n\n" \
+                          f"Do you want to MERGE '{target.name}' into '{self.artist.name}'?\n" \
+                          f"This will make '{target.name}' an alias of '{self.artist.name}' and transfer all songs."
+                          
+            if QMessageBox.question(self, "Confirm Merge", confirm_msg, 
+                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                                  
+                if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                    from src.core import logger
+                    logger.info(f"Identity Absorbed via Alias Add: '{target.name}' merged into '{self.artist.name}'.")
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+            
+            self._refresh_data()
 
-                    # Proceed with Auto-Merge Logic
-                    # SAFETY CHECK: Do types match?
-                    real_owner = self.service.get_by_id(real_owner_id)
-                    if real_owner and real_owner.type != self.artist.type:
-                         QMessageBox.warning(self, "Type Mismatch", 
-                                           f"Cannot auto-merge '{self.artist.name}' ({self.artist.type}) into '{real_owner.name}' ({real_owner.type}).\n\n"
-                                           "Please resolve this manually.")
-                         cmb.clearEditText()
-                         return
-
-                    # DECISION: Absorb or Consolidate?
-                    # If the name we typed IS the Primary Name of the other artist, we "Eat" them (Absorb).
-                    # If the name we typed is just an ALIAS of the other artist, we "Join" them (Consolidate).
-                    
-                    is_absorbing = (name.lower() == real_owner.name.lower())
-                    
-                    if is_absorbing:
-                        # Absorb: Merge THE OTHER GUY into ME.
-                        if self.service.merge(real_owner_id, self.artist.contributor_id):
-                            from src.core import logger
-                            logger.info(f"Identity Absorbed: '{real_owner.name}' merged into '{self.artist.name}'.")
-                            self._refresh_data() # I am still alive, just richer.
-                            cmb.clearEditText()
-                        else:
-                            QMessageBox.warning(self, "Error", "Failed to absorb identity.")
-                    else:
-                        # Consolidate: Merge ME into THEM.
-                        if self.service.merge(self.artist.contributor_id, real_owner_id):
-                            # CRITICAL: We just merged OURSELF into someone else.
-                            # Signal merge (Code 3) to prompt UI refresh of the NEW ID.
-                            self.merged_target = real_owner
-                            self.done(3)
-                            
-                            from src.core import logger
-                            logger.info(f"Identity Consolidated: '{self.artist.name}' merged into '{real_owner.name}'.")
-                        else:
-                            QMessageBox.warning(self, "Error", "Failed to link identities.")
-                    return
-
-                self.service.add_alias(self.artist.contributor_id, name)
-                self._refresh_data()
-                cmb.clearEditText()
-
-    def _show_alias_menu(self, pos):
-        item = self.list_aliases.itemAt(pos)
-        if not item: return
-        alias_id = item.data(Qt.ItemDataRole.UserRole)
-        alias_name = item.text()
-        
+    def _show_alias_chip_menu(self, alias_id, alias_name, global_pos):
+        """Show context menu for alias chips."""
         menu = QMenu(self)
         
-        promote_act = QAction("Set as Primary", self)
+        promote_act = QAction("Set as Primary ★", self)
         promote_act.triggered.connect(lambda: self._promote_alias(alias_id, alias_name))
         menu.addAction(promote_act)
         
@@ -945,7 +875,7 @@ class ArtistDetailsDialog(QDialog):
         del_act = QAction("Unlink Name", self)
         del_act.triggered.connect(lambda: self._confirm_delete_alias(alias_id, alias_name))
         menu.addAction(del_act)
-        menu.exec(self.list_aliases.mapToGlobal(pos))
+        menu.exec(global_pos)
 
     def _confirm_delete_alias(self, alias_id, name):
         # Simplified: Just do it. Audit log handles the safety.
@@ -998,6 +928,8 @@ class ArtistDetailsDialog(QDialog):
                     target_name=new_name,
                     song_count=usage_count,
                     has_context_song=(self.context_song is not None),
+                    title="Artist Exists",
+                    header="IDENTITY CONFLICT",
                     parent=self
                 )
 

@@ -26,6 +26,7 @@ class UniversalImportDialog(QDialog):
         
         # Default to Home if no last_dir is provided
         self.start_dir = start_dir if (start_dir and os.path.exists(start_dir)) else QDir.homePath()
+        self.selected_paths = []
         
         self._init_ui()
 
@@ -148,15 +149,20 @@ class UniversalImportDialog(QDialog):
         paths = [self.model.filePath(idx) for idx in indexes]
         
         if paths:
+            self.selected_paths = paths
             self.import_requested.emit(paths)
             self.accept()
         else:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Empty Selection", "Target selection is empty. Select files or folders to proceed.")
 
+    def get_selected(self):
+        """Return the list of paths selected by the user."""
+        return self.selected_paths
+
     @staticmethod
     def get_import_paths(start_dir=None, parent=None):
         dlg = UniversalImportDialog(start_dir, parent)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            pass
+            return dlg.get_selected()
         return []

@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QPushButton, QGridLayout, QLabel, QGraphicsBlurEffect
-from PyQt6.QtCore import Qt, pyqtSignal, QEvent, pyqtProperty
+from PyQt6.QtCore import Qt, pyqtSignal, QEvent, pyqtProperty, QSize
 from PyQt6.QtGui import QIcon
 from .base import GlowWidget
 
@@ -58,6 +58,17 @@ class GlowButton(GlowWidget):
         self.btn.clicked.connect(self.clicked.emit)
         self.btn.toggled.connect(self.toggled.emit)
         self.btn.toggled.connect(self._on_toggled)
+        self._update_size()
+
+    def _update_size(self):
+        """Force the internal button to be wide enough for its labels."""
+        self.lbl_main.adjustSize()
+        hint = self.lbl_main.sizeHint()
+        # 24px padding (12px per side) for the pill look
+        self.btn.setMinimumWidth(hint.width() + 24)
+        # Standard pill height
+        self.btn.setMinimumHeight(32)
+        self.updateGeometry()
 
     def changeEvent(self, event):
         if event.type() == QEvent.Type.EnabledChange:
@@ -175,6 +186,7 @@ class GlowButton(GlowWidget):
         self.btn.setToolTip(text) # Tooltip fallback if clipped?den
         self.btn.setText("") # Native text always hidden
         self._update_text_styles()
+        self._update_size()
 
     def setFont(self, f): 
         self.btn.setFont(f)

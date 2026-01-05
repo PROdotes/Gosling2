@@ -7,9 +7,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
-from ..widgets.chip_tray_widget import ChipTrayWidget
-from .publisher_manager_dialog import PublisherPickerDialog, PublisherDetailsDialog
-from .artist_manager_dialog import ArtistPickerDialog, ArtistDetailsDialog
+from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
+from ...core.entity_registry import EntityType
+from ...core.context_adapters import AlbumContributorAdapter, AlbumPublisherAdapter
+from .entity_picker_dialog import EntityPickerDialog
+from src.core.picker_config import get_artist_picker_config, get_publisher_picker_config
+from .publisher_manager_dialog import PublisherDetailsDialog
+from .artist_manager_dialog import ArtistDetailsDialog
 
 
 class AlbumManagerDialog(QDialog):
@@ -21,8 +25,6 @@ class AlbumManagerDialog(QDialog):
     Refactor T-63: Layout split into HBox[MainContainer, Sidecar] to prevent button jumping.
     """
     
-    # Returns the selected/created Album(s) as a list of dicts:
-    # [{'id': int, 'title': str, 'primary': bool}, ...]
     album_selected = pyqtSignal(list) 
     save_and_select_requested = pyqtSignal(list)
     album_deleted = pyqtSignal(int)
@@ -32,6 +34,16 @@ class AlbumManagerDialog(QDialog):
     BASE_HEIGHT = 650
     PANE_MIN_WIDTH = 250
     
+    class DummyAlbum:
+        """Helper for 'Create New' staging."""
+        def __init__(self):
+            self.album_id = 0
+            self.album_artist = ""
+            self.publisher_id = 0
+            self.title = ""
+            self.release_year = None
+            self.album_type = "Album"
+
     def __init__(self, album_service, publisher_service, contributor_service, initial_data=None, parent=None, staged_deletions=None):
         super().__init__(parent)
         self.album_service = album_service
@@ -340,18 +352,20 @@ class AlbumManagerDialog(QDialog):
         input_layout_art.setContentsMargins(0, 0, 0, 0)
         input_layout_art.setSpacing(6)
         
-        self.tray_artist = ChipTrayWidget(parent=self, show_add=False)
-        self.tray_artist.is_add_visible = False
-        self.tray_artist.btn_add.hide()
-        self.tray_artist.chip_clicked.connect(self._on_artist_chip_clicked)
-        self.tray_artist.chip_remove_requested.connect(
-            lambda eid, name: self._remove_chip_from_tray(self.tray_artist, name)
+        self.tray_artist = EntityListWidget(
+            service_provider=self,
+            entity_type=EntityType.ARTIST,
+            layout_mode=LayoutMode.CLOUD,
+            allow_add=True,
+            parent=self
         )
+        self.tray_artist.tray.btn_add.hide() # Use external button
+        
         input_layout_art.addWidget(self.tray_artist, 1)
         
         btn_add_artist = GlowButton("")
         btn_add_artist.setObjectName("AddInlineButton")
-        btn_add_artist.clicked.connect(self._on_search_artist)
+        btn_add_artist.clicked.connect(self.tray_artist.add_item_interactive)
         input_layout_art.addWidget(btn_add_artist)
         
         module_layout_art.addWidget(input_row_art)
@@ -385,18 +399,20 @@ class AlbumManagerDialog(QDialog):
         input_layout_pub.setContentsMargins(0, 0, 0, 0)
         input_layout_pub.setSpacing(6)
         
-        self.tray_publisher = ChipTrayWidget(parent=self, show_add=False)
-        self.tray_publisher.is_add_visible = False
-        self.tray_publisher.btn_add.hide()
-        self.tray_publisher.chip_clicked.connect(self._on_publisher_chip_clicked)
-        self.tray_publisher.chip_remove_requested.connect(
-            lambda eid, name: self._remove_chip_from_tray(self.tray_publisher, name)
+        self.tray_publisher = EntityListWidget(
+            service_provider=self,
+            entity_type=EntityType.PUBLISHER,
+            layout_mode=LayoutMode.CLOUD,
+            allow_add=True,
+            parent=self
         )
+        self.tray_publisher.tray.btn_add.hide() # Use external button
+        
         input_layout_pub.addWidget(self.tray_publisher, 1)
         
         btn_add_pub = GlowButton("")
         btn_add_pub.setObjectName("AddInlineButton")
-        btn_add_pub.clicked.connect(self._on_search_publisher)
+        btn_add_pub.clicked.connect(self.tray_publisher.add_item_interactive)
         input_layout_pub.addWidget(btn_add_pub)
         
         module_layout_pub.addWidget(input_row_pub)
@@ -480,23 +496,33 @@ class AlbumManagerDialog(QDialog):
             except: pass
             inp.edit.textEdited.connect(self._ungrey_text)
 
-        # Clear trays
-        self.tray_artist.set_chips([])
-        self.tray_publisher.set_chips([])
-
-        # Smart Fill
+        # T-Adapter: Create DummyAlbum for Staging so adapters have a target
+        self.current_album = self.DummyAlbum()
+        
+        # Pre-fill from initial data
         if self.initial_data.get('title'):
-            self.inp_title.setText(self.initial_data.get('title'))
+             self.current_album.title = self.initial_data.get('title')
         elif self.initial_data.get('song_display'):
-            # Fallback: Use Song Title if Album Title is missing (Common for Singles)
-            parts = self.initial_data.get('song_display').split(" - ", 1)
-            # If parts has 2 (Artist - Title), take title. Else take whole string.
-            title_part = parts[1] if len(parts) == 2 else parts[0]
-            self.inp_title.setText(title_part)
+             parts = self.initial_data.get('song_display').split(" - ", 1)
+             self.current_album.title = parts[1] if len(parts) == 2 else parts[0]
+
         if self.initial_data.get('artist'):
-            self.tray_artist.set_chips([(0, self.initial_data.get('artist'), "")])
+            self.current_album.album_artist = self.initial_data.get('artist')
+            
         if self.initial_data.get('year'):
-            self.inp_year.setText(str(self.initial_data.get('year')))
+            self.current_album.release_year = self.initial_data.get('year')
+        
+        # Set Up Adapters
+        self.tray_artist.set_context_adapter(
+            AlbumContributorAdapter(self.current_album, self.contributor_service)
+        )
+        self.tray_publisher.set_context_adapter(
+             AlbumPublisherAdapter(self.current_album, self.publisher_service)
+        )
+        
+        # Populate UI
+        self.inp_title.setText(self.current_album.title)
+        self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
             
         self.cmb_type.setCurrentText("Single")
         self.selected_pub_name = ""
@@ -562,20 +588,24 @@ class AlbumManagerDialog(QDialog):
         if not db_artist and self.initial_data.get('artist'):
             db_artist = self.initial_data.get('artist')
             
-        # Populate Tray (Fix: Pass list of tuples)
-        self.tray_artist.set_chips([(0, db_artist, "")] if db_artist else [])
-            
-        # Smart Fill Year
-        db_year = self.current_album.release_year
-        if not db_year and self.initial_data.get('year'):
-            db_year = self.initial_data.get('year')
-        self.inp_year.setText(str(db_year) if db_year else "")
-        self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
+        # T-Adapter: Connect EntityListWidgets to the current album
+        self.tray_artist.set_context_adapter(
+            AlbumContributorAdapter(self.current_album, self.contributor_service)
+        )
+        self.tray_publisher.set_context_adapter(
+            AlbumPublisherAdapter(self.current_album, self.publisher_service)
+        )
         
-        # Publisher
+        # Publisher (Old code removed, adapter handles it)
         pub_name = self.album_service.get_publisher_name(self.current_album.album_id)
-        self.selected_pub_name = pub_name or ""
-        self.tray_publisher.set_chips([(0, pub_name, "")] if pub_name else [])
+        # Ensure our object has the ID so adapter works
+        if pub_name and not getattr(self.current_album, 'publisher_id', 0):
+             # Reverse lookup if ID missing (legacy model safety)
+             p = self.publisher_service.find_by_name(pub_name)
+             if p: self.current_album.publisher_id = p.publisher_id
+        
+        # Refresh adapter again just in case we patched the ID
+        self.tray_publisher.refresh_from_adapter()
         
         # 2. Populate Context (Songs)
         self._refresh_context(album_id)
@@ -706,28 +736,28 @@ class AlbumManagerDialog(QDialog):
         self._refresh_vault(text)
         
     def _on_search_publisher(self):
-        # Modal Picker
-        from .publisher_manager_dialog import PublisherPickerDialog
-        diag = PublisherPickerDialog(self.publisher_service, parent=self)
-        if diag.exec():
+        """Use universal EntityPickerDialog for publishers."""
+        diag = EntityPickerDialog(
+            service_provider=self,
+            config=get_publisher_picker_config(),
+            parent=self
+        )
+        if diag.exec() == 1:
             pub = diag.get_selected()
             if pub:
                 self.tray_publisher.set_chips([(0, pub.publisher_name, "")])
             
-    def _on_publisher_selected(self, pub_id, pub_name):
-        # Used by deprecated sidecar, but might be called if we reused logic?
-        # Safe update
-        self.selected_pub_name = pub_name
-        self.tray_publisher.set_chips([(0, pub_name, "")])
-        # Auto-save publisher? Or wait for save button?
-        # Logic says: wait for save button for atomic commit.
+
 
             
     def _on_search_artist(self):
-        # Use injected service
-        diag = ArtistPickerDialog(self.contributor_service, parent=self)
-        if diag.exec():
-            # Support Smart Split List Return
+        """Use universal EntityPickerDialog for artists."""
+        diag = EntityPickerDialog(
+            service_provider=self,
+            config=get_artist_picker_config(),
+            parent=self
+        )
+        if diag.exec() == 1:
             result = diag.get_selected()
             new_names = []
             if isinstance(result, list):
@@ -742,68 +772,6 @@ class AlbumManagerDialog(QDialog):
                 # Set chips as tuples
                 self.tray_artist.set_chips([(0, n, "") for n in merged])
 
-    def _on_artist_chip_clicked(self, chip_id, label):
-        """Open Artist Manager for the clicked chip."""
-        # 1. Resolve Artist
-        artist = None
-        if chip_id > 0:
-            artist = self.contributor_service.get_by_id(chip_id)
-        else:
-            # Fallback: Find by exact name
-            artist = self.contributor_service.get_by_name(label)
-            
-        if not artist:
-            # Opportunity to create it properly?
-            if QMessageBox.question(self, "Artist Not Found", 
-                                  f"Artist '{label}' does not exist in the database yet.\nCreate and manage it now?") == QMessageBox.StandardButton.Yes:
-                artist, _ = self.contributor_service.get_or_create(label)
-            else:
-                return
-
-        # 2. Open Manager
-        # Note: no context song here since we are in Album Manager, not Song Editor
-        diag = ArtistDetailsDialog(artist, self.contributor_service, context_song=None, parent=self)
-        if diag.exec():
-            # Refresh Tray (Name might have changed)
-            # Since AlbumArtist is a string (legacy), we update the string.
-            # If the artist was renamed, we need to reflect that.
-            # However, the tray might have multiple names (unlikely for Album Artist but supported by tray)
-            
-            # Simple approach: If this chip was clicked, update THIS chip's label
-            # But get_names() returns all.
-            # Best is to just refresh the tray with the new name if it changed.
-            if artist.name != label:
-                current_names = self.tray_artist.get_names()
-                new_names = [artist.name if n == label else n for n in current_names]
-                self.tray_artist.set_chips([(0, n, "") for n in new_names])
-
-    def _on_publisher_chip_clicked(self, chip_id, label):
-        """Open Publisher Manager for the clicked chip."""
-        pub = None
-        if chip_id > 0:
-            pub = self.publisher_service.get_by_id(chip_id)
-        else:
-            pub = self.publisher_service.find_by_name(label)
-            
-        if not pub:
-            if QMessageBox.question(self, "Publisher Not Found",
-                                  f"Publisher '{label}' not found.\nCreate it now?") == QMessageBox.StandardButton.Yes:
-                pub, _ = self.publisher_service.get_or_create(label)
-            else:
-                return
-                
-        diag = PublisherDetailsDialog(pub, self.publisher_service, allow_remove_from_context=False, parent=self)
-        if diag.exec():
-            # Update Link if renamed
-            if pub.publisher_name != label:
-               self.tray_publisher.set_chips([(0, pub.publisher_name, "")])
-               self.selected_pub_name = pub.publisher_name
-    
-    def _remove_chip_from_tray(self, tray, name):
-        """Remove a chip by name from the given tray."""
-        current = tray.get_names()
-        new_list = [n for n in current if n != name]
-        tray.set_chips([(0, n, "") for n in new_list])
                  
     def _save_inspector(self, silent=False, close_on_success=False):
         # Gather Data
@@ -812,9 +780,8 @@ class AlbumManagerDialog(QDialog):
             QMessageBox.warning(self, "Error", "Title cannot be empty")
             return False
             
-        # Get Artist from Chip Tray (Fix: use get_names)
-        art_chips = self.tray_artist.get_names()
-        artist = art_chips[0] if art_chips else ""
+        # Get Artist from Object (Updated by Adapter)
+        artist = getattr(self.current_album, 'album_artist', "")
         
         year_str = self.inp_year.text().strip()
         
@@ -839,9 +806,13 @@ class AlbumManagerDialog(QDialog):
                 album.album_type = alb_type
                 self.album_service.update(album)
                 
-                # Get Publisher from Tray
-                pub_chips = self.tray_publisher.get_names()
-                pub_name = pub_chips[0] if pub_chips else None
+                # Get Publisher from Object
+                pid = getattr(self.current_album, 'publisher_id', 0)
+                pub_name = None
+                if pid:
+                    p = self.publisher_service.get_by_id(pid)
+                    if p: pub_name = p.publisher_name
+                
                 self.album_service.set_publisher(album.album_id, pub_name)
                 
                 self.current_album = album
@@ -997,3 +968,7 @@ class AlbumManagerDialog(QDialog):
             self.btn_view_toggle.setText("View: Edit")
             self.pane_context.hide()
             self.pane_vault.hide()
+
+    def get_selected(self):
+        """Adapter method for EntityClickRouter compatibility."""
+        return self._gather_selection()

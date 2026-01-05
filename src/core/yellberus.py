@@ -412,7 +412,7 @@ FIELDS: List[FieldDef] = [
     ),
     FieldDef(
         name='is_active',
-        ui_header='Active',
+        ui_header='TOGGLE LIVE',
         db_column='MS.IsActive',
         field_type=FieldType.BOOLEAN,
         filterable=True,

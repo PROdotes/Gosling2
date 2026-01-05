@@ -12,16 +12,22 @@
             "color": "#32A8FF",
             "description": "Emotional mood or atmosphere"
         },
+        "Instrument": {
+            "id3_frame": null,
+            "icon": "🎸",
+            "color": "#AFB42B",
+            "description": "Featured musical instruments"
+        },
         "Status": {
             "id3_frame": null,
-            "icon": "📋",
-            "color": "#888888",
+            "icon": "🏁",
+            "color": "#9E9E9E",
             "description": "Internal workflow status",
             "internal_only": true
         },
         "Custom": {
             "id3_frame": null,
-            "icon": "🏷️",
+            "icon": "📌",
             "color": "#888888",
             "description": "User-defined tags",
             "default": true

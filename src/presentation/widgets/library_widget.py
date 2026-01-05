@@ -1499,11 +1499,7 @@ class LibraryWidget(QWidget):
         
         dlg = UniversalImportDialog(start_dir=last_dir, parent=self)
         if dlg.exec():
-            # Get selected paths from the selection model via a helper or signal
-            # Actually, I'll just reach into the tree in the dialog logic or 
-            # have the dialog emit a signal. For simplicity here, let's use the result.
-            indexes = dlg.tree.selectionModel().selectedRows()
-            paths = [dlg.model.filePath(idx) for idx in indexes]
+            paths = dlg.get_selected()
             
             if paths:
                 # Save the first dir as last_dir
@@ -1699,6 +1695,14 @@ class LibraryWidget(QWidget):
                     convert_action.setToolTip("Conversion disabled in settings.")
                 
                 menu.addAction(convert_action)
+        
+        # 2c. Audit History (T-82)
+        if len(indexes) == 1:
+            menu.addSeparator()
+            audit_action = QAction("Show Audit History", self)
+            audit_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogInfoView))
+            audit_action.triggered.connect(self._show_selected_audit_history)
+            menu.addAction(audit_action)
         
         menu.addSeparator()
         
@@ -2373,6 +2377,36 @@ class LibraryWidget(QWidget):
             import traceback
             traceback.print_exc()
             QMessageBox.warning(self, "Metadata Error", f"Could not read metadata for {file_name}:\n{e}")
+
+    def _show_selected_audit_history(self):
+        """Open Audit History dialog for the selected song."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if len(indexes) != 1: return
+        
+        idx = indexes[0]
+        source_idx = self.proxy_model.mapToSource(idx)
+        id_col = self.field_indices.get('file_id', -1)
+        item = self.library_model.item(source_idx.row(), id_col)
+        if not item: return
+        
+        raw_val = item.data(Qt.ItemDataRole.UserRole)
+        # Safe extraction
+        try:
+            source_id = int(float(raw_val)) if raw_val is not None else 0
+        except:
+            source_id = 0
+            
+        if source_id > 0:
+            from ..dialogs.audit_history_dialog import AuditHistoryDialog
+            from ...business.services.audit_service import AuditService
+            
+            # Use same DB path as library
+            service = AuditService() 
+            # Resolver: Map IDs to Names for display
+            resolver = self.library_service.get_human_name
+            
+            dlg = AuditHistoryDialog(service, resolver=resolver, parent=self, initial_query=str(source_id))
+            dlg.exec()
 
     def _handle_metadata_import(self, song):
         """Update repository with values from file (Import to DB)"""

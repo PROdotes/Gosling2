@@ -123,7 +123,7 @@ ENTITY_REGISTRY: dict[EntityType, EntityConfig] = {
     ),
     
     EntityType.ALIAS: EntityConfig(
-        editor_dialog="artist_manager_dialog.ArtistCreatorDialog",  # Simple rename dialog
+        editor_dialog="artist_manager_dialog.ArtistDetailsDialog",  # Go to identity
         picker_dialog="artist_manager_dialog.ArtistPickerDialog",
         service_attr="contributor_service",
         icon_fn=lambda e: "📝",

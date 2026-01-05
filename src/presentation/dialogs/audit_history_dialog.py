@@ -141,10 +141,11 @@ class AuditTableModel(QAbstractTableModel):
 
 class AuditHistoryDialog(QDialog):
     
-    def __init__(self, audit_service: AuditService, resolver=None, parent=None):
+    def __init__(self, audit_service: AuditService, resolver=None, parent=None, initial_query=""):
         super().__init__(parent)
         self.audit_service = audit_service
         self.resolver = resolver
+        self._initial_query = initial_query
         self.setWindowTitle("Data Flight Recorder")
         self.resize(1000, 600)
         self.setObjectName("AuditHistoryDialog")
@@ -181,6 +182,8 @@ class AuditHistoryDialog(QDialog):
         
         self.txt_search = GlowLineEdit()
         self.txt_search.setPlaceholderText("Filter by Record ID, Field Name, or Value...")
+        if self._initial_query:
+            self.txt_search.setText(self._initial_query)
         self.txt_search.textChanged.connect(self._on_filter_changed)
         f_layout.addWidget(self.txt_search)
         
@@ -231,7 +234,7 @@ class AuditHistoryDialog(QDialog):
         try:
             raw_data = self.audit_service.get_unified_history(limit=HISTORY_LIMIT)
             self._full_data = raw_data
-            self._apply_filter()
+            self._apply_filter(self.txt_search.text())
             self.lbl_status.setText(f"Showing last {len(raw_data)} events (Changes & Actions).")
         except Exception as e:
             logger.error(f"Audit load error: {e}")
@@ -248,28 +251,9 @@ class AuditHistoryDialog(QDialog):
             
         filtered = []
         for row in self._full_data:
-            # Hydrate a temporary corpus with resolved names for better searchability
-            res_id = self.resolver(row.get('TableName'), row.get('RecordID')) if self.resolver else ""
-            
-            # Simple value resolution for corpus
-            val_names = []
-            field = row.get('FieldName')
-            if self.resolver and field and field.endswith('ID'):
-                for v in [row.get('OldValue'), row.get('NewValue')]:
-                    if v:
-                        try:
-                            # Guess target table from common patterns
-                            target = None
-                            if field == "ContributorID": target = "Contributors"
-                            elif field == "AlbumID": target = "Albums"
-                            elif field == "SourceID": target = "Songs"
-                            elif field == "PublisherID": target = "Publishers"
-                            if target:
-                                name = self.resolver(target, int(v))
-                                if name: val_names.append(name)
-                        except: pass
-
-            search_corpus = f"{row.get('TableName')} {row.get('FieldName')} {row.get('RecordID')} {res_id} {' '.join(val_names)} {row.get('OldValue')} {row.get('NewValue')} {row.get('EntryType')}".lower()
+            # SEARCH VALUES: Raw ID and Raw string values only (FASTER)
+            # We don't resolve human names here because it hits the DB in a loop (slowness)
+            search_corpus = f"{row.get('TableName')} {row.get('FieldName')} {row.get('RecordID')} {row.get('OldValue')} {row.get('NewValue')} {row.get('EntryType')}".lower()
             
             if query in search_corpus:
                 filtered.append(row)

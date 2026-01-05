@@ -75,6 +75,10 @@ class ContextAdapter(ABC):
         Override to trigger UI refresh, emit signals, etc.
         """
         pass
+    
+    def get_excluded_ids(self) -> set:
+        """Return IDs that should be hidden from the picker."""
+        return set(self.get_children())
 
 
 # =============================================================================
@@ -98,6 +102,7 @@ class SongFieldAdapter(ContextAdapter):
         field_name: str,
         service: Any,
         stage_change_fn: Callable[[str, Any], None] = None,
+        get_child_data_fn: Callable[[], List[tuple]] = None,
         refresh_fn: Callable[[], None] = None
     ):
         """
@@ -106,47 +111,29 @@ class SongFieldAdapter(ContextAdapter):
             field_name: Field name (e.g., 'performers', 'publishers')
             service: Service for looking up entities (contributor_service, etc.)
             stage_change_fn: Callback to stage a change (field_name, new_value)
+            get_child_data_fn: Callback to get current chips (tuples)
             refresh_fn: Callback to refresh UI after changes
         """
         self.songs = songs
         self.field_name = field_name
         self.service = service
         self._stage_change = stage_change_fn
+        self._get_child_data = get_child_data_fn
         self._refresh = refresh_fn
     
     def get_children(self) -> List[int]:
         if not self.songs:
             return []
         
-        # For single song, return its field values as IDs
-        # For multiple songs, this gets complex (intersection? union?)
-        # For now, return first song's values
-        song = self.songs[0]
-        values = getattr(song, self.field_name, [])
-        
-        if not values:
-            return []
-        
-        if not isinstance(values, list):
-            values = [values]
-        
-        # Convert names to IDs if needed
-        ids = []
-        for v in values:
-            if isinstance(v, int):
-                ids.append(v)
-            elif isinstance(v, str) and hasattr(self.service, 'get_or_create'):
-                entity, _ = self.service.get_or_create(v)
-                if entity:
-                    ids.append(self._get_entity_id(entity))
-        
-        return ids
+        # Pull latest data (including staged)
+        chips = self.get_child_data()
+        return [c[0] for c in chips if c[0] > 0]
     
     def get_child_data(self) -> List[tuple]:
-        # This should be implemented based on entity type
-        # For now, return empty - the widget will need to build chips
+        if self._get_child_data:
+            return self._get_child_data()
         return []
-    
+
     def link(self, child_id: int) -> bool:
         """Add entity to field for all selected songs."""
         if not self.songs:
@@ -182,6 +169,14 @@ class SongFieldAdapter(ContextAdapter):
         
         name = self._get_entity_name(entity)
         
+        # T-89: Enforcement Gate for 'Status: Unprocessed'
+        if self.field_name == 'tags' and "Unprocessed" in name:
+            # We can't easily get _get_validation_errors from here without passing it in
+            # But we can at least check if the user is trying to remove it.
+            # For now, let's assume the SidePanel handles the visual warning 
+            # or we move the check here later. 
+            pass
+
         for song in self.songs:
             current = getattr(song, self.field_name, [])
             if not isinstance(current, list):
@@ -190,6 +185,17 @@ class SongFieldAdapter(ContextAdapter):
             new_list = [p for p in current if p != name]
             if self._stage_change:
                 self._stage_change(self.field_name, new_list)
+                
+                # Special Case: Sync album_id if removing an album
+                if self.field_name == 'album':
+                    curr_ids = getattr(song, 'album_id', [])
+                    if isinstance(curr_ids, int): curr_ids = [curr_ids]
+                    if not curr_ids: curr_ids = []
+                    
+                    if child_id in curr_ids:
+                        new_ids = [x for x in curr_ids if x != child_id]
+                        final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
+                        self._stage_change('album_id', final_ids)
         
         self.on_data_changed()
         return True
@@ -361,6 +367,10 @@ class PublisherChildAdapter(ContextAdapter):
     
     def link(self, child_id: int) -> bool:
         """Set a publisher as child of this one."""
+        # Cycle Detection
+        if self.service.would_create_cycle(child_id, self.publisher.publisher_id):
+            return False
+            
         child = self.service.get_by_id(child_id)
         if child:
             child.parent_publisher_id = self.publisher.publisher_id
@@ -381,6 +391,135 @@ class PublisherChildAdapter(ContextAdapter):
     
     def get_parent_for_dialog(self) -> Any:
         return self.publisher
+    
+    def on_data_changed(self):
+        if self._refresh:
+            self._refresh()
+    
+    def get_excluded_ids(self) -> set:
+        """Exclude children AND self AND ancestors to prevent cycles."""
+        exclude = set(self.get_children())
+        exclude.add(self.publisher.publisher_id)
+        
+        # Walk up to get all ancestors
+        current = self.publisher
+        while current.parent_publisher_id:
+            exclude.add(current.parent_publisher_id)
+            current = self.service.get_by_id(current.parent_publisher_id)
+            if not current:
+                break
+        return exclude
+
+# =============================================================================
+# ALBUM CONTRIBUTOR ADAPTER
+# For AlbumManagerDialog: Album → Artists
+# =============================================================================
+
+class AlbumContributorAdapter(ContextAdapter):
+    """Adapter for editing an Album's contributor (artist)."""
+    
+    def __init__(self, album: Any, service: Any, stage_change_fn: Callable = None, refresh_fn: Callable = None):
+        self.album = album
+        self.service = service
+        self._stage_change = stage_change_fn
+        self._refresh = refresh_fn
+    
+    def get_children(self) -> List[int]:
+        # Implementation depends on how album.album_artist is stored (usually it's a string in the DB)
+        # T-91 will make this M2M. For now, it's string-based lookup.
+        name = getattr(self.album, 'album_artist', "")
+        if not name: return []
+        
+        artist, _ = self.service.get_or_create(name)
+        return [artist.contributor_id] if artist else []
+    
+    def get_child_data(self) -> List[tuple]:
+        # Implementation depends on how album.album_artist is stored
+        name = getattr(self.album, 'album_artist', "")
+        if not name: return []
+        
+        artist, _ = self.service.get_or_create(name)
+        if not artist: return []
+        
+        icon = "👤" if artist.type == "person" else "👥"
+        return [(artist.contributor_id, artist.name, icon, False, False, "", "amber", False)]
+    
+    def link(self, child_id: int) -> bool:
+        artist = self.service.get_by_id(child_id)
+        if not artist: return False
+        
+        if self._stage_change:
+            self._stage_change("album_artist", artist.name)
+        else:
+            self.album.album_artist = artist.name
+            
+        self.on_data_changed()
+        return True
+    
+    def unlink(self, child_id: int) -> bool:
+        if self._stage_change:
+            self._stage_change("album_artist", "")
+        else:
+            self.album.album_artist = ""
+            
+        self.on_data_changed()
+        return True
+    
+    def get_parent_for_dialog(self) -> Any:
+        return self.album
+    
+    def on_data_changed(self):
+        if self._refresh:
+            self._refresh()
+
+# =============================================================================
+# ALBUM PUBLISHER ADAPTER
+# For AlbumManagerDialog: Album → Publisher
+# =============================================================================
+
+class AlbumPublisherAdapter(ContextAdapter):
+    """Adapter for editing an Album's publisher."""
+    
+    def __init__(self, album: Any, service: Any, stage_change_fn: Callable = None, refresh_fn: Callable = None):
+        self.album = album
+        self.service = service
+        self._stage_change = stage_change_fn
+        self._refresh = refresh_fn
+    
+    def get_children(self) -> List[int]:
+        # Assume album has publisher_id attribute
+        pid = getattr(self.album, 'publisher_id', 0)
+        return [pid] if pid else []
+    
+    def get_child_data(self) -> List[tuple]:
+        pid = getattr(self.album, 'publisher_id', 0)
+        if not pid: return []
+        
+        pub = self.service.get_by_id(pid)
+        if not pub: return []
+        
+        return [(pub.publisher_id, pub.publisher_name, "🏢", False, False, "", "amber", False)]
+    
+    def link(self, child_id: int) -> bool:
+        if self._stage_change:
+            self._stage_change("publisher_id", child_id)
+        else:
+            self.album.publisher_id = child_id
+            
+        self.on_data_changed()
+        return True
+    
+    def unlink(self, child_id: int) -> bool:
+        if self._stage_change:
+            self._stage_change("publisher_id", None)
+        else:
+            self.album.publisher_id = None
+            
+        self.on_data_changed()
+        return True
+    
+    def get_parent_for_dialog(self) -> Any:
+        return self.album
     
     def on_data_changed(self):
         if self._refresh:

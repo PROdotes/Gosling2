@@ -3,14 +3,19 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
     QScrollArea, QFrame, QSizePolicy, QMessageBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QFont
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl
+from PyQt6.QtGui import QFont, QDesktopServices
 from ...core import yellberus
 from ...core.registries.id3_registry import ID3Registry
-from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED
-from ..widgets.chip_tray_widget import ChipTrayWidget
+from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED, GlowToggle
+from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
+from ...core.entity_registry import EntityType
+from ...core.entity_click_router import ClickResult, ClickAction
+from ...core.context_adapters import SongFieldAdapter
 from ..dialogs.tag_picker_dialog import TagPickerDialog
-from ..dialogs.artist_manager_dialog import ArtistPickerWidget, ArtistCreatorDialog
+from ..dialogs.entity_picker_dialog import EntityPickerDialog
+from ...core.picker_config import get_tag_picker_config, get_artist_picker_config
+from ..dialogs.artist_manager_dialog import ArtistPickerWidget
 import copy
 import os
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
@@ -402,32 +407,13 @@ class SidePanelWidget(QFrame):
                         self._field_widgets[field.name] = widget
 
 
-                        if is_mult:
-                            # Add Button
-                            btn_add = GlowButton("")
-                            btn_add.setObjectName("AddInlineButton")
-                            self._configure_micro_button(btn_add)
-                            btn_add.setToolTip(f"Add new {field.ui_header}")
-                            btn_add.clicked.connect(lambda f=field: self._on_add_field_value(f))
-                            v_col.addWidget(btn_add, 0, Qt.AlignmentFlag.AlignRight)
-
-
                         input_row = QWidget()
                         input_layout = QHBoxLayout(input_row)
                         input_layout.setContentsMargins(0, 0, 0, 0)
                         input_layout.setSpacing(4)
                         input_layout.addWidget(widget, 1)
 
-                        # Add external + button if it's a chip tray
-                        if isinstance(widget, ChipTrayWidget):
-                            widget.is_add_visible = False 
-                            widget.btn_add.hide()
-                            btn_add_ext = GlowButton("")
-                            btn_add_ext.setObjectName("AddInlineButton")
-                            self._configure_micro_button(btn_add_ext)
-                            # Size handled by QSS
-                            btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
-                            input_layout.addWidget(btn_add_ext)
+                        # External + button removed in favor of EntityListWidget's internal tray button
                         
                         v_col.addWidget(input_row)
                         
@@ -462,61 +448,61 @@ class SidePanelWidget(QFrame):
                 # NEW: All fields get the same 'Unit Stack' chassis
                 field_module = QWidget()
                 field_module.setObjectName("FieldModuleCompact" if compact else "FieldModule")
-                module_layout = QVBoxLayout(field_module) # Back to Vertical for responsiveness
+                module_layout = QVBoxLayout(field_module)
                 module_layout.setContentsMargins(0, 0, 0, 0)
-                module_layout.setSpacing(0) # SLAMMED TIGHT
+                module_layout.setSpacing(0)
 
-                # Header Row (Label + Search Icon)
-                header_row = QWidget()
-                header_layout = QHBoxLayout(header_row)
-                header_layout.setContentsMargins(0, 0, 0, 0)
-                header_layout.setSpacing(4)
-
-                if field.ui_search:
-                    btn_search = GlowButton("")
-                    btn_search.setObjectName("SearchInlineButton")
-                    btn_search.setObjectName("SearchInlineButton")
-                    self._configure_micro_button(btn_search)
-                    # Left Click: Instant Search
-                    btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
-                    # Right Click: Provider Menu
-                    btn_search.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-                    btn_search.customContextMenuRequested.connect(lambda pos, f=field, b=btn_search: self._show_search_menu_internal(b.mapToGlobal(pos), f))
-                    header_layout.addWidget(btn_search)
-
-                label = QLabel(field.ui_header)
-                label.setObjectName("FieldLabelCompact" if compact else "FieldLabel")
-                header_layout.addWidget(label, 1) # Expanding to handle long names
-                
-                module_layout.addWidget(header_row)
-                
-                # Determine Current Effective Value
+                # Determine Type
                 effective_val, is_multiple = self._calculate_bulk_value(field)
-                
-                # Input Row (Input + Add Button)
+                is_bool = (field.strategy and field.strategy.upper() == "BOOLEAN") or \
+                          (field.field_type == yellberus.FieldType.BOOLEAN)
+
+                # Input Row (Input + optional label for bools)
                 input_row = QWidget()
                 input_row.setObjectName("FieldRow")
                 input_layout = QHBoxLayout(input_row)
                 input_layout.setContentsMargins(0, 0, 0, 0)
                 input_layout.setSpacing(6)
-                
-                # Edit Widget (The actual field)
+
+                # 1. Header Row (Only for non-booleans)
+                label = QLabel(field.ui_header)
+                label.setObjectName("FieldLabelCompact" if compact else "FieldLabel")
+
+                if not is_bool:
+                    header_row = QWidget()
+                    header_layout = QHBoxLayout(header_row)
+                    header_layout.setContentsMargins(0, 0, 0, 0)
+                    header_layout.setSpacing(4)
+
+                    if field.ui_search:
+                         btn_search = GlowButton("")
+                         btn_search.setObjectName("SearchInlineButton")
+                         self._configure_micro_button(btn_search)
+                         btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                         header_layout.addWidget(btn_search)
+
+                    header_layout.addWidget(label, 1)
+                    module_layout.addWidget(header_row)
+                else:
+                    # Boolean layout: [Label] [Toggle] [Stretch]
+                    # We keep the label inside the input row for a consolidated hardware look
+                    label.setFixedWidth(80) # Force alignment for the label
+                    input_layout.addWidget(label, 0)
+                    input_layout.addSpacing(12)
+
+                # 2. Edit Widget
                 edit_widget = self._create_field_widget(field, effective_val, is_multiple)
                 self._field_widgets[field.name] = edit_widget
-                input_layout.addWidget(edit_widget, 1) # Expanding
                 
-                # Add Button (Only for multi-value trays)
-                if isinstance(edit_widget, ChipTrayWidget):
-                    edit_widget.is_add_visible = False
-                    edit_widget.btn_add.hide()
-                    btn_add_ext = GlowButton("")
-                    btn_add_ext.setObjectName("AddInlineButton")
-                    # Size handled by QSS
-                    btn_add_ext.clicked.connect(lambda f=field.name, b=btn_add_ext: self._on_add_button_clicked(f, origin=b))
-                    input_layout.addWidget(btn_add_ext)
+                if is_bool:
+                    input_layout.addWidget(edit_widget, 0)
+                    input_layout.addStretch(1)
+                else:
+                    input_layout.addWidget(edit_widget, 1)
 
                 module_layout.addWidget(input_row)
                 self.field_layout.addWidget(field_module)
+                continue
                 # Spacing handled via CSS margin-bottom
 
         add_group(identity_struct, "Identity", show_line=False)
@@ -565,8 +551,8 @@ class SidePanelWidget(QFrame):
             widget.blockSignals(True)
             try:
                 # Update widget based on type
-                if isinstance(widget, QCheckBox):
-                    if is_multiple:
+                if isinstance(widget, (QCheckBox, GlowToggle)):
+                    if is_multiple and isinstance(widget, QCheckBox):
                         widget.setCheckState(Qt.CheckState.PartiallyChecked)
                     else:
                         val_bool = str(effective_val).lower() in ("true", "1", "yes") if isinstance(effective_val, str) else bool(effective_val)
@@ -580,112 +566,10 @@ class SidePanelWidget(QFrame):
                         display_text = str(effective_val) if (effective_val and str(effective_val).strip()) else "(No Album)"
                         widget.setText(display_text)
 
-                elif isinstance(widget, ChipTrayWidget):
-                    if is_multiple and field_name != 'tags': # Tags handles its own mixed state
-                        # Show the Mixed selection chip
-                        widget.set_chips([(-1, f"{len(self.current_songs)} Mixed", "🔀", True, False, "", "gray")])
-                    else:
-                        # Convert to identities for the Chip Tray
-                        chips = []
-                        delimiters = r',|;| & '
-                        if field_name == 'composers':
-                            delimiters += r'|/'
-                            
-                        if field_name == 'tags':
-                            # effective_val for 'tags' already has some chip data
-                            # but we need to ensure the 7-tuple format for consistency if needed
-                            # actually _calculate_bulk_value already returns 4-tuples, let's enhance it.
-                            chips = effective_val
-                            widget.setObjectName("TagsTray")
-                        else:
-                            raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
-                            names = []
-                            for rn in raw_names:
-                                if isinstance(rn, str) and field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
-                                    import re
-                                    split_parts = re.split(delimiters, rn)
-                                    names.extend([p.strip() for p in split_parts if p.strip()])
-                                else:
-                                    names.append(rn)
-
-                            chips = []
-                            for i, n in enumerate(names):
-                                # Convert to 8-tuple format
-                                # (id, name, icon, is_ghost, is_inherited, tooltip, zone, is_primary)
-                                # NOTE: is_primary star only shown for Genre (first item)
-                                if field_name == 'publisher':
-                                    # Lookup Publisher ID via Service
-                                    pub, created = self.publisher_service.get_or_create(str(n))
-                                    pid = pub.publisher_id if pub else 0
-                                    
-                                    # Ghost Chips Logic (T-63)
-                                    # Check if this publisher is inherited from the Primary Album
-                                    is_inherited = False
-                                    if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
-                                        alb_id = self.current_songs[0].album_id
-                                        # Handle Multi-Album: Link against Primary (First) Album Only
-                                        if isinstance(alb_id, list):
-                                            alb_id = alb_id[0] if alb_id else None
-                                        
-                                        if alb_id:
-                                            # Use AlbumService for publisher lookup
-                                            alb_pub = self.album_service.get_publisher(alb_id)
-                                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
-                                            is_inherited = True
-                                    
-                                    if pub:
-                                        display_name = pub.publisher_name
-                                        if pub.parent_publisher_id:
-                                            parent = self.publisher_service.get_by_id(pub.parent_publisher_id)
-                                            if parent:
-                                                display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
-                                        
-                                        if is_inherited:
-                                            # Use new is_inherited parameter with link icon
-                                            raw_alb_name = self.current_songs[0].album
-                                            alb_name = "Album"
-                                            if isinstance(raw_alb_name, list):
-                                                 alb_name = raw_alb_name[0] if raw_alb_name else "Album"
-                                            else:
-                                                 alb_name = raw_alb_name or "Album"
-                                                 
-                                            chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
-                                        else:
-                                            chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))  # Local/Editable
-                                elif field_name == 'album':
-                                    aid = 0
-                                    is_p = (i == 0)
-                                    label = str(n)
-                                    
-                                    # Smart Lookup via Releases (Accuracy)
-                                    src = self.current_songs[0]
-                                    if hasattr(src, 'releases'):
-                                        for r in src.releases:
-                                            # Relaxed matching (titles might vary slightly?) No, should be exact.
-                                            if r['title'] == label:
-                                                aid = r['album_id']
-                                                # Trust list order for primary status (live editing), not stale DB flag
-                                                # is_p = r.get('is_primary', False) 
-                                                break
-                                    
-                                    if not aid:
-                                    # Fallback Search via Service
-                                        results = self.album_service.search(label)
-                                        aid = results[0].album_id if results else 0
-                                    
-                                    # Visual Primary Indicator
-                                    if len(names) > 1 and is_p:
-                                        label = f"★ {label}"
-                                        
-                                    chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
-                                else:
-                                    # Standard Contributor (Artist) via Service
-                                    artist, created = self.contributor_service.get_or_create(str(n))
-                                    icon = "👤" if artist.type == "person" else "👥"
-                                    # Fix: Display the specific credit text (str(n)) instead of canonical artist.name
-                                    # This preserves aliases like "Sonja Burić" instead of forcing "Trixy"
-                                    chips.append((artist.contributor_id, str(n), icon, False, False, "", field_def.zone or "amber", False))
-                        widget.set_chips(chips)
+                elif isinstance(widget, EntityListWidget):
+                    if widget.context_adapter and isinstance(widget.context_adapter, SongFieldAdapter):
+                        widget.context_adapter.songs = self.current_songs
+                    widget.refresh_from_adapter()
 
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
                     if is_multiple:
@@ -732,6 +616,9 @@ class SidePanelWidget(QFrame):
         # T-89: Status Tags are locked and informational.
         # Clicking them shows a Metadata Audit instead of Rename.
         if category == "Status":
+            if not self.current_songs:
+                return ClickResult(ClickAction.CANCELLED, entity_id)
+            
             errors = self._get_validation_errors()
             from PyQt6.QtWidgets import QMessageBox
             
@@ -752,13 +639,15 @@ class SidePanelWidget(QFrame):
                 
                 if reply == QMessageBox.StandardButton.Yes:
                     # Remove 'Unprocessed' status tag via Service
-                    self.tag_service.remove_tag_from_source(self.current_songs[0].source_id, tag_id)
+                    self.tag_service.remove_tag_from_source(self.current_songs[0].source_id, entity_id)
                     
                     # Refresh UI
                     self.filter_refresh_requested.emit()
                     self._refresh_field_values()
                     
-                return
+                    return ClickResult(ClickAction.DATA_CHANGED, entity_id)
+                else:
+                    return ClickResult(ClickAction.CANCELLED, entity_id)
 
             else:
                 lines.append("❌ The following requirements are missing or invalid:")
@@ -813,7 +702,7 @@ class SidePanelWidget(QFrame):
                     msg += f"\n\n⚠️ Note: This item appears in 'Incomplete' because the Library sees these fields as missing:\n[{db_reasons}]\n\n(Save changes to fix this sync issue)"
             
             QMessageBox.information(self, f"Metadata Audit: {actual_name}", msg)
-            return
+            return ClickResult(ClickAction.CANCELLED, entity_id)
         
         # If we have an entity ID (best case)
         if entity_id and entity_id > 0:
@@ -825,97 +714,80 @@ class SidePanelWidget(QFrame):
         if not tag:
             return
 
-        diag = TagPickerDialog(
-            tag_service=self.tag_service,
-            target_tag=tag,
+        diag = EntityPickerDialog(
+            service_provider=self,
+            config=get_tag_picker_config(),
+            target_entity=tag,
             parent=self
         )
         res = diag.exec()
         if res == 1:
-            # Check if user selected the explicit "Rename" action
-            if diag.is_rename_requested():
-                rename_info = diag.get_rename_info()
-                new_name = rename_info[0]
-                new_category = rename_info[1]
-            elif diag.get_selected():
-                # User selected an existing tag (switch to it)
-                selected_tag = diag.get_selected()
-                new_name = selected_tag.tag_name
-                new_category = selected_tag.category
-            else:
-                # Fallback to text box content
-                new_name = diag.get_new_name()
-                new_category = diag.get_target_category()
-            ok = True
-        elif res == 2:
-            # REMOVE REQUEST (Contextual Unlink)
-            # Standardize category to field name (e.g., 'Genre' -> 'genre')
-            cat_lower = tag.category.lower()
+            selected_tag = diag.get_selected()
             
-            # Remove from all selected songs
-            for song in self.current_songs:
-                self._handle_chip_removal(song, cat_lower, tag.tag_name)
-            
-            self._refresh_field_values()
-            return
-        else:
-            new_name = None
-            new_category = None
-            ok = False
-        
-        # Check if Name OR Category changed
-        has_change = False
-        if ok and new_name:
-            new_name = new_name.strip()
-            if new_name:
-                new_name = new_name[0].upper() + new_name[1:] # Sentence Case
-                
-            if new_name != tag.tag_name: has_change = True
-            if new_category != tag.category: has_change = True
-            
-        if has_change:
-            # Check for conflict in TARGET category via Service
-            conflict = self.tag_service.find_by_name(new_name, new_category)
-            if conflict and conflict.tag_id != tag.tag_id:
-                # Count affected songs for user-friendly message
-                affected_count = self.tag_service.count_sources_for_tag(tag.tag_id)
-                conflict_count = self.tag_service.count_sources_for_tag(conflict.tag_id)
-                
-                # Reuse the standard collision resolver
-                from ..dialogs.artist_manager_dialog import IdentityCollisionDialog
-                resolver = IdentityCollisionDialog(
-                    target_name=f"{new_name} ({new_category})",
-                    song_count=affected_count,
-                    has_context_song=True,
-                    parent=self
-                )
-                res = resolver.exec()
-                
-                if res == 0:  # Cancel
-                    return
-                
-                if res == 3:  # Switch Just This Song (local tag swap)
-                    for song in self.current_songs:
-                        # Remove old tag, add new tag via Service
-                        self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
-                        self.tag_service.add_tag_to_source(song.source_id, conflict.tag_id)
-                    self._refresh_field_values()
-                    self.filter_refresh_requested.emit()
-                    return
-                
-                if res == 1:  # Replace Everywhere (global merge) via Service
-                    if self.tag_service.merge_tags(tag.tag_id, conflict.tag_id):
-                        self._refresh_field_values()
-                        self.filter_refresh_requested.emit()
-                return
-
-            # No Conflict - Perform Rename / Move via Service
-            tag.tag_name = new_name
-            tag.category = new_category
-            if self.tag_service.update(tag):
-                # Refresh everything
+            # --- 🛑 CASE 1: Silent Selection Swap ---
+            if selected_tag and selected_tag.tag_id != tag.tag_id:
+                for song in self.current_songs:
+                    self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
+                    self.tag_service.add_tag_to_source(song.source_id, selected_tag.tag_id)
                 self._refresh_field_values()
                 self.filter_refresh_requested.emit()
+                return ClickResult(ClickAction.DATA_CHANGED, selected_tag.tag_id)
+
+            # --- CASE 2: Global Rename / Merge ---
+            if diag.is_rename_requested():
+                new_name, new_category = diag.get_rename_info()
+                new_name = new_name.strip()
+                
+                conflict = self.tag_service.find_by_name(new_name, new_category)
+                if conflict and conflict.tag_id != tag.tag_id:
+                    affected_count = self.tag_service.count_sources_for_tag(tag.tag_id)
+                    
+                    from ..dialogs.artist_manager_dialog import IdentityCollisionDialog
+                    if affected_count > 1:
+                        desc = f"'{new_name}' already exists in {new_category}.\nWould you like to move these {len(self.current_songs)} items, or combine all {affected_count} occurrences in your library?"
+                    else:
+                        desc = f"'{new_name}' already exists in {new_category}.\nWould you like to switch to the existing tag?"
+
+                    resolver = IdentityCollisionDialog(
+                        target_name=f"{new_name}",
+                        song_count=affected_count,
+                        has_context_song=True,
+                        title="Tag Exists",
+                        header="TAG CONFLICT",
+                        primary_label="USE EXISTING TAG" if len(self.current_songs) == 1 else "APPLY TO SELECTION",
+                        secondary_label="MERGE GLOBALLY" if affected_count > 1 else None,
+                        description=desc,
+                        parent=self
+                    )
+                    res_conflict = resolver.exec()
+                    
+                    if res_conflict == 3:  # Local Swap
+                        for song in self.current_songs:
+                            self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
+                            self.tag_service.add_tag_to_source(song.source_id, conflict.tag_id)
+                    elif res_conflict == 1:  # Global Merge
+                        self.tag_service.merge_tags(tag.tag_id, conflict.tag_id)
+                    else:
+                        return True
+                    
+                    self._refresh_field_values()
+                    self.filter_refresh_requested.emit()
+                    return ClickResult(ClickAction.DATA_CHANGED, conflict.tag_id)
+
+                # NO CONFLICT: Safe Global Rename
+                tag.tag_name = new_name
+                tag.category = new_category
+                if self.tag_service.update(tag):
+                    self._refresh_field_values()
+                    self.filter_refresh_requested.emit()
+                    return ClickResult(ClickAction.UPDATED, tag.tag_id)
+            return ClickResult(ClickAction.CANCELLED, tag.tag_id)
+
+        elif res == 2:
+            # REMOVE REQUEST (Contextual Unlink)
+            return ClickResult(ClickAction.REMOVED, tag.tag_id)
+        
+        return ClickResult(ClickAction.CANCELLED, entity_id)
 
     def _handle_publisher_click(self, entity_id, name):
         if not self.publisher_service: return
@@ -1106,26 +978,32 @@ class SidePanelWidget(QFrame):
         self._refresh_field_values()
 
     def _on_add_button_clicked(self, field_name, origin=None):
-        """T-70: Generic 'Add' button handler with Dropdown support."""
-        if field_name == 'publisher':
-            from ..dialogs.publisher_manager_dialog import PublisherPickerDialog
-            diag = PublisherPickerDialog(self.publisher_service, parent=self)
-            if diag.exec():
-                selected = diag.get_selected()
-                if selected:
-                    self._add_name_to_selection(field_name, selected.publisher_name)
-        elif field_name == 'album':
+        """Generic 'Add' button handler."""
+        
+        # Legacy / Special Handling (e.g. Album Manager direct invocation)
+        # MUST come before delegation because Album field IS an EntityListWidget 
+        # but the generic picker doesn't support AlbumManagerDialog's complexity yet.
+        if field_name == 'album':
             # Clean Slate for Add, Merge logic handled in callback
             self._open_album_manager(clean_slate=True, mode='add')
+            return
+
+        # T-Refactor: Delegate to EntityListWidget if applicable
+        if field_name in self._field_widgets:
+             widget = self._field_widgets[field_name]
+             if isinstance(widget, EntityListWidget):
+                 widget.add_item_interactive()
+                 return
         elif field_name == 'tags':
-            # Unified tag picker - use TagRepository for all categories
-            from ..dialogs.tag_picker_dialog import TagPickerDialog
-            # Use first category from registry as default
-            cats = ID3Registry.get_all_category_names()
-            # Find the category mapped to TCON (Genre) for a sensible default
-            default_cat = next((c for c in cats if ID3Registry.get_id3_frame(c) == 'TCON'), cats[0] if cats else 'Genre')
-            diag = TagPickerDialog(self.tag_service, default_category=default_cat, parent=self)
-            if diag.exec():
+            # Unified tag picker - use universal EntityPickerDialog
+            from ..dialogs.entity_picker_dialog import EntityPickerDialog
+            from src.core.picker_config import get_tag_picker_config
+            diag = EntityPickerDialog(
+                service_provider=self,
+                config=get_tag_picker_config(),
+                parent=self
+            )
+            if diag.exec() == 1:
                 selected = diag.get_selected()
                 if selected:
                     # Add tag to all selected songs via TagService
@@ -1134,19 +1012,40 @@ class SidePanelWidget(QFrame):
                     # Refresh to show new tag
                     self._refresh_field_values()
                     self.filter_refresh_requested.emit()
+        elif field_name == 'publisher':
+            # Publisher picker - use universal EntityPickerDialog
+            from ..dialogs.entity_picker_dialog import EntityPickerDialog
+            from src.core.picker_config import get_publisher_picker_config
+            diag = EntityPickerDialog(
+                service_provider=self,
+                config=get_publisher_picker_config(),
+                parent=self
+            )
+            if diag.exec() == 1:
+                selected = diag.get_selected()
+                if selected:
+                    # Support both List (Smart Split) and Single Item (Legacy)
+                    name = selected.publisher_name if hasattr(selected, 'publisher_name') else str(selected)
+                    self._add_name_to_selection(field_name, name)
         else:
-            # Artists / Contributors
-            from ..dialogs.artist_manager_dialog import ArtistPickerDialog
-            diag = ArtistPickerDialog(self.contributor_service, parent=self)
-            if diag.exec():
+            # Artists / Contributors - use universal EntityPickerDialog
+            from ..dialogs.entity_picker_dialog import EntityPickerDialog
+            from src.core.picker_config import get_artist_picker_config
+            diag = EntityPickerDialog(
+                service_provider=self,
+                config=get_artist_picker_config(),
+                parent=self
+            )
+            
+            if diag.exec() == 1:
                 selected = diag.get_selected()
                 if selected:
                     # Support both List (Smart Split) and Single Item (Legacy)
                     if isinstance(selected, list):
                         for item in selected:
-                            self._add_name_to_selection(field_name, item.name)
+                            self._add_name_to_selection(field_name, item.name if hasattr(item, 'name') else str(item))
                     else:
-                        self._add_name_to_selection(field_name, selected.name)
+                        self._add_name_to_selection(field_name, selected.name if hasattr(selected, 'name') else str(selected))
 
     def _add_name_to_selection(self, field_name, name):
         """T-70: Add a name to the specified field for all selected songs."""
@@ -1213,58 +1112,110 @@ class SidePanelWidget(QFrame):
         
         self._refresh_field_values()
 
+    def _on_field_changed_and_save(self, field_name: str, value: Any):
+        """Helper to stage a change and immediately commit it (Auto-Save)."""
+        self._on_field_changed(field_name, value)
+        # Trigger immediate save of all staged changes
+        # Trigger immediate save of all staged changes using existing handler
+        self._on_save_clicked()
+
+    def _on_entity_data_changed(self):
+        """Called when EntityListWidget reports a data change (e.g. rename/edit)."""
+        # Reload current songs to reflect potential renames (e.g. cached 'performers' string)
+        if self.current_songs:
+             updated_songs = []
+             for s in self.current_songs:
+                 new_s = self.library_service.song_service.get_by_id(s.source_id)
+                 if new_s: updated_songs.append(new_s)
+             
+             if updated_songs:
+                 self.current_songs = updated_songs
+                 
+                 # UPDATE ADAPTERS: Propagate new song list to all EntityListWidgets
+                 # This prevents them from using stale references during refresh_from_adapter()
+                 for f_name, widget in self._field_widgets.items():
+                    if isinstance(widget, EntityListWidget):
+                        # Duck-type check for SongFieldAdapter or compatible
+                        if hasattr(widget, 'context_adapter') and hasattr(widget.context_adapter, 'songs'):
+                            widget.context_adapter.songs = self.current_songs
+        
+        self._refresh_field_values()
+
     def _create_field_widget(self, field_def, value, is_multiple):
         # Determine strict type or strategy
         is_bool = (field_def.strategy and field_def.strategy.upper() == "BOOLEAN") or \
                   (field_def.field_type.name == "BOOLEAN")
 
         if is_bool:
-            cb = QCheckBox()
+            tg = GlowToggle()
+            
+            # T-93: Contextual Labels for Boolean Toggles
+            if field_def.name == 'is_active':
+                tg.set_labels("ON", "OFF")
+                tg.setToolTip("Determines if this song is enabled for library playback and rotation.")
+            else:
+                tg.set_labels("YES", "NO")
+
             # Handle string 'True'/'False' from some legacy paths just in case
             val_bool = str(value).lower() in ("true", "1", "yes") if isinstance(value, str) else bool(value)
             
-            cb.setChecked(val_bool if value is not None else False)
-            if is_multiple: cb.setTristate(True); cb.setCheckState(Qt.CheckState.PartiallyChecked)
-            cb.stateChanged.connect(lambda state: self._on_field_changed(field_def.name, bool(state)))
-            return cb
+            tg.setChecked(val_bool if value is not None else False)
+            # is_multiple partially checked not yet supported by GlowToggle, default to False
+            tg.toggled.connect(lambda checked, f=field_def.name: self._on_field_changed(f, checked))
+            return tg
             
         if field_def.name == 'album_REMOVE_OLD_BUTTON_LOGIC':
             pass # Removed
 
-        if field_def.name == 'tags':
-            tray = ChipTrayWidget(
-                confirm_template=f"Remove tag '{{label}}'?",
-                add_tooltip=f"Add Tag",
-                show_add=False,
-                parent=self
-            )
-            tray.add_requested.connect(lambda: self._on_add_button_clicked('tags'))
-            tray.chip_clicked.connect(lambda eid, n: self._on_chip_clicked('tags', eid, n))
-            tray.chip_remove_requested.connect(lambda eid, n: self._on_chip_removed('tags', eid, n))
-            tray.chip_context_menu_requested.connect(lambda eid, n, p, f='tags': self._on_chip_context_menu(f, eid, n, p))
-            tray.set_chips(value) # Value is already the list of chips
-            return tray
-
-        # Default: Line Edit for Alpha
-        # T-70: Artist/Publisher/Album Chip Tray
-        if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'album']:
-            # T-Multi: Enable Add button for Album to allow explicit "Add" workflow
-            can_add = (field_def.name == 'album')
+        if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'album', 'tags']:
+            # Determine EntityType
+            e_type = EntityType.ARTIST
+            if field_def.name == 'publisher': e_type = EntityType.PUBLISHER
+            elif field_def.name == 'album': e_type = EntityType.ALBUM
+            elif field_def.name == 'tags': e_type = EntityType.TAG
             
-            tray = ChipTrayWidget(
-                confirm_template=f"Unlink '{{label}}' from {field_def.name}?",
-                add_tooltip=f"Add {field_def.ui_header} (Ctrl+Click chip to remove)",
-                show_add=can_add,
-                parent=self
-            )
-            # Use lambda to capture the field name for generic handlers
-            fname = field_def.name
-            tray.chip_clicked.connect(lambda eid, n, f=fname: self._on_chip_clicked(f, eid, n))
-            tray.chip_remove_requested.connect(lambda aid, n, f=fname: self._on_chip_removed(f, aid, n))
-            tray.chip_context_menu_requested.connect(lambda eid, n, p, f=fname: self._on_chip_context_menu(f, eid, n, p))
-            tray.add_requested.connect(lambda f=fname: self._on_add_button_clicked(f))
+            # Select Service
+            from ...core.entity_registry import ENTITY_REGISTRY
+            config = ENTITY_REGISTRY[e_type]
+            service = getattr(self, config.service_attr)
             
-            return tray
+            # Create Adapter for the Song Field
+            adapter = SongFieldAdapter(
+                self.current_songs, 
+                field_def.name, 
+                service,
+                stage_change_fn=self._on_field_changed_and_save,
+                get_child_data_fn=lambda f=field_def.name: self._get_latest_chips(f),
+                refresh_fn=self._refresh_field_values
+            )
+            
+            # Create the Unified Component
+            ew = EntityListWidget(
+                service_provider=self,
+                entity_type=e_type,
+                layout_mode=LayoutMode.CLOUD,
+                context_adapter=adapter,
+                allow_add=True, # SidePanel always allows adding via exterior button or tray
+                allow_remove=True,
+                allow_edit=True,
+                add_tooltip=f"Add {field_def.ui_header}",
+                parent=self
+            ) 
+            
+            # Register SidePanel custom handlers on the internal router
+            # Wrap in lambda to curry 'field_def.name' since router only passes (id, label)
+            ew.click_router.register_custom_handler(
+                "handle_tag_click", 
+                lambda eid, name: self._handle_tag_click(field_def.name, eid, name)
+            )
+            
+            # Connect Context Menu
+            ew.chip_context_menu_requested.connect(lambda eid, n, p, f=field_def.name: self._on_chip_context_menu(f, eid, n, p))
+            
+            # Connect Data Changed (e.g. Rename from Dialog) to Reload
+            ew.data_changed.connect(self._on_entity_data_changed)
+            
+            return ew
 
         edit = GlowLineEdit()
         
@@ -1715,6 +1666,107 @@ class SidePanelWidget(QFrame):
         self._validate_done_gate()
         self._projected_timer.start(500)
         self.staging_changed.emit(list(self._staged_changes.keys()))
+
+    def _get_latest_chips(self, field_name: str) -> List[tuple]:
+        """Unified method to get chip data (tuples) for a field, considering staged changes."""
+        field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
+        if not field_def: return []
+        
+        effective_val, is_multiple = self._calculate_bulk_value(field_def)
+        
+        if is_multiple and field_name != 'tags':
+            return [(-1, f"{len(self.current_songs)} Mixed", "🔀", True, False, "", "gray", False)]
+            
+        if field_name == 'tags':
+            # Tags handle their own complex chip formatting in _calculate_bulk_value
+            return effective_val or []
+            
+        # Convert to identities for the Chip Tray
+        chips = []
+        delimiters = r',|;| & '
+        if field_name == 'composers':
+            delimiters += r'|/'
+            
+        raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
+        names = []
+        for rn in raw_names:
+            if isinstance(rn, str) and field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
+                import re
+                split_parts = re.split(delimiters, rn)
+                names.extend([p.strip() for p in split_parts if p.strip()])
+            else:
+                names.append(rn)
+
+        chips = []
+        for i, n in enumerate(names):
+            if field_name == 'publisher':
+                # Lookup Publisher ID via Service
+                pub, created = self.publisher_service.get_or_create(str(n))
+                pid = pub.publisher_id if pub else 0
+                
+                # Ghost Chips Logic (T-63)
+                is_inherited = False
+                if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
+                    alb_id = self.current_songs[0].album_id
+                    if isinstance(alb_id, list):
+                        alb_id = alb_id[0] if alb_id else None
+                    
+                    if alb_id:
+                        alb_pub = self.album_service.get_publisher(alb_id)
+                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
+                            is_inherited = True
+                
+                if pub:
+                    display_name = pub.publisher_name
+                    if pub.parent_publisher_id:
+                        parent = self.publisher_service.get_by_id(pub.parent_publisher_id)
+                        if parent:
+                            display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
+                    
+                    if is_inherited:
+                        raw_alb_name = self.current_songs[0].album
+                        alb_name = "Album"
+                        if isinstance(raw_alb_name, list):
+                            alb_name = raw_alb_name[0] if raw_alb_name else "Album"
+                        else:
+                            alb_name = raw_alb_name or "Album"
+                            
+                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
+                    else:
+                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))
+            elif field_name == 'album':
+                aid = 0
+                is_p = (i == 0)
+                label = str(n)
+                
+                src = self.current_songs[0]
+                if hasattr(src, 'releases'):
+                    for r in src.releases:
+                        if r['title'] == label:
+                            aid = r['album_id']
+                            break
+                
+                if not aid:
+                    results = self.album_service.search(label)
+                    aid = results[0].album_id if results else 0
+                
+                if len(names) > 1 and is_p:
+                    label = f"★ {label}"
+                    
+                chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
+            else:
+                # Standard Contributor (Artist) via Service
+                # FIX: Use get_by_name to prevent 'Ghost Creation' when rendering stale 'performers' strings 
+                # (e.g. during a rename operation before the refresh completes).
+                artist = self.contributor_service.get_by_name(str(n))
+                
+                if artist:
+                    icon = "👤" if artist.type == "person" else "👥"
+                    chips.append((artist.contributor_id, str(n), icon, False, False, "", field_def.zone or "amber", False))
+                else:
+                    # Unresolved reference (stale string or missing identity)
+                    chips.append((0, str(n), "⚠️", False, False, "Unresolved Reference", "gray", False))
+        return chips
 
     def _on_status_toggled(self):
         """Toggle the ready/pending state using the unified Tags system."""

@@ -104,11 +104,14 @@ class EntityClickRouter:
         """
         config = get_entity_config(entity_type)
         
-        # Check for custom click handler (e.g., Status tags show audit)
         if config.custom_click_handler:
             handler = self._custom_handlers.get(config.custom_click_handler)
-            if handler and handler(entity_id, label):
-                return ClickResult(ClickAction.CANCELLED, entity_id)
+            if handler:
+                res = handler(entity_id, label)
+                if isinstance(res, ClickResult):
+                    return res
+                if res: # Legacy handled bool
+                    return ClickResult(ClickAction.CANCELLED, entity_id)
         
         # Get the service for this entity type
         service = getattr(self.services, config.service_attr, None)
@@ -220,41 +223,63 @@ class EntityClickRouter:
     ) -> Optional[Any]:
         """
         Open a picker dialog for selecting/creating an entity.
-        
-        Args:
-            entity_type: Type of entity to pick
-            exclude_ids: IDs to exclude from the list
-            filter_type: Optional type filter (e.g., "person" for artists)
-        
-        Returns:
-            Selected entity, or None if cancelled
+        Prefers universal EntityPickerDialog if a PickerConfig exists for the type.
         """
-        config = get_entity_config(entity_type)
+        from .picker_config import get_config_for_type
+        picker_config = get_config_for_type(entity_type)
         
-        service = getattr(self.services, config.service_attr, None)
-        if not service:
+        if picker_config:
+            from src.presentation.dialogs.entity_picker_dialog import EntityPickerDialog
+            
+            # Customize config if filter_type is provided
+            # This hides the opposite type button (e.g., hide Group when adding Person members)
+            if filter_type and entity_type in (EntityType.ARTIST, EntityType.GROUP_MEMBER):
+                filter_type_title = filter_type.title()  # "person" -> "Person"
+                opposite_type = "Group" if filter_type_title == "Person" else "Person"
+                
+                # Remove the opposite type from buttons
+                picker_config.type_buttons = [t for t in picker_config.type_buttons if t != opposite_type]
+                picker_config.type_icons = {k: v for k, v in picker_config.type_icons.items() if k != opposite_type}
+                picker_config.type_colors = {k: v for k, v in picker_config.type_colors.items() if k != opposite_type}
+                picker_config.default_type = filter_type_title
+            
+            dialog = EntityPickerDialog(
+                service_provider=self.services,
+                config=picker_config,
+                exclude_ids=exclude_ids,
+                parent=self.parent
+            )
+            # Set the current type filter (will be auto-set if only one button, but be explicit)
+            if filter_type:
+                dialog._current_type_filter = filter_type.title()
+                
+            if dialog.exec() == 1:
+                return dialog.get_selected()
             return None
-        
+
+        # Fallback to Registry-defined picker (e.g. AlbumManagerDialog)
+        config = get_entity_config(entity_type)
         dialog_class = resolve_dialog_class(config.picker_dialog)
         if not dialog_class:
             return None
         
-        # Build picker kwargs
+        service = getattr(self.services, config.service_attr, None)
         kwargs = {"parent": self.parent}
         
+        # Legacy specific logic for specialized pickers
         if entity_type in (EntityType.ARTIST, EntityType.GROUP_MEMBER):
-            # GROUP_MEMBER uses the same ArtistPickerDialog
             kwargs["service"] = service
             kwargs["exclude_ids"] = exclude_ids or set()
-            if filter_type:
-                kwargs["filter_type"] = filter_type
-                
+            if filter_type: kwargs["filter_type"] = filter_type
         elif entity_type == EntityType.PUBLISHER:
             kwargs["service"] = service
             kwargs["exclude_ids"] = exclude_ids or set()
-            
         elif entity_type == EntityType.TAG:
             kwargs["tag_service"] = service
+        elif entity_type == EntityType.ALBUM:
+            kwargs["album_service"] = service
+            kwargs["publisher_service"] = getattr(self.services, "publisher_service", None)
+            kwargs["contributor_service"] = getattr(self.services, "contributor_service", None)
         
         dialog = dialog_class(**kwargs)
         if dialog.exec():

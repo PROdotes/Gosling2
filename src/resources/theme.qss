@@ -1721,7 +1721,7 @@ QLineEdit[ghost='true'] {
 
 #IdentityTypeButton {
     min-width: 120px;
-    min-height: 32px;
+    /* min-height removed - controlled by Python to accommodate glow */
 }
 
 #PickerTypeButton {

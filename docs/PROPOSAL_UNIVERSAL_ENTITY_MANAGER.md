@@ -350,7 +350,127 @@ The widget just calls `self.context_adapter.unlink(entity_id)` — it doesn't ne
 
 ---
 
-## 5. Yellberus Integration (Phase 3)
+## 5. EntityPickerDialog (Universal Search/Create/Rename)
+
+The `TagPickerDialog` pattern is a proven UX for fast entity management. Generalize it to work for **all entity types**.
+
+### 5.1 Common UX Pattern
+
+```
+┌─────────────────────────────────────┐
+│ ADD/RENAME ENTITY                   │
+├─────────────────────────────────────┤
+│ [🎵 Genre] [💭 Mood] [📋 Status]... │  ← Type/Category buttons
+├─────────────────────────────────────┤
+│ [Search or prefix:value...       ]  │  ← Search with prefix support
+├─────────────────────────────────────┤
+│ ✏️ Rename to "NewName" in Mood      │  ← Edit mode only
+│ ➕ Create "NewName" in Mood         │  ← If no exact match
+│ 🎵 Pop (Genre)                      │
+│ 🎵 Rock (Genre)                     │
+│ ...                                 │
+├─────────────────────────────────────┤
+│ [Remove]        [Cancel] [SELECT]   │
+└─────────────────────────────────────┘
+```
+
+### 5.2 Entity-Specific Behavior
+
+| Aspect | Tags | Artists |
+|:-------|:-----|:--------|
+| **Type Buttons** | Categories: Genre, Mood, Status, Custom | Types: Person, Group, Alias |
+| **Prefix Syntax** | `m:chill` → Mood, `genre:rock` → Genre | `alias:pink` → Aliases, `group:queen` → Groups |
+| **New Types** | ✅ Can create (`vacation:beach`) | ❌ Cannot create (`clown:bob` = error) |
+| **Create** | Creates tag with name + category | Creates artist with name + type |
+| **Rename** | Renames tag, can change category | Renames artist, can change type?* |
+| **Merge** | Tags can merge on conflict | Artists can merge on conflict |
+
+*Artist type change (Person↔Group) has implications for memberships.
+
+### 5.3 Configuration
+
+```python
+@dataclass
+class PickerConfig:
+    """Configuration for EntityPickerDialog behavior."""
+    
+    # Display
+    title_add: str          # "Add Tag" / "Add Artist"
+    title_edit: str         # "Rename Tag" / "Edit Artist"
+    
+    # Type/Category system
+    type_buttons: List[str]             # ["Genre", "Mood", ...] or ["Person", "Group", "Alias"]
+    type_icons: Dict[str, str]          # {"Genre": "🎵", "Person": "👤", ...}
+    type_colors: Dict[str, str]         # Glow colors for each button
+    allow_new_types: bool               # True for Tags, False for Artists
+    
+    # Prefix parsing
+    prefix_map: Dict[str, str]          # {"g": "Genre", "m": "Mood"} or {"a": "Alias", "p": "Person"}
+    
+    # Actions
+    allow_create: bool = True
+    allow_rename: bool = True
+    allow_remove: bool = True
+    
+    # Entity-specific
+    service_attr: str                   # "tag_service" or "contributor_service"
+    search_fn: str                      # Method name for searching
+    get_all_fn: str                     # Method name for getting all by type
+```
+
+### 5.4 Usage
+
+```python
+# Tags - current TagPickerDialog behavior
+tag_picker = EntityPickerDialog(
+    service_provider=self.services,
+    config=TAG_PICKER_CONFIG,
+    target_entity=existing_tag,  # Edit mode
+    parent=self
+)
+
+# Artists - new ArtistPicker using same UX
+artist_picker = EntityPickerDialog(
+    service_provider=self.services,
+    config=ARTIST_PICKER_CONFIG,
+    target_entity=existing_artist,  # Edit mode
+    parent=self
+)
+```
+
+### 5.5 Predefined Configs
+
+```python
+TAG_PICKER_CONFIG = PickerConfig(
+    title_add="Add Tag",
+    title_edit="Rename Tag",
+    type_buttons=["Genre", "Mood", "Status", "Custom"],  # Dynamic from DB
+    type_icons=ID3Registry.get_all_category_icons(),
+    type_colors=ID3Registry.get_all_category_colors(),
+    allow_new_types=True,  # Can create "vacation:beach"
+    prefix_map={"g": "Genre", "m": "Mood", "s": "Status", "c": "Custom"},
+    service_attr="tag_service",
+    search_fn="search",
+    get_all_fn="get_all_by_category",
+)
+
+ARTIST_PICKER_CONFIG = PickerConfig(
+    title_add="Add Artist",
+    title_edit="Edit Artist", 
+    type_buttons=["Person", "Group", "Alias"],
+    type_icons={"Person": "👤", "Group": "👥", "Alias": "📝"},
+    type_colors={"Person": "#4FC3F7", "Group": "#81C784", "Alias": "#FFB74D"},
+    allow_new_types=False,  # Cannot invent new types
+    prefix_map={"p": "Person", "g": "Group", "a": "Alias"},
+    service_attr="contributor_service",
+    search_fn="search",
+    get_all_fn="search",  # with type filter
+)
+```
+
+---
+
+## 6. Yellberus Integration (Phase 4)
 
 Once `EntityListWidget` is stable, extend `FieldDef` to drive UI generation:
 

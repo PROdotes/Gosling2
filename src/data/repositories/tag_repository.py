@@ -205,6 +205,21 @@ class TagRepository(GenericRepository[Tag]):
                 tags.append(Tag.from_row(row))
         return tags
 
+    def search(self, query: str) -> List[Tag]:
+        """Search for tags by name (case-insensitive partial match)."""
+        sql = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName LIKE ? ORDER BY TagName"
+        q = f"%{query}%"
+        tags = []
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(sql, (q,))
+                for row in cursor.fetchall():
+                    tags.append(Tag.from_row(row))
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error searching tags: {e}")
+        return tags
+
     def get_distinct_categories(self) -> List[str]:
         """Get all distinct tag categories that exist in the database."""
         query = "SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL ORDER BY TagCategory"

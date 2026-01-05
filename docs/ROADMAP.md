@@ -150,6 +150,7 @@ tags:
     *   *Task*: Make clicking Artist/Publisher chips *inside* the Album Editor open their respective Managers (currently does nothing).
     *   *Status*: **Done** - Connected chip signals to `ArtistDetailsDialog` and `PublisherDetailsDialog` in `AlbumManagerDialog`.
     *   *Bug*: Clicking Inherited Publisher on Side Panel incorrectly triggers "Add New" dialog instead of just focusing the Album Editor.
+    *   *Refactor*: "Add Album" flow in Side Panel needs audit (prone to crashes if services missing).
 *   [ ] **Safe Save Logic (Tag/DB Sync)**
     *   *Observation*: Currently tags are written *before* DB commit. If DB fails (encoding crash), tags remain written but DB rolls back -> Desync.
     *   *Task*: Move Tag Writing to *after* successful DB commit, OR wrap both in a revertable transaction (hard for files). Best strategy: DB Commit -> Then Write Tags.
