@@ -75,13 +75,13 @@ class TestArtistPickerDialog:
     def mock_repo(self):
         """Mock contributor repository."""
         repo = MagicMock()
-        # search is called in _populate, not get_all
-        mock_artists = [
-            MagicMock(contributor_id=1, name="Artist One", type="person"),
-            MagicMock(contributor_id=2, name="Band Two", type="group"),
-            MagicMock(contributor_id=3, name="Artist Three", type="person"),
+        # Mock search_identities used in _populate
+        mock_identities = [
+            (1, "Artist One", "person", "Primary"),
+            (2, "Band Two", "group", "Primary"),
+            (3, "Artist Three", "person", "Primary"),
         ]
-        repo.search.return_value = mock_artists
+        repo.search_identities.return_value = mock_identities
         return repo
 
     def test_initialization(self, qtbot, mock_repo):
@@ -89,9 +89,9 @@ class TestArtistPickerDialog:
         dialog = ArtistPickerDialog(service=mock_repo)
         qtbot.addWidget(dialog)
         
-        assert dialog.windowTitle() == "Select Artist"
-        # search("") is called in _populate
-        mock_repo.search.assert_called_once_with("")
+        assert dialog.windowTitle() == "Select or Add Artist"
+        # search_identities("") is called in _populate
+        mock_repo.search_identities.assert_called_once_with("")
 
     def test_filter_by_type(self, qtbot, mock_repo):
         """Test picker can filter by artist type."""
@@ -172,12 +172,18 @@ class TestArtistDetailsDialog:
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
-        # Mock the ArtistCreatorDialog to return name without showing
-        with patch('src.presentation.dialogs.artist_manager_dialog.ArtistCreatorDialog') as MockCreator:
-            mock_dlg = MagicMock()
-            mock_dlg.exec.return_value = True
-            mock_dlg.get_data.return_value = ("Stage Name", "person")
-            MockCreator.return_value = mock_dlg
+        # Mock QDialog (for the popup) and GlowComboBox (for the input)
+        with patch('src.presentation.dialogs.artist_manager_dialog.QDialog') as MockQDialog, \
+             patch('src.presentation.dialogs.artist_manager_dialog.GlowComboBox') as MockCombo, \
+             patch('src.presentation.dialogs.artist_manager_dialog.QVBoxLayout'):
+            
+            # Setup Dialog Mock
+            mock_dlg_instance = MockQDialog.return_value
+            mock_dlg_instance.exec.return_value = True
+            
+            # Setup Combo Mock (to return the alias name)
+            mock_cmb_instance = MockCombo.return_value
+            mock_cmb_instance.currentText.return_value = "Stage Name"
             
             # Mock validation to pass
             mock_repo.validate_identity.return_value = (False, "")
@@ -191,11 +197,11 @@ class TestArtistDetailsDialog:
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
-        # Mock the ArtistCreatorDialog to simulate cancel
-        with patch('src.presentation.dialogs.artist_manager_dialog.ArtistCreatorDialog') as MockCreator:
-            mock_dlg = MagicMock()
-            mock_dlg.exec.return_value = False  # User cancelled
-            MockCreator.return_value = mock_dlg
+        # Mock QDialog to simulate cancel
+        with patch('src.presentation.dialogs.artist_manager_dialog.QDialog') as MockQDialog, \
+             patch('src.presentation.dialogs.artist_manager_dialog.QVBoxLayout'):
+            mock_dlg_instance = MockQDialog.return_value
+            mock_dlg_instance.exec.return_value = False  # User cancelled
             
             dialog._add_alias()
         

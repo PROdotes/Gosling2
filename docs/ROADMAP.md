@@ -118,7 +118,7 @@ tags:
 *   [x] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
     *   *Status*: **Done** - Core ABC and SongRepository integration complete.
 *   [x] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
-*   [ ] **Unified Input Dialog** (T-85): Extract `TagRenameDialog` logic to reusable module; replace all `QInputDialog`s.
+*   [ ] [**Unified Input Dialog**](tasks/T-85_universal_input_dialog.md) (T-85): Extract `TagRenameDialog` logic to reusable module; replace all `QInputDialog`s.
 -   [x] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
 -   [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
 *   [x] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
@@ -138,7 +138,7 @@ tags:
 ### 🚀 Milestone 6: Post-Alpha Refinements (Tomorrow/Future)
 *   [ ] **Fix & Silence Test Suite (TOP PRIORITY)**
     *   *Task*: Fix 33 Failures / 17 Errors caused by recent refactors.
-    *   *Task*: Silence interactive popups (e.g. `add_alias`) to restore "Law of Silence".
+    *   [x] **Silence interactive popups** (e.g. `add_alias`) to restore "Law of Silence".
 *   [ ] **Album Artist M2M Schema** (T-91)
     *   *Task*: Upgrade `Albums.AlbumArtist` from text to `AlbumContributors` (M2M) table.
     *   *Why*: Fixes "Existential Dread" - allows linking multiple identities to an album properly.
@@ -169,6 +169,6 @@ tags:
 *   [ ] **Verify Multi-Edit Logic & Tech Debt Audit**
     *   *Task*: Test adding/removing tags in multi-select mode.
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
-*   [ ] **Universal "Data Editor" Refactor** (T-85)
+*   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
     *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
     *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.
