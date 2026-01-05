@@ -6,6 +6,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
+from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
+from src.core.entity_registry import EntityType
+from src.core.context_adapters import ArtistMemberAdapter
 
 class IdentityCollisionDialog(QDialog):
     """
@@ -699,26 +702,47 @@ class ArtistDetailsDialog(QDialog):
         self.list_aliases.customContextMenuRequested.connect(self._show_alias_menu)
         layout.addWidget(self.list_aliases)
         
-        # Membership
+        # Membership - NOW USES EntityListWidget!
         h_member = QHBoxLayout()
         self.lbl_member = QLabel("MEMBERS")
         self.lbl_member.setObjectName("DialogFieldLabel")
         h_member.addWidget(self.lbl_member)
-        
         h_member.addStretch()
-        
-        self.btn_add_member = GlowButton("")
-        self.btn_add_member.setObjectName("AddInlineButton")
-        # Size handled by QSS
-        self.btn_add_member.clicked.connect(self._add_member)
-        h_member.addWidget(self.btn_add_member)
-        
         layout.addLayout(h_member)
         
-        self.list_members = QListWidget()
+        # Create a mock service provider for the EntityListWidget
+        # This is a temporary adapter until we have a real ServiceProvider
+        class _ServiceAdapter:
+            def __init__(self, service):
+                self.contributor_service = service
+        
+        self._service_adapter = _ServiceAdapter(self.service)
+        
+        # Create the member adapter (will be recreated on type toggle)
+        self._member_adapter = ArtistMemberAdapter(
+            self.artist, 
+            self.service, 
+            refresh_fn=self._refresh_data
+        )
+        
+        self.list_members = EntityListWidget(
+            service_provider=self._service_adapter,
+            entity_type=EntityType.GROUP_MEMBER,
+            layout_mode=LayoutMode.STACK,
+            context_adapter=self._member_adapter,
+            allow_add=True,
+            allow_remove=True,
+            allow_edit=True,
+            add_tooltip="Add Member/Group",
+            parent=self
+        )
         self.list_members.setObjectName("ArtistSubList")
-        self.list_members.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_members.customContextMenuRequested.connect(self._show_member_menu)
+        
+        # Set the picker filter based on artist type
+        self.list_members.set_picker_filter(
+            lambda: "person" if self.artist.type == "group" else "group"
+        )
+        
         layout.addWidget(self.list_members)
         
         btns = QHBoxLayout()
@@ -770,24 +794,22 @@ class ArtistDetailsDialog(QDialog):
         self.radio_person.blockSignals(False)
         self.radio_group.blockSignals(False)
             
-        # Aliases
+        # Aliases (still manual - complex merge logic)
         self.list_aliases.clear()
         for alias_id, alias_name in self.service.get_aliases(self.artist.contributor_id):
             item = QListWidgetItem(alias_name)
             item.setData(Qt.ItemDataRole.UserRole, alias_id)
             self.list_aliases.addItem(item)
             
-        # Memberships
-        self.list_members.clear()
-        if self.artist.type == "group":
-            members = self.service.get_members(self.artist.contributor_id)
-        else:
-            members = self.service.get_groups(self.artist.contributor_id)
-            
-        for m in members:
-            item = QListWidgetItem(m.name)
-            item.setData(Qt.ItemDataRole.UserRole, m.contributor_id)
-            self.list_members.addItem(item)
+        # Memberships - now uses EntityListWidget!
+        # Update the adapter with current artist (type may have changed)
+        self._member_adapter = ArtistMemberAdapter(
+            self.artist,
+            self.service,
+            refresh_fn=self._refresh_data
+        )
+        self.list_members.context_adapter = self._member_adapter
+        self.list_members.refresh_from_adapter()
 
     def _on_type_toggled(self, new_type):
         """Update local model and refresh context labels."""
@@ -957,47 +979,8 @@ class ArtistDetailsDialog(QDialog):
         # Unused now, replaced by confirm version
         pass
 
-    def _add_member(self):
-        # If I am a Group, I want to add Persons.
-        # If I am a Person, I want to add Groups.
-        target_type = "person" if self.radio_group.isChecked() else "group"
-        
-        # Exclude self and current members
-        exclude = {self.artist.contributor_id}
-        for i in range(self.list_members.count()):
-            exclude.add(self.list_members.item(i).data(Qt.ItemDataRole.UserRole))
-
-        diag = ArtistPickerDialog(self.service, filter_type=target_type, exclude_ids=exclude, parent=self)
-        if diag.exec():
-            result = diag.get_selected()
-            if result:
-                targets = result if isinstance(result, list) else [result]
-                
-                for selected in targets:
-                    if self.radio_group.isChecked():
-                        self.service.add_member(self.artist.contributor_id, selected.contributor_id)
-                    else:
-                        self.service.add_member(selected.contributor_id, self.artist.contributor_id)
-                self._refresh_data()
-
-    def _show_member_menu(self, pos):
-        item = self.list_members.itemAt(pos)
-        if not item: return
-        other_id = item.data(Qt.ItemDataRole.UserRole)
-        
-        menu = QMenu(self)
-        remove_act = QAction("Remove Link", self)
-        remove_act.triggered.connect(lambda: self._remove_member(other_id))
-        menu.addAction(remove_act)
-        menu.exec(self.list_members.mapToGlobal(pos))
-
-    def _remove_member(self, other_id):
-        # Relationship removal is non-destructive (label management)
-        if self.radio_group.isChecked():
-            self.service.remove_member(self.artist.contributor_id, other_id)
-        else:
-            self.service.remove_member(other_id, self.artist.contributor_id)
-        self._refresh_data()
+    # NOTE: _add_member, _show_member_menu, _remove_member are now handled by EntityListWidget
+    # The old manual implementations have been removed.
 
     def _save(self):
         new_name = self.txt_name.text().strip()

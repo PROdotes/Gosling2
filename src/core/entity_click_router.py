@@ -242,7 +242,8 @@ class EntityClickRouter:
         # Build picker kwargs
         kwargs = {"parent": self.parent}
         
-        if entity_type == EntityType.ARTIST:
+        if entity_type in (EntityType.ARTIST, EntityType.GROUP_MEMBER):
+            # GROUP_MEMBER uses the same ArtistPickerDialog
             kwargs["service"] = service
             kwargs["exclude_ids"] = exclude_ids or set()
             if filter_type:

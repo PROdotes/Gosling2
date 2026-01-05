@@ -832,11 +832,18 @@ class SidePanelWidget(QFrame):
         )
         res = diag.exec()
         if res == 1:
-            selected_tag = diag.get_selected()
-            if selected_tag:
+            # Check if user selected the explicit "Rename" action
+            if diag.is_rename_requested():
+                rename_info = diag.get_rename_info()
+                new_name = rename_info[0]
+                new_category = rename_info[1]
+            elif diag.get_selected():
+                # User selected an existing tag (switch to it)
+                selected_tag = diag.get_selected()
                 new_name = selected_tag.tag_name
                 new_category = selected_tag.category
             else:
+                # Fallback to text box content
                 new_name = diag.get_new_name()
                 new_category = diag.get_target_category()
             ok = True

@@ -107,6 +107,7 @@ class TagPickerDialog(QDialog):
         self.default_category = default_category
         self.target_tag = target_tag
         self._selected_tag = None
+        self._rename_info = None  # Set when user selects "Rename" action
         self._current_category_filter = None  # None = all categories
         
         if self.target_tag:
@@ -395,19 +396,42 @@ class TagPickerDialog(QDialog):
                 else:
                     tags = self.tag_service.get_all_tags()
             
-            # Add "Create new" option FIRST if query doesn't exactly match IN THIS CATEGORY
+            # --- EDIT MODE: Add "Rename" option FIRST ---
+            # Show if: 1) We have a target_tag (edit mode)
+            #          2) Name OR category differs from original
+            if self.target_tag:
+                original_name = self.target_tag.tag_name.lower()
+                original_cat = self.target_tag.category
+                current_name = self.txt_search.text().strip()
+                current_name_lower = current_name.lower() if current_name else ""
+                current_cat = self._current_category_filter or original_cat
+                
+                name_changed = current_name_lower and current_name_lower != original_name
+                category_changed = current_cat != original_cat
+                
+                if name_changed or category_changed:
+                    # Use original name if user hasn't typed anything new
+                    display_name = current_name if current_name else self.target_tag.tag_name
+                    rename_item = QListWidgetItem(f"✏️ Rename to \"{display_name}\" in {current_cat}")
+                    rename_item.setData(Qt.ItemDataRole.UserRole, ("RENAME", display_name, current_cat))
+                    self.list_results.addItem(rename_item)
+            
+            # --- Add "Create new" option if query doesn't exactly match IN THIS CATEGORY ---
             # This prioritizes CREATION (Speed) over selection of partial matches
-            if query:
-                current_cat = self._current_category_filter or self.default_category
+            # Note: In edit mode, Create still shows below Rename (for switching to existing tag)
+            current_cat = self._current_category_filter or self.default_category
+            current_name = self.txt_search.text().strip()
+            
+            if current_name:
                 # Check if exact match exists specifically in the target category
                 exact_match_in_cat = any(
-                    t.tag_name.lower() == query and t.category == current_cat 
+                    t.tag_name.lower() == current_name.lower() and t.category == current_cat 
                     for t in tags
                 )
                 
                 if not exact_match_in_cat:
-                    create_item = QListWidgetItem(f"➕ Create \"{query}\" in {current_cat}")
-                    create_item.setData(Qt.ItemDataRole.UserRole, ("CREATE", query, current_cat))
+                    create_item = QListWidgetItem(f"➕ Create \"{current_name}\" in {current_cat}")
+                    create_item.setData(Qt.ItemDataRole.UserRole, ("CREATE", current_name, current_cat))
                     self.list_results.addItem(create_item)
             
             # Add existing tags (Global matches)
@@ -436,8 +460,12 @@ class TagPickerDialog(QDialog):
         item = self.list_results.item(row)
         data = item.data(Qt.ItemDataRole.UserRole)
         
-        if isinstance(data, tuple) and data[0] == "CREATE":
-            self.btn_select.setText("UPDATE" if self.target_tag else "Create")
+        if isinstance(data, tuple):
+            action = data[0]
+            if action == "RENAME":
+                self.btn_select.setText("RENAME")
+            elif action == "CREATE":
+                self.btn_select.setText("UPDATE" if self.target_tag else "Create")
         else:
             self.btn_select.setText("UPDATE" if self.target_tag else "Select")
 
@@ -469,15 +497,26 @@ class TagPickerDialog(QDialog):
         
         data = item.data(Qt.ItemDataRole.UserRole)
         
-        if isinstance(data, tuple) and data[0] == "CREATE":
-            # Create new tag
-            _, name, category = data
-            self._selected_tag, _ = self.tag_service.get_or_create(name, category)
+        if isinstance(data, tuple):
+            action = data[0]
+            
+            if action == "RENAME":
+                # Rename the target tag
+                _, new_name, new_category = data
+                # Store rename info for caller to handle
+                self._rename_info = (new_name, new_category)
+                self._selected_tag = self.target_tag  # Return the original tag
+                self.accept()
+                
+            elif action == "CREATE":
+                # Create new tag
+                _, name, category = data
+                self._selected_tag, _ = self.tag_service.get_or_create(name, category)
+                self.accept()
         else:
             # Select existing tag
             self._selected_tag = data
-        
-        self.accept()
+            self.accept()
 
     def get_selected(self):
         """Return the selected or created Tag object."""
@@ -491,6 +530,19 @@ class TagPickerDialog(QDialog):
         """Return the currently selected category filter."""
         # Use active filter, or default, or fallback to target tag's original category
         return self._current_category_filter or self.default_category
+    
+    def is_rename_requested(self) -> bool:
+        """Check if user selected the 'Rename' action (vs selecting another tag)."""
+        return hasattr(self, '_rename_info') and self._rename_info is not None
+    
+    def get_rename_info(self):
+        """
+        Get the rename details if user selected 'Rename'.
+        
+        Returns:
+            Tuple of (new_name, new_category) if rename was selected, else None.
+        """
+        return getattr(self, '_rename_info', None)
 
 
 

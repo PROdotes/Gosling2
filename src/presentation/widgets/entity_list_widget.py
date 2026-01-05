@@ -101,6 +101,10 @@ class EntityListWidget(QWidget):
         self.allow_edit = allow_edit
         self.confirm_removal = confirm_removal
         
+        # Optional: Callback to get filter_type for picker at runtime
+        # e.g., lambda: "person" if artist.type == "group" else "group"
+        self._picker_filter_fn: Optional[Callable[[], str]] = None
+        
         # Get entity config from registry
         self.entity_config = get_entity_config(entity_type)
         
@@ -111,6 +115,15 @@ class EntityListWidget(QWidget):
         self._inner_widget = None
         
         self._init_ui(add_tooltip)
+    
+    def set_picker_filter(self, filter_fn: Callable[[], str]):
+        """
+        Set a callback to determine filter_type for the picker dialog.
+        
+        Example:
+            widget.set_picker_filter(lambda: "person" if self.artist.type == "group" else "group")
+        """
+        self._picker_filter_fn = filter_fn
     
     def _init_ui(self, add_tooltip: str):
         """Build the UI based on layout mode."""
@@ -276,10 +289,16 @@ class EntityListWidget(QWidget):
         if self.context_adapter:
             exclude_ids = set(self.context_adapter.get_children())
         
+        # Get filter type if callback is set
+        filter_type = None
+        if self._picker_filter_fn:
+            filter_type = self._picker_filter_fn()
+        
         # Open picker
         selected = self.click_router.open_picker(
             self.entity_type,
-            exclude_ids=exclude_ids
+            exclude_ids=exclude_ids,
+            filter_type=filter_type
         )
         
         if selected:
