@@ -146,8 +146,9 @@ tags:
     *   *Why*: Fixes "Existential Dread" - allows linking multiple identities to an album properly.
 *   [ ] **Album Publisher Backend catch-up**
     *   *Task*: Ensure Album Manager "Tags" UI correctly writes multiple rows to `AlbumPublishers`.
-*   [ ] **Wire up Chips inside Album Manager**
+*   [x] **Wire up Chips inside Album Manager**
     *   *Task*: Make clicking Artist/Publisher chips *inside* the Album Editor open their respective Managers (currently does nothing).
+    *   *Status*: **Done** - Connected chip signals to `ArtistDetailsDialog` and `PublisherDetailsDialog` in `AlbumManagerDialog`.
     *   *Bug*: Clicking Inherited Publisher on Side Panel incorrectly triggers "Add New" dialog instead of just focusing the Album Editor.
 *   [ ] **Safe Save Logic (Tag/DB Sync)**
     *   *Observation*: Currently tags are written *before* DB commit. If DB fails (encoding crash), tags remain written but DB rolls back -> Desync.

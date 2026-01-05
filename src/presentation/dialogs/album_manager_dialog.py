@@ -8,8 +8,8 @@ from PyQt6.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt6.QtGui import QAction
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowComboBox
 from ..widgets.chip_tray_widget import ChipTrayWidget
-from .publisher_manager_dialog import PublisherPickerDialog
-from .artist_manager_dialog import ArtistPickerDialog
+from .publisher_manager_dialog import PublisherPickerDialog, PublisherDetailsDialog
+from .artist_manager_dialog import ArtistPickerDialog, ArtistDetailsDialog
 
 
 class AlbumManagerDialog(QDialog):
@@ -343,6 +343,7 @@ class AlbumManagerDialog(QDialog):
         self.tray_artist = ChipTrayWidget(parent=self, show_add=False)
         self.tray_artist.is_add_visible = False
         self.tray_artist.btn_add.hide()
+        self.tray_artist.chip_clicked.connect(self._on_artist_chip_clicked)
         self.tray_artist.chip_remove_requested.connect(
             lambda eid, name: self._remove_chip_from_tray(self.tray_artist, name)
         )
@@ -387,6 +388,7 @@ class AlbumManagerDialog(QDialog):
         self.tray_publisher = ChipTrayWidget(parent=self, show_add=False)
         self.tray_publisher.is_add_visible = False
         self.tray_publisher.btn_add.hide()
+        self.tray_publisher.chip_clicked.connect(self._on_publisher_chip_clicked)
         self.tray_publisher.chip_remove_requested.connect(
             lambda eid, name: self._remove_chip_from_tray(self.tray_publisher, name)
         )
@@ -739,6 +741,63 @@ class AlbumManagerDialog(QDialog):
                 merged = sorted(list(set(current + new_names)))
                 # Set chips as tuples
                 self.tray_artist.set_chips([(0, n, "") for n in merged])
+
+    def _on_artist_chip_clicked(self, chip_id, label):
+        """Open Artist Manager for the clicked chip."""
+        # 1. Resolve Artist
+        artist = None
+        if chip_id > 0:
+            artist = self.contributor_service.get_by_id(chip_id)
+        else:
+            # Fallback: Find by exact name
+            artist = self.contributor_service.get_by_name(label)
+            
+        if not artist:
+            # Opportunity to create it properly?
+            if QMessageBox.question(self, "Artist Not Found", 
+                                  f"Artist '{label}' does not exist in the database yet.\nCreate and manage it now?") == QMessageBox.StandardButton.Yes:
+                artist, _ = self.contributor_service.get_or_create(label)
+            else:
+                return
+
+        # 2. Open Manager
+        # Note: no context song here since we are in Album Manager, not Song Editor
+        diag = ArtistDetailsDialog(artist, self.contributor_service, context_song=None, parent=self)
+        if diag.exec():
+            # Refresh Tray (Name might have changed)
+            # Since AlbumArtist is a string (legacy), we update the string.
+            # If the artist was renamed, we need to reflect that.
+            # However, the tray might have multiple names (unlikely for Album Artist but supported by tray)
+            
+            # Simple approach: If this chip was clicked, update THIS chip's label
+            # But get_names() returns all.
+            # Best is to just refresh the tray with the new name if it changed.
+            if artist.name != label:
+                current_names = self.tray_artist.get_names()
+                new_names = [artist.name if n == label else n for n in current_names]
+                self.tray_artist.set_chips([(0, n, "") for n in new_names])
+
+    def _on_publisher_chip_clicked(self, chip_id, label):
+        """Open Publisher Manager for the clicked chip."""
+        pub = None
+        if chip_id > 0:
+            pub = self.publisher_service.get_by_id(chip_id)
+        else:
+            pub = self.publisher_service.find_by_name(label)
+            
+        if not pub:
+            if QMessageBox.question(self, "Publisher Not Found",
+                                  f"Publisher '{label}' not found.\nCreate it now?") == QMessageBox.StandardButton.Yes:
+                pub, _ = self.publisher_service.get_or_create(label)
+            else:
+                return
+                
+        diag = PublisherDetailsDialog(pub, self.publisher_service, allow_remove_from_context=False, parent=self)
+        if diag.exec():
+            # Update Link if renamed
+            if pub.publisher_name != label:
+               self.tray_publisher.set_chips([(0, pub.publisher_name, "")])
+               self.selected_pub_name = pub.publisher_name
     
     def _remove_chip_from_tray(self, tray, name):
         """Remove a chip by name from the given tray."""
