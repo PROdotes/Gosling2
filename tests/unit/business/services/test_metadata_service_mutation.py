@@ -196,7 +196,11 @@ class TestMetadataServiceRobustness:
         """Robustness: Invalid numerical values are skipped during write"""
         mock_audio = MagicMock()
         mock_mp3.return_value = mock_audio
-        song = Song(source="test.mp3", recording_year=2500, bpm=-10)
+        from src.core import yellberus
+        fdef = yellberus.get_field('recording_year')
+        bad_year = (fdef.min_value - 1) if fdef and fdef.min_value else 1000
+        
+        song = Song(source="test.mp3", recording_year=bad_year, bpm=-10)
         
         MetadataService.write_tags(song)
         

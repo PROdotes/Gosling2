@@ -1,4 +1,32 @@
 {
+    "tag_categories": {
+        "Genre": {
+            "id3_frame": "TCON",
+            "icon": "🏷️",
+            "color": "#FFB84D",
+            "description": "Musical genre classification"
+        },
+        "Mood": {
+            "id3_frame": "TMOO",
+            "icon": "✨",
+            "color": "#32A8FF",
+            "description": "Emotional mood or atmosphere"
+        },
+        "Status": {
+            "id3_frame": null,
+            "icon": "📋",
+            "color": "#888888",
+            "description": "Internal workflow status",
+            "internal_only": true
+        },
+        "Custom": {
+            "id3_frame": null,
+            "icon": "🏷️",
+            "color": "#888888",
+            "description": "User-defined tags",
+            "default": true
+        }
+    },
     "TDRC": {
         "description": "Recording time",
         "field": "recording_year",
@@ -26,8 +54,8 @@
     },
     "TCON": {
         "description": "Content type (Genre)",
-        "field": "genre",
-        "type": "text"
+        "tag_category": "Genre",
+        "type": "list"
     },
     "TCOP": "Copyright",
     "TDAT": "Date",
@@ -84,8 +112,8 @@
     "TPOS": "Part of a set",
     "TMOO": {
         "description": "Mood",
-        "field": "mood",
-        "type": "text"
+        "tag_category": "Mood",
+        "type": "list"
     },
     "TPUB": {
         "description": "Publisher",

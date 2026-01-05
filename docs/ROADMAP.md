@@ -136,9 +136,11 @@ tags:
 
 
 ### 🚀 Milestone 6: Post-Alpha Refinements (Tomorrow/Future)
-*   [ ] **Fix & Silence Test Suite (TOP PRIORITY)**
+*   [x] **Fix & Silence Test Suite (TOP PRIORITY)**
     *   *Task*: Fix 33 Failures / 17 Errors caused by recent refactors.
+    *   *Status*: **Done** - All Unit and Integration tests confirmed passing.
     *   [x] **Silence interactive popups** (e.g. `add_alias`) to restore "Law of Silence".
+    *   [x] **Repository Hardening**: Backfilled tests for `TagRepository` (Merge/Workflow) and `GenericRepository` (Audit Transactions).
 *   [ ] **Album Artist M2M Schema** (T-91)
     *   *Task*: Upgrade `Albums.AlbumArtist` from text to `AlbumContributors` (M2M) table.
     *   *Why*: Fixes "Existential Dread" - allows linking multiple identities to an album properly.
@@ -157,17 +159,23 @@ tags:
     *   *Bug*: "Ghost Conflict" - Renaming tag seems to create the new tag *before* checking for conflict, triggering false positive "Exists".
     *   *Feature*: **True Rename** - Renaming "Rock" -> "Rockk" currently creates new "Rockk" tag (link swap) instead of renaming the ID itself. Need "Rename vs Create New" logic.
     *   *Feature*: **Category Mutability** - Allow changing a tag's category (e.g. Mood:Jazz -> Genre:Jazz) directly in the UI.
-*   [ ] **Bug: Duration Import Zero**
+*   [x] **Bug: Duration Import Zero**
     *   *Observation*: "Duration isn't getting imported from the song."
-    *   *Hypothesis*: New `ImportService` or `GenericRepository` mapping might be missing the `Duration` field or calculating it wrong (int vs float, ms vs sec).
+    *   *Cause*: `SongRepository.insert` schema mismatch (missing Duration/Notes in INSERT stmt).
+    *   *Status*: **Fixed** - Added regression test `test_insert_persists_full_object` and updated query.
+*   [x] **Feature: Safe Save Protocol**
+    *   *Goal*: Prevent file/DB desync if DB write fails.
+    *   *Action*: Swapped `ExportService` order to DB-First, ID3-Second.
+    *   *Status*: **Done** - Refactored `ExportService` and `test_export_service.py`.
 *   [ ] **UX: Chip Instant Save?**
     *   *Observation*: Users expect removing a chip to be "final/instant". Current "Save" button flow feels disconnected for Chips.
     *   *Task*: Discuss/Implement instant-save or better dirty state feedback for Chip actions in Album Manager.
 *   [ ] **UX: Chip Sorting Stability**
     *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
     *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.
-*   [ ] **Verify Multi-Edit Logic & Tech Debt Audit**
+*   [ ] **Verify Multi-Edit Logic**
     *   *Task*: Test adding/removing tags in multi-select mode.
+*   [x] **Tech Debt Audit (Genre/Mood)**
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
 *   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
     *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.

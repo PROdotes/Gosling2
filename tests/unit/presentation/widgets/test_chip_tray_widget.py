@@ -122,39 +122,17 @@ class TestChipTrayWidget:
         with qtbot.waitSignal(tray.add_requested, timeout=1000):
             tray.btn_add.clicked.emit()
 
-    def test_remove_with_confirmation(self, qtbot):
-        """Test chip removal with confirmation dialog."""
-        tray = ChipTrayWidget(confirm_removal=True)
+    def test_remove_emits_signal(self, qtbot):
+        """Test chip removal emits signal immediately (No confirmation)."""
+        tray = ChipTrayWidget(confirm_removal=True) # Param ignored now
         qtbot.addWidget(tray)
         
         tray.add_chip(1, "Artist To Remove", "🎤")
         
-        # Mock the confirmation dialog to return Yes
-        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.Yes):
-            with qtbot.waitSignal(tray.chip_remove_requested, timeout=1000) as blocker:
-                tray._on_remove_requested(1, "Artist To Remove")
+        with qtbot.waitSignal(tray.chip_remove_requested, timeout=1000) as blocker:
+            tray._on_remove_requested(1, "Artist To Remove")
         
         assert blocker.args == [1, "Artist To Remove"]
-
-    def test_remove_cancelled(self, qtbot):
-        """Test chip removal cancelled by user."""
-        tray = ChipTrayWidget(confirm_removal=True)
-        qtbot.addWidget(tray)
-        
-        tray.add_chip(1, "Artist To Keep", "🎤")
-        
-        # Mock the confirmation dialog to return No
-        with patch.object(QMessageBox, 'question', return_value=QMessageBox.StandardButton.No):
-            # Signal should NOT be emitted
-            signal_emitted = False
-            def on_remove(entity_id, label):
-                nonlocal signal_emitted
-                signal_emitted = True
-            tray.chip_remove_requested.connect(on_remove)
-            
-            tray._on_remove_requested(1, "Artist To Keep")
-            
-            assert not signal_emitted
 
     def test_get_names_empty(self, qtbot):
         """Test get_names returns empty list when no chips."""

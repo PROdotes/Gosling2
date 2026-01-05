@@ -71,18 +71,19 @@ class ExportService:
             return ExportResult(success=True, dry_run=True)
         
         try:
-            # Step 1: Write ID3 tags to file
-            if not self.metadata_service.write_tags(song):
-                return ExportResult(
-                    success=False, 
-                    error=f"Failed to write ID3 tags to {song.path}"
-                )
-            
-            # Step 2: Update database (only if ID3 succeeded)
+            # Step 1: Update database (Application Source of Truth)
+            # Safe Save: We commit to the DB first. If this fails, the file is untouched.
             if not self.library_service.update_song(song):
                 return ExportResult(
                     success=False,
-                    error=f"ID3 written but database update failed for {song.path}"
+                    error=f"Database update failed for {song.path}"
+                )
+            
+            # Step 2: Write ID3 tags to file (Reflection)
+            if not self.metadata_service.write_tags(song):
+                return ExportResult(
+                    success=False, 
+                    error=f"Database saved, but failed to write ID3 tags to {song.path}"
                 )
             
             return ExportResult(success=True)

@@ -93,7 +93,7 @@ class TestConversionService:
                 performers=["Dr. Beat", "Nurse Rhythm"],
                 album="The Clinic",
                 recording_year=2025,
-                genre="Industrial",
+                tags=["Genre:Industrial"],
                 publisher="Med Records"
             )
             

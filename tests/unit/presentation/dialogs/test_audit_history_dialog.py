@@ -12,7 +12,7 @@ def mock_service():
     """Mock AuditService."""
     service = MagicMock()
     # Mock data return
-    service.get_recent_changes.return_value = [
+    service.get_unified_history.return_value = [
         {
             'LogTimestamp': '2023-01-01 10:00:00',
             'LogTableName': 'Songs',
@@ -20,7 +20,8 @@ def mock_service():
             'RecordID': 123,
             'OldValue': 'Old Title',
             'NewValue': 'New Title',
-            'BatchID': 'batch-guid-1'
+            'BatchID': 'batch-guid-1',
+            'EntryType': 'CHANGE'
         },
         {
             'LogTimestamp': '2023-01-01 10:05:00',
@@ -29,7 +30,8 @@ def mock_service():
             'RecordID': 124,
             'OldValue': None,
             'NewValue': 'Some Insert Data',
-            'BatchID': 'batch-guid-2'
+            'BatchID': 'batch-guid-2',
+            'EntryType': 'CHANGE'
         },
         {
             'LogTimestamp': '2023-01-01 10:10:00',
@@ -38,7 +40,8 @@ def mock_service():
             'RecordID': 125,
             'OldValue': 'Delete Me',
             'NewValue': None,
-            'BatchID': 'batch-guid-3'
+            'BatchID': 'batch-guid-3',
+            'EntryType': 'CHANGE'
         }
     ]
     return service
@@ -60,7 +63,7 @@ def test_initialization(dialog, mock_service):
     # We can manually trigger _refresh_data since it's singleShot(100)
     dialog._refresh_data()
     
-    mock_service.get_recent_changes.assert_called()
+    mock_service.get_unified_history.assert_called()
     assert dialog.model.rowCount() == 3
 
 def test_filtering(dialog):
@@ -100,9 +103,9 @@ def test_view_logic(dialog):
 
 def test_refresh_button(qtbot, dialog, mock_service):
     """Test refresh button triggers service call."""
-    mock_service.get_recent_changes.reset_mock()
+    mock_service.get_unified_history.reset_mock()
     
     with qtbot.waitSignal(dialog.btn_refresh.clicked, timeout=1000, raising=False):
         qtbot.mouseClick(dialog.btn_refresh, Qt.MouseButton.LeftButton)
         
-    mock_service.get_recent_changes.assert_called()
+    mock_service.get_unified_history.assert_called()

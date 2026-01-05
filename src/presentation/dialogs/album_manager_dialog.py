@@ -910,9 +910,9 @@ class AlbumManagerDialog(QDialog):
                     self.current_album = None
                     self.current_id = None
                     self.inp_title.clear()
-                    self.inp_artist.clear()
+                    self.tray_artist.set_chips([]) # Clear artist tray
+                    self.tray_publisher.set_chips([]) # Clear publisher tray
                     self.inp_year.clear()
-                    self.btn_pub_trigger.setText("(None)")
                     self.pane_inspector.setEnabled(False)
                 
                 self._refresh_vault()

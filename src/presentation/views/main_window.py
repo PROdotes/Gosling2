@@ -192,7 +192,9 @@ class MainWindow(QMainWindow):
         self.import_service = ImportService(
             self.library_service,
             self.metadata_service,
-            self.duplicate_scanner
+            self.duplicate_scanner,
+            self.settings_manager,
+            self.conversion_service
         )
 
         from ...business.services.export_service import ExportService

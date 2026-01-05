@@ -34,6 +34,7 @@ class FieldDef:
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     min_length: Optional[int] = None
+    max_length: Optional[int] = None
     validation_pattern: Optional[str] = None  # Regex pattern for format validation (e.g., ISRC)
     
     # UI behavior
@@ -54,6 +55,63 @@ class FieldDef:
     query_expression: Optional[str] = None  # Full SQL expression (for GROUP_CONCAT etc). If None, uses db_column.
     id3_tag: Optional[str] = None # Direct ID3 tag mapping (e.g. "TIT2")
 
+    def is_valid(self, value: Any) -> bool:
+        """
+        Check if a value satisfies this field's constraints.
+        Does NOT throw, just returns True/False.
+        """
+        # 1. Required Check
+        if self.required:
+            if value is None: return False
+            if isinstance(value, str) and not value.strip(): return False
+            if isinstance(value, (list, tuple)) and not value: return False
+            
+        if value is None:
+            return True # If not required, None is valid
+            
+        # 2. String-based Checks (Length / Regex)
+        if self.field_type in (FieldType.TEXT, FieldType.LIST): # List check applies to items or count... 
+            # Current policy: min_length on List means "Number of Items"
+            if self.field_type == FieldType.LIST:
+                if isinstance(value, (list, tuple)):
+                    if self.min_length is not None and len(value) < self.min_length:
+                        return False
+                elif isinstance(value, str):
+                    items = [x.strip() for x in value.split(',') if x.strip()]
+                    if self.min_length is not None and len(items) < self.min_length:
+                        return False
+                    if self.max_length is not None and len(items) > self.max_length:
+                        return False
+            else:
+                s_val = str(value).strip()
+                if self.min_length is not None and len(s_val) < self.min_length:
+                    return False
+                if self.max_length is not None and len(s_val) > self.max_length:
+                    return False
+                if self.validation_pattern:
+                    import re
+                    if not re.match(self.validation_pattern, s_val):
+                        return False
+                        
+        # 3. Numeric Range Checks
+        if self.field_type in (FieldType.INTEGER, FieldType.REAL, FieldType.DURATION):
+            try:
+                num_val = float(value)
+                if self.min_value is not None and num_val < self.min_value:
+                    return False
+                if self.max_value is not None and num_val > self.max_value:
+                    return False
+                
+                # Dynamic Future-Proofing for Year
+                if self.name == 'recording_year':
+                    from datetime import datetime
+                    if num_val > datetime.now().year + 5:
+                        return False
+            except (ValueError, TypeError):
+                return False
+                
+        return True
+
 # ==================== THE REGISTRY ====================
 
 # Query parts (FROM, WHERE, GROUP BY are static; SELECT is generated from FIELDS)
@@ -72,10 +130,6 @@ QUERY_FROM = """
     LEFT JOIN Albums A ON SA.AlbumID = A.AlbumID
     LEFT JOIN AlbumPublishers AP ON A.AlbumID = AP.AlbumID
     LEFT JOIN Publishers P ON AP.PublisherID = P.PublisherID
-    LEFT JOIN MediaSourceTags MST_G ON MS.SourceID = MST_G.SourceID
-    LEFT JOIN Tags TG_G ON MST_G.TagID = TG_G.TagID AND TG_G.TagCategory = 'Genre'
-    LEFT JOIN MediaSourceTags MST_M ON MS.SourceID = MST_M.SourceID
-    LEFT JOIN Tags TG_M ON MST_M.TagID = TG_M.TagID AND TG_M.TagCategory = 'Mood'
     LEFT JOIN MediaSourceTags MST_S ON MS.SourceID = MST_S.SourceID
     LEFT JOIN Tags TG_S ON MST_S.TagID = TG_S.TagID AND TG_S.TagCategory = 'Status' AND TG_S.TagName = 'Unprocessed'
     LEFT JOIN Publishers P_TRK ON SA.TrackPublisherID = P_TRK.PublisherID
@@ -151,6 +205,7 @@ FIELDS: List[FieldDef] = [
         db_column='MS.MediaName',
         id3_tag='TIT2',
         min_length=1,
+        max_length=1000,
         required=True,
         ui_search=True,
         zone='amber',
@@ -221,32 +276,19 @@ FIELDS: List[FieldDef] = [
         validation_pattern=r'^\d{4}$', # Enforce 4 digits (e.g. 1999) to catch typos like "199"
         zone='amber', # ATTRIBUTE
     ),
+
     FieldDef(
-        name='genre',
-        ui_header='Genre',
-        db_column='Genre',
+        name='tags',
+        ui_header='Tags',
+        db_column='AllTags',
         field_type=FieldType.LIST,
         filterable=True,
-        id3_tag='TCON',
-        query_expression='GROUP_CONCAT(DISTINCT TG_G.TagName) AS Genre',
-        required=True,
+        portable=False,  # Virtual container for TCON/TMOO
+        query_expression="(SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||') FROM MediaSourceTags MST JOIN Tags TG ON MST.TagID = TG.TagID WHERE MST.SourceID = MS.SourceID) AS AllTags",
         strategy='list',
-        ui_search=True,
-        zone='amber', # Warm Amber (Matches Speech/All)
+        zone='gray',
     ),
-    FieldDef(
-        name='mood',
-        ui_header='Mood',
-        db_column='Mood',
-        field_type=FieldType.LIST,
-        filterable=True,
-        id3_tag='TMOO',
-        query_expression='GROUP_CONCAT(DISTINCT TG_M.TagName) AS Mood',
-        required=False,
-        strategy='list',
-        ui_search=True,
-        zone='amber',
-    ),
+
     FieldDef(
         name='isrc',
         ui_header='ISRC',
@@ -404,6 +446,11 @@ VALIDATION_GROUPS = [
 
 # ==================== QUERY GENERATION ====================
 
+def get_field(name: str) -> Optional[FieldDef]:
+    """Retrieve field definition by internal name."""
+    return next((f for f in FIELDS if f.name == name), None)
+
+
 def build_query_select() -> str:
     """
     Generate SELECT clause from FIELDS list.
@@ -460,55 +507,7 @@ def validate_row(row_data: list) -> set:
             break
             
         field_def = FIELDS[col_idx]
-        is_valid = True
-        
-        # Check required
-        if field_def.required:
-            if cell_value is None:
-                is_valid = False
-            elif isinstance(cell_value, str) and not cell_value.strip():
-                is_valid = False
-            elif isinstance(cell_value, (list, tuple)) and len(cell_value) == 0:
-                is_valid = False
-        
-        # Check list min_length
-        if is_valid and field_def.field_type == FieldType.LIST:
-            if field_def.required and not cell_value:
-                is_valid = False
-            elif cell_value and field_def.min_length is not None:
-                items = [x.strip() for x in str(cell_value).split(',') if x.strip()]
-                if len(items) < field_def.min_length:
-                    is_valid = False
-        
-        # Check text min_length
-        elif is_valid and field_def.field_type == FieldType.TEXT:
-            if cell_value and field_def.min_length is not None:
-                if len(str(cell_value).strip()) < field_def.min_length:
-                    is_valid = False
-        
-        # Check numeric range (min/max)
-        elif is_valid and field_def.field_type in (FieldType.INTEGER, FieldType.REAL, FieldType.DURATION):
-            if cell_value is not None:
-                try:
-                    val_num = float(cell_value)
-                    
-                    if field_def.min_value is not None and val_num < field_def.min_value:
-                        is_valid = False
-                        
-                    if field_def.max_value is not None and val_num > field_def.max_value:
-                        is_valid = False
-                        
-                    # Dynamic Cap for Years
-                    if field_def.name == 'recording_year':
-                        from datetime import datetime
-                        max_year = datetime.now().year + 1
-                        if val_num > max_year:
-                             is_valid = False
-                             
-                except (ValueError, TypeError):
-                    pass # logic elsewhere might catch type errors, but here we just skip check
-        
-        if not is_valid:
+        if not field_def.is_valid(cell_value):
             failed_fields.add(field_def.name)
     
     # Cross-field validation from VALIDATION_GROUPS
@@ -562,22 +561,13 @@ def validate_schema() -> None:
     
     Call this at app startup or in tests to catch schema drift early.
     """
-    import json
-    import os
     from src.data.models.song import Song
+    from .registries.id3_registry import ID3Registry
     
     errors = []
     
-    # Load id3_frames.json
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(base_dir, '..', 'resources', 'id3_frames.json')
-    
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            id3_frames = json.load(f)
-    except Exception as e:
-        errors.append(f"❌ Failed to load id3_frames.json: {e}")
-        id3_frames = {}
+    # Load ID3 frames from registry
+    id3_frames = ID3Registry.get_frame_map()
     
     # Build reverse lookup: field_name -> frame_code
     field_to_frame = {}
@@ -610,9 +600,7 @@ def validate_schema() -> None:
                 # Check 2: JSON field maps to Song attribute
                 attr = attr_map.get(json_field, json_field)
                 
-                # Unified fields (Genre, Mood) don't have direct attributes
-                if json_field in ('genre', 'mood'):
-                    continue
+
                     
                 if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
                     errors.append(f"❌ JSON field '{json_field}' → Song missing attribute '{attr}'")
@@ -623,7 +611,7 @@ def validate_schema() -> None:
             attr = attr_map.get(attr, attr)
             
             # Unified fields live in the 'tags' list, not as direct attributes
-            if field.name in ('genre', 'mood', 'is_done'):
+            if field.name == 'is_done':
                 continue
                 
             if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
@@ -642,18 +630,10 @@ def row_to_tagged_tuples(row: tuple) -> list:
     
     Song will use these to look up mappings in id3_frames.json.
     """
-    import json
-    import os
+    from .registries.id3_registry import ID3Registry
     
-    # Load id3_frames.json to find frame codes
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(base_dir, '..', 'resources', 'id3_frames.json')
-    
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            id3_frames = json.load(f)
-    except Exception:
-        id3_frames = {}
+    # Load ID3 frames from registry
+    id3_frames = ID3Registry.get_frame_map()
     
     # Build reverse lookup: field_name -> frame_code
     field_to_frame = {}
@@ -668,9 +648,13 @@ def row_to_tagged_tuples(row: tuple) -> list:
             
         value = row[i]
         
-        # Handle list types (comma-separated strings from DB)
+        # Handle list types (aggregated strings from DB)
         if field.field_type == FieldType.LIST and value:
-            value = [v.strip() for v in str(value).split(',') if v.strip()]
+            # T-70: Support both standard comma and the '|||' separator used for tags
+            if '|||' in str(value):
+                value = [v.strip() for v in str(value).split('|||') if v.strip()]
+            else:
+                value = [v.strip() for v in str(value).split(',') if v.strip()]
         
         # Look up ID3 frame from JSON
         frame_code = field_to_frame.get(field.name)
@@ -703,6 +687,8 @@ def check_db_integrity(cursor) -> None:
     # Valid columns that are in DB but intentionally not in Yellberus yet
     known_ignored = {
         'Notes',  # Not yet fully implemented
+        'SongIsDone', # Legacy column, replaced by virtual is_done
+        'IsDone', # Variant? To be safe.
     }
     
     for table in ['MediaSources', 'Songs']:
@@ -739,55 +725,33 @@ def cast_from_string(field_def: FieldDef, value: Any) -> Any:
     if not s_val:
         return None
 
-    # 2. Pattern Validation (Global)
-    if field_def.validation_pattern:
-        import re
-        if not re.match(field_def.validation_pattern, s_val):
+    # 2. Validation
+    if not field_def.is_valid(s_val):
+         # Try to be helpful with the error message
+         if field_def.required and not s_val:
+             raise ValueError(f"{field_def.ui_header} is required")
+         if field_def.min_length is not None:
+             # Text or List?
+             if field_def.field_type == FieldType.LIST:
+                 raise ValueError(f"{field_def.ui_header} requires at least {field_def.min_length} items")
+             else:
+                 raise ValueError(f"'{s_val}' is too short for {field_def.ui_header}")
+         if field_def.min_value is not None:
+             raise ValueError(f"{field_def.ui_header} must be at least {field_def.min_value}")
+         if field_def.validation_pattern:
              raise ValueError(f"'{s_val}' does not match format for {field_def.ui_header}")
+             
+         raise ValueError(f"Invalid value for {field_def.ui_header}: '{s_val}'")
 
-    # 3. Min Length Check (Text/String based)
-    if field_def.min_length is not None:
-        if len(s_val) < field_def.min_length:
-             raise ValueError(f"'{s_val}' is too short for {field_def.ui_header} (Min: {field_def.min_length})")
-
-    # 4. Type Casting & Range Check
+    # 3. Type Casting
     if field_def.field_type == FieldType.LIST:
-        # Check size of list items? (min_length usually applies to list count OR item length?)
-        # Yellberus validate_row checks LIST COUNT.
-        items = [v.strip() for v in s_val.split(',') if v.strip()]
-        if field_def.min_length is not None and len(items) < field_def.min_length:
-             raise ValueError(f"{field_def.ui_header} requires at least {field_def.min_length} items")
-        return items
+        return [v.strip() for v in s_val.split(',') if v.strip()]
         
     elif field_def.field_type == FieldType.INTEGER:
-        try:
-            i_val = int(s_val)
-            if field_def.min_value is not None and i_val < field_def.min_value:
-                 raise ValueError(f"{field_def.ui_header} must be at least {field_def.min_value}")
-            if field_def.max_value is not None and i_val > field_def.max_value:
-                 raise ValueError(f"{field_def.ui_header} cannot be greater than {field_def.max_value}")
-                 
-            # Dynamic Cap for Years (Future-Proofing Logic)
-            if field_def.name == 'recording_year':
-                from datetime import datetime
-                max_year = datetime.now().year + 1
-                if i_val > max_year:
-                     raise ValueError(f"{field_def.ui_header} cannot be in the future (Max: {max_year})")
-
-            return i_val
-        except (ValueError, TypeError):
-            raise ValueError(f"'{value}' is not a valid number for {field_def.ui_header}")
+        return int(s_val)
             
     elif field_def.field_type == FieldType.REAL:
-        try:
-            f_val = float(s_val)
-            if field_def.min_value is not None and f_val < field_def.min_value:
-                 raise ValueError(f"{field_def.ui_header} must be at least {field_def.min_value}")
-            if field_def.max_value is not None and f_val > field_def.max_value:
-                 raise ValueError(f"{field_def.ui_header} cannot be greater than {field_def.max_value}")
-            return f_val
-        except (ValueError, TypeError):
-            raise ValueError(f"'{value}' is not a valid number for {field_def.ui_header}")
+        return float(s_val)
             
     elif field_def.field_type == FieldType.BOOLEAN:
         return s_val.lower() in ("true", "1", "yes", "on")

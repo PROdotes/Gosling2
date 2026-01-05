@@ -42,6 +42,10 @@ def test_song_model_field_alignment():
     for field in yellberus.FIELDS:
         attr = attr_map.get(field.name, field.name)
         # Check dataclass fields OR hasattr (for properties)
+        # T-Refactor: Unified Fields like 'is_done' live in tags/statuses, not as Song attributes.
+        if field.name == 'is_done':
+            continue
+
         assert attr in model_fields or hasattr(Song, attr), \
             f"Yellberus field '{field.name}' has no matching attribute '{attr}' in Song model."
 

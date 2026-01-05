@@ -155,6 +155,7 @@ def mock_widget_deps():
     deps['settings_manager'].get_column_visibility.return_value = {}
     deps['settings_manager'].get_column_layout.return_value = None
     deps['settings_manager'].get_type_filter.return_value = 0
+    deps['settings_manager'].get_default_year.return_value = 0
     
     # Default library data (Empty but structured)
     deps['library_service'].get_all_songs.return_value = ([], [])
@@ -166,6 +167,9 @@ def mock_widget_deps():
     mock_contributor.contributor_name = "Test Artist"
     deps['library_service'].contributor_repository = MagicMock()
     deps['library_service'].contributor_repository.get_or_create.return_value = (mock_contributor, False)
+    # Service mock (SidePanel uses service, not repo directly)
+    deps['library_service'].contributor_service = MagicMock()
+    deps['library_service'].contributor_service.get_or_create.return_value = (mock_contributor, False)
     
     # Publisher repo
     mock_publisher = MagicMock()
@@ -175,6 +179,10 @@ def mock_widget_deps():
     deps['library_service'].publisher_repo = MagicMock()
     deps['library_service'].publisher_repo.get_or_create.return_value = (mock_publisher, False)
     deps['library_service'].publisher_repo.get_by_id.return_value = None
+    # Service mock
+    deps['library_service'].publisher_service = MagicMock()
+    # PublisherService.get_or_create might act same as repo
+    deps['library_service'].publisher_service.get_or_create.return_value = (mock_publisher, False)
     
     # Album repo
     mock_album = MagicMock()

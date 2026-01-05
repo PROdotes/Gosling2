@@ -1,6 +1,6 @@
 """Base Repository with database operations"""
 import sqlite3
-from typing import Optional
+from typing import Optional, Any
 from contextlib import contextmanager
 from .database_config import DatabaseConfig
 

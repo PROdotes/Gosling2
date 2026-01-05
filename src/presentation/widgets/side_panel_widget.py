@@ -1,18 +1,18 @@
 from typing import List, Any
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-    QLineEdit, QCheckBox, QComboBox, QScrollArea,
-    QFrame, QSizePolicy, QPushButton, QMenu
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
+    QScrollArea, QFrame, QSizePolicy, QMessageBox
 )
-from PyQt6.QtGui import QAction, QDesktopServices, QIcon, QPixmap, QPainter, QColor, QFont, QPen
-from PyQt6.QtCore import Qt, pyqtSignal, QUrl, QPoint
-from .glow_factory import GlowLineEdit, GlowButton, GlowLED
-from .chip_tray_widget import ChipTrayWidget
-from ..dialogs.artist_manager_dialog import ArtistDetailsDialog, ArtistPickerWidget, ArtistCreatorDialog
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtGui import QFont
+from ...core import yellberus
+from ...core.registries.id3_registry import ID3Registry
+from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED
+from ..widgets.chip_tray_widget import ChipTrayWidget
+from ..dialogs.tag_picker_dialog import TagPickerDialog
+from ..dialogs.artist_manager_dialog import ArtistPickerWidget, ArtistCreatorDialog
 import copy
 import os
-from ...core import yellberus
-from ..dialogs.tag_picker_dialog import TagPickerDialog
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
 
 class SidePanelWidget(QFrame):
@@ -311,20 +311,15 @@ class SidePanelWidget(QFrame):
         identity_names = ['title', 'performers', 'album', 'composers', 'publisher', ['recording_year', 'isrc']]
         attribute_names = ['tags'] # Virtual field merging Genre & Mood
         
-        core_names_flat = {'genre', 'mood'} # Mark as handled for Advanced section
+        core_names_flat = set() # Track handled fields
         
         def build_struct(names):
             struct = []
             for item in names:
                 if item == 'tags':
-                    # Create a virtual field definition for the Unified Tag Tray
-                    tags_def = yellberus.FieldDef(
-                        name='tags',
-                        ui_header='Tags',
-                        db_column='', # Virtual
-                        ui_search=False # Consolidated search is complex, skip for now
-                    )
-                    struct.append(tags_def)
+                    if item in all_visible:
+                        struct.append(all_visible[item])
+                        core_names_flat.add(item)
                     continue
 
                 if isinstance(item, list):
@@ -554,10 +549,7 @@ class SidePanelWidget(QFrame):
         if not self.current_songs:
             return
 
-        # T-70: Include virtual fields (like 'tags') in the refresh queue
         refresh_queue = list(yellberus.FIELDS)
-        # Create a lightweight FieldDef for virtual 'tags'
-        refresh_queue.append(yellberus.FieldDef(name='tags', ui_header='Tags', db_column=''))
 
         for field_def in refresh_queue:
             field_name = field_def.name
@@ -621,14 +613,7 @@ class SidePanelWidget(QFrame):
                                 # Convert to 8-tuple format
                                 # (id, name, icon, is_ghost, is_inherited, tooltip, zone, is_primary)
                                 # NOTE: is_primary star only shown for Genre (first item)
-                                if field_name == 'genre':
-                                    # Genres now use the TagService
-                                    tag, created = self.tag_service.get_or_create(str(n), category='Genre')
-                                    chips.append((tag.tag_id, tag.tag_name, "🏷️", False, False, "", field_def.zone or "amber", i == 0))
-                                elif field_name == 'mood':
-                                    tag, created = self.tag_service.get_or_create(str(n), category='Mood')
-                                    chips.append((tag.tag_id, tag.tag_name, "✨", False, False, "", field_def.zone or "amber", False))
-                                elif field_name == 'publisher':
+                                if field_name == 'publisher':
                                     # Lookup Publisher ID via Service
                                     pub, created = self.publisher_service.get_or_create(str(n))
                                     pid = pub.publisher_id if pub else 0
@@ -726,7 +711,7 @@ class SidePanelWidget(QFrame):
             self._handle_publisher_click(entity_id, name)
         elif field_name == 'album':
             self._handle_album_click(entity_id, name)
-        elif field_name in ['genre', 'mood', 'tags']:
+        elif field_name == 'tags':
              self._handle_tag_click(field_name, entity_id, name)
         else:
              # Contributors
@@ -1125,10 +1110,13 @@ class SidePanelWidget(QFrame):
         elif field_name == 'album':
             # Clean Slate for Add, Merge logic handled in callback
             self._open_album_manager(clean_slate=True, mode='add')
-        elif field_name in ['tags', 'genre', 'mood']:
+        elif field_name == 'tags':
             # Unified tag picker - use TagRepository for all categories
             from ..dialogs.tag_picker_dialog import TagPickerDialog
-            default_cat = 'Mood' if field_name == 'mood' else 'Genre'
+            # Use first category from registry as default
+            cats = ID3Registry.get_all_category_names()
+            # Find the category mapped to TCON (Genre) for a sensible default
+            default_cat = next((c for c in cats if ID3Registry.get_id3_frame(c) == 'TCON'), cats[0] if cats else 'Genre')
             diag = TagPickerDialog(self.tag_service, default_category=default_cat, parent=self)
             if diag.exec():
                 selected = diag.get_selected()
@@ -1174,28 +1162,18 @@ class SidePanelWidget(QFrame):
         self._refresh_field_values()
 
     def _on_chip_context_menu(self, field_name, entity_id, name, global_pos):
-        """T-82: Direct Right-Click action (Skip Menu) - ONLY for Genre."""
-        if field_name == 'genre':
-            self._on_chip_primary_requested(field_name, entity_id, name)
-        elif field_name == 'album':
+        """T-82: Direct Right-Click action (Skip Menu) - ONLY for Genre category."""
+        if field_name == 'album':
             self._on_chip_primary_requested(field_name, entity_id, name)
         elif field_name == 'tags' and ': ' in name:
-            # Virtual 'tags' field - only act if it's a Genre tag
+            # Virtual 'tags' field - only act if it's a Genre tag (TCON frame)
             cat, _ = name.split(': ', 1)
-            if cat.lower() == 'genre':
+            if ID3Registry.get_id3_frame(cat) == 'TCON':
                 self._on_chip_primary_requested(field_name, entity_id, name)
 
     def _on_chip_primary_requested(self, field_name, entity_id, name):
         """T-82: Move a specific tag/genre to the front of the list."""
-        if field_name == 'tags':
-            if ': ' in name:
-                cat, actual_name = name.split(': ', 1)
-                target_field = 'genre' if cat.lower() == 'genre' else 'mood'
-                self._on_chip_primary_requested(target_field, entity_id, actual_name)
-                return
-            else:
-                self._on_chip_primary_requested('genre', entity_id, name)
-                return
+
 
         for song in self.current_songs:
             current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
@@ -1249,7 +1227,7 @@ class SidePanelWidget(QFrame):
         if field_def.name == 'tags':
             tray = ChipTrayWidget(
                 confirm_template=f"Remove tag '{{label}}'?",
-                add_tooltip=f"Add Tag (Genre or Mood)",
+                add_tooltip=f"Add Tag",
                 show_add=False,
                 parent=self
             )
@@ -1261,8 +1239,8 @@ class SidePanelWidget(QFrame):
             return tray
 
         # Default: Line Edit for Alpha
-        # T-70: Artist/Publisher/Genre/Album/Mood Chip Tray
-        if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'genre', 'album', 'mood']:
+        # T-70: Artist/Publisher/Album Chip Tray
+        if field_def.name in ['performers', 'composers', 'producers', 'lyricists', 'publisher', 'album']:
             # T-Multi: Enable Add button for Album to allow explicit "Add" workflow
             can_add = (field_def.name == 'album')
             
@@ -1649,8 +1627,8 @@ class SidePanelWidget(QFrame):
                     icon = self._get_tag_category_icon(category)
                     zone = self._get_tag_category_zone(category)
                     for i, tag in enumerate(tags):
-                        # Only Genre gets primary star (first item)
-                        is_primary = (i == 0 and category == "Genre")
+                        # Only Genre (TCON) gets primary star (first item)
+                        is_primary = (i == 0 and ID3Registry.get_id3_frame(category) == "TCON")
                         chips.append((tag.tag_id, f"{category}: {tag.tag_name}", icon, False, False, "", zone, is_primary))
             else:
                 # Multiple songs - show mixed indicator
@@ -1703,25 +1681,20 @@ class SidePanelWidget(QFrame):
 
     def _get_tag_category_icon(self, category):
         """Get icon emoji for a tag category."""
-        icons = {
-            "Genre": "🏷️",
-            "Mood": "✨",
-            "Instrument": "🎸",
-            "Theme": "📚",
-            "Status": "📋",
-        }
-        return icons.get(category, "📦")
+        return ID3Registry.get_category_icon(category, default="📦")
 
     def _get_tag_category_zone(self, category):
         """Get color zone for a tag category."""
-        zones = {
-            "Genre": "blue",
-            "Mood": "magenta",
-            "Instrument": "orange",
-            "Theme": "green",
-            "Status": "yellow",
+        # Map ID3Registry colors to zones
+        # This is a simplified mapping - you might want to enhance this
+        color = ID3Registry.get_category_color(category, default="#888888")
+        # Simple color to zone mapping
+        color_to_zone = {
+            "#FFB84D": "amber",  # Genre
+            "#32A8FF": "blue",   # Mood
+            "#888888": "gray",   # Default
         }
-        return zones.get(category, "gray")
+        return color_to_zone.get(color, "gray")
 
     def _on_field_changed(self, field_name, value):
         """Stage the change for the current selection."""
@@ -1892,16 +1865,15 @@ class SidePanelWidget(QFrame):
             default_year_setting = self.settings_manager.get_default_year()
             
         # Only apply auto-fill if a default year is explicitly configured (User Request)
-        if default_year_setting > 0:
-            current_year = default_year_setting
+        for song_id in list(changes_to_emit.keys()):
+            # Ensure sub-dict exists
+            if song_id not in changes_to_emit:
+                    changes_to_emit[song_id] = {}
+                    
+            changes = changes_to_emit[song_id]
             
-            for song_id in list(changes_to_emit.keys()):
-                # Ensure sub-dict exists
-                if song_id not in changes_to_emit:
-                     changes_to_emit[song_id] = {}
-                     
-                changes = changes_to_emit[song_id]
-                
+            # --- Auto-fill Year logic ---
+            if default_year_setting > 0:
                 # Check if year is valid
                 has_year_change = 'recording_year' in changes
                 effective_year = None
@@ -1922,11 +1894,11 @@ class SidePanelWidget(QFrame):
                         song = self.library_service.get_song_by_id(song_id)
                     
                     if song:
-                         effective_year = song.recording_year
+                            effective_year = song.recording_year
                 
                 # If effectively empty, force it
                 if not effective_year:
-                    changes['recording_year'] = current_year
+                    changes['recording_year'] = default_year_setting
 
             # --- Composer Logic (Hardcoded Splitter) ---
             if 'composers' in changes:

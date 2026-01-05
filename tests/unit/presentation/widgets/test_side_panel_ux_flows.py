@@ -17,6 +17,7 @@ class TestSidePanelUXFlows:
         widget = SidePanelWidget(
             deps['library_service'],
             deps['metadata_service'],
+            deps['settings_manager'],
             deps['renaming_service'],
             deps['duplicate_scanner']
         )
@@ -36,8 +37,7 @@ class TestSidePanelUXFlows:
         s.is_done = False
         s.recording_year = 2023
         s.publisher = "Test Publisher"
-        s.genre = "Test Genre"
-        s.mood = "Test Mood"
+        s.tags = ["Genre:Test Genre", "Mood:Test Mood"]
         s.composers = []
         s.producers = []
         s.lyricists = []

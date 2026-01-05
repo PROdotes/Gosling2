@@ -65,6 +65,20 @@ class TestSongRepoCRUD:
         assert fetched_song.name == "Test Song"
         assert fetched_song.duration == 180
 
+    def test_insert_persists_full_object(self, song_repo, sample_song):
+        """Regression: Ensure insert(Song) persists all fields without needing update()."""
+        # 1. Direct Insert of Song Object
+        file_id = song_repo.insert(sample_song)
+        assert file_id is not None
+        
+        # 2. Fetch immediately
+        fetched = song_repo.get_by_id(file_id)
+        
+        # 3. Verify fields
+        assert fetched.name == sample_song.name
+        assert fetched.duration == sample_song.duration # This should be 180, not None/0
+        assert fetched.bpm == sample_song.bpm
+
     def test_update_song(self, song_repo, sample_song):
         """Test updating an existing song."""
         file_id = self._create_song(song_repo, sample_song)

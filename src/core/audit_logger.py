@@ -32,10 +32,12 @@ class AuditLogger:
         
         rows = []
         for field, value in normalized.items():
-            if value is not None:
+            # Filter: Do not log empty writes (not a DB change)
+            if value is not None and value != "":
                 rows.append((table_name, record_id, field, None, value, self.batch_id))
         
-        self.audit_repo.insert_change_logs(rows)
+        if rows:
+            self.audit_repo.insert_change_logs(rows)
 
     def log_update(self, table_name: str, record_id: int, old_data: Dict[str, Any], new_data: Dict[str, Any]) -> None:
         """
@@ -78,8 +80,10 @@ class AuditLogger:
         # 2. Add to ChangeLog so it shows up in "Data History"
         normalized = self._normalize_dict(old_data)
         rows = []
+        skipped = []
         for field, value in normalized.items():
-            if value is not None:
+            # Filter: Do not log empty deletes (not a DB change)
+            if value is not None and value != "":
                 rows.append((table_name, record_id, field, value, None, self.batch_id))
         
         if rows:
@@ -108,7 +112,7 @@ class AuditLogger:
                 # Filter None/Empty, convert to string, sort
                 items = sorted([str(x).strip() for x in v if x])
                 val = ", ".join(items)
-                normalized[k] = val if val else None # Normalize empty list to None
+                normalized[k] = val  # Allow empty string for lists
                 
             # Bool Handling: explicit 0/1 
             elif isinstance(v, bool):
@@ -141,12 +145,12 @@ class AuditLogger:
             val_old = norm_old.get(k)
             val_new = norm_new.get(k)
             
-            # Strict string equality check
-            if val_old != val_new:
-                # If both are effectively empty (None vs "")?
-                # _normalize_dict leaves None as None, Strings as Strings.
-                # If we want to treat None and "" as same, do it there.
-                # For now, explicit change None -> "" is a change.
+            # T-Clean: Treat None and "" as equivalent for Audit purposes
+            # This prevents "Null -> Empty List" logs which users see as "Nothing -> Nothing"
+            eff_old = val_old if val_old is not None else ""
+            eff_new = val_new if val_new is not None else ""
+            
+            if eff_old != eff_new:
                 diffs[k] = {'old': val_old, 'new': val_new}
                 
         return diffs

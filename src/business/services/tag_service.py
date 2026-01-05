@@ -3,7 +3,7 @@ Tag Service
 
 Handles business logic for Genres and Custom Tags.
 """
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple, Dict, Any
 from ...data.repositories.tag_repository import TagRepository
 
 class TagService:
@@ -12,9 +12,6 @@ class TagService:
     def __init__(self, tag_repository: Optional[TagRepository] = None):
         self._repo = tag_repository or TagRepository()
 
-    def get_all_genres(self) -> List[str]:
-        """Fetch all unique genre names."""
-        return self._repo.get_all_genres()
 
     def get_distinct_categories(self) -> List[str]:
         """Fetch all used categories."""
@@ -28,17 +25,27 @@ class TagService:
         """Get all tags in a specific category."""
         return self._repo.get_all_by_category(category)
 
-    def get_tags_for_song(self, song_id: int) -> List[Dict]:
-        """Get all tags/genres linked to a song."""
-        return self._repo.get_tags_for_song(song_id)
+    def get_tags_for_song(self, song_id: int) -> List[Any]:
+        """Get all tags linked to a song."""
+        return self._repo.get_tags_for_source(song_id)
 
-    def set_tags(self, song_id: int, tags: List[str], category: str = "Genre") -> bool:
-        """Update tags for a song."""
-        return self._repo.set_tags(song_id, tags, category)
+    def set_tags(self, song_id: int, tags: List[str], category: str) -> bool:
+        """Update tags for a song by category (Replaces existing)."""
+        try:
+            self._repo.remove_all_tags_from_source(song_id, category)
+            for t_name in tags:
+                self._repo.add_tag_to_source(song_id, t_name, category)
+            return True
+        except Exception:
+            return False
         
-    def rename_tag(self, old_name: str, new_name: str, category: str = "Genre") -> bool:
+    def rename_tag(self, old_name: str, new_name: str, category: str) -> bool:
         """Global rename of a tag across all songs."""
-        return self._repo.rename_tag(old_name, new_name, category)
+        tag = self._repo.find_by_name(old_name, category)
+        if not tag: return False
+        
+        tag.tag_name = new_name
+        return self._repo.update(tag)
 
     def is_unprocessed(self, song_id: int) -> bool:
         """Check if a song has the 'Status:Unprocessed' tag."""

@@ -106,6 +106,11 @@ class SettingsDialog(QDialog):
         layout.addWidget(self.chk_rename_enabled)
         layout.addWidget(self.chk_move_done)
         
+        # T-Refactor: ZIP Cleanup
+        self.chk_delete_zip = QCheckBox("Delete original ZIP after successful import")
+        self.chk_delete_zip.setToolTip("If checked, ZIP files will be deleted ONLY if all their contents are successfully imported.")
+        layout.addWidget(self.chk_delete_zip)
+        
         # Pattern (Conditional)
         # Check for Rules JSON (T-52 Conflict Resolution)
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -146,6 +151,11 @@ class SettingsDialog(QDialog):
         self.chk_conversion_enabled = QCheckBox("Enable Conversion on Import (or Export)")
         self.chk_conversion_enabled.setObjectName("FieldLabel")
         layout.addWidget(self.chk_conversion_enabled)
+        
+        # WAV Deletion Toggle
+        self.chk_delete_wav = QCheckBox("Delete original WAV after successful conversion")
+        self.chk_delete_wav.setToolTip("If checked, the original WAV file will be deleted automatically after it is converted to MP3.")
+        layout.addWidget(self.chk_delete_wav)
 
         # Quality Row
         bitrate_layout = QHBoxLayout()
@@ -207,8 +217,13 @@ class SettingsDialog(QDialog):
         self.chk_default_year.setObjectName("FieldLabel")
         self.chk_default_year.toggled.connect(self._on_year_toggled)
         
+        from ...core import yellberus
+        fdef = yellberus.get_field('recording_year')
+        min_year_val = fdef.min_value if fdef and fdef.min_value is not None else 1860
+        max_year_val = fdef.max_value if fdef and fdef.max_value is not None else 9999
+
         self.spin_default_year = QSpinBox()
-        self.spin_default_year.setRange(1860, 9999) 
+        self.spin_default_year.setRange(int(min_year_val), int(max_year_val)) 
         self.spin_default_year.setFixedHeight(30)
         self.spin_default_year.setObjectName("SettingsSpin")
         self.spin_default_year.setEnabled(False) 
@@ -249,6 +264,7 @@ class SettingsDialog(QDialog):
 
         # Conversion
         self.chk_conversion_enabled.setChecked(self.settings_manager.get_conversion_enabled())
+        self.chk_delete_wav.setChecked(self.settings_manager.get_delete_wav_after_conversion())
 
         # Match bitrate to combo
         current_bitrate = self.settings_manager.get_conversion_bitrate()
@@ -358,6 +374,7 @@ class SettingsDialog(QDialog):
 
         # Conversion
         self.settings_manager.set_conversion_enabled(self.chk_conversion_enabled.isChecked())
+        self.settings_manager.set_delete_wav_after_conversion(self.chk_delete_wav.isChecked())
         self.settings_manager.set_conversion_bitrate(self.cmb_bitrate.currentText())
         self.settings_manager.set_ffmpeg_path(self.txt_ffmpeg_path.text().strip())
         

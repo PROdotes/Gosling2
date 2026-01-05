@@ -65,15 +65,9 @@ class TestT06Publishers(unittest.TestCase):
         pub = self.pub_repo.find_by_name(self.test_publisher)
         self.assertIsNotNone(pub)
         
-        # Check Album was auto-created
-        # Album name defaults to file name if Song Name was simple (Insert logic uses BaseName)
-        # SongRepo.insert uses os.path.basename(file_path) as Name.
-        expected_album_title = "t06_publisher_song.mp3" 
-        
-        # Use existing album repo or raw sql? pub_repo doesn't fetch albums.
-        # Let's inspect via raw SQL or album repo if we imported it. 
-        # Actually I can rely on song_fresh.album being set!
-        self.assertEqual(song_fresh.album, expected_album_title)
+        # Check Album was NOT auto-created (Single Paradox Deprecated)
+        # SongRepo now supports RecordingPublishers (Level 3) which links to SourceID directly.
+        self.assertIsNone(song_fresh.album)
         
     def test_publisher_on_existing_album(self):
         """

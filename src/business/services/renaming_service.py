@@ -25,18 +25,15 @@ class RenamingService:
         # Extract genres from Unified Tags (e.g., "Genre:Rock" -> "rock")
         song_genres = []
         if hasattr(song, 'tags') and song.tags:
+            from ...core.registries.id3_registry import ID3Registry
             for tag in song.tags:
                 if ":" in tag:
                     cat, val = tag.split(":", 1)
-                    if cat.lower() == "genre":
+                    # Check if this category is Genre (maps to TCON frame)
+                    if ID3Registry.get_id3_frame(cat) == "TCON":
                         song_genres.append(val.lower().strip())
         
-        # Fallback to legacy .genre if tags are empty (migration safety)
-        if not song_genres and hasattr(song, 'genre') and song.genre:
-             if isinstance(song.genre, list):
-                 song_genres = [g.lower().strip() for g in song.genre]
-             else:
-                 song_genres = [g.strip().lower() for g in str(song.genre).split(',') if g.strip()]
+
 
         if rules and song_genres:    
             for rule in rules.get("routing_rules", []):
@@ -104,28 +101,21 @@ class RenamingService:
         elif isinstance(album, list) and album:
             album = album[0]
         
-        # Resolve Genre (Handle list)
         # Resolve Genre (Handle list from tags or legacy field)
         genre_name = "Uncategorized"
         
         # 1. Try Unified Tags
         if hasattr(song, 'tags') and song.tags:
+            from ...core.registries.id3_registry import ID3Registry
             for tag in song.tags:
                 if ":" in tag:
                      cat, val = tag.split(":", 1)
-                     if cat.lower() == "genre":
+                     # Check if this category is Genre (maps to TCON frame)
+                     if ID3Registry.get_id3_frame(cat) == "TCON":
                          genre_name = val.strip()
                          break # Take first genre as primary
         
-        # 2. Fallback to Legacy .genre
-        if genre_name == "Uncategorized":
-            genre_val = getattr(song, 'genre', None)
-            if isinstance(genre_val, list) and genre_val:
-                genre_name = genre_val[0]
-            elif isinstance(genre_val, str) and "," in genre_val:
-                genre_name = genre_val.split(",")[0].strip()
-            elif genre_val:
-                genre_name = str(genre_val)
+
 
         # Resolve Composers
         composers = getattr(song, 'composers', [])

@@ -17,7 +17,8 @@ class TestImportServiceMutation:
         return ImportService(
             service_deps['library'],
             service_deps['metadata'],
-            service_deps['scanner']
+            service_deps['scanner'],
+            MagicMock() # SettingsManager
         )
 
     def test_import_non_existent_file(self, import_service):
@@ -39,12 +40,12 @@ class TestImportServiceMutation:
             assert "Malformed ID3" in err
 
     def test_database_insert_failure(self, import_service, service_deps):
-        """Should handle DB failures gracefully if add_file returns None."""
+        """Should handle DB failures gracefully if add_song returns None."""
         with patch('src.business.services.import_service.calculate_audio_hash', return_value="hash"):
             service_deps['scanner'].check_audio_duplicate.return_value = None
             service_deps['scanner'].check_isrc_duplicate.return_value = None
             service_deps['metadata'].extract_metadata.return_value = MagicMock(isrc=None)
-            service_deps['library'].add_file.return_value = None
+            service_deps['library'].add_song.return_value = None
             
             success, sid, err = import_service.import_single_file("fail.mp3")
             

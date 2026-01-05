@@ -97,9 +97,7 @@ class LibraryService:
         """Find a song by audio hash for duplicate detection"""
         return self.song_service._repo.get_by_audio_hash(audio_hash)
 
-    def get_all_years(self) -> List[int]:
-        """Get all distinct recording years"""
-        return self.song_service.get_distinct_values("RecordingYear")
+
 
     def get_all_aliases(self) -> List[str]:
         """Get all distinct alias names"""

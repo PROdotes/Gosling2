@@ -5,33 +5,21 @@ from mutagen.id3 import ID3, ID3NoHeaderError
 from ...data.models.song import Song
 from ...core.yellberus import FIELDS
 from ...core import logger
+from ...core.registries.id3_registry import ID3Registry
 import mutagen.id3
 from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER, TLEN
-import json
-import os
 
 
 class MetadataService:
     """Service for extracting metadata from audio files"""
 
-    _id3_map = None
-
     @classmethod
     def _get_id3_map(cls):
-        """Load ID3 mapping once and cache it."""
-        if cls._id3_map is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
-            if os.path.exists(json_path):
-                try:
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        cls._id3_map = json.load(f)
-                except Exception as e:
-                    logger.error(f"Error loading id3_frames.json: {e}")
-                    cls._id3_map = {}
-            else:
-                cls._id3_map = {}
-        return cls._id3_map
+        """
+        DEPRECATED: Use ID3Registry.get_frame_map() directly.
+        Kept for backward compatibility with Song.from_row().
+        """
+        return ID3Registry.get_frame_map()
 
     @classmethod
     def extract_metadata(cls, path: str, source_id: Optional[int] = None) -> Song:
@@ -244,11 +232,20 @@ class MetadataService:
         
         song_data['duration'] = duration
 
-        # --- FALLBACK: COMPOSERS / LYRICISTS (Union Logic for TCOM) ---
-        # If composers/lyricists are empty, check if TCOM contains them?
-        # Legacy logic: TCOM was treated as union. 
-        # Modern: TCOM -> composers, TEXT/TOLY -> lyricists.
-        # We rely on generic extraction for TCOM -> composers.
+        # --- TAGS (Extract Mapped Categories) ---
+        tags_list = []
+        
+        # Pull Category Mappings from JSON
+        for frame_key, frame_def in id3_map.items():
+            if not isinstance(frame_def, dict): continue
+            
+            cat = frame_def.get('tag_category')
+            if cat and frame_key in audio.tags:
+                values = get_values(audio.tags[frame_key], 'list')
+                for v in values:
+                    tags_list.append(f"{cat}:{v}")
+                    
+        song_data['tags'] = list(dict.fromkeys(tags_list))
         
         # 3. Construct Song
         return Song(
@@ -296,48 +293,33 @@ class MetadataService:
         if not song.path:
             return False
 
-        # --- VALIDATION ---
-        from datetime import datetime
-        current_year = datetime.now().year
-        
-        # Validate Year is handled by Yellberus casting logic before getting here
+        # --- VALIDATION (Fail-Safe) ---
+        # Centralized Yellberus Validation: Improves data before writing to ID3.
+        from ...core import yellberus
+        for field in yellberus.FIELDS:
+             if not field.portable: continue
+             attr = field.model_attr or field.name
+             val = getattr(song, attr, None)
+             if val is None: continue
+             
+             # 1. Clean Lists (Remove None/'')
+             if field.field_type == yellberus.FieldType.LIST and isinstance(val, list):
+                 val = [str(v).strip() for v in val if v and str(v).strip()]
+                 setattr(song, attr, val)
+                 
+             # 2. Truncate Fields (Fail-Safe Overflow)
+             if field.max_length and isinstance(val, str) and len(val) > field.max_length:
+                 val = val[:field.max_length]
+                 setattr(song, attr, val)
+
+             # 3. Final Policy Check
+             if not field.is_valid(val):
+                 from src.core import logger
+                 logger.dev_warning(f"MetadataService: Dropping invalid value '{val}' for field '{field.name}'")
+                 setattr(song, attr, None)
 
 
-        # Validate ISRC
-        if song.isrc:
-            from ...utils.validation import validate_isrc, sanitize_isrc
-            from ...core import logger
-            
-            if validate_isrc(song.isrc):
-                song.isrc = sanitize_isrc(song.isrc)  # Store sanitized version
-            else:
-                logger.dev_warning(f"Invalid ISRC format: {song.isrc}, skipping ID3 write")
-                # Keep DB value, just don't write to ID3
-                song.isrc = None
 
-        # Validate BPM
-        if song.bpm is not None and song.bpm <= 0:
-            print(f"Warning: Invalid BPM {song.bpm}, skipping BPM write")
-            song.bpm = None
-
-        # Validate Lengths
-        MAX_TEXT_LENGTH = 1000
-        if song.title and len(song.title) > MAX_TEXT_LENGTH:
-            song.title = song.title[:MAX_TEXT_LENGTH]
-        if song.isrc and len(song.isrc) > 50:
-            song.isrc = song.isrc[:50]
-
-        # Clean Lists Helper
-        def clean_list(items):
-            if not items: return []
-            return [str(item).strip() for item in items if item and str(item).strip()]
-
-        # Clean all list fields
-        if song.performers: song.performers = clean_list(song.performers)
-        if song.composers: song.composers = clean_list(song.composers)
-        if song.lyricists: song.lyricists = clean_list(song.lyricists)
-        if song.producers: song.producers = clean_list(song.producers)
-        if song.groups: song.groups = clean_list(song.groups)
 
         try:
             # Use Cached ID3 Mapping from JSON (Spec T-38)
@@ -406,11 +388,36 @@ class MetadataService:
                     logger.warning(f"Unknown Mutagen class for {frame_id}")
                     continue
                 
-                # Write: Explicitly join lists with ' / ' to prevent Null Separators in v2.4
+                # Write: Use native lists for ID3v2.4 (Mutagen handles null separation)
                 if isinstance(val, list):
-                    audio.tags.add(FrameClass(encoding=1, text=[LIST_SEP.join(val)]))
+                    audio.tags.add(FrameClass(encoding=1, text=val))
                 else:
                     audio.tags.add(FrameClass(encoding=1, text=[str(val)]))
+
+            # --- DYNAMIC TAG CATEGORY WRITE ---
+            # Look for frames mapped to tag categories in the JSON map
+            for frame_id, frame_def in id3_map.items():
+                if not isinstance(frame_def, dict): continue
+                
+                cat = frame_def.get('tag_category')
+                if not cat: continue
+                
+                # Resolve from unified tags
+                prefix = f"{cat}:"
+                val = [t.split(':', 1)[1] for t in (song.tags or []) if t.startswith(prefix)]
+                
+                if not val:
+                    continue
+                    
+                # Direct write to frame
+                FrameClass = getattr(mutagen.id3, frame_id, None)
+                if not FrameClass and frame_id.startswith("TXXX:"):
+                    desc = frame_id.split(":", 1)[1]
+                    audio.tags.delall(frame_id)
+                    audio.tags.add(TXXX(encoding=1, desc=desc, text=val))
+                elif FrameClass:
+                    audio.tags.delall(frame_id)
+                    audio.tags.add(FrameClass(encoding=1, text=val))
 
             # --- COMPLEX FIELDS (Dual Mode / Legacy) ---
 
@@ -479,8 +486,6 @@ class MetadataService:
             
             if union_list:
                 audio.tags.add(TCOM(encoding=1, text=[LIST_SEP.join(union_list)]))
-            else:
-                 pass # TCOM cleared.
 
             # 5. Duration (TLEN) - Backup for VBR glitches
             if song.duration and song.duration > 0:

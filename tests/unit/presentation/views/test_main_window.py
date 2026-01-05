@@ -52,6 +52,11 @@ class TestMainWindow:
             m_lib.contributor_repository = MagicMock()
             m_lib.contributor_repository.get_or_create.return_value = (mock_contributor, False)
             
+            # Fix: SidePanelWidget uses contributor_service directly via library_service property
+            mock_contrib_service = MagicMock()
+            mock_contrib_service.get_or_create.return_value = (mock_contributor, False)
+            m_lib.contributor_service = mock_contrib_service
+            
             mock_publisher = MagicMock()
             mock_publisher.publisher_id = 1
             mock_publisher.publisher_name = "Test Publisher"

@@ -14,6 +14,7 @@ def side_panel(qtbot, mock_widget_deps):
     widget = SidePanelWidget(
         deps['library_service'],
         deps['metadata_service'],
+        deps['settings_manager'],
         deps['renaming_service'],
         deps['duplicate_scanner']
     )
@@ -40,7 +41,11 @@ class TestSidePanelLogic:
         mock_song.performers = ["Artist"]
         mock_song.title = "Duplicate Song"
         mock_song.unified_artist = "Artist"
+        mock_song.unified_artist = "Artist"
         deps['duplicate_scanner'].check_isrc_duplicate.return_value = mock_song
+        
+        # Ensure is_self_match fails because IDs differ (Test logic)
+        # Note: Logic compares str(source_id). 999 != 1.
         
         # Setup side panel with a DIFFERENT song (ID 1)
         current_song = MagicMock(spec=Song)
@@ -58,6 +63,7 @@ class TestSidePanelLogic:
         assert "Duplicate ISRC found" in widget.toolTip()
         assert side_panel.isrc_collision is True
 
+    # @pytest.mark.skip(reason="Fails assertion despite debug confirming logic matches. Needs deep dive.")
     def test_validate_isrc_duplicate_self_ignored(self, side_panel, mock_widget_deps):
         """Test that duplicate ISRC is ignored if it matches current song ID."""
         deps = mock_widget_deps
@@ -67,7 +73,7 @@ class TestSidePanelLogic:
         mock_song.performers = ["Artist"]
         mock_song.title = "Same Song"
         mock_song.unified_artist = "Artist"
-        deps['duplicate_scanner'].check_isrc_duplicate.return_value = mock_song
+        side_panel.duplicate_scanner.check_isrc_duplicate.return_value = mock_song
         
         # Setup side panel with SAME song (ID 1)
         current_song = MagicMock(spec=Song)
@@ -115,13 +121,16 @@ class TestSidePanelLogic:
         # Stage a change without year
         side_panel._staged_changes = {1: {'title': 'Changed'}}
         
+        # Force Mock Setup (Use 2026 to verify logic)
+        side_panel.settings_manager.get_default_year.return_value = 2026
+        
         # Catch signal
         with qtbot.waitSignal(side_panel.save_requested) as blocker:
             side_panel._on_save_clicked()
             
         args = blocker.args[0]
         # args[1] is the changes dict
-        assert args[1]['recording_year'] == datetime.now().year
+        assert args[1]['recording_year'] == 2026
 
     def test_composer_splitter(self, side_panel, qtbot, mock_widget_deps):
         """Test that trailing comma splits CamelCase composers."""
@@ -137,6 +146,8 @@ class TestSidePanelLogic:
         
         # Stage a change with camelcase and trailing comma
         side_panel._staged_changes = {1: {'composers': 'JohnPaul,'}}
+        # Ensure default year doesn't interfere (set to 0)
+        side_panel.settings_manager.get_default_year.return_value = 0
         
         with qtbot.waitSignal(side_panel.save_requested) as blocker:
             side_panel._on_save_clicked()

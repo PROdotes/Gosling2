@@ -5,11 +5,7 @@ from PyQt6.QtWidgets import QMessageBox
 from src.presentation.dialogs.album_manager_dialog import AlbumManagerDialog
 from src.data.models.album import Album
 
-@pytest.fixture(autouse=True)
-def mock_pub_repo_instantiation():
-    # Patch PublisherRepository at the source of import to avoid real DB access
-    with patch("src.presentation.dialogs.album_manager_dialog.PublisherRepository") as mock:
-        yield mock
+
 
 @pytest.fixture
 def mock_album_service():

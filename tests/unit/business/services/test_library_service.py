@@ -33,12 +33,21 @@ class TestLibraryService:
     def service(self, temp_db):
         """Create a service instance with a clean DB"""
         from src.data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
+        from src.business.services import SongService, ContributorService, AlbumService, PublisherService, TagService
+        
         song_repo = SongRepository(temp_db)
         cont_repo = ContributorRepository(temp_db)
         alb_repo = AlbumRepository(temp_db)
         pub_repo = PublisherRepository(temp_db)
         tag_repo = TagRepository(temp_db)
-        return LibraryService(song_repo, cont_repo, alb_repo, pub_repo, tag_repo)
+        
+        song_service = SongService(song_repo)
+        cont_service = ContributorService(cont_repo)
+        alb_service = AlbumService(alb_repo)
+        pub_service = PublisherService(pub_repo)
+        tag_service = TagService(tag_repo)
+        
+        return LibraryService(song_service, cont_service, alb_service, pub_service, tag_service)
 
     def test_add_file(self, service):
         """Test adding a file to the library"""

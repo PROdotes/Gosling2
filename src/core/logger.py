@@ -93,11 +93,11 @@ def get() -> logging.Logger:
 
 def dev_warning(msg: str):
     """Log a warning relevant to developers (Schema mismatch, Internal logic)."""
-    get().warning(f"🔧 [DEV] {msg}")
+    get().warning(f"[DEV] {msg}")
 
 def user_warning(msg: str):
     """Log a warning relevant to users (Invalid ID3, File missing, Config issue)."""
-    get().warning(f"⚠️  [USER] {msg}")
+    get().warning(f"[USER] {msg}")
     
     # Notify UI or other listeners (thread-safe copy)
     with _LOGGER_LOCK:
@@ -119,4 +119,4 @@ def debug(msg: str):
 
 def error(msg: str, exc_info=False):
     """Log a failure with optional traceback."""
-    get().error(f"❌ {msg}", exc_info=exc_info)
+    get().error(f"[ERROR] {msg}", exc_info=exc_info)

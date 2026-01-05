@@ -6,7 +6,9 @@ from src.data.models.publisher import Publisher
 
 @pytest.fixture
 def mock_repo():
-    return MagicMock()
+    repo = MagicMock()
+    repo.would_create_cycle.return_value = False
+    return repo
 
 @pytest.fixture
 def sample_pub():

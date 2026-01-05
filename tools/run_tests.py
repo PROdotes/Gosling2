@@ -44,14 +44,18 @@ def main():
             f.write('\n--- STDERR ---\n')
             f.write(result.stderr)
     
-    # Also print to console for humans
-    print(result.stdout)
-    if result.stderr:
-        print('--- STDERR ---', file=sys.stderr)
-        print(result.stderr, file=sys.stderr)
+    # Also print to console for humans (safely)
+    try:
+        print(result.stdout)
+        if result.stderr:
+            print('--- STDERR ---', file=sys.stderr)
+            print(result.stderr, file=sys.stderr)
+    except UnicodeEncodeError:
+        print("\n[Warning] Could not print full output to console due to encoding issues.")
+        print("Please check test_output.txt for full results.")
     
     # Print summary
-    print(f'\n📁 Full output saved to: test_output.txt')
+    print(f'\nFull output saved to: test_output.txt')
     
     return result.returncode
 

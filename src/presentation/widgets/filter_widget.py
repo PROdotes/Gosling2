@@ -1,13 +1,14 @@
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTreeView, QScrollArea, QFrame, 
-    QFrame, QSizePolicy, QLayout, QLayoutItem, QStyle, QStyledItemDelegate, QPushButton
+    QWidget, QVBoxLayout, QHBoxLayout, QFrame, QTreeView,
+    QScrollArea, QPushButton, QLabel, QStyledItemDelegate, QStyle, QLayout
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QColor, QBrush, QFont, QPainter, QPen
-from PyQt6.QtCore import Qt, pyqtSignal, QPoint, QRect, QSize
-from typing import Any
+from PyQt6.QtCore import Qt, pyqtSignal, QRect, QSize, QPoint
+from PyQt6.QtGui import QStandardItemModel, QStandardItem, QPainter, QColor, QBrush, QPen
 from ...core import yellberus
+from ...core.registries.id3_registry import ID3Registry
 from ...resources import constants
 from .glow_factory import GlowButton, GlowLED
+from .flow_layout import FlowLayout
 
 class FlowLayout(QLayout):
     """Layout that arranges items horizontally and wraps them to the next line."""
@@ -327,9 +328,7 @@ class FilterWidget(QFrame):
         sorted_fields = sorted(filterable_fields, key=lambda f: f.ui_header)
         
         for field in sorted_fields:
-            # T-83: Skip genre/mood - now handled by unified Tags filter
-            if field.name in ('genre', 'mood'):
-                continue
+
                 
             if field.strategy in ("list", "decade_grouper", "first_letter_grouper"):
                 self._add_list_filter(field)
@@ -545,19 +544,11 @@ class FilterWidget(QFrame):
             root_item.setData('tags', Qt.ItemDataRole.UserRole + 1)
             root_item.setData("root", Qt.ItemDataRole.AccessibleTextRole)
             
-            # Category icons
-            cat_icons = {
-                "Genre": "🏷️",
-                "Mood": "✨",
-                "Instrument": "🎸", 
-                "Theme": "📚",
-                "Status": "📋",
-            }
-            
             # Create branches for each category
             for cat_name in sorted(categories.keys()):
                 tag_list = categories[cat_name]
-                icon = cat_icons.get(cat_name, "📦")
+                # Get icon from ID3Registry
+                icon = ID3Registry.get_category_icon(cat_name, default="📦")
                 
                 branch = QStandardItem(f"{icon} {cat_name}")
                 branch.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)
@@ -796,9 +787,9 @@ class FilterWidget(QFrame):
                         cat, name = display_val.split(':', 1)
                         header = cat.strip()
                         display_val = name.strip()
-                        # Optional: Add icon based on category?
-                        cat_icons = {"Genre": "🏷️", "Mood": "✨", "Status": "📋"}
-                        if header in cat_icons: header = f"{cat_icons[header]} {header}"
+                        # Get icon from ID3Registry
+                        icon = ID3Registry.get_category_icon(header)
+                        if icon: header = f"{icon} {header}"
                     except ValueError:
                         pass
                 

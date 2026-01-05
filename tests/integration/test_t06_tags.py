@@ -60,8 +60,8 @@ class TestT06Tags(unittest.TestCase):
         source_id = self.song_repo.insert(self.test_path)
         song = self.song_repo.get_by_path(self.test_path)
         
-        # 2. Set Genre
-        song.genre = "T06_Rock, T06_Pop"
+        # 2. Set Genre via unified tags
+        song.tags = ["Genre:T06_Rock", "Genre:T06_Pop"]
         self.song_repo.update(song)
         
         # 3. Verify Tags Created
@@ -82,7 +82,7 @@ class TestT06Tags(unittest.TestCase):
         # 1. Setup with initial genre
         source_id = self.song_repo.insert(self.test_path)
         song = self.song_repo.get_by_path(self.test_path)
-        song.genre = "T06_Old"
+        song.tags = ["Genre:T06_Old"]
         self.song_repo.update(song)
         
         # Verify initial
@@ -90,7 +90,7 @@ class TestT06Tags(unittest.TestCase):
         self.assertEqual(tags[0].tag_name, "T06_Old")
         
         # 2. Update to new genre
-        song.genre = "T06_New"
+        song.tags = ["Genre:T06_New"]
         self.song_repo.update(song)
         
         # 3. Verify Replacement
@@ -111,7 +111,7 @@ class TestT06Tags(unittest.TestCase):
         # 2. Update song with lowercase 't06_case'
         source_id = self.song_repo.insert(self.test_path)
         song = self.song_repo.get_by_path(self.test_path)
-        song.genre = "t06_case"
+        song.tags = ["Genre:t06_case"]
         self.song_repo.update(song)
         
         # 3. Verify it used the existing tag

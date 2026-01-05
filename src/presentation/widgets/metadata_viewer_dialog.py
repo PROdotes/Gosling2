@@ -94,21 +94,9 @@ class MetadataViewerDialog(QDialog):
         # Reset state
         self.has_discrepancies = False
         
-        # Common ID3v2.3/v2.4 frames
-        ID3_FRAMES = {}
-        try:
-            import json
-            import os
-            # Resolve path: src/resources/id3_frames.json
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            src_dir = os.path.dirname(os.path.dirname(base_dir))
-            json_path = os.path.join(src_dir, 'resources', 'id3_frames.json')
-            
-            with open(json_path, 'r', encoding='utf-8') as f:
-                ID3_FRAMES = json.load(f)
-        except Exception as e:
-            print(f"Failed to load ID3 frames JSON: {e}")
-            pass
+        # Load ID3 frame definitions from registry
+        from ...core.registries.id3_registry import ID3Registry
+        ID3_FRAMES = ID3Registry.get_frame_map()
             
         self.ID3_FRAMES = ID3_FRAMES
         from ...core import yellberus

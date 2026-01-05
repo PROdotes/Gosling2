@@ -41,7 +41,7 @@ class TestLogger:
             with caplog.at_level(logging.WARNING):
                 logger.dev_warning("Schema Bad")
                 
-            assert "🔧 [DEV] Schema Bad" in caplog.text
+            assert "[DEV] Schema Bad" in caplog.text
 
         def test_formatted_methods(self, caplog):
             """Test info/error/debug wrappers include correct icons/prefix."""
@@ -52,7 +52,7 @@ class TestLogger:
                 
             assert "Info Msg" in caplog.text
             assert "Debug Msg" in caplog.text
-            assert "❌ Error Msg" in caplog.text
+            assert "[ERROR] Error Msg" in caplog.text
 
     class TestObserverLogic:
         """Tests for warning subscription and notifications."""

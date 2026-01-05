@@ -1,6 +1,6 @@
 """Song Repository for database operations"""
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union, Any
 import sqlite3
 from src.data.database import BaseRepository
 from ..models.song import Song
@@ -38,10 +38,10 @@ class SongRepository(GenericRepository[Song]):
         # 1. Insert into MediaSources
         cursor.execute(
             """
-            INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive) 
-            VALUES (1, ?, ?, ?)
+            INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive, SourceDuration, SourceNotes, AudioHash) 
+            VALUES (1, ?, ?, ?, ?, ?, ?)
             """,
-            (file_title, file_path, 1 if song.is_active else 0)
+            (file_title, file_path, 1 if song.is_active else 0, song.duration, song.notes, song.audio_hash)
         )
         source_id = cursor.lastrowid
         
@@ -159,6 +159,9 @@ class SongRepository(GenericRepository[Song]):
         # 6. Sync Publisher
         if song.publisher is not None:
              self._sync_publisher(song, cursor, auditor=auditor)
+
+        # 7. Sync Tags (Unified Category:Name)
+        self._sync_tags(song, cursor, auditor=auditor)
 
     def update_status(self, file_id: int, is_done: bool) -> bool:
         """Update the status of a song (Tag-Driven, Flag-Synced)"""
@@ -482,8 +485,61 @@ class SongRepository(GenericRepository[Song]):
 
             cursor.execute("UPDATE SongAlbums SET TrackPublisherID = ? WHERE SourceID = ?", (primary_pid, song.source_id))
 
-    # _sync_tags removed (Legacy)
+    def _sync_tags(self, song: Song, cursor, auditor=None) -> None:
+        """
+        Sync unified tags (Category:Name) between Song object and MediaSourceTags.
+        """
+        if song.tags is None:
+            return  # Sparse update support
 
+        # 1. Parse Desired State
+        desired_ids = set()
+        for t in song.tags:
+            if not t or not t.strip(): continue
+            
+            if ":" in t:
+                category, name = t.split(":", 1)
+                category = category.strip()
+                name = name.strip()
+            else:
+                # Legacy default: use first category from registry
+                from ...core.registries.id3_registry import ID3Registry
+                cats = ID3Registry.get_all_category_names()
+                category = cats[0] if cats else "Genre"  # Fallback to Genre if registry empty
+                name = t.strip()
+            
+            if not name: continue
+            
+            # Find or create tag
+            cursor.execute("SELECT TagID FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory = ?", (name, category))
+            row = cursor.fetchone()
+            if row:
+                desired_ids.add(row[0])
+            else:
+                cursor.execute("INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)", (name, category))
+                new_id = cursor.lastrowid
+                desired_ids.add(new_id)
+                if auditor:
+                    auditor.log_insert("Tags", new_id, {"TagName": name, "TagCategory": category})
+
+        # 2. Get Current State
+        cursor.execute("SELECT TagID FROM MediaSourceTags WHERE SourceID = ?", (song.source_id,))
+        current_ids = set(r[0] for r in cursor.fetchall())
+
+        # 3. Calculate Diffs
+        to_add = desired_ids - current_ids
+        to_remove = current_ids - desired_ids
+
+        # 4. Execute Changes
+        for tid in to_remove:
+            cursor.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (song.source_id, tid))
+            if auditor:
+                auditor.log_delete("MediaSourceTags", f"{song.source_id}-{tid}", {"SourceID": song.source_id, "TagID": tid})
+        
+        for tid in to_add:
+            cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (song.source_id, tid))
+            if auditor:
+                auditor.log_insert("MediaSourceTags", f"{song.source_id}-{tid}", {"SourceID": song.source_id, "TagID": tid})
     # _sync_status_tag removed: Status is now managed by TagRepository.is_unprocessed/set_unprocessed
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
@@ -621,18 +677,7 @@ class SongRepository(GenericRepository[Song]):
                                 WHERE RP.SourceID = MS.SourceID
                             )
                         ) as PublisherName,
-                        (
-                            SELECT GROUP_CONCAT(TG.TagName, ', ')
-                            FROM MediaSourceTags MST
-                            JOIN Tags TG ON MST.TagID = TG.TagID
-                            WHERE MST.SourceID = MS.SourceID AND TG.TagCategory = 'Genre'
-                        ) as Genre,
-                        (
-                            SELECT GROUP_CONCAT(TG.TagName, ', ')
-                            FROM MediaSourceTags MST
-                            JOIN Tags TG ON MST.TagID = TG.TagID
-                            WHERE MST.SourceID = MS.SourceID AND TG.TagCategory = 'Mood'
-                        ) as Mood,
+
                         (
                             SELECT A.AlbumArtist FROM Albums A 
                             JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
@@ -654,22 +699,11 @@ class SongRepository(GenericRepository[Song]):
                 songs_map = {}
                 for row in cursor.fetchall():
                     (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-                     notes, is_active_int, album_title, album_id, publisher_name, genre_str, 
-                     mood_str, album_artist, all_tags_str) = row
+                     notes, is_active_int, album_title, album_id, publisher_name, 
+                     album_artist, all_tags_str) = row
                     
                     groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
                     tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
-                    
-                    # Migration: Fold Legacy Genre/Mood into Tags
-                    if genre_str:
-                        # Split by comma if multiple legacy genres
-                        for g in genre_str.split(','):
-                             g_clean = g.strip()
-                             if g_clean: tags.append(f"Genre:{g_clean}")
-                    if mood_str:
-                        for m in mood_str.split(','):
-                             m_clean = m.strip()
-                             if m_clean: tags.append(f"Mood:{m_clean}")
                     
                     song = Song(
                         source_id=source_id,
@@ -901,14 +935,16 @@ class SongRepository(GenericRepository[Song]):
             """
         elif field_name == "publisher":
             query = "SELECT DISTINCT PublisherName FROM Publishers"
-        elif field_name == "genre":
-            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Genre'"
-        elif field_name == "mood":
-            query = "SELECT DISTINCT TagName FROM Tags WHERE TagCategory = 'Mood'"
         elif field_name == "album":
             query = "SELECT DISTINCT AlbumTitle FROM Albums"
         elif field_name == "album_artist":
             query = "SELECT DISTINCT AlbumArtist FROM Albums WHERE AlbumArtist IS NOT NULL"
+        
+        # 2. Tag Mapping Path
+        if not query:
+            field_def = yellberus.get_field(field_name)
+            if field_def and field_def.tag_category:
+                query = f"SELECT DISTINCT TagName FROM Tags WHERE TagCategory = '{field_def.tag_category}'"
 
         if query:
             with self.get_connection() as conn:

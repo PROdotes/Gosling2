@@ -13,7 +13,7 @@ def mock_song():
     song.unified_artist = "Logic Boys"
     song.title = "Algorithmic Beats"
     song.year = "2024"
-    song.genre = "Techno"
+    song.tags = ["Genre:Techno"]
     song.bpm = 120
     # Use generic path based on OS sep
     song.path = os.path.join("music", "incoming", "random_file.mp3")
@@ -50,7 +50,7 @@ def test_calculate_path_sanitization(service, mock_song):
 def test_calculate_path_missing_metadata(service, mock_song):
     """Verify fallback for missing Genre/Year."""
     mock_song.year = None
-    mock_song.genre = ""
+    mock_song.tags = []
     
     path = service.calculate_target_path(mock_song)
     

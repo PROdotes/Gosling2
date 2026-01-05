@@ -122,3 +122,59 @@ class ConversionService:
         finally:
             # Restore original path
             source_song.path = original_path
+
+    def prompt_and_convert(self, wav_path: str) -> Optional[str]:
+        """
+        Interactively prompt the user to convert a WAV file to MP3.
+        If accepted, performs conversion and returns the new MP3 path.
+        If rejected or failed, returns None.
+        """
+        try:
+            from PyQt6.QtWidgets import QMessageBox, QApplication
+            
+            # Ensure we have an application instance
+            app = QApplication.instance()
+            if not app:
+                return None
+                
+            # If strictly headless or no windows, we might need a parent. 
+            # Using None parent creates a modal top-level app window.
+            # Check settings for auto-deletion
+            should_delete = self.settings.get_delete_wav_after_conversion()
+            
+            # Dynamic prompt text
+            disclaimer = "(Original WAV will be DELETED)" if should_delete else "(Original WAV will remain untouched)"
+            
+            fname = os.path.basename(wav_path)
+            reply = QMessageBox.question(
+                None, 
+                "Format Conversion Required",
+                f"The file '{fname}' is in WAV format.\n\n"
+                "Gosling2 requires MP3s for the library.\n"
+                "Would you like to convert it to high-quality MP3 now?\n\n"
+                f"{disclaimer}",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                mp3_path = self.convert_wav_to_mp3(wav_path)
+                
+                # Logic: Delete only if successful conversion AND setting is strictly enabled
+                if mp3_path and os.path.exists(mp3_path) and should_delete:
+                    from src.core import logger
+                    try:
+                        os.remove(wav_path)
+                        logger.info(f"Deleted original WAV after conversion: {wav_path}")
+                    except OSError as e:
+                        logger.error(f"Failed to delete original WAV: {e}")
+                        
+                return mp3_path
+            else:
+                return None
+                
+        except ImportError:
+            # Fallback for headless/test environments without PyQt
+            from src.core import logger
+            logger.warning("PyQt6 not found, cannot prompt for conversion.")
+            return None

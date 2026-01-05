@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QWheelEvent
 from ..widgets.glow_factory import GlowLineEdit, GlowButton
+from ...core.registries.id3_registry import ID3Registry
 
 
 class HorizontalScrollArea(QScrollArea):
@@ -156,39 +157,21 @@ class TagPickerDialog(QDialog):
         # Cache category buttons for toggle logic
         self.category_buttons = {}
         
-        # Emoji map for known categories (fallback to 📌 for custom)
-        category_emoji = {
-            "Genre": "🏷️",
-            "Mood": "✨",
-            "Era": "📅",
-            "Status": "⏳",
-            "Theme": "🎭",
-            "Energy": "⚡",
-        }
-        
         # Query distinct categories from Service
         categories = self.tag_service.get_distinct_categories()
         
-        # Glow colors for tag categories
-        category_colors = {
-            "Genre": "#FFC66D",   # Amber
-            "Mood": "#32A8FF",    # Blue
-            "Era": "#9B59B6",     # Purple
-            "Status": "#E53935",  # Red
-            "Theme": "#4DFFB8",   # Teal
-            "Energy": "#FF4DFF",  # Magenta
-        }
-        
         for cat in categories:
-            emoji = category_emoji.get(cat, "📌")
+            # Get icon and color from ID3Registry
+            emoji = ID3Registry.get_category_icon(cat, default="📌")
+            glow_color = ID3Registry.get_category_color(cat, default="#FFC66D")
+            
             btn = GlowButton(f"{emoji} {cat}")
             btn.setCheckable(True)
             # Prevent button from shrinking - keep fixed size based on content
             btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             if cat == self._current_category_filter:
                 btn.setChecked(True)
-            # Set glow color for this category (fallback to amber)
-            glow_color = category_colors.get(cat, "#FFC66D")
+            # Set glow color for this category
             btn.setGlowColor(glow_color)
             btn.clicked.connect(lambda c=cat: self._on_category_clicked(c))
             cat_layout.addWidget(btn)
@@ -363,11 +346,10 @@ class TagPickerDialog(QDialog):
 
     def _get_all_categories(self):
         """Get all distinct tag categories from the database."""
-        # Default categories always available
-        categories = {"Genre", "Mood"}
+        # Get categories from ID3Registry (defined in JSON)
+        categories = set(ID3Registry.get_all_category_names())
         
-        # Add any custom categories from DB
-        # Add any custom categories from DB
+        # Add any custom categories from DB that aren't in the registry
         try:
             db_cats = self.tag_service.get_distinct_categories()
             for c in db_cats:
@@ -446,16 +428,7 @@ class TagPickerDialog(QDialog):
 
     def _get_category_icon(self, category):
         """Get icon for category."""
-        icons = {
-            "Genre": "🏷️",
-            "Mood": "✨",
-            "Instrument": "🎸",
-            "Theme": "📚",
-            "Era": "📅",
-            "Status": "⏳",
-            "Energy": "⚡",
-        }
-        return icons.get(category, "📦")
+        return ID3Registry.get_category_icon(category, default="📦")
 
     def _on_selection_changed(self, row):
         """Update UI based on selection."""

@@ -7,9 +7,18 @@ from src.presentation.dialogs.settings_dialog import SettingsDialog
 def mock_settings():
     settings = MagicMock()
     settings.get_root_directory.return_value = "C:/Music"
+    settings.get_database_path.return_value = "C:/db.sqlite"
+    settings.get_conversion_enabled.return_value = True
+    settings.get_delete_wav_after_conversion.return_value = False
+    settings.get_delete_zip_after_import.return_value = False
+    settings.get_rename_enabled.return_value = True
+    settings.get_move_after_done.return_value = False
+    settings.get_rename_pattern.return_value = "{Artist}/{Album}/{Title}"
     settings.get_conversion_bitrate.return_value = "320k"
     settings.get_ffmpeg_path.return_value = "ffmpeg"
-    settings.get_search_provider.return_value = "Google" # Fix for findText TypeError
+    settings.get_search_provider.return_value = "Google"
+    settings.get_default_year.return_value = 2026
+    settings.get_log_path.return_value = "C:/logs/gosling.log"
     return settings
 
 def test_settings_dialog_load_save(qtbot, mock_settings):

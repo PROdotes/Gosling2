@@ -45,6 +45,8 @@ class SettingsManager:
     KEY_CONVERSION_ENABLED = "conversion/enabled"
     KEY_CONVERSION_BITRATE = "conversion/bitrate" # e.g. "320k"
     KEY_FFMPEG_PATH = "conversion/ffmpegPath"
+    KEY_DELETE_WAV_AFTER_CONVERSION = "conversion/deleteWavAfterConversion"
+    KEY_DELETE_ZIP_AFTER_IMPORT = "library/deleteZipAfterImport"
     
     # Search Settings (T-81)
     KEY_SEARCH_PROVIDER = "search/provider"
@@ -356,6 +358,18 @@ class SettingsManager:
 
     def set_ffmpeg_path(self, path: str) -> None:
         self._settings.setValue(self.KEY_FFMPEG_PATH, path)
+
+    def get_delete_wav_after_conversion(self) -> bool:
+        return self._settings.value(self.KEY_DELETE_WAV_AFTER_CONVERSION, False, type=bool)
+
+    def set_delete_wav_after_conversion(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_DELETE_WAV_AFTER_CONVERSION, enabled)
+
+    def get_delete_zip_after_import(self) -> bool:
+        return self._settings.value(self.KEY_DELETE_ZIP_AFTER_IMPORT, False, type=bool)
+
+    def set_delete_zip_after_import(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_DELETE_ZIP_AFTER_IMPORT, enabled)
 
     # ===== Search Settings (T-81) =====
     
