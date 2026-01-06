@@ -582,11 +582,19 @@ class AlbumManagerDialog(QDialog):
             
         # 1. Populate Inspector
         self.inp_title.setText(self.current_album.title or "")
+        self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
+        self.cmb_type.setCurrentText(self.current_album.album_type or "Album")
         
-        # Smart Fill for Existing: If DB has no artist, suggest from song context
-        db_artist = self.current_album.album_artist
-        if not db_artist and self.initial_data.get('artist'):
-            db_artist = self.initial_data.get('artist')
+        # Smart Fill for Existing: If DB has no artist/year/type, suggest from song context
+        if not self.current_album.album_artist and self.initial_data.get('artist'):
+            self.current_album.album_artist = self.initial_data.get('artist')
+            
+        if not self.current_album.release_year and self.initial_data.get('year'):
+            self.inp_year.setText(str(self.initial_data.get('year')))
+            # Also stage it on the object so it's ready for saving
+            try:
+                self.current_album.release_year = int(self.initial_data.get('year'))
+            except: pass
             
         # T-Adapter: Connect EntityListWidgets to the current album
         self.tray_artist.set_context_adapter(

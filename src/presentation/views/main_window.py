@@ -871,25 +871,8 @@ class MainWindow(QMainWindow):
                 
                 self.right_panel.editor_widget.clear_staged(successful_ids)
                 
-                # Check for Auto-Rename BEFORE refresh so we can batch the UI update
-                rename_needed = False
-                for song in songs_to_check:
-                    # Permission to rename = NOT unprocessed
-                    is_unprocessed = self.library_service.is_song_unprocessed(song.source_id)
-                    if not is_unprocessed:
-                        try:
-                            target = self.renaming_service.calculate_target_path(song)
-                            if song.path:
-                                 if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
-                                     rename_needed = True
-                                     break
-                        except Exception as e:
-                            logger.error(f"Rename check failed: {e}")
-
-                
-                if rename_needed:
-                    # Trigger rename (which handles its own confirmation)
-                    self.library_widget.rename_selection(refresh=False)
+                # Trigger rename (which now handles its own pre-check, settings, and confirmation)
+                self.library_widget.rename_selection(refresh=False)
                 
                 self.library_widget.load_library(refresh_filters=needs_filter_refresh)
                 

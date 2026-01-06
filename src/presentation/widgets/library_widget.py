@@ -2456,6 +2456,10 @@ class LibraryWidget(QWidget):
         Renames selected files based on metadata using RenamingService.
         Triggers strictly if gates (Done/Clean/Unique) are passed.
         """
+        # Gate 0: Check if auto-renaming is enabled in settings
+        if not self.settings_manager.get_rename_enabled():
+            return
+        
         try:
             indexes = self.table_view.selectionModel().selectedRows()
             if not indexes:
@@ -2465,6 +2469,39 @@ class LibraryWidget(QWidget):
             if self._dirty_ids:
                  QMessageBox.warning(self, "Unsaved Changes", "Please save all changes before renaming.")
                  return
+    
+            # Pre-check: Determine if any files actually need renaming
+            id_col = self.field_indices.get('file_id', -1)
+            rename_needed = False
+            
+            for idx in indexes:
+                source_idx = self.proxy_model.mapToSource(idx)
+                item = self.library_model.item(source_idx.row(), id_col)
+                if not item: continue
+                
+                raw_val = item.data(Qt.ItemDataRole.UserRole)
+                try:
+                    sid = int(float(raw_val)) if raw_val is not None else None
+                    if sid is not None:
+                        song = self.library_service.get_song_by_id(sid)
+                        if not song: continue
+                        
+                        # Check if song is processed (not unprocessed)
+                        tag_service = self.library_service.tag_service if hasattr(self.library_service, 'tag_service') else None
+                        is_unprocessed = tag_service.is_unprocessed(sid) if tag_service else True
+                        if not is_unprocessed:
+                            # Check if path differs from target
+                            target = self.renaming_service.calculate_target_path(song)
+                            if song.path:
+                                if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
+                                    rename_needed = True
+                                    break
+                except Exception:
+                    pass
+            
+            # If no files need renaming, silently return
+            if not rename_needed:
+                return
     
             confirm = QMessageBox.question(
                 self, 

@@ -1505,14 +1505,20 @@ class SidePanelWidget(QFrame):
         # 5. Metadata Auto-Fill (From PRIMARY Only) via Services
         # T-69: Publisher
         primary = data[0] # First is Primary by convention
+        
+        # Publisher
         pub_name = self.album_service.get_publisher(primary['id'])
         self._on_field_changed("publisher", pub_name if pub_name else None)
-
+        
         # T-46: Artist & Year
         full_album = self.album_service.get_by_id(primary['id'])
         if full_album:
              if full_album.album_artist:
                  self._on_field_changed("album_artist", full_album.album_artist)
+             if full_album.release_year:
+                 self._on_field_changed("recording_year", full_album.release_year)
+
+
 
             
         # Ensure UI reflects the new managed state (Enabling/Disabling)
@@ -1750,7 +1756,29 @@ class SidePanelWidget(QFrame):
             elif field_name == 'album':
                 aid = 0
                 is_p = (i == 0)
-                label = str(n)
+                print(f"DEBUG: [ALBUM_CHIP] Raw n type: {type(n).__name__}")
+                print(f"DEBUG: [ALBUM_CHIP] Has title attr: {hasattr(n, 'title')}")
+                if hasattr(n, '__dict__'):
+                     print(f"DEBUG: [ALBUM_CHIP] Object attributes: {list(n.__dict__.keys())}")
+                
+                # Extract title from Album object or dict, or use string directly
+                # Check type first to avoid confusion with str.title() method
+                if isinstance(n, str):
+                    # It's already a string
+                    label = n
+                    print(f"DEBUG: [ALBUM_CHIP] Using string directly: {label}")
+                elif isinstance(n, dict) and 'title' in n:
+                    # It's a dict
+                    label = n['title']
+                    print(f"DEBUG: [ALBUM_CHIP] Extracted from dict['title']: {label}")
+                elif hasattr(n, 'title') and not callable(getattr(n, 'title', None)):
+                    # It's an Album object with a title attribute (not a method)
+                    label = n.title
+                    print(f"DEBUG: [ALBUM_CHIP] Extracted from Album.title: {label}")
+                else:
+                    # Fallback
+                    label = str(n)
+                    print(f"DEBUG: [ALBUM_CHIP] Fallback str(n): {label}")
                 
                 src = self.current_songs[0]
                 if hasattr(src, 'releases'):
