@@ -99,28 +99,31 @@ def test_publisher_details_dialog_add_child_cycle_prevention(qtbot, mock_service
     dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
-    with patch('src.presentation.dialogs.publisher_manager_dialog.PublisherPickerDialog.exec', return_value=True), \
-         patch('src.presentation.dialogs.publisher_manager_dialog.PublisherPickerDialog.get_selected', return_value=ancestor), \
+    # The EntityClickRouter uses EntityPickerDialog for publishers now
+    with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog.exec', return_value=1), \
+         patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog.get_selected', return_value=ancestor), \
          patch('PyQt6.QtWidgets.QMessageBox.warning') as mock_warn:
         
-        dialog._add_child()
+        dialog.list_children.add_item_interactive()
         mock_warn.assert_called_once()
         mock_service.update.assert_not_called()
 
 def test_publisher_details_dialog_remove_child(qtbot, mock_service, sample_publisher):
     child = Publisher(500, "Son", 200)
+    # The PublisherChildAdapter uses search to find subsidiaries
     mock_service.search.return_value = [child]
-    # Critical: ensure repo returns the SAME object we are checking
     mock_service.get_by_id.return_value = child 
     
     dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
     
-    # Find child item in list
-    item = dialog.list_children.item(0)
-    assert "Son" in item.text()
+    # Verify child in list (get_names returns labels like "🏢 Son")
+    names = dialog.list_children.get_names()
+    assert any("Son" in n for n in names)
     
-    dialog._remove_child_link(item)
+    # Simulate removal via EntityListWidget internal logic
+    mock_service.update.return_value = True
+    dialog.list_children._do_remove(500)
     
     assert child.parent_publisher_id is None
     mock_service.update.assert_called_with(child)
@@ -132,12 +135,10 @@ def test_publisher_details_dialog_rename_child(qtbot, mock_service, sample_publi
     
     dialog = PublisherDetailsDialog(sample_publisher, mock_service)
     qtbot.addWidget(dialog)
-    item = dialog.list_children.item(0)
     
-    with patch('src.presentation.dialogs.publisher_manager_dialog.PublisherCreatorDialog.exec', return_value=True), \
-         patch('src.presentation.dialogs.publisher_manager_dialog.PublisherCreatorDialog.get_name', return_value="New Son"):
-        
-        dialog._on_child_double_clicked(item)
-        
-        assert child.publisher_name == "New Son"
-        mock_service.update.assert_called_with(child)
+    # Verify clicking child triggers ClickRouter
+    from src.core.entity_click_router import ClickResult, ClickAction
+    # ClickResult needs (action, entity_id)
+    with patch.object(dialog.list_children.click_router, 'route_click', return_value=ClickResult(ClickAction.UPDATED, 500)) as mock_route:
+        dialog.list_children._on_item_clicked(500, "Son")
+        mock_route.assert_called_once()

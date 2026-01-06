@@ -753,7 +753,7 @@ class AlbumManagerDialog(QDialog):
         if diag.exec() == 1:
             pub = diag.get_selected()
             if pub:
-                self.tray_publisher.set_chips([(0, pub.publisher_name, "")])
+                self.tray_publisher.set_items([(0, pub.publisher_name, "")])
             
 
 
@@ -778,7 +778,7 @@ class AlbumManagerDialog(QDialog):
                 current = self.tray_artist.get_names()
                 merged = sorted(list(set(current + new_names)))
                 # Set chips as tuples
-                self.tray_artist.set_chips([(0, n, "") for n in merged])
+                self.tray_artist.set_items([(0, n, "") for n in merged])
 
                  
     def _save_inspector(self, silent=False, close_on_success=False):
@@ -948,8 +948,8 @@ class AlbumManagerDialog(QDialog):
                     self.current_album = None
                     self.current_id = None
                     self.inp_title.clear()
-                    self.tray_artist.set_chips([]) # Clear artist tray
-                    self.tray_publisher.set_chips([]) # Clear publisher tray
+                    self.tray_artist.set_items([]) # Clear artist tray
+                    self.tray_publisher.set_items([]) # Clear publisher tray
                     self.inp_year.clear()
                     self.pane_inspector.setEnabled(False)
                 

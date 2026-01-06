@@ -26,7 +26,7 @@ from typing import Any, Optional, Callable
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
-    QMenu, QSizePolicy
+    QMenu, QSizePolicy, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 
@@ -340,6 +340,9 @@ class EntityListWidget(QWidget):
             if self.context_adapter.link(entity_id):
                 self.refresh_from_adapter()
                 self.data_changed.emit()
+            else:
+                QMessageBox.warning(self, "Action Failed", 
+                                   "Could not complete the link. This might be due to a circular relationship or validation error.")
     
     def _show_stack_context_menu(self, pos):
         """Show context menu for stack mode items."""

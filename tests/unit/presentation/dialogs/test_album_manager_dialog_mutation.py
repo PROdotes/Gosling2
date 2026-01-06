@@ -17,11 +17,23 @@ def mock_repo(): # Acts as AlbumService
 
 @pytest.fixture
 def mock_pub_service():
-    return MagicMock()
+    service = MagicMock()
+    pub = MagicMock(publisher_id=2)
+    pub.publisher_name = "Test Pub"
+    service.get_by_id.return_value = pub
+    service.get_or_create.return_value = (pub, False)
+    return service
 
 @pytest.fixture
 def mock_contrib_service():
-    return MagicMock()
+    service = MagicMock()
+    # Correct mock config for Adapter usage
+    artist = MagicMock(contributor_id=1, type="person")
+    artist.name = "Test Artist"
+    service.get_or_create.return_value = (artist, False)
+    service.get_by_id.return_value = artist
+    service.get_by_name.return_value = artist
+    return service
 
 @pytest.fixture
 def sample_album():
@@ -38,7 +50,7 @@ def test_album_mutation_field_exhaustion(qtbot, mock_repo, mock_pub_service, moc
     huge = "X" * 5000
     dialog.inp_title.setText(huge)
     # dialog.inp_artist.setText(huge) -> Use tray
-    dialog.tray_artist.set_chips([(0, huge, "")])
+    dialog.tray_artist.set_items([(0, huge, "")])
     
     dialog.inp_year.setText("2024")
     

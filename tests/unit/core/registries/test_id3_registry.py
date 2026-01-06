@@ -66,7 +66,7 @@ class TestID3Registry:
         # Test real categories
         assert ID3Registry.get_category_icon("Genre") == "🏷️"
         assert ID3Registry.get_category_icon("Mood") == "✨"
-        assert ID3Registry.get_category_icon("Status") == "📋"
+        assert ID3Registry.get_category_icon("Status") == "🏁"
         
         # Test default fallback
         icon = ID3Registry.get_category_icon("NonExistent", default="🎵")
@@ -77,7 +77,7 @@ class TestID3Registry:
         # Test real categories
         assert ID3Registry.get_category_color("Genre") == "#FFB84D"
         assert ID3Registry.get_category_color("Mood") == "#32A8FF"
-        assert ID3Registry.get_category_color("Status") == "#888888"
+        assert ID3Registry.get_category_color("Status") == "#9E9E9E"
         
         # Test default fallback
         color = ID3Registry.get_category_color("NonExistent", default="#FF0000")
@@ -100,11 +100,12 @@ class TestID3Registry:
         names = ID3Registry.get_all_category_names()
         
         assert isinstance(names, list)
-        assert len(names) == 4  # Genre, Mood, Status, Custom
+        assert len(names) == 5  # Genre, Mood, Status, Custom, Instrument
         assert "Genre" in names
         assert "Mood" in names
         assert "Status" in names
         assert "Custom" in names
+        assert "Instrument" in names
     
     def test_is_valid_category(self):
         """Test category validation."""

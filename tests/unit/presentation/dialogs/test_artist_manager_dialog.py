@@ -8,64 +8,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
 from src.presentation.dialogs.artist_manager_dialog import (
-    ArtistCreatorDialog,
     ArtistPickerDialog,
     ArtistDetailsDialog
 )
 from src.data.models.contributor import Contributor
 
 
-class TestArtistCreatorDialog:
-    """Tests for the quick artist creation dialog."""
-
-    def test_initialization(self, qtbot):
-        """Test dialog initializes with empty fields."""
-        dialog = ArtistCreatorDialog()
-        qtbot.addWidget(dialog)
-        
-        assert dialog.inp_name.text() == ""
-        assert dialog.windowTitle() == "New Artist"
-
-    def test_initialization_with_name(self, qtbot):
-        """Test dialog initializes with pre-filled name."""
-        dialog = ArtistCreatorDialog(initial_name="John Doe")
-        qtbot.addWidget(dialog)
-        
-        assert dialog.inp_name.text() == "John Doe"
-
-    def test_get_data_person(self, qtbot):
-        """Test getting data with Person type selected."""
-        dialog = ArtistCreatorDialog()
-        qtbot.addWidget(dialog)
-        
-        dialog.inp_name.setText("Solo Artist")
-        dialog.radio_person.setChecked(True)
-        
-        name, artist_type = dialog.get_data()
-        
-        assert name == "Solo Artist"
-        assert artist_type == "person"
-
-    def test_get_data_group(self, qtbot):
-        """Test getting data with Group type selected."""
-        dialog = ArtistCreatorDialog()
-        qtbot.addWidget(dialog)
-        
-        dialog.inp_name.setText("The Band")
-        dialog.radio_group.setChecked(True)
-        
-        name, artist_type = dialog.get_data()
-        
-        assert name == "The Band"
-        assert artist_type == "group"
-
-    def test_default_type_is_person(self, qtbot):
-        """Test that Person is the default type selection."""
-        dialog = ArtistCreatorDialog()
-        qtbot.addWidget(dialog)
-        
-        assert dialog.radio_person.isChecked()
-        assert not dialog.radio_group.isChecked()
 
 
 class TestArtistPickerDialog:
@@ -168,40 +116,48 @@ class TestArtistDetailsDialog:
         assert dialog.lbl_member.text() == "GROUP MEMBERS"
 
     def test_add_alias(self, qtbot, mock_artist, mock_repo):
-        """Test adding an alias to artist."""
+        """Test adding an alias (via merge) to artist."""
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
-        # Mock QDialog (for the popup) and GlowComboBox (for the input)
-        with patch('src.presentation.dialogs.artist_manager_dialog.QDialog') as MockQDialog, \
-             patch('src.presentation.dialogs.artist_manager_dialog.GlowComboBox') as MockCombo, \
-             patch('src.presentation.dialogs.artist_manager_dialog.QVBoxLayout'):
+        # Mock EntityPickerDialog and QMessageBox (since merge triggers confirmation)
+        with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker, \
+             patch('src.presentation.dialogs.artist_manager_dialog.QMessageBox') as MockMsg:
             
-            # Setup Dialog Mock
-            mock_dlg_instance = MockQDialog.return_value
+            # Setup Picker
+            mock_dlg_instance = MockPicker.return_value
             mock_dlg_instance.exec.return_value = True
             
-            # Setup Combo Mock (to return the alias name)
-            mock_cmb_instance = MockCombo.return_value
-            mock_cmb_instance.currentText.return_value = "Stage Name"
+            # Use a mock object that simulates a different Contributor
+            mock_selected = MagicMock()
+            mock_selected.contributor_id = 999
+            mock_selected.name = "Stage Name"
+            mock_selected.type = "person" # Match artist type
+            mock_dlg_instance.get_selected.return_value = mock_selected
             
-            # Mock validation to pass
-            mock_repo.validate_identity.return_value = (False, "")
+            # Setup MessageBox to say YES
+            # Ensure both the return value AND the constant match
+            YES_VAL = 16384
+            MockMsg.question.return_value = YES_VAL
+            MockMsg.StandardButton.Yes = YES_VAL
+            MockMsg.StandardButton.No = 0
+            
+            # Setup Service
+            mock_repo.merge.return_value = True
             
             dialog._add_alias()
         
-        mock_repo.add_alias.assert_called_once()
+        # Verify merge was called (target_id, self_id)
+        mock_repo.merge.assert_called_once_with(999, 1)
 
     def test_add_alias_cancelled(self, qtbot, mock_artist, mock_repo):
         """Test cancelling alias addition."""
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
-        # Mock QDialog to simulate cancel
-        with patch('src.presentation.dialogs.artist_manager_dialog.QDialog') as MockQDialog, \
-             patch('src.presentation.dialogs.artist_manager_dialog.QVBoxLayout'):
-            mock_dlg_instance = MockQDialog.return_value
-            mock_dlg_instance.exec.return_value = False  # User cancelled
+        with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker:
+            mock_dlg_instance = MockPicker.return_value
+            mock_dlg_instance.exec.return_value = False  # Cancelled
             
             dialog._add_alias()
         

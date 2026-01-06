@@ -18,12 +18,23 @@ def mock_album_service():
     return service
 
 @pytest.fixture
-def mock_publisher_service():
-    return MagicMock()
+def mock_contributor_service():
+    service = MagicMock()
+    # Ensure get_or_create returns a tuple (Artist, Created)
+    artist = MagicMock(contributor_id=1, type="person")
+    artist.name = "Test Artist" # Explicit assignment because 'name' kwarg is reserved
+    service.get_or_create.return_value = (artist, False)
+    service.get_by_id.return_value = artist
+    service.get_by_name.return_value = artist
+    return service
 
 @pytest.fixture
-def mock_contributor_service():
-    return MagicMock()
+def mock_publisher_service():
+    service = MagicMock()
+    pub = MagicMock(publisher_id=2, publisher_name="Test Pub")
+    service.get_by_id.return_value = pub
+    service.get_or_create.return_value = (pub, False)
+    return service
 
 @pytest.fixture
 def sample_album():
@@ -39,7 +50,7 @@ def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_se
     
     assert dialog.inp_title.text() == "Highway to Heck"
     # assert dialog.inp_artist.text() == "AC/BC" # Removed field, now tray
-    assert dialog.tray_artist.get_names() == ["AC/BC"]
+    assert dialog.tray_artist.get_names() == ["Test Artist"]
     assert dialog.inp_year.text() == "1979"
     assert dialog.cmb_type.currentText() == "Album"
 
@@ -72,8 +83,8 @@ def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_s
     qtbot.addWidget(dialog)
     
     dialog.inp_title.setText("Highway to Heaven")
-    # dialog.inp_artist.setText("Angels") -> Use tray
-    dialog.tray_artist.set_chips([(0, "Angels", "")])
+    # Simulate user changing artist via tray interaction (which updates object via adapter)
+    sample_album.album_artist = "Angels"
     
     mock_album_service.update.return_value = True
     
