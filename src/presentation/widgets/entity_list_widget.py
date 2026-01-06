@@ -368,7 +368,15 @@ class EntityListWidget(QWidget):
         menu.exec(self._inner_widget.mapToGlobal(pos))
     
     def _get_entity_id(self, entity: Any) -> int:
-        """Get ID from entity object."""
+        """Get ID from entity object or dictionary."""
+        # Handle Dictionary
+        if isinstance(entity, dict):
+            for key in ['contributor_id', 'publisher_id', 'album_id', 'tag_id', 'id']:
+                if key in entity:
+                    return entity[key]
+            return 0
+            
+        # Handle Object
         for attr in ['contributor_id', 'publisher_id', 'album_id', 'tag_id', 'id']:
             if hasattr(entity, attr):
                 return getattr(entity, attr)

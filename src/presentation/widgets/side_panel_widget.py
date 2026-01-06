@@ -558,7 +558,7 @@ class SidePanelWidget(QFrame):
                         val_bool = str(effective_val).lower() in ("true", "1", "yes") if isinstance(effective_val, str) else bool(effective_val)
                         widget.setChecked(val_bool if effective_val is not None else False)
 
-                elif isinstance(widget, (QPushButton, GlowButton)):  # Album picker
+                elif isinstance(widget, (QPushButton, GlowButton)):  # Legacy Album picker (if any)
                     if is_multiple:
                         widget.setText("(Multiple Values)")
                     else:
@@ -567,9 +567,15 @@ class SidePanelWidget(QFrame):
                         widget.setText(display_text)
 
                 elif isinstance(widget, EntityListWidget):
-                    if widget.context_adapter and isinstance(widget.context_adapter, SongFieldAdapter):
-                        widget.context_adapter.songs = self.current_songs
-                    widget.refresh_from_adapter()
+                    # T-Fix: Force update from SidePanel's "Latest Chips" logic which respects Staged Changes.
+                    # This ensures that when we pick an album, "ghost" changes appear immediately.
+                    # Bypassing adapter.refresh_from_db because we are in Draft Mode.
+                    try:
+                        chips = self._get_latest_chips(field_def.name)
+                        widget.set_items(chips)
+                    except Exception:
+                        # Fallback to adapter if staging logic fails
+                        widget.refresh_from_adapter()
 
                 elif isinstance(widget, (QLineEdit, GlowLineEdit)):
                     if is_multiple:
@@ -1322,12 +1328,11 @@ class SidePanelWidget(QFrame):
         dlg.save_and_select_requested.connect(lambda data: self._on_album_picked_context(data, mode, target_id))
         dlg.album_deleted.connect(self._on_album_deleted_externally)
         
-        res = dlg.exec()
-        if res == 2:
-            # T-Fix: Handle 'Remove Link' request (Matched to Artist workflow)
-            if initial_album:
-                self._on_chip_removed('album', initial_album.album_id, initial_album.title)
-            return
+        if dlg.exec() == 2:
+             # T-Fix: Handle 'Remove Link' request (Matched to Artist workflow)
+             if initial_album:
+                 self._on_chip_removed('album', initial_album.album_id, initial_album.title)
+             return
         
         # Sync: Re-fetch current selection to ensure memory matches DB (e.g. if album was deleted)
         if self.current_songs:
@@ -1756,37 +1761,39 @@ class SidePanelWidget(QFrame):
             elif field_name == 'album':
                 aid = 0
                 is_p = (i == 0)
-                print(f"DEBUG: [ALBUM_CHIP] Raw n type: {type(n).__name__}")
-                print(f"DEBUG: [ALBUM_CHIP] Has title attr: {hasattr(n, 'title')}")
-                if hasattr(n, '__dict__'):
-                     print(f"DEBUG: [ALBUM_CHIP] Object attributes: {list(n.__dict__.keys())}")
                 
                 # Extract title from Album object or dict, or use string directly
                 # Check type first to avoid confusion with str.title() method
                 if isinstance(n, str):
                     # It's already a string
                     label = n
-                    print(f"DEBUG: [ALBUM_CHIP] Using string directly: {label}")
                 elif isinstance(n, dict) and 'title' in n:
                     # It's a dict
                     label = n['title']
-                    print(f"DEBUG: [ALBUM_CHIP] Extracted from dict['title']: {label}")
                 elif hasattr(n, 'title') and not callable(getattr(n, 'title', None)):
                     # It's an Album object with a title attribute (not a method)
                     label = n.title
-                    print(f"DEBUG: [ALBUM_CHIP] Extracted from Album.title: {label}")
                 else:
                     # Fallback
                     label = str(n)
-                    print(f"DEBUG: [ALBUM_CHIP] Fallback str(n): {label}")
                 
-                src = self.current_songs[0]
-                if hasattr(src, 'releases'):
-                    for r in src.releases:
-                        if r['title'] == label:
-                            aid = r['album_id']
-                            break
+                # T-Fix: Direct ID Lookup via Index
+                # Instead of searching by name (risky/ambiguous), grab the ID directly from the source song
+                # knowing that 'album' (names) and 'album_id' (ids) are kept in sync 1:1.
+                try:
+                    src = self.current_songs[0]
+                    # Get effective/staged ID if possible, else DB
+                    eff_ids = self._get_effective_value(src.source_id, 'album_id', getattr(src, 'album_id', []))
+                    
+                    if isinstance(eff_ids, int): eff_ids = [eff_ids]
+                    if not eff_ids: eff_ids = []
+                    
+                    if i < len(eff_ids):
+                        aid = eff_ids[i]
+                except Exception:
+                    pass
                 
+                # Fallback: Search (Only if ID lookups failed)
                 if not aid:
                     results = self.album_service.search(label)
                     aid = results[0].album_id if results else 0
@@ -1795,6 +1802,7 @@ class SidePanelWidget(QFrame):
                     label = f"★ {label}"
                     
                 chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
+
             else:
                 # Standard Contributor (Artist) via Service
                 # FIX: Use get_by_name to prevent 'Ghost Creation' when rendering stale 'performers' strings 

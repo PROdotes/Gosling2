@@ -174,6 +174,8 @@ links: []
 | [docs/METADATA_CONSTITUTION.md](docs/METADATA_CONSTITUTION.md) | The Law of Data Relationships |
 | [docs/proposals/MODULARIZATION_MASTER_PLAN.md](docs/proposals/MODULARIZATION_MASTER_PLAN.md) | Big File Refactoring Plan (T-28) |
 | [docs/TEST_REMEDIATION_PLAN.md](docs/TEST_REMEDIATION_PLAN.md) | Test Suite Status (430 tests) |
+| [docs/MASS_REFACTOR_WORKFLOW.md](docs/MASS_REFACTOR_WORKFLOW.md) | Mass Refactor / Audit Protocol |
+| [docs/REFACTOR_AUDIT.md](docs/REFACTOR_AUDIT.md) | Refactor Audit: Tag Categories |
 | [docs/STRATEGY_v0.2.md](docs/STRATEGY_v0.2.md) | Strangler Fig Refactor Strategy |
 
 
