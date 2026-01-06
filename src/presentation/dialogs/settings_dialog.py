@@ -3,7 +3,7 @@ from PyQt6.QtWidgets import (
     QPushButton, QFileDialog, QFrame, QCheckBox, QComboBox, QSpinBox, QMessageBox
 )
 from PyQt6.QtCore import Qt
-from ..widgets.glow_factory import GlowButton, GlowLineEdit
+from ..widgets.glow_factory import GlowButton, GlowLineEdit, GlowToggle
 import os
 
 class SettingsDialog(QDialog):
@@ -99,17 +99,22 @@ class SettingsDialog(QDialog):
         ren_label.setObjectName("FieldLabel")
         layout.addWidget(ren_label)
 
-        # Checkboxes
-        self.chk_rename_enabled = QCheckBox("Enable Auto-Renaming")
-        self.chk_move_done = QCheckBox("Move Files to Root on 'Mark Done'")
+        # Toggles Group
+        self.chk_rename_enabled = GlowToggle()
+        self.chk_rename_enabled.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("ENABLE AUTO-RENAMING", self.chk_rename_enabled))
+
+        self.chk_move_done = GlowToggle()
+        self.chk_move_done.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("MOVE FILES TO ROOT ON 'MARK DONE'", self.chk_move_done))
         
-        layout.addWidget(self.chk_rename_enabled)
-        layout.addWidget(self.chk_move_done)
-        
-        # T-Refactor: ZIP Cleanup
-        self.chk_delete_zip = QCheckBox("Delete original ZIP after successful import")
-        self.chk_delete_zip.setToolTip("If checked, ZIP files will be deleted ONLY if all their contents are successfully imported.")
-        layout.addWidget(self.chk_delete_zip)
+        self.chk_write_tags = GlowToggle()
+        self.chk_write_tags.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("WRITE TO TAGS", self.chk_write_tags, "If disabled, metadata changes will only be saved to the database."))
+
+        self.chk_delete_zip = GlowToggle()
+        self.chk_delete_zip.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("DELETE ZIP AFTER IMPORT", self.chk_delete_zip, "Delete ZIP files after successful import."))
         
         # Pattern (Conditional)
         # Check for Rules JSON (T-52 Conflict Resolution)
@@ -148,14 +153,14 @@ class SettingsDialog(QDialog):
         layout.addWidget(trans_label)
 
         # Conversion Toggle
-        self.chk_conversion_enabled = QCheckBox("Enable Conversion on Import (or Export)")
-        self.chk_conversion_enabled.setObjectName("FieldLabel")
-        layout.addWidget(self.chk_conversion_enabled)
+        # Conversion Toggles
+        self.chk_conversion_enabled = GlowToggle()
+        self.chk_conversion_enabled.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("ENABLE TRANSCODING", self.chk_conversion_enabled))
         
-        # WAV Deletion Toggle
-        self.chk_delete_wav = QCheckBox("Delete original WAV after successful conversion")
-        self.chk_delete_wav.setToolTip("If checked, the original WAV file will be deleted automatically after it is converted to MP3.")
-        layout.addWidget(self.chk_delete_wav)
+        self.chk_delete_wav = GlowToggle()
+        self.chk_delete_wav.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("DELETE WAV AFTER CONVERSION", self.chk_delete_wav, "Delete original WAV after successful conversion."))
 
         # Quality Row
         bitrate_layout = QHBoxLayout()
@@ -252,6 +257,21 @@ class SettingsDialog(QDialog):
         button_row.addWidget(self.btn_save)
         layout.addLayout(button_row)
 
+    def _add_toggle_row(self, label_text, toggle_obj, tooltip=""):
+        """Helper to create a standard left-aligned toggle row."""
+        row = QHBoxLayout()
+        row.setSpacing(10)
+        
+        label = QLabel(label_text)
+        label.setObjectName("FieldLabel")
+        if tooltip:
+            label.setToolTip(tooltip)
+            toggle_obj.setToolTip(tooltip)
+            
+        row.addWidget(toggle_obj)
+        row.addWidget(label, 1)
+        return row
+
     def _load_settings(self):
         self.txt_root_dir.setText(self.settings_manager.get_root_directory())
         self.txt_db_path.setText(self.settings_manager.get_database_path() or "")
@@ -260,6 +280,8 @@ class SettingsDialog(QDialog):
         # File Management
         self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
         self.chk_move_done.setChecked(self.settings_manager.get_move_after_done())
+        self.chk_delete_zip.setChecked(self.settings_manager.get_delete_zip_after_import())
+        self.chk_write_tags.setChecked(self.settings_manager.get_write_tags())
         self.txt_pattern.setText(self.settings_manager.get_rename_pattern())
 
         # Conversion
@@ -370,6 +392,8 @@ class SettingsDialog(QDialog):
         # File Management
         self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())
         self.settings_manager.set_move_after_done(self.chk_move_done.isChecked())
+        self.settings_manager.set_delete_zip_after_import(self.chk_delete_zip.isChecked())
+        self.settings_manager.set_write_tags(self.chk_write_tags.isChecked())
         self.settings_manager.set_rename_pattern(self.txt_pattern.text().strip())
 
         # Conversion

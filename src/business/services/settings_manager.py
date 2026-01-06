@@ -32,6 +32,7 @@ class SettingsManager:
     KEY_RENAME_PATTERN = "rules/renamePattern"
     KEY_RENAME_ENABLED = "rules/renameEnabled"
     KEY_MOVE_AFTER_DONE = "rules/moveAfterDone"
+    KEY_WRITE_TAGS = "rules/writeTags"
     
     # Playback settings
     KEY_VOLUME = "playback/volume"
@@ -64,6 +65,7 @@ class SettingsManager:
     DEFAULT_RENAME_PATTERN = "{Artist}/{Album}/{Title}"
     DEFAULT_RENAME_ENABLED = True
     DEFAULT_MOVE_AFTER_DONE = True
+    DEFAULT_WRITE_TAGS = True
     
     DEFAULT_CONVERSION_ENABLED = False
     DEFAULT_CONVERSION_BITRATE = "320k"
@@ -220,12 +222,21 @@ class SettingsManager:
 
     def set_rename_enabled(self, enabled: bool) -> None:
         self._settings.setValue(self.KEY_RENAME_ENABLED, enabled)
+        self._settings.sync()
 
     def get_move_after_done(self) -> bool:
         return self._settings.value(self.KEY_MOVE_AFTER_DONE, self.DEFAULT_MOVE_AFTER_DONE, type=bool)
 
     def set_move_after_done(self, enabled: bool) -> None:
         self._settings.setValue(self.KEY_MOVE_AFTER_DONE, enabled)
+        self._settings.sync()
+
+    def get_write_tags(self) -> bool:
+        return self._settings.value(self.KEY_WRITE_TAGS, self.DEFAULT_WRITE_TAGS, type=bool)
+
+    def set_write_tags(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_WRITE_TAGS, enabled)
+        self._settings.sync()
     
     def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:
         """

@@ -91,8 +91,9 @@ class ImportService:
                     {"path": file_path, "title": temp_song.name}
                 )
 
-                # Bake it into the ID3
-                self.metadata_service.write_tags(temp_song)
+                # Bake it into the ID3 (Reflection)
+                if self.settings_manager.get_write_tags():
+                    self.metadata_service.write_tags(temp_song)
                 
                 return True, file_id, None
             else:

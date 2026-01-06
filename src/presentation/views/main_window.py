@@ -849,13 +849,15 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         logger.error(f"Error applying change {field_name}: {e}")
                 
-                # Export to ID3 and DB via ExportService
-                result = self.export_service.export_song(song)
+                # Orchestration Layer: Delegate save to ExportService, but tell it our preference.
+                write_tags = self.settings_manager.get_write_tags()
+                result = self.export_service.export_song(song, write_tags=write_tags)
+                
                 if result.success:
                     successful_ids.append(song_id)
                     songs_to_check.append(song)
                 else:
-                    QMessageBox.warning(self, "Save Failed", f"Could not save song:\n{result.error}")
+                    QMessageBox.warning(self, "Save Failed", f"Metadata could not be persisted:\n{result.error}")
             
             # NOTE: Orphan album handling removed - belongs in Album Editor, not save flow
                     

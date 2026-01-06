@@ -52,18 +52,15 @@ class ExportService:
         self.metadata_service = metadata_service
         self.library_service = library_service
     
-    def export_song(self, song: Song, dry_run: bool = False) -> ExportResult:
+    def export_song(self, song: Song, dry_run: bool = False, write_tags: bool = True) -> ExportResult:
         """
-        Export a single song to ID3 and database.
+        Export a single song to database and optionally ID3.
         
         Args:
             song: The Song object with metadata to write.
             dry_run: If True, validate but don't actually write.
-        
-        Returns:
-            ExportResult with success status and any error message.
+            write_tags: If True, also write metadata to the physical file.
         """
-        # Validation: Must have a file path
         if not song.path:
             return ExportResult(success=False, error="Song has no file path")
         
@@ -71,27 +68,20 @@ class ExportService:
             return ExportResult(success=True, dry_run=True)
         
         try:
-            # Step 1: Update database (Application Source of Truth)
-            # Safe Save: We commit to the DB first. If this fails, the file is untouched.
+            # Step 1: Update database (The source of truth)
             if not self.library_service.update_song(song):
-                return ExportResult(
-                    success=False,
-                    error=f"Database update failed for {song.path}"
-                )
+                return ExportResult(success=False, error=f"Database update failed for {song.path}")
             
-            # Step 2: Write ID3 tags to file (Reflection)
-            if not self.metadata_service.write_tags(song):
-                return ExportResult(
-                    success=False, 
-                    error=f"Database saved, but failed to write ID3 tags to {song.path}"
-                )
+            # Step 2: Write ID3 tags (The reflection)
+            if write_tags:
+                if not self.metadata_service.write_tags(song):
+                    return ExportResult(
+                        success=False, 
+                        error=f"Database saved, but failed to write ID3 tags to {song.path} (File may be missing or locked)"
+                    )
             
             return ExportResult(success=True)
             
-        except PermissionError as e:
-            return ExportResult(success=False, error=f"Permission denied: {e}")
-        except FileNotFoundError as e:
-            return ExportResult(success=False, error=f"File not found: {e}")
         except Exception as e:
             logger.error(f"Export failed for {song.path}: {e}")
             return ExportResult(success=False, error=str(e))
@@ -99,6 +89,7 @@ class ExportService:
     def export_songs(self, 
                      songs: List[Song], 
                      dry_run: bool = False,
+                     write_tags: bool = True,
                      progress_callback: Callable[[int, int, str, bool], None] = None
                      ) -> BatchExportResult:
         """
@@ -116,7 +107,7 @@ class ExportService:
         total = len(songs)
         
         for i, song in enumerate(songs, start=1):
-            export_result = self.export_song(song, dry_run=dry_run)
+            export_result = self.export_song(song, dry_run=dry_run, write_tags=write_tags)
             
             if export_result.success:
                 result.success_count += 1
