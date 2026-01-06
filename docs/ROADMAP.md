@@ -86,6 +86,9 @@ tags:
     *   *Status*: **Done**.
 *   [x] **T-61 Universal Tag Picker** (Search/Tree Dialog)
     *   *Status*: **Done** - Implemented "Speed Mode", Global Search, and Auto-Context Switching.
+*   [x] **UX: "Active" Toggle Styling**
+    *   *Task*: Replaced "Active" checkbox (Side Panel) with a Pro "GlowToggle" switch for the Airplay Gate.
+    *   *Status*: **Done**.
 *   [x] [**T-70 Artist Selector**](tasks/T-70_artist_manager_plan.md) (Database-backed Picker)
 *   [x] **Multi-Album Infrastructure** (T-22/T-63)
     *   *Status*: **Core Schema & Logic Done**.
@@ -151,13 +154,10 @@ tags:
     *   *Status*: **Done** - Connected chip signals to `ArtistDetailsDialog` and `PublisherDetailsDialog` in `AlbumManagerDialog`.
     *   *Bug*: Clicking Inherited Publisher on Side Panel incorrectly triggers "Add New" dialog instead of just focusing the Album Editor.
     *   *Refactor*: "Add Album" flow in Side Panel needs audit (prone to crashes if services missing).
-*   [ ] **Safe Save Logic (Tag/DB Sync)**
-    *   *Observation*: Currently tags are written *before* DB commit. If DB fails (encoding crash), tags remain written but DB rolls back -> Desync.
-    *   *Task*: Move Tag Writing to *after* successful DB commit, OR wrap both in a revertable transaction (hard for files). Best strategy: DB Commit -> Then Write Tags.
-*   [ ] **UX: "Active" Toggle Styling**
-    *   *Task*: Replace ugly "Active" checkbox (bottom of Side Panel) with a Pro "Toggle Button" or switch.
-    *   *Why*: Critical control (Airplay Gate) looks like a debug checkbox. Needs visual weight.
-*   [ ] **Tag Editing Improvements**
+*   [x] **Safe Save Logic (Tag/DB Sync)**
+    *   *Observation*: Fixed desync risk where tags were written before DB success.
+    *   *Status*: **Done** - `ExportService` now follows DB-First, ID3-Second protocol. Verified by `test_db_failure_skips_id3`.
+*   [x] **Tag Editing Improvements**
     *   *Bug*: "Ghost Conflict" - Renaming tag seems to create the new tag *before* checking for conflict, triggering false positive "Exists".
     *   *Feature*: **True Rename** - Renaming "Rock" -> "Rockk" currently creates new "Rockk" tag (link swap) instead of renaming the ID itself. Need "Rename vs Create New" logic.
     *   *Feature*: **Category Mutability** - Allow changing a tag's category (e.g. Mood:Jazz -> Genre:Jazz) directly in the UI.
@@ -165,13 +165,9 @@ tags:
     *   *Observation*: "Duration isn't getting imported from the song."
     *   *Cause*: `SongRepository.insert` schema mismatch (missing Duration/Notes in INSERT stmt).
     *   *Status*: **Fixed** - Added regression test `test_insert_persists_full_object` and updated query.
-*   [x] **Feature: Safe Save Protocol**
-    *   *Goal*: Prevent file/DB desync if DB write fails.
-    *   *Action*: Swapped `ExportService` order to DB-First, ID3-Second.
-    *   *Status*: **Done** - Refactored `ExportService` and `test_export_service.py`.
-*   [ ] **UX: Chip Instant Save?**
-    *   *Observation*: Users expect removing a chip to be "final/instant". Current "Save" button flow feels disconnected for Chips.
-    *   *Task*: Discuss/Implement instant-save or better dirty state feedback for Chip actions in Album Manager.
+*   [x] **UX: Chip Instant Save?**
+    *   *Observation*: Users expect removing a chip to be "final/instant".
+    *   *Status*: **Done** - Refactored to `EntityListWidget` which provides instant-reflex saving for Side Panel and relational managers (M2M).
 *   [ ] **UX: Chip Sorting Stability**
     *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
     *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.

@@ -314,7 +314,7 @@ class SidePanelWidget(QFrame):
         
         # Define Explicit Layout Sections (Order Matters)
         identity_names = ['title', 'performers', 'album', 'composers', 'publisher', ['recording_year', 'isrc']]
-        attribute_names = ['tags'] # Virtual field merging Genre & Mood
+        attribute_names = ['tags', 'is_active'] # Virtual field merging Genre & Mood + Toggle
         
         core_names_flat = set() # Track handled fields
         
@@ -486,7 +486,7 @@ class SidePanelWidget(QFrame):
                 else:
                     # Boolean layout: [Label] [Toggle] [Stretch]
                     # We keep the label inside the input row for a consolidated hardware look
-                    label.setFixedWidth(80) # Force alignment for the label
+                    label.setFixedWidth(100) # Increased from 80 to prevent cropping of "TOGGLE LIVE"
                     input_layout.addWidget(label, 0)
                     input_layout.addSpacing(12)
 
