@@ -1798,9 +1798,7 @@ class SidePanelWidget(QFrame):
                     results = self.album_service.search(label)
                     aid = results[0].album_id if results else 0
                 
-                if len(names) > 1 and is_p:
-                    label = f"★ {label}"
-                    
+
                 chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
 
             else:

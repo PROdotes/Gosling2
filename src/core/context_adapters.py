@@ -154,6 +154,17 @@ class SongFieldAdapter(ContextAdapter):
                 new_list = current + [name]
                 if self._stage_change:
                     self._stage_change(self.field_name, new_list)
+                    
+                    # Special Case: Sync album_id if adding an album
+                    if self.field_name == 'album':
+                        curr_ids = getattr(song, 'album_id', [])
+                        if isinstance(curr_ids, int): curr_ids = [curr_ids]
+                        if not curr_ids: curr_ids = []
+                        if curr_ids is None: curr_ids = []
+                        
+                        if child_id not in curr_ids:
+                             new_ids = curr_ids + [child_id]
+                             self._stage_change('album_id', new_ids)
         
         self.on_data_changed()
         return True
@@ -219,7 +230,7 @@ class SongFieldAdapter(ContextAdapter):
     
     def _get_entity_name(self, entity: Any) -> str:
         """Get display name from entity."""
-        for attr in ['name', 'publisher_name', 'album_title', 'tag_name']:
+        for attr in ['name', 'title', 'publisher_name', 'album_title', 'tag_name']:
             if hasattr(entity, attr):
                 return getattr(entity, attr)
         return str(entity)
