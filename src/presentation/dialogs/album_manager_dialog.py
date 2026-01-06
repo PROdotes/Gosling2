@@ -57,7 +57,7 @@ class AlbumManagerDialog(QDialog):
         if aid:
              fresh_album = self.album_service.get_by_id(aid)
              if fresh_album:
-                  self.initial_data['title'] = fresh_album.title
+                  self.initial_data['title'] = fresh_album.title or ""
                   self.current_album = fresh_album
 
         target = self.initial_data.get('title', '')
@@ -239,7 +239,7 @@ class AlbumManagerDialog(QDialog):
         # Initial Load
         title_to_find = self.initial_data.get('title', '')
         if title_to_find:
-            self.txt_search.setText(title_to_find)
+            self.txt_search.setText(title_to_find or "")
         else:
             self._refresh_vault()
 
