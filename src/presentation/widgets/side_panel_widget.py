@@ -1209,6 +1209,19 @@ class SidePanelWidget(QFrame):
                 lambda eid, name: self._handle_tag_click(field_def.name, eid, name)
             )
             
+            if field_def.name == 'album':
+                # Signals full handling to router to prevent double dialogs
+                ew.click_router.register_custom_handler(
+                    "handle_album_click",
+                    lambda eid, name: self._handle_album_click(eid, name) or True
+                )
+
+            if field_def.name == 'publisher':
+                ew.click_router.register_custom_handler(
+                    "handle_publisher_click",
+                    lambda eid, name: self._handle_publisher_click(eid, name) or True
+                )
+            
             # Connect Context Menu
             ew.chip_context_menu_requested.connect(lambda eid, n, p, f=field_def.name: self._on_chip_context_menu(f, eid, n, p))
             

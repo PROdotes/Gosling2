@@ -103,6 +103,7 @@ ENTITY_REGISTRY: dict[EntityType, EntityConfig] = {
         service_attr="publisher_service",
         icon_fn=lambda e: "🏢",
         display_fn=lambda e: getattr(e, 'publisher_name', str(e)),
+        custom_click_handler="handle_publisher_click",
     ),
     
     EntityType.ALBUM: EntityConfig(
@@ -111,6 +112,7 @@ ENTITY_REGISTRY: dict[EntityType, EntityConfig] = {
         service_attr="album_service",
         icon_fn=lambda e: "💿",
         display_fn=lambda e: getattr(e, 'album_title', str(e)),
+        custom_click_handler="handle_album_click",
     ),
     
     EntityType.TAG: EntityConfig(
