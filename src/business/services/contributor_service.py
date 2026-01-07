@@ -12,6 +12,8 @@ class ContributorService:
     
     def __init__(self, contributor_repository: Optional[ContributorRepository] = None):
         self._repo = contributor_repository or ContributorRepository()
+        from .identity_service import IdentityService
+        self._identity_service = IdentityService(self._repo)
 
     def get_all(self) -> List[Contributor]:
         """Fetch all contributors."""
@@ -68,7 +70,7 @@ class ContributorService:
         """Merge one contributor identity into another."""
         return self._repo.merge(source_id, target_id, create_alias)
 
-    def get_by_role(self, role_name: str) -> List[Tuple[int, str]]:
+    def get_by_role(self, role_name: str) -> List[Contributor]:
         """Get all contributors for a specific role."""
         return self._repo.get_by_role(role_name)
 
@@ -80,7 +82,7 @@ class ContributorService:
         """Get count of members in a group."""
         return self._repo.get_member_count(contributor_id)
 
-    def get_aliases(self, contributor_id: int) -> List[Tuple[int, str]]:
+    def get_aliases(self, contributor_id: int) -> List[Any]:
         """Get aliases for a contributor."""
         return self._repo.get_aliases(contributor_id)
 
@@ -106,7 +108,7 @@ class ContributorService:
 
     def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
         """Merge contributor source_id into target_id."""
-        return self._repo.merge(source_id, target_id, create_alias, batch_id=batch_id)
+        return self._identity_service.merge(source_id, target_id, create_alias, batch_id=batch_id)
 
     def add_alias(self, contributor_id: int, alias_name: str, batch_id: Optional[str] = None) -> Optional[int]:
         """Add an alias to a contributor."""
@@ -118,7 +120,7 @@ class ContributorService:
 
     def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Promote an alias to primary name."""
-        return self._repo.promote_alias(contributor_id, alias_id, batch_id=batch_id)
+        return self._identity_service.promote_alias(contributor_id, alias_id, batch_id=batch_id)
 
     def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
         """Update an alias name."""
@@ -126,11 +128,11 @@ class ContributorService:
 
     def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
         """Transfer Alias ownership."""
-        return self._repo.move_alias(alias_name, old_owner_id, new_owner_id, batch_id=batch_id)
+        return self._identity_service.move_alias(alias_name, old_owner_id, new_owner_id, batch_id=batch_id)
 
     def abdicate_identity(self, current_id: int, heir_alias_id: int, target_parent_id: int, batch_id: Optional[str] = None) -> bool:
         """Abdicate an identity, transferring its primary name to an alias of another identity."""
-        return self._repo.abdicate_identity(current_id, heir_alias_id, target_parent_id, batch_id=batch_id)
+        return self._identity_service.abdicate_identity(current_id, heir_alias_id, target_parent_id, batch_id=batch_id)
 
     def add_member(self, group_id: int, member_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
         """Add a member to a group."""

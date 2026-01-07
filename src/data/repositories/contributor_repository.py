@@ -63,13 +63,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             )
         return None
 
-    def get_by_role(self, role_name: str) -> List[Tuple[int, str]]:
+    def get_by_role(self, role_name: str) -> List[Contributor]:
         """Fetch all contributors who have a specific role assigned at least once"""
+        from ..models.contributor import Contributor
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT DISTINCT c.ContributorID, c.ContributorName 
+                    SELECT DISTINCT c.ContributorID, c.ContributorName, c.SortName, c.ContributorType
                     FROM Contributors c
                     JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
                     JOIN Roles r ON mscr.RoleID = r.RoleID
@@ -77,7 +78,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                     ORDER BY c.SortName ASC
                 """, (role_name,))
 
-                return cursor.fetchall()
+                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
         except Exception as e:
             from src.core import logger
             logger.error(f"Error fetching contributors by role: {e}")
@@ -475,151 +476,7 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return None, str(e)
 
-    def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """
-        Consolidate source identity into target.
-        Transfers all songs, aliases, and relationships. (Audited Manually)
-        :param create_alias: If True, the source primary name is preserved as an alias for the target.
-        """
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Snapshot for Audit (Deleted Source)
-                old_c = self.get_by_id(source_id)
-                old_snapshot = old_c.to_dict() if old_c else {}
-
-                # 1. Get Source Primary Name
-                cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (source_id,))
-                res = cursor.fetchone()
-                if not res: return False
-                s_name = res[0]
-                
-                # Initialize Logger once for Batching
-                auditor = AuditLogger(conn, batch_id=batch_id)
-
-                # 2. Source Name becomes an alias for target (Optional)
-                source_name_alias_id = None
-                if create_alias:
-                    cursor.execute("INSERT OR IGNORE INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_id, s_name))
-                    new_alias_id = cursor.lastrowid
-                    if new_alias_id:
-                        auditor.log_insert("ContributorAliases", new_alias_id, {"ContributorID": target_id, "AliasName": s_name})
-                    
-                    # Retrieve the AliasID for this name for song credit migration
-                    cursor.execute("SELECT AliasID FROM ContributorAliases WHERE ContributorID = ? AND AliasName = ?", (target_id, s_name))
-                    row = cursor.fetchone()
-                    source_name_alias_id = row[0] if row else None
-                
-                # 3. Transfer existing Aliases (Audited)
-                cursor.execute("SELECT AliasID, AliasName FROM ContributorAliases WHERE ContributorID = ?", (source_id,))
-                moving_aliases = cursor.fetchall()
-                for a_id, a_name in moving_aliases:
-                    auditor.log_update("ContributorAliases", a_id, 
-                        {"ContributorID": source_id, "AliasName": a_name},
-                        {"ContributorID": target_id, "AliasName": a_name}
-                    )
-                cursor.execute("UPDATE OR IGNORE ContributorAliases SET ContributorID = ? WHERE ContributorID = ?", (target_id, source_id))
-                
-                # 4. Transfer Song Roles (MediaSourceContributorRoles)
-                # Deduplicate before updating to avoid primary key violations
-                cursor.execute("""
-                    SELECT SourceID, RoleID FROM MediaSourceContributorRoles 
-                    WHERE ContributorID = ? AND (SourceID, RoleID) IN (
-                        SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?
-                    )
-                """, (source_id, target_id))
-                duplicates = cursor.fetchall()
-                for s_id, r_id in duplicates:
-                     # Log the deletion of the redundant link (Virtual Composite ID)
-                     auditor.log_delete("MediaSourceContributorRoles", f"{s_id}-{source_id}-{r_id}", 
-                         {"SourceID": s_id, "ContributorID": source_id, "RoleID": r_id})
-
-                cursor.execute("""
-                    DELETE FROM MediaSourceContributorRoles 
-                    WHERE ContributorID = ? AND (SourceID, RoleID) IN (
-                        SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?
-                    )
-                """, (source_id, target_id))
-                
-                # Audit Migration
-                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?", (source_id,))
-                moving_roles = cursor.fetchall()
-                for s_id, r_id in moving_roles:
-                     auditor.log_update("MediaSourceContributorRoles", f"{s_id}-{source_id}-{r_id}", 
-                         {"ContributorID": source_id}, {"ContributorID": target_id})
-
-                # Update links: Point to TargetID.
-                if source_name_alias_id:
-                     cursor.execute("""
-                        UPDATE MediaSourceContributorRoles 
-                        SET ContributorID = ?, 
-                            CreditedAliasID = COALESCE(CreditedAliasID, ?)
-                        WHERE ContributorID = ?
-                     """, (target_id, source_name_alias_id, source_id))
-                else:
-                     cursor.execute("""
-                        UPDATE MediaSourceContributorRoles 
-                        SET ContributorID = ?,
-                            CreditedAliasID = NULL
-                        WHERE ContributorID = ?
-                     """, (target_id, source_id))
-                
-                # 5. Transfer Group Memberships (Audited)
-                # Cleanup duplicates where source and target were already in the same relationship
-                cursor.execute("""
-                    DELETE FROM GroupMembers 
-                    WHERE MemberID = ? AND GroupID IN (
-                        SELECT GroupID FROM GroupMembers WHERE MemberID = ?
-                    )
-                """, (source_id, target_id))
-                
-                # Audit Member Transfer
-                cursor.execute("SELECT GroupID FROM GroupMembers WHERE MemberID = ?", (source_id,))
-                for (g_id,) in cursor.fetchall():
-                    auditor.log_update("GroupMembers", f"{g_id}-{source_id}", 
-                        {"MemberID": source_id}, 
-                        {"MemberID": target_id}
-                    )
-                cursor.execute("UPDATE GroupMembers SET MemberID = ? WHERE MemberID = ?", (target_id, source_id))
-                
-                cursor.execute("""
-                    DELETE FROM GroupMembers 
-                    WHERE GroupID = ? AND MemberID IN (
-                        SELECT MemberID FROM GroupMembers WHERE GroupID = ?
-                    )
-                """, (source_id, target_id))
-                
-                # Audit Group Owner Transfer
-                cursor.execute("SELECT MemberID FROM GroupMembers WHERE GroupID = ?", (source_id,))
-                for (m_id,) in cursor.fetchall():
-                    auditor.log_update("GroupMembers", f"{source_id}-{m_id}", 
-                        {"GroupID": source_id}, 
-                        {"GroupID": target_id}
-                    )
-                cursor.execute("UPDATE GroupMembers SET GroupID = ? WHERE GroupID = ?", (target_id, source_id))
-                
-                # SAFETY: Remove any resulting self-references
-                cursor.execute("DELETE FROM GroupMembers WHERE GroupID = MemberID")
-                
-                # 6. Delete Source
-                cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (source_id,))
-                
-                # 7. Audit Log
-                auditor.log_delete("Contributors", source_id, old_snapshot)
-                
-                # High-level Merge Action (shares the same BatchID)
-                auditor.log_action(
-                    "MERGE", "Contributors", target_id, 
-                    {"absorbed_id": source_id, "absorbed_name": s_name, "alias_created": create_alias}
-                )
-                
-                return True
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"CRITICAL: Failed to merge artist identities {source_id} -> {target_id}: {e}")
-            return False
+    # Complex identity methods removed (Moved to IdentityService)
 
     def get_member_count(self, contributor_id: int) -> int:
         """Return count of associated group memberships (as Group or as Member)."""
@@ -712,13 +569,14 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return False
 
-    def get_aliases(self, contributor_id: int) -> List[Tuple[int, str]]:
+    def get_aliases(self, contributor_id: int) -> List[ContributorAlias]:
         """Get all aliases for a contributor (ID and Name)."""
+        from ..models.contributor_alias import ContributorAlias
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT AliasID, AliasName FROM ContributorAliases WHERE ContributorID = ?", (contributor_id,))
-                return cursor.fetchall()
+                cursor.execute("SELECT AliasID, ContributorID, AliasName FROM ContributorAliases WHERE ContributorID = ?", (contributor_id,))
+                return [ContributorAlias(alias_id=r[0], contributor_id=r[1], alias_name=r[2]) for r in cursor.fetchall()]
         except Exception as e:
             return []
 
@@ -763,216 +621,8 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return False
 
-    def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        Transfer ownership of an alias string from one contributor to another.
-        """
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Verify existence and specific ownership (security check)
-                cursor.execute("SELECT AliasID FROM ContributorAliases WHERE AliasName = ? AND ContributorID = ?", (alias_name, old_owner_id))
-                row = cursor.fetchone()
-                if not row: return False
-                alias_id = row[0]
-                
-                # 1. Move the Alias Record
-                cursor.execute("UPDATE ContributorAliases SET ContributorID = ? WHERE AliasID = ?", (new_owner_id, alias_id))
-                
-                if cursor.rowcount > 0:
-                    AuditLogger(conn, batch_id=batch_id).log_update("ContributorAliases", alias_id, 
-                        {"ContributorID": old_owner_id}, {"ContributorID": new_owner_id}
-                    )
 
-                # 2. Move Song Credits that use this Alias (CRITICAL INTEGRITY FIX)
-                # Any song credited to this specific alias must now point to the new owner.
-                # BUT: Check for conflicts first. If New Owner already has the same Role on the same Song,
-                # we can't just UPDATE (PK Violation). In that case, we delete the "Ghost" link 
-                # because the "Real" link already exists.
-                
-                # a. Find conflicts
-                cursor.execute("""
-                    SELECT SourceID, RoleID FROM MediaSourceContributorRoles 
-                    WHERE CreditedAliasID = ? AND (SourceID, RoleID) IN (
-                        SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?
-                    )
-                """, (alias_id, new_owner_id))
-                conflicts = cursor.fetchall()
 
-                # b. Resolve conflicts (Delete the old link that we can't move)
-                for s_id, r_id in conflicts:
-                    cursor.execute("""
-                        DELETE FROM MediaSourceContributorRoles 
-                        WHERE SourceID = ? AND RoleID = ? AND CreditedAliasID = ?
-                    """, (s_id, r_id, alias_id))
-                    
-                    AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceContributorRoles", f"{s_id}-{old_owner_id}-{r_id}",
-                         {"ContributorID": old_owner_id, "CreditedAliasID": alias_id}
-                    )
-                
-                # c. Move the rest (Safe to update)
-                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE CreditedAliasID = ?", (alias_id,))
-                moving_roles = cursor.fetchall()
-                
-                cursor.execute("UPDATE MediaSourceContributorRoles SET ContributorID = ? WHERE CreditedAliasID = ?", (new_owner_id, alias_id))
-                
-                # Audit the role moves
-                for s_id, r_id in moving_roles:
-                     AuditLogger(conn, batch_id=batch_id).log_update("MediaSourceContributorRoles", f"{s_id}-{old_owner_id}-{r_id}",
-                         {"ContributorID": old_owner_id}, {"ContributorID": new_owner_id}
-                     )
-                
-                return True
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error moving alias '{alias_name}': {e}")
-            return False
-
-    def abdicate_identity(self, current_id: int, heir_alias_id: int, target_parent_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        'Peel & Move':
-        1. Promotes 'heir_alias_id' to be the Primary Name of 'current_id'.
-        2. Creates a NEW alias for the OLD Primary Name attached to 'target_parent_id'.
-        3. 'current_id' survives (with songs/other aliases) but has a new name.
-        """
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 1. Get info
-                cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (current_id,))
-                old_primary_name = cursor.fetchone()[0]
-                
-                cursor.execute("SELECT AliasName FROM ContributorAliases WHERE AliasID = ?", (heir_alias_id,))
-                heir_name = cursor.fetchone()[0]
-                
-                # 2. Promote Heir (Rename ID)
-                cursor.execute("UPDATE Contributors SET ContributorName = ? WHERE ContributorID = ?", (heir_name, current_id))
-                
-                # 3. Delete Heir Alias Record (It is now primary)
-                cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (heir_alias_id,))
-                
-                # 4. Create Old Name as Alias on TARGET
-                cursor.execute("INSERT INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_parent_id, old_primary_name))
-                new_alias_id = cursor.lastrowid
-                
-                # 5. MOVE OTHER ALIASES (e.g. 'Mr Bad Guy')
-                # Farrokh (Heir) stays. All others move to Target.
-                cursor.execute("""
-                    UPDATE ContributorAliases 
-                    SET ContributorID = ? 
-                    WHERE ContributorID = ? AND AliasID != ?
-                """, (target_parent_id, current_id, heir_alias_id))
-
-                # 6. MOVE CREDITS (Split Logic)
-                
-                # A. Move Primary Credits (Freddie) -> Target + New Alias
-                cursor.execute("""
-                    UPDATE MediaSourceContributorRoles 
-                    SET ContributorID = ?, CreditedAliasID = ?
-                    WHERE ContributorID = ? AND CreditedAliasID IS NULL
-                """, (target_parent_id, new_alias_id, current_id))
-                
-                # B. Move Credits for Other Aliases (e.g. Mr Bad Guy) -> Target (Keep Alias ID)
-                # These aliases were just moved in Step 5, so their IDs are valid on Target.
-                cursor.execute("""
-                    UPDATE MediaSourceContributorRoles 
-                    SET ContributorID = ?
-                    WHERE ContributorID = ? AND CreditedAliasID IS NOT NULL AND CreditedAliasID != ?
-                """, (target_parent_id, current_id, heir_alias_id))
-                
-                # C. Heir Credits (Farrokh) -> STAY on ID 1 (Renamed to Farrokh)
-                # No action needed.
-
-                # 7. MOVE GROUP MEMBERSHIPS
-                # If Freddie was in Queen, DJ Someone (who is now Freddie) should be in Queen.
-                # Farrokh (Heir) is losing the membership (unless he was separately added? No, ID 1 has 1 membership).
-                
-                # a. Delete duplicates (if Target is ALREADY in the group)
-                cursor.execute("""
-                    DELETE FROM GroupMembers 
-                    WHERE MemberID = ? AND GroupID IN (
-                        SELECT GroupID FROM GroupMembers WHERE MemberID = ?
-                    )
-                """, (current_id, target_parent_id))
-                
-                # b. Move remaining memberships
-                # Audit the move
-                cursor.execute("SELECT GroupID, MemberAliasID FROM GroupMembers WHERE MemberID = ?", (current_id,))
-                for (gid, old_alias_id) in cursor.fetchall():
-                    AuditLogger(conn, batch_id=batch_id).log_update("GroupMembers", f"{gid}-{current_id}", 
-                        {"GroupID": gid, "MemberID": current_id, "MemberAliasID": old_alias_id}, 
-                        {"GroupID": gid, "MemberID": target_parent_id, "MemberAliasID": new_alias_id}
-                    )
-
-                # Crucially, we set MemberAliasID to the new 'Freddie' alias so it displays correctly.
-                cursor.execute("""
-                    UPDATE GroupMembers 
-                    SET MemberID = ?, MemberAliasID = ?
-                    WHERE MemberID = ?
-                """, (target_parent_id, new_alias_id, current_id))
-
-                AuditLogger(conn, batch_id=batch_id).log_action("IDENTITY_ABDICATION", "Contributors", current_id, 
-                    f"Renamed to {heir_name}; '{old_primary_name}' credits & groups moved to {target_parent_id}")
-                
-                return True
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error abdicating identity {current_id}: {e}")
-            return False
-
-    def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        Swap the current primary name with an alias.
-        The current primary name becomes a new alias.
-        """
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 1. Get current primary name
-                cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (contributor_id,))
-                old_primary = cursor.fetchone()[0]
-                
-                # 2. Get the target alias name
-                cursor.execute("SELECT AliasName FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
-                new_primary = cursor.fetchone()[0]
-                
-                # 3. Swap in Contributors table
-                cursor.execute("UPDATE Contributors SET ContributorName = ? WHERE ContributorID = ?", (new_primary, contributor_id))
-                
-                # 4. Update the alias record to hold the old primary name
-                cursor.execute("UPDATE ContributorAliases SET AliasName = ? WHERE AliasID = ?", (old_primary, alias_id))
-                
-                # 5. STABLE SWAP of Credits
-                cursor.execute("""
-                    UPDATE MediaSourceContributorRoles
-                    SET CreditedAliasID = CASE
-                        WHEN CreditedAliasID IS NULL THEN ?
-                        WHEN CreditedAliasID = ? THEN NULL
-                    END
-                    WHERE ContributorID = ? 
-                      AND (CreditedAliasID IS NULL OR CreditedAliasID = ?)
-                """, (alias_id, alias_id, contributor_id, alias_id))
-
-                # Auditor
-                auditor = AuditLogger(conn, batch_id=batch_id)
-
-                # 6. Audit Log
-                auditor.log_action(
-                    "PROMOTE_ALIAS", "Contributors", contributor_id, 
-                    {"new_primary": new_primary, "old_primary": old_primary}
-                )
-                
-                return True
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error promoting alias {alias_id}: {e}")
-            return False
 
     def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias. Nullifies any specific credit references first."""

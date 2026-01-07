@@ -873,7 +873,7 @@ class ArtistDetailsDialog(QDialog):
                 return
 
             # Match Type 2: PRIMARY IDENTITY MATCH (Person/Group)
-            aliases = self.service.get_aliases(target.contributor_id) # [(id, name), ...]
+            aliases = self.service.get_aliases(target.contributor_id)
             alias_count = len(aliases)
             song_count = self.service.get_usage_count(target.contributor_id)
             
@@ -884,8 +884,8 @@ class ArtistDetailsDialog(QDialog):
             # CASE 3: IDENTITY with ALIASES (Freddie -> Queen)
             if alias_count > 0:
                 is_abdication = True
-                heir_id = aliases[0][0]
-                heir_name = aliases[0][1]
+                heir_id = aliases[0].alias_id
+                heir_name = aliases[0].alias_name
 
                 header = "SEPARATE IDENTITY?"
                 btn_label = "SEPARATE & MOVE"

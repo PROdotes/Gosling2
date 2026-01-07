@@ -13,9 +13,14 @@ class TagRepository(GenericRepository[Tag]):
     def __init__(self, db_path: Optional[str] = None):
         super().__init__(db_path, "Tags", "tag_id")
 
-    def get_by_id(self, tag_id: int) -> Optional[Tag]:
+    def get_by_id(self, tag_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Tag]:
         """Retrieve tag by ID."""
         query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ?"
+        if conn:
+            cursor = conn.execute(query, (tag_id,))
+            row = cursor.fetchone()
+            return Tag.from_row(row) if row else None
+
         with self.get_connection() as conn:
             cursor = conn.execute(query, (tag_id,))
             row = cursor.fetchone()

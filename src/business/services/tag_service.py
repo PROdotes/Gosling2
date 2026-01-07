@@ -48,10 +48,24 @@ class TagService:
             return False
         
     def rename_tag(self, old_name: str, new_name: str, category: str) -> bool:
-        """Global rename of a tag across all songs."""
+        """
+        Global rename of a tag across all songs.
+        If the new name exists in the same category, merges the tags.
+        """
         tag = self._repo.find_by_name(old_name, category)
         if not tag: return False
         
+        # T-83: Auto-format to Sentence Case
+        new_name = new_name.strip()
+        if new_name:
+            new_name = new_name[0].upper() + new_name[1:]
+            
+        existing = self._repo.find_by_name(new_name, category)
+        if existing:
+            if existing.tag_id == tag.tag_id:
+                return True
+            return self._repo.merge_tags(tag.tag_id, existing.tag_id)
+            
         tag.tag_name = new_name
         return self._repo.update(tag)
 

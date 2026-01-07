@@ -39,7 +39,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
     # --- ABSTRACT IMPLEMENTATION HOOKS ---
     
     @abstractmethod
-    def get_by_id(self, record_id: int) -> Optional[T]:
+    def get_by_id(self, record_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[T]:
         """
         Fetch a single record by ID.
         REQUIRED for Audit Logging to calculate diffs (Old vs New).
@@ -72,96 +72,106 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
 
     # --- PUBLIC TRANSACTIONAL METHODS ---
 
-    def insert(self, entity: T, batch_id: Optional[str] = None) -> Optional[int]:
+    def insert(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
         """
         Transactional Insert with Audit.
         Returns: New ID on success, None on failure.
         """
-        # AuditLogger imported locally to handle dependency resolution
-        from src.core.audit_logger import AuditLogger
-        
+        if conn:
+            return self._insert_logic(entity, conn, batch_id)
+            
         try:
             with self.get_connection() as conn:
-                cursor = conn.cursor()
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                
-                # 1. Write Data
-                new_id = self._insert_db(cursor, entity, auditor=auditor)
-                
-                # 2. Write Audit (Snapshots the entity as provided)
-                if hasattr(entity, 'to_dict') and new_id:
-                    auditor.log_insert(self.table_name, new_id, entity.to_dict())
-                
-                return new_id
-                
+                return self._insert_logic(entity, conn, batch_id)
         except Exception as e:
-            # BaseRepository context manager handles Rollback.
-            # We log and return failure.
             logger.error(f"GenericRepository Insert Failed ({self.table_name}): {e}")
             return None
 
-    def update(self, entity: T, batch_id: Optional[str] = None) -> bool:
+    def _insert_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str]) -> Optional[int]:
+        """Internal logic for insert, allowing connection sharing."""
+        from src.core.audit_logger import AuditLogger
+        cursor = conn.cursor()
+        auditor = AuditLogger(conn, batch_id=batch_id)
+        
+        new_id = self._insert_db(cursor, entity, auditor=auditor)
+        
+        if hasattr(entity, 'to_dict') and new_id:
+            auditor.log_insert(self.table_name, new_id, entity.to_dict())
+        
+        return new_id
+
+    def update(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
         """
         Transactional Update with Audit (Diffing).
         Returns: True on success, False on failure.
         """
-        from src.core.audit_logger import AuditLogger
-        
-        try:
-            # 1. Fetch Old State (Snapshot T0)
-            record_id = getattr(entity, self.id_attr, None)
-            if not record_id: 
-                raise ValueError(f"Entity missing ID attribute '{self.id_attr}'")
+        if conn:
+            return self._update_logic(entity, conn, batch_id)
             
-            old_entity = self.get_by_id(record_id)
-            if not old_entity:
-                logger.warning(f"Update failed: Record {record_id} not found in {self.table_name}")
-                return False
-                
-            old_snapshot = old_entity.to_dict() if hasattr(old_entity, 'to_dict') else {}
-
-            # 2. Write Data & Audit (Snapshot T1)
+        try:
             with self.get_connection() as conn:
-                cursor = conn.cursor()
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                
-                self._update_db(cursor, entity, auditor=auditor)
-                
-                if hasattr(entity, 'to_dict'):
-                    auditor.log_update(self.table_name, record_id, old_snapshot, entity.to_dict())
-                
-                return True
-                
+                return self._update_logic(entity, conn, batch_id)
         except Exception as e:
             logger.error(f"GenericRepository Update Failed ({self.table_name}): {e}")
             return False
 
-    def delete(self, record_id: int, batch_id: Optional[str] = None) -> bool:
+    def _update_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str]) -> bool:
+        """Internal logic for update, allowing connection sharing."""
+        from src.core.audit_logger import AuditLogger
+        
+        record_id = getattr(entity, self.id_attr, None)
+        if not record_id: 
+            raise ValueError(f"Entity missing ID attribute '{self.id_attr}'")
+        
+        # NOTE: get_by_id still creates its own connection unless overridden
+        # For full transaction support, get_by_id should also support conn
+        old_entity = self.get_by_id(record_id, conn=conn)
+        if not old_entity:
+            logger.warning(f"Update failed: Record {record_id} not found in {self.table_name}")
+            return False
+            
+        old_snapshot = old_entity.to_dict() if hasattr(old_entity, 'to_dict') else {}
+
+        cursor = conn.cursor()
+        auditor = AuditLogger(conn, batch_id=batch_id)
+        
+        self._update_db(cursor, entity, auditor=auditor)
+        
+        if hasattr(entity, 'to_dict'):
+            auditor.log_update(self.table_name, record_id, old_snapshot, entity.to_dict())
+        
+        return True
+
+    def delete(self, record_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
         """
         Transactional Delete with Audit (Recycle Bin).
         Returns: True on success, False on failure.
         """
-        from src.core.audit_logger import AuditLogger
-        
+        if conn:
+            return self._delete_logic(record_id, conn, batch_id)
+            
         try:
-            # 1. Fetch Old State (Snapshot T0) for Recycle Bin
-            old_entity = self.get_by_id(record_id)
-            if not old_entity:
-                return False # Idempotent-ish failure (Record already gone)
-
-            old_snapshot = old_entity.to_dict() if hasattr(old_entity, 'to_dict') else {}
-
-            # 2. Delete Data & Audit
             with self.get_connection() as conn:
-                cursor = conn.cursor()
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                
-                self._delete_db(cursor, record_id, auditor=auditor)
-                
-                auditor.log_delete(self.table_name, record_id, old_snapshot)
-                
-                return True
-                
+                return self._delete_logic(record_id, conn, batch_id)
         except Exception as e:
             logger.error(f"GenericRepository Delete Failed ({self.table_name}): {e}")
             return False
+
+    def _delete_logic(self, record_id: int, conn: sqlite3.Connection, batch_id: Optional[str]) -> bool:
+        """Internal logic for delete, allowing connection sharing."""
+        from src.core.audit_logger import AuditLogger
+        
+        old_entity = self.get_by_id(record_id, conn=conn)
+        if not old_entity:
+            return False 
+
+        old_snapshot = old_entity.to_dict() if hasattr(old_entity, 'to_dict') else {}
+
+        cursor = conn.cursor()
+        auditor = AuditLogger(conn, batch_id=batch_id)
+        
+        self._delete_db(cursor, record_id, auditor=auditor)
+        
+        auditor.log_delete(self.table_name, record_id, old_snapshot)
+        
+        return True

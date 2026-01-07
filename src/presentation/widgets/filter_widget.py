@@ -636,8 +636,8 @@ class FilterWidget(QFrame):
         if field.name == "unified_artist":
             # Merge logic for Unified Artist
             artists = set()
-            for _, name in self.library_service.get_contributors_by_role("Performer"):
-                if name: artists.add(name)
+            for c in self.library_service.get_contributors_by_role("Performer"):
+                if c.name: artists.add(c.name)
             for alias in self.library_service.get_all_aliases():
                 if alias: artists.add(alias)
             return sorted(list(artists))

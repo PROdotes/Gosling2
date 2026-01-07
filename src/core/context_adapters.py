@@ -273,13 +273,13 @@ class ArtistAliasAdapter(ContextAdapter):
     
     def get_children(self) -> List[int]:
         aliases = self.service.get_aliases(self.artist.contributor_id)
-        return [alias_id for alias_id, _ in aliases]
+        return [a.alias_id for a in aliases]
     
     def get_child_data(self) -> List[tuple]:
         aliases = self.service.get_aliases(self.artist.contributor_id)
         return [
-            (alias_id, alias_name, "📝", False, False, "", "amber", False)
-            for alias_id, alias_name in aliases
+            (a.alias_id, a.alias_name, "📝", False, False, "", "amber", False)
+            for a in aliases
         ]
     
     def link(self, child_id: int, **kwargs) -> bool:
@@ -349,9 +349,9 @@ class ArtistMemberAdapter(ContextAdapter):
         if alias_name:
             # Resolve Alias Name to ID for the target contributor
             aliases = self.service.get_aliases(child_id)
-            for a_id, a_name in aliases:
-                if a_name.lower() == alias_name.lower():
-                    alias_id = a_id
+            for a in aliases:
+                if a.alias_name.lower() == alias_name.lower():
+                    alias_id = a.alias_id
                     break
 
         if self.artist.type == "group":

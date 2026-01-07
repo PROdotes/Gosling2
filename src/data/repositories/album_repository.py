@@ -14,16 +14,22 @@ class AlbumRepository(GenericRepository[Album]):
     def __init__(self, db_path: Optional[str] = None):
         super().__init__(db_path, "Albums", "album_id")
 
-    def get_by_id(self, album_id: int) -> Optional[Album]:
+    def get_by_id(self, album_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Album]:
         """Retrieve album by ID."""
-        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
+        if conn:
+            return self._get_by_id_logic(album_id, conn)
         with self.get_connection() as conn:
-            cursor = conn.execute(query, (album_id,))
-            row = cursor.fetchone()
-            if row:
-                album = Album.from_row(row)
-                album.album_artist = self._get_joined_album_artist(conn, album_id) or album.album_artist
-                return album
+            return self._get_by_id_logic(album_id, conn)
+
+    def _get_by_id_logic(self, album_id: int, conn: sqlite3.Connection) -> Optional[Album]:
+        """Internal logic for retrieving album by ID."""
+        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
+        cursor = conn.execute(query, (album_id,))
+        row = cursor.fetchone()
+        if row:
+            album = Album.from_row(row)
+            album.album_artist = self._get_joined_album_artist(conn, album_id) or album.album_artist
+            return album
         return None
 
     def _get_joined_album_artist(self, conn: sqlite3.Connection, album_id: int) -> Optional[str]:
@@ -203,18 +209,19 @@ class AlbumRepository(GenericRepository[Album]):
             is_primary = 0 if has_primary else 1
             
             # 2. Link
-            conn.execute("""
+            cursor = conn.execute("""
                 INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary)
                 VALUES (?, ?, ?, ?)
             """, (source_id, album_id, track_number, is_primary))
             
             # 3. Audit
-            AuditLogger(conn, batch_id=batch_id).log_insert("SongAlbums", f"{source_id}-{album_id}", {
-                "SourceID": source_id,
-                "AlbumID": album_id,
-                "TrackNumber": track_number,
-                "IsPrimary": is_primary
-            })
+            if cursor.rowcount > 0:
+                AuditLogger(conn, batch_id=batch_id).log_insert("SongAlbums", f"{source_id}-{album_id}", {
+                    "SourceID": source_id,
+                    "AlbumID": album_id,
+                    "TrackNumber": track_number,
+                    "IsPrimary": is_primary
+                })
 
     def remove_song_from_album(self, source_id: int, album_id: int, batch_id: Optional[str] = None) -> None:
         """Unlink a song from an album."""
