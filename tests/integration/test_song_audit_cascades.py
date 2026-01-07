@@ -74,7 +74,7 @@ def test_song_delete_cascades_audited(repos):
     
     tables_deleted = [h['TableName'] for h in history if h['EntryType'] == 'CHANGE' and h['NewValue'] is None]
     
-    assert "MediaSourceContributorRoles" in tables_deleted
+    assert "SongCredits" in tables_deleted
     assert "SongAlbums" in tables_deleted
     assert "RecordingPublishers" in tables_deleted
     assert "Songs" in tables_deleted
@@ -111,5 +111,5 @@ def test_song_update_batching(repos):
     batch_id = main_update['BatchID']
     
     # Check related junction changes
-    junction_changes = [h for h in history if h['BatchID'] == batch_id and h['TableName'] in ["MediaSourceContributorRoles", "SongAlbums"]]
+    junction_changes = [h for h in history if h['BatchID'] == batch_id and h['TableName'] in ["SongCredits", "SongAlbums"]]
     assert len(junction_changes) > 0, "Junction changes should share BatchID with main update"

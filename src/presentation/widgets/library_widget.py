@@ -396,6 +396,42 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
         # T-83: Also search tags if search text is set
         search_text = self.filterRegularExpression().pattern()
         if search_text:
+            search_text_clean = search_text.strip().lower()
+            
+            # --- T-70: Semantic Identity Search ---
+            # Resolve the search term to alias graph (e.g. "Farrokh" -> "Queen", "Freddie")
+            if not hasattr(self, '_search_alias_cache'): self._search_alias_cache = {}
+            
+            # Key by the actual text
+            if search_text_clean not in self._search_alias_cache:
+                if self.contributor_service:
+                    # Resolve aliases
+                    resolved = self.contributor_service.resolve_identity_graph(search_text_clean)
+                    self._search_alias_cache[search_text_clean] = {r.lower() for r in resolved}
+                else:
+                    self._search_alias_cache[search_text_clean] = {search_text_clean}
+            
+            search_aliases = self._search_alias_cache[search_text_clean]
+            
+            # Check Artist/Performer columns against these aliases
+            # Columns to check for artist match:
+            artist_cols = []
+            for field in ['performers', 'album_artist', 'composers', 'producers']:
+                idx = self._field_indices.get(field, -1)
+                if idx >= 0: artist_cols.append(idx)
+                
+            for col in artist_cols:
+                raw_val = model.data(model.index(source_row, col, source_parent), Qt.ItemDataRole.UserRole)
+                if raw_val:
+                    # Normalized check
+                    val_str = str(raw_val).lower()
+                    # Check if any alias is IN the value (fuzzy) or exact match
+                    # Optimization: Iterate aliases
+                    for alias in search_aliases:
+                         if alias in val_str:
+                             return True
+            # -------------------------------------
+
             # Check tag cache
             if not hasattr(self, '_tag_cache'):
                 self._tag_cache = {}

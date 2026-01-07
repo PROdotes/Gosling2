@@ -320,7 +320,12 @@ class ArtistPickerDialog(QDialog):
             artist_id, name_to_use, _ = data
             selected = self.service.get_by_id(artist_id)
             if selected:
-                if name_to_use: selected.name = name_to_use
+                # If we're using a name different from the primary, it's an ALIAS.
+                # We must flag this so the EntityListWidget passes it to the adapter.
+                if name_to_use and name_to_use != selected.name:
+                    selected.matched_alias = name_to_use
+                    selected.name = name_to_use
+                
                 self._selected_artists = [selected]
                 self.accept()
             return
@@ -684,7 +689,8 @@ class ArtistDetailsDialog(QDialog):
         self._member_adapter = ArtistMemberAdapter(
             self.artist, 
             self.service, 
-            refresh_fn=self._refresh_data
+            refresh_fn=self._refresh_data,
+            parent=self
         )
         
         self.list_members = EntityListWidget(

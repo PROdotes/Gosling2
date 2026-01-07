@@ -240,7 +240,10 @@ class TestSongRepoMultiAlbum:
     """Tests for Phase 2/3 Multi-Album Infrastructure."""
 
     def test_sync_album_non_destructive(self, song_repo, sample_song):
-        """Verify _sync_album promotes new target and preserves old links."""
+        """Verify sync_album promotes new target and preserves old links."""
+        from src.business.services.song_sync_service import SongSyncService
+        sync_service = SongSyncService(song_repo.db_path)
+        
         crud = TestSongRepoCRUD()
         file_id = crud._create_song(song_repo, sample_song)
         
@@ -249,8 +252,8 @@ class TestSongRepoMultiAlbum:
         sample_song.recording_year = 2020
         
         with song_repo.get_connection() as conn:
-            cursor = conn.cursor()  # Get cursor from connection
-            song_repo._sync_album(sample_song, cursor)  # Pass cursor
+            cursor = conn.cursor()
+            sync_service.sync_album(sample_song, cursor)
             conn.commit()
         
         # Verify 1 link
@@ -265,8 +268,8 @@ class TestSongRepoMultiAlbum:
         # 2. Link to Album B (Should Replace Album A - Snapshot strategy)
         sample_song.album = "Album B"
         with song_repo.get_connection() as conn:
-            cursor = conn.cursor()  # Get cursor from connection
-            song_repo._sync_album(sample_song, cursor)  # Pass cursor
+            cursor = conn.cursor()
+            sync_service.sync_album(sample_song, cursor)
             conn.commit()
         
         # Verify 1 link (Snapshot strategy replaces, doesn't append)
@@ -282,6 +285,9 @@ class TestSongRepoMultiAlbum:
 
     def test_sync_publisher_track_override(self, song_repo, sample_song):
         """Verify Track Override (Level 1) vs Album (Level 2)."""
+        from src.business.services.song_sync_service import SongSyncService
+        sync_service = SongSyncService(song_repo.db_path)
+        
         crud = TestSongRepoCRUD()
         file_id = crud._create_song(song_repo, sample_song)
         
@@ -289,8 +295,8 @@ class TestSongRepoMultiAlbum:
         sample_song.album = "Album A"
         
         with song_repo.get_connection() as conn:
-            cursor = conn.cursor()  # Get cursor from connection
-            song_repo._sync_album(sample_song, cursor)  # Pass cursor
+            cursor = conn.cursor()
+            sync_service.sync_album(sample_song, cursor)
             
             # Manually set Album Publisher to Major Label
             cursor = conn.cursor()
@@ -307,8 +313,8 @@ class TestSongRepoMultiAlbum:
         # 2. Set 'Remix Label' on Song (Override)
         sample_song.publisher = "Remix Label"
         with song_repo.get_connection() as conn:
-            cursor = conn.cursor()  # Get cursor from connection
-            song_repo._sync_publisher(sample_song, cursor)  # Pass cursor
+            cursor = conn.cursor()
+            sync_service.sync_publisher(sample_song, cursor)
             conn.commit()
             
         # 3. Verify Waterfall Resolution via get_songs_by_ids
@@ -332,3 +338,4 @@ class TestSongRepoMultiAlbum:
             track_pid = cursor.fetchone()[0]
             assert track_pid is not None
             assert track_pid != maj_id
+

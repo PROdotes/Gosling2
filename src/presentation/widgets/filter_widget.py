@@ -397,6 +397,9 @@ class FilterWidget(QFrame):
         
         for val in values:
             t = type_map.get(val, 'unknown')
+            # Normalize keys to prevent crash if DB has weird values like 'placeholder'
+            if t not in bins:
+                t = 'unknown'
             bins[t].append(val)
             
         # Helper to create a branch

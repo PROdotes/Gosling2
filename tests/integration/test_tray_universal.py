@@ -151,8 +151,8 @@ def test_artist_details_alias_relay(qtbot, mock_widget_deps):
     deps = mock_widget_deps
     artist = Contributor(1, "Main Artist")
     service = deps['library_service'].contributor_service
-    # Service should return tuples (id, name) for aliases
-    service.get_aliases.return_value = [(2, "Alias 1")]
+    from types import SimpleNamespace
+    service.get_aliases.return_value = [SimpleNamespace(alias_id=2, alias_name="Alias 1")]
     
     dialog = ArtistDetailsDialog(artist, service)
     qtbot.addWidget(dialog)

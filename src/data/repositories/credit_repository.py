@@ -9,8 +9,9 @@ class CreditRepository(BaseRepository):
     Repository for managing song and album credits.
     """
 
-    def add_song_credit(self, source_id: int, name_id: int, role_id: int, position: int = 0) -> int:
+    def add_song_credit(self, source_id: int, name_id: int, role_id: int, position: int = 0, batch_id: Optional[str] = None) -> int:
         """Add a credit record to a song."""
+        from src.core.audit_logger import AuditLogger
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -18,7 +19,14 @@ class CreditRepository(BaseRepository):
                     INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID, CreditPosition)
                     VALUES (?, ?, ?, ?)
                 """, (source_id, name_id, role_id, position))
-                return cursor.lastrowid
+                new_id = cursor.lastrowid
+                
+                if new_id:
+                    AuditLogger(conn, batch_id=batch_id).log_insert("SongCredits", f"{source_id}-{name_id}-{role_id}", {
+                        "SourceID": source_id, "CreditedNameID": name_id, 
+                        "RoleID": role_id, "CreditPosition": position
+                    })
+                return new_id
         except sqlite3.IntegrityError:
             # Credit already exists (UNIQUE constraint)
             return 0
@@ -27,15 +35,23 @@ class CreditRepository(BaseRepository):
             logger.error(f"Error adding song credit: {e}")
             return 0
 
-    def remove_song_credit(self, source_id: int, name_id: int, role_id: int) -> bool:
+    def remove_song_credit(self, source_id: int, name_id: int, role_id: int, batch_id: Optional[str] = None) -> bool:
         """Remove a credit record from a song."""
+        from src.core.audit_logger import AuditLogger
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # Snapshot for audit
+                snapshot = {"SourceID": source_id, "CreditedNameID": name_id, "RoleID": role_id}
+                
                 cursor.execute("""
                     DELETE FROM SongCredits 
                     WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
                 """, (source_id, name_id, role_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn, batch_id=batch_id).log_delete("SongCredits", f"{source_id}-{name_id}-{role_id}", snapshot)
                 return cursor.rowcount > 0
         except Exception as e:
             from src.core import logger
@@ -74,8 +90,9 @@ class CreditRepository(BaseRepository):
             logger.error(f"Error fetching song credits for {source_id}: {e}")
             return []
 
-    def add_album_credit(self, album_id: int, name_id: int, role_id: int) -> int:
+    def add_album_credit(self, album_id: int, name_id: int, role_id: int, batch_id: Optional[str] = None) -> int:
         """Add a credit record to an album."""
+        from src.core.audit_logger import AuditLogger
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -83,7 +100,13 @@ class CreditRepository(BaseRepository):
                     INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID)
                     VALUES (?, ?, ?)
                 """, (album_id, name_id, role_id))
-                return cursor.lastrowid
+                new_id = cursor.lastrowid
+                
+                if new_id:
+                    AuditLogger(conn, batch_id=batch_id).log_insert("AlbumCredits", f"{album_id}-{name_id}-{role_id}", {
+                        "AlbumID": album_id, "CreditedNameID": name_id, "RoleID": role_id
+                    })
+                return new_id
         except sqlite3.IntegrityError:
             return 0
         except Exception as e:
@@ -91,15 +114,23 @@ class CreditRepository(BaseRepository):
             logger.error(f"Error adding album credit: {e}")
             return 0
 
-    def remove_album_credit(self, album_id: int, name_id: int, role_id: int) -> bool:
+    def remove_album_credit(self, album_id: int, name_id: int, role_id: int, batch_id: Optional[str] = None) -> bool:
         """Remove a credit record from an album."""
+        from src.core.audit_logger import AuditLogger
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                
+                # Snapshot for audit
+                snapshot = {"AlbumID": album_id, "CreditedNameID": name_id, "RoleID": role_id}
+                
                 cursor.execute("""
                     DELETE FROM AlbumCredits 
                     WHERE AlbumID = ? AND CreditedNameID = ? AND RoleID = ?
                 """, (album_id, name_id, role_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn, batch_id=batch_id).log_delete("AlbumCredits", f"{album_id}-{name_id}-{role_id}", snapshot)
                 return cursor.rowcount > 0
         except Exception as e:
             from src.core import logger

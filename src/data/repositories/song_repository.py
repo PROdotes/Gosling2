@@ -150,7 +150,7 @@ class SongRepository(GenericRepository[Song]):
         # Delegated Sync Logic (Moved to SongSyncService to reduce file size)
         self.sync_service.sync_all(song, cursor, auditor=auditor)
 
-    def update_status(self, file_id: int, is_done: bool) -> bool:
+    def update_status(self, file_id: int, is_done: bool, batch_id: Optional[str] = None) -> bool:
         """Update the status of a song (Tag-Driven, Flag-Synced)"""
         try:
             with self.get_connection() as conn:
@@ -169,15 +169,20 @@ class SongRepository(GenericRepository[Song]):
                     cursor = cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (file_id, tag_id))
                     if cursor.rowcount > 0:
                         from src.core.audit_logger import AuditLogger
-                        AuditLogger(conn).log_insert("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
+                        AuditLogger(conn, batch_id=batch_id).log_insert("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
                 else:
                     # Remove 'Unprocessed' status tag
-                    cursor.execute("""
-                        DELETE FROM MediaSourceTags 
-                        WHERE SourceID = ? AND TagID IN (
-                            SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'
-                        )
-                    """, (file_id,))
+                    # First get the tag ID for auditing
+                    cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'")
+                    tag_row = cursor.fetchone()
+                    if tag_row:
+                        tag_id = tag_row[0]
+                        # Check if link exists before deleting
+                        cursor.execute("SELECT 1 FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
+                        if cursor.fetchone():
+                            cursor.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
+                            from src.core.audit_logger import AuditLogger
+                            AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
 
                 # 2. Sync LEGACY (Skip - DB cleanup in progress)
                 # (The column likely still exists but we don't write to it)
@@ -197,11 +202,11 @@ class SongRepository(GenericRepository[Song]):
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
                     WHERE MS.SourceID IN (
-                        SELECT MSCR_SUB.SourceID 
-                        FROM MediaSourceContributorRoles MSCR_SUB
-                        JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
-                        JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
-                        WHERE C_SUB.ContributorName = ? AND R_SUB.RoleName = 'Performer'
+                        SELECT SC.SourceID 
+                        FROM SongCredits SC
+                        JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                        JOIN Roles R ON SC.RoleID = R.RoleID
+                        WHERE AN.DisplayName = ? AND R.RoleName = 'Performer'
                     ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
@@ -223,11 +228,11 @@ class SongRepository(GenericRepository[Song]):
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
                     WHERE MS.SourceID IN (
-                        SELECT MSCR_SUB.SourceID 
-                        FROM MediaSourceContributorRoles MSCR_SUB
-                        JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
-                        JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
-                        WHERE C_SUB.ContributorName = ? AND R_SUB.RoleName = 'Composer'
+                        SELECT SC.SourceID 
+                        FROM SongCredits SC
+                        JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                        JOIN Roles R ON SC.RoleID = R.RoleID
+                        WHERE AN.DisplayName = ? AND R.RoleName = 'Composer'
                     ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
@@ -263,11 +268,11 @@ class SongRepository(GenericRepository[Song]):
                     WHERE (
                         S.SongGroups IN ({placeholders}) 
                         OR MS.SourceID IN (
-                            SELECT MSCR_SUB.SourceID 
-                            FROM MediaSourceContributorRoles MSCR_SUB
-                            JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
-                            JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
-                            WHERE C_SUB.ContributorName IN ({placeholders}) AND R_SUB.RoleName = 'Performer'
+                            SELECT SC.SourceID 
+                            FROM SongCredits SC
+                            JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                            JOIN Roles R ON SC.RoleID = R.RoleID
+                            WHERE AN.DisplayName IN ({placeholders}) AND R.RoleName = 'Performer'
                         )
                     ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
@@ -297,6 +302,8 @@ class SongRepository(GenericRepository[Song]):
             with self.get_connection() as conn:
                 return self._get_songs_by_ids_logic(source_ids, conn)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             logger.error(f"Error bulk fetching songs: {e}")
             return []
 
@@ -363,37 +370,54 @@ class SongRepository(GenericRepository[Song]):
             WHERE MS.SourceID IN ({placeholders})
         """
         cursor.execute(query, source_ids)
+        rows = cursor.fetchall()
+        print(f"DEBUG REPO: Query (IDs={source_ids}) returned {len(rows)} rows.")
+        if not rows and source_ids:
+             # Deep debug if missing
+             print(f"DEBUG REPO: Check if MediaSource {source_ids[0]} exists...")
+             cursor.execute("SELECT * FROM MediaSources WHERE SourceID=?", (source_ids[0],))
+             print(f"  MediaSource: {cursor.fetchone()}")
+             cursor.execute("SELECT * FROM Songs WHERE SourceID=?", (source_ids[0],))
+             print(f"  Song: {cursor.fetchone()}")
         
         songs_map = {}
-        for row in cursor.fetchall():
-            (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-             notes, is_active_int, album_title, album_id, publisher_name, 
-             album_artist, all_tags_str) = row
-            
-            groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
-            tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
-            
-            song = Song(
-                source_id=source_id,
-                source=path,
-                name=name,
-                duration=duration,
-                bpm=bpm,
-                recording_year=recording_year,
-                isrc=isrc,
-                notes=notes,
-                is_active=bool(is_active_int),
-                album=[a.strip() for a in album_title.split('|||')] if album_title else [],
-                album_id=album_id,
-                album_artist=album_artist,
-                publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
-                # genre/mood arguments removed
-                groups=groups,
-                tags=tags
-            )
-            songs_map[source_id] = song
+        for row in rows:
+            try:
+                (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
+                 notes, is_active_int, album_title, album_id, publisher_name, 
+                 album_artist, all_tags_str) = row
+                 
+                # DEBUG: Check ID
+                print(f"DEBUG REPO: Processing Row ID={source_id} (Type: {type(source_id)})")
+
+                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+                tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
+                
+                song = Song(
+                    source_id=source_id,
+                    source=path,
+                    name=name,
+                    duration=duration,
+                    bpm=bpm,
+                    recording_year=recording_year,
+                    isrc=isrc,
+                    notes=notes,
+                    is_active=bool(is_active_int),
+                    album=[a.strip() for a in album_title.split('|||')] if album_title else [],
+                    album_id=album_id,
+                    album_artist=album_artist,
+                    publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
+                    groups=groups,
+                    tags=tags
+                )
+                songs_map[source_id] = song
+            except Exception as e:
+                print(f"DEBUG REPO: Failed to create Song object from row: {e}")
+                import traceback
+                traceback.print_exc()
 
         # 2. Fetch all roles for all songs in one go (with Credit Preservation)
+        print("DEBUG REPO: Fetching roles...")
         query_roles = f"""
             SELECT sc.SourceID, r.RoleName, an.DisplayName
             FROM SongCredits sc
@@ -401,7 +425,11 @@ class SongRepository(GenericRepository[Song]):
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
             WHERE sc.SourceID IN ({placeholders})
         """
-        cursor.execute(query_roles, source_ids)
+        try:
+             cursor.execute(query_roles, source_ids)
+        except Exception as e:
+             print(f"DEBUG REPO: Role query failed: {e}")
+             raise
         
         for source_id, role_name, contributor_name in cursor.fetchall():
             if source_id in songs_map:
@@ -415,48 +443,53 @@ class SongRepository(GenericRepository[Song]):
                 elif role_name == 'Producer':
                     song.producers.append(contributor_name)
 
-                # 3. Fetch all releases (Multi-Album Hydration)
-                query_releases = f"""
-                    SELECT SA.SourceID, A.AlbumID, A.AlbumTitle, A.ReleaseYear, SA.TrackNumber, SA.IsPrimary
-                    FROM SongAlbums SA
-                    JOIN Albums A ON SA.AlbumID = A.AlbumID
-                    WHERE SA.SourceID IN ({placeholders})
-                    ORDER BY SA.IsPrimary DESC, A.ReleaseYear DESC
-                """
-                cursor.execute(query_releases, source_ids)
-                
-                for r_src_id, r_alb_id, r_title, r_year, r_track, r_primary in cursor.fetchall():
-                    if r_src_id in songs_map:
-                         songs_map[r_src_id].releases.append({
-                             'album_id': r_alb_id,
-                             'title': r_title,
-                             'year': r_year,
-                             'track_number': r_track,
-                             'is_primary': bool(r_primary)
-                         })
+        print("DEBUG REPO: Fetching releases...")
+        # 3. Fetch all releases (Multi-Album Hydration)
+        query_releases = f"""
+            SELECT SA.SourceID, A.AlbumID, A.AlbumTitle, A.ReleaseYear, SA.TrackNumber, SA.IsPrimary
+            FROM SongAlbums SA
+            JOIN Albums A ON SA.AlbumID = A.AlbumID
+            WHERE SA.SourceID IN ({placeholders})
+            ORDER BY SA.IsPrimary DESC, A.ReleaseYear DESC
+        """
+        try:
+            cursor.execute(query_releases, source_ids)
+        except Exception as e:
+             print(f"DEBUG REPO: Releases query failed: {e}")
+             raise
+             
+        for r_src_id, r_alb_id, r_title, r_year, r_track, r_primary in cursor.fetchall():
+            if r_src_id in songs_map:
+                 songs_map[r_src_id].releases.append({
+                     'album_id': r_alb_id,
+                     'title': r_title,
+                     'year': r_year,
+                     'track_number': r_track,
+                     'is_primary': bool(r_primary)
+                 })
 
-                # Maintain original order of requested IDs
-                final_list = []
-                for sid in source_ids:
-                    if sid in songs_map:
-                        song = songs_map[sid]
-                        # T-Fix: Re-hydrate album/album_id from structured releases to prevent
-                        # "GROUP_CONCAT" merging (e.g. "Album A, Album B" becoming one title).
-                        if song.releases:
-                            # Releases are already sorted by IsPrimary DESC
-                            titles = [r['title'] for r in song.releases]
-                            ids = [r['album_id'] for r in song.releases]
-                            
-                            if len(titles) > 1:
-                                song.album = titles
-                                song.album_id = ids
-                            elif titles:
-                                song.album = titles[0]
-                                song.album_id = ids[0]
-                        
-                        final_list.append(song)
+        # Maintain original order of requested IDs
+        final_list = []
+        for sid in source_ids:
+            if sid in songs_map:
+                song = songs_map[sid]
+                # T-Fix: Re-hydrate album/album_id from structured releases to prevent
+                # "GROUP_CONCAT" merging (e.g. "Album A, Album B" becoming one title).
+                if song.releases:
+                    # Releases are already sorted by IsPrimary DESC
+                    titles = [r['title'] for r in song.releases]
+                    ids = [r['album_id'] for r in song.releases]
+                    
+                    if len(titles) > 1:
+                        song.album = titles
+                        song.album_id = ids
+                    elif titles:
+                        song.album = titles[0]
+                        song.album_id = ids[0]
                 
-                return final_list
+                final_list.append(song)
+        
+        return final_list
 
     def get_songs_by_paths(self, paths: List[str]) -> List[Song]:
         """Bulk fetch songs by their absolute paths"""

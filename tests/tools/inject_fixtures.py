@@ -32,8 +32,19 @@ def inject():
     with open(fixture_path, 'r') as f:
         songs_data = json.load(f)
 
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    from src.core import logger
+    
+    # Force Logger to DEBUG
+    log_instance = logger.get()
+    log_instance.setLevel(logging.DEBUG)
+    for handler in log_instance.handlers:
+        handler.setLevel(logging.DEBUG)
+
     # 1. Boot Repos
     repo = SongRepository()
+    print(f"DB Path: {repo.db_path}")
     from src.data.repositories.contributor_repository import ContributorRepository
     crepo = ContributorRepository()
     
@@ -56,22 +67,36 @@ def inject():
         conn.commit()
 
     # 3. Inject Contributors (Complex Identities)
+    from src.business.services.contributor_service import ContributorService
+    c_service = ContributorService()
+    
     if os.path.exists(contrib_path):
         with open(contrib_path, 'r') as f:
             contrib_data = json.load(f)
         
         print(f"Injecting {len(contrib_data)} complex artist identities...")
         for c in contrib_data:
-            artist, created = crepo.get_or_create(c['name'], c.get('type', 'person'))
+            # 1. Create Core Identity + Primary Name
+            # Use get_by_name to check existence first (legacy safe)
+            existing = c_service.get_by_name(c['name'])
+            if not existing:
+                artist = c_service.create(c['name'], c.get('type', 'person'))
+                created = True
+            else:
+                artist = existing
+                created = False
             
             # Aliases
             for alias in c.get('aliases', []):
-                crepo.add_alias(artist.contributor_id, alias)
+                c_service.add_alias(artist.contributor_id, alias)
             
             # Members (Requires IDs, we resolve by name)
             for m_name in c.get('members', []):
-                member, _ = crepo.get_or_create(m_name, 'person')
-                crepo.add_member(artist.contributor_id, member.contributor_id)
+                member_obj = c_service.get_by_name(m_name)
+                if not member_obj:
+                    member_obj = c_service.create(m_name, 'person')
+                
+                c_service.add_member(artist.contributor_id, member_obj.contributor_id) # Group, Member
         print("[OK] Artist identities established.")
 
     print(f"Processing {len(songs_data)} songs from fixture...")
@@ -93,7 +118,27 @@ def inject():
             seen_paths.add(path)
         
         # 2. Fetch and Update Metadata
-        song = repo.get_by_path(path)
+        # 2. Fetch and Update Metadata
+        # Use source_id from insert if available, otherwise fetch by path
+        if 'source_id' in locals() and source_id:
+            print(f"DEBUG: Fetching by ID {source_id}")
+            song = repo.get_by_id(source_id)
+        else:
+            print(f"DEBUG: Fetching by path {path}")
+            song = repo.get_by_path(path)
+            
+        if not song:
+             print(f"[FAIL] Could not retrieve song object for {path} (ID: {source_id if 'source_id' in locals() else 'Unknown'})")
+             # DEBUG: Check DB content directly
+             if 'source_id' in locals() and source_id:
+                 with repo.get_connection() as conn:
+                     cur = conn.cursor()
+                     cur.execute(f"SELECT * FROM MediaSources WHERE SourceID={source_id}")
+                     print(f"  MediaSources Row: {dict(cur.fetchone())}")
+                     cur.execute(f"SELECT * FROM Songs WHERE SourceID={source_id}")
+                     print(f"  Songs Row: {dict(cur.fetchone())}")
+             continue
+             
         song.title = data['title']
         
         # Split performers if delimited (legacy support)
@@ -193,12 +238,14 @@ def inject():
             second_album_id = cursor.lastrowid
             
             # T-91: Link ABBA to Gold Greatest Hits via M2M
-            cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = 'ABBA'")
-            abba_id = cursor.fetchone()[0]
-            cursor.execute(
-                "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
-                (second_album_id, abba_id)
-            )
+            # Resolve name to NameID in ArtistNames
+            abba = c_service.get_by_name("ABBA")
+            if abba:
+                abba_id = abba.contributor_id
+                cursor.execute(
+                    "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
+                    (second_album_id, abba_id)
+                )
 
             # Link song to second album (non-primary)
             cursor.execute(

@@ -134,7 +134,7 @@ class TagRepository(GenericRepository[Tag]):
             conn.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
             AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{source_id}-{tag_id}", snapshot)
             
-    def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None) -> None:
+    def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None, batch_id: Optional[str] = None) -> None:
         """
         Unlink all tags from a source.
         Optionally filter by category (e.g., clear only Genres).
@@ -152,7 +152,7 @@ class TagRepository(GenericRepository[Tag]):
             
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            auditor = AuditLogger(conn)
+            auditor = AuditLogger(conn, batch_id=batch_id)
             # Find all tags being removed for auditing
             if category:
                 cursor = conn.execute("SELECT SourceID, T.TagID FROM MediaSourceTags MT JOIN Tags T ON MT.TagID = T.TagID WHERE SourceID = ? AND TagCategory = ?", (source_id, category))
@@ -266,7 +266,7 @@ class TagRepository(GenericRepository[Tag]):
             if tag:
                 self.remove_tag_from_source(source_id, tag.tag_id)
 
-    def merge_tags(self, source_id: int, target_id: int) -> bool:
+    def merge_tags(self, source_id: int, target_id: int, batch_id: Optional[str] = None) -> bool:
         """
         Merge source_id into target_id.
         1. Reassign all MediaSourceTags
@@ -282,7 +282,7 @@ class TagRepository(GenericRepository[Tag]):
                 old_snapshot = old_tag.to_dict() if old_tag else {}
 
                 # Auditor for Batching
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
 
                 # 1. Audit Migration: Find all links that will move
                 cursor.execute("SELECT SourceID, TagID FROM MediaSourceTags WHERE TagID = ?", (source_id,))

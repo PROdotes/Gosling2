@@ -59,7 +59,12 @@ class MockRepository(GenericRepository[MockEntity]):
                 )
             """)
 
-    def get_by_id(self, record_id: int) -> Optional[MockEntity]:
+    def get_by_id(self, record_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[MockEntity]:
+        if conn:
+            cur = conn.execute("SELECT id, name FROM MockTable WHERE id = ?", (record_id,))
+            row = cur.fetchone()
+            return MockEntity.from_row(row) if row else None
+            
         with self.get_connection() as conn:
             cur = conn.execute("SELECT id, name FROM MockTable WHERE id = ?", (record_id,))
             row = cur.fetchone()

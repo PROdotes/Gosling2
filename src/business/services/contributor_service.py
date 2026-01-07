@@ -10,23 +10,49 @@ from ...data.repositories.contributor_repository import ContributorRepository
 class ContributorService:
     """
     Service for managing contributor identities and their metadata.
-    Refactored to act as a facade for the new Identity and ArtistName services.
     """
     
-    def __init__(self, contributor_repository: Optional[ContributorRepository] = None):
+    def __init__(self, contributor_repository: Optional[ContributorRepository] = None, credit_repository: Optional[any] = None, db_path: Optional[str] = None):
         # Keep old repo for legacy fallback if needed, but primary logic uses new services
-        self._repo = contributor_repository or ContributorRepository()
+        self._db_path = db_path
+        self._repo = contributor_repository or ContributorRepository(db_path=db_path)
+        
         from .identity_service import IdentityService
         from .artist_name_service import ArtistNameService
-        from ..repositories.credit_repository import CreditRepository
-        self._identity_service = IdentityService()
-        self._name_service = ArtistNameService()
-        self._credit_repo = CreditRepository()
+        from ...data.repositories.credit_repository import CreditRepository
+        from ...data.repositories.identity_repository import IdentityRepository
+        from ...data.repositories.artist_name_repository import ArtistNameRepository
+        
+        # Inject repositories to services to ensure they use the same DB
+        self._identity_service = IdentityService(
+            identity_repository=IdentityRepository(db_path=db_path),
+            name_repository=ArtistNameRepository(db_path=db_path)
+        )
+        self._name_service = ArtistNameService(
+            repository=ArtistNameRepository(db_path=db_path)
+        )
+        self._credit_repo = credit_repository or CreditRepository(db_path=db_path)
 
     def get_all(self) -> List[Contributor]:
         """Fetch all contributors (Mapped to all ArtistNames)."""
-        # This is expensive in new model, ideally we should limit or use a view
-        return self._repo.get_all()
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            # Join ArtistNames and Identities
+            cursor.execute("""
+                SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType
+                FROM ArtistNames an
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE an.IsPrimaryName = 1
+                ORDER BY an.SortName
+            """)
+            return [
+                Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2], 
+                    type=row[3] or 'person'
+                ) for row in cursor.fetchall()
+            ]
 
     def search(self, query: str) -> List[Contributor]:
         """Search for contributors by name or alias."""
@@ -44,10 +70,17 @@ class ContributorService:
         name = self._name_service.get_name(contributor_id)
         if not name:
             return None
+            
+        c_type = 'person'
+        if name.owner_identity_id:
+            ident = self._identity_service.get_identity(name.owner_identity_id)
+            if ident: c_type = ident.identity_type
+            
         return Contributor(
             contributor_id=name.name_id,
             name=name.display_name,
-            sort_name=name.sort_name
+            sort_name=name.sort_name,
+            type=c_type
         )
 
     def get_by_name(self, name: str) -> Optional[Contributor]:
@@ -58,10 +91,16 @@ class ContributorService:
         # Try to find exact match
         for n in names:
             if n.display_name.lower() == name.lower():
+                c_type = 'person'
+                if n.owner_identity_id:
+                    ident = self._identity_service.get_identity(n.owner_identity_id)
+                    if ident: c_type = ident.identity_type
+                    
                 return Contributor(
                     contributor_id=n.name_id,
                     name=n.display_name,
-                    sort_name=n.sort_name
+                    sort_name=n.sort_name,
+                    type=c_type
                 )
         return None
 
@@ -78,6 +117,9 @@ class ContributorService:
 
     def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
         """Merge contributor source_id into target_id (Identity Merge)."""
+        import uuid
+        batch_id = batch_id or str(uuid.uuid4())
+        
         # In new model, source_id and target_id are NameIDs. 
         # We need to find their identities and merge them.
         s_name = self._name_service.get_name(source_id)
@@ -91,15 +133,37 @@ class ContributorService:
             if not t_name.owner_identity_id:
                 return False # Cannot merge into an orphan target identity-wise
             s_name.owner_identity_id = t_name.owner_identity_id
-            return self._name_service.update_name(s_name)
+            return self._name_service.update_name(s_name, batch_id=batch_id)
             
-        return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id)
+        return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
+
+    def get_by_role(self, role_name: str) -> List[Contributor]:
+        """Fetch all contributors who have a specific role assigned at least once."""
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT an.NameID, an.DisplayName, an.SortName, i.IdentityType
+                FROM ArtistNames an
+                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                JOIN Roles r ON sc.RoleID = r.RoleID
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE r.RoleName = ?
+                ORDER BY an.SortName ASC
+            """, (role_name,))
+            
+            return [
+                Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3] or 'person'
+                ) for row in cursor.fetchall()
+            ]
 
     def add_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
         """Link a contributor (NameID) to a song with a specific role."""
         # Get RoleID
-        from src.data.database import Database
-        with Database().get_connection() as conn:
+        with self._credit_repo.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
             row = cursor.fetchone()
@@ -110,8 +174,7 @@ class ContributorService:
 
     def remove_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
         """Remove a contributor role from a song."""
-        from src.data.database import Database
-        with Database().get_connection() as conn:
+        with self._credit_repo.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
             row = cursor.fetchone()
@@ -129,14 +192,67 @@ class ContributorService:
 
     def get_usage_count(self, contributor_id: int) -> int:
         """Count how many songs/albums a contributor is linked to."""
-        from src.data.database import Database
-        with Database().get_connection() as conn:
+        with self._credit_repo.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = ?", (contributor_id,))
             song_count = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = ?", (contributor_id,))
             album_count = cursor.fetchone()[0]
             return song_count + album_count
+
+    def get_all_aliases(self) -> List[str]:
+        """Get all alias names (Non-primary names)."""
+        with self._credit_repo.get_connection() as conn:
+             cursor = conn.cursor()
+             # In new model, aliases are non-primary names
+             cursor.execute("SELECT DisplayName FROM ArtistNames WHERE IsPrimaryName = 0 ORDER BY DisplayName ASC")
+             return [row[0] for row in cursor.fetchall()]
+
+    def get_all_primary_names(self) -> List[str]:
+        """Get all primary artist names."""
+        with self._credit_repo.get_connection() as conn:
+             cursor = conn.cursor()
+             cursor.execute("SELECT DisplayName FROM ArtistNames WHERE IsPrimaryName = 1 ORDER BY DisplayName ASC")
+             return [row[0] for row in cursor.fetchall()]
+
+    def resolve_identity_graph(self, search_term: str) -> List[str]:
+        """
+        Resolve a search term to a complete list of related artist names (Identity Graph).
+        Finds the Identity for the term, and returns ALL names associated with that identity (and groups if person).
+        """
+        if not search_term: return []
+        resolved_names = set()
+        resolved_names.add(search_term) # Always include original
+        
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # 1. Find Identity IDs matching the Name (Fuzzy Match)
+            # This allows searching "Farrokh" to find "Farrokh Bulsara" -> Identity -> "Freddie Mercury"
+            term_wild = f"%{search_term}%"
+            cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE DisplayName LIKE ? COLLATE NOCASE", (term_wild,))
+            identity_ids = {row[0] for row in cursor.fetchall() if row[0] is not None}
+            
+            if not identity_ids:
+                return list(resolved_names)
+            
+            # 2. Expand Identity IDs (Person -> Groups)
+            # Find groups where these identities are members
+            placeholders = ','.join('?' for _ in identity_ids)
+            params = list(identity_ids)
+            cursor.execute(f"SELECT GroupIdentityID FROM GroupMemberships WHERE MemberIdentityID IN ({placeholders})", params)
+            for row in cursor.fetchall():
+                identity_ids.add(row[0])
+            
+            # 3. Get ALL names for these identities
+            placeholders = ','.join('?' for _ in identity_ids)
+            params = list(identity_ids)
+            # Need to execute again with potentially larger set
+            cursor.execute(f"SELECT DisplayName FROM ArtistNames WHERE OwnerIdentityID IN ({placeholders})", params)
+            for row in cursor.fetchall():
+                resolved_names.add(row[0])
+                
+        return list(resolved_names)
 
     def update(self, contributor: Contributor) -> bool:
         """Update an existing contributor record (ArtistName)."""
@@ -145,3 +261,208 @@ class ContributorService:
         name.display_name = contributor.name
         name.sort_name = contributor.sort_name
         return self._name_service.update_name(name)
+        
+    # ==========================
+    # Group & Alias Management
+    # ==========================
+
+    def _get_identity_id(self, name_id: int) -> Optional[int]:
+        """Helper: Resolve NameID to OwnerIdentityID."""
+        name = self._name_service.get_name(name_id)
+        return name.owner_identity_id if name else None
+
+    def get_members(self, group_id: int) -> List[Contributor]:
+        """Get members of a group (NameID -> Identity -> Members -> PrimaryNames)."""
+        group_identity_id = self._get_identity_id(group_id)
+        if not group_identity_id: return []
+
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            # Join GroupMemberships -> Identity -> ArtistNames (Primary)
+            # LEFT JOIN to get Alias Name if CreditedAsNameID is set
+            query = """
+                SELECT 
+                    COALESCE(alias.NameID, an.NameID), 
+                    COALESCE(alias.DisplayName, an.DisplayName), 
+                    COALESCE(alias.SortName, an.SortName), 
+                    i.IdentityType,
+                    alias.DisplayName
+                FROM GroupMemberships gm
+                JOIN Identities i ON gm.MemberIdentityID = i.IdentityID
+                JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1
+                LEFT JOIN ArtistNames alias ON gm.CreditedAsNameID = alias.NameID
+                WHERE gm.GroupIdentityID = ?
+                ORDER BY COALESCE(alias.SortName, an.SortName)
+            """
+            cursor.execute(query, (group_identity_id,))
+            return [
+                 Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3] or 'person',
+                    matched_alias=row[4]
+                ) for row in cursor.fetchall()
+            ]
+
+    def get_groups(self, member_id: int) -> List[Contributor]:
+        """Get groups this person belongs to."""
+        member_identity_id = self._get_identity_id(member_id)
+        if not member_identity_id: return []
+
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            query = """
+                SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType
+                FROM GroupMemberships gm
+                JOIN Identities i ON gm.GroupIdentityID = i.IdentityID
+                JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID
+                WHERE gm.MemberIdentityID = ? AND an.IsPrimaryName = 1
+                ORDER BY an.SortName
+            """
+            cursor.execute(query, (member_identity_id,))
+            return [
+                 Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3] or 'group'
+                ) for row in cursor.fetchall()
+            ]
+
+    def add_member(self, group_id: int, member_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
+        """Add a member to a group."""
+        group_ident = self._get_identity_id(group_id)
+        member_ident = self._get_identity_id(member_id)
+        
+        if not group_ident or not member_ident: return False
+        
+        # Check if already exists (via SQL or try/except)
+        try:
+            with self._credit_repo.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID, CreditedAsNameID, JoinDate)
+                    VALUES (?, ?, ?, CURRENT_DATE)
+                    ON CONFLICT(GroupIdentityID, MemberIdentityID) DO UPDATE SET
+                    CreditedAsNameID = excluded.CreditedAsNameID
+                """, (group_ident, member_ident, member_alias_id))
+                # Audit Logging
+                from src.core.audit_logger import AuditLogger
+                if cursor.rowcount > 0:
+                    action = "INSERT" # Default to INSERT logic, but could be UPDATE. 
+                    # For now we just log the link established.
+                    AuditLogger(conn, batch_id=batch_id).log_insert("GroupMemberships", f"{group_ident}-{member_ident}", {
+                        "GroupIdentityID": group_ident,
+                        "MemberIdentityID": member_ident,
+                        "CreditedAsNameID": member_alias_id
+                    })
+                return cursor.rowcount > 0
+        except Exception:
+            return False
+
+    def remove_member(self, group_id: int, member_id: int, batch_id: Optional[str] = None) -> bool:
+        """Remove a member from a group."""
+        group_ident = self._get_identity_id(group_id)
+        member_ident = self._get_identity_id(member_id)
+        
+        if not group_ident or not member_ident: return False
+        
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Snapshot for Audit
+            from src.core.audit_logger import AuditLogger
+            cursor.execute("SELECT GroupIdentityID, MemberIdentityID, CreditedAsNameID FROM GroupMemberships WHERE GroupIdentityID = ? AND MemberIdentityID = ?", (group_ident, member_ident))
+            row = cursor.fetchone()
+            if not row: return False
+            snapshot = {"GroupIdentityID": row[0], "MemberIdentityID": row[1], "CreditedAsNameID": row[2]}
+
+            cursor.execute("""
+                DELETE FROM GroupMemberships 
+                WHERE GroupIdentityID = ? AND MemberIdentityID = ?
+            """, (group_ident, member_ident))
+            
+            if cursor.rowcount > 0:
+                AuditLogger(conn, batch_id=batch_id).log_delete("GroupMemberships", f"{group_ident}-{member_ident}", snapshot)
+            return cursor.rowcount > 0
+
+    def get_member_count(self, contributor_id: int) -> int:
+        """Count how many group memberships this entity is involved in (as group or member)."""
+        identity_id = self._get_identity_id(contributor_id)
+        if not identity_id: return 0
+        
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM GroupMemberships 
+                WHERE GroupIdentityID = ? OR MemberIdentityID = ?
+            """, (identity_id, identity_id))
+            return cursor.fetchone()[0]
+
+    def get_aliases(self, contributor_id: int) -> List[Any]:
+        """Get all aliases (non-primary names) for this contributor."""
+        identity_id = self._get_identity_id(contributor_id)
+        if not identity_id: return []
+        
+        names = self._name_service.get_by_owner(identity_id)
+        # Filter for non-primary
+        aliases = []
+        for n in names:
+            if not n.is_primary_name:
+                # Return object structure expected by ArtistAliasAdapter
+                # It expects .alias_id and .alias_name
+                from types import SimpleNamespace
+                aliases.append(SimpleNamespace(alias_id=n.name_id, alias_name=n.display_name))
+        return aliases
+
+    def add_alias(self, contributor_id: int, alias_name: str) -> bool:
+        """Create a new alias for this contributor."""
+        identity_id = self._get_identity_id(contributor_id)
+        if not identity_id: return False
+        
+        try:
+            self._name_service.create_name(alias_name, owner_identity_id=identity_id, is_primary=False)
+            return True
+        except Exception:
+            return False
+
+    def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
+        """Delete an alias."""
+        return self._name_service.delete_name(alias_id, batch_id=batch_id)
+
+    def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Move an alias from one identity to another.
+        
+        Args:
+            alias_name: The display name of the alias to move
+            old_owner_id: NameID of the current owner (we resolve to IdentityID)
+            new_owner_id: NameID of the new owner (we resolve to IdentityID)
+            batch_id: Optional transaction ID
+        """
+        old_ident = self._get_identity_id(old_owner_id)
+        new_ident = self._get_identity_id(new_owner_id)
+        if not old_ident or not new_ident:
+            return False
+        return self._identity_service.move_alias(alias_name, old_ident, new_ident, batch_id=batch_id)
+
+    def abdicate_identity(self, old_id: int, heir_id: int, adopter_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Abdicate an identity: move the primary name to another identity,
+        and promote an heir to become the new primary.
+        
+        Args:
+            old_id: NameID of the identity being abdicated from (resolved to IdentityID)
+            heir_id: NameID that will become the new primary
+            adopter_id: NameID of the identity receiving the old primary (resolved to IdentityID)
+        """
+        old_ident = self._get_identity_id(old_id)
+        adopter_ident = self._get_identity_id(adopter_id)
+        
+        if not old_ident or not adopter_ident:
+            return False
+        
+        # heir_id is already a NameID, not a ContributorID that needs resolution
+        return self._identity_service.abdicate(old_ident, heir_id, adopter_ident, batch_id=batch_id)
+

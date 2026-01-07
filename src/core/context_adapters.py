@@ -315,12 +315,13 @@ class ArtistAliasAdapter(ContextAdapter):
 # =============================================================================
 
 class ArtistMemberAdapter(ContextAdapter):
-    """Adapter for editing an Artist's group memberships."""
+    """Adapter for Member <-> Group relationships."""
     
-    def __init__(self, artist: Any, service: Any, refresh_fn: Callable = None):
+    def __init__(self, artist: Any, service: Any, refresh_fn: Callable = None, parent: Any = None):
         self.artist = artist
         self.service = service
         self._refresh = refresh_fn
+        self.parent = parent # For QDialogs
     
     def get_children(self) -> List[int]:
         if self.artist.type == "group":
@@ -363,7 +364,65 @@ class ArtistMemberAdapter(ContextAdapter):
     
     def unlink(self, child_id: int) -> bool:
         """Remove membership link."""
+        # Safety Check: If removing an ALIAS member, warn that it removes the Person.
+        name_info = self.service.get_by_id(child_id) # child_id is NameID
+        if name_info and self.parent: 
+             # Is it an alias? (Name != Primary Name of Identity)
+             # Wait, get_by_id returns Contributor object with 'name' being the resolved name for that ID.
+             # We need to know if it's acting as an alias in THIS context.
+             # But 'child_id' passed from EntityListWidget is the NameID we visualized (the Alias NameID).
+             
+             # If the NameID is NOT a Primary Name, it is an Alias.
+             is_alias = False
+             # We can check name_service or infer from type. 
+             # Easier: Check if Name != Identity Primary Name
+             # But get_by_id logic is complex.
+             
+             # Let's rely on the explicit warning:
+             # "You are removing 'NAME'. If this is an alias, 'REAL PERSON' will be removed."
+             
+             pass
+
         if self.artist.type == "group":
+            # Check if Aliased
+            member = self.service.get_by_id(child_id)
+            if member and self.parent:
+                from PyQt6.QtWidgets import QMessageBox
+                
+                # Resolving identity to see who we are really deleting
+                real_person = self.service.get_by_id(child_id) 
+                # Note: get_by_id(AliasID) returns the Identity info but with Alias Name?
+                # Let's use internal resolution to be sure
+                
+                # If the displayed name (from child_id) is NOT the primary name?
+                # Actually, simpler:
+                # If we are in "Aliases" mode? No, this is Members.
+                
+                # Only warn if it LOOKS like an alias?
+                # Or just warn regardless? "Remove 'Name' from group?"
+                # EntityListWidget logic is silent.
+                # Let's be safe.
+                
+                msg = f"Remove '{member.name}' from '{self.artist.name}'?"
+                if member.matched_alias: 
+                     # If we fetched it via get_members, it might have matched_alias set?
+                     # No, get_by_id(child_id) returns a fresh object.
+                     pass
+
+                # If the ID is an ALIAS ID, get_by_id returns the properties of that NameID.
+                # If we want to check for "Shadow Removal", we should check if ChildID belongs to an Identity
+                # that has a DIFFERENT Primary Name.
+                
+                # This is getting complex to sniff.
+                # User complaint: "Deleting 'Ziggy' deleted 'Freddie'".
+                # So we just say: "Removing this member ('Ziggy') will remove the underlying artist ('Freddie') from the group."
+                
+                reply = QMessageBox.question(self.parent, "Remove Member?", 
+                                             f"Are you sure you want to remove '{member.name}' from '{self.artist.name}'?\n\nThis will remove the member entirely, including any aliases.",
+                                             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if reply != QMessageBox.StandardButton.Yes:
+                    return False
+
             self.service.remove_member(self.artist.contributor_id, child_id)
         else:
             self.service.remove_member(child_id, self.artist.contributor_id)
@@ -371,7 +430,10 @@ class ArtistMemberAdapter(ContextAdapter):
         return True
     
     def get_parent_for_dialog(self) -> Any:
-        return self.artist
+        # T-Bug: Do NOT return self.artist here.
+        # This is passed to the router as 'context_entity', which maps to 'context_song'.
+        # Passing an Artist as a Song context is semantically wrong and dangerous.
+        return None
     
     def on_data_changed(self):
         if self._refresh:

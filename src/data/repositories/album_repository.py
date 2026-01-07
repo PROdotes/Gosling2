@@ -289,19 +289,29 @@ class AlbumRepository(GenericRepository[Album]):
             print(f"Error fetching album songs: {e}")
         return songs
 
-    def set_primary_album(self, source_id: int, album_id: int) -> None:
+    def set_primary_album(self, source_id: int, album_id: int, batch_id: Optional[str] = None) -> None:
         """Promote an album link to be the Primary source."""
+        from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            # 1. Demote all
+            auditor = AuditLogger(conn, batch_id=batch_id)
+            cursor = conn.cursor()
+            
+            # 1. Snapshot current state and demote all
+            cursor.execute("SELECT AlbumID, IsPrimary FROM SongAlbums WHERE SourceID = ?", (source_id,))
+            for row in cursor.fetchall():
+                if row[1] == 1:  # Was primary
+                    auditor.log_update("SongAlbums", f"{source_id}-{row[0]}", {"IsPrimary": 1}, {"IsPrimary": 0})
             conn.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,))
+            
             # 2. Promote specific
             conn.execute("UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id))
+            auditor.log_update("SongAlbums", f"{source_id}-{album_id}", {"IsPrimary": 0}, {"IsPrimary": 1})
 
     def get_item_albums(self, source_id: int) -> List[Album]:
         """Get albums linked to a source item."""
         return self.get_albums_for_song(source_id)
 
-    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
+    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None, batch_id: Optional[str] = None) -> Album:
         """
         Link a song to an album by title, artist, and year (Find or Create).
         This prevents different artists with the same album title from merging.
@@ -311,6 +321,8 @@ class AlbumRepository(GenericRepository[Album]):
         
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            from src.core.audit_logger import AuditLogger
+            auditor = AuditLogger(conn, batch_id=batch_id)
             
             # Find or Create Album
             album = self.find_by_key(album_title.strip(), artist, year)
@@ -323,29 +335,33 @@ class AlbumRepository(GenericRepository[Album]):
                 new_id = cursor.lastrowid
                 album = Album(album_id=new_id, title=album_title.strip(), album_artist=artist, release_year=year, album_type='Album')
                 created = True
+                # Audit Album INSERT
+                auditor.log_insert("Albums", new_id, {"AlbumTitle": album_title.strip(), "AlbumArtist": artist, "AlbumType": "Album", "ReleaseYear": year})
 
             # T-91: If newly created, also link the provided artist via M2M
             if created and artist:
                 # Handle multiple artists if comma-separated
                 artist_names = [a.strip() for a in artist.split(',')]
                 for a_name in artist_names:
-                    # Resolve artist ID
-                    cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ?", (a_name,))
+                    # Resolve artist ID from ArtistNames (New Model)
+                    cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ?", (a_name,))
                     c_row = cursor.fetchone()
                     if not c_row:
-                        cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (a_name, a_name))
+                        # Orphan Create
+                        cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (a_name, a_name))
                         c_id = cursor.lastrowid
+                        # Audit ArtistNames INSERT
+                        auditor.log_insert("ArtistNames", c_id, {"DisplayName": a_name, "SortName": a_name, "IsPrimaryName": 0})
                     else:
                         c_id = c_row[0]
                     
-                    # Link
+                    # Link via AlbumCredits
                     cursor = cursor.execute(
-                        "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
+                        "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
                         (album.album_id, c_id)
                     )
                     if cursor.rowcount > 0:
-                        from src.core.audit_logger import AuditLogger
-                        AuditLogger(conn).log_insert("AlbumContributors", f"{album.album_id}-{c_id}", {"AlbumID": album.album_id, "ContributorID": c_id})
+                        auditor.log_insert("AlbumCredits", f"{album.album_id}-{c_id}", {"AlbumID": album.album_id, "CreditedNameID": c_id})
 
             # Link song to album
             # Check if link exists
@@ -358,6 +374,8 @@ class AlbumRepository(GenericRepository[Album]):
                     "INSERT INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, ?)",
                     (source_id, album.album_id, is_primary)
                 )
+                # Audit SongAlbums INSERT
+                auditor.log_insert("SongAlbums", f"{source_id}-{album.album_id}", {"SourceID": source_id, "AlbumID": album.album_id, "IsPrimary": is_primary})
     
         return album
 
@@ -382,14 +400,14 @@ class AlbumRepository(GenericRepository[Album]):
             role_id = r_row[0]
 
             cursor = conn.execute("""
-                INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID)
+                INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID)
                 VALUES (?, ?, ?)
             """, (album_id, contributor_id, role_id))
             
             if cursor.rowcount > 0:
-                AuditLogger(conn, batch_id=batch_id).log_insert("AlbumContributors", f"{album_id}-{contributor_id}-{role_id}", {
+                AuditLogger(conn, batch_id=batch_id).log_insert("AlbumCredits", f"{album_id}-{contributor_id}-{role_id}", {
                     "AlbumID": album_id,
-                    "ContributorID": contributor_id,
+                    "CreditedNameID": contributor_id,
                     "RoleID": role_id
                 })
             return True
@@ -398,14 +416,16 @@ class AlbumRepository(GenericRepository[Album]):
         """Retrieve all contributors linked to an album."""
         from src.data.models.contributor import Contributor
         query = """
-            SELECT c.ContributorID, c.ContributorName, c.SortName, c.ContributorType
-            FROM Contributors c
-            JOIN AlbumContributors ac ON c.ContributorID = ac.ContributorID
+            SELECT an.NameID, an.DisplayName, an.SortName, 'person' -- Simplified type assumption for now, or join Identities
+            FROM ArtistNames an
+            JOIN AlbumCredits ac ON an.NameID = ac.CreditedNameID
             WHERE ac.AlbumID = ?
         """
         with self.get_connection() as conn:
             cursor = conn.execute(query, (album_id,))
-            return [Contributor.from_row(row) for row in cursor.fetchall()]
+            # Note: ArtistNames doesn't have 'type', defaulting to person/unknown. 
+            # Ideally we join Identities but ArtistNames can be orphans.
+            return [Contributor(contributor_id=row[0], name=row[1], sort_name=row[2], type='person') for row in cursor.fetchall()]
 
     def add_publisher_to_album(self, album_id: int, publisher_name: str, batch_id: Optional[str] = None) -> bool:
         """Link a publisher to an album. (Delegated to PublisherRepository)"""
@@ -413,41 +433,41 @@ class AlbumRepository(GenericRepository[Album]):
             return False
         from .publisher_repository import PublisherRepository
         with self.get_connection() as conn:
-            return PublisherRepository().add_publisher_to_album_by_name(album_id, publisher_name, batch_id=batch_id, conn=conn)
+            return PublisherRepository(self.db_path).add_publisher_to_album_by_name(album_id, publisher_name, batch_id=batch_id, conn=conn)
 
     def get_publishers_for_album(self, album_id: int) -> List[Publisher]:
         """Retrieve all publishers linked to an album. (Delegated to PublisherRepository)"""
         from .publisher_repository import PublisherRepository
-        return PublisherRepository().get_publishers_for_album(album_id)
+        return PublisherRepository(self.db_path).get_publishers_for_album(album_id)
 
     def get_publisher(self, album_id: int) -> Optional[str]:
         """Get all publisher names for an album (separated by |||). (Delegated to PublisherRepository)"""
         from .publisher_repository import PublisherRepository
-        return PublisherRepository().get_joined_names(album_id)
+        return PublisherRepository(self.db_path).get_joined_names(album_id)
 
     def remove_contributor_from_album(self, album_id: int, contributor_id: int, batch_id: Optional[str] = None) -> bool:
         """Unlink a contributor from an album."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
             # Snapshot for audit
-            query = "SELECT AlbumID, ContributorID, RoleID FROM AlbumContributors WHERE AlbumID = ? AND ContributorID = ?"
+            query = "SELECT AlbumID, CreditedNameID, RoleID FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?"
             cursor = conn.execute(query, (album_id, contributor_id))
             rows = cursor.fetchall()
             if not rows: return False
             
             auditor = AuditLogger(conn, batch_id=batch_id)
             for row in rows:
-                snapshot = {"AlbumID": row[0], "ContributorID": row[1], "RoleID": row[2]}
-                auditor.log_delete("AlbumContributors", f"{album_id}-{contributor_id}-{row[2]}", snapshot)
+                snapshot = {"AlbumID": row[0], "CreditedNameID": row[1], "RoleID": row[2]}
+                auditor.log_delete("AlbumCredits", f"{album_id}-{contributor_id}-{row[2]}", snapshot)
                 
-            conn.execute("DELETE FROM AlbumContributors WHERE AlbumID = ? AND ContributorID = ?", (album_id, contributor_id))
+            conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?", (album_id, contributor_id))
             return True
 
     def remove_publisher_from_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None) -> bool:
         """Unlink a publisher from an album. (Delegated to PublisherRepository)"""
         from .publisher_repository import PublisherRepository
         with self.get_connection() as conn:
-            return PublisherRepository().remove_publisher_from_album(album_id, publisher_id, batch_id=batch_id, conn=conn)
+            return PublisherRepository(self.db_path).remove_publisher_from_album(album_id, publisher_id, batch_id=batch_id, conn=conn)
 
     def set_publisher(self, album_id: int, publisher_name: str, batch_id: Optional[str] = None) -> None:
         """
@@ -456,7 +476,7 @@ class AlbumRepository(GenericRepository[Album]):
         """
         from .publisher_repository import PublisherRepository
         with self.get_connection() as conn:
-            PublisherRepository().set_primary_publisher(album_id, publisher_name, batch_id=batch_id, conn=conn)
+            PublisherRepository(self.db_path).set_primary_publisher(album_id, publisher_name, batch_id=batch_id, conn=conn)
 
     def sync_publishers(self, album_id: int, publisher_names: List[str], batch_id: Optional[str] = None) -> None:
         """
@@ -465,7 +485,7 @@ class AlbumRepository(GenericRepository[Album]):
         """
         from .publisher_repository import PublisherRepository
         with self.get_connection() as conn:
-            PublisherRepository().sync_publishers(album_id, publisher_names, batch_id=batch_id, conn=conn)
+            PublisherRepository(self.db_path).sync_publishers(album_id, publisher_names, batch_id=batch_id, conn=conn)
 
     def sync_contributors(self, album_id: int, contributors: List[Contributor], role_name: str = "Performer", batch_id: Optional[str] = None) -> None:
         """
@@ -486,7 +506,7 @@ class AlbumRepository(GenericRepository[Album]):
                 role_id = row[0]
 
             # 2. Get current links for this role
-            cursor = conn.execute("SELECT ContributorID FROM AlbumContributors WHERE AlbumID = ? AND RoleID = ?", (album_id, role_id))
+            cursor = conn.execute("SELECT CreditedNameID FROM AlbumCredits WHERE AlbumID = ? AND RoleID = ?", (album_id, role_id))
             current_ids = {row[0] for row in cursor.fetchall()}
             
             target_ids = {c.contributor_id for c in contributors if c.contributor_id}
@@ -494,17 +514,17 @@ class AlbumRepository(GenericRepository[Album]):
             # 3. Remove items not in target
             for c_id in current_ids:
                 if c_id not in target_ids:
-                    auditor.log_delete("AlbumContributors", f"{album_id}-{c_id}-{role_id}", {"AlbumID": album_id, "ContributorID": c_id, "RoleID": role_id})
-                    conn.execute("DELETE FROM AlbumContributors WHERE AlbumID = ? AND ContributorID = ? AND RoleID = ?", (album_id, c_id, role_id))
+                    auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
+                    conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ? AND RoleID = ?", (album_id, c_id, role_id))
             
             # 4. Add new items
             for c in contributors:
                 if c.contributor_id not in current_ids:
                     cursor = conn.execute(
-                        "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, ?)",
+                        "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
                         (album_id, c.contributor_id, role_id)
                     )
                     if cursor.rowcount > 0:
-                        auditor.log_insert("AlbumContributors", f"{album_id}-{c.contributor_id}-{role_id}", {"AlbumID": album_id, "ContributorID": c.contributor_id, "RoleID": role_id})
+                        auditor.log_insert("AlbumCredits", f"{album_id}-{c.contributor_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c.contributor_id, "RoleID": role_id})
 
 

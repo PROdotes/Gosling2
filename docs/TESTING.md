@@ -141,6 +141,27 @@ Gosling2 uses **Yellberus** (in `tests/unit/integrity/`).
 
 ---
 
+## 📋 Audit Coverage Canary Test
+Location: `tests/unit/test_audit_coverage.py`
+
+This test **automatically detects missing audit logging** by scanning the codebase for CRUD operations.
+
+### What it checks:
+1. **`test_all_crud_operations_have_audit_logging`** - Scans for `INSERT/UPDATE/DELETE` SQL and verifies the method has `AuditLogger` + `batch_id` patterns
+2. **`test_no_audit_logger_without_batch_id`** - Catches any `AuditLogger(conn)` calls missing `batch_id=`
+
+### Exclusions (by design):
+- `presentation/` - UI goes through services, not direct DB
+- `database.py` - Schema init doesn't need auditing  
+- `_insert_db`, `_update_db`, `_delete_db` - Called by audited `GenericRepository` methods
+- Audit tables (`ChangeLog`, `DeletedRecords`, `ActionLog`) - Can't audit themselves
+- `Roles` - Static lookup table
+
+### Why it exists:
+LLMs tend to add CRUD operations without corresponding audit logging. This canary test **fails CI** if anyone forgets to audit a database write.
+
+---
+
 ## 🤖 Specialist/LLM Protocol (The Duck Test)
 Before you (The Agent) commit any test changes, you must answer these three questions:
 1.  **Is this a Logic test or a Mutation test?** (If it's both, split the file).

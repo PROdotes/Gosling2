@@ -264,6 +264,7 @@ class EntityListWidget(QWidget):
     
     def _on_item_clicked(self, entity_id: int, label: str):
         """Handle click on an item - open editor dialog."""
+        print(f"DEBUG: EntityListWidget clicked: ID={entity_id}, Label={label}, Type={self.entity_type}")
         if not self.allow_edit:
             return
         

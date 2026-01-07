@@ -76,6 +76,10 @@ class ImportService:
 
             # 5. Create Database Record (Consolidated Insert)
             temp_song.audio_hash = audio_hash
+            
+            # USER 614: Toggle is_active False on import (Staging Mode)
+            temp_song.is_active = False
+            
             file_id = self.library_service.add_song(temp_song)
             
             if file_id:

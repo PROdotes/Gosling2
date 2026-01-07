@@ -592,7 +592,7 @@ class MainWindow(QMainWindow):
         playlist_widget = self.right_panel.playlist_widget
         
         # Resolve metadata from database in one efficient bulk fetch
-        songs = self.library_service.get_songs_by_paths(playlist_data)
+        songs = self.library_service.get_songs_by_paths(playlist_data) or []
         song_map = {song.path: song for song in songs}
         
         for path in playlist_data:

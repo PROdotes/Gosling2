@@ -65,13 +65,13 @@ class PublisherRepository(GenericRepository[Publisher]):
         cursor.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
         cursor.execute("DELETE FROM Publishers WHERE PublisherID = ?", (record_id,))
 
-    def create(self, name: str, parent_id: Optional[int] = None) -> Publisher:
+    def create(self, name: str, parent_id: Optional[int] = None, conn: Optional[sqlite3.Connection] = None) -> Publisher:
         """
         Create a new publisher.
         Uses GenericRepository.insert() for Audit Logging.
         """
         pub = Publisher(publisher_id=None, publisher_name=name, parent_publisher_id=parent_id)
-        new_id = self.insert(pub)
+        new_id = self.insert(pub, conn=conn)
         if new_id:
             pub.publisher_id = new_id
             return pub
@@ -86,10 +86,7 @@ class PublisherRepository(GenericRepository[Publisher]):
         if existing:
             return existing, False
         
-        # Note: self.insert defaults to a new connection if none provided via subclassing GenericRepository
-        # To strictly use a transaction, we'd need to update GenericRepository.
-        # For now, this suffices for Gosling2's current usage.
-        return self.create(name), True
+        return self.create(name, conn=conn), True
 
     def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
         """Retrieve tag by exact name."""

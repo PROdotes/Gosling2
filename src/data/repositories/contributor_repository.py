@@ -378,15 +378,25 @@ class ContributorRepository(GenericRepository[Contributor]):
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 # Batch query? SQLite limit is 999 vars. 
-                # For safety, we process in chunks or use a temp table, but for now assuming < 500 active artists in filter.
-                # If list is huge, we might just query ALL contributors/types and map in memory.
-                
-                cursor.execute("SELECT ContributorName, ContributorType FROM Contributors")
+                cursor.execute("""
+                    SELECT an.DisplayName, i.IdentityType, an.IsPrimaryName 
+                    FROM ArtistNames an
+                    LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                """)
                 rows = cursor.fetchall()
-                # Build map (Memory intensive if 100k artists? No, string keys are fine for < 10k)
                 
                 # Case insensitive lookup map
-                name_map = {r[0].lower(): r[1] for r in rows}
+                name_map = {}
+                for r in rows:
+                    name = r[0].lower()
+                    id_type = r[1]
+                    is_primary = r[2]
+                    
+                    if not is_primary:
+                        # Explicitly mark as alias so FilterWidget can bin it correctly
+                        name_map[name] = 'alias'
+                    else:
+                        name_map[name] = id_type or 'person'
                 
                 result = {}
                 for n in names:
@@ -479,7 +489,14 @@ class ContributorRepository(GenericRepository[Contributor]):
     # Complex identity methods removed (Moved to IdentityService)
 
     def get_member_count(self, contributor_id: int) -> int:
-        """Return count of associated group memberships (as Group or as Member)."""
+        """
+        Return count of associated group memberships (as Group or as Member).
+        
+        .. deprecated::
+            Use ContributorService.get_member_count() instead (uses new GroupMemberships table).
+        """
+        import warnings
+        warnings.warn("ContributorRepository.get_member_count is deprecated. Use ContributorService.get_member_count instead.", DeprecationWarning, stacklevel=2)
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -492,7 +509,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             return 0
 
     def get_members(self, group_id: int) -> List[Contributor]:
-        """Get all members of a Group, respecting MemberAliasID."""
+        """
+        Get all members of a Group, respecting MemberAliasID.
+        
+        .. deprecated::
+            Use ContributorService.get_members() instead (uses new GroupMemberships table).
+        """
+        import warnings
+        warnings.warn("ContributorRepository.get_members is deprecated. Use ContributorService.get_members instead.", DeprecationWarning, stacklevel=2)
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -515,7 +539,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             return []
 
     def get_groups(self, person_id: int) -> List[Contributor]:
-        """Get all Groups a Person belongs to."""
+        """
+        Get all Groups a Person belongs to.
+        
+        .. deprecated::
+            Use ContributorService.get_groups() instead (uses new GroupMemberships table).
+        """
+        import warnings
+        warnings.warn("ContributorRepository.get_groups is deprecated. Use ContributorService.get_groups instead.", DeprecationWarning, stacklevel=2)
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
@@ -531,7 +562,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             return []
 
     def add_member(self, group_id: int, person_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
-        """Add a member to a group, optionally with a specific alias."""
+        """
+        Add a member to a group, optionally with a specific alias.
+        
+        .. deprecated::
+            Use ContributorService.add_member() instead (uses new GroupMemberships table).
+        """
+        import warnings
+        warnings.warn("ContributorRepository.add_member is deprecated. Use ContributorService.add_member instead.", DeprecationWarning, stacklevel=2)
         try:
             from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
@@ -549,7 +587,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             return False
 
     def remove_member(self, group_id: int, person_id: int, batch_id: Optional[str] = None) -> bool:
-        """Remove a member from a group."""
+        """
+        Remove a member from a group.
+        
+        .. deprecated::
+            Use ContributorService.remove_member() instead (uses new GroupMemberships table).
+        """
+        import warnings
+        warnings.warn("ContributorRepository.remove_member is deprecated. Use ContributorService.remove_member instead.", DeprecationWarning, stacklevel=2)
         try:
             from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:

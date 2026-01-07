@@ -161,10 +161,10 @@ class LibraryService:
         """Get all contributor names (primary names + aliases) for filtering."""
         all_names = set()
         # Get primary names
-        primary_names = self.contributor_service._repo.get_all_names()
+        primary_names = self.contributor_service.get_all_primary_names()
         all_names.update(primary_names)
         # Get aliases
-        aliases = self.contributor_service._repo.get_all_aliases()
+        aliases = self.contributor_service.get_all_aliases()
         all_names.update(aliases)
         return sorted(list(all_names))
 

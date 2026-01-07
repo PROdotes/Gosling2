@@ -253,8 +253,8 @@ class TestAliasManagement:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [
-            (1, "Slim Shady"),
-            (2, "Marshall Mathers"),
+            (1, 42, "Slim Shady"),
+            (2, 42, "Marshall Mathers"),
         ]
         
         @contextmanager
@@ -265,7 +265,8 @@ class TestAliasManagement:
             aliases = repo.get_aliases(42)
             
             assert len(aliases) == 2
-            assert (1, "Slim Shady") in aliases
+            assert aliases[0].alias_name == "Slim Shady"
+            assert aliases[0].contributor_id == 42
     
     def test_add_alias(self, repo):
         """Test adding a new alias to contributor."""
@@ -323,8 +324,11 @@ class TestMembership:
         def mock_get_conn():
             yield mock_conn
         
-        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
-            members = repo.get_members(group_id=10)  # The Beatles
+        from src.business.services.contributor_service import ContributorService
+        service = ContributorService(contributor_repository=repo, credit_repository=repo)
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn), \
+             patch.object(service, '_get_identity_id', side_effect=lambda x: x):
+            members = service.get_members(group_id=10)  # The Beatles
             
             assert len(members) == 2
             assert all(isinstance(m, Contributor) for m in members)
@@ -343,8 +347,11 @@ class TestMembership:
         def mock_get_conn():
             yield mock_conn
         
-        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
-            groups = repo.get_groups(person_id=1)  # Paul McCartney
+        from src.business.services.contributor_service import ContributorService
+        service = ContributorService(contributor_repository=repo, credit_repository=repo)
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn), \
+             patch.object(service, '_get_identity_id', side_effect=lambda x: x):
+            groups = service.get_groups(member_id=1)  # Paul McCartney
             
             assert len(groups) == 2
             assert groups[0].name == "The Beatles"
@@ -359,12 +366,16 @@ class TestMembership:
         def mock_get_conn():
             yield mock_conn
         
-        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
-            repo.add_member(group_id=10, person_id=5)
+        from src.business.services.contributor_service import ContributorService
+        service = ContributorService(contributor_repository=repo, credit_repository=repo)
+        mock_cursor.rowcount = 1
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn), \
+             patch.object(service, '_get_identity_id', side_effect=lambda x: x):
+            service.add_member(group_id=10, member_id=5)
             
             mock_cursor.execute.assert_called()
-            call_args = mock_cursor.execute.call_args[0]
-            assert "INSERT" in call_args[0]
+            # Check for the INSERT call among all calls (could be followed by audit logs)
+            assert any("INSERT INTO GroupMemberships" in c[0][0] for c in mock_cursor.execute.call_args_list)
     
     def test_remove_member(self, repo):
         """Test removing a person from a group."""
@@ -376,12 +387,17 @@ class TestMembership:
         def mock_get_conn():
             yield mock_conn
         
-        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
-            repo.remove_member(group_id=10, person_id=5)
+        from src.business.services.contributor_service import ContributorService
+        service = ContributorService(contributor_repository=repo, credit_repository=repo)
+        mock_cursor.rowcount = 1
+        mock_cursor.fetchone.return_value = (10, 5, None) # Mock snapshot
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn), \
+             patch.object(service, '_get_identity_id', side_effect=lambda x: x):
+            service.remove_member(group_id=10, member_id=5)
             
             mock_cursor.execute.assert_called()
-            call_args = mock_cursor.execute.call_args[0]
-            assert "DELETE" in call_args[0]
+            # Check for the DELETE call among all calls (could be preceded by snapshots/followed by audit logs)
+            assert any("DELETE FROM GroupMemberships" in c[0][0] for c in mock_cursor.execute.call_args_list)
     
     def test_get_member_count(self, repo):
         """Test counting group memberships."""
@@ -394,8 +410,11 @@ class TestMembership:
         def mock_get_conn():
             yield mock_conn
         
-        with patch.object(repo, 'get_connection', side_effect=mock_get_conn):
-            count = repo.get_member_count(10)
+        from src.business.services.contributor_service import ContributorService
+        service = ContributorService(contributor_repository=repo, credit_repository=repo)
+        with patch.object(repo, 'get_connection', side_effect=mock_get_conn), \
+             patch.object(service, '_get_identity_id', side_effect=lambda x: x):
+            count = service.get_member_count(10)
             assert count == 5
 
 
@@ -488,7 +507,7 @@ class TestGetByRole:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.return_value = [(1, "Artist 1"), (2, "Artist 2")]
+        mock_cursor.fetchall.return_value = [(1, "Artist 1", "Artist 1", "person"), (2, "Artist 2", "Artist 2", "person")]
         
         @contextmanager
         def mock_get_conn():
@@ -498,7 +517,7 @@ class TestGetByRole:
             result = repo.get_by_role("Performer")
             
             assert len(result) == 2
-            assert result[0] == (1, "Artist 1")
+            assert result[0].name == "Artist 1"
             
             mock_cursor.execute.assert_called_once()
             args = mock_cursor.execute.call_args[0]
