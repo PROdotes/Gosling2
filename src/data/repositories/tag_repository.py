@@ -94,7 +94,7 @@ class TagRepository(GenericRepository[Tag]):
         
         return self.create(name, category), True
 
-    def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None) -> None:
+    def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None, batch_id: Optional[str] = None) -> None:
         """
         Link a tag to a source item (song).
         If tag_id is a string, it's treated as a TagName and will be resolved/created
@@ -111,12 +111,12 @@ class TagRepository(GenericRepository[Tag]):
             if cur.fetchone(): return
 
             conn.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (source_id, tag_id))
-            AuditLogger(conn).log_insert("MediaSourceTags", f"{source_id}-{tag_id}", {
+            AuditLogger(conn, batch_id=batch_id).log_insert("MediaSourceTags", f"{source_id}-{tag_id}", {
                 "SourceID": source_id,
                 "TagID": tag_id
             })
 
-    def remove_tag_from_source(self, source_id: int, tag_id: int) -> None:
+    def remove_tag_from_source(self, source_id: int, tag_id: int, batch_id: Optional[str] = None) -> None:
         """Unlink a tag from a source item."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
@@ -127,7 +127,7 @@ class TagRepository(GenericRepository[Tag]):
             snapshot = {"SourceID": row[0], "TagID": row[1]}
 
             conn.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
-            AuditLogger(conn).log_delete("MediaSourceTags", f"{source_id}-{tag_id}", snapshot)
+            AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{source_id}-{tag_id}", snapshot)
             
     def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None) -> None:
         """

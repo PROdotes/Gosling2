@@ -24,7 +24,7 @@ class AuditTableModel(QAbstractTableModel):
     Optimized for display (colors, fonts).
     """
     
-    COLUMNS = ["Time", "Type", "Table", "Field", "Record ID", "Old Value", "New Value"]
+    COLUMNS = ["Time", "Type", "Table", "Field", "Record ID", "Old Value", "New Value", "Batch ID"]
     
     def __init__(self, data=None, resolver=None):
         super().__init__()
@@ -78,6 +78,9 @@ class AuditTableModel(QAbstractTableModel):
                     name = self._resolver(record.get('TableName'), val)
                     if name: return f"{name} [#{val}]"
                 return str(val or "")
+            
+            if col == 7: # Batch ID
+                return record.get('BatchID') or ""
 
             if col in [5, 6]: 
                 val = record.get('OldValue') if col == 5 else record.get('NewValue')
@@ -136,6 +139,13 @@ class AuditTableModel(QAbstractTableModel):
             if old is not None and new is not None:
                 return QColor(75, 55, 25)  # Amber Tint (Update)
 
+
+        return None
+        
+    def get_batch_id(self, row):
+        """Helper to get batch ID for a specific row index."""
+        if 0 <= row < len(self._data):
+            return self._data[row].get('BatchID')
         return None
 
 
@@ -209,6 +219,17 @@ class AuditHistoryDialog(QDialog):
         h.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents) # ID
         h.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)          # Old
         h.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)          # New
+        h.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)      # Batch ID
+        
+        # Hide Batch ID by default (Power User feature revealed via Context Menu or future update)
+        self.table_view.setColumnHidden(7, True)
+        
+        # Context Menu
+        self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table_view.customContextMenuRequested.connect(self._show_context_menu)
+        
+        # Selection Handling (Batch Grouping)
+        self.table_view.clicked.connect(self._on_row_clicked)
         
         layout.addWidget(self.table_view)
         
@@ -259,3 +280,65 @@ class AuditHistoryDialog(QDialog):
                 filtered.append(row)
                 
         self.model.update_data(filtered)
+
+    def _on_row_clicked(self, index):
+        """When a row is clicked, select all rows with the same BatchID."""
+        if not index.isValid(): return
+        
+        batch_id = self.model.get_batch_id(index.row())
+        if not batch_id: return
+        
+        # Select all rows with this batch ID
+        selection = self.table_view.selectionModel()
+        selection.clearSelection() # Clear previous
+        
+        # Determine strict matching mode
+        # If user holds CTRL, maybe add? For now, simpler: Atomic Click = Atomic Batch Select
+        
+        from PyQt6.QtCore import QItemSelection, QItemSelectionRange
+        
+        # Scan model for matching rows (Linear scan ok for 500 items)
+        # TODO: Optimize with a map if history grows
+        rows_to_select = []
+        for r in range(self.model.rowCount()):
+            bid = self.model.get_batch_id(r)
+            if bid == batch_id:
+                # Add whole row
+                # Range: (r, 0) to (r, COLS-1)
+                idx_tl = self.model.index(r, 0)
+                idx_br = self.model.index(r, self.model.columnCount()-1)
+                selection.select(QItemSelectionRange(idx_tl, idx_br), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+
+    def _show_context_menu(self, pos):
+        """Show context menu for table."""
+        index = self.table_view.indexAt(pos)
+        if not index.isValid(): return
+        
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction
+        
+        menu = QMenu(self)
+        
+        batch_id = self.model.get_batch_id(index.row())
+        
+        # Copy Info
+        action_copy_val = QAction("Copy Value", self)
+        action_copy_val.triggered.connect(lambda: self._copy_to_clipboard(index.data()))
+        menu.addAction(action_copy_val)
+        
+        if batch_id:
+            menu.addSeparator()
+            action_copy_batch = QAction(f"Copy Batch ID: {batch_id[:8]}...", self)
+            action_copy_batch.triggered.connect(lambda: self._copy_to_clipboard(batch_id))
+            menu.addAction(action_copy_batch)
+            
+            # Future: Undo Batch
+            # action_undo = QAction("Undo This Batch (Experimental)", self)
+            # action_undo.triggered.connect(lambda: self.audit_service.undo_batch(batch_id))
+            # menu.addAction(action_undo)
+            
+        menu.exec(self.table_view.viewport().mapToGlobal(pos))
+        
+    def _copy_to_clipboard(self, text):
+        from PyQt6.QtWidgets import QApplication
+        QApplication.clipboard().setText(str(text))

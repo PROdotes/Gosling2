@@ -50,7 +50,7 @@ class ContextAdapter(ABC):
         pass
     
     @abstractmethod
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         """Link a child entity to the parent. Returns success."""
         pass
     
@@ -103,6 +103,7 @@ class SongFieldAdapter(ContextAdapter):
         service: Any,
         stage_change_fn: Callable[[str, Any], None] = None,
         get_child_data_fn: Callable[[], List[tuple]] = None,
+        get_value_fn: Callable[[int, str, Any], Any] = None,
         refresh_fn: Callable[[], None] = None
     ):
         """
@@ -119,6 +120,7 @@ class SongFieldAdapter(ContextAdapter):
         self.service = service
         self._stage_change = stage_change_fn
         self._get_child_data = get_child_data_fn
+        self._get_value = get_value_fn
         self._refresh = refresh_fn
     
     def get_children(self) -> List[int]:
@@ -134,7 +136,7 @@ class SongFieldAdapter(ContextAdapter):
             return self._get_child_data()
         return []
 
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         """Add entity to field for all selected songs."""
         if not self.songs:
             return False
@@ -146,25 +148,36 @@ class SongFieldAdapter(ContextAdapter):
         name = self._get_entity_name(entity)
         
         for song in self.songs:
-            current = getattr(song, self.field_name, [])
+            # Get current value (prioritize staging)
+            if self._get_value:
+                current = self._get_value(song.source_id, self.field_name, getattr(song, self.field_name, []))
+            else:
+                current = getattr(song, self.field_name, [])
+            
             if not isinstance(current, list):
                 current = [current] if current else []
             
             if name not in current:
                 new_list = current + [name]
                 if self._stage_change:
-                    self._stage_change(self.field_name, new_list)
+                    # Differential Stage if supported by callback
+                    if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+                        self._stage_change(self.field_name, new_list, song_id=song.source_id)
+                    else:
+                        self._stage_change(self.field_name, new_list)
                     
-                    # Special Case: Sync album_id if adding an album
+                    # Sync album_id if adding an album
                     if self.field_name == 'album':
-                        curr_ids = getattr(song, 'album_id', [])
+                        curr_ids = self._get_value(song.source_id, 'album_id', getattr(song, 'album_id', [])) if self._get_value else getattr(song, 'album_id', [])
                         if isinstance(curr_ids, int): curr_ids = [curr_ids]
                         if not curr_ids: curr_ids = []
-                        if curr_ids is None: curr_ids = []
                         
                         if child_id not in curr_ids:
                              new_ids = curr_ids + [child_id]
-                             self._stage_change('album_id', new_ids)
+                             if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+                                 self._stage_change('album_id', new_ids, song_id=song.source_id)
+                             else:
+                                 self._stage_change('album_id', new_ids)
         
         self.on_data_changed()
         return True
@@ -180,33 +193,37 @@ class SongFieldAdapter(ContextAdapter):
         
         name = self._get_entity_name(entity)
         
-        # T-89: Enforcement Gate for 'Status: Unprocessed'
-        if self.field_name == 'tags' and "Unprocessed" in name:
-            # We can't easily get _get_validation_errors from here without passing it in
-            # But we can at least check if the user is trying to remove it.
-            # For now, let's assume the SidePanel handles the visual warning 
-            # or we move the check here later. 
-            pass
-
         for song in self.songs:
-            current = getattr(song, self.field_name, [])
+            # Get current value (prioritize staging)
+            if self._get_value:
+                current = self._get_value(song.source_id, self.field_name, getattr(song, self.field_name, []))
+            else:
+                current = getattr(song, self.field_name, [])
+                 
             if not isinstance(current, list):
                 current = [current] if current else []
             
             new_list = [p for p in current if p != name]
             if self._stage_change:
-                self._stage_change(self.field_name, new_list)
+                # Differential Stage if supported by callback
+                if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+                    self._stage_change(self.field_name, new_list, song_id=song.source_id)
+                else:
+                    self._stage_change(self.field_name, new_list)
                 
-                # Special Case: Sync album_id if removing an album
+                # Sync album_id if removing an album
                 if self.field_name == 'album':
-                    curr_ids = getattr(song, 'album_id', [])
+                    curr_ids = self._get_value(song.source_id, 'album_id', getattr(song, 'album_id', [])) if self._get_value else getattr(song, 'album_id', [])
                     if isinstance(curr_ids, int): curr_ids = [curr_ids]
                     if not curr_ids: curr_ids = []
                     
                     if child_id in curr_ids:
                         new_ids = [x for x in curr_ids if x != child_id]
                         final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
-                        self._stage_change('album_id', final_ids)
+                        if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+                            self._stage_change('album_id', final_ids, song_id=song.source_id)
+                        else:
+                            self._stage_change('album_id', final_ids)
         
         self.on_data_changed()
         return True
@@ -230,6 +247,11 @@ class SongFieldAdapter(ContextAdapter):
     
     def _get_entity_name(self, entity: Any) -> str:
         """Get display name from entity."""
+        if self.field_name == 'tags' and hasattr(entity, 'tag_name'):
+             # Special Case: Unified tag format for internal logic (Category:Name)
+             cat = getattr(entity, 'category', 'Genre') # Default to Genre if None
+             return f"{cat}:{entity.tag_name}"
+             
         for attr in ['name', 'title', 'publisher_name', 'album_title', 'tag_name']:
             if hasattr(entity, attr):
                 return getattr(entity, attr)
@@ -260,7 +282,7 @@ class ArtistAliasAdapter(ContextAdapter):
             for alias_id, alias_name in aliases
         ]
     
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         # For aliases, "link" means adding a new alias by name
         # This is handled differently - see ArtistDetailsDialog._add_alias
         return False
@@ -319,12 +341,23 @@ class ArtistMemberAdapter(ContextAdapter):
             for m in members
         ]
     
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         """Add member to group (or group to person)."""
+        alias_name = kwargs.get('matched_alias')
+        alias_id = None
+        
+        if alias_name:
+            # Resolve Alias Name to ID for the target contributor
+            aliases = self.service.get_aliases(child_id)
+            for a_id, a_name in aliases:
+                if a_name.lower() == alias_name.lower():
+                    alias_id = a_id
+                    break
+
         if self.artist.type == "group":
-            self.service.add_member(self.artist.contributor_id, child_id)
+            self.service.add_member(self.artist.contributor_id, child_id, member_alias_id=alias_id)
         else:
-            self.service.add_member(child_id, self.artist.contributor_id)
+            self.service.add_member(child_id, self.artist.contributor_id) # Reverse direction
         self.on_data_changed()
         return True
     
@@ -376,7 +409,7 @@ class PublisherChildAdapter(ContextAdapter):
             for p in children
         ]
     
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         """Set a publisher as child of this one."""
         # Cycle Detection
         if self.service.would_create_cycle(child_id, self.publisher.publisher_id):
@@ -474,7 +507,7 @@ class AlbumContributorAdapter(ContextAdapter):
             results.append((c.contributor_id, c.name, icon, False, False, "", "amber", False))
         return results
     
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         if not self.album:
             return False
             
@@ -600,7 +633,7 @@ class AlbumPublisherAdapter(ContextAdapter):
             results.append((p['id'], p['name'], "🏢", False, False, "", "amber", False))
         return results
     
-    def link(self, child_id: int) -> bool:
+    def link(self, child_id: int, **kwargs) -> bool:
         if not self.album:
             return False
             

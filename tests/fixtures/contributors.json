@@ -51,5 +51,10 @@
         "aliases": [
             "The Ghost of Mixes"
         ]
+    },
+    {
+        "name": "Ziggy Stardust",
+        "type": "person",
+        "aliases": []
     }
 ]

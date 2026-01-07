@@ -52,7 +52,7 @@ class ExportService:
         self.metadata_service = metadata_service
         self.library_service = library_service
     
-    def export_song(self, song: Song, dry_run: bool = False, write_tags: bool = True) -> ExportResult:
+    def export_song(self, song: Song, dry_run: bool = False, write_tags: bool = True, batch_id: Optional[str] = None) -> ExportResult:
         """
         Export a single song to database and optionally ID3.
         
@@ -69,7 +69,7 @@ class ExportService:
         
         try:
             # Step 1: Update database (The source of truth)
-            if not self.library_service.update_song(song):
+            if not self.library_service.update_song(song, batch_id=batch_id):
                 return ExportResult(success=False, error=f"Database update failed for {song.path}")
             
             # Step 2: Write ID3 tags (The reflection)
@@ -90,7 +90,8 @@ class ExportService:
                      songs: List[Song], 
                      dry_run: bool = False,
                      write_tags: bool = True,
-                     progress_callback: Callable[[int, int, str, bool], None] = None
+                     progress_callback: Callable[[int, int, str, bool], None] = None,
+                     batch_id: Optional[str] = None
                      ) -> BatchExportResult:
         """
         Export multiple songs with optional progress reporting.
@@ -107,7 +108,7 @@ class ExportService:
         total = len(songs)
         
         for i, song in enumerate(songs, start=1):
-            export_result = self.export_song(song, dry_run=dry_run, write_tags=write_tags)
+            export_result = self.export_song(song, dry_run=dry_run, write_tags=write_tags, batch_id=batch_id)
             
             if export_result.success:
                 result.success_count += 1

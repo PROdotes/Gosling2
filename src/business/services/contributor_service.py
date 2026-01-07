@@ -92,34 +92,54 @@ class ContributorService:
         """Check if name conflicts with existing identity."""
         return self._repo.validate_identity(name, exclude_id)
 
-    def merge(self, source_id: int, target_id: int, create_alias: bool = True) -> bool:
+    def add_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
+        """Instant Link: Link a contributor to a song with a specific role."""
+        return self._repo.add_song_role(source_id, contributor_id, role_name, batch_id=batch_id)
+
+    def remove_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
+        """Instant Unlink: Remove a contributor role from a song."""
+        return self._repo.remove_song_role(source_id, contributor_id, role_name, batch_id=batch_id)
+
+    def create(self, name: str, type: str = 'person', batch_id: Optional[str] = None) -> Contributor:
+        """Create new contributor."""
+        return self._repo.create(name, type, batch_id=batch_id)
+
+    def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
         """Merge contributor source_id into target_id."""
-        return self._repo.merge(source_id, target_id, create_alias)
+        return self._repo.merge(source_id, target_id, create_alias, batch_id=batch_id)
 
-    def add_alias(self, contributor_id: int, alias_name: str) -> Optional[int]:
+    def add_alias(self, contributor_id: int, alias_name: str, batch_id: Optional[str] = None) -> Optional[int]:
         """Add an alias to a contributor."""
-        return self._repo.add_alias(contributor_id, alias_name)
+        return self._repo.add_alias(contributor_id, alias_name, batch_id=batch_id)
 
-    def delete_alias(self, alias_id: int) -> bool:
+    def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias."""
-        return self._repo.delete_alias(alias_id)
+        return self._repo.delete_alias(alias_id, batch_id=batch_id)
 
-    def promote_alias(self, contributor_id: int, alias_id: int) -> bool:
+    def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Promote an alias to primary name."""
-        return self._repo.promote_alias(contributor_id, alias_id)
+        return self._repo.promote_alias(contributor_id, alias_id, batch_id=batch_id)
 
-    def update_alias(self, alias_id: int, new_name: str) -> bool:
+    def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
         """Update an alias name."""
-        return self._repo.update_alias(alias_id, new_name)
+        return self._repo.update_alias(alias_id, new_name, batch_id=batch_id)
 
-    def add_member(self, group_id: int, member_id: int) -> bool:
+    def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
+        """Transfer Alias ownership."""
+        return self._repo.move_alias(alias_name, old_owner_id, new_owner_id, batch_id=batch_id)
+
+    def abdicate_identity(self, current_id: int, heir_alias_id: int, target_parent_id: int, batch_id: Optional[str] = None) -> bool:
+        """Abdicate an identity, transferring its primary name to an alias of another identity."""
+        return self._repo.abdicate_identity(current_id, heir_alias_id, target_parent_id, batch_id=batch_id)
+
+    def add_member(self, group_id: int, member_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
         """Add a member to a group."""
-        return self._repo.add_member(group_id, member_id)
+        return self._repo.add_member(group_id, member_id, member_alias_id=member_alias_id, batch_id=batch_id)
 
-    def remove_member(self, group_id: int, member_id: int) -> bool:
+    def remove_member(self, group_id: int, member_id: int, batch_id: Optional[str] = None) -> bool:
         """Remove a member from a group."""
-        return self._repo.remove_member(group_id, member_id)
+        return self._repo.remove_member(group_id, member_id, batch_id=batch_id)
 
-    def swap_song_contributor(self, source_id: int, old_contrib_id: int, new_contrib_id: int) -> bool:
+    def swap_song_contributor(self, source_id: int, old_contrib_id: int, new_contrib_id: int, batch_id: Optional[str] = None) -> bool:
         """Swap contributor on a specific song (Fix This Song Only)."""
-        return self._repo.swap_song_contributor(source_id, old_contrib_id, new_contrib_id)
+        return self._repo.swap_song_contributor(source_id, old_contrib_id, new_contrib_id, batch_id=batch_id)

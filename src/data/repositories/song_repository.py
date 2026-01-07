@@ -224,7 +224,8 @@ class SongRepository(GenericRepository[Song]):
                 if not contributor_name.strip(): continue
 
                 # Resolve Identity
-                artist, _ = self.contributor_repository.get_or_create(contributor_name, conn=conn)
+                batch_id = auditor.batch_id if auditor else None
+                artist, _ = self.contributor_repository.get_or_create(contributor_name, conn=conn, batch_id=batch_id)
                 contributor_id = artist.contributor_id
                 
                 # Resolve Alias
@@ -449,6 +450,8 @@ class SongRepository(GenericRepository[Song]):
                 # Insert missing publisher
                 cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
                 pid = cursor.lastrowid
+                if auditor:
+                    auditor.log_insert("Publishers", pid, {"PublisherName": pub_name})
             
             desired_ids.add(pid)
             publisher_ids.append(pid) # Keep order

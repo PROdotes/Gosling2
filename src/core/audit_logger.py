@@ -16,11 +16,18 @@ class AuditLogger:
     Requires an active database connection.
     """
 
-    def __init__(self, connection):
+    def __init__(self, connection, batch_id: str = None):
         # Local import to avoid circular dependency if repositories import core
         from src.data.repositories.audit_repository import AuditRepository
         self.audit_repo = AuditRepository(connection=connection)
-        self.batch_id = str(uuid.uuid4())
+        
+        # Use provided batch_id or generate a new one
+        self.batch_id = batch_id or str(uuid.uuid4())
+
+    @staticmethod
+    def generate_batch_id() -> str:
+        """Utility to generate a standard Batch UUID."""
+        return str(uuid.uuid4())
 
     def log_insert(self, table_name: str, record_id: int, new_data: Dict[str, Any]) -> None:
         """Log a newly inserted record."""

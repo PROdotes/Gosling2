@@ -107,8 +107,15 @@ def inject():
         song.album = data.get('album')  # Optional - None triggers "Single Paradox"
         song.album_artist = data.get('album_artist', data['artist'])  # Default to artist if not specified
         song.publisher = data.get('publisher')  # Optional
-        song.genre = data.get('genre') # Optional
-        song.mood = data.get('mood') # Optional
+        # Handle Tags (Unified Category:Name)
+        tags = []
+        if data.get('genre'):
+            genres = [g.strip() for g in str(data['genre']).split(',') if g.strip()]
+            tags.extend([f"Genre:{g}" for g in genres])
+        if data.get('mood'):
+            moods = [m.strip() for m in str(data['mood']).split(',') if m.strip()]
+            tags.extend([f"Mood:{m}" for m in moods])
+        song.tags = tags
 
         # T-70: Role Splitting logic
         delims = r',|;| & '

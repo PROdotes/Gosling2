@@ -72,7 +72,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
 
     # --- PUBLIC TRANSACTIONAL METHODS ---
 
-    def insert(self, entity: T) -> Optional[int]:
+    def insert(self, entity: T, batch_id: Optional[str] = None) -> Optional[int]:
         """
         Transactional Insert with Audit.
         Returns: New ID on success, None on failure.
@@ -83,7 +83,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
                 
                 # 1. Write Data
                 new_id = self._insert_db(cursor, entity, auditor=auditor)
@@ -100,7 +100,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             logger.error(f"GenericRepository Insert Failed ({self.table_name}): {e}")
             return None
 
-    def update(self, entity: T) -> bool:
+    def update(self, entity: T, batch_id: Optional[str] = None) -> bool:
         """
         Transactional Update with Audit (Diffing).
         Returns: True on success, False on failure.
@@ -123,7 +123,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             # 2. Write Data & Audit (Snapshot T1)
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
                 
                 self._update_db(cursor, entity, auditor=auditor)
                 
@@ -136,7 +136,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             logger.error(f"GenericRepository Update Failed ({self.table_name}): {e}")
             return False
 
-    def delete(self, record_id: int) -> bool:
+    def delete(self, record_id: int, batch_id: Optional[str] = None) -> bool:
         """
         Transactional Delete with Audit (Recycle Bin).
         Returns: True on success, False on failure.
@@ -154,7 +154,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
             # 2. Delete Data & Audit
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
                 
                 self._delete_db(cursor, record_id, auditor=auditor)
                 

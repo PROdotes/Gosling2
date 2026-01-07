@@ -28,11 +28,11 @@ class BaseRepository:
         finally:
             conn.close()
 
-    def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None) -> None:
+    def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None, batch_id: str = None) -> None:
         """Log a high-level systemic or user action."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            AuditLogger(conn).log_action(action_type, target_table, target_id, details)
+            AuditLogger(conn, batch_id=batch_id).log_action(action_type, target_table, target_id, details)
 
     def _ensure_schema(self) -> None:
         """Create database schema if it doesn't exist"""
@@ -126,9 +126,11 @@ class BaseRepository:
                 CREATE TABLE IF NOT EXISTS GroupMembers (
                     GroupID INTEGER NOT NULL,
                     MemberID INTEGER NOT NULL,
+                    MemberAliasID INTEGER,
                     PRIMARY KEY (GroupID, MemberID),
                     FOREIGN KEY (GroupID) REFERENCES Contributors(ContributorID),
-                    FOREIGN KEY (MemberID) REFERENCES Contributors(ContributorID)
+                    FOREIGN KEY (MemberID) REFERENCES Contributors(ContributorID),
+                    FOREIGN KEY (MemberAliasID) REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL
                 )
             """)
 
@@ -301,6 +303,12 @@ class BaseRepository:
             if 'CreditedAliasID' not in mscr_cols:
                 cursor.execute("ALTER TABLE MediaSourceContributorRoles ADD COLUMN CreditedAliasID INTEGER REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL")
             
+            # GroupMembers Migrations (MemberAliasID)
+            cursor.execute("PRAGMA table_info(GroupMembers)")
+            gm_cols = [row[1] for row in cursor.fetchall()]
+            if 'MemberAliasID' not in gm_cols:
+                cursor.execute("ALTER TABLE GroupMembers ADD COLUMN MemberAliasID INTEGER REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL")
+
             # Create indexes for duplicate detection and performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_audiohash ON MediaSources(AudioHash)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_songs_isrc ON Songs(ISRC)")

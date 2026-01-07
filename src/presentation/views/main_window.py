@@ -788,6 +788,10 @@ class MainWindow(QMainWindow):
         }
         
         try:
+            # Generate a Batch ID for this multi-song save operation
+            from ...core.audit_logger import AuditLogger
+            batch_id = AuditLogger.generate_batch_id()
+
             for song_id, changes in staged_changes.items():
                 song = self.library_service.get_song_by_id(song_id)
                 if not song: continue
@@ -851,7 +855,7 @@ class MainWindow(QMainWindow):
                 
                 # Orchestration Layer: Delegate save to ExportService, but tell it our preference.
                 write_tags = self.settings_manager.get_write_tags()
-                result = self.export_service.export_song(song, write_tags=write_tags)
+                result = self.export_service.export_song(song, write_tags=write_tags, batch_id=batch_id)
                 
                 if result.success:
                     successful_ids.append(song_id)

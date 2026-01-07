@@ -402,7 +402,7 @@ class SidePanelWidget(QFrame):
                         v_col.addWidget(item_header)
 
                         # 2. Input Row (Widget + optional Add button)
-                        eff_val, is_mult = self._calculate_bulk_value(field)
+                        eff_val, is_mult, mixed_count = self._calculate_bulk_value(field)
                         widget = self._create_field_widget(field, eff_val, is_mult)
                         self._field_widgets[field.name] = widget
 
@@ -453,7 +453,7 @@ class SidePanelWidget(QFrame):
                 module_layout.setSpacing(0)
 
                 # Determine Type
-                effective_val, is_multiple = self._calculate_bulk_value(field)
+                effective_val, is_multiple, mixed_count = self._calculate_bulk_value(field)
                 is_bool = (field.strategy and field.strategy.upper() == "BOOLEAN") or \
                           (field.field_type == yellberus.FieldType.BOOLEAN)
 
@@ -544,7 +544,7 @@ class SidePanelWidget(QFrame):
                 continue
 
             # Calculate new value
-            effective_val, is_multiple = self._calculate_bulk_value(field_def)
+            effective_val, is_multiple, mixed_count = self._calculate_bulk_value(field_def)
 
             # CRITICAL: Block signals to prevent triggering _on_field_changed
             # This prevents false "unsaved changes" when switching between songs
@@ -1112,15 +1112,15 @@ class SidePanelWidget(QFrame):
                         new_ids = [x for x in curr_ids if x != entity_id]
                         new_ids.insert(0, entity_id)
                         final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
-                        self._on_field_changed('album_id', final_ids)
+                        self._on_field_changed('album_id', final_ids, song_id=song.source_id)
 
-                self._on_field_changed(field_name, new_list)
+                self._on_field_changed(field_name, new_list, song_id=song.source_id)
         
         self._refresh_field_values()
 
-    def _on_field_changed_and_save(self, field_name: str, value: Any):
+    def _on_field_changed_and_save(self, field_name: str, value: Any, song_id=None):
         """Helper to stage a change and immediately commit it (Auto-Save)."""
-        self._on_field_changed(field_name, value)
+        self._on_field_changed(field_name, value, song_id=song_id)
         # Trigger immediate save of all staged changes
         # Trigger immediate save of all staged changes using existing handler
         self._on_save_clicked()
@@ -1192,6 +1192,7 @@ class SidePanelWidget(QFrame):
                 service,
                 stage_change_fn=self._on_field_changed_and_save,
                 get_child_data_fn=lambda f=field_def.name: self._get_latest_chips(f),
+                get_value_fn=self._get_effective_value,
                 refresh_fn=self._refresh_field_values
             )
             
@@ -1585,38 +1586,46 @@ class SidePanelWidget(QFrame):
     
     def _calculate_bulk_value(self, field_def):
         """Determine what to show when 1 or many songs are selected."""
-        if not self.current_songs: return None, False
+        if not self.current_songs: return None, False, 0
 
         if field_def.name == 'tags':
-            # Unified Tags: Read ALL tags from TagRepository for current song(s)
+            # Unified Tags: Intersection logic using effective values (staging-aware)
+            all_tag_sets = []
+            for song in self.current_songs:
+                 # 1. Get DB tags as strings
+                 db_tags = self.tag_service.get_tags_for_source(song.source_id)
+                 db_tag_strings = [f"{t.category}:{t.tag_name}" for t in db_tags]
+                 
+                 # 2. Get effective tags (handles staging)
+                 effective_tags = self._get_effective_value(song.source_id, 'tags', db_tag_strings)
+                 if not isinstance(effective_tags, list):
+                      effective_tags = [effective_tags] if effective_tags else []
+                 
+                 all_tag_sets.append(set(effective_tags))
+            
+            common_strings = set.intersection(*all_tag_sets) if all_tag_sets else set()
+            union_strings = set.union(*all_tag_sets) if all_tag_sets else set()
+            
+            # 3. Resolve common strings back to chip tuples
             chips = []
+            for tag_str in sorted(list(common_strings)):
+                 if ':' in tag_str:
+                      cat, name = tag_str.split(':', 1)
+                 else:
+                      cat, name = "Genre", tag_str
+                 
+                 # Lookup ID for unlinking (Try to find existing tag)
+                 tag_obj = self.tag_service.find_by_name(name, cat)
+                 tid = tag_obj.tag_id if tag_obj else -1
+                 
+                 icon = self._get_tag_category_icon(cat)
+                 zone = self._get_tag_category_zone(cat)
+                 is_primary = (ID3Registry.get_id3_frame(cat) == "TCON") # Simply mark all common genres?
+                 
+                 chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, is_primary))
             
-            if len(self.current_songs) == 1:
-                # Single song - get all its tags via Service
-                source_id = self.current_songs[0].source_id
-                all_tags = self.tag_service.get_tags_for_source(source_id)
-                
-                # Group by category to identify primary (first in each category)
-                by_category = {}
-                for tag in all_tags:
-                    cat = tag.category or "Other"
-                    if cat not in by_category:
-                        by_category[cat] = []
-                    by_category[cat].append(tag)
-                
-                # Build chips for each category
-                for category, tags in by_category.items():
-                    icon = self._get_tag_category_icon(category)
-                    zone = self._get_tag_category_zone(category)
-                    for i, tag in enumerate(tags):
-                        # Only Genre (TCON) gets primary star (first item)
-                        is_primary = (i == 0 and ID3Registry.get_id3_frame(category) == "TCON")
-                        chips.append((tag.tag_id, f"{category}: {tag.tag_name}", icon, False, False, "", zone, is_primary))
-            else:
-                # Multiple songs - show mixed indicator
-                chips.append((-1, f"{len(self.current_songs)} Songs Selected", "🔀", True, False, "", "gray", False))
-            
-            return chips, False
+            mixed_count = len(union_strings - common_strings)
+            return chips, (mixed_count > 0), mixed_count
 
         # Handle regular fields
         s0 = self.current_songs[0]
@@ -1624,7 +1633,7 @@ class SidePanelWidget(QFrame):
         v0 = self._get_effective_value(s0.source_id, field_def.name, getattr(s0, attr, ""))
         
         if len(self.current_songs) == 1:
-            return v0, False
+            return v0, False, 0
             
         # T-69: Special Union logic for Publisher
         if field_def.name == 'publisher':
@@ -1632,20 +1641,37 @@ class SidePanelWidget(QFrame):
             for song in self.current_songs:
                 val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
                 if val:
-                    # T-Policy: Do NOT split publishers by comma anymore. Treat as whole entities.
-                    # This respects "Sony / ATV" or "Smith, Jones & Co" as single units.
                     all_pubs.add(str(val).strip())
             
             if not all_pubs:
-                return "", False
+                return "", False, 0
             
-            # Return sorted union (joined with a safe delimiter, though display logic handles lists)
-            # Actually, _calculate_bulk_value expects a single value if not multiple...
-            # But wait, publisher is now a ChipTray, so it expects a LIST for multi-value fields?
-            # Let's check _refresh_field_values... it handles lists.
-            return list(sorted(all_pubs)), False
+            return list(sorted(all_pubs)), False, 0
 
-        # Bulk Mode: Compare values
+        # Bulk Mode: Field Type Specific Logic
+        if field_def.field_type == yellberus.FieldType.LIST:
+             all_sets = []
+             import re
+             delimiters = r',|;| & |\|\|\|'
+             if field_def.name == 'composers':
+                  delimiters += r'|/'
+
+             for song in self.current_songs:
+                  val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
+                  if isinstance(val, list):
+                       items = [str(x).strip() for x in val if str(x).strip()]
+                  elif isinstance(val, str):
+                       items = [x.strip() for x in re.split(delimiters, val) if x.strip()]
+                  else:
+                       items = []
+                  all_sets.append(set(items))
+             
+             common = set.intersection(*all_sets)
+             union = set.union(*all_sets)
+             is_multiple = len(common) != len(union)
+             return list(sorted(list(common))), is_multiple, len(union - common)
+
+        # Standard scalar comparison
         is_multiple = False
         for song in self.current_songs[1:]:
             v_other = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
@@ -1653,7 +1679,7 @@ class SidePanelWidget(QFrame):
                 is_multiple = True
                 break
         
-        return v0 if not is_multiple else None, is_multiple
+        return v0 if not is_multiple else None, is_multiple, (1 if is_multiple else 0)
 
     def _get_effective_value(self, song_id, field_name, db_value):
         """Lookup staged value, fallback to DB."""
@@ -1678,12 +1704,19 @@ class SidePanelWidget(QFrame):
         }
         return color_to_zone.get(color, "gray")
 
-    def _on_field_changed(self, field_name, value):
+    def _on_field_changed(self, field_name, value, song_id=None):
         """Stage the change for the current selection."""
-        for song in self.current_songs:
-            if song.source_id not in self._staged_changes:
-                self._staged_changes[song.source_id] = {}
-            self._staged_changes[song.source_id][field_name] = value
+        if song_id is not None:
+             # Targeted Stage (Differential Edit)
+             if song_id not in self._staged_changes:
+                  self._staged_changes[song_id] = {}
+             self._staged_changes[song_id][field_name] = value
+        else:
+             # Bulk Stage
+             for song in self.current_songs:
+                 if song.source_id not in self._staged_changes:
+                     self._staged_changes[song.source_id] = {}
+                 self._staged_changes[song.source_id][field_name] = value
             
         self._update_header()
         self._update_save_state()
@@ -1696,14 +1729,15 @@ class SidePanelWidget(QFrame):
         field_def = next((f for f in yellberus.FIELDS if f.name == field_name), None)
         if not field_def: return []
         
-        effective_val, is_multiple = self._calculate_bulk_value(field_def)
+        effective_val, is_multiple, mixed_count = self._calculate_bulk_value(field_def)
         
-        if is_multiple and field_name != 'tags':
-            return [(-1, f"{len(self.current_songs)} Mixed", "🔀", True, False, "", "gray", False)]
-            
         if field_name == 'tags':
             # Tags handle their own complex chip formatting in _calculate_bulk_value
-            return effective_val or []
+            chips = effective_val or []
+            if mixed_count > 0:
+                # Add "X Mixed" dummy chip
+                chips.append((-1, f"{mixed_count} Mixed", "🔀", True, False, "", "gray", False))
+            return chips
             
         # Convert to identities for the Chip Tray
         chips = []
@@ -1824,6 +1858,11 @@ class SidePanelWidget(QFrame):
                 else:
                     # Unresolved reference (stale string or missing identity)
                     chips.append((0, str(n), "⚠️", False, False, "Unresolved Reference", "gray", False))
+        
+        # Mixed indicator for multi-edit (T-Mixed)
+        if mixed_count > 0:
+             chips.append((-1, f"{mixed_count} Mixed", "🔀", True, False, "", "gray", False))
+             
         return chips
 
     def _on_status_toggled(self):

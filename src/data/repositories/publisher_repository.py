@@ -83,20 +83,21 @@ class PublisherRepository(GenericRepository[Publisher]):
         
         return self.create(name), True
 
-    def add_publisher_to_album(self, album_id: int, publisher_id: int) -> None:
+    def add_publisher_to_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None) -> None:
         """Link a publisher to an album."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
-            # Check if link exists
-            cursor = conn.execute("SELECT 1 FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
-            if cursor.fetchone(): return
-
-            conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, publisher_id))
-            AuditLogger(conn).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
-                "AlbumID": album_id, "PublisherID": publisher_id
+            conn.execute("""
+                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
+                VALUES (?, ?)
+            """, (album_id, publisher_id))
+            
+            AuditLogger(conn, batch_id=batch_id).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
+                "AlbumID": album_id,
+                "PublisherID": publisher_id
             })
 
-    def remove_publisher_from_album(self, album_id: int, publisher_id: int) -> None:
+    def remove_publisher_from_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None) -> None:
         """Unlink a publisher from an album."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
@@ -107,7 +108,7 @@ class PublisherRepository(GenericRepository[Publisher]):
             snapshot = {"AlbumID": row[0], "PublisherID": row[1]}
 
             conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
-            AuditLogger(conn).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
+            AuditLogger(conn, batch_id=batch_id).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
 
     def get_publishers_for_album(self, album_id: int) -> List[Publisher]:
         """Get all publishers associated with an album."""

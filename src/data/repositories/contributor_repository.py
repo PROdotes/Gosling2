@@ -95,13 +95,19 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error getting usage count for {contributor_id}: {e}")
             return 0
 
-    def swap_song_contributor(self, song_id: int, old_id: int, new_id: int) -> bool:
+    def swap_song_contributor(self, song_id: int, old_id: int, new_id: int, batch_id: Optional[str] = None) -> bool:
         """Replace one contributor link with another for a single song. (Deduplication aware)"""
         try:
+            from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                auditor = AuditLogger(conn, batch_id=batch_id)
                 
-                # 1. Deduplicate: Find roles that BOTH already have for this song
+                # 1. Fetch current roles for old_id to audit
+                cursor.execute("SELECT RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ?", (song_id, old_id))
+                old_links = cursor.fetchall()
+
+                # 2. Deduplicate: Find roles that BOTH already have for this song
                 # If both have the same role, we must delete the OLD one to avoiding breaking the PK (Source, Contributor, Role)
                 cursor.execute("""
                     DELETE FROM MediaSourceContributorRoles 
@@ -110,13 +116,19 @@ class ContributorRepository(GenericRepository[Contributor]):
                     )
                 """, (song_id, old_id, song_id, new_id))
                 
-                # 2. Update remaining roles from OLD to NEW
+                # 3. Update remaining roles from OLD to NEW
                 cursor.execute("""
                     UPDATE MediaSourceContributorRoles 
                     SET ContributorID = ?, CreditedAliasID = NULL
                     WHERE SourceID = ? AND ContributorID = ?
                 """, (new_id, song_id, old_id))
-                return True # If we deleted or updated, it's a success
+
+                # 4. Audit
+                for r_id, a_id in old_links:
+                    auditor.log_update("MediaSourceContributorRoles", f"{song_id}-{old_id}-{r_id}", 
+                        {"ContributorID": old_id}, {"ContributorID": new_id})
+
+                return True 
         except Exception as e:
             from src.core import logger
             logger.error(f"Error swapping contributor {old_id} -> {new_id} on song {song_id}: {e}")
@@ -212,7 +224,7 @@ class ContributorRepository(GenericRepository[Contributor]):
         cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
         cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (record_id,))
 
-    def create(self, name: str, type: str = 'person', sort_name: str = None, conn=None) -> Contributor:
+    def create(self, name: str, type: str = 'person', sort_name: str = None, conn=None, batch_id: Optional[str] = None) -> Contributor:
         """Create new contributor. Auto-generates sort_name if not provided. (Connection Aware)"""
         if not sort_name:
             sort_name = self._generate_sort_name(name)
@@ -228,14 +240,14 @@ class ContributorRepository(GenericRepository[Contributor]):
             
             from src.core.audit_logger import AuditLogger
             try:
-                AuditLogger(conn).log_insert("Contributors", new_id, c.to_dict())
+                AuditLogger(conn, batch_id=batch_id).log_insert("Contributors", new_id, c.to_dict())
             except Exception:
                 pass # Don't fail create if audit fails in legacy path? 
             return c
 
         else:
             # No Connection: Use GenericRepository.insert (Auto Transaction + Audit)
-            new_id = self.insert(c)
+            new_id = self.insert(c, batch_id=batch_id)
             if new_id:
                 c.contributor_id = new_id
                 return c
@@ -398,17 +410,17 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error fetching contributor types: {e}")
             return {}
 
-    def get_or_create(self, name: str, type: str = 'person', conn=None) -> Tuple[Contributor, bool]:
+    def get_or_create(self, name: str, type: str = 'person', conn=None, batch_id: Optional[str] = None) -> Tuple[Contributor, bool]:
         """
         Get existing or create new. 
         Returns (contributor, was_created). (Connection Aware)
         """
         if conn:
-            return self._get_or_create_logic(name, type, conn)
+            return self._get_or_create_logic(name, type, conn, batch_id=batch_id)
 
         try:
             with self.get_connection() as conn:
-                return self._get_or_create_logic(name, type, conn)
+                return self._get_or_create_logic(name, type, conn, batch_id=batch_id)
         except Exception as e:
             from src.core import logger
             logger.error(f"Error in get_or_create: {e}")
@@ -416,7 +428,7 @@ class ContributorRepository(GenericRepository[Contributor]):
             # Better to let it bubble or return a dummy.
             raise
 
-    def _get_or_create_logic(self, name: str, type: str, conn) -> Tuple[Contributor, bool]:
+    def _get_or_create_logic(self, name: str, type: str, conn, batch_id: Optional[str] = None) -> Tuple[Contributor, bool]:
         cursor = conn.cursor()
         # 1. Check direct name match (NOCASE)
         cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
@@ -431,7 +443,7 @@ class ContributorRepository(GenericRepository[Contributor]):
             return self.get_by_id(row[0], conn=conn), False
         
         # 3. Create if not found
-        return self.create(name, type, conn=conn), True
+        return self.create(name, type, conn=conn, batch_id=batch_id), True
 
     def validate_identity(self, name: str, exclude_id: int = None) -> Tuple[Optional[int], str]:
         """
@@ -475,7 +487,7 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return None, str(e)
 
-    def merge(self, source_id: int, target_id: int, create_alias: bool = True) -> bool:
+    def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
         """
         Consolidate source identity into target.
         Transfers all songs, aliases, and relationships. (Audited Manually)
@@ -497,7 +509,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 s_name = res[0]
                 
                 # Initialize Logger once for Batching
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
 
                 # 2. Source Name becomes an alias for target (Optional)
                 source_name_alias_id = None
@@ -635,18 +647,25 @@ class ContributorRepository(GenericRepository[Contributor]):
             return 0
 
     def get_members(self, group_id: int) -> List[Contributor]:
-        """Get all members of a Group."""
+        """Get all members of a Group, respecting MemberAliasID."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT C.ContributorID, C.ContributorName, C.SortName, C.ContributorType
-                    FROM Contributors C
-                    JOIN GroupMembers GM ON C.ContributorID = GM.MemberID
+                    SELECT 
+                        C.ContributorID, 
+                        COALESCE(CA.AliasName, C.ContributorName) as DisplayName, 
+                        C.SortName, 
+                        C.ContributorType,
+                        CA.AliasName -- Matched Alias
+                    FROM GroupMembers GM
+                    JOIN Contributors C ON GM.MemberID = C.ContributorID
+                    LEFT JOIN ContributorAliases CA ON GM.MemberAliasID = CA.AliasID
                     WHERE GM.GroupID = ?
-                    ORDER BY C.SortName ASC
+                    ORDER BY DisplayName ASC
                 """, (group_id,))
-                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
+                
+                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3], matched_alias=r[4]) for r in cursor.fetchall()]
         except Exception as e:
             return []
 
@@ -666,24 +685,25 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return []
 
-    def add_member(self, group_id: int, person_id: int) -> bool:
-        """Add a member to a group."""
+    def add_member(self, group_id: int, person_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
+        """Add a member to a group, optionally with a specific alias."""
         try:
             from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute("INSERT OR IGNORE INTO GroupMembers (GroupID, MemberID) VALUES (?, ?)", (group_id, person_id))
+                cursor.execute("INSERT OR IGNORE INTO GroupMembers (GroupID, MemberID, MemberAliasID) VALUES (?, ?, ?)", (group_id, person_id, member_alias_id))
                 
                 if cursor.rowcount > 0:
-                    AuditLogger(conn).log_insert("GroupMembers", f"{group_id}-{person_id}", {
+                    AuditLogger(conn, batch_id=batch_id).log_insert("GroupMembers", f"{group_id}-{person_id}", {
                         "GroupID": group_id,
-                        "MemberID": person_id
+                        "MemberID": person_id,
+                        "MemberAliasID": member_alias_id
                     })
                 return cursor.rowcount > 0
         except Exception as e:
             return False
 
-    def remove_member(self, group_id: int, person_id: int) -> bool:
+    def remove_member(self, group_id: int, person_id: int, batch_id: Optional[str] = None) -> bool:
         """Remove a member from a group."""
         try:
             from src.core.audit_logger import AuditLogger
@@ -699,7 +719,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? AND MemberID = ?", (group_id, person_id))
                 
                 if cursor.rowcount > 0:
-                    AuditLogger(conn).log_delete("GroupMembers", f"{group_id}-{person_id}", snapshot)
+                    AuditLogger(conn, batch_id=batch_id).log_delete("GroupMembers", f"{group_id}-{person_id}", snapshot)
                 return cursor.rowcount > 0
         except Exception as e:
             return False
@@ -714,7 +734,7 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return []
 
-    def add_alias(self, contributor_id: int, alias_name: str) -> int:
+    def add_alias(self, contributor_id: int, alias_name: str, batch_id: Optional[str] = None) -> int:
         """Add an alias."""
         try:
             with self.get_connection() as conn:
@@ -724,7 +744,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 
                 # Audit Aliases
                 from src.core.audit_logger import AuditLogger
-                AuditLogger(conn).log_insert("ContributorAliases", new_id, {
+                AuditLogger(conn, batch_id=batch_id).log_insert("ContributorAliases", new_id, {
                     "ContributorID": contributor_id,
                     "AliasName": alias_name
                 })
@@ -733,17 +753,190 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return -1
 
-    def update_alias(self, alias_id: int, new_name: str) -> bool:
+    def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
         """Rename an alias."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                # Get old name for audit
+                cursor.execute("SELECT ContributorID, AliasName FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
+                row = cursor.fetchone()
+                if not row: return False
+                old_cid, old_name = row
+
                 cursor.execute("UPDATE ContributorAliases SET AliasName = ? WHERE AliasID = ?", (new_name, alias_id))
+                
+                if cursor.rowcount > 0:
+                    from src.core.audit_logger import AuditLogger
+                    AuditLogger(conn, batch_id=batch_id).log_update("ContributorAliases", alias_id, 
+                        {"AliasName": old_name}, {"AliasName": new_name}
+                    )
                 return cursor.rowcount > 0
         except Exception as e:
             return False
 
-    def promote_alias(self, contributor_id: int, alias_id: int) -> bool:
+    def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Transfer ownership of an alias string from one contributor to another.
+        """
+        try:
+            from src.core.audit_logger import AuditLogger
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Verify existence and specific ownership (security check)
+                cursor.execute("SELECT AliasID FROM ContributorAliases WHERE AliasName = ? AND ContributorID = ?", (alias_name, old_owner_id))
+                row = cursor.fetchone()
+                if not row: return False
+                alias_id = row[0]
+                
+                # 1. Move the Alias Record
+                cursor.execute("UPDATE ContributorAliases SET ContributorID = ? WHERE AliasID = ?", (new_owner_id, alias_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn, batch_id=batch_id).log_update("ContributorAliases", alias_id, 
+                        {"ContributorID": old_owner_id}, {"ContributorID": new_owner_id}
+                    )
+
+                # 2. Move Song Credits that use this Alias (CRITICAL INTEGRITY FIX)
+                # Any song credited to this specific alias must now point to the new owner.
+                # BUT: Check for conflicts first. If New Owner already has the same Role on the same Song,
+                # we can't just UPDATE (PK Violation). In that case, we delete the "Ghost" link 
+                # because the "Real" link already exists.
+                
+                # a. Find conflicts
+                cursor.execute("""
+                    SELECT SourceID, RoleID FROM MediaSourceContributorRoles 
+                    WHERE CreditedAliasID = ? AND (SourceID, RoleID) IN (
+                        SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE ContributorID = ?
+                    )
+                """, (alias_id, new_owner_id))
+                conflicts = cursor.fetchall()
+
+                # b. Resolve conflicts (Delete the old link that we can't move)
+                for s_id, r_id in conflicts:
+                    cursor.execute("""
+                        DELETE FROM MediaSourceContributorRoles 
+                        WHERE SourceID = ? AND RoleID = ? AND CreditedAliasID = ?
+                    """, (s_id, r_id, alias_id))
+                    
+                    AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceContributorRoles", f"{s_id}-{old_owner_id}-{r_id}",
+                         {"ContributorID": old_owner_id, "CreditedAliasID": alias_id}
+                    )
+                
+                # c. Move the rest (Safe to update)
+                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE CreditedAliasID = ?", (alias_id,))
+                moving_roles = cursor.fetchall()
+                
+                cursor.execute("UPDATE MediaSourceContributorRoles SET ContributorID = ? WHERE CreditedAliasID = ?", (new_owner_id, alias_id))
+                
+                # Audit the role moves
+                for s_id, r_id in moving_roles:
+                     AuditLogger(conn, batch_id=batch_id).log_update("MediaSourceContributorRoles", f"{s_id}-{old_owner_id}-{r_id}",
+                         {"ContributorID": old_owner_id}, {"ContributorID": new_owner_id}
+                     )
+                
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error moving alias '{alias_name}': {e}")
+            return False
+
+    def abdicate_identity(self, current_id: int, heir_alias_id: int, target_parent_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        'Peel & Move':
+        1. Promotes 'heir_alias_id' to be the Primary Name of 'current_id'.
+        2. Creates a NEW alias for the OLD Primary Name attached to 'target_parent_id'.
+        3. 'current_id' survives (with songs/other aliases) but has a new name.
+        """
+        try:
+            from src.core.audit_logger import AuditLogger
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Get info
+                cursor.execute("SELECT ContributorName FROM Contributors WHERE ContributorID = ?", (current_id,))
+                old_primary_name = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT AliasName FROM ContributorAliases WHERE AliasID = ?", (heir_alias_id,))
+                heir_name = cursor.fetchone()[0]
+                
+                # 2. Promote Heir (Rename ID)
+                cursor.execute("UPDATE Contributors SET ContributorName = ? WHERE ContributorID = ?", (heir_name, current_id))
+                
+                # 3. Delete Heir Alias Record (It is now primary)
+                cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (heir_alias_id,))
+                
+                # 4. Create Old Name as Alias on TARGET
+                cursor.execute("INSERT INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (target_parent_id, old_primary_name))
+                new_alias_id = cursor.lastrowid
+                
+                # 5. MOVE OTHER ALIASES (e.g. 'Mr Bad Guy')
+                # Farrokh (Heir) stays. All others move to Target.
+                cursor.execute("""
+                    UPDATE ContributorAliases 
+                    SET ContributorID = ? 
+                    WHERE ContributorID = ? AND AliasID != ?
+                """, (target_parent_id, current_id, heir_alias_id))
+
+                # 6. MOVE CREDITS (Split Logic)
+                
+                # A. Move Primary Credits (Freddie) -> Target + New Alias
+                cursor.execute("""
+                    UPDATE MediaSourceContributorRoles 
+                    SET ContributorID = ?, CreditedAliasID = ?
+                    WHERE ContributorID = ? AND CreditedAliasID IS NULL
+                """, (target_parent_id, new_alias_id, current_id))
+                
+                # B. Move Credits for Other Aliases (e.g. Mr Bad Guy) -> Target (Keep Alias ID)
+                # These aliases were just moved in Step 5, so their IDs are valid on Target.
+                cursor.execute("""
+                    UPDATE MediaSourceContributorRoles 
+                    SET ContributorID = ?
+                    WHERE ContributorID = ? AND CreditedAliasID IS NOT NULL AND CreditedAliasID != ?
+                """, (target_parent_id, current_id, heir_alias_id))
+                
+                # C. Heir Credits (Farrokh) -> STAY on ID 1 (Renamed to Farrokh)
+                # No action needed.
+
+                # 7. MOVE GROUP MEMBERSHIPS
+                # If Freddie was in Queen, DJ Someone (who is now Freddie) should be in Queen.
+                # Farrokh (Heir) is losing the membership (unless he was separately added? No, ID 1 has 1 membership).
+                
+                # a. Delete duplicates (if Target is ALREADY in the group)
+                cursor.execute("""
+                    DELETE FROM GroupMembers 
+                    WHERE MemberID = ? AND GroupID IN (
+                        SELECT GroupID FROM GroupMembers WHERE MemberID = ?
+                    )
+                """, (current_id, target_parent_id))
+                
+                # b. Move remaining memberships
+                # Audit the move
+                cursor.execute("SELECT GroupID, MemberAliasID FROM GroupMembers WHERE MemberID = ?", (current_id,))
+                for (gid, old_alias_id) in cursor.fetchall():
+                    AuditLogger(conn, batch_id=batch_id).log_update("GroupMembers", f"{gid}-{current_id}", 
+                        {"GroupID": gid, "MemberID": current_id, "MemberAliasID": old_alias_id}, 
+                        {"GroupID": gid, "MemberID": target_parent_id, "MemberAliasID": new_alias_id}
+                    )
+
+                # Crucially, we set MemberAliasID to the new 'Freddie' alias so it displays correctly.
+                cursor.execute("""
+                    UPDATE GroupMembers 
+                    SET MemberID = ?, MemberAliasID = ?
+                    WHERE MemberID = ?
+                """, (target_parent_id, new_alias_id, current_id))
+
+                AuditLogger(conn, batch_id=batch_id).log_action("IDENTITY_ABDICATION", "Contributors", current_id, 
+                    f"Renamed to {heir_name}; '{old_primary_name}' credits & groups moved to {target_parent_id}")
+                
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error abdicating identity {current_id}: {e}")
+            return False
+
+    def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """
         Swap the current primary name with an alias.
         The current primary name becomes a new alias.
@@ -779,7 +972,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 """, (alias_id, alias_id, contributor_id, alias_id))
 
                 # Auditor
-                auditor = AuditLogger(conn)
+                auditor = AuditLogger(conn, batch_id=batch_id)
 
                 # 6. Audit Log
                 auditor.log_action(
@@ -793,32 +986,32 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error promoting alias {alias_id}: {e}")
             return False
 
-    def delete_alias(self, alias_id: int) -> bool:
+    def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias. Nullifies any specific credit references first."""
         try:
             from src.core.audit_logger import AuditLogger
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # Snapshot for Audit
-                cursor.execute("SELECT AliasName, ContributorID FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
+                auditor = AuditLogger(conn, batch_id=batch_id)
+                # Snapshot
+                cursor.execute("SELECT ContributorID, AliasName FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
                 row = cursor.fetchone()
                 if not row: return False
-                snapshot = {"AliasName": row[0], "ContributorID": row[1]}
+                snapshot = {"ContributorID": row[0], "AliasName": row[1]}
 
-                # 1. Nullify usage in credits (Reverts display to Primary Name)
+                # Audit Credit Nullification
+                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE CreditedAliasID = ?", (alias_id,))
+                affected = cursor.fetchall()
+                for s_id, r_id in affected:
+                    auditor.log_update("MediaSourceContributorRoles", f"{s_id}-{row[0]}-{r_id}", 
+                        {"CreditedAliasID": alias_id}, {"CreditedAliasID": None}
+                    )
+
                 cursor.execute("UPDATE MediaSourceContributorRoles SET CreditedAliasID = NULL WHERE CreditedAliasID = ?", (alias_id,))
-                
-                # 2. Delete
                 cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
                 
-                # Auditor
-                auditor = AuditLogger(conn)
-
-                # 3. Audit Log
                 auditor.log_delete("ContributorAliases", alias_id, snapshot)
-                
-                return cursor.rowcount > 0
+                return True
         except Exception as e:
             return False
 
@@ -886,3 +1079,88 @@ class ContributorRepository(GenericRepository[Contributor]):
             return [term]
 
         return list(identities)
+
+    def add_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
+        """Instant Link: Link a contributor to a song with a specific role."""
+        try:
+            from src.core.audit_logger import AuditLogger
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Resolve RoleID
+                # Map plural field names to singular roles if needed
+                role_map = {
+                    'performers': 'Performer',
+                    'composers': 'Composer',
+                    'lyricists': 'Lyricist',
+                    'producers': 'Producer'
+                }
+                mapped_role = role_map.get(role_name.lower(), role_name)
+                
+                cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (mapped_role,))
+                role_row = cursor.fetchone()
+                if not role_row: return False
+                role_id = role_row[0]
+
+                # 2. Link
+                cursor.execute("""
+                    INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID)
+                    VALUES (?, ?, ?)
+                """, (source_id, contributor_id, role_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn, batch_id=batch_id).log_insert("MediaSourceContributorRoles", f"{source_id}-{contributor_id}-{role_id}", {
+                        "SourceID": source_id,
+                        "ContributorID": contributor_id,
+                        "RoleID": role_id
+                    })
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error adding song role: {e}")
+            return False
+
+    def remove_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
+        """Instant Unlink: Remove a contributor role from a song."""
+        try:
+            from src.core.audit_logger import AuditLogger
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # 1. Resolve RoleID
+                role_map = {
+                    'performers': 'Performer',
+                    'composers': 'Composer',
+                    'lyricists': 'Lyricist',
+                    'producers': 'Producer'
+                }
+                mapped_role = role_map.get(role_name.lower(), role_name)
+                
+                cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (mapped_role,))
+                role_row = cursor.fetchone()
+                if not role_row: return False
+                role_id = role_row[0]
+
+                # 2. Snapshot for Audit
+                cursor.execute("""
+                    SELECT SourceID, ContributorID, RoleID, CreditedAliasID 
+                    FROM MediaSourceContributorRoles 
+                    WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?
+                """, (source_id, contributor_id, role_id))
+                row = cursor.fetchone()
+                if not row: return False # Idempotent success
+                snapshot = {"SourceID": row[0], "ContributorID": row[1], "RoleID": row[2], "CreditedAliasID": row[3]}
+
+                # 3. Delete
+                cursor.execute("""
+                    DELETE FROM MediaSourceContributorRoles 
+                    WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?
+                """, (source_id, contributor_id, role_id))
+                
+                if cursor.rowcount > 0:
+                    AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceContributorRoles", f"{source_id}-{contributor_id}-{role_id}", snapshot)
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error removing song role: {e}")
+            return False

@@ -337,7 +337,13 @@ class EntityListWidget(QWidget):
         """Perform the actual add via adapter."""
         if self.context_adapter:
             entity_id = self._get_entity_id(entity)
-            if self.context_adapter.link(entity_id):
+            
+            # Check for Alias Match to pass to adapter (important for Group Members)
+            kwargs = {}
+            if hasattr(entity, 'matched_alias') and entity.matched_alias:
+                kwargs['matched_alias'] = entity.matched_alias
+                
+            if self.context_adapter.link(entity_id, **kwargs):
                 self.refresh_from_adapter()
                 self.data_changed.emit()
             else:

@@ -43,9 +43,9 @@ class LibraryService:
         """Delete a song from the library"""
         return self.song_service.delete(file_id)
 
-    def update_song(self, song: Song) -> bool:
+    def update_song(self, song: Song, batch_id: Optional[str] = None) -> bool:
         """Update song metadata."""
-        return self.song_service.update(song)
+        return self.song_service.update(song, batch_id=batch_id)
 
     def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None) -> None:
         """Log a high-level systemic or user action."""

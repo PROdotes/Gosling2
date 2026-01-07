@@ -359,14 +359,7 @@ class AlbumManagerDialog(QDialog):
             allow_add=True,
             parent=self
         )
-        self.tray_artist.tray.btn_add.hide() # Use external button
-        
         input_layout_art.addWidget(self.tray_artist, 1)
-        
-        btn_add_artist = GlowButton("")
-        btn_add_artist.setObjectName("AddInlineButton")
-        btn_add_artist.clicked.connect(self.tray_artist.add_item_interactive)
-        input_layout_art.addWidget(btn_add_artist)
         
         module_layout_art.addWidget(input_row_art)
         layout.addWidget(field_module_art)
@@ -406,14 +399,7 @@ class AlbumManagerDialog(QDialog):
             allow_add=True,
             parent=self
         )
-        self.tray_publisher.tray.btn_add.hide() # Use external button
-        
         input_layout_pub.addWidget(self.tray_publisher, 1)
-        
-        btn_add_pub = GlowButton("")
-        btn_add_pub.setObjectName("AddInlineButton")
-        btn_add_pub.clicked.connect(self.tray_publisher.add_item_interactive)
-        input_layout_pub.addWidget(btn_add_pub)
         
         module_layout_pub.addWidget(input_row_pub)
         layout.addWidget(field_module_pub)
@@ -514,10 +500,10 @@ class AlbumManagerDialog(QDialog):
         
         # Set Up Adapters
         self.tray_artist.set_context_adapter(
-            AlbumContributorAdapter(self.current_album, self.contributor_service)
+            AlbumContributorAdapter(self.current_album, self.contributor_service, stage_change_fn=self._stage_inspector_change)
         )
         self.tray_publisher.set_context_adapter(
-             AlbumPublisherAdapter(self.current_album, self.publisher_service)
+             AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
         )
         
         # Populate UI
@@ -602,13 +588,13 @@ class AlbumManagerDialog(QDialog):
                 self.current_album.release_year = int(self.initial_data.get('year'))
             except: pass
             
-        # T-Adapter: Connect EntityListWidgets to the current album
+        # T-Adapter: Connect EntityListWidgets to the current album (Immediate Save Mode)
         self.tray_artist.set_context_adapter(
-            AlbumContributorAdapter(self.current_album, self.contributor_service, stage_change_fn=self._stage_inspector_change)
+            AlbumContributorAdapter(self.current_album, self.contributor_service)
         )
         
         self.tray_publisher.set_context_adapter(
-            AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
+            AlbumPublisherAdapter(self.current_album, self.publisher_service)
         )
         
         # 2. Populate Context (Songs)
@@ -817,25 +803,28 @@ class AlbumManagerDialog(QDialog):
                 repo = AlbumRepository()
                 repo.sync_publishers(album.album_id, pub_names)
                 
-                # Save Artists (M2M)
-                # Ensure we have Contributor objects
-                artists = []
-                for art_name in artist_names:
-                    artist_obj, _ = self.contributor_service.get_or_create(art_name)
-                    if artist_obj:
-                        artists.append(artist_obj)
+                # Save Artists (M2M) from Staged Adapter or Tray
+                # For Create Mode, we likely relied on staging or reading from tray names if adapter failed to stage
+                if hasattr(self.current_album, '_staged_contributors'):
+                     repo.sync_contributors(album.album_id, self.current_album._staged_contributors)
+                else:
+                    # Fallback if no staging happened (e.g. manual text entry)
+                    artists = []
+                    for art_name in artist_names:
+                        artist_obj, _ = self.contributor_service.get_or_create(art_name)
+                        if artist_obj:
+                            artists.append(artist_obj)
+                    repo.sync_contributors(album.album_id, artists)
                 
-                repo.sync_contributors(album.album_id, artists)
-
+                # ... 
                 self.current_album = album
                 self.is_creating_new = False
                 
-                # Clear Dirty State
+                # Clean up
                 self.btn_save_inspector.setProperty("dirty", False)
                 self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
                 self.btn_save_inspector.style().polish(self.btn_save_inspector)
                 
-                # Clear search so we see the new item
                 self.txt_search.blockSignals(True)
                 self.txt_search.clear() 
                 self.txt_search.blockSignals(False)
@@ -845,48 +834,33 @@ class AlbumManagerDialog(QDialog):
                     QMessageBox.information(self, "Success", "Album Created")
                 success = True
             else:
-                # Update
+                # Update (Edit Mode)
                 if not self.current_album: return False
                 
                 self.current_album.title = title
-                self.current_album.album_artist = artist
+                # self.current_album.album_artist = artist # Don't overwrite display string if M2M handles it, but maybe keep for legacy?
+                # Actually, if we use M2M, 'album_artist' legacy field might be derived.
+                # But for now, let's keep it sync.
+                self.current_album.album_artist = artist 
                 self.current_album.release_year = year
                 self.current_album.album_type = alb_type
                 
                 self.album_service.update(self.current_album)
                 
-                # 1. Sync Staged Contributors (M2M)
-                if hasattr(self.current_album, '_staged_contributors'):
-                    # Synchronize all at once
-                    from src.data.repositories.album_repository import AlbumRepository
-                    AlbumRepository().sync_contributors(self.current_album.album_id, self.current_album._staged_contributors)
-                    
-                    delattr(self.current_album, '_staged_contributors')
-
-                # 2. Sync Staged Publishers (M2M)
-                if hasattr(self.current_album, '_staged_publishers'):
-                    # Synchronize all at once
-                    pub_names = [p['name'] for p in self.current_album._staged_publishers]
-                    from src.data.repositories.album_repository import AlbumRepository
-                    AlbumRepository().sync_publishers(self.current_album.album_id, pub_names)
-                    
-                    delattr(self.current_album, '_staged_publishers')
-                else:
-                    # Fallback to tray if no staged (Legacy compatibility)
-                    pub_names = self.tray_publisher.get_names()
-                    from src.data.repositories.album_repository import AlbumRepository
-                    AlbumRepository().sync_publishers(self.current_album.album_id, pub_names)
+                # IMMEDIATE SAVE PROTOCOL: 
+                # Chips (Publishers/Contributors) are already saved by the adapters.
+                # We DO NOT sync them here.
                 
                 # Clear Dirty State
                 self.btn_save_inspector.setProperty("dirty", False)
                 self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
                 self.btn_save_inspector.style().polish(self.btn_save_inspector)
                 
-                # Clear search so we see the updated item (if renamed out of search scope)
+                # Clear search
                 self.txt_search.blockSignals(True)
                 self.txt_search.clear() 
                 self.txt_search.blockSignals(False)
-
+                
                 self._refresh_vault() 
                 if not silent and not close_on_success: 
                     QMessageBox.information(self, "Success", "Album Updated")

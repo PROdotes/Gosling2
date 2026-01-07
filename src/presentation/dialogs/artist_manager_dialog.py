@@ -839,24 +839,111 @@ class ArtistDetailsDialog(QDialog):
                                    "Aliases must be of the same type.")
                  return
             
-            # MERGE: Absorb 'target' into 'self.artist'
-            # This moves all of target's songs/roles to self.artist, and deletes target.
-            # It also usually adds 'target.name' as an alias of 'self.artist' implicitly via the merge service logic.
+            # SCENARIO CHECK: Alias Match vs Primary Identity Match
+            # The EntityPickerDialog returns an object where .name is set to the *Matched Name*.
+            # We fetch the FRESH database record to get the *Primary Name*.
+            real_target = self.service.get_by_id(target.contributor_id)
+            if not real_target: return
             
-            confirm_msg = f"'{target.name}' exists as a separate artist.\n\n" \
-                          f"Do you want to MERGE '{target.name}' into '{self.artist.name}'?\n" \
-                          f"This will make '{target.name}' an alias of '{self.artist.name}' and transfer all songs."
-                          
-            if QMessageBox.question(self, "Confirm Merge", confirm_msg, 
-                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-                                  
-                if self.service.merge(target.contributor_id, self.artist.contributor_id):
-                    from src.core import logger
-                    logger.info(f"Identity Absorbed via Alias Add: '{target.name}' merged into '{self.artist.name}'.")
+            # CASE 2: ALIAS RE-LINKING (Stealing a name)
+            # If the picker returned name is NOT the primary name, the user selected an ALIAS string.
+            # We should move that alias, NOT merge the identity.
+            if target.name != real_target.name:
+                alias_name = target.name
+                parent_name = real_target.name
+                
+                # Prompt for "Move Alias"
+                resolver = IdentityCollisionDialog(
+                    target_name=alias_name,
+                    song_count=0, # Not impactful for just moving a name
+                    has_context_song=False,
+                    title="Move Alias?",
+                    header="ALIAS OWNERSHIP CONFLICT",
+                    primary_label=None,
+                    secondary_label=f"STEAL ALIAS & LINK HERE",
+                    description=f"'{alias_name}' is currently linked to '{parent_name}'.\n\nDo you want to break that link and move the alias here?",
+                    parent=self
+                )
+                
+                if resolver.exec() != 1: return
+                
+        # Execute Move
+                if self.service.move_alias(alias_name, real_target.contributor_id, self.artist.contributor_id):
+                     self._refresh_data()
+                return
+
+            # Match Type 2: PRIMARY IDENTITY MATCH (Person/Group)
+            aliases = self.service.get_aliases(target.contributor_id) # [(id, name), ...]
+            alias_count = len(aliases)
+            song_count = self.service.get_usage_count(target.contributor_id)
+            
+            is_abdication = False
+            heir_id = None
+            heir_name = ""
+
+            # CASE 3: IDENTITY with ALIASES (Freddie -> Queen)
+            if alias_count > 0:
+                is_abdication = True
+                heir_id = aliases[0][0]
+                heir_name = aliases[0][1]
+
+                header = "SEPARATE IDENTITY?"
+                btn_label = "SEPARATE & MOVE"
+                desc = f"'{real_target.name}' has {alias_count} aliases (e.g. '{heir_name}').\n\n"
+                desc += f"• All aliases (inc. {heir_name}) will STAY with the ID.\n"
+                desc += f"• Only '{real_target.name}' will move to '{self.artist.name}'."
+                desc += f"\n\nEffectively: '{real_target.name}' becomes '{heir_name}'."
+
+            # CASE 4: IDENTITY (SIMPLE) (Ziggy -> Bowie)
+            else:
+                header = "DELETE PROFILE?"
+                btn_label = "DELETE & MERGE"
+                desc = f"Deleting '{real_target.name}' profile.\n\n"
+                desc += f"• '{real_target.name}' becomes an alias of '{self.artist.name}'.\n"
+                
+                if song_count > 0:
+                     desc += f"• {song_count} songs mixed into '{self.artist.name}'."
                 else:
-                    QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+                     desc += "• Empty profile removed."
+                     
+                desc += "\n\nCannot be undone."
+
+            # Execute Dialog
+            resolver = IdentityCollisionDialog(
+                target_name=real_target.name,
+                song_count=song_count,
+                has_context_song=False,
+                title="Merge Artist?",
+                header=header,
+                primary_label=None, # Hide Primary
+                secondary_label=btn_label,
+                description=desc,
+                parent=self
+            )
             
-            self._refresh_data()
+            res = resolver.exec()
+            if res != 1: # 1 = Merge/Secondary
+                return
+            
+            # Execution
+            if is_abdication:
+                 # Case 3: Abdicate
+                 if self.service.abdicate_identity(target.contributor_id, heir_id, self.artist.contributor_id):
+                      from src.core import logger
+                      logger.info(f"Identity Abdicated: '{real_target.name}' renamed to '{heir_name}'; Name moved to '{self.artist.name}'.")
+                      self._refresh_data()
+                 else:
+                      QMessageBox.warning(self, "Error", f"Failed to abdicate '{real_target.name}'.")
+            else:
+                 # Case 4: Standard Merge
+                 if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                        from src.core import logger
+                        logger.info(f"Identity Absorbed via Alias Add: '{target.name}' merged into '{self.artist.name}'.")
+                        self._refresh_data()
+                 else:
+                        QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+            
+
 
     def _show_alias_chip_menu(self, alias_id, alias_name, global_pos):
         """Show context menu for alias chips."""

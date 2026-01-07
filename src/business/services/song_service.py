@@ -29,9 +29,9 @@ class SongService:
         """Fetch all songs in the library."""
         return self._repo.get_all()
 
-    def update(self, song: Song) -> bool:
+    def update(self, song: Song, batch_id: Optional[str] = None) -> bool:
         """Update song metadata."""
-        return self._repo.update(song)
+        return self._repo.update(song, batch_id=batch_id)
 
     def delete(self, song_id: int) -> bool:
         """Delete a song record."""
