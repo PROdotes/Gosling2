@@ -93,10 +93,9 @@ tags:
 *   [x] **Multi-Album Infrastructure** (T-22/T-63)
     *   *Status*: **Core Schema & Logic Done**.
     *   *Ref*: `PROPOSAL_MULTI_ALBUM_INFRASTRUCTURE.md`.
-*   [ ] **Audit Log (History)** (T-05) (~1.0 h)
+*   [x] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events and expose via UI.
-    *   *Status*: **In Progress** - Added retrieval logic to AuditRepository; building AuditService.
-    *   *Blocker*: Requires Generic Repository (CRUD Refactor).
+    *   *Status*: **Done** - Full stack implementation (Repo, Service, Dialog) working and tested.
 *   [ ] **Advanced Rule Editor** (T-82) (~2.0 h)
     *   *Task*: UI for managing `rules.json` (Genre Routing, Profiles) inside Settings.
 *   [x] **Settings UI** (T-52) (~1.5 h)
@@ -147,8 +146,9 @@ tags:
 *   [x] **Album Artist M2M Schema** (T-91)
     *   *Task*: Upgrade `Albums.AlbumArtist` from text to `AlbumContributors` (M2M) table.
     *   *Status*: **Done** — Full M2M integration completed, including UI Picker and streamlined display logic.
-*   [ ] **Album Publisher Backend catch-up**
+*   [x] **Album Publisher Backend catch-up**
     *   *Task*: Ensure Album Manager "Tags" UI correctly writes multiple rows to `AlbumPublishers`.
+    *   *Status*: **Done**. Verified delegate logic in `AlbumRepository` and `PublisherRepository`.
 *   [x] **Wire up Chips inside Album Manager**
     *   *Task*: Make clicking Artist/Publisher chips *inside* the Album Editor open their respective Managers (currently does nothing).
     *   *Status*: **Done** - Connected chip signals to `ArtistDetailsDialog` and `PublisherDetailsDialog` in `AlbumManagerDialog`.
@@ -171,12 +171,34 @@ tags:
 *   [ ] **UX: Chip Sorting Stability**
     *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
     *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.
-*   [ ] **Verify Multi-Edit Logic**
-    *   *Task*: Test adding/removing tags in multi-select mode.
+*   [x] **Verify Multi-Edit Logic**
+    *   *Task*: Tests confirmed adding/removing tags in multi-select mode correctly uses intersection/union logic.
 *   [x] **Tech Debt Audit (Genre/Mood)**
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
 *   [ ] **Bug: Filter Tree LED Disappears**
     *   *Issue*: Clearing the search bar causes the checkbox LEDs in the filter tree to vanish.
+*   [ ] **Bug: Publisher Multi-Edit & RecordingPublishers Implementation**
+    *   *Issue*: Publisher multi-editing fails because backend logic for `RecordingPublishers` (Song-Level) is missing in `PublisherRepository`.
+    *   *Reference*: See [PROPOSAL_SCHEMA_V2.md](PROPOSAL_SCHEMA_V2.md) (Phase 2 Checklist).
+    *   *Task*: Implement `add_publisher_to_recording` and update SidePanel to target `RecordingPublishers` instead of inferring Album Publishers.
 *   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
     *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
     *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.
+*   [ ] **Unify Entity Creation UI**
+    *   *Task*: Ensure all "Add Person" buttons (Creator, Artist, Group Member) use the standard `EntityPickerDialog` UI (same as Composer).
+    *   *Goal*: Eliminate formatting discrepancies between different creation dialogs.
+
+##  Pending Work Estimates
+Quick reference for remaining tasks.
+
+| Priority | Task | Estimate |
+| :--- | :--- | :--- |
+| **High** | **Fix Publisher Multi-Edit** (Schema Gap) | ~2.0h |
+| **Med** | **Unify Entity Creation UI** (Cleanup) | ~1.0h |
+| **Med** | **Fix Filter Tree LEDs** (Bug) | ~0.5h |
+| Low | Chip Sorting Stability (Polish) | ~0.5h |
+| Low | Universal Data Editor (Refactor) | ~3.0h |
+| Low | Advanced Rule Editor (New Feature) | ~2.0h |
+
+**Total Critical Path:** ~3.5h
+**Total All:** ~9.0h
