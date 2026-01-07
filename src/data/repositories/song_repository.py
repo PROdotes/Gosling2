@@ -179,7 +179,10 @@ class SongRepository(GenericRepository[Song]):
                         tag_id = cursor.lastrowid
                     else:
                         tag_id = row[0]
-                    cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (file_id, tag_id))
+                    cursor = cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (file_id, tag_id))
+                    if cursor.rowcount > 0:
+                        from src.core.audit_logger import AuditLogger
+                        AuditLogger(conn).log_insert("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
                 else:
                     # Remove 'Unprocessed' status tag
                     cursor.execute("""
@@ -364,10 +367,13 @@ class SongRepository(GenericRepository[Song]):
                                 c_id = c_row[0]
 
                             # 2. Link to AlbumContributors
-                            cursor.execute(
+                            cursor = cursor.execute(
                                 "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
                                 (new_album_id, c_id)
                             )
+                            if cursor.rowcount > 0:
+                                from src.core.audit_logger import AuditLogger
+                                AuditLogger(cursor.connection).log_insert("AlbumContributors", f"{new_album_id}-{c_id}", {"AlbumID": new_album_id, "ContributorID": c_id})
 
         # Handle 'Clear Album' scenario (Explicit empty string)
         if effective_title is not None and not effective_title.strip() and not use_precise_id:
@@ -665,11 +671,6 @@ class SongRepository(GenericRepository[Song]):
         except Exception as e:
             logger.error(f"Error fetching songs by unified artists: {e}")
             return [], []
-
-    def get_by_id(self, source_id: int) -> Optional[Song]:
-        """Get full song object by ID (Legacy wrapper)"""
-        songs = self.get_songs_by_ids([source_id])
-        return songs[0] if songs else None
 
     def get_by_path(self, path: str) -> Optional[Song]:
         """Get full song object by path (Legacy wrapper)"""

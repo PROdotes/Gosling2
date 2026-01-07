@@ -9,6 +9,43 @@ This document describes the SQLite database structure used by the Gosling2 appli
 - **Foreign Keys**: Enabled (`PRAGMA foreign_keys = ON`)
 - **Total Tables**: 30 (including junctions and lookups)
 
+---
+
+## 🔮 Planned Schema Changes
+
+> **See:** [PROPOSAL_SCHEMA_V2.md](./PROPOSAL_SCHEMA_V2.md) and [PROPOSAL_IDENTITY_MODEL.md](./PROPOSAL_IDENTITY_MODEL.md)
+
+### Immediate (Schema V2)
+
+| Change | Table | Status |
+|--------|-------|--------|
+| Remove `AlbumArtist` TEXT column | `Albums` | 🔴 Pending |
+| Add `RoleCategory`, `ShowInCredits`, `ShowInReport` | `Roles` | 🔴 Pending |
+| Add partial unique index for single primary album | `SongAlbums` | 🔴 Pending |
+| Create `TagCategories` table | NEW | 🔴 Pending |
+
+### Future (Identity Model)
+
+| Change | Current Table | New Table | Status |
+|--------|---------------|-----------|--------|
+| Split Contributors into Identity + Name | `Contributors` | `Identities` + `ArtistNames` | 📋 Proposed |
+| Replace credits with immutable Name references | `MediaSourceContributorRoles` | `SongCredits` | 📋 Proposed |
+| Replace credits with immutable Name references | `AlbumContributors` | `AlbumCredits` | 📋 Proposed |
+| Add temporal membership data | `GroupMembers` | `GroupMemberships` | 📋 Proposed |
+
+### Publisher Clarification (Already Correct!)
+
+The two publisher tables serve **different semantic purposes**:
+
+| Table | Purpose | Example |
+|-------|---------|---------|
+| `RecordingPublishers` | Master recording owner | Northern Songs owns "Help" |
+| `AlbumPublishers` | Release label for this album | Sony released the 2009 remaster |
+
+These are NOT override/fallback — they're distinct relationships!
+
+---
+
 ## 🛡️ Schema Governance (Strict Mode)
 
 This database schema is **Strictly Enforced** by the test suite. 
@@ -185,12 +222,16 @@ erDiagram
     Roles {
         INTEGER RoleID PK
         TEXT RoleName
+        TEXT RoleCategory "🔮 PLANNED: primary/featured/composition/production"
+        BOOLEAN ShowInCredits "🔮 PLANNED"
+        BOOLEAN ShowInReport "🔮 PLANNED"
+        INTEGER DisplayOrder "🔮 PLANNED"
     }
 
     Albums {
         INTEGER AlbumID PK
         TEXT AlbumTitle
-        TEXT AlbumArtist "Legacy joined field"
+        TEXT AlbumArtist "⚠️ DEPRECATED - Use AlbumContributors M2M"
         TEXT AlbumType
         INTEGER ReleaseYear
         TEXT CatalogNumber "RESERVED v0.3"
@@ -818,6 +859,9 @@ SELECT * FROM EntityTimeline WHERE SourceID = 123 ORDER BY Timestamp DESC;
 
 ### 21. `Contributors` ✅ Implemented
 
+> **🔮 Future Change:** See [PROPOSAL_IDENTITY_MODEL.md](./PROPOSAL_IDENTITY_MODEL.md)  
+> This table will be split into `Identities` (the person/group) and `ArtistNames` (names they use).
+
 Artists, composers, and other credited individuals or groups.
 
 | Column | Type | Constraints | Description |
@@ -825,7 +869,7 @@ Artists, composers, and other credited individuals or groups.
 | `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `ContributorName` | TEXT | NOT NULL UNIQUE | Display name |
 | `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
-| `ContributorType` | TEXT | CHECK(ContributorType IN ('person', 'group')) | ❌ Individual or band |
+| `ContributorType` | TEXT | CHECK(ContributorType IN ('person', 'group')) | Individual or band |
 
 **Type Definitions:**
 - `'person'`: An individual human being (e.g., "Dave Grohl").
@@ -870,12 +914,17 @@ Types of participation (Performer, Composer, etc.).
 |--------|------|-------------|-------------|
 | `RoleID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `RoleName` | TEXT | NOT NULL UNIQUE | Role name |
+| `RoleCategory` | TEXT | 🔮 PLANNED | Category: 'primary', 'featured', 'composition', 'production' |
+| `ShowInCredits` | BOOLEAN | 🔮 PLANNED | Show in song/album credit display |
+| `ShowInReport` | BOOLEAN | 🔮 PLANNED | Include in royalty reports |
+| `DisplayOrder` | INTEGER | 🔮 PLANNED | Sort order for UI display |
 
 **Default Roles:**
-- Performer
-- Composer  
-- Lyricist
-- Producer
+- Performer (category: primary)
+- Featuring (category: featured) 🔮 PLANNED
+- Composer (category: composition)
+- Lyricist (category: composition)
+- Producer (category: production)
 
 ### 24. `MediaSourceContributorRoles` (Junction) ✅ Implemented
 
@@ -944,15 +993,20 @@ Links songs to albums.
 | `TrackNumber` | INTEGER | - | Position on album |
 | `DiscNumber` | INTEGER | - | Disc number (for multi-disc sets) |
 | `IsPrimary` | BOOLEAN | DEFAULT 1 | Whether this is the primary album for the song |
-| `TrackPublisherID` | INTEGER | FK | 🔮 (v0.5) Track-specific publisher override |
+| `TrackPublisherID` | INTEGER | FK | ⚠️ DEPRECATED - Use `RecordingPublishers` instead |
 
 **Constraints:**
 - Primary Key: `(SourceID, AlbumID)`
 - `ON DELETE CASCADE` for both FKs
+- 🔮 PLANNED: Partial unique index to enforce single primary album per song
 
 ### 28. `AlbumPublishers` (Junction) ✅ Implemented
 
-Links albums to publishers.
+Links albums to publishers. **This is the RELEASE LABEL** — who released this specific album.
+
+> **Note:** This is different from `RecordingPublishers` which tracks **master ownership**.
+> - `RecordingPublishers` = Who owns the master recording (e.g., Northern Songs owns "Help")
+> - `AlbumPublishers` = Who released this album (e.g., Sony released the 2009 remaster)
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|

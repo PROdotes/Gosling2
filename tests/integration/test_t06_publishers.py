@@ -67,7 +67,7 @@ class TestT06Publishers(unittest.TestCase):
         
         # Check Album was NOT auto-created (Single Paradox Deprecated)
         # SongRepo now supports RecordingPublishers (Level 3) which links to SourceID directly.
-        self.assertIsNone(song_fresh.album)
+        self.assertEqual(song_fresh.album, [])
         
     def test_publisher_on_existing_album(self):
         """

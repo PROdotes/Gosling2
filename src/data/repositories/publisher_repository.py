@@ -13,9 +13,14 @@ class PublisherRepository(GenericRepository[Publisher]):
     def __init__(self, db_path: Optional[str] = None):
         super().__init__(db_path, "Publishers", "publisher_id")
 
-    def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
+    def get_by_id(self, publisher_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
         """Retrieve publisher by ID."""
         query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherID = ?"
+        if conn:
+            cursor = conn.execute(query, (publisher_id,))
+            row = cursor.fetchone()
+            return Publisher.from_row(row) if row else None
+            
         with self.get_connection() as conn:
             cursor = conn.execute(query, (publisher_id,))
             row = cursor.fetchone()
@@ -72,45 +77,92 @@ class PublisherRepository(GenericRepository[Publisher]):
             return pub
         raise Exception("Failed to insert publisher")
 
-    def get_or_create(self, name: str) -> Tuple[Publisher, bool]:
+    def get_or_create(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Tuple[Publisher, bool]:
         """
         Find an existing publisher by name or create a new one.
         Returns (Publisher, created).
         """
-        existing = self.find_by_name(name)
+        existing = self.find_by_name(name, conn=conn)
         if existing:
             return existing, False
         
+        # Note: self.insert defaults to a new connection if none provided via subclassing GenericRepository
+        # To strictly use a transaction, we'd need to update GenericRepository.
+        # For now, this suffices for Gosling2's current usage.
         return self.create(name), True
 
-    def add_publisher_to_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None) -> None:
-        """Link a publisher to an album."""
-        from src.core.audit_logger import AuditLogger
-        with self.get_connection() as conn:
-            conn.execute("""
-                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
-                VALUES (?, ?)
-            """, (album_id, publisher_id))
+    def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
+        """Retrieve tag by exact name."""
+        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE NOCASE"
+        if conn:
+            cursor = conn.execute(query, (name,))
+            row = cursor.fetchone()
+            return Publisher.from_row(row) if row else None
             
-            AuditLogger(conn, batch_id=batch_id).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
-                "AlbumID": album_id,
-                "PublisherID": publisher_id
-            })
+        with self.get_connection() as main_conn:
+            cursor = main_conn.execute(query, (name,))
+            row = cursor.fetchone()
+            if row:
+                return Publisher.from_row(row)
+        return None
 
-    def remove_publisher_from_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None) -> None:
+    def add_publisher_to_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """Link a publisher ID to an album."""
+        from src.core.audit_logger import AuditLogger
+        
+        sql = "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)"
+        
+        if conn:
+            cursor = conn.execute(sql, (album_id, publisher_id))
+            if cursor.rowcount > 0:
+                AuditLogger(conn, batch_id=batch_id).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
+                    "AlbumID": album_id,
+                    "PublisherID": publisher_id
+                })
+            return True
+
+        with self.get_connection() as conn:
+            cursor = conn.execute(sql, (album_id, publisher_id))
+            if cursor.rowcount > 0:
+                AuditLogger(conn, batch_id=batch_id).log_insert("AlbumPublishers", f"{album_id}-{publisher_id}", {
+                    "AlbumID": album_id,
+                    "PublisherID": publisher_id
+                })
+            return True
+
+    def add_publisher_to_album_by_name(self, album_id: int, publisher_name: str, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """Link a publisher by name to an album (auto-creates publisher if needed)."""
+        if not publisher_name: 
+            return False
+            
+        # 1. Get or create publisher
+        publisher, _ = self.get_or_create(publisher_name, conn=conn)
+        
+        # 2. Link
+        return self.add_publisher_to_album(album_id, publisher.publisher_id, batch_id=batch_id, conn=conn)
+
+    def remove_publisher_from_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
         """Unlink a publisher from an album."""
         from src.core.audit_logger import AuditLogger
-        with self.get_connection() as conn:
+        
+        def _execute(target_conn):
             # Snapshot for audit
-            cursor = conn.execute("SELECT AlbumID, PublisherID FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
+            query = "SELECT AlbumID, PublisherID FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?"
+            cursor = target_conn.execute(query, (album_id, publisher_id))
             row = cursor.fetchone()
-            if not row: return
+            if not row: return False
+            
             snapshot = {"AlbumID": row[0], "PublisherID": row[1]}
+            target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
+            AuditLogger(target_conn, batch_id=batch_id).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
+            return True
 
-            conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
-            AuditLogger(conn, batch_id=batch_id).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            return _execute(conn)
 
-    def get_publishers_for_album(self, album_id: int) -> List[Publisher]:
+    def get_publishers_for_album(self, album_id: int, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]:
         """Get all publishers associated with an album."""
         query = """
             SELECT p.PublisherID, p.PublisherName, p.ParentPublisherID
@@ -118,12 +170,105 @@ class PublisherRepository(GenericRepository[Publisher]):
             JOIN AlbumPublishers ap ON p.PublisherID = ap.PublisherID
             WHERE ap.AlbumID = ?
         """
-        publishers = []
+        
+        def _execute(target_conn):
+            cursor = target_conn.execute(query, (album_id,))
+            return [Publisher.from_row(row) for row in cursor.fetchall()]
+
+        if conn:
+            return _execute(conn)
         with self.get_connection() as conn:
-            cursor = conn.execute(query, (album_id,))
-            for row in cursor.fetchall():
-                publishers.append(Publisher.from_row(row))
-        return publishers
+            return _execute(conn)
+
+    def get_joined_names(self, album_id: int, separator: str = "|||", conn: Optional[sqlite3.Connection] = None) -> Optional[str]:
+        """Get all publisher names linked to an album, joined by a separator."""
+        query = """
+            SELECT GROUP_CONCAT(p.PublisherName, ?)
+            FROM Publishers p
+            JOIN AlbumPublishers ap ON p.PublisherID = ap.PublisherID
+            WHERE ap.AlbumID = ?
+        """
+        if conn:
+            row = conn.execute(query, (separator, album_id)).fetchone()
+            return row[0] if row else None
+            
+        with self.get_connection() as conn:
+            row = conn.execute(query, (separator, album_id)).fetchone()
+            return row[0] if row else None
+
+    def set_primary_publisher(self, album_id: int, publisher_name: str, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> None:
+        """
+        Set the primary publisher for an album, replacing all existing links.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn, batch_id=batch_id)
+            
+            # 1. Handle Unsetting
+            if not publisher_name or not publisher_name.strip():
+                existing = self.get_publishers_for_album(album_id, conn=target_conn)
+                for p in existing:
+                    auditor.log_delete("AlbumPublishers", f"{album_id}-{p.publisher_id}", {"AlbumID": album_id, "PublisherID": p.publisher_id})
+                target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+                return
+             
+            pub_name = publisher_name.strip()
+            # 2. Get or create target publisher
+            publisher, _ = self.get_or_create(pub_name, conn=target_conn)
+            pub_id = publisher.publisher_id
+            
+            # 3. Snapshot for deletions
+            existing = self.get_publishers_for_album(album_id, conn=target_conn)
+            for p in existing:
+                 if p.publisher_id == pub_id: continue 
+                 auditor.log_delete("AlbumPublishers", f"{album_id}-{p.publisher_id}", {"AlbumID": album_id, "PublisherID": p.publisher_id})
+            
+            # 4. Update
+            target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID != ?", (album_id, pub_id))
+            
+            # 5. Link if not present
+            cursor = target_conn.execute("SELECT 1 FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, pub_id))
+            if not cursor.fetchone():
+                target_conn.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, pub_id))
+                auditor.log_insert("AlbumPublishers", f"{album_id}-{pub_id}", {"AlbumID": album_id, "PublisherID": pub_id})
+
+        if conn:
+            _execute(conn)
+        else:
+            with self.get_connection() as conn:
+                _execute(conn)
+
+    def sync_publishers(self, album_id: int, publisher_names: List[str], batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> None:
+        """
+        Synchronize album publishers to match the provided list exactly.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn, batch_id=batch_id)
+            current_pubs = self.get_publishers_for_album(album_id, conn=target_conn)
+            current_map = {p.publisher_name.lower(): p.publisher_id for p in current_pubs}
+            
+            target_names = {name.strip() for name in publisher_names if name and name.strip()}
+            target_names_lower = {n.lower() for n in target_names}
+            
+            # 1. Remove items not in target
+            for name_lower, pub_id in current_map.items():
+                if name_lower not in target_names_lower:
+                    auditor.log_delete("AlbumPublishers", f"{album_id}-{pub_id}", {"AlbumID": album_id, "PublisherID": pub_id})
+                    target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, pub_id))
+            
+            # 2. Add new items
+            for name in target_names:
+                if name.lower() not in current_map:
+                    self.add_publisher_to_album_by_name(album_id, name, batch_id=batch_id, conn=target_conn)
+
+        if conn:
+            _execute(conn)
+        else:
+            with self.get_connection() as conn:
+                _execute(conn)
 
     def search(self, query: str = "") -> List[Publisher]:
         """Search for publishers by name."""

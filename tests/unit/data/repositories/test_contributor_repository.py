@@ -315,8 +315,8 @@ class TestMembership:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.fetchall.return_value = [
-            (1, "Paul McCartney", "McCartney, Paul", "person"),
-            (2, "John Lennon", "Lennon, John", "person"),
+            (1, "Paul McCartney", "McCartney, Paul", "person", None),
+            (2, "John Lennon", "Lennon, John", "person", None),
         ]
         
         @contextmanager

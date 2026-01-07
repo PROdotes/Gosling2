@@ -99,7 +99,9 @@ def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publish
 def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         mock_repo = mock_repo_cls.return_value
-        mock_repo.get_contributors_for_album.return_value = []
+        c = MagicMock(contributor_id=7, type="person")
+        c.name = "Angels"
+        mock_repo.get_contributors_for_album.return_value = [c]
         mock_repo.get_publishers_for_album.return_value = []
         
         mock_album_service.get_by_id.return_value = sample_album
@@ -108,7 +110,7 @@ def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_s
         qtbot.addWidget(dialog)
         
         dialog.inp_title.setText("Highway to Heaven")
-        sample_album.album_artist = "Angels"
+        # sample_album.album_artist = "Angels" # No longer needed manually, tray has it
         
         mock_album_service.update.return_value = True
         

@@ -77,6 +77,8 @@ class TestArtistDetailsDialog:
         repo.get_members.return_value = []
         repo.get_groups.return_value = []
         repo.update.return_value = True
+        repo.get_usage_count.return_value = 0
+        repo.validate_identity.return_value = (None, "")
         return repo
 
     @pytest.fixture
@@ -120,20 +122,33 @@ class TestArtistDetailsDialog:
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
         
-        # Mock EntityPickerDialog and QMessageBox (since merge triggers confirmation)
+        # Mock IdentityCollisionDialog, EntityPickerDialog and QMessageBox
         with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker, \
+             patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision, \
              patch('src.presentation.dialogs.artist_manager_dialog.QMessageBox') as MockMsg:
             
             # Setup Picker
             mock_dlg_instance = MockPicker.return_value
             mock_dlg_instance.exec.return_value = True
             
-            # Use a mock object that simulates a different Contributor
+            # Setup Collision Dialog
+            mock_collision_instance = MockCollision.return_value
+            mock_collision_instance.exec.return_value = 1 # Merge/Secondary
+            
+            # Use a mock object that simulates a different Contributor (The Absorb Target)
+            mock_target = MagicMock()
+            mock_target.contributor_id = 999
+            mock_target.name = "Target Artist"
+            mock_target.type = "person"
+            mock_repo.get_by_id.return_value = mock_target
+            
+            # Setup Picker to return the same identity (Primary Match)
             mock_selected = MagicMock()
             mock_selected.contributor_id = 999
-            mock_selected.name = "Stage Name"
-            mock_selected.type = "person" # Match artist type
+            mock_selected.name = "Target Artist"
+            mock_selected.type = "person"
             mock_dlg_instance.get_selected.return_value = mock_selected
+            
             
             # Setup MessageBox to say YES
             # Ensure both the return value AND the constant match
@@ -172,10 +187,11 @@ class TestArtistDetailsDialog:
         dialog.txt_name.setText("New Name")
         
         # Mock validation to pass
-        mock_repo.validate_identity.return_value = (False, "")
+        mock_repo.validate_identity.return_value = (None, "")
         
-        # Save (mocking accept to prevent dialog close)
-        with patch.object(QDialog, 'accept'):
+        # Save (mocking accept to prevent dialog close and IdentityCollisionDialog)
+        with patch.object(dialog, 'done'), \
+             patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision:
             dialog._save()
         
         # Verify update was called and artist was modified

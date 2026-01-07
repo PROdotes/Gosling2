@@ -602,7 +602,7 @@ class AlbumPublisherAdapter(ContextAdapter):
         
         # If we have staged changes, use them
         if hasattr(self.album, '_staged_publishers'):
-            return [p['id'] for p in self.album._staged_publishers]
+            return [p.publisher_id for p in self.album._staged_publishers]
 
         if not self.album.album_id:
             return []
@@ -610,7 +610,7 @@ class AlbumPublisherAdapter(ContextAdapter):
         from src.data.repositories.album_repository import AlbumRepository
         repo = AlbumRepository()
         publishers = repo.get_publishers_for_album(self.album.album_id)
-        return [p['id'] for p in publishers]
+        return [p.publisher_id for p in publishers]
     
     def get_child_data(self) -> List[tuple]:
         if not self.album:
@@ -627,10 +627,10 @@ class AlbumPublisherAdapter(ContextAdapter):
         results = []
         seen_ids = set()
         for p in publishers:
-            if p['id'] in seen_ids:
+            if p.publisher_id in seen_ids:
                 continue
-            seen_ids.add(p['id'])
-            results.append((p['id'], p['name'], "🏢", False, False, "", "amber", False))
+            seen_ids.add(p.publisher_id)
+            results.append((p.publisher_id, p.publisher_name, "🏢", False, False, "", "amber", False))
         return results
     
     def link(self, child_id: int, **kwargs) -> bool:
@@ -649,8 +649,8 @@ class AlbumPublisherAdapter(ContextAdapter):
                 from src.data.repositories.album_repository import AlbumRepository
                 current = AlbumRepository().get_publishers_for_album(self.album.album_id)
             
-            if child_id not in [p['id'] for p in current]:
-                new_list = current + [{'id': pub.publisher_id, 'name': pub.publisher_name}]
+            if child_id not in [p.publisher_id for p in current]:
+                new_list = current + [pub]
                 self._stage_change('publishers', new_list)
                 self.album._staged_publishers = new_list
                 self.on_data_changed()
@@ -682,7 +682,7 @@ class AlbumPublisherAdapter(ContextAdapter):
                 from src.data.repositories.album_repository import AlbumRepository
                 current = AlbumRepository().get_publishers_for_album(self.album.album_id)
             
-            new_list = [p for p in current if p['id'] != child_id]
+            new_list = [p for p in current if p.publisher_id != child_id]
             self._stage_change('publishers', new_list)
             self.album._staged_publishers = new_list
             self.on_data_changed()

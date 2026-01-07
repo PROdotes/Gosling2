@@ -17,27 +17,35 @@ def mock_service():
     return service
 
 @pytest.fixture
-def dialog(mock_service):
+def dialog(qtbot, mock_service):
     artist = Contributor(1, "Queen", "Queen", "group")
     # We mock parent to avoid Qt parenting issues in headless
-    return ArtistDetailsDialog(artist, mock_service, parent=None)
+    dlg = ArtistDetailsDialog(artist, mock_service, parent=None)
+    qtbot.addWidget(dlg)
+    return dlg
 
 # 1. Test Silent Merge (Dead Alias)
 def test_silent_merge_dead_alias(dialog, mock_service):
     # Setup: Target has 0 songs, 0 aliases, 0 members
-    target = Contributor(CONTRIBUTOR_ID=2, NAME="Ziggy", TYPE="person") 
     # NOTE: Attribute names in Contributor dataclass are lowercase: contributor_id, name, type
-    target = Contributor(contributor_id=2, name="Ziggy", type="person")
+    target = Contributor(contributor_id=2, name="Ziggy", type="group") # Match dialog artist type
     
     # Mock retrieval
     mock_service.get_by_id.return_value = target
     mock_service.get_usage_count.return_value = 0
     
     # Mock Picker to return this target
-    with patch('src.presentation.dialogs.artist_manager_dialog.EntityPickerDialog') as MockPicker:
-        config_mock = MockPicker.return_value
-        config_mock.exec.return_value = True
-        config_mock.get_selected.return_value = target
+    with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker, \
+         patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision, \
+         patch('src.presentation.dialogs.artist_manager_dialog.QMessageBox') as MockMsg:
+        
+        picker_mock = MockPicker.return_value
+        picker_mock.exec.return_value = True
+        picker_mock.get_selected.return_value = target
+        
+        # Mock Collision (Proceed)
+        collision_mock = MockCollision.return_value
+        collision_mock.exec.return_value = 1
         
         # Execute
         dialog._add_alias()
@@ -48,16 +56,17 @@ def test_silent_merge_dead_alias(dialog, mock_service):
 # 2. Test Move Alias (Alias Link)
 def test_move_alias_popup(dialog, mock_service):
     # Setup: Picker returns "Ghost" (Alias Name), but ID points to "DJ Someone" (Parent)
-    parent = Contributor(contributor_id=5, name="DJ Someone", type="person")
+    parent = Contributor(contributor_id=5, name="DJ Someone", type="group")
     
     # Mock retrieval: ID 5 returns correct parent
     mock_service.get_by_id.return_value = parent
     
     # Picker returns Parent Object but with MODIFIED Name (The Alias String)
-    target_proxy = Contributor(contributor_id=5, name="The Ghost", type="person")
+    target_proxy = Contributor(contributor_id=5, name="The Ghost", type="group")
     
-    with patch('src.presentation.dialogs.artist_manager_dialog.EntityPickerDialog') as MockPicker, \
-         patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision:
+    with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker, \
+         patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision, \
+         patch('src.presentation.dialogs.artist_manager_dialog.QMessageBox') as MockMsg:
         
         picker_mock = MockPicker.return_value
         picker_mock.exec.return_value = True
@@ -85,12 +94,13 @@ def test_move_alias_popup(dialog, mock_service):
 # 3. Test Destructive Merge (Data Loss)
 def test_destructive_merge_warning(dialog, mock_service):
     # Setup: Target has songs
-    target = Contributor(contributor_id=3, name="Bowie", type="person")
+    target = Contributor(contributor_id=3, name="Bowie", type="group")
     mock_service.get_by_id.return_value = target
     mock_service.get_usage_count.return_value = 10 # ACTIVE!
     
-    with patch('src.presentation.dialogs.artist_manager_dialog.EntityPickerDialog') as MockPicker, \
-         patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision:
+    with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker, \
+         patch('src.presentation.dialogs.artist_manager_dialog.IdentityCollisionDialog') as MockCollision, \
+         patch('src.presentation.dialogs.artist_manager_dialog.QMessageBox') as MockMsg:
         
         picker_mock = MockPicker.return_value
         picker_mock.exec.return_value = True
@@ -105,7 +115,7 @@ def test_destructive_merge_warning(dialog, mock_service):
         
         # Verify Collision Header
         call_args = MockCollision.call_args[1]
-        assert call_args['header'] == "PERMANENT DATA LOSS WARNING"
+        assert call_args['header'] == "DELETE PROFILE?"
         
         # Verify Merge Called
         mock_service.merge.assert_called_with(3, 1)

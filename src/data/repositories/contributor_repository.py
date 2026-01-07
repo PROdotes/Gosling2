@@ -160,18 +160,6 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error fetching contributor names: {e}")
             return []
 
-    def get_all_names(self) -> List[str]:
-        """Fetch all unique contributor primary names (Ordered by SortName)."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
-                return [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error fetching contributor names: {e}")
-            return []
-
     def _insert_db(self, cursor: sqlite3.Cursor, contributor: Contributor, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute(

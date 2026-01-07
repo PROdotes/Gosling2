@@ -1666,9 +1666,9 @@ class SidePanelWidget(QFrame):
                        items = []
                   all_sets.append(set(items))
              
-             common = set.intersection(*all_sets)
-             union = set.union(*all_sets)
-             is_multiple = len(common) != len(union)
+             common = set.intersection(*all_sets) if all_sets else set()
+             union = set.union(*all_sets) if all_sets else set()
+             is_multiple = len(common) != len(union) if all_sets else False
              return list(sorted(list(common))), is_multiple, len(union - common)
 
         # Standard scalar comparison

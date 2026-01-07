@@ -53,7 +53,7 @@ class TestAlbumM2M:
         # 3. Verify
         publishers = album_repo.get_publishers_for_album(album.album_id)
         assert len(publishers) == 2
-        names = [p['name'] for p in publishers]
+        names = [p.publisher_name for p in publishers]
         assert "Publisher Alpha" in names
         assert "Publisher Beta" in names
 
@@ -86,7 +86,7 @@ class TestAlbumM2M:
         
         # Remove
         album_repo.remove_contributor_from_album(album.album_id, artist.contributor_id)
-        album_repo.remove_publisher_from_album(album.album_id, album_repo.get_publishers_for_album(album.album_id)[0]['id'])
+        album_repo.remove_publisher_from_album(album.album_id, album_repo.get_publishers_for_album(album.album_id)[0].publisher_id)
         
         # Verify final state
         assert len(album_repo.get_contributors_for_album(album.album_id)) == 0
@@ -100,14 +100,14 @@ class TestAlbumM2M:
         album_repo.sync_publishers(album.album_id, ["Pub A", "Pub B"])
         pubs = album_repo.get_publishers_for_album(album.album_id)
         assert len(pubs) == 2
-        names = {p['name'] for p in pubs}
+        names = {p.publisher_name for p in pubs}
         assert names == {"Pub A", "Pub B"}
         
         # 2. Sync to different set (Add one, remove one, keep one)
         album_repo.sync_publishers(album.album_id, ["Pub B", "Pub C"])
         pubs = album_repo.get_publishers_for_album(album.album_id)
         assert len(pubs) == 2
-        names = {p['name'] for p in pubs}
+        names = {p.publisher_name for p in pubs}
         assert names == {"Pub B", "Pub C"}
         
         # 3. Sync to empty
