@@ -15,7 +15,7 @@ from ...core.context_adapters import SongFieldAdapter
 from ..dialogs.tag_picker_dialog import TagPickerDialog
 from ..dialogs.entity_picker_dialog import EntityPickerDialog
 from ...core.picker_config import get_tag_picker_config, get_artist_picker_config
-from ..dialogs.artist_manager_dialog import ArtistPickerWidget
+
 import copy
 import os
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
@@ -595,17 +595,7 @@ class SidePanelWidget(QFrame):
                 # Always restore signals
                 widget.blockSignals(False)
 
-    def _on_chip_clicked(self, field_name, entity_id, name):
-        """T-70: Handle chip click regarding the specific field context."""
-        if field_name == 'publisher':
-            self._handle_publisher_click(entity_id, name)
-        elif field_name == 'album':
-            self._handle_album_click(entity_id, name)
-        elif field_name == 'tags':
-             self._handle_tag_click(field_name, entity_id, name)
-        else:
-             # Contributors
-             self._handle_contributor_click(entity_id, name, field_name)
+
 
     def _handle_tag_click(self, field_name, entity_id, name):
         """Open editor to rename a tag globally."""
@@ -796,9 +786,13 @@ class SidePanelWidget(QFrame):
         return ClickResult(ClickAction.CANCELLED, entity_id)
 
     def _handle_publisher_click(self, entity_id, name):
-        if not self.publisher_service: return
+        """
+        Intercept Publisher clicks to handle 'Jump to Album Manager'.
+        Returns True if handled (Jumped), False to let Router open standard Dialog.
+        """
+        if not self.publisher_service: return False
         pub = self.publisher_service.get_by_id(entity_id)
-        if not pub: return
+        if not pub: return False
 
         # Check Inherited Status for Deep Link
         # Note: Use pub.publisher_name (raw) not 'name' param (display name with hierarchy)
@@ -818,27 +812,9 @@ class SidePanelWidget(QFrame):
             alb = self.album_service.get_by_id(alb_id)
             if alb:
                     self._open_album_manager(initial_album=alb, focus_publisher=True)
-            return
+            return True # Handled custom action
         
-        from ..dialogs.publisher_manager_dialog import PublisherDetailsDialog
-        diag = PublisherDetailsDialog(pub, self.publisher_service, allow_remove_from_context=True, parent=self)
-        
-        result = diag.exec()
-        
-        if result == 2:
-            self._on_chip_removed('publisher', entity_id, name)
-            return
-            
-        if result:
-            # T-70: Re-fetch current selection to reflect DB changes (Renames/Hierarchy)
-            if self.current_songs:
-                 refreshed = []
-                 for s in self.current_songs:
-                      song_data = self.library_service.get_song_by_id(s.source_id)
-                      if song_data: refreshed.append(song_data)
-                 self.current_songs = refreshed
-                 self._refresh_field_values()
-                 self.filter_refresh_requested.emit() # Sync Table View
+        return False # Fallback to Standard Router (PublisherDetailsDialog)
 
     def _handle_album_click(self, entity_id, name):
         if self.album_service:
@@ -846,70 +822,9 @@ class SidePanelWidget(QFrame):
             if alb:
                 self._open_album_manager(initial_album=alb)
 
-    def _handle_contributor_click(self, entity_id, name, field_name=None):
-         artist = self.contributor_service.get_by_id(entity_id)
-         if artist:
-            old_name = artist.name
-            from ..dialogs.artist_manager_dialog import ArtistDetailsDialog
-            # T-90: Provide current song for "Fix This Song Only" collision resolution
-            context_song = self.current_songs[0] if len(self.current_songs) == 1 else None
-            diag = ArtistDetailsDialog(artist, self.contributor_service, 
-                                     context_song=context_song,
-                                     allow_remove_from_context=(field_name is not None), 
-                                     parent=self)
 
-            
-            result = diag.exec()
-            
-            # Case 1: Removal Requested (Code 2)
-            if result == 2 and field_name:
-                self._on_chip_removed(field_name, entity_id, name)
-                return
-            
-            if result == 3:
-                # T-Policy: Database changed (Merge/Fix/Rename).
-                # We must reload data AND stage changes for ID3 sync.
-                if self.library_service:
-                     # 1. Capture old state for differential staging
-                     old_state = { s.source_id: s for s in self.current_songs }
-                     
-                     # 2. Re-fetch all current songs from fresh DB state
-                     fresh_songs = []
-                     for s in self.current_songs:
-                         s_fresh = self.library_service.get_song_by_id(s.source_id)
-                         if s_fresh: fresh_songs.append(s_fresh)
-                     
-                     # 3. Detect DB -> Tag drift and STAGE it
-                     for s_new in fresh_songs:
-                         s_old = old_state.get(s_new.source_id)
-                         if s_old:
-                             for field_def in yellberus.FIELDS:
-                                 if field_def.id3_tag: # Only sync fields that go to file
-                                     attr = field_def.model_attr or field_def.name
-                                     v_old = getattr(s_old, attr, None)
-                                     v_new = getattr(s_new, attr, None)
-                                     if v_old != v_new:
-                                         if s_new.source_id not in self._staged_changes:
-                                             self._staged_changes[s_new.source_id] = {}
-                                         self._staged_changes[s_new.source_id][field_def.name] = v_new
-                     
-                     # 4. Update memory and UI
-                     self.current_songs = fresh_songs
-                     self._update_header()
-                     self._update_save_state()
-                     self._refresh_field_values()
-                     self.staging_changed.emit(list(self._staged_changes.keys()))
-                     self.filter_refresh_requested.emit() # Force table to reload fresh DB values
-                return
 
-            if result == 1 or result is True: # Legacy/Fallback updates
-                # Re-fetch anyway just in case
-                fresh = []
-                for s in self.current_songs:
-                    s_f = self.library_service.get_song_by_id(s.source_id)
-                    if s_f: fresh.append(s_f)
-                self.current_songs = fresh
-                self._refresh_field_values()
+
 
     def _on_chip_removed(self, field_name, entity_id, name):
         """T-70: Generic chip removal handling."""
@@ -1226,7 +1141,7 @@ class SidePanelWidget(QFrame):
             if field_def.name == 'publisher':
                 ew.click_router.register_custom_handler(
                     "handle_publisher_click",
-                    lambda eid, name: self._handle_publisher_click(eid, name) or True
+                    lambda eid, name: self._handle_publisher_click(eid, name)
                 )
             
             # Connect Context Menu

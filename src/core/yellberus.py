@@ -161,6 +161,7 @@ FIELDS: List[FieldDef] = [
         searchable=False,
         strategy='list',
         ui_search=True,
+        visible=True,
         zone='amber',
     ),
     FieldDef(
@@ -178,15 +179,8 @@ FIELDS: List[FieldDef] = [
         editable=False,
         filterable=True,
         portable=False,
-        query_expression="""
-            COALESCE(NULLIF(S.SongGroups, ''), 
-            (SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') 
-             FROM SongCredits SC_SUB 
-             JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID 
-             JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID 
-             WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer')) 
-            AS UnifiedArtist
-        """,
+        visible=False,
+        query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer') AS UnifiedArtist",
         strategy='list',
         zone='amber',
     ),
@@ -336,9 +330,9 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='album_artist',
         ui_header='Album Artist',
-        db_column='AlbumArtist',
+        db_column='AlbumArtist', # Still maps to legacy col for basic sorting/writes if needed
         id3_tag='TPE2',
-        query_expression="(SELECT A_SUB.AlbumArtist FROM SongAlbums SA_SUB JOIN Albums A_SUB ON SA_SUB.AlbumID = A_SUB.AlbumID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1 LIMIT 1) AS AlbumArtist",
+        query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM AlbumCredits AC_SUB JOIN ArtistNames AN_SUB ON AC_SUB.CreditedNameID = AN_SUB.NameID WHERE AC_SUB.AlbumID = (SELECT SA_SUB.AlbumID FROM SongAlbums SA_SUB WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1 LIMIT 1)) AS AlbumArtist",
         strategy='list',
         visible=False,
     ),
@@ -359,6 +353,7 @@ FIELDS: List[FieldDef] = [
         query_expression="(CASE WHEN EXISTS (SELECT 1 FROM MediaSourceTags MST_SUB JOIN Tags TG_SUB ON MST_SUB.TagID = TG_SUB.TagID WHERE MST_SUB.SourceID = MS.SourceID AND TG_SUB.TagCategory = 'Status' AND TG_SUB.TagName = 'Unprocessed') THEN 0 ELSE 1 END) AS is_done",
         searchable=False,
         strategy='boolean',
+        visible=False,
         zone='magenta', # Console Magenta (Matches Surgical Highlights)
     ),
 

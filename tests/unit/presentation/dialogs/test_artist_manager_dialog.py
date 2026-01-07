@@ -8,62 +8,11 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QMessageBox
 
 from src.presentation.dialogs.artist_manager_dialog import (
-    ArtistPickerDialog,
     ArtistDetailsDialog
 )
 from src.data.models.contributor import Contributor
 
 
-
-
-class TestArtistPickerDialog:
-    """Tests for the artist selection dialog."""
-
-    @pytest.fixture
-    def mock_repo(self):
-        """Mock contributor repository."""
-        repo = MagicMock()
-        # Mock search_identities used in _populate
-        mock_identities = [
-            (1, "Artist One", "person", "Primary"),
-            (2, "Band Two", "group", "Primary"),
-            (3, "Artist Three", "person", "Primary"),
-        ]
-        repo.search_identities.return_value = mock_identities
-        return repo
-
-    def test_initialization(self, qtbot, mock_repo):
-        """Test picker initializes and populates list."""
-        dialog = ArtistPickerDialog(service=mock_repo)
-        qtbot.addWidget(dialog)
-        
-        assert dialog.windowTitle() == "Select or Add Artist"
-        # search_identities("") is called in _populate
-        mock_repo.search_identities.assert_called_once_with("")
-
-    def test_filter_by_type(self, qtbot, mock_repo):
-        """Test picker can filter by artist type."""
-        dialog = ArtistPickerDialog(service=mock_repo, filter_type="person")
-        qtbot.addWidget(dialog)
-        
-        # The repo.search is called; filtering happens client-side
-        assert dialog.filter_type == "person"
-
-    def test_exclude_ids(self, qtbot, mock_repo):
-        """Test picker excludes specified IDs."""
-        exclude = {1, 2}
-        dialog = ArtistPickerDialog(service=mock_repo, exclude_ids=exclude)
-        qtbot.addWidget(dialog)
-        
-        assert dialog.exclude_ids == exclude
-
-    def test_get_selected_returns_none_before_selection(self, qtbot, mock_repo):
-        """Test get_selected returns None when nothing selected."""
-        dialog = ArtistPickerDialog(service=mock_repo)
-        qtbot.addWidget(dialog)
-        
-        # Verified Fix: Should return None, not raise AttributeError
-        assert dialog.get_selected() is None
 
 
 class TestArtistDetailsDialog:

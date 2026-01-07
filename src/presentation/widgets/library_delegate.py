@@ -148,7 +148,7 @@ class WorkstationDelegate(QStyledItemDelegate):
 
         # 7. CONTENT RENDERING
         column_name = self._get_column_name_by_index(index.column())
-        if column_name == "is_done":
+        if column_name == "is_active":
             self._draw_status_badge(painter, option, index, category_color)
         else:
             text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
@@ -185,24 +185,22 @@ class WorkstationDelegate(QStyledItemDelegate):
     def _draw_status_badge(self, painter, option, index, category_color):
         model = index.model()
         row = index.row()
-        val = model.index(row, self.field_indices.get('is_done', -1)).data(Qt.ItemDataRole.DisplayRole)
-        is_done = str(val).lower() in ('true', '1')
+        val = model.index(row, self.field_indices.get('is_active', -1)).data(Qt.ItemDataRole.UserRole)
+        is_active = str(val).lower() in ('true', '1')
         
-        badge_rect = option.rect.adjusted(10, 5, -10, -6)
+        badge_rect = option.rect.adjusted(10, 8, -10, -9)  # Tighter tactical fit
         palette = option.palette
         
-        if is_done:
-            bg = QColor(constants.COLOR_MAGENTA)  # Semantic: always magenta for "done"
-            txt = palette.color(palette.ColorRole.Base)
-            if not txt.isValid():
-                txt = QColor(constants.COLOR_BLACK)
+        if is_active:
+            # Active "AIR" state: Tactical Muted Amber
+            bg = QColor(constants.COLOR_MUTED_AMBER) 
+            txt = QColor(constants.COLOR_BLACK)
         else:
+            # Inactive "OFF" state: Void/Muted
             bg = palette.color(palette.ColorRole.AlternateBase)
             if not bg.isValid():
                 bg = QColor(constants.COLOR_VOID)
-            txt = palette.color(palette.ColorRole.Text)
-            if not txt.isValid():
-                txt = QColor(constants.COLOR_GRAY)
+            txt = QColor(constants.COLOR_GRAY)
             
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(QBrush(bg))
@@ -210,10 +208,11 @@ class WorkstationDelegate(QStyledItemDelegate):
         
         painter.setPen(txt)
         font = painter.font()
+        font.setFamily("Bahnschrift Condensed")
         font.setBold(True)
         font.setPointSize(8)
         painter.setFont(font)
-        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "READY" if is_done else "AIR")
+        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "AIR" if is_active else "OFF")
 
     def sizeHint(self, option, index):
         return QSize(option.rect.width(), 48)

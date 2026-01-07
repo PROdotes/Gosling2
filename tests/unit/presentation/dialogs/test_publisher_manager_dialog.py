@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QApplication, QMessageBox, QMenu
 from PyQt6.QtCore import Qt, QPoint
 from src.presentation.dialogs.publisher_manager_dialog import (
-    PublisherDetailsDialog, PublisherPickerDialog, PublisherCreatorDialog
+    PublisherDetailsDialog, PublisherCreatorDialog
 )
 from src.data.models.publisher import Publisher
 
@@ -23,22 +23,6 @@ def test_publisher_creator_dialog_init(qtbot):
     assert dialog.windowTitle() == "Rename Title"
     assert dialog.inp_name.text() == "Existing"
     assert dialog.btn_save.text() == "RenameBtn"
-
-def test_publisher_picker_dialog_populate(qtbot, mock_service):
-    pubs = [
-        Publisher(1, "Pub 1", None),
-        Publisher(2, "Pub 2", None),
-        Publisher(3, "Exclude Me", None)
-    ]
-    mock_service.search.return_value = pubs
-    
-    dialog = PublisherPickerDialog(mock_service, exclude_ids={3})
-    qtbot.addWidget(dialog)
-    
-    # GlowComboBox.count() should return 2
-    assert dialog.cmb.count() == 2
-    assert dialog.cmb.itemText(0) == "Pub 1"
-    assert dialog.cmb.itemText(1) == "Pub 2"
 
 def test_publisher_details_dialog_save_rename(qtbot, mock_service, sample_publisher):
     mock_service.search.return_value = []

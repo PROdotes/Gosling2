@@ -12,8 +12,6 @@ from ...core.entity_registry import EntityType
 from ...core.context_adapters import AlbumContributorAdapter, AlbumPublisherAdapter
 from .entity_picker_dialog import EntityPickerDialog
 from src.core.picker_config import get_artist_picker_config, get_publisher_picker_config
-from .publisher_manager_dialog import PublisherDetailsDialog
-from .artist_manager_dialog import ArtistDetailsDialog
 
 
 class AlbumManagerDialog(QDialog):
@@ -289,9 +287,7 @@ class AlbumManagerDialog(QDialog):
         self.list_vault = QListWidget()
         self.list_vault.setObjectName("DialogVaultList") # Will inherit QListWidget styles
         # Mode-based Selection Logic
-        mode = self.initial_data.get('mode', 'edit')
-        sel_mode = QAbstractItemView.SelectionMode.MultiSelection if mode == 'add' else QAbstractItemView.SelectionMode.ExtendedSelection
-        self.list_vault.setSelectionMode(sel_mode)
+        self.list_vault.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.list_vault.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.list_vault.customContextMenuRequested.connect(self._show_vault_context_menu)
         self.list_vault.itemClicked.connect(self._on_vault_item_clicked)
@@ -740,27 +736,7 @@ class AlbumManagerDialog(QDialog):
 
 
             
-    def _on_search_artist(self):
-        """Use universal EntityPickerDialog for artists."""
-        diag = EntityPickerDialog(
-            service_provider=self,
-            config=get_artist_picker_config(),
-            parent=self
-        )
-        if diag.exec() == 1:
-            result = diag.get_selected()
-            new_names = []
-            if isinstance(result, list):
-                new_names = [a.name for a in result]
-            elif result:
-                 new_names = [result.name]
 
-            if new_names:
-                # Merge with existing (Union)
-                current = self.tray_artist.get_names()
-                merged = sorted(list(set(current + new_names)))
-                # Set chips as tuples
-                self.tray_artist.set_items([(0, n, "") for n in merged])
 
                  
     def _save_inspector(self, silent=False, close_on_success=False):

@@ -62,7 +62,13 @@ class AlbumRepository(GenericRepository[Album]):
             "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
             (album.title, album.album_artist, album.album_type, album.release_year)
         )
-        return cursor.lastrowid
+        new_id = cursor.lastrowid
+        
+        # T-91: Automatic M2M linking
+        auditor = kwargs.get('auditor')
+        self._resolve_and_link_artists(cursor, new_id, album.album_artist, auditor)
+        
+        return new_id
 
     def _update_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
@@ -70,6 +76,56 @@ class AlbumRepository(GenericRepository[Album]):
             "UPDATE Albums SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
             (album.title, album.album_artist, album.album_type, album.release_year, album.album_id)
         )
+        
+        # T-91: Re-sync M2M links on update
+        auditor = kwargs.get('auditor')
+        self._resolve_and_link_artists(cursor, album.album_id, album.album_artist, auditor, sync=True)
+
+    def _resolve_and_link_artists(self, cursor: sqlite3.Cursor, album_id: int, artist_string: Optional[str], auditor=None, sync: bool = False) -> None:
+        """
+        Helper to resolve a comma-separated artist string into individual artist M2M links.
+        If sync=True, clears existing links first (Snapshot strategy).
+        """
+        if sync:
+            # Audit removal of old links if auditor present
+            if auditor:
+                cursor.execute("SELECT CreditedNameID, RoleID FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+                for c_id, r_id in cursor.fetchall():
+                    auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": r_id})
+            cursor.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+
+        if not artist_string or not artist_string.strip():
+            return
+
+        artist_names = [a.strip() for a in artist_string.split(',')]
+        for a_name in artist_names:
+            if not a_name: continue
+            
+            # 1. Resolve NameID from ArtistNames
+            cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ?", (a_name,))
+            row = cursor.fetchone()
+            if row:
+                name_id = row[0]
+            else:
+                # Orphan Create (Implicit Identity Creation?)
+                # Actually, standard behavior in assign_album was to just insert into ArtistNames.
+                cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (a_name, a_name))
+                name_id = cursor.lastrowid
+                if auditor:
+                    auditor.log_insert("ArtistNames", name_id, {"DisplayName": a_name, "SortName": a_name, "IsPrimaryName": 0})
+
+            # 2. Link via AlbumCredits
+            # Use 'Performer' role (Lookup RoleID)
+            cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = 'Performer'")
+            r_row = cursor.fetchone()
+            role_id = r_row[0] if r_row else 1 # Default fallback if schema missing Roles
+
+            cursor.execute(
+                "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+                (album_id, name_id, role_id)
+            )
+            if cursor.rowcount > 0 and auditor:
+                auditor.log_insert("AlbumCredits", f"{album_id}-{name_id}", {"AlbumID": album_id, "CreditedNameID": name_id, "RoleID": role_id})
 
     def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
@@ -112,18 +168,50 @@ class AlbumRepository(GenericRepository[Album]):
         if release_year:
             conditions.append("ReleaseYear = ?")
             params.append(release_year)
-        
-        query = f"""
-            SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear 
-            FROM Albums 
-            WHERE {' AND '.join(conditions)}
-        """
+        else:
+            conditions.append("ReleaseYear IS NULL")
+            
+        query = f"SELECT * FROM Albums WHERE {' AND '.join(conditions)}"
         
         with self.get_connection() as conn:
             cursor = conn.execute(query, params)
             row = cursor.fetchone()
             if row:
                 return Album.from_row(row)
+            
+            # T-91 FALLBACK: If string search failed, check M2M links
+            if album_artist:
+                # 1. Resolve names in search string
+                search_names = {a.strip().lower() for a in album_artist.split(',') if a.strip()}
+                if not search_names:
+                    return None
+                    
+                # 2. Find albums with matching title/year and check their contributors
+                base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+                base_params = [title]
+                if release_year:
+                    base_query += " AND ReleaseYear = ?"
+                    base_params.append(release_year)
+                else:
+                    base_query += " AND ReleaseYear IS NULL"
+                
+                cursor = conn.execute(base_query, base_params)
+                potential_albums = cursor.fetchall()
+                
+                for (potential_id,) in potential_albums:
+                    # Get contributors for this specific album
+                    cursor.execute("""
+                        SELECT lower(AN.DisplayName) 
+                        FROM AlbumCredits AC 
+                        JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID 
+                        WHERE AC.AlbumID = ?
+                    """, (potential_id,))
+                    linked_names = {row[0] for row in cursor.fetchall()}
+                    
+                    # If the exact set of names matches, we found it!
+                    if linked_names == search_names:
+                        return self.get_by_id(potential_id, conn=conn)
+
         return None
 
     def search(self, query: str, limit: int = 100, empty_only: bool = False) -> List[Album]:
@@ -340,28 +428,7 @@ class AlbumRepository(GenericRepository[Album]):
 
             # T-91: If newly created, also link the provided artist via M2M
             if created and artist:
-                # Handle multiple artists if comma-separated
-                artist_names = [a.strip() for a in artist.split(',')]
-                for a_name in artist_names:
-                    # Resolve artist ID from ArtistNames (New Model)
-                    cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ?", (a_name,))
-                    c_row = cursor.fetchone()
-                    if not c_row:
-                        # Orphan Create
-                        cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (a_name, a_name))
-                        c_id = cursor.lastrowid
-                        # Audit ArtistNames INSERT
-                        auditor.log_insert("ArtistNames", c_id, {"DisplayName": a_name, "SortName": a_name, "IsPrimaryName": 0})
-                    else:
-                        c_id = c_row[0]
-                    
-                    # Link via AlbumCredits
-                    cursor = cursor.execute(
-                        "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
-                        (album.album_id, c_id)
-                    )
-                    if cursor.rowcount > 0:
-                        auditor.log_insert("AlbumCredits", f"{album.album_id}-{c_id}", {"AlbumID": album.album_id, "CreditedNameID": c_id})
+                self._resolve_and_link_artists(cursor, album.album_id, artist, auditor)
 
             # Link song to album
             # Check if link exists

@@ -669,20 +669,20 @@ class SongRepository(GenericRepository[Song]):
         query = None
         if field_name == "recording_year":
              return self.get_all_years()
-        elif field_name == "performers":
+        elif field_name in ("performers", "unified_artist"):
             query = """
-                SELECT DISTINCT C.ContributorName 
-                FROM Contributors C
-                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
-                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                SELECT DISTINCT AN.DisplayName 
+                FROM SongCredits SC
+                JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                JOIN Roles R ON SC.RoleID = R.RoleID
                 WHERE R.RoleName = 'Performer'
             """
         elif field_name == "composers":
             query = """
-                SELECT DISTINCT C.ContributorName 
-                FROM Contributors C
-                JOIN MediaSourceContributorRoles MSCR ON C.ContributorID = MSCR.ContributorID
-                JOIN Roles R ON MSCR.RoleID = R.RoleID
+                SELECT DISTINCT AN.DisplayName 
+                FROM SongCredits SC
+                JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                JOIN Roles R ON SC.RoleID = R.RoleID
                 WHERE R.RoleName = 'Composer'
             """
         elif field_name == "publisher":

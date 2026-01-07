@@ -4,6 +4,9 @@ Per TESTING.md: Tests for expected behavior and documented edge cases.
 """
 import pytest
 from src.data.repositories.album_repository import AlbumRepository
+from src.data.repositories.artist_name_repository import ArtistNameRepository
+from src.data.models.artist_name import ArtistName
+from src.data.models.contributor import Contributor
 
 
 class TestAlbumRepository:
@@ -246,6 +249,147 @@ class TestAlbumRepository:
             with song_repo.get_connection() as conn:
                 conn.execute("DELETE FROM MediaSources WHERE SourcePath = ?", (test_path,))
                 conn.execute("DELETE FROM Albums WHERE AlbumTitle LIKE 'Replacement_Album%'")
+
+    class TestAlbumM2M:
+        """Strict TDD tests for Album Artist and Publisher M2M Schema."""
+
+        @pytest.fixture
+        def artist_repo(self, repo):
+            """Use ArtistNameRepository - AlbumCredits references ArtistNames.NameID."""
+            return ArtistNameRepository(repo.db_path)
+
+        def test_album_can_have_multiple_artists(self, repo, artist_repo):
+            """Verify that an album can be linked to multiple artists (M2M)."""
+            # 1. Create album
+            album = repo.create("Pytest_M2M_Album")
+            
+            # 2. Create artists using ArtistNames (the new model)
+            artist1 = ArtistName(name_id=None, display_name="Artist One", sort_name="One, Artist", is_primary_name=True)
+            artist2 = ArtistName(name_id=None, display_name="Artist Two", sort_name="Two, Artist", is_primary_name=True)
+            id1 = artist_repo.insert(artist1)
+            id2 = artist_repo.insert(artist2)
+            
+            # 3. Link artists to album (CreditedNameID now references ArtistNames.NameID)
+            repo.add_contributor_to_album(album.album_id, id1, "Performer")
+            repo.add_contributor_to_album(album.album_id, id2, "Performer")
+            
+            # 4. Verify links
+            contributors = repo.get_contributors_for_album(album.album_id)
+            assert len(contributors) == 2
+            names = [c.name for c in contributors]
+            assert "Artist One" in names
+            assert "Artist Two" in names
+
+        def test_album_can_have_multiple_publishers(self, repo):
+            """Verify that an album can be linked to multiple publishers (M2M)."""
+            # 1. Create album
+            album = repo.create("Pytest_M2M_Pub_Album")
+            
+            # 2. Add multiple publishers
+            repo.add_publisher_to_album(album.album_id, "Publisher Alpha")
+            repo.add_publisher_to_album(album.album_id, "Publisher Beta")
+            
+            # 3. Verify
+            publishers = repo.get_publishers_for_album(album.album_id)
+            assert len(publishers) == 2
+            names = [p.publisher_name for p in publishers]
+            assert "Publisher Alpha" in names
+            assert "Publisher Beta" in names
+
+        def test_album_artist_text_migration_fallback(self, repo, artist_repo):
+            """
+            Verify that even if AlbumArtist text field is used, 
+            it can coexist or migrate to M2M.
+            """
+            album = repo.create("Pytest_Migration_Album")
+            artist = ArtistName(name_id=None, display_name="Legacy Artist", sort_name="Artist, Legacy", is_primary_name=True)
+            artist_id = artist_repo.insert(artist)
+            repo.add_contributor_to_album(album.album_id, artist_id, "Performer")
+            
+            found = repo.get_by_id(album.album_id)
+            # This check might fail if we changed album_artist to return joined names
+            # But here we are checking the model field which might still be the text column
+            # In T-91, we expect the model field or a joined name to be correct.
+            assert found.album_artist == "Legacy Artist"
+
+        def test_remove_contributor_and_publisher(self, repo, artist_repo):
+            """Verify that we can unlink contributors and publishers."""
+            album = repo.create("Pytest_Remove_M2M")
+            artist = ArtistName(name_id=None, display_name="Artist to Remove", sort_name="Remove, Artist", is_primary_name=True)
+            artist_id = artist_repo.insert(artist)
+            repo.add_contributor_to_album(album.album_id, artist_id)
+            repo.add_publisher_to_album(album.album_id, "Pub to Remove")
+            
+            # Verify initial state
+            assert len(repo.get_contributors_for_album(album.album_id)) == 1
+            assert len(repo.get_publishers_for_album(album.album_id)) == 1
+            
+            # Remove
+            repo.remove_contributor_from_album(album.album_id, artist_id)
+            repo.remove_publisher_from_album(album.album_id, repo.get_publishers_for_album(album.album_id)[0].publisher_id)
+            
+            # Verify final state
+            assert len(repo.get_contributors_for_album(album.album_id)) == 0
+            assert len(repo.get_publishers_for_album(album.album_id)) == 0
+
+        def test_sync_publishers_prevents_ghosts(self, repo):
+            """Verify that sync_publishers correctly updates the list without leaving orphans or ghosts."""
+            album = repo.create("Pytest_Sync_Pubs")
+            
+            # 1. Initial sync
+            repo.sync_publishers(album.album_id, ["Pub A", "Pub B"])
+            pubs = repo.get_publishers_for_album(album.album_id)
+            assert len(pubs) == 2
+            names = {p.publisher_name for p in pubs}
+            assert names == {"Pub A", "Pub B"}
+            
+            # 2. Sync to different set (Add one, remove one, keep one)
+            repo.sync_publishers(album.album_id, ["Pub B", "Pub C"])
+            pubs = repo.get_publishers_for_album(album.album_id)
+            assert len(pubs) == 2
+            names = {p.publisher_name for p in pubs}
+            assert names == {"Pub B", "Pub C"}
+            
+            # 3. Sync to empty
+            repo.sync_publishers(album.album_id, [])
+            pubs = repo.get_publishers_for_album(album.album_id)
+            assert len(pubs) == 0
+
+        def test_sync_contributors(self, repo, artist_repo):
+            """Verify that sync_contributors correctly updates the list."""
+            album = repo.create("Pytest_Sync_Contribs")
+            
+            # Create ArtistNames
+            c1 = ArtistName(name_id=None, display_name="Artist A", sort_name="A", is_primary_name=True)
+            c2 = ArtistName(name_id=None, display_name="Artist B", sort_name="B", is_primary_name=True)
+            c3 = ArtistName(name_id=None, display_name="Artist C", sort_name="C", is_primary_name=True)
+            id1 = artist_repo.insert(c1)
+            id2 = artist_repo.insert(c2)
+            id3 = artist_repo.insert(c3)
+            
+            # Create Contributor-like objects for sync_contributors (it expects Contributor model)
+            contrib1 = Contributor(contributor_id=id1, name="Artist A", sort_name="A", type="person")
+            contrib2 = Contributor(contributor_id=id2, name="Artist B", sort_name="B", type="person")
+            contrib3 = Contributor(contributor_id=id3, name="Artist C", sort_name="C", type="person")
+            
+            # 1. Initial sync
+            repo.sync_contributors(album.album_id, [contrib1, contrib2])
+            contribs = repo.get_contributors_for_album(album.album_id)
+            assert len(contribs) == 2
+            ids = {c.contributor_id for c in contribs}
+            assert ids == {id1, id2}
+            
+            # 2. Sync to different set
+            repo.sync_contributors(album.album_id, [contrib2, contrib3])
+            contribs = repo.get_contributors_for_album(album.album_id)
+            assert len(contribs) == 2
+            ids = {c.contributor_id for c in contribs}
+            assert ids == {id2, id3}
+            
+            # 3. Sync to empty
+            repo.sync_contributors(album.album_id, [])
+            contribs = repo.get_contributors_for_album(album.album_id)
+            assert len(contribs) == 0
     
     class TestAlbumDisambiguation:
         """Tests for album artist disambiguation (Greatest Hits Paradox)."""

@@ -144,9 +144,9 @@ tags:
     *   *Status*: **Done** - All Unit and Integration tests confirmed passing.
     *   [x] **Silence interactive popups** (e.g. `add_alias`) to restore "Law of Silence".
     *   [x] **Repository Hardening**: Backfilled tests for `TagRepository` (Merge/Workflow) and `GenericRepository` (Audit Transactions).
-*   [ ] **Album Artist M2M Schema** (T-91)
+*   [x] **Album Artist M2M Schema** (T-91)
     *   *Task*: Upgrade `Albums.AlbumArtist` from text to `AlbumContributors` (M2M) table.
-    *   *Why*: Fixes "Existential Dread" - allows linking multiple identities to an album properly.
+    *   *Status*: **Done** — Full M2M integration completed, including UI Picker and streamlined display logic.
 *   [ ] **Album Publisher Backend catch-up**
     *   *Task*: Ensure Album Manager "Tags" UI correctly writes multiple rows to `AlbumPublishers`.
 *   [x] **Wire up Chips inside Album Manager**
@@ -175,6 +175,8 @@ tags:
     *   *Task*: Test adding/removing tags in multi-select mode.
 *   [x] **Tech Debt Audit (Genre/Mood)**
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
+*   [ ] **Bug: Filter Tree LED Disappears**
+    *   *Issue*: Clearing the search bar causes the checkbox LEDs in the filter tree to vanish.
 *   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
     *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
     *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.
