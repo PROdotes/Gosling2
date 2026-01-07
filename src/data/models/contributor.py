@@ -26,3 +26,15 @@ class Contributor:
             "type": self.type
         }
 
+    @classmethod
+    def from_row(cls, row: tuple) -> 'Contributor':
+        """Create Contributor from DB row."""
+        if not row:
+            return None
+        return cls(
+            contributor_id=row[0],
+            name=row[1],
+            sort_name=row[2],
+            type=row[3]
+        )
+

@@ -436,45 +436,111 @@ class AlbumContributorAdapter(ContextAdapter):
         self._refresh = refresh_fn
     
     def get_children(self) -> List[int]:
-        # Implementation depends on how album.album_artist is stored (usually it's a string in the DB)
-        # T-91 will make this M2M. For now, it's string-based lookup.
-        name = getattr(self.album, 'album_artist', "")
-        if not name: return []
+        if not self.album:
+            return []
         
-        artist, _ = self.service.get_or_create(name)
-        return [artist.contributor_id] if artist else []
+        # If we have staged changes, use them
+        if hasattr(self.album, '_staged_contributors'):
+            return [c.contributor_id for c in self.album._staged_contributors]
+
+        if not self.album.album_id:
+            return []
+        
+        # M2M support via repository fallback (if no staged)
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        contributors = repo.get_contributors_for_album(self.album.album_id)
+        return [c.contributor_id for c in contributors]
     
     def get_child_data(self) -> List[tuple]:
-        # Implementation depends on how album.album_artist is stored
-        name = getattr(self.album, 'album_artist', "")
-        if not name: return []
+        if not self.album:
+            return []
+            
+        contributors = []
+        if hasattr(self.album, '_staged_contributors'):
+            contributors = self.album._staged_contributors
+        elif self.album.album_id:
+            from src.data.repositories.album_repository import AlbumRepository
+            repo = AlbumRepository()
+            contributors = repo.get_contributors_for_album(self.album.album_id)
         
-        artist, _ = self.service.get_or_create(name)
-        if not artist: return []
-        
-        icon = "👤" if artist.type == "person" else "👥"
-        return [(artist.contributor_id, artist.name, icon, False, False, "", "amber", False)]
+        results = []
+        seen_ids = set()
+        for c in contributors:
+            if c.contributor_id in seen_ids:
+                continue
+            seen_ids.add(c.contributor_id)
+            icon = "👤" if c.type == "person" else "👥"
+            results.append((c.contributor_id, c.name, icon, False, False, "", "amber", False))
+        return results
     
     def link(self, child_id: int) -> bool:
-        artist = self.service.get_by_id(child_id)
-        if not artist: return False
-        
-        if self._stage_change:
-            self._stage_change("album_artist", artist.name)
-        else:
-            self.album.album_artist = artist.name
+        if not self.album:
+            return False
             
-        self.on_data_changed()
-        return True
+        contributor = self.service.get_by_id(child_id)
+        if not contributor:
+            return False
+
+        # If we have a staging function, use it
+        if self._stage_change:
+            current = []
+            if hasattr(self.album, '_staged_contributors'):
+                current = self.album._staged_contributors
+            elif self.album.album_id:
+                from src.data.repositories.album_repository import AlbumRepository
+                current = AlbumRepository().get_contributors_for_album(self.album.album_id)
+            
+            if child_id not in [c.contributor_id for c in current]:
+                new_list = current + [contributor]
+                self._stage_change('contributors', new_list)
+                self.album._staged_contributors = new_list
+                self.on_data_changed()
+                return True
+            return False
+
+        # Immediate Save (Legacy)
+        if not self.album.album_id:
+            return False
+            
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        success = repo.add_contributor_to_album(self.album.album_id, child_id)
+        
+        if success:
+            self.on_data_changed()
+        return success
     
     def unlink(self, child_id: int) -> bool:
-        if self._stage_change:
-            self._stage_change("album_artist", "")
-        else:
-            self.album.album_artist = ""
+        if not self.album:
+            return False
             
-        self.on_data_changed()
-        return True
+        # If we have a staging function, use it
+        if self._stage_change:
+            current = []
+            if hasattr(self.album, '_staged_contributors'):
+                current = self.album._staged_contributors
+            elif self.album.album_id:
+                from src.data.repositories.album_repository import AlbumRepository
+                current = AlbumRepository().get_contributors_for_album(self.album.album_id)
+            
+            new_list = [c for c in current if c.contributor_id != child_id]
+            self._stage_change('contributors', new_list)
+            self.album._staged_contributors = new_list
+            self.on_data_changed()
+            return True
+
+        # Immediate Save (Legacy)
+        if not self.album.album_id:
+            return False
+            
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        success = repo.remove_contributor_from_album(self.album.album_id, child_id)
+        
+        if success:
+            self.on_data_changed()
+        return success
     
     def get_parent_for_dialog(self) -> Any:
         return self.album
@@ -498,36 +564,108 @@ class AlbumPublisherAdapter(ContextAdapter):
         self._refresh = refresh_fn
     
     def get_children(self) -> List[int]:
-        # Assume album has publisher_id attribute
-        pid = getattr(self.album, 'publisher_id', 0)
-        return [pid] if pid else []
+        if not self.album:
+            return []
+        
+        # If we have staged changes, use them
+        if hasattr(self.album, '_staged_publishers'):
+            return [p['id'] for p in self.album._staged_publishers]
+
+        if not self.album.album_id:
+            return []
+        
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        publishers = repo.get_publishers_for_album(self.album.album_id)
+        return [p['id'] for p in publishers]
     
     def get_child_data(self) -> List[tuple]:
-        pid = getattr(self.album, 'publisher_id', 0)
-        if not pid: return []
+        if not self.album:
+            return []
+            
+        publishers = []
+        if hasattr(self.album, '_staged_publishers'):
+            publishers = self.album._staged_publishers
+        elif self.album.album_id:
+            from src.data.repositories.album_repository import AlbumRepository
+            repo = AlbumRepository()
+            publishers = repo.get_publishers_for_album(self.album.album_id)
         
-        pub = self.service.get_by_id(pid)
-        if not pub: return []
-        
-        return [(pub.publisher_id, pub.publisher_name, "🏢", False, False, "", "amber", False)]
+        results = []
+        seen_ids = set()
+        for p in publishers:
+            if p['id'] in seen_ids:
+                continue
+            seen_ids.add(p['id'])
+            results.append((p['id'], p['name'], "🏢", False, False, "", "amber", False))
+        return results
     
     def link(self, child_id: int) -> bool:
-        if self._stage_change:
-            self._stage_change("publisher_id", child_id)
-        else:
-            self.album.publisher_id = child_id
+        if not self.album:
+            return False
             
-        self.on_data_changed()
-        return True
+        pub = self.service.get_by_id(child_id)
+        if not pub: return False
+
+        # If we have a staging function, use it
+        if self._stage_change:
+            current = []
+            if hasattr(self.album, '_staged_publishers'):
+                current = self.album._staged_publishers
+            elif self.album.album_id:
+                from src.data.repositories.album_repository import AlbumRepository
+                current = AlbumRepository().get_publishers_for_album(self.album.album_id)
+            
+            if child_id not in [p['id'] for p in current]:
+                new_list = current + [{'id': pub.publisher_id, 'name': pub.publisher_name}]
+                self._stage_change('publishers', new_list)
+                self.album._staged_publishers = new_list
+                self.on_data_changed()
+                return True
+            return False
+
+        # Immediate Save (Legacy)
+        if not self.album.album_id:
+            return False
+            
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        success = repo.add_publisher_to_album(self.album.album_id, pub.publisher_name)
+        
+        if success:
+            self.on_data_changed()
+        return success
     
     def unlink(self, child_id: int) -> bool:
-        if self._stage_change:
-            self._stage_change("publisher_id", None)
-        else:
-            self.album.publisher_id = None
+        if not self.album:
+            return False
             
-        self.on_data_changed()
-        return True
+        # If we have a staging function, use it
+        if self._stage_change:
+            current = []
+            if hasattr(self.album, '_staged_publishers'):
+                current = self.album._staged_publishers
+            elif self.album.album_id:
+                from src.data.repositories.album_repository import AlbumRepository
+                current = AlbumRepository().get_publishers_for_album(self.album.album_id)
+            
+            new_list = [p for p in current if p['id'] != child_id]
+            self._stage_change('publishers', new_list)
+            self.album._staged_publishers = new_list
+            self.on_data_changed()
+            return True
+
+        # Immediate Save (Legacy)
+        if not self.album.album_id:
+            return False
+            
+        from src.data.repositories.album_repository import AlbumRepository
+        repo = AlbumRepository()
+        success = repo.remove_publisher_from_album(self.album.album_id, child_id)
+        
+        if success:
+            self.on_data_changed()
+        return success
     
     def get_parent_for_dialog(self) -> Any:
         return self.album

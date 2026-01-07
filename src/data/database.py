@@ -153,6 +153,19 @@ class BaseRepository:
                 )
             """)
 
+            # 31. AlbumContributors (Junction)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS AlbumContributors (
+                    AlbumID INTEGER NOT NULL,
+                    ContributorID INTEGER NOT NULL,
+                    RoleID INTEGER NOT NULL,
+                    PRIMARY KEY (AlbumID, ContributorID, RoleID),
+                    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE,
+                    FOREIGN KEY (ContributorID) REFERENCES Contributors(ContributorID) ON DELETE CASCADE,
+                    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)
+                )
+            """)
+
             # 24. SongAlbums (Junction)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS SongAlbums (
@@ -297,6 +310,7 @@ class BaseRepository:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_songalbums_albumid ON SongAlbums(AlbumID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_contributorid ON MediaSourceContributorRoles(ContributorID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_roleid ON MediaSourceContributorRoles(RoleID)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_albumcontributor_albumid ON AlbumContributors(AlbumID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON Tags(TagCategory)")
 
 

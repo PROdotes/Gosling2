@@ -79,6 +79,9 @@ erDiagram
     %% MULTI-ALBUM INFRASTRUCTURE
     Songs ||--|{ SongAlbums : "appears on"
     Albums ||--|{ SongAlbums : "contains"
+    Albums ||--|{ AlbumContributors : "has"
+    Contributors ||--|{ AlbumContributors : "participates in"
+    Roles ||--|{ AlbumContributors : "defines role"
     Songs ||--|{ RecordingPublishers : "owned by (Master)"
     Publishers ||--|{ RecordingPublishers : "owns"
     Albums ||--|{ AlbumPublishers : "published by (Release)"
@@ -187,7 +190,7 @@ erDiagram
     Albums {
         INTEGER AlbumID PK
         TEXT AlbumTitle
-        TEXT AlbumArtist
+        TEXT AlbumArtist "Legacy joined field"
         TEXT AlbumType
         INTEGER ReleaseYear
         TEXT CatalogNumber "RESERVED v0.3"
@@ -256,6 +259,12 @@ erDiagram
     GroupMembers {
         INTEGER GroupID PK
         INTEGER MemberID PK
+    }
+    
+    AlbumContributors {
+        INTEGER AlbumID PK
+        INTEGER ContributorID PK
+        INTEGER RoleID PK
     }
 
     SongAlbums {
@@ -349,7 +358,7 @@ erDiagram
 ```
 
 > **Implementation Status Overview:**
-> - ✅ **Implemented (13 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases, Albums, SongAlbums, Publishers, AlbumPublishers, RecordingPublishers
+> - ✅ **Implemented (14 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases, Albums, SongAlbums, Publishers, AlbumPublishers, RecordingPublishers, AlbumContributors
 > - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, Agencies, Clients, Campaigns
 > - ⏸️ **Planned (Audit):** ChangeLog, DeletedRecords, PlayHistory, ActionLog
 > - 🔮 **Future (Broadcast):** Timeslots, ContentRules
@@ -454,11 +463,28 @@ Groups songs into collections.
 |--------|------|-------------|-------------|
 | `AlbumID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `AlbumTitle` | TEXT | NOT NULL | Album title |
-| `AlbumArtist` | TEXT | - | Album artist (from ID3 `TPE2`, fallback `TPE1`). Used for disambiguation. |
+| `AlbumArtist` | TEXT | - | **Legacy field.** Joined artist names (for backward compatibility). |
 | `AlbumType` | TEXT | - | 'Album', 'Single', 'EP', 'Compilation' |
 | `ReleaseYear` | INTEGER | - | Release year |
 | `CatalogNumber` | TEXT | - | 🔮 (v0.3) Label catalog number |
 | `MusicBrainzReleaseID` | TEXT | - | 🔮 (v0.3) Unique Release ID |
+
+**M2M Migration (v0.2):**
+- Primary artist links moved to `AlbumContributors`.
+- `AlbumArtist` remains as a joined text field for quick display and legacy disambiguation.
+
+### 6. `AlbumContributors` (Junction) ✅ Implemented
+Links albums to contributors with roles (e.g., Album Artist).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `AlbumID` | INTEGER | FK NOT NULL | Reference to `Albums` |
+| `ContributorID` | INTEGER | FK NOT NULL | Reference to `Contributors` |
+| `RoleID` | INTEGER | FK NOT NULL | Reference to `Roles` |
+
+**Constraints:**
+- Primary Key: `(AlbumID, ContributorID, RoleID)`
+- `ON DELETE CASCADE` for AlbumID and ContributorID.
 
 **Uniqueness Constraint:**
 - `UNIQUE(Title, AlbumArtist, ReleaseYear)` — Prevents "Greatest Hits" paradox where Queen and ABBA albums merge.
@@ -473,7 +499,7 @@ Groups songs into collections.
 - **Orphan Policy:** Empty albums (0 songs) are **NOT** automatically deleted. They persist to preserve metadata.
 - **Cleanup:** User must be prompted to delete empty albums via the UI.
 
-### 6. `Streams` (Remote Audio) ❌ Not Implemented
+### 7. `Streams` (Remote Audio) ❌ Not Implemented
 
 Extends `MediaSources` for live audio streams.
 
@@ -486,7 +512,7 @@ Extends `MediaSources` for live audio streams.
 **Constraints:**
 - `ON DELETE CASCADE` from `MediaSources`
 
-### 7. `Commercials` (Ad-Specific) ❌ Not Implemented
+### 8. `Commercials` (Ad-Specific) ❌ Not Implemented
 
 Extends `MediaSources` for advertisements with campaign linking.
 

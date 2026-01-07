@@ -1714,7 +1714,18 @@ class SidePanelWidget(QFrame):
         raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
         names = []
         for rn in raw_names:
-            if isinstance(rn, str) and field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
+            if not isinstance(rn, str):
+                names.append(rn)
+                continue
+                
+            # T-91: Support safe multi-value splitting (|||) for all fields
+            if '|||' in rn:
+                split_parts = rn.split('|||')
+                names.extend([p.strip() for p in split_parts if p.strip()])
+                continue
+
+            # Legacy splitting for other fields (not album/publisher which might contain commas)
+            if field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
                 import re
                 split_parts = re.split(delimiters, rn)
                 names.extend([p.strip() for p in split_parts if p.strip()])
@@ -1737,7 +1748,7 @@ class SidePanelWidget(QFrame):
                     
                     if alb_id:
                         alb_pub = self.album_service.get_publisher(alb_id)
-                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split(',')]:
+                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split('|||')]:
                             is_inherited = True
                 
                 if pub:

@@ -242,4 +242,9 @@ class MetadataViewerDialog(QDialog):
             return ""
         if isinstance(val, list):
             return ", ".join(sorted(val))
-        return str(val)
+        
+        s_val = str(val)
+        if "|||" in s_val:
+            return ", ".join(s_val.split("|||"))
+            
+        return s_val

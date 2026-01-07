@@ -564,6 +564,12 @@ class AlbumManagerDialog(QDialog):
         if sender:
             sender.setProperty("ghost", False)
 
+    def _stage_inspector_change(self, field, value):
+        """Callback for context adapters to stage changes."""
+        self.btn_save_inspector.setProperty("dirty", True)
+        self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
+        self.btn_save_inspector.style().polish(self.btn_save_inspector)
+
     def _on_vault_item_clicked(self, item):
         # Reset Create Button if we were creating
         if self.is_creating_new:
@@ -598,22 +604,12 @@ class AlbumManagerDialog(QDialog):
             
         # T-Adapter: Connect EntityListWidgets to the current album
         self.tray_artist.set_context_adapter(
-            AlbumContributorAdapter(self.current_album, self.contributor_service)
+            AlbumContributorAdapter(self.current_album, self.contributor_service, stage_change_fn=self._stage_inspector_change)
         )
+        
         self.tray_publisher.set_context_adapter(
-            AlbumPublisherAdapter(self.current_album, self.publisher_service)
+            AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
         )
-        
-        # Publisher (Old code removed, adapter handles it)
-        pub_name = self.album_service.get_publisher_name(self.current_album.album_id)
-        # Ensure our object has the ID so adapter works
-        if pub_name and not getattr(self.current_album, 'publisher_id', 0):
-             # Reverse lookup if ID missing (legacy model safety)
-             p = self.publisher_service.find_by_name(pub_name)
-             if p: self.current_album.publisher_id = p.publisher_id
-        
-        # Refresh adapter again just in case we patched the ID
-        self.tray_publisher.refresh_from_adapter()
         
         # 2. Populate Context (Songs)
         self._refresh_context(album_id)
@@ -788,8 +784,9 @@ class AlbumManagerDialog(QDialog):
             QMessageBox.warning(self, "Error", "Title cannot be empty")
             return False
             
-        # Get Artist from Object (Updated by Adapter)
-        artist = getattr(self.current_album, 'album_artist', "")
+        # Get Artist from Tray (M2M aware)
+        artist_names = self.tray_artist.get_names()
+        artist = ", ".join(artist_names) if artist_names else ""
         
         year_str = self.inp_year.text().strip()
         
@@ -814,17 +811,29 @@ class AlbumManagerDialog(QDialog):
                 album.album_type = alb_type
                 self.album_service.update(album)
                 
-                # Get Publisher from Object
-                pid = getattr(self.current_album, 'publisher_id', 0)
-                pub_name = None
-                if pid:
-                    p = self.publisher_service.get_by_id(pid)
-                    if p: pub_name = p.publisher_name
+                # Save Publishers (M2M)
+                pub_names = self.tray_publisher.get_names()
+                from src.data.repositories.album_repository import AlbumRepository
+                repo = AlbumRepository()
+                repo.sync_publishers(album.album_id, pub_names)
                 
-                self.album_service.set_publisher(album.album_id, pub_name)
+                # Save Artists (M2M)
+                # Ensure we have Contributor objects
+                artists = []
+                for art_name in artist_names:
+                    artist_obj, _ = self.contributor_service.get_or_create(art_name)
+                    if artist_obj:
+                        artists.append(artist_obj)
                 
+                repo.sync_contributors(album.album_id, artists)
+
                 self.current_album = album
                 self.is_creating_new = False
+                
+                # Clear Dirty State
+                self.btn_save_inspector.setProperty("dirty", False)
+                self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
+                self.btn_save_inspector.style().polish(self.btn_save_inspector)
                 
                 # Clear search so we see the new item
                 self.txt_search.blockSignals(True)
@@ -846,10 +855,32 @@ class AlbumManagerDialog(QDialog):
                 
                 self.album_service.update(self.current_album)
                 
-                # Get Publisher from Tray
-                pub_chips = self.tray_publisher.get_names()
-                pub_name = pub_chips[0] if pub_chips else None
-                self.album_service.set_publisher(self.current_album.album_id, pub_name)
+                # 1. Sync Staged Contributors (M2M)
+                if hasattr(self.current_album, '_staged_contributors'):
+                    # Synchronize all at once
+                    from src.data.repositories.album_repository import AlbumRepository
+                    AlbumRepository().sync_contributors(self.current_album.album_id, self.current_album._staged_contributors)
+                    
+                    delattr(self.current_album, '_staged_contributors')
+
+                # 2. Sync Staged Publishers (M2M)
+                if hasattr(self.current_album, '_staged_publishers'):
+                    # Synchronize all at once
+                    pub_names = [p['name'] for p in self.current_album._staged_publishers]
+                    from src.data.repositories.album_repository import AlbumRepository
+                    AlbumRepository().sync_publishers(self.current_album.album_id, pub_names)
+                    
+                    delattr(self.current_album, '_staged_publishers')
+                else:
+                    # Fallback to tray if no staged (Legacy compatibility)
+                    pub_names = self.tray_publisher.get_names()
+                    from src.data.repositories.album_repository import AlbumRepository
+                    AlbumRepository().sync_publishers(self.current_album.album_id, pub_names)
+                
+                # Clear Dirty State
+                self.btn_save_inspector.setProperty("dirty", False)
+                self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
+                self.btn_save_inspector.style().polish(self.btn_save_inspector)
                 
                 # Clear search so we see the updated item (if renamed out of search scope)
                 self.txt_search.blockSignals(True)

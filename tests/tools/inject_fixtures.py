@@ -43,6 +43,7 @@ def inject():
         conn.execute("DELETE FROM MediaSourceContributorRoles")
         conn.execute("DELETE FROM SongAlbums")
         conn.execute("DELETE FROM AlbumPublishers")
+        conn.execute("DELETE FROM AlbumContributors")
         conn.execute("DELETE FROM Albums")
         conn.execute("DELETE FROM Publishers")
         conn.execute("DELETE FROM GroupMembers")
@@ -183,6 +184,15 @@ def inject():
                 ("Gold: Greatest Hits", "ABBA", 1992)
             )
             second_album_id = cursor.lastrowid
+            
+            # T-91: Link ABBA to Gold Greatest Hits via M2M
+            cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = 'ABBA'")
+            abba_id = cursor.fetchone()[0]
+            cursor.execute(
+                "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
+                (second_album_id, abba_id)
+            )
+
             # Link song to second album (non-primary)
             cursor.execute(
                 "INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, IsPrimary) VALUES (?, ?, 0)",

@@ -55,7 +55,7 @@ class TestT06Albums(unittest.TestCase):
         # 2. Get the song object to update
         song = self.song_repo.get_by_path(self.test_path)
         self.assertIsNotNone(song, "Failed to read back test song")
-        self.assertIsNone(song.album, "New song should have no album")
+        self.assertEqual(song.album, [], "New song should have no album")
 
         # 3. Update with Album
         song.album = self.test_album

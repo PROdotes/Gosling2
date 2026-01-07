@@ -342,7 +342,31 @@ class SongRepository(GenericRepository[Song]):
                     target_ids.append(row[0])
                 else:
                     cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", (album_title, album_artist, release_year))
-                    target_ids.append(cursor.lastrowid)
+                    new_album_id = cursor.lastrowid
+                    target_ids.append(new_album_id)
+                    
+                    # T-91: Link Album Artist via M2M if artist provided
+                    if album_artist:
+                        # Split album_artist if it's a list/comma-separated or ||| separated
+                        if '|||' in album_artist:
+                            artist_names = [a.strip() for a in album_artist.split('|||')]
+                        else:
+                            artist_names = [a.strip() for a in album_artist.split(',')]
+                        for a_name in artist_names:
+                            # 1. Ensure Contributor exists (using cursor to avoid deadlock)
+                            cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ?", (a_name,))
+                            c_row = cursor.fetchone()
+                            if not c_row:
+                                cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (a_name, a_name))
+                                c_id = cursor.lastrowid
+                            else:
+                                c_id = c_row[0]
+
+                            # 2. Link to AlbumContributors
+                            cursor.execute(
+                                "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
+                                (new_album_id, c_id)
+                            )
 
         # Handle 'Clear Album' scenario (Explicit empty string)
         if effective_title is not None and not effective_title.strip() and not use_precise_id:
@@ -406,7 +430,11 @@ class SongRepository(GenericRepository[Song]):
             publisher_names = [str(p).strip() for p in song.publisher if p]
         else:
             raw_val = song.publisher or ""
-            publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
+            # T-91: Support safe delimiter ||| primarily, fall back to comma if ||| not present
+            if '|||' in raw_val:
+                publisher_names = [p.strip() for p in raw_val.split('|||') if p.strip()]
+            else:
+                publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
 
         # Resolve Publisher IDs
         desired_ids = set()
@@ -547,11 +575,16 @@ class SongRepository(GenericRepository[Song]):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                # Filter by Contributor Name where Role is Performer
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE C.ContributorName = ? AND R.RoleName = 'Performer' AND MS.IsActive = 1
+                    WHERE MS.SourceID IN (
+                        SELECT MSCR_SUB.SourceID 
+                        FROM MediaSourceContributorRoles MSCR_SUB
+                        JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
+                        JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
+                        WHERE C_SUB.ContributorName = ? AND R_SUB.RoleName = 'Performer'
+                    ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
@@ -568,11 +601,16 @@ class SongRepository(GenericRepository[Song]):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                # Filter by Contributor Name where Role is Composer
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE C.ContributorName = ? AND R.RoleName = 'Composer' AND MS.IsActive = 1
+                    WHERE MS.SourceID IN (
+                        SELECT MSCR_SUB.SourceID 
+                        FROM MediaSourceContributorRoles MSCR_SUB
+                        JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
+                        JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
+                        WHERE C_SUB.ContributorName = ? AND R_SUB.RoleName = 'Composer'
+                    ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
@@ -604,8 +642,16 @@ class SongRepository(GenericRepository[Song]):
                 query = f"""
                     {yellberus.QUERY_SELECT}
                     {yellberus.QUERY_FROM}
-                    WHERE (S.SongGroups IN ({placeholders}) OR (C.ContributorName IN ({placeholders}) AND R.RoleName = 'Performer')) 
-                      AND MS.IsActive = 1
+                    WHERE (
+                        S.SongGroups IN ({placeholders}) 
+                        OR MS.SourceID IN (
+                            SELECT MSCR_SUB.SourceID 
+                            FROM MediaSourceContributorRoles MSCR_SUB
+                            JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
+                            JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID
+                            WHERE C_SUB.ContributorName IN ({placeholders}) AND R_SUB.RoleName = 'Performer'
+                        )
+                    ) AND MS.IsActive = 1
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """
@@ -644,7 +690,7 @@ class SongRepository(GenericRepository[Song]):
                         S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
                         MS.SourceNotes, MS.IsActive,
                         (
-                            SELECT GROUP_CONCAT(A.AlbumTitle)
+                            SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
                             FROM Albums A 
                             JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
                             WHERE SA.SourceID = MS.SourceID
@@ -664,14 +710,14 @@ class SongRepository(GenericRepository[Song]):
                                 WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
                             ),
                             (
-                                SELECT GROUP_CONCAT(P.PublisherName, ', ')
+                                SELECT GROUP_CONCAT(P.PublisherName, '|||')
                                 FROM SongAlbums SA 
                                 JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
                                 JOIN Publishers P ON AP.PublisherID = P.PublisherID
                                 WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
                             ),
                             (
-                                SELECT GROUP_CONCAT(P.PublisherName, ', ')
+                                SELECT GROUP_CONCAT(P.PublisherName, '|||')
                                 FROM RecordingPublishers RP
                                 JOIN Publishers P ON RP.PublisherID = P.PublisherID
                                 WHERE RP.SourceID = MS.SourceID
@@ -715,10 +761,10 @@ class SongRepository(GenericRepository[Song]):
                         isrc=isrc,
                         notes=notes,
                         is_active=bool(is_active_int),
-                        album=album_title,
+                        album=[a.strip() for a in album_title.split('|||')] if album_title else [],
                         album_id=album_id,
                         album_artist=album_artist,
-                        publisher=[p.strip() for p in publisher_name.split(',')] if publisher_name else [],
+                        publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
                         # genre/mood arguments removed
                         groups=groups,
                         tags=tags

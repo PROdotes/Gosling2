@@ -1304,6 +1304,11 @@ class LibraryWidget(QWidget):
                 items = []
                 for col_idx, cell in enumerate(row_data):
                     display_text = str(cell) if cell is not None else ""
+                    
+                    # T-91: Format multi-value fields (||| -> , ) for display
+                    if '|||' in display_text:
+                        display_text = display_text.replace('|||', ', ')
+                        
                     sort_value = cell
                     
                     # Special handling for specific columns

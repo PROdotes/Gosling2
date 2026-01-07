@@ -1,18 +1,22 @@
 from dataclasses import dataclass, field
 from typing import Optional, List
 
+from .contributor import Contributor
+
 @dataclass
 class Album:
     """Represents a music album."""
     album_id: Optional[int] = None
     title: str = ""
-    album_artist: Optional[str] = None  # For disambiguation (TPE2)
+    album_artist: Optional[str] = None  # Legacy/Joined display name
     album_type: Optional[str] = None  # Single, Album, EP, Compilation
     release_year: Optional[int] = None
     song_count: int = 0  # Runtime statistic
     
     # Relationships (Optional hydration)
     tracks: List['Song'] = field(default_factory=list)
+    contributors: List[Contributor] = field(default_factory=list)
+    publishers: List[dict] = field(default_factory=list) # [{'id': 1, 'name': 'Label'}]
 
     @classmethod
     def from_row(cls, row: tuple) -> 'Album':

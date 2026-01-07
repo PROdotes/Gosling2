@@ -229,6 +229,7 @@ class ChipTrayWidget(QWidget):
             if isinstance(widget, Chip) and widget.entity_id == entity_id:
                 taken_item = self.flow_layout.takeAt(i)
                 if taken_item.widget():
+                    taken_item.widget().hide() # Hide immediately to prevent ghosting
                     taken_item.widget().deleteLater()
                 break
         self.container.updateGeometry()
@@ -244,6 +245,7 @@ class ChipTrayWidget(QWidget):
             if widget != self.btn_add:
                 taken_item = self.flow_layout.takeAt(i)
                 if taken_item.widget():
+                    taken_item.widget().hide() # Hide immediately to prevent ghosting
                     taken_item.widget().deleteLater()
             else:
                 i += 1

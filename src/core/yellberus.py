@@ -118,23 +118,6 @@ class FieldDef:
 QUERY_FROM = """
     FROM MediaSources MS
     JOIN Songs S ON MS.SourceID = S.SourceID
-    LEFT JOIN MediaSourceContributorRoles MSCR ON MS.SourceID = MSCR.SourceID
-    LEFT JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-    LEFT JOIN ContributorAliases CA ON MSCR.CreditedAliasID = CA.AliasID
-    LEFT JOIN ContributorAliases CA_ALL ON C.ContributorID = CA_ALL.ContributorID
-    LEFT JOIN GroupMembers GM ON C.ContributorID = GM.GroupID
-    LEFT JOIN Contributors MEM ON GM.MemberID = MEM.ContributorID
-    LEFT JOIN ContributorAliases MA ON MEM.ContributorID = MA.ContributorID
-    LEFT JOIN Roles R ON MSCR.RoleID = R.RoleID
-    LEFT JOIN SongAlbums SA ON MS.SourceID = SA.SourceID
-    LEFT JOIN Albums A ON SA.AlbumID = A.AlbumID
-    LEFT JOIN AlbumPublishers AP ON A.AlbumID = AP.AlbumID
-    LEFT JOIN Publishers P ON AP.PublisherID = P.PublisherID
-    LEFT JOIN MediaSourceTags MST_S ON MS.SourceID = MST_S.SourceID
-    LEFT JOIN Tags TG_S ON MST_S.TagID = TG_S.TagID AND TG_S.TagCategory = 'Status' AND TG_S.TagName = 'Unprocessed'
-    LEFT JOIN Publishers P_TRK ON SA.TrackPublisherID = P_TRK.PublisherID
-    LEFT JOIN RecordingPublishers RP ON MS.SourceID = RP.SourceID
-    LEFT JOIN Publishers P_REC ON RP.PublisherID = P_REC.PublisherID
 """
 
 QUERY_BASE_WHERE = "WHERE MS.IsActive = 1"
@@ -174,7 +157,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         id3_tag='TPE1',
         min_length=1,
-        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Performer' THEN COALESCE(CA.AliasName, C.ContributorName) END) AS Performers",
+        query_expression="(SELECT GROUP_CONCAT(COALESCE(CA_SUB.AliasName, C_SUB.ContributorName)) FROM MediaSourceContributorRoles MSCR_SUB JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID LEFT JOIN ContributorAliases CA_SUB ON MSCR_SUB.CreditedAliasID = CA_SUB.AliasID JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID WHERE MSCR_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer') AS Performers",
         searchable=False,
         strategy='list',
         ui_search=True,
@@ -195,7 +178,27 @@ FIELDS: List[FieldDef] = [
         editable=False,
         filterable=True,
         portable=False,
-        query_expression="COALESCE(NULLIF(S.SongGroups, ''), GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Performer' THEN COALESCE(CA.AliasName, C.ContributorName) END)) || ' ::: ' || COALESCE(GROUP_CONCAT(DISTINCT CA_ALL.AliasName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT C.ContributorName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT MEM.ContributorName), '') || ' ' || COALESCE(GROUP_CONCAT(DISTINCT MA.AliasName), '') AS UnifiedArtist",
+        query_expression="""
+            COALESCE(NULLIF(S.SongGroups, ''), 
+            (SELECT GROUP_CONCAT(COALESCE(CA_SUB.AliasName, C_SUB.ContributorName)) 
+             FROM MediaSourceContributorRoles MSCR_SUB 
+             JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID 
+             LEFT JOIN ContributorAliases CA_SUB ON MSCR_SUB.CreditedAliasID = CA_SUB.AliasID 
+             JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID 
+             WHERE MSCR_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer')) 
+            || ' ::: ' || 
+            (SELECT COALESCE(GROUP_CONCAT(DISTINCT CA_SUB.AliasName), '') || ' ' || 
+                    COALESCE(GROUP_CONCAT(DISTINCT C_SUB.ContributorName), '') || ' ' || 
+                    COALESCE(GROUP_CONCAT(DISTINCT MEM_SUB.ContributorName), '') || ' ' || 
+                    COALESCE(GROUP_CONCAT(DISTINCT MA_SUB.AliasName), '')
+             FROM MediaSourceContributorRoles MSCR_SUB
+             JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID
+             LEFT JOIN ContributorAliases CA_SUB ON C_SUB.ContributorID = CA_SUB.ContributorID
+             LEFT JOIN GroupMembers GM_SUB ON C_SUB.ContributorID = GM_SUB.GroupID
+             LEFT JOIN Contributors MEM_SUB ON GM_SUB.MemberID = MEM_SUB.ContributorID
+             LEFT JOIN ContributorAliases MA_SUB ON MEM_SUB.ContributorID = MA_SUB.ContributorID
+             WHERE MSCR_SUB.SourceID = MS.SourceID) AS UnifiedArtist
+        """,
         strategy='list',
         zone='amber',
     ),
@@ -217,7 +220,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TALB',
-        query_expression="GROUP_CONCAT(A.AlbumTitle, ', ') AS AlbumTitle",
+        query_expression="(SELECT GROUP_CONCAT(A_SUB.AlbumTitle, '|||') FROM SongAlbums SA_SUB JOIN Albums A_SUB ON SA_SUB.AlbumID = A_SUB.AlbumID WHERE SA_SUB.SourceID = MS.SourceID ORDER BY SA_SUB.IsPrimary DESC) AS AlbumTitle",
         required=True,
         strategy='list',
         ui_search=True,
@@ -226,10 +229,11 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='album_id',
         ui_header='Album ID',
-        db_column='SA.AlbumID',
+        db_column='AlbumID',
         field_type=FieldType.INTEGER,
         editable=False,
         portable=False,
+        query_expression="(SELECT SA_SUB.AlbumID FROM SongAlbums SA_SUB WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1 LIMIT 1) AS AlbumID",
         searchable=False,
         visible=False,
     ),
@@ -241,7 +245,7 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TCOM',
         min_length=1,
-        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Composer' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Composers",
+        query_expression="(SELECT GROUP_CONCAT(COALESCE(CA_SUB.AliasName, C_SUB.ContributorName)) FROM MediaSourceContributorRoles MSCR_SUB JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID LEFT JOIN ContributorAliases CA_SUB ON MSCR_SUB.CreditedAliasID = CA_SUB.AliasID JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID WHERE MSCR_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Composer') AS Composers",
         required=True,
         strategy='list',
         ui_search=True,
@@ -255,7 +259,13 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TPUB',
         # Logic: Track Override > Album Publisher > Recording/Archival Publisher
-        query_expression='COALESCE(P_TRK.PublisherName, GROUP_CONCAT(DISTINCT P.PublisherName), GROUP_CONCAT(DISTINCT P_REC.PublisherName)) AS Publisher',
+        query_expression="""
+            COALESCE(
+                (SELECT P_SUB.PublisherName FROM SongAlbums SA_SUB JOIN Publishers P_SUB ON SA_SUB.TrackPublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
+                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM SongAlbums SA_SUB JOIN AlbumPublishers AP_SUB ON SA_SUB.AlbumID = AP_SUB.AlbumID JOIN Publishers P_SUB ON AP_SUB.PublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
+                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM RecordingPublishers RP_SUB JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID WHERE RP_SUB.SourceID = MS.SourceID)
+            ) AS Publisher
+        """,
         required=True,
         strategy='list',
         ui_search=True,
@@ -317,7 +327,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.LIST,
         filterable=True,
         id3_tag='TIPL',
-        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Producer' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Producers",
+        query_expression="(SELECT GROUP_CONCAT(COALESCE(CA_SUB.AliasName, C_SUB.ContributorName)) FROM MediaSourceContributorRoles MSCR_SUB JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID LEFT JOIN ContributorAliases CA_SUB ON MSCR_SUB.CreditedAliasID = CA_SUB.AliasID JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID WHERE MSCR_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Producer') AS Producers",
         strategy='list',
         ui_search=True,
         zone='amber', # ATTRIBUTE
@@ -330,7 +340,7 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TEXT',
         portable=False,
-        query_expression="GROUP_CONCAT(DISTINCT CASE WHEN R.RoleName = 'Lyricist' THEN COALESCE(CA.AliasName, C.ContributorName) END) || ' ::: ' || GROUP_CONCAT(DISTINCT CA_ALL.AliasName) || ' ' || GROUP_CONCAT(DISTINCT C.ContributorName) AS Lyricists",
+        query_expression="(SELECT GROUP_CONCAT(COALESCE(CA_SUB.AliasName, C_SUB.ContributorName)) FROM MediaSourceContributorRoles MSCR_SUB JOIN Contributors C_SUB ON MSCR_SUB.ContributorID = C_SUB.ContributorID LEFT JOIN ContributorAliases CA_SUB ON MSCR_SUB.CreditedAliasID = CA_SUB.AliasID JOIN Roles R_SUB ON MSCR_SUB.RoleID = R_SUB.RoleID WHERE MSCR_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Lyricist') AS Lyricists",
         strategy='list',
         ui_search=True,
         zone='amber', # ATTRIBUTE
@@ -340,7 +350,7 @@ FIELDS: List[FieldDef] = [
         ui_header='Album Artist',
         db_column='AlbumArtist',
         id3_tag='TPE2',
-        query_expression="GROUP_CONCAT(A.AlbumArtist, ', ') AS AlbumArtist",
+        query_expression="(SELECT A_SUB.AlbumArtist FROM SongAlbums SA_SUB JOIN Albums A_SUB ON SA_SUB.AlbumID = A_SUB.AlbumID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1 LIMIT 1) AS AlbumArtist",
         strategy='list',
         visible=False,
     ),
@@ -358,7 +368,7 @@ FIELDS: List[FieldDef] = [
         field_type=FieldType.BOOLEAN,
         filterable=True,
         portable=False,
-        query_expression="(CASE WHEN COUNT(DISTINCT TG_S.TagID) > 0 THEN 0 ELSE 1 END) AS is_done",
+        query_expression="(CASE WHEN EXISTS (SELECT 1 FROM MediaSourceTags MST_SUB JOIN Tags TG_SUB ON MST_SUB.TagID = TG_SUB.TagID WHERE MST_SUB.SourceID = MS.SourceID AND TG_SUB.TagCategory = 'Status' AND TG_SUB.TagName = 'Unprocessed') THEN 0 ELSE 1 END) AS is_done",
         searchable=False,
         strategy='boolean',
         zone='magenta', # Console Magenta (Matches Surgical Highlights)
