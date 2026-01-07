@@ -81,7 +81,89 @@ class BaseRepository:
                 )
             """)
 
-            # 4. Contributors
+            # 4. Identities (The Real Person/Group)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS Identities (
+                    IdentityID INTEGER PRIMARY KEY,
+                    IdentityType TEXT CHECK(IdentityType IN ('person', 'group', 'placeholder')) NOT NULL,
+                    LegalName TEXT,
+                    DateOfBirth DATE,
+                    DateOfDeath DATE,
+                    Nationality TEXT,
+                    FormationDate DATE,
+                    DisbandDate DATE,
+                    Biography TEXT,
+                    Notes TEXT
+                )
+            """)
+
+            # 5. ArtistNames (Names Owned by Identities)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ArtistNames (
+                    NameID INTEGER PRIMARY KEY,
+                    OwnerIdentityID INTEGER,
+                    DisplayName TEXT NOT NULL,
+                    SortName TEXT,
+                    IsPrimaryName BOOLEAN DEFAULT 0,
+                    DisambiguationNote TEXT,
+                    FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID) ON DELETE SET NULL
+                )
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_artistnames_owner ON ArtistNames(OwnerIdentityID)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_artistnames_display ON ArtistNames(DisplayName)")
+
+            # 6. GroupMemberships (Links persons to groups)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS GroupMemberships (
+                    MembershipID INTEGER PRIMARY KEY,
+                    GroupIdentityID INTEGER NOT NULL,
+                    MemberIdentityID INTEGER NOT NULL,
+                    CreditedAsNameID INTEGER,
+                    JoinDate DATE,
+                    LeaveDate DATE,
+                    FOREIGN KEY (GroupIdentityID) REFERENCES Identities(IdentityID) ON DELETE CASCADE,
+                    FOREIGN KEY (MemberIdentityID) REFERENCES Identities(IdentityID) ON DELETE CASCADE,
+                    FOREIGN KEY (CreditedAsNameID) REFERENCES ArtistNames(NameID) ON DELETE SET NULL,
+                    UNIQUE(GroupIdentityID, MemberIdentityID)
+                )
+            """)
+
+            # 7. SongCredits (Immutable credits on songs)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS SongCredits (
+                    CreditID INTEGER PRIMARY KEY,
+                    SourceID INTEGER NOT NULL,
+                    CreditedNameID INTEGER NOT NULL,
+                    RoleID INTEGER NOT NULL,
+                    CreditPosition INTEGER DEFAULT 0,
+                    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
+                    FOREIGN KEY (CreditedNameID) REFERENCES ArtistNames(NameID),
+                    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID),
+                    UNIQUE(SourceID, CreditedNameID, RoleID)
+                )
+            """)
+
+            # 8. AlbumCredits (Immutable credits on albums)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS AlbumCredits (
+                    CreditID INTEGER PRIMARY KEY,
+                    AlbumID INTEGER NOT NULL,
+                    CreditedNameID INTEGER NOT NULL,
+                    RoleID INTEGER NOT NULL,
+                    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE,
+                    FOREIGN KEY (CreditedNameID) REFERENCES ArtistNames(NameID),
+                    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID),
+                    UNIQUE(AlbumID, CreditedNameID, RoleID)
+                )
+            """)
+
+            # Insert default identities
+            cursor.execute("INSERT OR IGNORE INTO Identities (IdentityID, IdentityType, LegalName) VALUES (0, 'placeholder', 'Unknown Artist')")
+            cursor.execute("INSERT OR IGNORE INTO Identities (IdentityID, IdentityType, LegalName) VALUES (-1, 'placeholder', 'Various Artists')")
+            cursor.execute("INSERT OR IGNORE INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (0, 0, 'Unknown Artist', 1)")
+            cursor.execute("INSERT OR IGNORE INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (-1, -1, 'Various Artists', 1)")
+
+            # 4. Contributors (LEGACY)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Contributors (
                     ContributorID INTEGER PRIMARY KEY,

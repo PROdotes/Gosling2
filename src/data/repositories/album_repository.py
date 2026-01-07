@@ -35,9 +35,9 @@ class AlbumRepository(GenericRepository[Album]):
     def _get_joined_album_artist(self, conn: sqlite3.Connection, album_id: int) -> Optional[str]:
         """Get album artists from M2M table (separated by |||)."""
         query = """
-            SELECT GROUP_CONCAT(c.ContributorName, '|||')
-            FROM Contributors c
-            JOIN AlbumContributors ac ON c.ContributorID = ac.ContributorID
+            SELECT GROUP_CONCAT(an.DisplayName, '|||')
+            FROM ArtistNames an
+            JOIN AlbumCredits ac ON an.NameID = ac.CreditedNameID
             WHERE ac.AlbumID = ?
         """
         cursor = conn.execute(query, (album_id,))

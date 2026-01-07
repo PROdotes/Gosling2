@@ -39,7 +39,7 @@ class SongSyncService:
             'producers': 'Producer'
         }
         
-        desired_links = set() # Set of (ContributorID, RoleID, CreditedAliasID)
+        desired_links = set() # Set of (NameID, RoleID)
         
         for attr, role_name in role_map.items():
             contributors = getattr(song, attr, [])
@@ -54,16 +54,15 @@ class SongSyncService:
             for contributor_name in contributors:
                 if not contributor_name.strip(): continue
 
-                # Resolve Identity (Use Repository logic via cursor to avoid layered violation)
-                # We replicate the get_or_create logic here slightly or use a collaborator
-                contributor_id, credited_alias_id = self._resolve_identity(cursor, contributor_name, auditor)
+                # Resolve Name to NameID
+                name_id = self._resolve_identity(cursor, contributor_name, auditor)
                 
-                desired_links.add((contributor_id, role_id, credited_alias_id))
+                desired_links.add((name_id, role_id))
 
         # 2. Get Current State
-        cursor.execute("SELECT ContributorID, RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ?", (song.source_id,))
+        cursor.execute("SELECT CreditedNameID, RoleID FROM SongCredits WHERE SourceID = ?", (song.source_id,))
         current_links_raw = cursor.fetchall()
-        current_links = set((c, r, a) for c, r, a in current_links_raw)
+        current_links = set((n, r) for n, r in current_links_raw)
             
         # 3. Calculate Diff
         to_add = desired_links - current_links
@@ -71,53 +70,45 @@ class SongSyncService:
         
         # 4. Execute Changes
         # DELETE
-        for c_id, r_id, a_id in to_remove:
+        for n_id, r_id in to_remove:
             cursor.execute(
-                "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?",
-                (song.source_id, c_id, r_id)
+                "DELETE FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?",
+                (song.source_id, n_id, r_id)
             )
             if auditor:
-                auditor.log_delete("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                auditor.log_delete("SongCredits", f"{song.source_id}-{n_id}-{r_id}", {
                     "SourceID": song.source_id,
-                    "ContributorID": c_id,
-                    "RoleID": r_id,
-                    "CreditedAliasID": a_id
+                    "CreditedNameID": n_id,
+                    "RoleID": r_id
                 })
                 
         # INSERT
-        for c_id, r_id, a_id in to_add:
+        for n_id, r_id in to_add:
             cursor.execute(
-                "INSERT INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID, CreditedAliasID) VALUES (?, ?, ?, ?)",
-                (song.source_id, c_id, r_id, a_id)
+                "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+                (song.source_id, n_id, r_id)
             )
             if auditor:
-                auditor.log_insert("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                auditor.log_insert("SongCredits", f"{song.source_id}-{n_id}-{r_id}", {
                     "SourceID": song.source_id,
-                    "ContributorID": c_id,
-                    "RoleID": r_id,
-                    "CreditedAliasID": a_id
+                    "CreditedNameID": n_id,
+                    "RoleID": r_id
                 })
 
-    def _resolve_identity(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> tuple:
-        """Helper to resolve a name to a ContributorID and CreditedAliasID."""
-        # 1. Exact Match on Primary Name
-        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
+    def _resolve_identity(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> int:
+        """Helper to resolve a name to a NameID."""
+        # 1. Exact Match on DisplayName (case-insensitive)
+        cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE NOCASE", (name,))
         row = cursor.fetchone()
         if row:
-            return row[0], None
+            return row[0]
             
-        # 2. Exact Match on Alias
-        cursor.execute("SELECT ContributorID, AliasID FROM ContributorAliases WHERE AliasName = ? COLLATE NOCASE", (name,))
-        row = cursor.fetchone()
-        if row:
-            return row[0], row[1]
-            
-        # 3. Create New
-        cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (name, name))
-        c_id = cursor.lastrowid
+        # 2. Create New Name (Orphan for now, as per recommendation in Proposal)
+        cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (name, name))
+        name_id = cursor.lastrowid
         if auditor:
-            auditor.log_insert("Contributors", c_id, {"ContributorName": name, "SortName": name, "ContributorType": 'person'})
-        return c_id, None
+            auditor.log_insert("ArtistNames", name_id, {"DisplayName": name, "SortName": name, "IsPrimaryName": 0})
+        return name_id
 
     def sync_album(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None) -> None:
         """Sync album relationship (Find or Create with Artist Disambiguation)."""
@@ -190,22 +181,18 @@ class SongSyncService:
                         else:
                             artist_names = [a.strip() for a in album_artist.split(',')]
                         for a_name in artist_names:
-                            cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ?", (a_name,))
-                            c_row = cursor.fetchone()
-                            if not c_row:
-                                cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (a_name, a_name))
-                                c_id = cursor.lastrowid
-                                if auditor:
-                                    auditor.log_insert("Contributors", c_id, {"ContributorName": a_name, "SortName": a_name, "ContributorType": 'person'})
-                            else:
-                                c_id = c_row[0]
+                            # Resolve Name to NameID
+                            name_id = self._resolve_identity(cursor, a_name, auditor)
 
                             cursor.execute(
-                                "INSERT OR IGNORE INTO AlbumContributors (AlbumID, ContributorID, RoleID) VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))",
-                                (new_album_id, c_id)
+                                """
+                                INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) 
+                                VALUES (?, ?, (SELECT RoleID FROM Roles WHERE RoleName = 'Performer'))
+                                """,
+                                (new_album_id, name_id)
                             )
                             if cursor.rowcount > 0 and auditor:
-                                auditor.log_insert("AlbumContributors", f"{new_album_id}-{c_id}", {"AlbumID": new_album_id, "ContributorID": c_id})
+                                auditor.log_insert("AlbumCredits", f"{new_album_id}-{name_id}", {"AlbumID": new_album_id, "CreditedNameID": name_id})
 
         # Handle 'Clear Album' scenario
         if effective_title is not None and not effective_title.strip() and not use_precise_id:

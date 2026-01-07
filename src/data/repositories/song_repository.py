@@ -102,10 +102,10 @@ class SongRepository(GenericRepository[Song]):
         auditor = kwargs.get('auditor')
         # Audit cascaded deletes for junctions
         if auditor:
-            cursor.execute("SELECT ContributorID, RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ?", (record_id,))
-            for c_id, r_id, a_id in cursor.fetchall():
-                 auditor.log_delete("MediaSourceContributorRoles", f"{record_id}-{c_id}-{r_id}", {
-                     "SourceID": record_id, "ContributorID": c_id, "RoleID": r_id, "CreditedAliasID": a_id
+            cursor.execute("SELECT CreditedNameID, RoleID FROM SongCredits WHERE SourceID = ?", (record_id,))
+            for n_id, r_id in cursor.fetchall():
+                 auditor.log_delete("SongCredits", f"{record_id}-{n_id}-{r_id}", {
+                     "SourceID": record_id, "CreditedNameID": n_id, "RoleID": r_id
                  })
             
             cursor.execute("SELECT AlbumID, TrackNumber, IsPrimary FROM SongAlbums WHERE SourceID = ?", (record_id,))
@@ -303,118 +303,117 @@ class SongRepository(GenericRepository[Song]):
     def _get_songs_by_ids_logic(self, source_ids: List[int], conn: sqlite3.Connection) -> List[Song]:
         """Internal logic for bulk fetching songs by their SourceID."""
         cursor = conn.cursor()
-                
-                # 1. Fetch main song data using efficient IN clause
-                placeholders = ",".join(["?"] * len(source_ids))
-                query = f"""
-                    SELECT 
-                        MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
-                        S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
-                        MS.SourceNotes, MS.IsActive,
-                        (
-                            SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
-                            FROM Albums A 
-                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                            WHERE SA.SourceID = MS.SourceID
-                            ORDER BY SA.IsPrimary DESC
-                        ) as AlbumTitle,
-                        (
-                            SELECT A.AlbumID FROM Albums A 
-                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                            WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                            LIMIT 1
-                        ) as AlbumID,
-                        COALESCE(
-                            (
-                                SELECT P.PublisherName 
-                                FROM SongAlbums SA 
-                                JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
-                                WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                            ),
-                            (
-                                SELECT GROUP_CONCAT(P.PublisherName, '|||')
-                                FROM SongAlbums SA 
-                                JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
-                                JOIN Publishers P ON AP.PublisherID = P.PublisherID
-                                WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                            ),
-                            (
-                                SELECT GROUP_CONCAT(P.PublisherName, '|||')
-                                FROM RecordingPublishers RP
-                                JOIN Publishers P ON RP.PublisherID = P.PublisherID
-                                WHERE RP.SourceID = MS.SourceID
-                            )
-                        ) as PublisherName,
-
-                        (
-                            SELECT A.AlbumArtist FROM Albums A 
-                            JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                            WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                            LIMIT 1
-                        ) as AlbumArtist,
-                        (
-                            SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
-                            FROM MediaSourceTags MST
-                            JOIN Tags TG ON MST.TagID = TG.TagID
-                            WHERE MST.SourceID = MS.SourceID
-                        ) as AllTags
-                    FROM MediaSources MS
-                    JOIN Songs S ON MS.SourceID = S.SourceID
-                    WHERE MS.SourceID IN ({placeholders})
-                """
-                cursor.execute(query, source_ids)
-                
-                songs_map = {}
-                for row in cursor.fetchall():
-                    (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-                     notes, is_active_int, album_title, album_id, publisher_name, 
-                     album_artist, all_tags_str) = row
-                    
-                    groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
-                    tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
-                    
-                    song = Song(
-                        source_id=source_id,
-                        source=path,
-                        name=name,
-                        duration=duration,
-                        bpm=bpm,
-                        recording_year=recording_year,
-                        isrc=isrc,
-                        notes=notes,
-                        is_active=bool(is_active_int),
-                        album=[a.strip() for a in album_title.split('|||')] if album_title else [],
-                        album_id=album_id,
-                        album_artist=album_artist,
-                        publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
-                        # genre/mood arguments removed
-                        groups=groups,
-                        tags=tags
+        
+        # 1. Fetch main song data using efficient IN clause
+        placeholders = ",".join(["?"] * len(source_ids))
+        query = f"""
+            SELECT 
+                MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
+                S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
+                MS.SourceNotes, MS.IsActive,
+                (
+                    SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
+                    FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    WHERE SA.SourceID = MS.SourceID
+                    ORDER BY SA.IsPrimary DESC
+                ) as AlbumTitle,
+                (
+                    SELECT A.AlbumID FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    LIMIT 1
+                ) as AlbumID,
+                COALESCE(
+                    (
+                        SELECT P.PublisherName 
+                        FROM SongAlbums SA 
+                        JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
+                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    ),
+                    (
+                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
+                        FROM SongAlbums SA 
+                        JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
+                        JOIN Publishers P ON AP.PublisherID = P.PublisherID
+                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    ),
+                    (
+                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
+                        FROM RecordingPublishers RP
+                        JOIN Publishers P ON RP.PublisherID = P.PublisherID
+                        WHERE RP.SourceID = MS.SourceID
                     )
-                    songs_map[source_id] = song
+                ) as PublisherName,
 
-                # 2. Fetch all roles for all songs in one go (with Credit Preservation)
-                query_roles = f"""
-                    SELECT MSCR.SourceID, R.RoleName, COALESCE(CA.AliasName, C.ContributorName)
-                    FROM MediaSourceContributorRoles MSCR
-                    JOIN Roles R ON MSCR.RoleID = R.RoleID
-                    JOIN Contributors C ON MSCR.ContributorID = C.ContributorID
-                    LEFT JOIN ContributorAliases CA ON MSCR.CreditedAliasID = CA.AliasID
-                    WHERE MSCR.SourceID IN ({placeholders})
-                """
-                cursor.execute(query_roles, source_ids)
-                
-                for source_id, role_name, contributor_name in cursor.fetchall():
-                    if source_id in songs_map:
-                        song = songs_map[source_id]
-                        if role_name == 'Performer':
-                            song.performers.append(contributor_name)
-                        elif role_name == 'Composer':
-                            song.composers.append(contributor_name)
-                        elif role_name == 'Lyricist':
-                            song.lyricists.append(contributor_name)
-                        elif role_name == 'Producer':
-                            song.producers.append(contributor_name)
+                (
+                    SELECT A.AlbumArtist FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    LIMIT 1
+                ) as AlbumArtist,
+                (
+                    SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
+                    FROM MediaSourceTags MST
+                    JOIN Tags TG ON MST.TagID = TG.TagID
+                    WHERE MST.SourceID = MS.SourceID
+                ) as AllTags
+            FROM MediaSources MS
+            JOIN Songs S ON MS.SourceID = S.SourceID
+            WHERE MS.SourceID IN ({placeholders})
+        """
+        cursor.execute(query, source_ids)
+        
+        songs_map = {}
+        for row in cursor.fetchall():
+            (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
+             notes, is_active_int, album_title, album_id, publisher_name, 
+             album_artist, all_tags_str) = row
+            
+            groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+            tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
+            
+            song = Song(
+                source_id=source_id,
+                source=path,
+                name=name,
+                duration=duration,
+                bpm=bpm,
+                recording_year=recording_year,
+                isrc=isrc,
+                notes=notes,
+                is_active=bool(is_active_int),
+                album=[a.strip() for a in album_title.split('|||')] if album_title else [],
+                album_id=album_id,
+                album_artist=album_artist,
+                publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
+                # genre/mood arguments removed
+                groups=groups,
+                tags=tags
+            )
+            songs_map[source_id] = song
+
+        # 2. Fetch all roles for all songs in one go (with Credit Preservation)
+        query_roles = f"""
+            SELECT sc.SourceID, r.RoleName, an.DisplayName
+            FROM SongCredits sc
+            JOIN Roles r ON sc.RoleID = r.RoleID
+            JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+            WHERE sc.SourceID IN ({placeholders})
+        """
+        cursor.execute(query_roles, source_ids)
+        
+        for source_id, role_name, contributor_name in cursor.fetchall():
+            if source_id in songs_map:
+                song = songs_map[source_id]
+                if role_name == 'Performer':
+                    song.performers.append(contributor_name)
+                elif role_name == 'Composer':
+                    song.composers.append(contributor_name)
+                elif role_name == 'Lyricist':
+                    song.lyricists.append(contributor_name)
+                elif role_name == 'Producer':
+                    song.producers.append(contributor_name)
 
                 # 3. Fetch all releases (Multi-Album Hydration)
                 query_releases = f"""
