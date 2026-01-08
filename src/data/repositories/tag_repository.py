@@ -173,6 +173,7 @@ class TagRepository(GenericRepository[Tag]):
                 FROM Tags t
                 JOIN MediaSourceTags mst ON t.TagID = mst.TagID
                 WHERE mst.SourceID = ? AND t.TagCategory = ?
+                ORDER BY mst.rowid ASC
             """
             params = (source_id, category)
         else:
@@ -181,6 +182,7 @@ class TagRepository(GenericRepository[Tag]):
                 FROM Tags t
                 JOIN MediaSourceTags mst ON t.TagID = mst.TagID
                 WHERE mst.SourceID = ?
+                ORDER BY mst.rowid ASC
             """
             params = (source_id,)
             

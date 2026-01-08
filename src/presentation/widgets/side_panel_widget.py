@@ -994,46 +994,15 @@ class SidePanelWidget(QFrame):
                 self._on_chip_primary_requested(field_name, entity_id, name)
 
     def _on_chip_primary_requested(self, field_name, entity_id, name):
-        """T-82: Move a specific tag/genre to the front of the list."""
-        
-        # Normalize UI name ("Genre: Rock") to System name ("Genre:Rock") for Tags
-        target_name = name
-        if field_name == 'tags' and ': ' in name:
-            target_name = name.replace(': ', ':', 1)
+        """T-82: Atomic re-order via Adapter (Immediate Save, bypassing SidePanel staging)."""
+        widget = self._get_actual_widget(field_name)
+        if isinstance(widget, EntityListWidget) and widget.context_adapter:
+            if widget.context_adapter.set_primary(entity_id):
+                # Success - the adapter triggers on_data_changed() which calls self._refresh_field_values()
+                return
 
-        for song in self.current_songs:
-            current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
-            if not isinstance(current, list):
-                if field_name in ['album', 'publisher']:
-                    current = [str(current)] if current else []
-                else:
-                    delims = r',|;| & '
-                    if field_name == 'composers': delims += r'|/'
-                    import re
-                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
-            
-            # Check for target_name (Clean) OR name (Raw) just in case
-            match = target_name if target_name in current else (name if name in current else None)
-            
-            if match:
-                new_list = [p for p in current if p != match]
-                new_list.insert(0, match) # Move to front
-                
-                # Special Case: Album IDs (Sync Order)
-                if field_name == 'album':
-                    curr_ids = self._get_effective_value(song.source_id, 'album_id', getattr(song, 'album_id', []))
-                    if isinstance(curr_ids, int): curr_ids = [curr_ids]
-                    if not curr_ids: curr_ids = []
-                    
-                    if entity_id in curr_ids:
-                        new_ids = [x for x in curr_ids if x != entity_id]
-                        new_ids.insert(0, entity_id)
-                        final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
-                        self._on_field_changed('album_id', final_ids, song_id=song.source_id)
-
-                self._on_field_changed(field_name, new_list, song_id=song.source_id)
-        
-        self._refresh_field_values()
+        # Fallback for legacy fields not yet unified via EntityListWidget (e.g. title)
+        # (Currently tags and albums already use EntityListWidget)
 
     def _on_field_changed_and_save(self, field_name: str, value: Any, song_id=None):
         """Helper to stage a change and immediately commit it (Auto-Save)."""

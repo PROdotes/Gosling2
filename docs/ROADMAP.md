@@ -173,10 +173,9 @@ tags:
 *   [x] **UX: Chip Instant Save?**
     *   *Observation*: Users expect removing a chip to be "final/instant".
     *   *Status*: **Done** - Refactored to `EntityListWidget` which provides instant-reflex saving for Side Panel and relational managers (M2M).
-*   [x] **UX: Chip Sorting Stability**
-    *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
-    *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.
-    *   *Status*: **Done** - Implemented "Append Mode" in `EntityListWidget` to preserve insertion context during edits, reverting to DB-Sort on reload.
+*   [x] **UX: Chip Sorting Stability & Primary Genre**
+    *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). Also primary genre (index 0) was lost on refresh.
+    *   *Status*: **Done** - Implemented "Append Mode" in `EntityListWidget` + `ORDER BY rowid` in DB + Atomic `set_primary` save logic.
 *   [x] **Verify Multi-Edit Logic**
     *   *Task*: Tests confirmed adding/removing tags in multi-select mode correctly uses intersection/union logic.
 *   [x] **Tech Debt Audit (Genre/Mood)**
@@ -206,8 +205,7 @@ Quick reference for remaining tasks.
 
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
-| Low | Chip Sorting Stability (Polish) | ~0.5h |
 | Low | Advanced Rule Editor (New Feature) | ~2.0h |
 
 **Total Critical Path:** 0.0h (Release Candidate Ready)
-**Total All:** ~5.0h
+**Total All:** ~2.5h
