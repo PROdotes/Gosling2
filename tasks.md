@@ -52,7 +52,11 @@ links: []
 | T-50 | **Dynamic Renaming Rules** | 5 | 2 | 20 | ✅ | Externalize hardcoded 'Patriotic/Cro' logic to config file. |
 | T-51 | **Tag Verification** | 5 | 1 | 25 | ✅ | Verify `TXXX:GOSLING_DONE` ID3 writes. |
 | T-52 | **Settings UI** | 5 | 2 | 20 | 📋 | UI for Root Directory & Rules. |
-| T-65 | **Audit Crossfade Logic** | 4 | 3 | 12 | 📋 | Investigate audio artifacts/timing in transitions. "Something sounds off". |
+| T-102 | **"Show Truncated" Filter** | 5 | 2 | 20 | 📋 | Gosling 1 parity: filter songs missing Composer/Publisher. Weekly workflow essential. |
+| T-103 | **ZAMP Search Button** | 5 | 1 | 25 | 📋 | Add ZAMP.hr to web search buttons for Croatian rights lookup. |
+| T-104 | **Completeness Indicator** | 5 | 2 | 20 | 📋 | Visual marker in grid showing missing required fields. |
+| T-105 | **Quick Lookup (Ctrl+F)** | 4 | 1 | 20 | 📋 | Focus search box on Ctrl+F for fast Title+Artist lookup. |
+| T-65 | **Audit Crossfade Logic** | 4 | 3 | 12 | ⏸️ Post-0.1 | Investigate audio artifacts/timing in transitions. |
 
 ### Foundation Work
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
@@ -93,24 +97,24 @@ links: []
 | T-48 | **Duplicate Detection** | 5 | 3 | 12 | ✅ | [proposal](docs/proposals/PROPOSAL_DUPLICATE_DETECTION.md) |
 | T-98 | **Mood Support** | 5 | 2 | 20 | ✅ | — | Implemented distinct tagging system (TMOO) parallel to Genre. |
 | T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
-| T-84 | **System SVGs** | 4 | 2 | 8 | 📋 | UI | Replace Unicode icons in TitleBar/SystemIsland with crisp SVGs. |
-| T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
-| T-101 | **Surgical Credits (Jobs)** | 3 | 4 | 12 | 💡 | Core | [spec](docs/tasks/T-101_surgical_credits_plan.md) — Multi-role support (e.g. Guitarist) via TMCL/TIPL. |
-| T-66 | **Scrubber Window** | 4 | 3 | 12 | 💡 | — | Double-click (or modifier-click TBD) on library song opens floating scrubber window. Allows preview playback, timeline jumping, without affecting main playback. Like a mini-player popup. |
-| T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | 📋 | — | Add cyber-glow effect to the count LCDs in the filter tree for consistent aesthetics. |
+| T-84 | **System SVGs** | 4 | 2 | 8 | ⏸️ Post-0.1 | UI | Replace Unicode icons in TitleBar/SystemIsland with crisp SVGs. |
+| T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | ⏸️ Post-0.1 | T-54 | Automation feature. Defer to v0.2. |
+| T-101 | **Surgical Credits (Jobs)** | 3 | 4 | 12 | 💡 | Core | [spec](docs/tasks/T-101_surgical_credits_plan.md) — Multi-role support for ZAMP. |
+| T-66 | **Scrubber Window** | 4 | 3 | 12 | ⏸️ Post-0.1 | — | Playback feature. Defer to v0.2. |
+| T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | ⏸️ Post-0.1 | — | UI polish. Defer to v0.2. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
 |----|------|-----|-------|-------|--------|------------|------|
 | T-20 | **Bulk Edit** | 4 | 4 | 8 | 🚀 | Side Panel | [spec](docs/proposals/PROPOSAL_METADATA_EDITOR.md) |
-| T-21 | **Saved Playlists** | 4 | 3 | 8 | 📋 | — | [spec](docs/proposals/PROPOSAL_PLAYLISTS.md) |
+| T-21 | **Saved Playlists** | 4 | 3 | 8 | ⏸️ Post-0.1 | — | Automation feature. Defer to v0.2. |
 | — | **Relational Logging** | 3 | 4 | 6 | ⏸️ | Undo Core | [spec](docs/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-26 | **Audit UI** | 3 | 3 | 6 | ⏸️ | Relational Logging | [spec](docs/proposals/PROPOSAL_TRANSACTION_LOG.md) |
 | T-22 | **Albums** | 4 | 4 | 8 | 📋 | Legacy Sync | [spec](docs/proposals/PROPOSAL_ALBUMS.md) |
 | T-37 | **Album Filter Disambiguation** | 2 | 2 | 4 | 📋 | T-22 | Show "(Artist)" in album filter to distinguish "Greatest Hits (ABBA)" from "Greatest Hits (Queen)". *Logged by Vesper.* |
 | T-23 | **Filter Trees** | 3 | 3 | 6 | 📋 | Legacy Sync | [spec](docs/proposals/PROPOSAL_FILTER_TREES.md) <br>*(Note: Treat 'Groups' as meta-Artist for filtering)* |
 | T-24 | **Renaming Service** | 4 | 4 | 8 | ⏸️ | Field Registry | [spec](docs/proposals/PROPOSAL_RENAMING_SERVICE.md) |
-| T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ | Log Core | DATABASE.md |
+| T-25 | **PlayHistory** | 3 | 3 | 9 | ⏸️ Post-0.1 | Log Core | Automation feature. Defer to v0.2. |
 | T-30 | **Broadcast Automation** | 2 | 5 | 2 | ⏸️ | Everything | [spec](docs/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) |
 | T-32 | **Pending Review Workflow** | 3 | 3 | 6 | 📋 | Tags (T-06 Phase 3) | [spec](docs/proposals/PROPOSAL_ALBUMS.md#7-migration-plan-task-t-22) |
 | T-33 | **AI Playlist Generation** | 2 | 5 | 2 | 💡 | Post-1.0 | [spec](docs/ideas/T-33_AI_PLAYLIST.md) |
@@ -168,17 +172,127 @@ links: []
 
 | Doc | Purpose |
 |-----|---------|
+| [docs/ROADMAP.md](docs/ROADMAP.md) | Release milestones & progress |
 | [docs/DATABASE.md](docs/DATABASE.md) | Schema governance |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | System architecture overview |
 | [docs/TESTING.md](docs/TESTING.md) | 10-layer yelling |
 | [docs/LOGGING.md](docs/LOGGING.md) | Logging Architecture |
+| [docs/QUICK_START.md](docs/QUICK_START.md) | Developer onboarding |
 | [docs/UX_UI_CONSTITUTION.md](docs/UX_UI_CONSTITUTION.md) | Radio Automation Design Philosophy |
 | [docs/METADATA_CONSTITUTION.md](docs/METADATA_CONSTITUTION.md) | The Law of Data Relationships |
+| [docs/FIELD_REGISTRY.md](docs/FIELD_REGISTRY.md) | Field definitions & ID3 mappings |
 | [docs/proposals/MODULARIZATION_MASTER_PLAN.md](docs/proposals/MODULARIZATION_MASTER_PLAN.md) | Big File Refactoring Plan (T-28) |
+| [docs/proposals/GENERIC_REPOSITORY_ARCHITECTURE.md](docs/proposals/GENERIC_REPOSITORY_ARCHITECTURE.md) | Repository pattern design |
 | [docs/TEST_REMEDIATION_PLAN.md](docs/TEST_REMEDIATION_PLAN.md) | Test Suite Status (430 tests) |
 | [docs/MASS_REFACTOR_WORKFLOW.md](docs/MASS_REFACTOR_WORKFLOW.md) | Mass Refactor / Audit Protocol |
 | [docs/REFACTOR_AUDIT.md](docs/REFACTOR_AUDIT.md) | Refactor Audit: Tag Categories |
 | [docs/STRATEGY_v0.2.md](docs/STRATEGY_v0.2.md) | Strangler Fig Refactor Strategy |
+| [docs/LOCALIZATION_STRATEGY.md](docs/LOCALIZATION_STRATEGY.md) | i18n implementation plan |
+| [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) | High-level project overview |
+| [docs/VERSION_PLAN.md](docs/specs/VERSION_PLAN.md) | Release versioning strategy |
+| [docs/proposals/YELLBERUS_MODULARIZATION.md](docs/proposals/YELLBERUS_MODULARIZATION.md) | Yellberus split plan (T-28) |
+| [docs/WISHLIST.md](docs/specs/WISHLIST.md) | User-requested features backlog |
 
+---
 
-language options... extract all text into a file so languages can easily be implemented...
-custom icon picker for tags, and maybe other stuff
+## 🗃️ Completed Task Archive
+
+Specs for completed tasks are archived in `docs/done/`:
+
+| Task | Spec |
+|------|------|
+| T-01 | [Type Tabs](docs/done/T-01_type_tabs.md) |
+| T-02 | [Field Registry](docs/done/T-02_field_registry.md) |
+| T-04 | [Test Consolidation](docs/done/T04_TEST_CONSOLIDATION_PLAN.md) |
+| T-05 | [Audit Log Viewer](docs/done/T-05_audit_log_viewer_plan.md) |
+| T-12 | [Side Panel Alpha](docs/done/T12_SIDE_PANEL_ALPHA_SPEC.md) |
+| T-15 | [Column Customization](docs/done/T-15_column_customization.md) |
+| T-19 | [Field Editor Hardening](docs/done/T-19_field_editor_hardening.md) |
+| T-38 | [Dynamic ID3 Write](docs/done/T-38_DYNAMIC_ID3_WRITE.md) |
+| T-44 | [Dynamic ID3 Read](docs/done/T-44_DYNAMIC_ID3_READ.md) |
+| T-46 | [Proper Album Editor](docs/done/T-46_PROPER_ALBUM_EDITOR.md) |
+| T-49 | [Radio Automation Layout](docs/done/T-49_RADIO_AUTOMATION_LAYOUT_CONVERSION.md) |
+| T-54 | [Visual Architecture](docs/done/T-54_VISUAL_ARCHITECTURE.md) |
+| T-55 | [Chip Bay Styles](docs/done/T-55_CHIP_BAY_STYLES.md) |
+| T-70 | [Artist Manager](docs/done/T-70_artist_manager_plan.md) |
+| T-81 | [Restore Web Search](docs/done/T-81_restore_web_search.md) |
+| T-85 | [Universal Input Dialog](docs/done/T-85_universal_input_dialog.md) |
+
+---
+
+## 💡 Idea Bank (Future Features)
+
+All ideas are stored in `docs/ideas/`. Browse by category:
+
+### 🎙️ Broadcast & Automation
+| Idea | Description |
+|------|-------------|
+| [Broadcast Automation](docs/proposals/PROPOSAL_BROADCAST_AUTOMATION.md) | Full radio automation system |
+| [Clock Templates](docs/ideas/IDEA_clock_templates.md) | Hour format templates |
+| [Commercial Scheduler](docs/ideas/IDEA_commercial_scheduler.md) | Ad scheduling system |
+| [Dayparting](docs/ideas/IDEA_dayparting.md) | Time-based scheduling |
+| [Rotation Rules](docs/ideas/IDEA_rotation_rules.md) | Music rotation logic |
+| [Schedule Generator](docs/ideas/IDEA_schedule_generator.md) | Auto-generate playlists |
+| [Separation Rules](docs/ideas/IDEA_separation_rules.md) | Artist/song spacing |
+| [Silence Detection](docs/ideas/IDEA_silence_detection.md) | Dead air detection |
+| [Silence Failover](docs/ideas/IDEA_silence_failover.md) | Auto-recovery from silence |
+| [Teaser Mode](docs/ideas/IDEA_teaser_mode.md) | Song preview snippets |
+| [Voice Ducking](docs/ideas/IDEA_voice_ducking.md) | Auto-lower music for voice |
+
+### 🎵 Audio & Processing
+| Idea | Description |
+|------|-------------|
+| [Audio Fingerprinting](docs/ideas/IDEA_audio_fingerprinting.md) | AcoustID/Shazam matching |
+| [Auto Audio Analysis](docs/ideas/IDEA_auto_audio_analysis.md) | BPM, cue points, voice detection on import |
+| [Audio Cue Detection](docs/ideas/IDEA_audio_cue_detection.md) | Detect news outro → trigger fade (standalone bot!) |
+| [Auto Teaser Generator](docs/ideas/IDEA_auto_teaser_generator.md) | Generate song previews |
+| [Builtin Encoder](docs/ideas/IDEA_builtin_encoder.md) | Streaming encoder |
+| [File Format Conversion](docs/ideas/IDEA_file_format_conversion.md) | Transcode on import |
+| [Loudness Normalization](docs/ideas/IDEA_loudness_normalization.md) | EBU R128 compliance |
+| [Multiple Outputs](docs/ideas/IDEA_multiple_outputs.md) | Multi-channel routing |
+| [Preview Hook](docs/ideas/IDEA_preview_hook.md) | Headphone cue system |
+| [VST/DSP Support](docs/ideas/IDEA_vst_dsp_support.md) | Audio plugin hosting |
+
+### 📊 Data & Metadata
+| Idea | Description |
+|------|-------------|
+| [AI Playlist Generation](docs/ideas/T-33_AI_PLAYLIST.md) | ML-powered playlists |
+| [Autofill on Import](docs/ideas/IDEA_autofill_on_import.md) | Auto-populate metadata |
+| [Crowd Sourced Data](docs/ideas/IDEA_crowd_sourced_data.md) | Community metadata |
+| [Last Played Tracking](docs/ideas/IDEA_last_played_tracking.md) | Play history analytics |
+| [Music API Lookup](docs/ideas/IDEA_music_api_lookup.md) | MusicBrainz/Discogs/Spotify |
+| [Statistics Dashboard](docs/ideas/IDEA_statistics_dashboard.md) | Usage analytics |
+| [Universal Tag Picker](docs/ideas/IDEA_UNIVERSAL_TAG_PICKER.md) | Tree-based tag selection |
+
+### 🌐 Remote & Integration
+| Idea | Description |
+|------|-------------|
+| [ASCAP/BMI Export](docs/ideas/IDEA_export_ascap_bmi.md) | Royalty reporting |
+| [Affidavit Generator](docs/ideas/IDEA_affidavit_generator.md) | Proof of airing reports |
+| [Cloud Sync](docs/ideas/IDEA_gosling_cloud_sync.md) | Multi-station sync |
+| [GPIO Fader Start](docs/ideas/IDEA_gpio_fader_start.md) | Hardware integration |
+| [MIDI Control](docs/ideas/IDEA_midi_control.md) | MIDI surface control |
+| [Multi-User Remote](docs/ideas/IDEA_multi_user_remote.md) | Collaborative editing |
+| [Now Playing Push](docs/ideas/IDEA_now_playing_push.md) | RDS/Web integration |
+| [Remote App Connection](docs/ideas/IDEA_remote_app_connection.md) | Mobile app API |
+| [Remote Audio Monitor](docs/ideas/IDEA_remote_audio_monitor.md) | Off-site listening |
+| [Remote Control](docs/ideas/IDEA_remote_control.md) | Web-based control panel |
+
+### 🎨 UI & UX
+| Idea | Description |
+|------|-------------|
+| [Column Loadouts](docs/ideas/IDEA_column_loadouts.md) | Saved column presets |
+| [Contract Management](docs/ideas/IDEA_contract_management.md) | Artist/license tracking |
+| [Cycle Detection Warning](docs/ideas/IDEA_cycle_detection_warning.md) | Circular reference alerts |
+| [Media Item Composition](docs/ideas/IDEA_media_item_composition.md) | Song/Jingle/Voice wrapper |
+| [Mirror View](docs/ideas/IDEA_mirror_view.md) | On-air display clone |
+| [Rule Graph Visualization](docs/ideas/IDEA_rule_graph_visualization.md) | Visual rule editor |
+| [Rule Testing](docs/ideas/IDEA_rule_testing.md) | Validate rules before deploy |
+| [Voice Recorder](docs/ideas/IDEA_voice_recorder.md) | Built-in recording |
+
+---
+
+## 📝 Notes
+
+- language options... extract all text into a file so languages can easily be implemented...
+- custom icon picker for tags, and maybe other stuff

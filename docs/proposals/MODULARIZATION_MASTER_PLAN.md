@@ -246,6 +246,27 @@ Filter tree logic mixed with:
 
 ---
 
+# 🌐 Design for Remote-ability
+
+> **"Don't create a Fallout 76 situation"** — Networking is painful to retrofit.
+
+When splitting modules, keep future **Remote Terminal** feature in mind (see `PROPOSAL_REMOTE_TERMINAL.md`):
+
+| Principle | Why It Matters |
+|-----------|----------------|
+| **State/UI separation** | Library state in model, not widgets — can serialize for sync |
+| **Event-driven updates** | `song_updated.emit()` not direct mutation — events can be forwarded |
+| **Abstract file access** | `FileService.open()` not raw `open()` — can intercept for remote |
+| **Async-ready operations** | Workers for slow ops — network is just another slow op |
+| **No hardcoded paths** | Paths come from config/service — master vs slave may differ |
+
+**Practical checklist for each extracted module:**
+- [ ] Can this module's state be serialized to JSON?
+- [ ] Are all file operations going through a service?
+- [ ] Would this work if the data came over a WebSocket?
+
+---
+
 # Dependencies
 
 Complete these BEFORE starting refactoring:

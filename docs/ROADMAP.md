@@ -114,6 +114,32 @@ tags:
 *   [x] **Virtual File System (VFS)** (T-90)
     *   *Task*: Index ZIP contents without explosion; virtual playback via temp files.
     *   *Status*: **Done** - Full implementation (Core, Import, Playback, UI Pip).
+*   [ ] **"Show Truncated" Filter (T-102)** (~2.0 h) 🔴 *Gosling 1 Parity*
+    *   *Task*: Filter songs missing Composer/Publisher. Weekly workflow essential.
+*   [ ] **ZAMP Search Button (T-103)** (~0.5 h) 🔴 *Gosling 1 Parity*
+    *   *Task*: Add ZAMP.hr to web search buttons for Croatian rights lookup.
+*   [ ] **Completeness Indicator (T-104)** (~2.0 h)
+    *   *Task*: Visual marker in grid showing missing required fields.
+*   [ ] **Quick Lookup (T-105)** (~1.0 h)
+    *   *Task*: Ctrl+F focuses search box for fast Title+Artist lookup.
+*   [ ] **Inline Edit (T-03)** (~2.0 h)
+    *   *Task*: Edit cells directly in grid. Critical for CD batch workflow.
+
+---
+
+## 🔄 Milestone 7: v0.2 Refactor Run
+
+*Status: Planned after 0.1 workflow is solid*
+
+> **Goal:** Clean up LLM-generated code debt. Form over function.
+
+*   [ ] **T-28 Leviathans Split**
+    *   `library_widget` (2032→7 modules), `main_window` (zip logic → VFS service), etc.
+*   [ ] **Async Background Save (T-62)**
+    *   Move save/renaming operations to background thread.
+*   [ ] **MS Access Migration** (v0.2+)
+    *   Import 50k songs from legacy database.
+    *   Bidirectional sync with old automation app.
 
 ---
 
@@ -191,7 +217,7 @@ tags:
 *   [x] **Unify Entity Creation UI**
     *   *Task*: Ensure all "Add Person" buttons (Creator, Artist, Group Member) use the standard `EntityPickerDialog` UI (same as Composer).
     *   *Goal*: Eliminate formatting discrepancies between different creation dialogs.
-*   [ ] **Bug: Ghost Chips (Staging/Parsing)**
+*   [x] **Bug: Ghost Chips (Staging/Parsing)**
     *   *Report*: "Ika MatančevićVedran Cvetojević Werone," should create 2 people... but we don't have time to look into that... i just wanna know why it created a person that i can't delete in the composers"
     *   *Analysis*: Parsing failure created a composite entity (bad name) which got staged. Immediate delete works on DB, but Staging buffer (from the paste) revives it in UI.
 *   [x] **Bug: Publisher Creation Missing**
