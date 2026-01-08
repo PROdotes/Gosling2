@@ -1,6 +1,6 @@
 # Schema V2: The Great Cleanup
 
-**Status:** Proposal  
+**Status:** Phase 1 Complete (Schema Normalized)  
 **Author:** Schema Audit (Jan 7, 2026)  
 **Priority:** CRITICAL (Blocking future features)
 
@@ -311,24 +311,19 @@ This ensures each song can have at most ONE primary album.
 
 ## 📋 Migration Checklist
 
-### Pre-Migration
-- [ ] Backup database (`gosling2.sqlite3.backup`)
-- [ ] Run full test suite (baseline)
-- [ ] Document current row counts for auditing
-
 ### Phase 1: AlbumArtist Removal
-- [ ] Add migration function to `database.py` or separate migration script
-- [ ] Update `Album` model: make `album_artist` a computed property
-- [ ] Update `AlbumRepository._insert_db()`: Remove AlbumArtist from INSERT
-- [ ] Update `AlbumRepository._update_db()`: Remove AlbumArtist from UPDATE  
-- [ ] Update `AlbumRepository.get_by_id()`: Remove fallback to AlbumArtist TEXT
-- [ ] Update `AlbumRepository.search()`: Search via AlbumContributors JOIN
-- [ ] Update `AlbumRepository.create()`: Ensure contributors are linked via M2M
-- [ ] Update `AlbumRepository.assign_album()`: Already uses M2M, verify
-- [ ] Update ID3 Import (`metadata_service.py`): Write artist to AlbumContributors
-- [ ] Update ID3 Export (`metadata_service.py`): Read artist from AlbumContributors
-- [ ] Run test suite (expect failures, fix them)
-- [ ] Verify existing albums display correctly in UI
+- [x] Add migration function to `database.py` or separate migration script
+- [x] Update `Album` model: make `album_artist` a computed property
+- [x] Update `AlbumRepository._insert_db()`: Remove AlbumArtist from INSERT
+- [x] Update `AlbumRepository._update_db()`: Remove AlbumArtist from UPDATE  
+- [x] Update `AlbumRepository.get_by_id()`: Remove fallback to AlbumArtist TEXT
+- [x] Update `AlbumRepository.search()`: Search via AlbumContributors JOIN
+- [x] Update `AlbumRepository.create()`: Ensure contributors are linked via M2M
+- [x] Update `AlbumRepository.assign_album()`: Already uses M2M, verify
+- [x] Update ID3 Import (`metadata_service.py`): Write artist to AlbumContributors
+- [x] Update ID3 Export (`metadata_service.py`): Read artist from AlbumContributors
+- [x] Run test suite (expect failures, fix them)
+- [x] Verify existing albums display correctly in UI
 
 ### Phase 2: Publisher UI Clarity
 - [ ] Verify Song Side Panel shows "Master Owner" from `RecordingPublishers`

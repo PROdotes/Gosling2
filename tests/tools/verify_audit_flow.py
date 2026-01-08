@@ -41,7 +41,7 @@ def verify():
     contrib_service.merge(freddie_id, ella_id)
     
     # 4. Check Database
-    conn = sqlite3.connect('sqldb/gosling2.sqlite3')
+    conn = sqlite3.connect('sqldb/gosling2.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     

@@ -1,4 +1,5 @@
 """Metadata extraction service"""
+import os
 from typing import Optional, List
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, ID3NoHeaderError
@@ -240,8 +241,8 @@ class MetadataService:
             if not isinstance(frame_def, dict): continue
             
             cat = frame_def.get('tag_category')
-            if cat and frame_key in audio.tags:
-                values = get_values(audio.tags[frame_key], 'list')
+            if cat and tags and frame_key in tags:
+                values = get_values(tags[frame_key], 'list')
                 for v in values:
                     tags_list.append(f"{cat}:{v}")
                     

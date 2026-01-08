@@ -1,7 +1,7 @@
 import sqlite3
 import os
 
-db_path = os.path.join("sqldb", "gosling2.sqlite3")
+db_path = os.path.join("sqldb", "gosling2.db")
 
 def inspect():
     if not os.path.exists(db_path):

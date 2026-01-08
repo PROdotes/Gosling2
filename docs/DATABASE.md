@@ -5,7 +5,7 @@ This document describes the SQLite database structure used by the Gosling2 appli
 ## Overview
 
 - **Database Engine**: SQLite 3
-- **File Location**: `sqldb/gosling2.sqlite3`
+- **File Location**: `sqldb/gosling2.db`
 - **Foreign Keys**: Enabled (`PRAGMA foreign_keys = ON`)
 - **Total Tables**: 30 (including junctions and lookups)
 

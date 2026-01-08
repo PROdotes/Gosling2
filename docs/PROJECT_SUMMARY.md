@@ -228,7 +228,7 @@ The new application is **fully compatible** with the existing database!
 
 ### Database Compatibility
 - ✅ Same database schema
-- ✅ Same database location (`sqldb/gosling2.sqlite3`)
+- ✅ Same database location (`sqldb/gosling2.db`)
 - ✅ Settings preserved (QSettings)
 
 ### Running

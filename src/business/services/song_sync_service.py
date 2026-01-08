@@ -151,24 +151,45 @@ class SongSyncService:
             release_year = getattr(song, 'recording_year', None)
             
             for album_title in all_titles:
-                conditions = ["AlbumTitle = ? COLLATE NOCASE"]
-                params = [album_title]
-                if album_artist:
-                    conditions.append("AlbumArtist = ? COLLATE NOCASE")
-                    params.append(album_artist)
-                else:
-                    conditions.append("(AlbumArtist IS NULL OR AlbumArtist = '')")
-                
+                # 1. Find candidates by Title + Year
+                base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+                base_params = [album_title]
                 if release_year:
-                    conditions.append("ReleaseYear = ?")
-                    params.append(release_year)
-                
-                cursor.execute(f"SELECT AlbumID FROM Albums WHERE {' AND '.join(conditions)}", params)
-                row = cursor.fetchone()
-                if row:
-                    target_ids.append(row[0])
+                    base_query += " AND ReleaseYear = ?"
+                    base_params.append(release_year)
                 else:
-                    cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)", (album_title, album_artist, release_year))
+                    base_query += " AND ReleaseYear IS NULL"
+                
+                cursor.execute(base_query, base_params)
+                candidates = [row[0] for row in cursor.fetchall()]
+                
+                # 2. Verify Artist (M2M)
+                found_id = None
+                target_names = set()
+                if album_artist:
+                    if '|||' in album_artist:
+                        target_names = {a.strip().lower() for a in album_artist.split('|||') if a.strip()}
+                    else:
+                        target_names = {a.strip().lower() for a in album_artist.split(',') if a.strip()}
+
+                for cand_id in candidates:
+                     cursor.execute("""
+                        SELECT lower(AN.DisplayName) 
+                        FROM AlbumCredits AC 
+                        JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID 
+                        WHERE AC.AlbumID = ?
+                     """, (cand_id,))
+                     linked_names = {row[0] for row in cursor.fetchall()}
+                     
+                     if linked_names == target_names:
+                         found_id = cand_id
+                         break
+                
+                if found_id:
+                    target_ids.append(found_id)
+                else:
+                    # Create New
+                    cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, 'Album', ?)", (album_title, release_year))
                     new_album_id = cursor.lastrowid
                     target_ids.append(new_album_id)
                     if auditor:

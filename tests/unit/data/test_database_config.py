@@ -27,7 +27,7 @@ class TestDatabaseConfig:
             # Mock the final file path joining
             mock_final_path = MagicMock()
             mock_db_dir.__truediv__.return_value = mock_final_path
-            mock_final_path.__str__.return_value = "/path/to/sqldb/gosling2.sqlite3"
+            mock_final_path.__str__.return_value = "/path/to/sqldb/gosling2.db"
             
             # Call the method
             result = DatabaseConfig.get_database_path()
@@ -36,4 +36,4 @@ class TestDatabaseConfig:
             mock_base_dir.__truediv__.assert_called_with(DatabaseConfig.DATABASE_SUBDIR)
             mock_db_dir.mkdir.assert_called_with(exist_ok=True)
             mock_db_dir.__truediv__.assert_called_with(DatabaseConfig.DATABASE_FILE_NAME)
-            assert result == "/path/to/sqldb/gosling2.sqlite3"
+            assert result == "/path/to/sqldb/gosling2.db"

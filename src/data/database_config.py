@@ -7,7 +7,7 @@ class DatabaseConfig:
     """Database configuration settings"""
     
     DATABASE_SUBDIR = 'sqldb'
-    DATABASE_FILE_NAME = 'gosling2.sqlite3'
+    DATABASE_FILE_NAME = 'gosling2.db'
     
     @classmethod
     def get_database_path(cls) -> str:

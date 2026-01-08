@@ -147,7 +147,7 @@ pip install -r requirements.txt
 ```
 
 ### Database Not Found
-The database is created automatically at `sqldb/gosling2.sqlite3` on first run.
+The database is created automatically at `sqldb/gosling2.db` on first run.
 
 ### Tests Failing
 ```bash

@@ -232,8 +232,8 @@ def inject():
             source_id = row[0]
             # Create the second album
             cursor.execute(
-                "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Compilation', ?)",
-                ("Gold: Greatest Hits", "ABBA", 1992)
+                "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, 'Compilation', ?)",
+                ("Gold: Greatest Hits", 1992)
             )
             second_album_id = cursor.lastrowid
             
@@ -268,7 +268,13 @@ def inject():
         
         # Get album IDs
         albums = {}
-        cur = conn.execute("SELECT AlbumID, AlbumTitle, AlbumArtist FROM Albums")
+        cur = conn.execute("""
+            SELECT A.AlbumID, A.AlbumTitle, GROUP_CONCAT(AN.DisplayName, ', ')
+            FROM Albums A
+            LEFT JOIN AlbumCredits AC ON A.AlbumID = AC.AlbumID
+            LEFT JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
+            GROUP BY A.AlbumID
+        """)
         for row in cur.fetchall():
             key = f"{row[1]} ({row[2] or 'N/A'})"
             albums[key] = row[0]
@@ -334,7 +340,13 @@ def inject():
     
     # Report on Albums
     with repo.get_connection() as conn:
-        cursor = conn.execute("SELECT AlbumID, AlbumTitle, AlbumArtist, ReleaseYear FROM Albums")
+        cursor = conn.execute("""
+            SELECT A.AlbumID, A.AlbumTitle, GROUP_CONCAT(AN.DisplayName, ', '), A.ReleaseYear
+            FROM Albums A
+            LEFT JOIN AlbumCredits AC ON A.AlbumID = AC.AlbumID
+            LEFT JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
+            GROUP BY A.AlbumID
+        """)
         albums = cursor.fetchall()
         print(f"\nCreated {len(albums)} Albums in DB:")
         for alb in albums:

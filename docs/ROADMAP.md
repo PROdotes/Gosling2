@@ -175,7 +175,7 @@ tags:
     *   *Task*: Tests confirmed adding/removing tags in multi-select mode correctly uses intersection/union logic.
 *   [x] **Tech Debt Audit (Genre/Mood)**
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
-*   [ ] **Bug: Filter Tree LED Disappears**
+*   [x] **Bug: Filter Tree LED Disappears**
     *   *Issue*: Clearing the search bar causes the checkbox LEDs in the filter tree to vanish.
 *   [ ] **Bug: Publisher Multi-Edit & RecordingPublishers Implementation**
     *   *Issue*: Publisher multi-editing fails because backend logic for `RecordingPublishers` (Song-Level) is missing in `PublisherRepository`.
@@ -194,7 +194,6 @@ Quick reference for remaining tasks.
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
 | **High** | **Fix Publisher Multi-Edit** (Schema Gap) | ~2.0h |
-| **Med** | **Fix Filter Tree LEDs** (Bug) | ~0.5h |
 | Low | Chip Sorting Stability (Polish) | ~0.5h |
 | Low | Universal Data Editor (Refactor) | ~3.0h |
 | Low | Advanced Rule Editor (New Feature) | ~2.0h |

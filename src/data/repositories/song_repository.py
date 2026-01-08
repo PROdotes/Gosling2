@@ -355,10 +355,12 @@ class SongRepository(GenericRepository[Song]):
                 ) as PublisherName,
 
                 (
-                    SELECT A.AlbumArtist FROM Albums A 
+                    SELECT GROUP_CONCAT(AN.DisplayName, '|||')
+                    FROM Albums A 
                     JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    JOIN AlbumCredits AC ON A.AlbumID = AC.AlbumID
+                    JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
                     WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    LIMIT 1
                 ) as AlbumArtist,
                 (
                     SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
@@ -691,7 +693,11 @@ class SongRepository(GenericRepository[Song]):
         elif field_name == "album":
             query = "SELECT DISTINCT AlbumTitle FROM Albums"
         elif field_name == "album_artist":
-            query = "SELECT DISTINCT AlbumArtist FROM Albums WHERE AlbumArtist IS NOT NULL"
+            query = """
+                SELECT DISTINCT AN.DisplayName
+                FROM AlbumCredits AC
+                JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
+            """
         
         # 2. Tag Mapping Path
         if not query:

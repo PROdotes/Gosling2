@@ -24,7 +24,7 @@ class AlbumRepository(GenericRepository[Album]):
 
     def _get_by_id_logic(self, album_id: int, conn: sqlite3.Connection) -> Optional[Album]:
         """Internal logic for retrieving album by ID."""
-        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
+        query = "SELECT AlbumID, AlbumTitle, AlbumType, ReleaseYear FROM Albums WHERE AlbumID = ?"
         cursor = conn.execute(query, (album_id,))
         row = cursor.fetchone()
         if row:
@@ -47,7 +47,7 @@ class AlbumRepository(GenericRepository[Album]):
 
     def find_by_title(self, title: str) -> Optional[Album]:
         """Retrieve album by exact title match (case-insensitive)."""
-        query = "SELECT AlbumID, AlbumTitle, AlbumArtist, AlbumType, ReleaseYear FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+        query = "SELECT AlbumID, AlbumTitle, AlbumType, ReleaseYear FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (title,))
             row = cursor.fetchone()
@@ -60,8 +60,8 @@ class AlbumRepository(GenericRepository[Album]):
     def _insert_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
         cursor.execute(
-            "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, ?, ?)",
-            (album.title, album.album_artist, album.album_type, album.release_year)
+            "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
+            (album.title, album.album_type, album.release_year)
         )
         new_id = cursor.lastrowid
         
@@ -74,8 +74,8 @@ class AlbumRepository(GenericRepository[Album]):
     def _update_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> None:
         """Execute SQL UPDATE for GenericRepository"""
         cursor.execute(
-            "UPDATE Albums SET AlbumTitle = ?, AlbumArtist = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
-            (album.title, album.album_artist, album.album_type, album.release_year, album.album_id)
+            "UPDATE Albums SET AlbumTitle = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
+            (album.title, album.album_type, album.release_year, album.album_id)
         )
         
         # T-91: Re-sync M2M links on update
@@ -154,64 +154,45 @@ class AlbumRepository(GenericRepository[Album]):
     ) -> Optional[Album]:
         """
         Find album by unique key (Title, AlbumArtist, ReleaseYear).
-        Handles NULL values appropriately for disambiguation.
+        Uses M2M AlbumCredits for artist comparison.
         """
-        # Build query dynamically based on what's provided
-        conditions = ["AlbumTitle = ? COLLATE NOCASE"]
-        params = [title]
-        
-        if album_artist:
-            conditions.append("AlbumArtist = ? COLLATE NOCASE")
-            params.append(album_artist)
-        else:
-            conditions.append("(AlbumArtist IS NULL OR AlbumArtist = '')")
+        # 1. Find candidates matching Title + Year
+        base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+        base_params = [title]
         
         if release_year:
-            conditions.append("ReleaseYear = ?")
-            params.append(release_year)
+            base_query += " AND ReleaseYear = ?"
+            base_params.append(release_year)
         else:
-            conditions.append("ReleaseYear IS NULL")
+            base_query += " AND ReleaseYear IS NULL"
             
-        query = f"SELECT * FROM Albums WHERE {' AND '.join(conditions)}"
-        
         with self.get_connection() as conn:
-            cursor = conn.execute(query, params)
-            row = cursor.fetchone()
-            if row:
-                return Album.from_row(row)
+            cursor = conn.execute(base_query, base_params)
+            candidates = [row[0] for row in cursor.fetchall()]
             
-            # T-91 FALLBACK: If string search failed, check M2M links
-            if album_artist:
-                # 1. Resolve names in search string
-                search_names = {a.strip().lower() for a in album_artist.split(',') if a.strip()}
-                if not search_names:
-                    return None
-                    
-                # 2. Find albums with matching title/year and check their contributors
-                base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
-                base_params = [title]
-                if release_year:
-                    base_query += " AND ReleaseYear = ?"
-                    base_params.append(release_year)
-                else:
-                    base_query += " AND ReleaseYear IS NULL"
+            if not candidates:
+                return None
                 
-                cursor = conn.execute(base_query, base_params)
-                potential_albums = cursor.fetchall()
+            # 2. Prepare target artist set
+            target_names = set()
+            if album_artist and album_artist.strip():
+                # Normalize similarly to M2M storage (logic depends on how we want to compare)
+                # Here we assume simple case-insensitive set match
+                target_names = {a.strip().lower() for a in album_artist.split(',') if a.strip()}
+            
+            # 3. Check each candidate
+            for album_id in candidates:
+                cursor.execute("""
+                    SELECT lower(AN.DisplayName) 
+                    FROM AlbumCredits AC 
+                    JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID 
+                    WHERE AC.AlbumID = ?
+                """, (album_id,))
                 
-                for (potential_id,) in potential_albums:
-                    # Get contributors for this specific album
-                    cursor.execute("""
-                        SELECT lower(AN.DisplayName) 
-                        FROM AlbumCredits AC 
-                        JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID 
-                        WHERE AC.AlbumID = ?
-                    """, (potential_id,))
-                    linked_names = {row[0] for row in cursor.fetchall()}
-                    
-                    # If the exact set of names matches, we found it!
-                    if linked_names == search_names:
-                        return self.get_by_id(potential_id, conn=conn)
+                linked_names = {row[0] for row in cursor.fetchall()}
+                
+                if linked_names == target_names:
+                    return self.get_by_id(album_id, conn=conn)
 
         return None
 
@@ -220,13 +201,16 @@ class AlbumRepository(GenericRepository[Album]):
         # Dynamic HAVING clause
         having_clause = "HAVING SongCount = 0" if empty_only else ""
         
+        # We need to join ArtistNames to search by artist
         sql_query = f"""
             SELECT 
-                a.AlbumID, a.AlbumTitle, a.AlbumArtist, a.AlbumType, a.ReleaseYear,
-                COUNT(sa.SourceID) as SongCount
+                a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
+                COUNT(DISTINCT sa.SourceID) as SongCount
             FROM Albums a
             LEFT JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
-            WHERE a.AlbumTitle LIKE ? OR a.AlbumArtist LIKE ?
+            LEFT JOIN AlbumCredits ac ON a.AlbumID = ac.AlbumID
+            LEFT JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
+            WHERE a.AlbumTitle LIKE ? OR an.DisplayName LIKE ?
             GROUP BY a.AlbumID
             {having_clause}
             ORDER BY CASE WHEN a.AlbumTitle LIKE ? THEN 1 ELSE 2 END, a.AlbumTitle
@@ -239,10 +223,21 @@ class AlbumRepository(GenericRepository[Album]):
         with self.get_connection() as conn:
             cursor = conn.execute(sql_query, (wildcard, wildcard, starts_with, limit))
             for row in cursor.fetchall():
-                results.append(Album.from_row(row))
+                # from_row will not have AlbumArtist, but we can hydrate it
+                # Optimization: Could GROUP_CONCAT in the search query, but existing pattern parses M2M in from_row?
+                # Actually from_row doesn't hydrate. We need to hydrate manually or rely on lazy loading?
+                # The existing pattern was:
+                # album = Album.from_row(row)
+                # But notice search results didn't hydrate artist in the previous code? 
+                # Wait, looking at previous code:
+                # results.append(Album.from_row(row))
+                # It DID NOT call _get_joined_album_artist. So previously it returned whatever was in the TEXT column.
+                # Now that column is gone. We SHOULD hydrate it for the UI to show the artist.
+                
+                album = Album.from_row(row)
+                album.album_artist = self._get_joined_album_artist(conn, album.album_id)
+                results.append(album)
         return results
-
-
 
     def create(
         self, 
@@ -258,7 +253,8 @@ class AlbumRepository(GenericRepository[Album]):
         album = Album(
             album_id=None, 
             title=title, 
-            album_artist=album_artist,
+            # album_artist IS NONE, intended for M2M linking
+            album_artist=album_artist, 
             album_type=album_type, 
             release_year=release_year
         )
@@ -328,7 +324,7 @@ class AlbumRepository(GenericRepository[Album]):
     def get_albums_for_song(self, source_id: int) -> List[Album]:
         """Get all albums a song appears on."""
         query = """
-            SELECT a.AlbumID, a.AlbumTitle, a.AlbumArtist, a.AlbumType, a.ReleaseYear
+            SELECT a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear
             FROM Albums a
             JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
             WHERE sa.SourceID = ?
@@ -337,7 +333,9 @@ class AlbumRepository(GenericRepository[Album]):
         with self.get_connection() as conn:
             cursor = conn.execute(query, (source_id,))
             for row in cursor.fetchall():
-                albums.append(Album.from_row(row))
+                album = Album.from_row(row)
+                album.album_artist = self._get_joined_album_artist(conn, album.album_id)
+                albums.append(album)
         return albums
 
     def get_songs_in_album(self, album_id: int) -> List[dict]:
@@ -418,8 +416,8 @@ class AlbumRepository(GenericRepository[Album]):
             created = False
             if not album:
                 cursor.execute(
-                    "INSERT INTO Albums (AlbumTitle, AlbumArtist, AlbumType, ReleaseYear) VALUES (?, ?, 'Album', ?)",
-                    (album_title.strip(), artist, year)
+                    "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, 'Album', ?)",
+                    (album_title.strip(), year)
                 )
                 new_id = cursor.lastrowid
                 album = Album(album_id=new_id, title=album_title.strip(), album_artist=artist, release_year=year, album_type='Album')
