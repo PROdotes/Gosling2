@@ -66,12 +66,6 @@ class PublisherDetailsDialog(QDialog):
         self.cmb_parent.setObjectName("PublisherParentCombo")
         h_parent.addWidget(self.cmb_parent)
         
-        # Use GlowButton for consistent workstation look
-        self.btn_new_parent = GlowButton("")
-        self.btn_new_parent.setObjectName("AddInlineButton")
-        self.btn_new_parent.setToolTip("Create New Parent")
-        self.btn_new_parent.clicked.connect(self._create_new_parent)
-        h_parent.addWidget(self.btn_new_parent)
         
         self.layout.addLayout(h_parent)
         self.layout.addSpacing(15)
@@ -157,29 +151,6 @@ class PublisherDetailsDialog(QDialog):
         # Subsidiaries - now uses EntityListWidget!
         self.list_children.refresh_from_adapter()
 
-    def _create_new_parent(self):
-        from .entity_picker_dialog import EntityPickerDialog
-        from src.core.picker_config import get_publisher_picker_config
-        
-        config = get_publisher_picker_config()
-        config.title_add = "Find or Create Parent"
-        
-        # Use existing service provider wrapper
-        diag = EntityPickerDialog(
-            service_provider=self.service_provider, 
-            config=config, 
-            parent=self
-        )
-        
-        if diag.exec() == 1:
-            new_pub = diag.get_selected()
-            if new_pub:
-                self._refresh_data()
-                # Auto-select the newly created/selected parent
-                idx = self.cmb_parent.findData(new_pub.publisher_id)
-                if idx >= 0: 
-                    self.cmb_parent.setCurrentIndex(idx)
-                    self.cmb_parent.setFocus()
 
     def _save(self):
         new_name = self.txt_name.text().strip()

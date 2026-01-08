@@ -104,10 +104,7 @@ class SettingsDialog(QDialog):
         self.chk_rename_enabled.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("ENABLE AUTO-RENAMING", self.chk_rename_enabled))
 
-        self.chk_move_done = GlowToggle()
-        self.chk_move_done.set_labels("ON", "OFF")
-        layout.addLayout(self._add_toggle_row("MOVE FILES TO ROOT ON 'MARK DONE'", self.chk_move_done))
-        
+
         self.chk_write_tags = GlowToggle()
         self.chk_write_tags.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("WRITE TO TAGS", self.chk_write_tags, "If disabled, metadata changes will only be saved to the database."))
@@ -278,7 +275,7 @@ class SettingsDialog(QDialog):
         
         # File Management
         self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
-        self.chk_move_done.setChecked(self.settings_manager.get_move_after_done())
+
         self.chk_delete_zip.setChecked(self.settings_manager.get_delete_zip_after_import())
         self.chk_write_tags.setChecked(self.settings_manager.get_write_tags())
         self.txt_pattern.setText(self.settings_manager.get_rename_pattern())
@@ -390,7 +387,7 @@ class SettingsDialog(QDialog):
             
         # File Management
         self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())
-        self.settings_manager.set_move_after_done(self.chk_move_done.isChecked())
+
         self.settings_manager.set_delete_zip_after_import(self.chk_delete_zip.isChecked())
         self.settings_manager.set_write_tags(self.chk_write_tags.isChecked())
         self.settings_manager.set_rename_pattern(self.txt_pattern.text().strip())
