@@ -519,6 +519,15 @@ class EntityPickerDialog(QDialog):
                 item = QListWidgetItem(f"➕ Create \"{current_name}\"{type_suffix}")
                 item.setData(Qt.ItemDataRole.UserRole, ("CREATE", current_name, t))
                 self.list_results.addItem(item)
+
+        # T-82/92: Spotify CamelCase Splitter Shortcut (Move outside loop to de-duplicate)
+        service = getattr(self.services, 'spotify_parsing_service', None)
+        if service and service.is_camel_case(current_name):
+            # Use the current filter type, or fallback to the config default (usually 'Person')
+            target_t = self._current_type_filter or self.config.default_type
+            spotify_item = QListWidgetItem(f"🎵 Create from Spotify (Split \"{current_name}\")")
+            spotify_item.setData(Qt.ItemDataRole.UserRole, ("CREATE_SPOTIFY", current_name, target_t))
+            self.list_results.addItem(spotify_item)
     
     def _add_entity_item(self, entity: Any):
         """Add an entity to the list."""
@@ -578,8 +587,21 @@ class EntityPickerDialog(QDialog):
                 self._selected_entity = self.target_entity
                 self.accept()
                 
-            elif action == "CREATE":
+            elif action in ("CREATE", "CREATE_SPOTIFY"):
                 _, name, type_name = data
+                service = getattr(self.services, 'spotify_parsing_service', None)
+                
+                # Split logic for Spotify CamelCase
+                if action == "CREATE_SPOTIFY" and service:
+                    parts = service.split_camel_case(name)
+                    if parts and hasattr(self.service, self.config.get_or_create_fn):
+                        create_method = getattr(self.service, self.config.get_or_create_fn)
+                        results = [create_method(p, type_name)[0] for p in parts]
+                        self._selected_entity = results
+                        self.accept()
+                        return
+
+                # Default Create
                 if hasattr(self.service, self.config.get_or_create_fn):
                     create_method = getattr(self.service, self.config.get_or_create_fn)
                     self._selected_entity, _ = create_method(name, type_name)

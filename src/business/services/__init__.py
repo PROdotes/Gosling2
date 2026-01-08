@@ -6,6 +6,7 @@ from .settings_manager import SettingsManager
 from .renaming_service import RenamingService
 from .duplicate_scanner import DuplicateScannerService
 from .conversion_service import ConversionService
+from .spotify_parsing_service import SpotifyParsingService
 from .song_service import SongService
 from .contributor_service import ContributorService
 from .album_service import AlbumService
@@ -14,7 +15,7 @@ from .tag_service import TagService
 
 __all__ = [
     'LibraryService', 'MetadataService', 'PlaybackService', 'SettingsManager', 
-    'RenamingService', 'DuplicateScannerService', 'ConversionService',
+    'RenamingService', 'DuplicateScannerService', 'ConversionService', 'SpotifyParsingService',
     'SongService', 'ContributorService', 'AlbumService', 'PublisherService', 'TagService'
 ]
 

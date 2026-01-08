@@ -19,12 +19,14 @@ class LibraryService:
                  contributor_service: ContributorService, 
                  album_service: AlbumService,
                  publisher_service: PublisherService,
-                 tag_service: TagService):
+                 tag_service: TagService,
+                 spotify_parsing_service=None):
         self.song_service = song_service
         self.contributor_service = contributor_service
         self.album_service = album_service
         self.publisher_service = publisher_service
         self.tag_service = tag_service
+        self.spotify_parsing_service = spotify_parsing_service
 
 
     def add_file(self, file_path: str) -> Optional[int]:

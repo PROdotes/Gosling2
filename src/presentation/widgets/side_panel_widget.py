@@ -30,7 +30,7 @@ class SidePanelWidget(QFrame):
     staging_changed = pyqtSignal(list) # list of song_ids in staging
     filter_refresh_requested = pyqtSignal() # Request rebuild of sidebar filters
     
-    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, spotify_parsing_service=None, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.settings_manager = settings_manager
@@ -43,6 +43,7 @@ class SidePanelWidget(QFrame):
         self.renaming_service = renaming_service
         self.renaming_service = renaming_service
         self.duplicate_scanner = duplicate_scanner
+        self.spotify_parsing_service = spotify_parsing_service
         
         # QSS Styling Support
         self.setObjectName("SidePanelEditor")

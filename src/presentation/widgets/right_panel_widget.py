@@ -172,7 +172,7 @@ class RightPanelWidget(QWidget):
     transition_command = pyqtSignal(str, int)
     editor_mode_changed = pyqtSignal(bool)
     
-    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, parent=None):
+    def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, spotify_parsing_service=None, parent=None):
         super().__init__(parent)
         self.setObjectName("RightSurgicalPanel")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -209,7 +209,7 @@ class RightPanelWidget(QWidget):
         
         # --- Zone 2: Editor ---
         self.editor_widget = SidePanelWidget(
-            library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager
+            library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, spotify_parsing_service
         )
         # settings_manager is now passed via constructor
         

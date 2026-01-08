@@ -14,7 +14,7 @@ from ..widgets import (
     SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
-from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService
+from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
 from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
@@ -174,13 +174,15 @@ class MainWindow(QMainWindow):
         from ...data.repositories.audit_repository import AuditRepository
         self.audit_repository = AuditRepository(db_path)
         self.audit_service = AuditService(self.audit_repository)
+        self.spotify_parsing_service = SpotifyParsingService()
 
         self.library_service = LibraryService(
             self.song_service, 
             self.contributor_service, 
             self.album_service,
             self.publisher_service,
-            self.tag_service
+            self.tag_service,
+            self.spotify_parsing_service
         )
         self.metadata_service = MetadataService()
         self.playback_service = PlaybackService(self.settings_manager)
@@ -317,7 +319,8 @@ class MainWindow(QMainWindow):
             self.metadata_service,
             self.renaming_service,
             self.duplicate_scanner,
-            self.settings_manager
+            self.settings_manager,
+            self.spotify_parsing_service
         )
         self.main_splitter.addWidget(self.right_panel)
         main_layout.addWidget(self.main_splitter, 1)
