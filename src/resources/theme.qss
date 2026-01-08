@@ -1254,13 +1254,9 @@ QPushButton#AlbumActionButton:hover {
     border: 1px solid #ffaa00;
 }
 
-/* Centralized Button Sizing for Dialogs */
-#AlbumManagerDialog GlowButton {
-    min-width: 140px;
-}
-
-/* Exclude inline add buttons from the 140px rule */
-#AlbumManagerDialog #AddInlineButton {
+/* Note: AlbumManagerDialog button sizing is handled via Python setFixedWidth() */
+/* EntityPickerDialog buttons should not inherit any cascaded min-width from parent dialogs */
+#EntityPickerDialog GlowButton {
     min-width: 0px;
 }
 

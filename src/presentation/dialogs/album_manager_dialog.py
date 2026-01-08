@@ -337,7 +337,7 @@ class AlbumManagerDialog(QDialog):
         header_layout_art.setContentsMargins(0, 0, 0, 0)
         header_layout_art.setSpacing(4)
         lbl_art = QLabel("ALBUM ARTIST")
-        lbl_art.setObjectName("FieldLabel")
+        lbl_art.setObjectName("DialogFieldLabel")
         header_layout_art.addWidget(lbl_art, 1)
         module_layout_art.addWidget(header_row_art)
         
@@ -377,7 +377,7 @@ class AlbumManagerDialog(QDialog):
         header_layout_pub.setContentsMargins(0, 0, 0, 0)
         header_layout_pub.setSpacing(4)
         lbl_pub = QLabel("PUBLISHER")
-        lbl_pub.setObjectName("FieldLabel")
+        lbl_pub.setObjectName("DialogFieldLabel")
         header_layout_pub.addWidget(lbl_pub, 1)
         module_layout_pub.addWidget(header_row_pub)
         
@@ -404,7 +404,7 @@ class AlbumManagerDialog(QDialog):
         
         # Type Dropdown
         lbl_type = QLabel("RELEASE TYPE")
-        lbl_type.setObjectName("FieldLabel")
+        lbl_type.setObjectName("DialogFieldLabel")
         layout.addWidget(lbl_type)
         
         self.cmb_type = GlowComboBox()
@@ -427,7 +427,7 @@ class AlbumManagerDialog(QDialog):
 
     def _add_field(self, layout, label):
         lbl = QLabel(label.upper())
-        lbl.setObjectName("FieldLabel")  # Same as side panel for tight proximity
+        lbl.setObjectName("DialogFieldLabel")  # Match other dialogs' styling
         inp = GlowLineEdit()
         layout.addWidget(lbl)
         layout.addWidget(inp)
