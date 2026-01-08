@@ -260,6 +260,7 @@ All ideas are stored in `docs/ideas/`. Browse by category:
 | [Autofill on Import](docs/ideas/IDEA_autofill_on_import.md) | Auto-populate metadata |
 | [Crowd Sourced Data](docs/ideas/IDEA_crowd_sourced_data.md) | Community metadata |
 | [Last Played Tracking](docs/ideas/IDEA_last_played_tracking.md) | Play history analytics |
+| [Library Intelligence](docs/ideas/IDEA_library_intelligence.md) | Chart gaps, wishlist, alias search |
 | [Music API Lookup](docs/ideas/IDEA_music_api_lookup.md) | MusicBrainz/Discogs/Spotify |
 | [Statistics Dashboard](docs/ideas/IDEA_statistics_dashboard.md) | Usage analytics |
 | [Universal Tag Picker](docs/ideas/IDEA_UNIVERSAL_TAG_PICKER.md) | Tree-based tag selection |
