@@ -226,22 +226,18 @@ class EntityClickRouter:
         Prefers universal EntityPickerDialog if a PickerConfig exists for the type.
         """
         from .picker_config import get_config_for_type
-        picker_config = get_config_for_type(entity_type)
+        
+        # Calculate allowed types if filtering is requested
+        allowed_types = None
+        if filter_type and entity_type in (EntityType.ARTIST, EntityType.GROUP_MEMBER):
+            # Strict filtering: If asking for "Person", only show "Person".
+            # This satisfies "pick group alias should only show group"
+            allowed_types = [filter_type.title()]
+
+        picker_config = get_config_for_type(entity_type, allowed_types=allowed_types)
         
         if picker_config:
             from src.presentation.dialogs.entity_picker_dialog import EntityPickerDialog
-            
-            # Customize config if filter_type is provided
-            # This hides the opposite type button (e.g., hide Group when adding Person members)
-            if filter_type and entity_type in (EntityType.ARTIST, EntityType.GROUP_MEMBER):
-                filter_type_title = filter_type.title()  # "person" -> "Person"
-                opposite_type = "Group" if filter_type_title == "Person" else "Person"
-                
-                # Remove the opposite type from buttons
-                picker_config.type_buttons = [t for t in picker_config.type_buttons if t != opposite_type]
-                picker_config.type_icons = {k: v for k, v in picker_config.type_icons.items() if k != opposite_type}
-                picker_config.type_colors = {k: v for k, v in picker_config.type_colors.items() if k != opposite_type}
-                picker_config.default_type = filter_type_title
             
             dialog = EntityPickerDialog(
                 service_provider=self.services,

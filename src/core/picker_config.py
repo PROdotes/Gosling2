@@ -112,18 +112,32 @@ def get_tag_picker_config() -> PickerConfig:
     )
 
 
-def get_artist_picker_config() -> PickerConfig:
-    """Get configuration for Artist/Contributor picker."""
+def get_artist_picker_config(allowed_types: Optional[List[str]] = None, default_type: Optional[str] = None) -> PickerConfig:
+    """
+    Get configuration for Artist/Contributor picker.
+    
+    Args:
+        allowed_types: Optional list of types to include (e.g., ["Group"]).
+                       If None, includes all ["Person", "Group", "Alias"].
+        default_type: Optional default selected type.
+    """
+    all_types = ["Person", "Group", "Alias"]
+    all_icons = {"Person": "👤", "Group": "👥", "Alias": "📝"}
+    all_colors = {"Person": "#4FC3F7", "Group": "#81C784", "Alias": "#FFB74D"}
+    
+    # Filter types if requested
+    types = allowed_types if allowed_types is not None else all_types
+    
     return PickerConfig(
         title_add="Add Artist",
         title_edit="Edit Artist",
         search_placeholder="Search or type type:name (e.g., alias:pink)",
         
-        type_buttons=["Person", "Group", "Alias"],
-        type_icons={"Person": "👤", "Group": "👥", "Alias": "📝"},
-        type_colors={"Person": "#4FC3F7", "Group": "#81C784", "Alias": "#FFB74D"},
+        type_buttons=types,
+        type_icons={k: v for k, v in all_icons.items() if k in types},
+        type_colors={k: v for k, v in all_colors.items() if k in types},
         allow_new_types=False,  # Cannot invent new types
-        default_type="Person",
+        default_type=default_type or (types[0] if types else "Person"),
         
         prefix_map={
             "p": "Person", "person": "Person",
@@ -139,7 +153,7 @@ def get_artist_picker_config() -> PickerConfig:
         
         display_fn=lambda a: a.name if hasattr(a, 'name') else str(a),
         id_fn=lambda a: a.contributor_id if hasattr(a, 'contributor_id') else 0,
-        type_fn=lambda a: a.type if hasattr(a, 'type') else "Person",
+        type_fn=lambda a: getattr(a, 'type', 'Person'),
         icon_fn=lambda a: "👥" if getattr(a, 'type', 'person').lower() == "group" else "👤",
     )
 
@@ -171,13 +185,13 @@ def get_publisher_picker_config() -> PickerConfig:
         icon_fn=lambda p: "🏢",
     )
 
-def get_config_for_type(entity_type: EntityType) -> Optional[PickerConfig]:
+def get_config_for_type(entity_type: EntityType, allowed_types: Optional[List[str]] = None) -> Optional[PickerConfig]:
     """Resolve PickerConfig for a given EntityType."""
     if entity_type == EntityType.ARTIST:
-        return get_artist_picker_config()
+        return get_artist_picker_config(allowed_types=allowed_types)
     if entity_type == EntityType.GROUP_MEMBER:
         # Group members use the same picker as Artists (just filtered differently)
-        return get_artist_picker_config()
+        return get_artist_picker_config(allowed_types=allowed_types)
     if entity_type == EntityType.PUBLISHER:
         return get_publisher_picker_config()
     if entity_type == EntityType.TAG:

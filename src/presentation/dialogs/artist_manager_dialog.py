@@ -350,20 +350,11 @@ class ArtistDetailsDialog(QDialog):
                 self.contributor_service = service
         
         # Get base config and customize for alias-adding
-        config = get_artist_picker_config()
-        config.title_add = f"Add Alias for {self.artist.name}"
-        
-        # FILTER: Show same type + Alias, but NOT the opposite type
-        # e.g., for Person: show Person + Alias, hide Group
-        # e.g., for Group: show Group + Alias, hide Person
+        # User Request: "pick group alias should only show group" (Strict filtering)
         artist_type = self.artist.type.title()  # "person" -> "Person"
-        opposite_type = "Group" if artist_type == "Person" else "Person"
         
-        # Remove the opposite type from buttons
-        config.type_buttons = [t for t in config.type_buttons if t != opposite_type]
-        config.type_icons = {k: v for k, v in config.type_icons.items() if k != opposite_type}
-        config.type_colors = {k: v for k, v in config.type_colors.items() if k != opposite_type}
-        config.default_type = artist_type
+        config = get_artist_picker_config(allowed_types=[artist_type])
+        config.title_add = f"Add Alias for {self.artist.name}"
         
         diag = EntityPickerDialog(
             service_provider=_ServiceProvider(self.service),
