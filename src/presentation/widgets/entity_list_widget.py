@@ -160,7 +160,10 @@ class EntityListWidget(QWidget):
         # Connect signals
         if self.allow_edit:
             self._inner_widget.chip_clicked.connect(self._on_item_clicked, Qt.ConnectionType.UniqueConnection)
-            self._inner_widget.chip_context_menu_requested.connect(self.chip_context_menu_requested.emit)
+            
+        # Context menu should always work if there are handlers
+        self._inner_widget.chip_context_menu_requested.connect(self.chip_context_menu_requested.emit)
+        
         if self.allow_remove:
             self._inner_widget.chip_remove_requested.connect(self._on_item_remove_requested)
         if self.allow_add:

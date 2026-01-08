@@ -499,9 +499,12 @@ class EntityPickerDialog(QDialog):
             types_to_offer = [self._current_type_filter]
         else:
             types_to_offer = self.config.type_buttons or [self.config.default_type]
+
+
             
         for t in types_to_offer:
-            if not t: continue
+            # if not t: continue  <-- REMOVED: support empty type strings (Publishers)
+
             
             # Check for exact match in this specific type
             # (Allows creating 'Queen' as Person even if 'Queen' Group exists)

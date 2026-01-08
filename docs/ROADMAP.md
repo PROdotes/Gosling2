@@ -120,7 +120,9 @@ tags:
 *   [x] **Generic Repository** (~2.0 h): Refactor repetitive CRUD code.
     *   *Status*: **Done** - Core ABC and SongRepository integration complete.
 *   [x] **ID3 Logic Extraction** (~1.0 h): Deduplicate JSON lookup.
-*   [ ] [**Unified Input Dialog**](tasks/T-85_universal_input_dialog.md) (T-85): Extract `TagRenameDialog` logic to reusable module; replace all `QInputDialog`s.
+*   [x] [**Unified Input Dialog**](tasks/T-85_universal_input_dialog.md) (T-85):
+    *   *Status*: **Done** — Consolidated `TagPickerDialog`, `ArtistCreatorDialog`, and `QInputDialog` into the generalized `EntityPickerDialog`.
+    *   *Result*: Standardized "Morning Logic" UI, eliminated code duplication, and removed 100% of ad-hoc `QInputDialog` usage.
 -   [x] **T-79 QSS Optimization**: Centralize remaining hardcoded styles.
 -   [x] [**T-81 Restore Web Search**](tasks/T-81_restore_web_search.md): Restore web search with Settings Manager persistence.
 *   [x] **Album Manager QSS Refactor**: Move hardcoded styles/layout tweaks from Python to `theme.qss` for cleaner separation.
@@ -177,22 +179,22 @@ tags:
     *   *Audit*: Search for and remove lingering hardcoded "Genre/Mood" logic (Tech Debt) in favor of generic `TagService`.
 *   [x] **Bug: Filter Tree LED Disappears**
     *   *Issue*: Clearing the search bar causes the checkbox LEDs in the filter tree to vanish.
-*   [ ] **Bug: Publisher Multi-Edit & RecordingPublishers Implementation**
-    *   *Issue*: Publisher multi-editing fails because backend logic for `RecordingPublishers` (Song-Level) is missing in `PublisherRepository`.
-    *   *Reference*: See [PROPOSAL_SCHEMA_V2.md](PROPOSAL_SCHEMA_V2.md) (Phase 2 Checklist).
-    *   *Task*: Implement `add_publisher_to_recording` and update SidePanel to target `RecordingPublishers` instead of inferring Album Publishers.
-*   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
-    *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
-    *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.
+*   [x] **Bug: Publisher Multi-Edit & RecordingPublishers Implementation**
+    *   *Issue*: Publisher multi-editing fails because backend logic for `RecordingPublishers` (Song-Level) was missing.
+    *   *Status*: **Done** — Implemented `RecordingPublishers` M2M table, ID-based `SongSyncService` priority, and "Effective View" waterfall logic (Grid = Inheritance, Editor = Direct links).
+    *   *Reference*: T-180.
+*   [x] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
+    *   *Status*: **Done** (Absorbed into `EntityPickerDialog`).
 *   [x] **Unify Entity Creation UI**
     *   *Task*: Ensure all "Add Person" buttons (Creator, Artist, Group Member) use the standard `EntityPickerDialog` UI (same as Composer).
     *   *Goal*: Eliminate formatting discrepancies between different creation dialogs.
 *   [ ] **Bug: Ghost Chips (Staging/Parsing)**
     *   *Report*: "Ika MatančevićVedran Cvetojević Werone," should create 2 people... but we don't have time to look into that... i just wanna know why it created a person that i can't delete in the composers"
     *   *Analysis*: Parsing failure created a composite entity (bad name) which got staged. Immediate delete works on DB, but Staging buffer (from the paste) revives it in UI.
-*   [ ] **Bug: Publisher Creation Missing**
+*   [x] **Bug: Publisher Creation Missing**
     *   *Report*: "can't add a publisher... prolly due to missing create..."
     *   *Issue*: Publisher Picker likely lacks "Create New" button or logic to handle non-existent publishers.
+    *   *Status*: **Fixed** - Removed type check logic in `EntityPickerDialog` that ignored typeless entities (Publishers).
 
 
 ##  Pending Work Estimates
@@ -200,10 +202,8 @@ Quick reference for remaining tasks.
 
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
-| **High** | **Fix Publisher Multi-Edit** (Schema Gap) | ~2.0h |
 | Low | Chip Sorting Stability (Polish) | ~0.5h |
-| Low | Universal Data Editor (Refactor) | ~3.0h |
 | Low | Advanced Rule Editor (New Feature) | ~2.0h |
 
-**Total Critical Path:** ~3.5h
-**Total All:** ~9.0h
+**Total Critical Path:** 0.0h (Release Candidate Ready)
+**Total All:** ~2.5h

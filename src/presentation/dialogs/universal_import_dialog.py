@@ -92,7 +92,53 @@ class UniversalImportDialog(QDialog):
         header = self.tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         
+        # Connect selection change for inspector
+        self.tree.selectionModel().selectionChanged.connect(self._on_selection_changed)
+        
         browser_deck.addWidget(self.tree, 1)
+
+        # C. ZIP INSPECTOR (The Right Deck)
+        self.inspector_pane = QFrame()
+        self.inspector_pane.setObjectName("ImportInspector")
+        self.inspector_pane.setFixedWidth(280)
+        self.inspector_pane.hide() # Hidden until a ZIP is clicked
+        
+        inspector_layout = QVBoxLayout(self.inspector_pane)
+        inspector_layout.setContentsMargins(15, 15, 15, 15)
+        inspector_layout.setSpacing(10)
+        
+        # Header
+        lbl_insp_title = QLabel("ZIP INSPECTOR")
+        lbl_insp_title.setObjectName("DialogFieldLabel")
+        inspector_layout.addWidget(lbl_insp_title)
+        
+        # Summary Area
+        self.lbl_zip_name = QLabel("No ZIP Selected")
+        self.lbl_zip_name.setWordWrap(True)
+        self.lbl_zip_name.setStyleSheet("font-weight: bold; color: #CCC;")
+        inspector_layout.addWidget(self.lbl_zip_name)
+        
+        self.lbl_zip_stats = QLabel("")
+        self.lbl_zip_stats.setStyleSheet("color: #888; font-size: 11px;")
+        inspector_layout.addWidget(self.lbl_zip_stats)
+        
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setStyleSheet("background: #333;")
+        inspector_layout.addWidget(line)
+        
+        # Content List
+        label_contents = QLabel("CONTAINS:")
+        label_contents.setStyleSheet("color: #666; font-size: 10px; font-weight: bold;")
+        inspector_layout.addWidget(label_contents)
+        
+        self.list_contents = QListWidget()
+        self.list_contents.setObjectName("InspectorContentList")
+        self.list_contents.setStyleSheet("background: transparent; border: none; font-size: 11px;")
+        inspector_layout.addWidget(self.list_contents, 1)
+        
+        browser_deck.addWidget(self.inspector_pane)
+        
         main_layout.addLayout(browser_deck)
 
         # 3. ACTION BAR (The Landing)

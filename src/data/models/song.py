@@ -17,6 +17,7 @@ class Song(MediaSource):
     album_id: Union[int, List[int], None] = None # Added for precise linking (T-46)
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
     publisher: Optional[object] = None # Union[str, List[str]]
+    publisher_id: Union[int, List[int], None] = None # Added for precise linking
     notes: Optional[str] = None
     is_active: bool = True
     
@@ -186,6 +187,7 @@ class Song(MediaSource):
             'album': self.album,  # Might be string or list
             'album_id': self.album_id, 
             'publisher': self.publisher,
+            'publisher_id': self.publisher_id,
             'performers': self.performers,
             'composers': self.composers,
             'lyricists': self.lyricists,

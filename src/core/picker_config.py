@@ -184,6 +184,29 @@ def get_publisher_picker_config() -> PickerConfig:
         icon_fn=lambda p: "🏢",
     )
 
+def get_alias_picker_config() -> PickerConfig:
+    """Get configuration for Alias picker (used for renaming)."""
+    return PickerConfig(
+        title_add="Add Alias",
+        title_edit="Rename Alias",
+        search_placeholder="Type new alias name...",
+        
+        type_buttons=[],
+        type_icons={},
+        type_colors={},
+        allow_new_types=False,
+        default_type="Alias",
+        
+        service_attr="contributor_service",
+        get_by_id_fn="get_by_id",
+        search_fn="search",
+        get_or_create_fn="get_or_create",
+        
+        display_fn=lambda a: a.name if hasattr(a, 'name') else str(a),
+        id_fn=lambda a: a.contributor_id if hasattr(a, 'contributor_id') else 0,
+        type_fn=lambda a: "Alias"
+    )
+
 def get_config_for_type(entity_type: EntityType, allowed_types: Optional[List[str]] = None) -> Optional[PickerConfig]:
     """Resolve PickerConfig for a given EntityType."""
     if entity_type == EntityType.ARTIST:
@@ -191,6 +214,8 @@ def get_config_for_type(entity_type: EntityType, allowed_types: Optional[List[st
     if entity_type == EntityType.GROUP_MEMBER:
         # Group members use the same picker as Artists (just filtered differently)
         return get_artist_picker_config(allowed_types=allowed_types)
+    if entity_type == EntityType.ALIAS:
+        return get_alias_picker_config()
     if entity_type == EntityType.PUBLISHER:
         return get_publisher_picker_config()
     if entity_type == EntityType.TAG:

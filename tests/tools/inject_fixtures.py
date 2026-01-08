@@ -328,12 +328,19 @@ def inject():
             UPDATE SongAlbums SET TrackPublisherID = NULL 
             WHERE SourceID IN (SELECT SourceID FROM MediaSources WHERE MediaName = 'Dancing Queen')
         """)
+        conn.execute("""
+            DELETE FROM RecordingPublishers 
+            WHERE SourceID IN (SELECT SourceID FROM MediaSources WHERE MediaName = 'Dancing Queen')
+        """)
         # Clear for Nirvana songs too
         conn.execute("""
             UPDATE SongAlbums SET TrackPublisherID = NULL 
             WHERE SourceID IN (SELECT SourceID FROM MediaSources WHERE MediaName IN ('Lithium', 'Polly', 'In Bloom'))
         """)
-        # Keep "Radio Ga Ga" with its TrackPublisherID (Special License Corp) for override test
+        conn.execute("""
+            DELETE FROM RecordingPublishers 
+            WHERE SourceID IN (SELECT SourceID FROM MediaSources WHERE MediaName IN ('Lithium', 'Polly', 'In Bloom'))
+        """)
         conn.commit()
         print("  [OK] Dancing Queen, Lithium, Polly, In Bloom now inherit from album (Level 2)")
         print("  [OK] Radio Ga Ga keeps TrackPublisherID override (Level 1)")

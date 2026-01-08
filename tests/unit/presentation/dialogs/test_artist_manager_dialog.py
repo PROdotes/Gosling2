@@ -155,13 +155,16 @@ class TestArtistDetailsDialog:
         assert dialog.lbl_member.text() == "BELONGS TO GROUPS"
 
     def test_edit_alias_rename(self, qtbot, mock_artist, mock_repo):
-        """Test renaming an alias using the simpler QInputDialog."""
+        """Test renaming an alias using the EntityPickerDialog."""
         dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
         qtbot.addWidget(dialog)
 
-        # Mock QInputDialog.getText
-        with patch('PyQt6.QtWidgets.QInputDialog.getText') as mock_get_text:
-            mock_get_text.return_value = ("New Alias Name", True)
+        # Mock EntityPickerDialog
+        with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker:
+            instance = MockPicker.return_value
+            instance.exec.return_value = 1 # Accept
+            instance.is_rename_requested.return_value = True
+            instance.get_rename_info.return_value = ("New Alias Name", "Alias")
 
             # Call _edit_alias
             dialog._edit_alias(alias_id=99, old_name="Old Name")

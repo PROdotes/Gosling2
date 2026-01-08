@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QFrame, QMessageBox, QWidget, QMenu, 
-    QComboBox, QRadioButton, QButtonGroup, QSizePolicy, QInputDialog, QCompleter
+    QComboBox, QRadioButton, QButtonGroup, QSizePolicy, QCompleter
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -212,7 +212,7 @@ class ArtistDetailsDialog(QDialog):
             context_adapter=self._alias_adapter,
             allow_add=True,  # Show the (+) button
             allow_remove=True,
-            allow_edit=False,  # Custom context menu instead
+            allow_edit=False,  # Context menu + Custom click handler instead
             add_tooltip="Add Alias",
             confirm_removal=False,  # Simplified removal
             parent=self
@@ -222,6 +222,9 @@ class ArtistDetailsDialog(QDialog):
             # Disconnect default and connect our custom handler
             self.list_aliases.tray.add_requested.disconnect()
             self.list_aliases.tray.add_requested.connect(self._add_alias)
+            # Normal click on alias -> Rename
+            self.list_aliases.tray.chip_clicked.connect(self._on_alias_chip_clicked)
+
         # Connect to custom context menu for Promote/Rename actions
         self.list_aliases.chip_context_menu_requested.connect(self._show_alias_chip_menu)
         layout.addWidget(self.list_aliases)
@@ -491,6 +494,11 @@ class ArtistDetailsDialog(QDialog):
             
 
 
+    def _on_alias_chip_clicked(self, alias_id, name):
+        """Handle mouse click on alias chip - trigger rename."""
+        self._edit_alias(alias_id, name)
+
+
     def _show_alias_chip_menu(self, alias_id, alias_name, global_pos):
         """Show context menu for alias chips."""
         menu = QMenu(self)
@@ -529,13 +537,39 @@ class ArtistDetailsDialog(QDialog):
                 self._refresh_data()
 
     def _edit_alias(self, alias_id, old_name):
-        new_name, ok = QInputDialog.getText(
-            self, "Rename Alias", "New Name:", 
-            QLineEdit.EchoMode.Normal, old_name
+        from .entity_picker_dialog import EntityPickerDialog
+        from src.core.picker_config import get_alias_picker_config
+        from types import SimpleNamespace
+        
+        # Create mock entity for Rename mode
+        target = SimpleNamespace(contributor_id=alias_id, name=old_name)
+        
+        diag = EntityPickerDialog(
+            service_provider=self._service_adapter,
+            config=get_alias_picker_config(),
+            target_entity=target,
+            parent=self
         )
-        if ok and new_name and new_name.strip() != old_name:
-            self.service.update_alias(alias_id, new_name.strip())
-            self._refresh_data()
+        
+        if diag.exec() == 1:
+            if diag.is_rename_requested():
+                new_name, _ = diag.get_rename_info()
+                new_name = new_name.strip() if new_name else ""
+                
+                if new_name and new_name != old_name:
+                    # Check for existence (any person, group, or alias)
+                    existing = self.service.get_by_name(new_name)
+                    if existing:
+                        QMessageBox.warning(
+                            self, 
+                            "Name in Use", 
+                            f"The name '{new_name}' is already in use by another artist or alias.\n\n"
+                            "If you want to merge these identities, please use the standard 'Add Alias' button to trigger the merge flow."
+                        )
+                        return
+                        
+                    if self.service.update_alias(alias_id, new_name):
+                        self._refresh_data()
 
     def _delete_alias(self, alias_id):
         # Unused now, replaced by confirm version

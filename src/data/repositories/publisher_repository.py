@@ -61,8 +61,13 @@ class PublisherRepository(GenericRepository[Publisher]):
             cursor.execute("SELECT AlbumID FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
             for (a_id,) in cursor.fetchall():
                  auditor.log_delete("AlbumPublishers", f"{a_id}-{record_id}", {"AlbumID": a_id, "PublisherID": record_id})
+            
+            cursor.execute("SELECT SourceID FROM RecordingPublishers WHERE PublisherID = ?", (record_id,))
+            for (s_id,) in cursor.fetchall():
+                 auditor.log_delete("RecordingPublishers", f"{s_id}-{record_id}", {"SourceID": s_id, "PublisherID": record_id})
 
         cursor.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (record_id,))
+        cursor.execute("DELETE FROM RecordingPublishers WHERE PublisherID = ?", (record_id,))
         cursor.execute("DELETE FROM Publishers WHERE PublisherID = ?", (record_id,))
 
     def create(self, name: str, parent_id: Optional[int] = None, conn: Optional[sqlite3.Connection] = None) -> Publisher:
@@ -153,6 +158,65 @@ class PublisherRepository(GenericRepository[Publisher]):
             target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, publisher_id))
             AuditLogger(target_conn, batch_id=batch_id).log_delete("AlbumPublishers", f"{album_id}-{publisher_id}", snapshot)
             return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            return _execute(conn)
+
+    def add_publisher_to_song(self, song_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """Link a publisher ID to a recording (song)."""
+        from src.core.audit_logger import AuditLogger
+        
+        sql = "INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)"
+        
+        def _execute(target_conn):
+            cursor = target_conn.execute(sql, (song_id, publisher_id))
+            if cursor.rowcount > 0:
+                AuditLogger(target_conn, batch_id=batch_id).log_insert("RecordingPublishers", f"{song_id}-{publisher_id}", {
+                    "SourceID": song_id,
+                    "PublisherID": publisher_id
+                })
+            return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            return _execute(conn)
+
+    def remove_publisher_from_song(self, song_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """Unlink a publisher from a recording (song)."""
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            # Snapshot for audit
+            query = "SELECT SourceID, PublisherID FROM RecordingPublishers WHERE SourceID = ? AND PublisherID = ?"
+            cursor = target_conn.execute(query, (song_id, publisher_id))
+            row = cursor.fetchone()
+            if not row: return False
+            
+            snapshot = {"SourceID": row[0], "PublisherID": row[1]}
+            target_conn.execute("DELETE FROM RecordingPublishers WHERE SourceID = ? AND PublisherID = ?", (song_id, publisher_id))
+            AuditLogger(target_conn, batch_id=batch_id).log_delete("RecordingPublishers", f"{song_id}-{publisher_id}", snapshot)
+            return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            return _execute(conn)
+
+    def get_publishers_for_song(self, song_id: int, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]:
+        """Get all publishers associated with a recording (song)."""
+        query = """
+            SELECT p.PublisherID, p.PublisherName, p.ParentPublisherID
+            FROM Publishers p
+            JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
+            WHERE rp.SourceID = ?
+        """
+        
+        def _execute(target_conn):
+            cursor = target_conn.execute(query, (song_id,))
+            return [Publisher.from_row(row) for row in cursor.fetchall()]
 
         if conn:
             return _execute(conn)

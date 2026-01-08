@@ -242,32 +242,44 @@ class SongSyncService:
                 auditor.log_insert("SongAlbums", f"{song.source_id}-{aid}", {"SourceID": song.source_id, "AlbumID": aid, "IsPrimary": 1})
 
     def sync_publisher(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None) -> None:
-        """Sync publisher relationship."""
-        if isinstance(song.publisher, list):
-            publisher_names = [str(p).strip() for p in song.publisher if p]
-        else:
-            raw_val = song.publisher or ""
-            if '|||' in raw_val:
-                publisher_names = [p.strip() for p in raw_val.split('|||') if p.strip()]
-            else:
-                publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
-
+        """Sync publisher relationship (ID-based prioritized)."""
         desired_ids = set()
-        publisher_ids_ordered = [] 
-        
-        for pub_name in publisher_names:
-            cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
-            row = cursor.fetchone()
-            if row:
-                pid = row[0]
+        publisher_ids_ordered = []
+
+        # 1. Use Precise IDs if available (T-180)
+        # Prioritize non-empty IDs; if IDs are empty but names are present, fall back to names
+        p_ids = getattr(song, 'publisher_id', None)
+        if p_ids:
+            if isinstance(p_ids, list):
+                publisher_ids_ordered = [int(pid) for pid in p_ids if pid]
             else:
-                cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
-                pid = cursor.lastrowid
-                if auditor:
-                    auditor.log_insert("Publishers", pid, {"PublisherName": pub_name})
-            
-            desired_ids.add(pid)
-            publisher_ids_ordered.append(pid)
+                publisher_ids_ordered = [int(p_ids)]
+            desired_ids = set(publisher_ids_ordered)
+        
+        # 2. Fallback to Name-based sync (Legacy/ID3 Tag driven / RESEED)
+        elif song.publisher:
+            if isinstance(song.publisher, list):
+                publisher_names = [str(p).strip() for p in song.publisher if p]
+            else:
+                raw_val = song.publisher or ""
+                if '|||' in raw_val:
+                    publisher_names = [p.strip() for p in raw_val.split('|||') if p.strip()]
+                else:
+                    publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
+
+            for pub_name in publisher_names:
+                cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
+                row = cursor.fetchone()
+                if row:
+                    pid = row[0]
+                else:
+                    cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
+                    pid = cursor.lastrowid
+                    if auditor:
+                        auditor.log_insert("Publishers", pid, {"PublisherName": pub_name})
+                
+                desired_ids.add(pid)
+                publisher_ids_ordered.append(pid)
 
         cursor.execute("SELECT PublisherID FROM RecordingPublishers WHERE SourceID = ?", (song.source_id,))
         current_ids = set(r[0] for r in cursor.fetchall())

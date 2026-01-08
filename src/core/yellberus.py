@@ -245,8 +245,9 @@ FIELDS: List[FieldDef] = [
         # We explicitly EXCLUDE AlbumPublishers to force users to edit those in Album Manager.
         query_expression="""
             COALESCE(
+                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM RecordingPublishers RP_SUB JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID WHERE RP_SUB.SourceID = MS.SourceID),
                 (SELECT P_SUB.PublisherName FROM SongAlbums SA_SUB JOIN Publishers P_SUB ON SA_SUB.TrackPublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
-                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM RecordingPublishers RP_SUB JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID WHERE RP_SUB.SourceID = MS.SourceID)
+                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM SongAlbums SA_SUB JOIN AlbumPublishers AP_SUB ON SA_SUB.AlbumID = AP_SUB.AlbumID JOIN Publishers P_SUB ON AP_SUB.PublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1)
             ) AS Publisher
         """,
         required=True,

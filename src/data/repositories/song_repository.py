@@ -344,13 +344,6 @@ class SongRepository(GenericRepository[Song]):
                         FROM SongAlbums SA 
                         JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
                         WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    ),
-                    (
-                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
-                        FROM SongAlbums SA 
-                        JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
-                        JOIN Publishers P ON AP.PublisherID = P.PublisherID
-                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
                     )
                 ) as PublisherName,
 
@@ -367,31 +360,31 @@ class SongRepository(GenericRepository[Song]):
                     FROM MediaSourceTags MST
                     JOIN Tags TG ON MST.TagID = TG.TagID
                     WHERE MST.SourceID = MS.SourceID
-                ) as AllTags
+                ) as AllTags,
+                COALESCE(
+                    (
+                        SELECT GROUP_CONCAT(RP.PublisherID, '|||')
+                        FROM RecordingPublishers RP
+                        WHERE RP.SourceID = MS.SourceID
+                    ),
+                    (
+                        SELECT TrackPublisherID 
+                        FROM SongAlbums SA 
+                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    )
+                ) as PublisherID
             FROM MediaSources MS
             JOIN Songs S ON MS.SourceID = S.SourceID
             WHERE MS.SourceID IN ({placeholders})
         """
         cursor.execute(query, source_ids)
         rows = cursor.fetchall()
-        print(f"DEBUG REPO: Query (IDs={source_ids}) returned {len(rows)} rows.")
-        if not rows and source_ids:
-             # Deep debug if missing
-             print(f"DEBUG REPO: Check if MediaSource {source_ids[0]} exists...")
-             cursor.execute("SELECT * FROM MediaSources WHERE SourceID=?", (source_ids[0],))
-             print(f"  MediaSource: {cursor.fetchone()}")
-             cursor.execute("SELECT * FROM Songs WHERE SourceID=?", (source_ids[0],))
-             print(f"  Song: {cursor.fetchone()}")
-        
         songs_map = {}
         for row in rows:
             try:
                 (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
                  notes, is_active_int, album_title, album_id, publisher_name, 
-                 album_artist, all_tags_str) = row
-                 
-                # DEBUG: Check ID
-                print(f"DEBUG REPO: Processing Row ID={source_id} (Type: {type(source_id)})")
+                 album_artist, all_tags_str, publisher_id) = row
 
                 groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
                 tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
@@ -410,17 +403,16 @@ class SongRepository(GenericRepository[Song]):
                     album_id=album_id,
                     album_artist=album_artist,
                     publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
+                    publisher_id=[int(p) for p in str(publisher_id).split('|||') if p] if publisher_id else [],
                     groups=groups,
                     tags=tags
                 )
                 songs_map[source_id] = song
-            except Exception as e:
-                print(f"DEBUG REPO: Failed to create Song object from row: {e}")
+            except Exception:
                 import traceback
                 traceback.print_exc()
 
         # 2. Fetch all roles for all songs in one go (with Credit Preservation)
-        print("DEBUG REPO: Fetching roles...")
         query_roles = f"""
             SELECT sc.SourceID, r.RoleName, an.DisplayName
             FROM SongCredits sc
@@ -428,11 +420,7 @@ class SongRepository(GenericRepository[Song]):
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
             WHERE sc.SourceID IN ({placeholders})
         """
-        try:
-             cursor.execute(query_roles, source_ids)
-        except Exception as e:
-             print(f"DEBUG REPO: Role query failed: {e}")
-             raise
+        cursor.execute(query_roles, source_ids)
         
         for source_id, role_name, contributor_name in cursor.fetchall():
             if source_id in songs_map:
@@ -446,7 +434,6 @@ class SongRepository(GenericRepository[Song]):
                 elif role_name == 'Producer':
                     song.producers.append(contributor_name)
 
-        print("DEBUG REPO: Fetching releases...")
         # 3. Fetch all releases (Multi-Album Hydration)
         query_releases = f"""
             SELECT SA.SourceID, A.AlbumID, A.AlbumTitle, A.ReleaseYear, SA.TrackNumber, SA.IsPrimary
@@ -455,11 +442,7 @@ class SongRepository(GenericRepository[Song]):
             WHERE SA.SourceID IN ({placeholders})
             ORDER BY SA.IsPrimary DESC, A.ReleaseYear DESC
         """
-        try:
-            cursor.execute(query_releases, source_ids)
-        except Exception as e:
-             print(f"DEBUG REPO: Releases query failed: {e}")
-             raise
+        cursor.execute(query_releases, source_ids)
              
         for r_src_id, r_alb_id, r_title, r_year, r_track, r_primary in cursor.fetchall():
             if r_src_id in songs_map:

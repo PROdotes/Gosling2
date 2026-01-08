@@ -25,6 +25,10 @@ class PublisherService:
         """Fetch a specific publisher by its ID."""
         return self._repo.get_by_id(publisher_id)
 
+    def get_for_song(self, song_id: int) -> List[Publisher]:
+        """Fetch all publishers associated with a recording (song)."""
+        return self._repo.get_publishers_for_song(song_id)
+
     def find_by_name(self, name: str) -> Optional[Publisher]:
         """Fetch a specific publisher by its exact name."""
         return self._repo.find_by_name(name)
@@ -44,6 +48,14 @@ class PublisherService:
     def delete(self, publisher_id: int) -> bool:
         """Delete a publisher record."""
         return self._repo.delete(publisher_id)
+
+    def add_publisher_to_song(self, song_id: int, publisher_id: int, batch_id: Optional[str] = None) -> bool:
+        """Link a publisher to a recording (song)."""
+        return self._repo.add_publisher_to_song(song_id, publisher_id, batch_id=batch_id)
+
+    def remove_publisher_from_song(self, song_id: int, publisher_id: int, batch_id: Optional[str] = None) -> bool:
+        """Unlink a publisher from a recording (song)."""
+        return self._repo.remove_publisher_from_song(song_id, publisher_id, batch_id=batch_id)
 
     def get_usage_stats(self, publisher_id: int) -> dict:
         """Retrieve usage statistics (referenced albums, dependencies) for safety checks."""

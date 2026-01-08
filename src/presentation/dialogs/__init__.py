@@ -1,7 +1,6 @@
 from .settings_dialog import SettingsDialog
 from .universal_import_dialog import UniversalImportDialog
 from .log_viewer_dialog import LogViewerDialog
-from .tag_picker_dialog import TagPickerDialog
 from .publisher_manager_dialog import PublisherDetailsDialog
 from .artist_manager_dialog import ArtistDetailsDialog
 from .album_manager_dialog import AlbumManagerDialog

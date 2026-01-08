@@ -61,6 +61,10 @@ class AlbumService:
         """Unlink a song from an album."""
         return self._repo.remove_song_from_album(source_id, album_id)
 
+    def get_publishers_for_album(self, album_id: int) -> List[Publisher]:
+        """Fetch all publishers associated with an album."""
+        return self._repo.get_publishers_for_album(album_id)
+
     def link_song_to_album(self, source_id: int, album_id: int, is_primary: int = 0) -> bool:
         """Link a song to an album."""
         return self._repo.link_source_to_album(source_id, album_id, is_primary)

@@ -12,7 +12,6 @@ from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
 from ...core.entity_registry import EntityType
 from ...core.entity_click_router import ClickResult, ClickAction
 from ...core.context_adapters import SongFieldAdapter
-from ..dialogs.tag_picker_dialog import TagPickerDialog
 from ..dialogs.entity_picker_dialog import EntityPickerDialog
 from ...core.picker_config import get_tag_picker_config, get_artist_picker_config
 
@@ -599,7 +598,6 @@ class SidePanelWidget(QFrame):
 
     def _handle_tag_click(self, field_name, entity_id, name):
         """Open editor to rename a tag globally."""
-        from PyQt6.QtWidgets import QInputDialog
         
         # Parse display name if it's from the unified tray (e.g. "Genre: Pop")
         display_name = name
@@ -794,24 +792,32 @@ class SidePanelWidget(QFrame):
         pub = self.publisher_service.get_by_id(entity_id)
         if not pub: return False
 
+        # T-180: If the publisher is explicitly linked to the song, manage it here.
+        # Don't jump to the album if it is a direct recording-level owner.
+        if self.current_songs:
+            song = self.current_songs[0]
+            # Check staged/effective IDs 
+            explicit_ids = self._get_effective_value(song.source_id, 'publisher_id', getattr(song, 'publisher_id', []))
+            if isinstance(explicit_ids, int): explicit_ids = [explicit_ids]
+            if explicit_ids and entity_id in explicit_ids:
+                return False # Direct link exists - open standard editor.
+
         # Check Inherited Status for Deep Link
-        # Note: Use pub.publisher_name (raw) not 'name' param (display name with hierarchy)
         is_inherited = False
         if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
-                alb_id = self.current_songs[0].album_id
-                # Handle Multi-Album List
-                if isinstance(alb_id, list):
-                     alb_id = alb_id[0] if alb_id else None
-                
-                if alb_id:
-                    alb_pub_str = self.album_service.get_publisher(alb_id) or ""
-                    if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
-                        is_inherited = True
+            alb_id = self.current_songs[0].album_id
+            if isinstance(alb_id, list):
+                 alb_id = alb_id[0] if alb_id else None
+            
+            if alb_id:
+                alb_pub_str = self.album_service.get_publisher(alb_id) or ""
+                if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
+                    is_inherited = True
         
         if is_inherited:
             alb = self.album_service.get_by_id(alb_id)
             if alb:
-                    self._open_album_manager(initial_album=alb, focus_publisher=True)
+                self._open_album_manager(initial_album=alb, focus_publisher=True)
             return True # Handled custom action
         
         return False # Fallback to Standard Router (PublisherDetailsDialog)
@@ -933,21 +939,6 @@ class SidePanelWidget(QFrame):
                     # Refresh to show new tag
                     self._refresh_field_values()
                     self.filter_refresh_requested.emit()
-        elif field_name == 'publisher':
-            # Publisher picker - use universal EntityPickerDialog
-            from ..dialogs.entity_picker_dialog import EntityPickerDialog
-            from src.core.picker_config import get_publisher_picker_config
-            diag = EntityPickerDialog(
-                service_provider=self,
-                config=get_publisher_picker_config(),
-                parent=self
-            )
-            if diag.exec() == 1:
-                selected = diag.get_selected()
-                if selected:
-                    # Support both List (Smart Split) and Single Item (Legacy)
-                    name = selected.publisher_name if hasattr(selected, 'publisher_name') else str(selected)
-                    self._add_name_to_selection(field_name, name)
         else:
             # Artists / Contributors - use universal EntityPickerDialog
             from ..dialogs.entity_picker_dialog import EntityPickerDialog
@@ -1424,13 +1415,6 @@ class SidePanelWidget(QFrame):
         self._refresh_field_values()
         
         # 5. Metadata Auto-Fill (From PRIMARY Only) via Services
-        # T-69: Publisher
-        primary = data[0] # First is Primary by convention
-        
-        # Publisher
-        pub_name = self.album_service.get_publisher(primary['id'])
-        self._on_field_changed("publisher", pub_name if pub_name else None)
-        
         # T-46: Artist & Year
         full_album = self.album_service.get_by_id(primary['id'])
         if full_album:
@@ -1550,18 +1534,38 @@ class SidePanelWidget(QFrame):
         if len(self.current_songs) == 1:
             return v0, False, 0
             
-        # T-69: Special Union logic for Publisher
+        # T-69: Publisher (Refactored to ID-based Intersection - T-180)
         if field_def.name == 'publisher':
-            all_pubs = set()
+            all_sets = []
             for song in self.current_songs:
-                val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
-                if val:
-                    all_pubs.add(str(val).strip())
+                # 1. Get IDs from effective values (staging-aware)
+                ids = self._get_effective_value(song.source_id, 'publisher_id', getattr(song, 'publisher_id', []))
+                if isinstance(ids, (int, str)) and str(ids).isdigit():
+                    ids = [int(ids)]
+                elif not isinstance(ids, list):
+                    ids = []
+                
+                # 2. Fallback to names if no IDs yet (Sync)
+                if not ids:
+                    names_val = self._get_effective_value(song.source_id, 'publisher', getattr(song, 'publisher', []))
+                    if isinstance(names_val, str):
+                        import re
+                        names_val = [n.strip() for n in re.split(r',|\|\|\|', names_val) if n.strip()]
+                    elif not isinstance(names_val, list):
+                        names_val = []
+                    
+                    for name in names_val:
+                        pub = self.publisher_service.find_by_name(name)
+                        if pub:
+                            ids.append(pub.publisher_id)
+                
+                all_sets.append(set(ids or []))
             
-            if not all_pubs:
-                return "", False, 0
+            common_ids = set.intersection(*all_sets) if all_sets else set()
+            union_ids = set.union(*all_sets) if all_sets else set()
+            mixed_count = len(union_ids - common_ids)
             
-            return list(sorted(all_pubs)), False, 0
+            return list(sorted(list(common_ids))), (mixed_count > 0), mixed_count
 
         # Bulk Mode: Field Type Specific Logic
         if field_def.field_type == yellberus.FieldType.LIST:
@@ -1684,9 +1688,16 @@ class SidePanelWidget(QFrame):
         chips = []
         for i, n in enumerate(names):
             if field_name == 'publisher':
-                # Lookup Publisher ID via Service
-                pub, created = self.publisher_service.get_or_create(str(n))
-                pid = pub.publisher_id if pub else 0
+                # ID-based Lookup (T-180)
+                pub = None
+                pid = 0
+                if isinstance(n, int):
+                    pid = n
+                    pub = self.publisher_service.get_by_id(pid)
+                else:
+                    # Fallback for legacy staged names
+                    pub, _ = self.publisher_service.get_or_create(str(n))
+                    pid = pub.publisher_id if pub else 0
                 
                 if pub:
                     display_name = pub.publisher_name
@@ -1695,8 +1706,6 @@ class SidePanelWidget(QFrame):
                         if parent:
                             display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
                     
-                    # STRICT MODE: Yellberus now filters 'publisher' to ONLY Direct/Master owners.
-                    # Therefore, everything here is Direct by definition.
                     chips.append((pid, display_name, "🏢", False, False, "Master Owner (Direct)", field_def.zone or "amber", False))
             elif field_name == 'album':
                 aid = 0

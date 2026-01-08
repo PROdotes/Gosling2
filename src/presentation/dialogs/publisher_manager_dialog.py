@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QListWidget, QListWidgetItem, QStackedWidget,
-    QFrame, QMessageBox, QWidget, QMenu, QComboBox, QInputDialog,
+    QFrame, QMessageBox, QWidget, QMenu, QComboBox,
     QCompleter, QSizePolicy
 )
 from PyQt6.QtCore import Qt, pyqtSignal
