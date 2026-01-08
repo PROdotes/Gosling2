@@ -2198,27 +2198,34 @@ class LibraryWidget(QWidget):
         if not indexes:
             return
 
-        wav_paths = []
+        wav_songs = []
 
         for idx in indexes:
             song = self._get_song_from_index(idx)
             if song and song.path and song.path.lower().endswith(".wav"):
-                wav_paths.append(song)
+                wav_songs.append(song)
 
-        if not wav_paths:
+        if not wav_songs:
             return
 
         reply = QMessageBox.question(
             self, "Confirm Conversion",
-            f"Convert {len(wav_paths)} WAV file(s) to MP3?\n\nTags will be preserved and the WAVs will remain in place.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            f"Convert {len(wav_songs)} WAV file(s) to MP3?\n\n"
+            "YES: Convert and REPLACE original entries\n"
+            "NO: Convert but KEEP originals (Duplicates)\n"
+            "CANCEL: Abort operation",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
         )
         
-        if reply == QMessageBox.StandardButton.No:
+        if reply == QMessageBox.StandardButton.Cancel:
             return
 
+        should_replace = (reply == QMessageBox.StandardButton.Yes)
+
         success_count = 0
-        for song in wav_paths:
+        from ...core.vfs import VFS
+
+        for song in wav_songs:
             # 1. Convert
             mp3_path = self.conversion_service.convert_wav_to_mp3(song.path)
             if mp3_path:
@@ -2228,15 +2235,40 @@ class LibraryWidget(QWidget):
                 # 3. Import New MP3
                 if self._import_file(mp3_path):
                     success_count += 1
-        
+                    
+                    # 4. Handle Cleanup (Replace/Unstage)
+                    if should_replace:
+                        self.library_service.delete_song(song.id)
+                        
+                        if not VFS.is_virtual(song.path):
+                             try: os.remove(song.path)
+                             except: pass
+
         if success_count > 0:
             self.load_library()
-            QMessageBox.information(self, "Conversion Finished", f"Successfully converted and imported {success_count} MP3(s).")
+            status = "converted and replaced" if should_replace else "converted"
+            QMessageBox.information(self, "Conversion Finished", f"Successfully {status} {success_count} file(s).")
         else:
             QMessageBox.warning(self, "Conversion Failed", "Conversion failed. Check log or FFmpeg path in settings.")
 
     def _on_table_double_click(self, index) -> None:
-        """Double click adds to playlist (as per original behavior)"""
+        """Double click adds to playlist, but intercepts WAVs for conversion."""
+        song = self._get_song_from_index(index)
+        
+        # Intercept WAV files
+        if song and song.path and song.path.lower().endswith(".wav"):
+            reply = QMessageBox.question(
+                self, "WAV Detected",
+                "This file is a WAV and cannot be streamed efficiently.\n\n"
+                "Would you like to convert it to MP3 now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                self._on_convert_selected()
+            return
+
+        # Standard behavior
         self._emit_add_to_playlist()
 
     def _emit_add_to_playlist(self) -> None:
