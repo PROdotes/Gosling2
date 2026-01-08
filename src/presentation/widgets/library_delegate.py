@@ -129,25 +129,36 @@ class WorkstationDelegate(QStyledItemDelegate):
         painter.setPen(sep_color)
         painter.drawLine(rect.bottomLeft(), rect.bottomRight())
 
-        # 6. CYLINDRICAL BLADE (Far Left)
-        if is_far_left:
-            # DIRTY = MAGENTA ALERT, NORMAL = ZONE COLOR
-            blade_color = QColor("#FF00FF") if is_dirty else category_color
-            blade_rect = QRect(rect.left(), rect.top(), 7, rect.height() - 1)
-            
-            if is_dirty:
-                # Solid Neon Magenta
-                painter.fillRect(blade_rect, blade_color)
-            else:
-                # Polished Cylindrical Gradient
-                blade_grad = QLinearGradient(float(blade_rect.left()), 0, float(blade_rect.right()), 0)
-                blade_grad.setColorAt(0.0, blade_color.darker(200))
-                blade_grad.setColorAt(0.5, blade_color)
-                blade_grad.setColorAt(1.0, blade_color.darker(200))
-                painter.fillRect(blade_rect, blade_grad)
-
+        # 6. [REMOVED] CYLINDRICAL BLADE (Unreliable with column reordering)
+        
         # 7. CONTENT RENDERING
         column_name = self._get_column_name_by_index(index.column())
+        
+        # Determine Status for Pip (Only show on Title column)
+        show_pip = False
+        pip_color = QColor()
+        
+        if column_name == 'title':
+            # Check Virtual
+            path_idx = self.field_indices.get('path', -1)
+            is_virtual = False
+            if path_idx != -1:
+                path_val = str(model.index(row, path_idx).data(Qt.ItemDataRole.UserRole) or "")
+                
+                # Check properties
+                is_virtual = "|" in path_val
+                is_wav = path_val.lower().endswith('.wav')
+
+                if is_dirty:
+                    show_pip = True
+                    pip_color = QColor(constants.COLOR_MAGENTA)
+                elif is_wav:
+                    show_pip = True
+                    pip_color = QColor(constants.COLOR_AMBER)
+                elif is_virtual:
+                    show_pip = True
+                    pip_color = QColor(constants.COLOR_CYAN)
+        
         if column_name == "is_active":
             self._draw_status_badge(painter, option, index, category_color)
         else:
@@ -167,7 +178,23 @@ class WorkstationDelegate(QStyledItemDelegate):
                 font.setBold(True)
             
             painter.setFont(font)
-            text_rect = rect.adjusted(18 if is_far_left else 10, 0, -4, 0)
+            
+            # Adjust padding for Pip
+            padding_left = 10
+            if show_pip:
+                padding_left = 24 # Make room for pip
+                
+            text_rect = rect.adjusted(padding_left, 0, -4, 0)
+
+            # Draw Pip
+            if show_pip:
+                pip_rect = QRect(rect.left() + 8, rect.center().y() - 3, 6, 6)
+                painter.save()
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QBrush(pip_color))
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.drawEllipse(pip_rect)
+                painter.restore()
 
             if option.state & QStyle.StateFlag.State_Selected:
                 painter.setPen(QColor("#FFFFFF")) # Force crisp white on selection

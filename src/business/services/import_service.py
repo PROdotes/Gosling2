@@ -36,25 +36,31 @@ class ImportService:
         self.settings_manager = settings_manager
         self.conversion_service = conversion_service
 
-    def import_single_file(self, file_path: str) -> Tuple[bool, Optional[int], Optional[str]]:
+    def import_single_file(self, file_path: str, conversion_policy: dict = None) -> Tuple[bool, Optional[int], Optional[str]]:
         """
         Import a single file into the library.
-        Handle WAV conversion interactivity if needed.
+        Handle WAV conversion interactivity or via policy.
+        
+        conversion_policy: {'convert': bool, 'delete_original': bool} (Optional)
         
         Returns:
             Tuple of (Success, SID, ErrorMessage)
         """
         try:
-            # 0. Handle WAV conversion
-            if file_path.lower().endswith('.wav'):
-                if self.conversion_service:
-                    converted_path = self.conversion_service.prompt_and_convert(file_path)
+            # 0. Handle WAV conversion (Optional via Policy)
+            if file_path.lower().endswith('.wav') and self.conversion_service and conversion_policy:
+                if conversion_policy.get('convert', False):
+                    converted_path = self.conversion_service.convert_wav_to_mp3(file_path)
+                    should_delete = conversion_policy.get('delete_original', False)
+                    
                     if converted_path:
+                        if should_delete and os.path.exists(converted_path):
+                             try: os.remove(file_path)
+                             except: pass
                         file_path = converted_path # Proceed with the new MP3
                     else:
-                        return False, None, f"Skipped WAV conversion: {os.path.basename(file_path)}"
-                else:
-                    return False, None, "Conversion service unavailable for WAV file."
+                        # Conversion failed, but we still import the original WAV
+                        pass
 
             # 1. Calculate Audio Hash
             audio_hash = calculate_audio_hash(file_path)
@@ -116,78 +122,18 @@ class ImportService:
     def collect_import_list(self, paths: List[str]) -> List[str]:
         """
         Takes a list of paths (files or folders) and returns a flat list of 
-        all supported audio files found.
+        all supported audio files found. ZIPs are indexed via VFS (Virtual Paths).
         """
-        valid_extensions = ('.mp3', '.wav', '.zip')
+        from ...core.vfs import VFS
+        valid_extensions = ('.mp3', '.wav')
         discovery_list = []
         
         for path in paths:
             if os.path.isfile(path):
                 lower_path = path.lower()
-                if lower_path.endswith('.zip') and zipfile.is_zipfile(path):
-                    # Handle In-Place ZIP Explosion
-                    try:
-                        target_dir = os.path.dirname(path)
-                        processing_succeeded = False
-                        
-                        with zipfile.ZipFile(path, 'r') as zip_ref:
-                            all_names = zip_ref.namelist()
-                            
-                            # A. Collision Check using Transactional Logic
-                            # If ANY file in the zip already exists on disk, we abort the entire zip.
-                            collision_found = False
-                            for name in all_names:
-                                full_target_path = os.path.join(target_dir, name)
-                                if os.path.exists(full_target_path):
-                                    if "gosling_nested_" not in full_target_path: # Allow recursion to pass
-                                        logger.warning(f"Skipping ZIP {path}: Collision detected with existing file {name}")
-                                        collision_found = True
-                                        break
-                            
-                            if collision_found:
-                                continue # Skip this zip
-                            
-                            # B. Atomic Extraction
-                            try:
-                                zip_ref.extractall(target_dir)
-                            except Exception as extract_err:
-                                logger.error(f"Failed to extract ZIP {path}: {extract_err}. Attempting rollback.")
-                                # Rollback: Delete any files we might have just created (best effort)
-                                for name in all_names:
-                                    full_target_path = os.path.join(target_dir, name)
-                                    if os.path.exists(full_target_path):
-                                        try:
-                                            os.remove(full_target_path)
-                                        except:
-                                            pass
-                                continue # Skip this zip
-                            
-                            # C. Add extracted files to discovery list
-                            for name in all_names:
-                                full_extracted_path = os.path.join(target_dir, name)
-                                
-                                # Recursive check for the extracted file
-                                if os.path.isdir(full_extracted_path):
-                                     discovery_list.extend(self.scan_directory_recursive(full_extracted_path))
-                                elif os.path.isfile(full_extracted_path):
-                                     f_lower = full_extracted_path.lower()
-                                     if f_lower.endswith(valid_extensions) and not f_lower.endswith('.zip'):
-                                         discovery_list.append(full_extracted_path)
-                                         
-                            # Mark success for deletion logic
-                            processing_succeeded = True
-
-                        # D. ZIP Cleanup (Safe: File handle closed)
-                        if processing_succeeded and self.settings_manager.get_delete_zip_after_import():
-                            try:
-                                os.remove(path)
-                                logger.info(f"Deleted source ZIP after successful extraction: {path}")
-                            except Exception as del_err:
-                                logger.warning(f"Failed to delete source ZIP {path}: {del_err}")
-                        
-                    except Exception as e:
-                        logger.error(f"Failed to explode zip {path}: {e}")
-                
+                if lower_path.endswith('.zip'):
+                    # T-90: VFS Mode - Do NOT explode, just index.
+                    discovery_list.extend(VFS.list_zip_contents(path, audio_only=True))
                 elif lower_path.endswith(valid_extensions):
                     discovery_list.append(path)
                     
@@ -197,18 +143,10 @@ class ImportService:
                         full_path = os.path.join(root, file)
                         lower_file = file.lower()
                         
-                        if lower_file.endswith('.zip') and zipfile.is_zipfile(full_path):
-                             # Recursive logic for nested zips?
-                             # Reuse the file logic
-                             temp_dir = tempfile.mkdtemp(prefix="gosling_nested_")
-                             try:
-                                 with zipfile.ZipFile(full_path, 'r') as zip_ref:
-                                     zip_ref.extractall(temp_dir)
-                                 discovery_list.extend(self.scan_directory_recursive(temp_dir))
-                             except Exception as e:
-                                 logger.error(f"Failed to explode nested zip {full_path}: {e}")
-                        
+                        if lower_file.endswith('.zip'):
+                            # Recursive indexing for ZIPs inside folders
+                            discovery_list.extend(VFS.list_zip_contents(full_path, audio_only=True))
                         elif lower_file.endswith(valid_extensions):
                             discovery_list.append(full_path)
         
-        return discovery_list
+        return list(dict.fromkeys(discovery_list)) # Dedupe results

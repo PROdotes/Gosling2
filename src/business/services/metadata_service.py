@@ -6,6 +6,7 @@ from mutagen.id3 import ID3, ID3NoHeaderError
 from ...data.models.song import Song
 from ...core.yellberus import FIELDS
 from ...core import logger
+from ...core.vfs import VFS
 from ...core.registries.id3_registry import ID3Registry
 import mutagen.id3
 from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER, TLEN
@@ -46,9 +47,10 @@ class MetadataService:
     @classmethod
     def extract_from_wav(cls, path: str, source_id: Optional[int] = None) -> Song:
         """Extract metadata from WAV (RIFF) using basic mapping."""
-        from mutagen.wave import WAVE
         try:
-            audio = WAVE(path)
+            stream = VFS.get_stream(path)
+            from mutagen.wave import WAVE
+            audio = WAVE(stream)
         except Exception as e:
             return Song(source_id=source_id, source=path)
 
@@ -86,7 +88,8 @@ class MetadataService:
         Handles ID3v2.3 '/' separator splitting for lists.
         """
         try:
-            audio = MP3(path)
+            stream = VFS.get_stream(path)
+            audio = MP3(stream)
         except Exception as e:
             raise ValueError(f"Unable to read MP3 file: {path}") from e
 

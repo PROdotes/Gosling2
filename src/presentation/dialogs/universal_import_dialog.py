@@ -76,7 +76,7 @@ class UniversalImportDialog(QDialog):
         self.model = QFileSystemModel()
         self.model.setRootPath(QDir.rootPath()) # Necessary for watcher
         self.model.setFilter(QDir.Filter.AllDirs | QDir.Filter.Files | QDir.Filter.NoDotAndDotDot)
-        self.model.setNameFilters(["*.mp3", "*.wav", "*.flac", "*.m4a", "*.zip"])
+        self.model.setNameFilters(["*.mp3", "*.wav", "*.zip"])
         self.model.setNameFilterDisables(False)
 
         self.tree = QTreeView()
@@ -201,6 +201,60 @@ class UniversalImportDialog(QDialog):
         else:
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Empty Selection", "Target selection is empty. Select files or folders to proceed.")
+
+    def _on_selection_changed(self, selected, deselected):
+        """Handle selection change in the tree."""
+        indexes = self.tree.selectionModel().selectedRows()
+        
+        # We only inspect if exactly ONE item is selected and it's a ZIP
+        if len(indexes) == 1:
+            path = self.model.filePath(indexes[0])
+            if path.lower().endswith(".zip") and os.path.isfile(path):
+                self._peek_into_zip(path)
+                return
+        
+        # Otherwise, hide inspector
+        self.inspector_pane.hide()
+
+    def _peek_into_zip(self, path):
+        """Read ZIP headers and show contents preview."""
+        import zipfile
+        self.list_contents.clear()
+        self.lbl_zip_name.setText(os.path.basename(path))
+        
+        try:
+            if not zipfile.is_zipfile(path):
+                self.lbl_zip_stats.setText("INVALID ZIP FILE")
+                self.inspector_pane.show()
+                return
+                
+            with zipfile.ZipFile(path, 'r') as zr:
+                namelist = zr.namelist()
+                
+                audio_exts = ('.mp3', '.wav')
+                audio_count = sum(1 for f in namelist if f.lower().endswith(audio_exts))
+                
+                size_mb = os.path.getsize(path) / (1024 * 1024)
+                self.lbl_zip_stats.setText(f"{len(namelist)} FILES | {audio_count} TRACKS | {size_mb:.1f} MB")
+                
+                # Show first 50 items to keep UI snappy
+                for name in namelist[:50]:
+                    icon = "📁" if name.endswith("/") else "📄"
+                    if name.lower().endswith(audio_exts): icon = "🎵"
+                    
+                    item = QListWidgetItem(f"{icon} {name}")
+                    self.list_contents.addItem(item)
+                
+                if len(namelist) > 50:
+                    self.list_contents.addItem(QListWidgetItem(f"... and {len(namelist)-50} more"))
+            
+            self.inspector_pane.show()
+            
+        except Exception as e:
+            from ...core import logger
+            logger.error(f"Failed to peek into zip {path}: {e}")
+            self.lbl_zip_stats.setText("ERROR READING ZIP")
+            self.inspector_pane.show()
 
     def get_selected(self):
         """Return the list of paths selected by the user."""

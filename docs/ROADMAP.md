@@ -111,6 +111,9 @@ tags:
     *   *Task*: Move file operations to worker thread to prevent UI freeze.
     *   *Why*: Required for Release Criteria #1 (Import 1k songs).
     *   *Status*: **Done** - Implemented via `ImportWorker(QThread)` in `library_widget.py`.
+*   [x] **Virtual File System (VFS)** (T-90)
+    *   *Task*: Index ZIP contents without explosion; virtual playback via temp files.
+    *   *Status*: **Done** - Full implementation (Core, Import, Playback, UI Pip).
 
 ---
 
@@ -206,4 +209,4 @@ Quick reference for remaining tasks.
 | Low | Advanced Rule Editor (New Feature) | ~2.0h |
 
 **Total Critical Path:** 0.0h (Release Candidate Ready)
-**Total All:** ~2.5h
+**Total All:** ~5.0h

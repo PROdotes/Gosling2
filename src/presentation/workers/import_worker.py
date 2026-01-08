@@ -22,10 +22,11 @@ class ImportWorker(QThread):
     # Emitted on critical failure
     error = pyqtSignal(str)
 
-    def __init__(self, import_service: ImportService, files: list):
+    def __init__(self, import_service: ImportService, files: list, conversion_policy: dict = None):
         super().__init__()
         self.import_service = import_service
         self.files = files
+        self.conversion_policy = conversion_policy
         self._is_running = True
 
     def stop(self):
@@ -46,7 +47,7 @@ class ImportWorker(QThread):
             if not self._is_running:
                 break
 
-            import_success, sid, err = self.import_service.import_single_file(file_path)
+            import_success, sid, err = self.import_service.import_single_file(file_path, conversion_policy=self.conversion_policy)
             
             if import_success:
                 success_count += 1

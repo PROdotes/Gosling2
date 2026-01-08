@@ -1,6 +1,8 @@
 import os
 import subprocess
+import tempfile
 from typing import Optional, Callable
+from ...core.vfs import VFS
 # (Mutagen imports removed, logic now handled by MetadataService)
 
 class ConversionService:
@@ -35,7 +37,9 @@ class ConversionService:
         Converts a WAV file to MP3 based on settings.
         Returns the path to the new MP3 file on success, None on failure.
         """
-        if not os.path.exists(wav_path):
+        # Handle Virtual or Physical Existence
+        is_virtual = VFS.is_virtual(wav_path)
+        if not is_virtual and not os.path.exists(wav_path):
             return None
             
         if not wav_path.lower().endswith(".wav"):
@@ -43,6 +47,23 @@ class ConversionService:
 
         ffmpeg_path = self.settings.get_ffmpeg_path() or "ffmpeg"
         quality_setting = self.settings.get_conversion_bitrate() or "320k"
+        
+        # 1. Surgical Extraction for Virtual WAVs
+        temp_wav = None
+        if is_virtual:
+            try:
+                # Extract to a temp file that FFmpeg can read
+                suffix = os.path.splitext(wav_path)[1]
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tf:
+                    tf.write(VFS.read_bytes(wav_path))
+                    temp_wav = tf.name
+            except Exception as e:
+                from src.core import logger
+                logger.error(f"Failed to extract virtual WAV for conversion: {e}")
+                return None
+        
+        # Use temp_wav if we extracted one, else the original path
+        source_path = temp_wav or wav_path
         
         # 1. Parse Quality args
         # VBR (V0) -> -q:a 0
@@ -54,8 +75,13 @@ class ConversionService:
             # Strip standard 'k' if user accidentally included it, FFmpeg handles '320k' fine though
             quality_args = ["-b:a", quality_setting]
 
-        # Output path
-        mp3_path = os.path.splitext(wav_path)[0] + ".mp3"
+        # Output path (Always physical)
+        if is_virtual:
+             # For virtual ZIPs, we place the MP3 next to the ZIP file itself
+             zip_file = wav_path.split("|")[0]
+             mp3_path = os.path.splitext(zip_file)[0] + "_" + os.path.basename(wav_path.split("|")[1]).replace(".wav", ".mp3")
+        else:
+             mp3_path = os.path.splitext(wav_path)[0] + ".mp3"
         
         if os.path.exists(mp3_path):
             return None
@@ -64,7 +90,7 @@ class ConversionService:
             # Run FFmpeg
             cmd = [
                 ffmpeg_path,
-                "-i", wav_path,
+                "-i", source_path,
                 "-vn",             # No video
                 "-ar", "44100",    # Standard sample rate
                 "-ac", "2",        # Stereo
@@ -102,6 +128,11 @@ class ConversionService:
             from src.core import logger
             logger.error(f"Conversion Error: {e}")
             return None
+        finally:
+            # Cleanup temp file
+            if temp_wav and os.path.exists(temp_wav):
+                try: os.remove(temp_wav)
+                except: pass
 
     def sync_tags(self, source_song, target_mp3_path: str) -> bool:
         """

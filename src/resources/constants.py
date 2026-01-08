@@ -4,6 +4,7 @@
 COLOR_AMBER = "#FFC66D"       # Main Accent / Signal
 COLOR_MUTED_AMBER = "#FF8C00" # Secondary / Tactical
 COLOR_MAGENTA = "#FF00FF"     # Critical / Surgical Highlights
+COLOR_CYAN = "#00E5FF"        # Virtual/Cloud Data
 COLOR_BLACK = "#000000"       # Chassis / Void
 COLOR_GRAY = "#888888"        # Ghost Data / Muted Text
 

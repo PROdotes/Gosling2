@@ -12,6 +12,10 @@ if TYPE_CHECKING:
     from .settings_manager import SettingsManager
 
 
+from .settings_manager import SettingsManager
+from ...core.vfs import VFS
+
+
 class PlaybackService(QObject):
     """Service for managing audio playback with crossfade support"""
 
@@ -127,7 +131,8 @@ class PlaybackService(QObject):
 
     def _get_temp_copy(self, file_path: str) -> str:
         """Create a temp copy to avoid file locking"""
-        if not os.path.exists(file_path):
+        is_virtual = VFS.is_virtual(file_path)
+        if not is_virtual and not os.path.exists(file_path):
             return file_path # Fallback
             
         try:
@@ -136,8 +141,13 @@ class PlaybackService(QObject):
             fd, temp_path = tempfile.mkstemp(suffix=ext, prefix="gosling_play_")
             os.close(fd) # Close file descriptor immediately
             
-            # Copy content
-            shutil.copy2(file_path, temp_path)
+            # Copy content (Handle Physical vs Virtual)
+            if is_virtual:
+                with open(temp_path, 'wb') as f:
+                    f.write(VFS.read_bytes(file_path))
+            else:
+                shutil.copy2(file_path, temp_path)
+                
             self._temp_files.append(temp_path)
             
             # Auto-cleanup old temps if list gets too big (e.g. > 50)
@@ -148,8 +158,9 @@ class PlaybackService(QObject):
                 except: pass
                 
             return temp_path
-        except Exception:
+        except Exception as e:
             # Fallback to original if copy fails
+            print(f"PlaybackService Error copying temp: {e}")
             return file_path
 
     def load(self, file_path: str) -> None:

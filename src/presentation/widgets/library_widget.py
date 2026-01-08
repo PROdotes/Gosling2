@@ -23,6 +23,7 @@ from PyQt6.QtGui import (
 )
 from .glow_factory import GlowButton
 from ..workers.import_worker import ImportWorker
+from ..dialogs.universal_import_dialog import UniversalImportDialog
 
 
 class DropIndicatorHeaderView(QHeaderView):
@@ -1009,7 +1010,7 @@ class LibraryWidget(QWidget):
         event.accept()
 
     def dropEvent(self, event):
-        """Handle dropped files or playlist items with WAV detection and ZIP inspection."""
+        """Handle dropped files/folders by delegating to ImportService."""
         if event.source() == self.table_view:
             event.ignore()
             return
@@ -1027,137 +1028,25 @@ class LibraryWidget(QWidget):
             event.ignore()
             return
 
-        standalone_mp3s = []
-        standalone_wavs = []
-        zip_info = {} # path -> {'mp3': [], 'wav': []}
-        
+        # 1. Harvest Paths
+        initial_paths = []
         for url in mime.urls():
-            if not url.isLocalFile(): continue
-            path = os.path.abspath(url.toLocalFile())
-            ext = path.lower().split('.')[-1]
-            
-            if ext == 'mp3':
-                standalone_mp3s.append(path)
-            elif ext == 'wav':
-                standalone_wavs.append(path)
-            elif ext == 'zip':
-                try:
-                    with zipfile.ZipFile(path, 'r') as zr:
-                        members = zr.namelist()
-                        mp3s = [m for m in members if m.lower().endswith('.mp3') and '..' not in m]
-                        wavs = [m for m in members if m.lower().endswith('.wav') and '..' not in m]
-                        if mp3s or wavs:
-                            zip_info[path] = {'mp3': mp3s, 'wav': wavs}
-                except Exception:
-                    pass
-
-        total_wavs = len(standalone_wavs) + sum(len(v['wav']) for v in zip_info.values())
+            if url.isLocalFile():
+                initial_paths.append(os.path.abspath(url.toLocalFile()))
         
-        convert_choice = False
-        delete_wav_choice = False
-
-        if total_wavs > 0:
-            if self.conversion_service and self.conversion_service.is_ffmpeg_available():
-                reply = QMessageBox.question(
-                    self, "WAV Files Detected",
-                    f"{total_wavs} WAV file(s) found in the import. Convert them to MP3?\n\n(Lossy collection preference)",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                )
-                convert_choice = (reply == QMessageBox.StandardButton.Yes)
-                
-                if convert_choice:
-                    # The "Pester" Prompt (Per User Request)
-                    del_reply = QMessageBox.question(
-                        self, "Cleanup Confirmation",
-                        "Delete original WAV files after successful conversion?\n\n(Source files will be removed from disk)",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                    )
-                    delete_wav_choice = (del_reply == QMessageBox.StandardButton.Yes)
-            else:
-                # FFmpeg missing - User wants to know!
-                QMessageBox.warning(self, "Conversion Unavailable", 
-                                    "WAV files detected but FFmpeg was not found.\n\nPlease configure FFmpeg in Settings to enable conversion.")
-                # We do NOT return here, we allow dropping other files (MP3s) if any.
-                # But WAVs will be ignored.
-
-        final_import_list = []
-        final_import_list.extend(standalone_mp3s)
-        
-        failed_conversions = 0
-        
-        # 1. Standalone WAVs
-        if convert_choice:
-            for wv in standalone_wavs:
-                # Sniff metadata from WAV before it's gone
-                wav_song = self.metadata_service.extract_metadata(wv)
-                mp3 = self.conversion_service.convert_wav_to_mp3(wv)
-                if mp3:
-                    # Carry over tags to the new MP3
-                    self.conversion_service.sync_tags(wav_song, mp3)
-                    final_import_list.append(os.path.abspath(mp3))
-                    if delete_wav_choice:
-                        try: os.remove(wv) 
-                        except: pass
-                else:
-                    failed_conversions += 1
-        
-        # 2. Handle ZIPs
-        for zp, info in zip_info.items():
-            base_dir = os.path.dirname(zp)
-            zip_import_list = []
-            
-            # Extract MP3s always
-            with zipfile.ZipFile(zp, 'r') as zr:
-                for m in info['mp3']:
-                    try:
-                        zr.extract(m, base_dir)
-                        zip_import_list.append(os.path.abspath(os.path.join(base_dir, m)))
-                    except Exception: pass
-                
-                # Extract and Convert WAVs if user said YES
-                if convert_choice:
-                    for m in info['wav']:
-                        try:
-                            zr.extract(m, base_dir)
-                            temp_wav = os.path.join(base_dir, m)
-                            # Sniff metadata
-                            wav_song = self.metadata_service.extract_metadata(temp_wav)
-                            new_mp3 = self.conversion_service.convert_wav_to_mp3(temp_wav)
-                            if new_mp3:
-                                # Carry over tags
-                                self.conversion_service.sync_tags(wav_song, new_mp3)
-                                zip_import_list.append(os.path.abspath(new_mp3))
-                                try: os.remove(temp_wav)
-                                except: pass
-                            else:
-                                failed_conversions += 1
-                        except Exception: 
-                            failed_conversions += 1
-            
-            final_import_list.extend(zip_import_list)
-            
-            # Deletion Logic
-            should_delete_zip = False
-            if not info['wav']: 
-                # Pure MP3 zip, safe to clear
-                should_delete_zip = True
-            elif convert_choice and delete_wav_choice and failed_conversions == 0:
-                # Converted and user explicitly said YES to cleanup (AND NO FAILURES)
-                should_delete_zip = True
-            
-            if should_delete_zip:
-                try: os.remove(zp)
-                except: pass
-
-        if final_import_list or failed_conversions > 0:
-            event.acceptProposedAction()
-            count = 0
-            if final_import_list:
-                self.import_files_list(final_import_list) # Call the new background import method
-            
-            # The message box will be handled by _on_import_finished now
-        else:
+        if not initial_paths:
             event.ignore()
+            return
+
+        event.acceptProposedAction()
+        
+        # 2. Delegate Discovery (Folders -> Files, ZIPs -> Virtual Paths)
+        # The ImportService handles recursion and VFS indexing
+        final_list = self.import_service.collect_import_list(initial_paths)
+        
+        # 3. Start Background Import
+        if final_list:
+            self.import_files_list(final_list)
 
     def _setup_top_controls(self, parent_layout) -> None:
         pass

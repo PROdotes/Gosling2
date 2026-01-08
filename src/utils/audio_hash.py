@@ -40,20 +40,15 @@ def calculate_audio_hash(filepath: str) -> str:
         >>> hash2 = calculate_audio_hash("song_retagged.mp3")
         >>> hash1 == hash2  # True if same audio, different tags
     """
-    file_path = Path(filepath)
+    from ..core.vfs import VFS
     
-    if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {filepath}")
-    
-    file_size = file_path.stat().st_size
-    
-    if file_size == 0:
-        raise ValueError(f"File is empty: {filepath}")
-    
-    # Read the entire file into memory
-    # For large files, we could use chunked reading, but MP3s are typically small
-    with open(file_path, 'rb') as f:
-        data = f.read()
+    # Use VFS to get bytes (handles physical or virtual paths)
+    try:
+        data = VFS.read_bytes(filepath)
+    except Exception as e:
+        if "not found" in str(e).lower():
+            raise FileNotFoundError(str(e))
+        raise ValueError(str(e))
     
     # Determine ID3v2 header size (if present)
     id3v2_size = 0
