@@ -2,6 +2,7 @@ from typing import List, Tuple, Optional, Any, Union
 import sqlite3
 from src.data.database import BaseRepository
 from ..models.contributor import Contributor
+from ..models.contributor_alias import ContributorAlias
 from .generic_repository import GenericRepository
 
 class ContributorRepository(GenericRepository[Contributor]):

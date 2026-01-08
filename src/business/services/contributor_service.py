@@ -3,7 +3,7 @@ Contributor Service
 
 Handles business logic for Contributors (Artists, Musicians, Composers).
 """
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Any
 from ...data.models.contributor import Contributor
 from ...data.repositories.contributor_repository import ContributorRepository
 

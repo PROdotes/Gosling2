@@ -7,6 +7,7 @@ from ..models.song import Song
 from ...core import yellberus, logger
 from .generic_repository import GenericRepository
 from .album_repository import AlbumRepository
+from ..models.contributor import Contributor
 
 
 class SongRepository(GenericRepository[Song]):

@@ -152,7 +152,6 @@ class SettingsDialog(QDialog):
         trans_label.setObjectName("FieldLabel")
         layout.addWidget(trans_label)
 
-        # Conversion Toggle
         # Conversion Toggles
         self.chk_conversion_enabled = GlowToggle()
         self.chk_conversion_enabled.set_labels("ON", "OFF")

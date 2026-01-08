@@ -40,6 +40,7 @@ from src.core.entity_registry import (
     get_entity_display
 )
 from src.core.entity_click_router import EntityClickRouter, ClickAction
+from src.core.context_adapters import ContextAdapter
 
 
 class LayoutMode(Enum):

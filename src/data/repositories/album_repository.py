@@ -3,6 +3,7 @@ import sqlite3
 from src.data.database import BaseRepository
 from src.data.models.album import Album
 from src.data.models.contributor import Contributor
+from src.data.models.publisher import Publisher
 from .generic_repository import GenericRepository
 
 class AlbumRepository(GenericRepository[Album]):
