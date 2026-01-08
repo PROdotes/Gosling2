@@ -11,45 +11,7 @@ from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
 from src.core.entity_registry import EntityType
 from src.core.context_adapters import PublisherChildAdapter
 
-class PublisherCreatorDialog(QDialog):
-    """Tiny nested window for creating/naming a publisher."""
-    def __init__(self, initial_name="", title="New Publisher", button_text="Create", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(title)
-        self.setFixedSize(350, 150)
-        self.setObjectName("PublisherCreatorDialog")
-        
-        layout = QVBoxLayout(self)
-        lbl = QLabel("PUBLISHER NAME")
-        lbl.setObjectName("DialogFieldLabel")
-        self.inp_name = GlowLineEdit()
-        self.inp_name.setText(initial_name)
-        layout.addWidget(lbl)
-        layout.addWidget(self.inp_name)
-        
-        btns = QHBoxLayout()
-        self.btn_cancel = GlowButton("Cancel")
-        self.btn_cancel.setObjectName("ActionPill")
-        self.btn_cancel.setProperty("action_role", "secondary")
-        self.btn_cancel.clicked.connect(self.reject)
-        
-        self.btn_save = GlowButton(button_text)
-        self.btn_save.setObjectName("ActionPill")
-        self.btn_save.setProperty("action_role", "primary")
-        self.btn_save.clicked.connect(self.accept)
-        
-        btns.addStretch()
-        btns.addWidget(self.btn_cancel)
-        btns.addWidget(self.btn_save)
-        
-        layout.addStretch(1) # Anchor to bottom
-        layout.addLayout(btns)
-        self.inp_name.setFocus()
-        if initial_name:
-            self.inp_name.edit.selectAll()
 
-    def get_name(self):
-        return self.inp_name.text().strip()
 
 
 
@@ -196,17 +158,28 @@ class PublisherDetailsDialog(QDialog):
         self.list_children.refresh_from_adapter()
 
     def _create_new_parent(self):
-        diag = PublisherCreatorDialog(parent=self)
-        if diag.exec():
-            name = diag.get_name()
-            if name:
-                new_pub, created = self.service.get_or_create(name)
+        from .entity_picker_dialog import EntityPickerDialog
+        from src.core.picker_config import get_publisher_picker_config
+        
+        config = get_publisher_picker_config()
+        config.title_add = "Find or Create Parent"
+        
+        # Use existing service provider wrapper
+        diag = EntityPickerDialog(
+            service_provider=self.service_provider, 
+            config=config, 
+            parent=self
+        )
+        
+        if diag.exec() == 1:
+            new_pub = diag.get_selected()
+            if new_pub:
                 self._refresh_data()
-                # Auto-select the newly created parent
+                # Auto-select the newly created/selected parent
                 idx = self.cmb_parent.findData(new_pub.publisher_id)
                 if idx >= 0: 
                     self.cmb_parent.setCurrentIndex(idx)
-                    self.cmb_parent.setFocus() # Focus on the selected parent
+                    self.cmb_parent.setFocus()
 
     def _save(self):
         new_name = self.txt_name.text().strip()

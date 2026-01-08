@@ -1695,7 +1695,7 @@ QLineEdit[ghost='true'] {
     qproperty-spacing: 12;
 }
 
-#ArtistCreatorDialog, #ArtistPickerDialog, #ArtistDetailsDialog {
+#ArtistDetailsDialog {
     min-width: 380px;
     qproperty-minimumSize: 380px 220px;
 }
@@ -1704,7 +1704,7 @@ QLineEdit[ghost='true'] {
     qproperty-minimumSize: 380px 480px;
 }
 
-#ArtistCreatorLayout, #ArtistPickerLayout, #ArtistDetailsLayout {
+#ArtistDetailsLayout {
     qproperty-spacing: 12;
 }
 

@@ -153,3 +153,35 @@ class TestArtistDetailsDialog:
         qtbot.addWidget(dialog)
         
         assert dialog.lbl_member.text() == "BELONGS TO GROUPS"
+
+    def test_edit_alias_rename(self, qtbot, mock_artist, mock_repo):
+        """Test renaming an alias using the standard EntityPickerDialog."""
+        dialog = ArtistDetailsDialog(artist=mock_artist, service=mock_repo)
+        qtbot.addWidget(dialog)
+
+        # Mock the EntityPickerDialog
+        with patch('src.presentation.dialogs.artist_manager_dialog.EntityPickerDialog') as MockPicker:
+            mock_instance = MockPicker.return_value
+            mock_instance.exec.return_value = 1  # Accepted
+            mock_instance.is_rename_requested.return_value = True
+            mock_instance.get_rename_info.return_value = ("New Alias Name", "Alias")
+
+            # Mock get_artist_picker_config to return a dummy config
+            with patch('src.presentation.dialogs.artist_manager_dialog.get_artist_picker_config') as mock_get_config:
+                mock_config = MagicMock()
+                mock_config.type_buttons = ["Person", "Group"]
+                mock_config.type_icons = {}
+                mock_config.type_colors = {}
+                mock_get_config.return_value = mock_config
+                
+                # Call _edit_alias
+                dialog._edit_alias(alias_id=99, old_name="Old Name")
+
+                # Verify update_alias was called with new name
+                mock_repo.update_alias.assert_called_with(99, "New Alias Name")
+                
+                # Check dialog initialization args
+                args, kwargs = MockPicker.call_args
+                assert kwargs['config'] == mock_config
+                assert kwargs['config'].title_edit == "Rename Alias"
+                assert mock_config.type_buttons == []  # Should be cleared for rename mode

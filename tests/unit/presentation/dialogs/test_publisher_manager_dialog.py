@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from PyQt6.QtWidgets import QApplication, QMessageBox, QMenu
 from PyQt6.QtCore import Qt, QPoint
 from src.presentation.dialogs.publisher_manager_dialog import (
-    PublisherDetailsDialog, PublisherCreatorDialog
+    PublisherDetailsDialog
 )
 from src.data.models.publisher import Publisher
 
@@ -16,13 +16,7 @@ def mock_service():
 def sample_publisher():
     return Publisher(publisher_id=200, publisher_name="Original Name", parent_publisher_id=None)
 
-def test_publisher_creator_dialog_init(qtbot):
-    dialog = PublisherCreatorDialog(initial_name="Existing", title="Rename Title", button_text="RenameBtn")
-    qtbot.addWidget(dialog)
-    
-    assert dialog.windowTitle() == "Rename Title"
-    assert dialog.inp_name.text() == "Existing"
-    assert dialog.btn_save.text() == "RenameBtn"
+
 
 def test_publisher_details_dialog_save_rename(qtbot, mock_service, sample_publisher):
     mock_service.search.return_value = []
@@ -126,3 +120,30 @@ def test_publisher_details_dialog_rename_child(qtbot, mock_service, sample_publi
     with patch.object(dialog.list_children.click_router, 'route_click', return_value=ClickResult(ClickAction.UPDATED, 500)) as mock_route:
         dialog.list_children._on_item_clicked(500, "Son")
         mock_route.assert_called_once()
+
+def test_create_new_parent(qtbot, mock_service, sample_publisher):
+    """Test creating a new parent using the standard EntityPickerDialog."""
+    dialog = PublisherDetailsDialog(sample_publisher, mock_service)
+    qtbot.addWidget(dialog)
+    
+    new_pub = Publisher(999, "New Parent", None)
+    
+    # Mock EntityPickerDialog
+    # Patch where it is defined, because it is imported locally in the method
+    with patch('src.presentation.dialogs.entity_picker_dialog.EntityPickerDialog') as MockPicker:
+        mock_instance = MockPicker.return_value
+        mock_instance.exec.return_value = 1
+        mock_instance.get_selected.return_value = new_pub
+        
+        # When _refresh_data is called, it searches for all publishers
+        mock_service.search.return_value = [new_pub]
+        
+        dialog._create_new_parent()
+        
+        # Verify dialog was executed
+        mock_instance.exec.assert_called_once()
+        
+        # Verify combo updated (it should find "New Parent" ID 999)
+        # Note: _refresh_data clears and refills combo from service.search
+        # We verify that currentData matches the new pub ID
+        assert dialog.cmb_parent.currentData() == 999

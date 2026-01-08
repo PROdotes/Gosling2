@@ -333,6 +333,12 @@ class SongRepository(GenericRepository[Song]):
                 ) as AlbumID,
                 COALESCE(
                     (
+                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
+                        FROM RecordingPublishers RP
+                        JOIN Publishers P ON RP.PublisherID = P.PublisherID
+                        WHERE RP.SourceID = MS.SourceID
+                    ),
+                    (
                         SELECT P.PublisherName 
                         FROM SongAlbums SA 
                         JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
@@ -344,12 +350,6 @@ class SongRepository(GenericRepository[Song]):
                         JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
                         JOIN Publishers P ON AP.PublisherID = P.PublisherID
                         WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    ),
-                    (
-                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
-                        FROM RecordingPublishers RP
-                        JOIN Publishers P ON RP.PublisherID = P.PublisherID
-                        WHERE RP.SourceID = MS.SourceID
                     )
                 ) as PublisherName,
 
