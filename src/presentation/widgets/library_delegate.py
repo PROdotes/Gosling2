@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle, Q
 from PyQt6.QtCore import Qt, QRect, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QFont, QBrush, QPen, QLinearGradient
 from ...resources import constants
+from .glow.led import GlowLED
 
 
 class WorkstationDelegate(QStyledItemDelegate):
@@ -139,28 +140,11 @@ class WorkstationDelegate(QStyledItemDelegate):
         pip_color = QColor()
         
         if column_name == 'title':
-            # Check Virtual
-            path_idx = self.field_indices.get('path', -1)
-            is_virtual = False
-            if path_idx != -1:
-                path_val = str(model.index(row, path_idx).data(Qt.ItemDataRole.UserRole) or "")
-                
-                # Check properties
-                is_virtual = "|" in path_val
-                is_wav = path_val.lower().endswith('.wav')
-
-                if is_dirty:
-                    show_pip = True
-                    pip_color = QColor(constants.COLOR_MAGENTA)
-                elif is_wav:
-                    show_pip = True
-                    pip_color = QColor(constants.COLOR_RED)
-                elif is_virtual:
-                    show_pip = True
-                    pip_color = QColor(constants.COLOR_CYAN)
+            # Clean Title Logic (Pips moved to Status Deck T-92)
+            pass
         
         if column_name == "is_active":
-            self._draw_status_badge(painter, option, index, category_color)
+            self._draw_status_deck(painter, option, index, is_dirty)
         else:
             text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
             # T-70: Strip "Secret Payload" (Identity Bubble search data) using separator
@@ -179,22 +163,8 @@ class WorkstationDelegate(QStyledItemDelegate):
             
             painter.setFont(font)
             
-            # Adjust padding for Pip
             padding_left = 10
-            if show_pip:
-                padding_left = 24 # Make room for pip
-                
             text_rect = rect.adjusted(padding_left, 0, -4, 0)
-
-            # Draw Pip
-            if show_pip:
-                pip_rect = QRect(rect.left() + 8, rect.center().y() - 3, 6, 6)
-                painter.save()
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QBrush(pip_color))
-                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-                painter.drawEllipse(pip_rect)
-                painter.restore()
 
             if option.state & QStyle.StateFlag.State_Selected:
                 painter.setPen(QColor("#FFFFFF")) # Force crisp white on selection
@@ -209,37 +179,53 @@ class WorkstationDelegate(QStyledItemDelegate):
 
         painter.restore()
 
-    def _draw_status_badge(self, painter, option, index, category_color):
+    def _draw_status_deck(self, painter, option, index, is_dirty):
+        """Render the T-92 Status Deck (Shape + Glow Logic)"""
         model = index.model()
         row = index.row()
-        val = model.index(row, self.field_indices.get('is_active', -1)).data(Qt.ItemDataRole.UserRole)
-        is_active = str(val).lower() in ('true', '1')
         
-        badge_rect = option.rect.adjusted(10, 8, -10, -9)  # Tighter tactical fit
-        palette = option.palette
+        # 1. Determine Props
+        path_idx = self.field_indices.get('path', -1)
+        active_col = self.field_indices.get('is_active', -1)
         
-        if is_active:
-            # Active "AIR" state: Tactical Muted Amber
-            bg = QColor(constants.COLOR_MUTED_AMBER) 
-            txt = QColor(constants.COLOR_BLACK)
-        else:
-            # Inactive "OFF" state: Void/Muted
-            bg = palette.color(palette.ColorRole.AlternateBase)
-            if not bg.isValid():
-                bg = QColor(constants.COLOR_VOID)
-            txt = QColor(constants.COLOR_GRAY)
+        is_active = False
+        if active_col != -1:
+             val = model.index(row, active_col).data(Qt.ItemDataRole.UserRole)
+             # Handle bool or string "1"/"True"
+             is_active = str(val).lower() in ('true', '1')
+             
+        path_val = ""
+        if path_idx != -1:
+            path_val = str(model.index(row, path_idx).data(Qt.ItemDataRole.UserRole) or "")
             
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QBrush(bg))
-        painter.drawRoundedRect(badge_rect, 4, 4)
+        is_virtual = "|" in path_val
+        is_wav = path_val.lower().endswith('.wav')
         
-        painter.setPen(txt)
-        font = painter.font()
-        font.setFamily("Bahnschrift Condensed")
-        font.setBold(True)
-        font.setPointSize(8)
-        painter.setFont(font)
-        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "AIR" if is_active else "OFF")
+        # 2. Determine Shape
+        shape = GlowLED.SHAPE_CIRCLE
+        if is_wav:
+            shape = GlowLED.SHAPE_TRIANGLE
+        elif is_virtual:
+            shape = GlowLED.SHAPE_SQUARE
+            
+        # 3. Determine Color (Priority: Dirty > Wav > Virtual > Standard)
+        color = QColor(constants.COLOR_AMBER)
+        if is_dirty:
+            color = QColor(constants.COLOR_MAGENTA)
+        elif is_wav:
+            color = QColor(constants.COLOR_RED)
+        elif is_virtual:
+            color = QColor(constants.COLOR_CYAN)
+            
+        # 4. Draw
+        GlowLED.draw_led(
+            painter, 
+            option.rect,
+            color,
+            is_active,
+            size=10, 
+            shape=shape
+        )
 
     def sizeHint(self, option, index):
         return QSize(option.rect.width(), 48)

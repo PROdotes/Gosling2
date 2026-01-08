@@ -72,4 +72,14 @@ class VFS:
         except Exception:
             pass
             
-        return virtual_paths
+    @classmethod
+    def get_physical_member_count(cls, zip_path: str) -> int:
+        """Count total files inside the ZIP (ignoring directories)."""
+        if not os.path.exists(zip_path) or not zipfile.is_zipfile(zip_path):
+            return 0
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zr:
+                # Count files (not dirs ending in /)
+                return sum(1 for name in zr.namelist() if not name.endswith('/'))
+        except Exception:
+            return 0

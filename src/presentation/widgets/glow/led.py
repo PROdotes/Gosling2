@@ -1,17 +1,23 @@
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import pyqtProperty, Qt, QRect, QSize, QPointF
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QRadialGradient, QPolygonF
 
 class GlowLED(QWidget):
     """
     Indication LED (Status Light) rendered via QPainter.
     Matches FilterTreeDelegate aesthetic (Solid Dot + Halo).
+    Supports Shapes: Circle, Square, Triangle.
     """
-    def __init__(self, color="#FFC66D", size=8, parent=None):
+    SHAPE_CIRCLE = 'CIRCLE'
+    SHAPE_SQUARE = 'SQUARE'
+    SHAPE_TRIANGLE = 'TRIANGLE'
+
+    def __init__(self, color="#FFC66D", size=8, parent=None, shape='CIRCLE'):
         super().__init__(parent)
         self._color = QColor(color)
         self._led_size = size
         self._active = False
+        self._shape = shape
         
         # Calculate size with halo padding. 
         # For gradient, we want a larger, softer falloff.
@@ -30,6 +36,10 @@ class GlowLED(QWidget):
         self._color = QColor(color)
         self.update()
 
+    def setShape(self, shape):
+        self._shape = shape
+        self.update()
+
     @pyqtProperty(bool)
     def active(self): return self._active
     
@@ -39,7 +49,7 @@ class GlowLED(QWidget):
     RING_COLOR = "#444444"
 
     @staticmethod
-    def draw_led(painter: QPainter, rect: QRect, color: QColor, active: bool, size: int, ring_color: QColor = None, max_radius: float = None):
+    def draw_led(painter: QPainter, rect: QRect, color: QColor, active: bool, size: int, ring_color: QColor = None, max_radius: float = None, shape='CIRCLE'):
         """
         Shared renderer for all LEDs (Widgets & Delegates).
         """
@@ -63,6 +73,7 @@ class GlowLED(QWidget):
             if max_radius is not None and halo_radius > max_radius:
                 halo_radius = max_radius
                 
+            # Halo is always circular/radial for "Glow" effect
             gradient = QRadialGradient(QPointF(cx, cy), halo_radius)
             
             # Gradient stops
@@ -82,20 +93,50 @@ class GlowLED(QWidget):
             painter.setBrush(QBrush(gradient))
             painter.setPen(Qt.PenStyle.NoPen)
             
-            # Draw gradient rect (larger than led)
+            # Draw gradient rect (larger than led) - always circle for glow
             h = int(halo_radius)
             painter.drawEllipse(center, h, h)
             
             # 2. Core (Solid, No Pen)
             painter.setBrush(color)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(led_rect)
+            
+            if shape == GlowLED.SHAPE_SQUARE:
+                painter.drawRoundedRect(led_rect, 2, 2)
+            elif shape == GlowLED.SHAPE_TRIANGLE:
+                # Upward Triangle
+                p1 = QPointF(cx, cy - r)     # Top
+                p2 = QPointF(cx - r, cy + r) # Bottom Left
+                p3 = QPointF(cx + r, cy + r) # Bottom Right
+                poly = QPolygonF([p1, p2, p3])
+                painter.drawPolygon(poly)
+            else:
+                painter.drawEllipse(led_rect)
             
         else:
-            # Unactive State (Subtle Ring)
-            painter.setBrush(Qt.BrushStyle.NoBrush)
-            painter.setPen(QPen(ring_color, 1))
-            painter.drawEllipse(led_rect)
+            # Inactive State (Dimmed Identity for T-92)
+            # Retain color identity but dimmed, no glow.
+            
+            dim_fill = QColor(color)
+            dim_fill.setAlpha(40) # Very subtle fill to show "mass"
+            
+            dim_stroke = QColor(color)
+            dim_stroke.setAlpha(120) # Crisp outline to show "shape" and "type"
+            
+            painter.setBrush(QBrush(dim_fill))
+            painter.setPen(QPen(dim_stroke, 1.5)) 
+            
+            if shape == GlowLED.SHAPE_SQUARE:
+                painter.drawRoundedRect(led_rect, 2, 2)
+            elif shape == GlowLED.SHAPE_TRIANGLE:
+                # Upward Triangle
+                p1 = QPointF(cx, cy - r)
+                p2 = QPointF(cx - r, cy + r)
+                p3 = QPointF(cx + r, cy + r)
+                poly = QPolygonF([p1, p2, p3])
+                painter.drawPolygon(poly)
+            else:
+                painter.drawEllipse(led_rect)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -107,6 +148,6 @@ class GlowLED(QWidget):
             self.rect(), 
             self._color, 
             self._active, 
-            self._led_size
+            self._led_size,
+            shape=self._shape
         )
-

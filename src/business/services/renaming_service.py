@@ -192,11 +192,32 @@ class RenamingService:
         if self.check_conflict(target_path):
             return False
             
-        # Ensure source exists
-        if not song.path or not os.path.exists(song.path):
-            return False
-
+        # Extension Check check to ensure we don't do something weird
+        
         try:
+            from ...core.vfs import VFS
+            
+            # CASE A: Virtual File (Extract)
+            if VFS.is_virtual(song.path):
+                # 1. Ensure target directory
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                
+                # 2. Extract content (Copy)
+                content = VFS.read_bytes(song.path)
+                with open(target_path, 'wb') as f:
+                    f.write(content)
+                    
+                # 3. Update Model (Link Broken)
+                # Note: We do NOT delete from ZIP (expensive/risky). 
+                # We leave the artifact and let Cleanup Logic handle the ZIP deletion if empty.
+                song.path = target_path
+                return True
+
+            # CASE B: Physical File (Move)
+            # Ensure source exists
+            if not song.path or not os.path.exists(song.path):
+                return False
+
             # 2. Create parent directories
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             
@@ -207,7 +228,7 @@ class RenamingService:
             song.path = target_path
             return True
             
-        except (OSError, shutil.Error) as e:
+        except (OSError, shutil.Error, Exception) as e:
             from src.core import logger
             logger.error(f"Rename Error during file move: {e}")
             return False

@@ -99,11 +99,10 @@ class TagRepository(GenericRepository[Tag]):
         
         return self.create(name, category), True
 
-    def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None, batch_id: Optional[str] = None) -> None:
+    def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None, batch_id: Optional[str] = None) -> bool:
         """
         Link a tag to a source item (song).
-        If tag_id is a string, it's treated as a TagName and will be resolved/created
-        within the optional category.
+        Returns True on success.
         """
         if isinstance(tag_id, str):
             tag_obj, _ = self.get_or_create(tag_id, category)
@@ -113,26 +112,28 @@ class TagRepository(GenericRepository[Tag]):
         with self.get_connection() as conn:
             # Check if link already exists
             cur = conn.execute("SELECT 1 FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
-            if cur.fetchone(): return
+            if cur.fetchone(): return True
 
             conn.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (source_id, tag_id))
             AuditLogger(conn, batch_id=batch_id).log_insert("MediaSourceTags", f"{source_id}-{tag_id}", {
                 "SourceID": source_id,
                 "TagID": tag_id
             })
+        return True
 
-    def remove_tag_from_source(self, source_id: int, tag_id: int, batch_id: Optional[str] = None) -> None:
-        """Unlink a tag from a source item."""
+    def remove_tag_from_source(self, source_id: int, tag_id: int, batch_id: Optional[str] = None) -> bool:
+        """Unlink a tag from a source item. Returns True on success."""
         from src.core.audit_logger import AuditLogger
         with self.get_connection() as conn:
             # Snapshot for audit
             cur = conn.execute("SELECT SourceID, TagID FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
             row = cur.fetchone()
-            if not row: return
+            if not row: return True
             snapshot = {"SourceID": row[0], "TagID": row[1]}
 
             conn.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id))
             AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{source_id}-{tag_id}", snapshot)
+        return True
             
     def remove_all_tags_from_source(self, source_id: int, category: Optional[str] = None, batch_id: Optional[str] = None) -> None:
         """

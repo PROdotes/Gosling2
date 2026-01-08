@@ -171,7 +171,7 @@ class ChipTrayWidget(QWidget):
         else:
             self.btn_add.hide()
 
-    def add_chip(self, entity_id, label, icon_char="", is_mixed=False, is_inherited=False, tooltip="", move_add_button=True, zone="default", is_primary=False):
+    def add_chip(self, entity_id, label, icon_char="", is_mixed=False, is_inherited=False, tooltip="", move_add_button=True, zone="default", is_primary=False, index=-1):
         """Add a new chip to the tray."""
         chip = Chip(entity_id, label, icon_char, is_mixed, is_primary=is_primary, parent=self.container)
         
@@ -190,11 +190,34 @@ class ChipTrayWidget(QWidget):
         chip.remove_requested.connect(self._on_remove_requested)
         chip.context_menu_requested.connect(self.chip_context_menu_requested.emit)
         
-        # Insert before the add button (the last item)
-        self.flow_layout.addWidget(chip)
+        # Insert
+        if index >= 0:
+            self.flow_layout.insertWidget(index, chip)
+        else:
+            self.flow_layout.addWidget(chip)
         
         if move_add_button and self.is_add_visible:
             self._move_add_to_end()
+
+    def get_insertion_index(self, new_label: str) -> int:
+        """Calculate the alphabetical insertion index for a new chip."""
+        new_label = new_label.lower()
+        cnt = self.flow_layout.count()
+        
+        for i in range(cnt):
+            item = self.flow_layout.itemAt(i)
+            widget = item.widget()
+            
+            # If we hit the add button, we MUST insert here (pushing button to end)
+            if widget == self.btn_add:
+                return i
+                
+            # If we hit a chip that is "larger", insert here
+            if isinstance(widget, Chip):
+                if new_label < widget.label_text.lower():
+                    return i
+                    
+        return cnt # Fallback (append)
             
         chip.show()
         # Refresh style for property change

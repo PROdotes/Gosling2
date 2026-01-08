@@ -346,14 +346,44 @@ class EntityListWidget(QWidget):
             # Check for Alias Match to pass to adapter (important for Group Members)
             kwargs = {}
             if hasattr(entity, 'matched_alias') and entity.matched_alias:
-                kwargs['matched_alias'] = entity.matched_alias
-                
+                 kwargs['matched_alias'] = entity.matched_alias
+
             if self.context_adapter.link(entity_id, **kwargs):
-                self.refresh_from_adapter()
+                # T-Polish: Use "Append Mode" for additive types to prevent sorting jumps
+                # Albums are usually exclusive/replacing, so they need full refresh.
+                if self.entity_type != EntityType.ALBUM:
+                    self._append_local_item(entity)
+                else:
+                    self.refresh_from_adapter()
+                
                 self.data_changed.emit()
             else:
                 QMessageBox.warning(self, "Action Failed", 
                                    "Could not complete the link. This might be due to a circular relationship or validation error.")
+    
+    def _append_local_item(self, entity: Any):
+        """Manually append a new item to avoid resort."""
+        entity_id = self._get_entity_id(entity)
+        label = get_entity_display(self.entity_type, entity)
+        icon = get_entity_icon(self.entity_type, entity)
+        
+        # Determine defaults for new item
+        is_mixed = False
+        is_inherited = False
+        tooltip = ""
+        zone = "amber"
+        is_primary = False
+        
+        if self.layout_mode == LayoutMode.CLOUD:
+             # Append to end (index=-1)
+             self._inner_widget.add_chip(entity_id, label, icon, is_mixed, is_inherited, tooltip, 
+                                         move_add_button=True, zone=zone, is_primary=is_primary)
+        else:
+             # Stack Mode - Append
+             full_label = f"{icon} {label}"
+             list_item = QListWidgetItem(full_label)
+             list_item.setData(Qt.ItemDataRole.UserRole, entity_id)
+             self._inner_widget.addItem(list_item)
     
     def _show_stack_context_menu(self, pos):
         """Show context menu for stack mode items."""

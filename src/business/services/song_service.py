@@ -49,6 +49,10 @@ class SongService:
         """Get unique values for filtering (Years, Genres, etc)."""
         return self._repo.get_distinct_values(field_name)
 
+    def get_virtual_member_count(self, zip_path: str) -> int:
+        """Count how many library items belong to this ZIP container."""
+        return self._repo.get_virtual_member_count(zip_path)
+
     def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None) -> None:
         """Log a high-level action via the repository."""
         self._repo.log_action(action_type, target_table, target_id, details)

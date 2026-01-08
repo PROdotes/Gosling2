@@ -86,8 +86,8 @@ tags:
     *   *Status*: **Done**.
 *   [x] **T-61 Universal Tag Picker** (Search/Tree Dialog)
     *   *Status*: **Done** - Implemented "Speed Mode", Global Search, and Auto-Context Switching.
-*   [x] **UX: "Active" Toggle Styling**
-    *   *Task*: Replaced "Active" checkbox (Side Panel) with a Pro "GlowToggle" switch for the Airplay Gate.
+*   [x] **Status Deck Implementation (T-92)**
+    *   *Task*: Implemented consolidated "Status Deck" column (GlowLED Shapes/Colors) and "Active" Toggle with Atomic Save.
     *   *Status*: **Done**.
 *   [x] [**T-70 Artist Selector**](tasks/T-70_artist_manager_plan.md) (Database-backed Picker)
 *   [x] **Multi-Album Infrastructure** (T-22/T-63)
@@ -173,9 +173,10 @@ tags:
 *   [x] **UX: Chip Instant Save?**
     *   *Observation*: Users expect removing a chip to be "final/instant".
     *   *Status*: **Done** - Refactored to `EntityListWidget` which provides instant-reflex saving for Side Panel and relational managers (M2M).
-*   [ ] **UX: Chip Sorting Stability**
+*   [x] **UX: Chip Sorting Stability**
     *   *Observation*: Adding "B" to "E" causes "B" to jump to front (Alphabetical auto-sort). This "jumping" disorients users.
     *   *Task*: Decide on Insertion Order vs Alphabetical, or animate the re-sort so it's not jarring.
+    *   *Status*: **Done** - Implemented "Append Mode" in `EntityListWidget` to preserve insertion context during edits, reverting to DB-Sort on reload.
 *   [x] **Verify Multi-Edit Logic**
     *   *Task*: Tests confirmed adding/removing tags in multi-select mode correctly uses intersection/union logic.
 *   [x] **Tech Debt Audit (Genre/Mood)**

@@ -27,7 +27,10 @@ from ..dialogs.universal_import_dialog import UniversalImportDialog
 
 
 class DropIndicatorHeaderView(QHeaderView):
-    """Custom header view that shows a drop indicator line when reordering columns."""
+    """
+    Custom header that prevents moving the Status Deck (Col 0)
+    and shows drop indicator for others.
+    """
     
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -35,7 +38,10 @@ class DropIndicatorHeaderView(QHeaderView):
         self._dragging = False
     
     def mousePressEvent(self, event):
-        self._dragging = True
+        # Prevent dragging the Status Deck (Logical Index 0)
+        idx = self.logicalIndexAt(event.pos())
+        if idx != 0:
+            self._dragging = True
         super().mousePressEvent(event)
     
     def mouseReleaseEvent(self, event):
@@ -53,21 +59,39 @@ class DropIndicatorHeaderView(QHeaderView):
         super().mouseMoveEvent(event)
     
     def _calculate_drop_position(self, x: int) -> int:
-        """Calculate the x position for the drop indicator line."""
+        """Calculate drop pos, ensuring we can't drop BEFORE the Status Deck."""
+        if self.count() == 0:
+            return -1
+
+        # Determine safety barrier (Right edge of Status Deck)
+        # We assume Logical 0 is the Status Deck.
+        deck_idx = 0
+        deck_width = self.sectionSize(deck_idx)
+        deck_pos = self.sectionPosition(deck_idx) 
+        barrier = deck_pos + deck_width
+
+        # If cursor is within the deck,snap to barrier
+        if x < barrier:
+             return barrier
+
         for visual_idx in range(self.count()):
             logical_idx = self.logicalIndex(visual_idx)
+            
+            # Skip Status Deck itself
+            if logical_idx == 0:
+                continue
+
             section_pos = self.sectionPosition(logical_idx)
             section_size = self.sectionSize(logical_idx)
             section_mid = section_pos + section_size // 2
             
             if x < section_mid:
-                return section_pos
+                # Ensure we don't return a position before the barrier
+                return max(section_pos, barrier)
         
         # After last column
-        if self.count() > 0:
-            last_logical = self.logicalIndex(self.count() - 1)
-            return self.sectionPosition(last_logical) + self.sectionSize(last_logical)
-        return -1
+        last_logical = self.logicalIndex(self.count() - 1)
+        return self.sectionPosition(last_logical) + self.sectionSize(last_logical)
     
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -1221,7 +1245,8 @@ class LibraryWidget(QWidget):
                 self.empty_label.hide()
             
             if headers:
-                ui_headers = [f.ui_header for f in yellberus.FIELDS]
+                # T-92: Override Status Deck header for table view (keep it empty even if Yellberus has label)
+                ui_headers = [("" if f.name == 'is_active' else f.ui_header) for f in yellberus.FIELDS]
                 self.library_model.setHorizontalHeaderLabels(ui_headers)
             
             show_incomplete = self._show_incomplete
@@ -1254,14 +1279,15 @@ class LibraryWidget(QWidget):
                     item.setData(sort_value, Qt.ItemDataRole.UserRole)
                     item.setEditable(False) # Ensure items are not editable by default
                     
-                    # Checkbox for IsActive
+                    # Status Deck (IsActive) - No Checkbox, just Data
                     if col_idx == self.field_indices.get('is_active'):
-                        item.setCheckable(True)
                         item.setEditable(False)
+                        item.setCheckable(False)
                         item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
                         
                         is_active_bool = bool(cell) if cell is not None else False
-                        item.setCheckState(Qt.CheckState.Checked if is_active_bool else Qt.CheckState.Unchecked)
+                        item.setData(is_active_bool, Qt.ItemDataRole.UserRole)
+                        item.setToolTip("Status: ACTIVE" if is_active_bool else "Status: INACTIVE")
                         item.setText("")
 
                     if col_idx == self.field_indices['is_done']:
@@ -1302,6 +1328,18 @@ class LibraryWidget(QWidget):
                 self._load_column_layout()
 
             self._update_tab_counts()
+
+            # T-92 Status Deck Enforcement (Must be First & Fixed)
+            h_header = self.table_view.horizontalHeader()
+            
+            # 1. Force Logical 0 to Visual 0
+            current_visual = h_header.visualIndex(0)
+            if current_visual != 0:
+                 h_header.moveSection(current_visual, 0)
+                
+            # 2. Lock Width
+            h_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+            h_header.resizeSection(0, 32) # Standard Icon Width
 
         finally:
             # 5. Re-enable layout saving
@@ -1596,6 +1634,34 @@ class LibraryWidget(QWidget):
                 status_action.setEnabled(False)
             
             menu.addAction(status_action)
+
+        # T-92: Active Toggle Action (Obvious Path)
+        active_col = self.field_indices.get('is_active', -1)
+        if active_col != -1 and indexes:
+             actives = []
+             for idx in indexes:
+                 source_idx = self.proxy_model.mapToSource(idx)
+                 item = self.library_model.item(source_idx.row(), active_col)
+                 if item:
+                    val = item.data(Qt.ItemDataRole.UserRole)
+                    actives.append(str(val).lower() in ('true', '1'))
+             
+             all_active = all(actives)
+             all_inactive = all(not a for a in actives)
+             
+             active_action = QAction(self)
+             if all_active:
+                 active_action.setText("Set Inactive")
+                 active_action.triggered.connect(lambda: self._toggle_active(False))
+             elif all_inactive:
+                 active_action.setText("Set Active")
+                 active_action.triggered.connect(lambda: self._toggle_active(True))
+             else:
+                 # Mixed: Default to Promoting to Active
+                 active_action.setText("Set Active")
+                 active_action.triggered.connect(lambda: self._toggle_active(True))
+            
+             menu.addAction(active_action)
         
         menu.addSeparator()
 
@@ -2158,6 +2224,33 @@ class LibraryWidget(QWidget):
 
 
 
+    def _toggle_active(self, new_state: bool) -> None:
+        """Bulk toggle 'Active' state for selected rows (T-92)."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+            
+        count = 0
+        active_col = self.field_indices.get('is_active', -1)
+        
+        for index in indexes:
+            # 1. Update DB
+            song = self._get_song_from_index(index)
+            if song:
+                song.is_active = new_state
+                self.library_service.update_song(song)
+                count += 1
+            
+            # 2. Update UI Model (Instant Feedback)
+            if active_col != -1:
+                source_index = self.proxy_model.mapToSource(index)
+                item = self.library_model.item(source_index.row(), active_col)
+                if item:
+                    item.setData(new_state, Qt.ItemDataRole.UserRole)
+        
+        if count > 0:
+            self.table_view.viewport().update()
+
     def _delete_selected(self) -> None:
         indexes = self.table_view.selectionModel().selectedRows()
         if not indexes:
@@ -2170,16 +2263,67 @@ class LibraryWidget(QWidget):
         
         if reply == QMessageBox.StandardButton.Yes:
             # Explicitly clear selection to notify listeners (SidePanel) that these items are gone.
-            # This prevents the Editor from showing stale data while we process the deletion.
             self.table_view.selectionModel().clearSelection()
+            
+            # Track containers for potential cleanup (VFS)
+            potential_empty_zips = set()
+            from ...core.vfs import VFS
 
             for index in indexes:
                 source_index = self.proxy_model.mapToSource(index)
                 file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])
+                # Get path to check for virtual content
+                path_item = self.library_model.item(source_index.row(), self.field_indices['path'])
+                
                 if file_id_item:
                     file_id = int(file_id_item.text())
+                    
+                    if path_item:
+                        path_str = path_item.text()
+                        if VFS.is_virtual(path_str):
+                            zip_path, _ = VFS.split_path(path_str)
+                            potential_empty_zips.add(zip_path)
+                            
                     self.library_service.delete_song(file_id)
+            
             self.load_library()
+            
+            # Post-delete: Check for empty containers (T-Cleanup)
+            # Post-delete: Check for empty containers (T-Cleanup)
+            self._check_and_cleanup_zips(potential_empty_zips)
+
+    def _check_and_cleanup_zips(self, zip_paths: set) -> None:
+        """Check provided ZIP paths for emptiness and prompt user to delete."""
+        from ...core.vfs import VFS
+        
+        for zip_path in zip_paths:
+            # 1. Check Library Usage (Are any songs still using this?)
+            lib_count = self.library_service.get_virtual_member_count(zip_path)
+            if lib_count > 0:
+                continue
+                
+            # 2. Check Physical Content (Are there non-audio leftovers?)
+            physical_count = VFS.get_physical_member_count(zip_path)
+            zip_name = os.path.basename(zip_path)
+            
+            message = ""
+            if physical_count == 0:
+                message = f"The archive '{zip_name}' is empty and no longer used.\nDelete it from disk?"
+            else:
+                message = (f"You have extracted/removed all audio from '{zip_name}'.\n"
+                           f"However, it still contains {physical_count} other file(s) (likely artwork/promo/nfo).\n\n"
+                           f"Delete the ZIP file anyway?")
+                           
+            reply = QMessageBox.question(
+                self, "Clean Up Archive?", message,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.Yes:
+                try:
+                    os.remove(zip_path)
+                except Exception as e:
+                    QMessageBox.warning(self, "Delete Failed", f"Could not delete archive: {e}")
 
     def _on_play_selected_immediately(self):
         """Play the first selected song now."""
@@ -2482,6 +2626,10 @@ class LibraryWidget(QWidget):
             success_count = 0
             error_count = 0
             errors = []
+            
+            # T-90: Track Zips for cleanup if files are extracted away
+            potential_empty_zips = set()
+            from ...core.vfs import VFS
 
             id_col = self.field_indices.get('file_id', -1)
 
@@ -2508,17 +2656,26 @@ class LibraryWidget(QWidget):
                         # Gate 3: Conflict (Calculated live)
                         target = self.renaming_service.calculate_target_path(song)
                         
+
                         # Optimization: If path matches target, skip
                         if song.path:
                             current = os.path.normcase(os.path.normpath(song.path))
                             new_target = os.path.normcase(os.path.normpath(target))
                             if current == new_target:
                                 continue
+                            
+                            # Capture old path for VFS Clean Check
+                            old_path = song.path
 
                         if self.renaming_service.rename_song(song, target_path=target):
                             # Success! Persist new path to DB
                             self.library_service.update_song(song)
                             success_count += 1
+                            
+                            # T-90: Check if we moved OUT of a virtual file
+                            if old_path and VFS.is_virtual(old_path) and not VFS.is_virtual(song.path):
+                                zp, _ = VFS.split_path(old_path)
+                                potential_empty_zips.add(zp)
                         else:
                             errors.append(f"{song.title}: Rename failed (Conflict or Access Denied)")
                             error_count += 1
@@ -2538,6 +2695,9 @@ class LibraryWidget(QWidget):
             # Refresh to show new paths
             if success_count > 0 and refresh:
                 self.load_library()
+                # Run Cleanup Check
+                if potential_empty_zips:
+                    self._check_and_cleanup_zips(potential_empty_zips)
 
         except Exception as e:
             import traceback

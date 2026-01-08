@@ -566,6 +566,10 @@ class SidePanelWidget(QFrame):
                         widget.setText(display_text)
 
                 elif isinstance(widget, EntityListWidget):
+                    # T-Fix: Update Adapter reference because self.current_songs object changed!
+                    if isinstance(widget.context_adapter, SongFieldAdapter):
+                        widget.context_adapter.songs = self.current_songs
+
                     # T-Fix: Force update from SidePanel's "Latest Chips" logic which respects Staged Changes.
                     # This ensures that when we pick an album, "ghost" changes appear immediately.
                     # Bypassing adapter.refresh_from_db because we are in Draft Mode.
@@ -991,7 +995,11 @@ class SidePanelWidget(QFrame):
 
     def _on_chip_primary_requested(self, field_name, entity_id, name):
         """T-82: Move a specific tag/genre to the front of the list."""
-
+        
+        # Normalize UI name ("Genre: Rock") to System name ("Genre:Rock") for Tags
+        target_name = name
+        if field_name == 'tags' and ': ' in name:
+            target_name = name.replace(': ', ':', 1)
 
         for song in self.current_songs:
             current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
@@ -1004,9 +1012,12 @@ class SidePanelWidget(QFrame):
                     import re
                     current = [p.strip() for p in re.split(delims, str(current))] if current else []
             
-            if name in current:
-                new_list = [p for p in current if p != name]
-                new_list.insert(0, name) # Move to front
+            # Check for target_name (Clean) OR name (Raw) just in case
+            match = target_name if target_name in current else (name if name in current else None)
+            
+            if match:
+                new_list = [p for p in current if p != match]
+                new_list.insert(0, match) # Move to front
                 
                 # Special Case: Album IDs (Sync Order)
                 if field_name == 'album':
@@ -1030,6 +1041,20 @@ class SidePanelWidget(QFrame):
         # Trigger immediate save of all staged changes
         # Trigger immediate save of all staged changes using existing handler
         self._on_save_clicked()
+
+    def _on_active_toggled_atomic(self, checked: bool):
+        """Atomic save for IsActive toggle (T-92 fix). Bypass staging."""
+        if not self.current_songs:
+            return
+            
+        # 1. Update DB directly
+        for song in self.current_songs:
+            song.is_active = checked
+            self.library_service.update_song(song)
+            
+        # 2. Trigger Refresh to update Table View
+        # This will reload the library but preserve SidePanel staging via selection persistance
+        self.filter_refresh_requested.emit()
 
     def _on_entity_data_changed(self):
         """Called when EntityListWidget reports a data change (e.g. rename/edit)."""
@@ -1073,7 +1098,11 @@ class SidePanelWidget(QFrame):
             
             tg.setChecked(val_bool if value is not None else False)
             # is_multiple partially checked not yet supported by GlowToggle, default to False
-            tg.toggled.connect(lambda checked, f=field_def.name: self._on_field_changed(f, checked))
+            # T-92: Atomic Save for "Live" Toggle per user request
+            if field_def.name == 'is_active':
+                tg.toggled.connect(self._on_active_toggled_atomic)
+            else:
+                tg.toggled.connect(lambda checked, f=field_def.name: self._on_field_changed(f, checked))
             return tg
             
         if field_def.name == 'album_REMOVE_OLD_BUTTON_LOGIC':
@@ -1489,13 +1518,52 @@ class SidePanelWidget(QFrame):
 
         if field_def.name == 'tags':
             # Unified Tags: Intersection logic using effective values (staging-aware)
+            
+            # CASE A: Single Song - Preserve Order & Enforce Single Primary Genre (T-82)
+            if len(self.current_songs) == 1:
+                song = self.current_songs[0]
+                # 1. Get DB tags (Used for fallback, but we rely on Staging mostly)
+                db_tags = self.tag_service.get_tags_for_source(song.source_id)
+                db_tag_strings = [f"{t.category}:{t.tag_name}" for t in db_tags]
+                
+                # 2. Get Ordered Effective Values
+                effective_tags = self._get_effective_value(song.source_id, 'tags', db_tag_strings)
+                if not isinstance(effective_tags, list):
+                     effective_tags = [effective_tags] if effective_tags else []
+                
+                chips = []
+                found_primary_genre = False
+                
+                for tag_str in effective_tags:
+                     if ':' in tag_str:
+                          cat, name = tag_str.split(':', 1)
+                     else:
+                          cat, name = "Genre", tag_str
+                     
+                     # Lookup ID
+                     tag_obj = self.tag_service.find_by_name(name, cat)
+                     tid = tag_obj.tag_id if tag_obj else -1
+                     
+                     icon = self._get_tag_category_icon(cat)
+                     zone = self._get_tag_category_zone(cat)
+                     
+                     # Logic: Only the FIRST Genre (TCON) is Primary
+                     is_tcon = (ID3Registry.get_id3_frame(cat) == "TCON")
+                     is_primary = False
+                     if is_tcon and not found_primary_genre:
+                         is_primary = True
+                         found_primary_genre = True
+                     
+                     chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, is_primary))
+                
+                return chips, False, 0
+
+            # CASE B: Bulk Selection - Intersection Logic (Sorting enforced, no Primary)
             all_tag_sets = []
             for song in self.current_songs:
-                 # 1. Get DB tags as strings
                  db_tags = self.tag_service.get_tags_for_source(song.source_id)
                  db_tag_strings = [f"{t.category}:{t.tag_name}" for t in db_tags]
                  
-                 # 2. Get effective tags (handles staging)
                  effective_tags = self._get_effective_value(song.source_id, 'tags', db_tag_strings)
                  if not isinstance(effective_tags, list):
                       effective_tags = [effective_tags] if effective_tags else []
@@ -1505,7 +1573,7 @@ class SidePanelWidget(QFrame):
             common_strings = set.intersection(*all_tag_sets) if all_tag_sets else set()
             union_strings = set.union(*all_tag_sets) if all_tag_sets else set()
             
-            # 3. Resolve common strings back to chip tuples
+            # Resolve chips (Alphabetical Sort, No Primary in Bulk to avoid confusion)
             chips = []
             for tag_str in sorted(list(common_strings)):
                  if ':' in tag_str:
@@ -1513,15 +1581,14 @@ class SidePanelWidget(QFrame):
                  else:
                       cat, name = "Genre", tag_str
                  
-                 # Lookup ID for unlinking (Try to find existing tag)
                  tag_obj = self.tag_service.find_by_name(name, cat)
                  tid = tag_obj.tag_id if tag_obj else -1
                  
                  icon = self._get_tag_category_icon(cat)
                  zone = self._get_tag_category_zone(cat)
-                 is_primary = (ID3Registry.get_id3_frame(cat) == "TCON") # Simply mark all common genres?
+                 # In bulk mode, we don't show primary stars to avoid implying specific order
                  
-                 chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, is_primary))
+                 chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, False))
             
             mixed_count = len(union_strings - common_strings)
             return chips, (mixed_count > 0), mixed_count

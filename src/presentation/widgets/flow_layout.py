@@ -17,6 +17,14 @@ class FlowLayout(QLayout):
         self._items.append(item)
         self.invalidate()
 
+    def insertItem(self, index, item):
+        self._items.insert(index, item)
+        self.invalidate()
+
+    def insertWidget(self, index, widget):
+        from PyQt6.QtWidgets import QWidgetItem
+        self.insertItem(index, QWidgetItem(widget))
+
     def horizontalSpacing(self):
         if self._hspacing >= 0:
             return self._hspacing

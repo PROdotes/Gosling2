@@ -147,6 +147,10 @@ class LibraryService:
         """Set the 'Status:Unprocessed' state for a song."""
         return self.tag_service.set_unprocessed(song_id, unprocessed)
 
+    def get_virtual_member_count(self, zip_path: str) -> int:
+        """Count how many library items belong to this ZIP container."""
+        return self.song_service.get_virtual_member_count(zip_path)
+
     # ==================== ADDITIONAL SERVICE METHODS ====================
 
     def get_all_years(self) -> List[int]:

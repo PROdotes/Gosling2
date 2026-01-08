@@ -151,6 +151,17 @@ GROUPERS = {
 # NOTE: The order of this list MUST match the columns in BASE_QUERY!
 FIELDS: List[FieldDef] = [
     FieldDef(
+        name='is_active',
+        ui_header='TOGGLE LIVE',
+        db_column='MS.IsActive',
+        field_type=FieldType.BOOLEAN,
+        filterable=True,
+        portable=False,
+        searchable=False,
+        strategy='boolean',
+        zone='gray',
+    ),
+    FieldDef(
         name='performers',
         ui_header='Performers',
         db_column='Performers',
@@ -443,17 +454,6 @@ FIELDS: List[FieldDef] = [
         min_value=0,
         searchable=False,
         strategy='range',
-        zone='gray', # SYSTEM
-    ),
-    FieldDef(
-        name='is_active',
-        ui_header='TOGGLE LIVE',
-        db_column='MS.IsActive',
-        field_type=FieldType.BOOLEAN,
-        filterable=True,
-        portable=False,
-        searchable=False,
-        strategy='boolean',
         zone='gray', # SYSTEM
     ),
     FieldDef(

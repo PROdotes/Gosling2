@@ -587,6 +587,21 @@ class SongRepository(GenericRepository[Song]):
             logger.error(f"Error fetching songs by year: {e}")
             return [], []
 
+    def get_virtual_member_count(self, zip_path: str) -> int:
+        """Count how many library items belong to this ZIP container."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                # Ensure we match the pipe separator
+                # DB stores normalized paths (lowercase on Windows)
+                normalized_zip = os.path.normcase(os.path.abspath(zip_path))
+                pattern = f"{normalized_zip}|%"
+                cursor.execute("SELECT COUNT(*) FROM MediaSources WHERE SourcePath LIKE ?", (pattern,))
+                return cursor.fetchone()[0]
+        except Exception as e:
+            logger.error(f"Error counting virtual members: {e}")
+            return 0
+
     def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by their Done status"""
         try:
