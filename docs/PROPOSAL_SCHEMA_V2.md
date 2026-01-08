@@ -1,6 +1,6 @@
 # Schema V2: The Great Cleanup
 
-**Status:** Phase 1 Complete (Schema Normalized)  
+**Status:** Phase 2 Complete (Publisher Clarity)  
 **Author:** Schema Audit (Jan 7, 2026)  
 **Priority:** CRITICAL (Blocking future features)
 
@@ -326,10 +326,10 @@ This ensures each song can have at most ONE primary album.
 - [x] Verify existing albums display correctly in UI
 
 ### Phase 2: Publisher UI Clarity
-- [ ] Verify Song Side Panel shows "Master Owner" from `RecordingPublishers`
-- [ ] Verify Album Panel shows "Released By" from `AlbumPublishers`
-- [ ] Add UI to add/edit `RecordingPublishers` directly from song view
-- [ ] Document `SongAlbums.TrackPublisherID` as deprecated
+- [x] Verify Song Side Panel shows "Master Owner" from `RecordingPublishers`
+- [x] Verify Album Panel shows "Released By" from `AlbumPublishers`
+- [x] Add UI to add/edit `RecordingPublishers` directly from song view
+- [x] Document `SongAlbums.TrackPublisherID` as deprecated
 
 ### Phase 3: LinkResult Refactor
 - [ ] Create `LinkResult` dataclass in `context_adapters.py`

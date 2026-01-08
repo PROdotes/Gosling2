@@ -187,6 +187,13 @@ tags:
 *   [x] **Unify Entity Creation UI**
     *   *Task*: Ensure all "Add Person" buttons (Creator, Artist, Group Member) use the standard `EntityPickerDialog` UI (same as Composer).
     *   *Goal*: Eliminate formatting discrepancies between different creation dialogs.
+*   [ ] **Bug: Ghost Chips (Staging/Parsing)**
+    *   *Report*: "Ika MatančevićVedran Cvetojević Werone," should create 2 people... but we don't have time to look into that... i just wanna know why it created a person that i can't delete in the composers"
+    *   *Analysis*: Parsing failure created a composite entity (bad name) which got staged. Immediate delete works on DB, but Staging buffer (from the paste) revives it in UI.
+*   [ ] **Bug: Publisher Creation Missing**
+    *   *Report*: "can't add a publisher... prolly due to missing create..."
+    *   *Issue*: Publisher Picker likely lacks "Create New" button or logic to handle non-existent publishers.
+
 
 ##  Pending Work Estimates
 Quick reference for remaining tasks.

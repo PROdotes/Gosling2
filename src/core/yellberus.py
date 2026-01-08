@@ -238,20 +238,61 @@ FIELDS: List[FieldDef] = [
         ui_header='Publisher',
         db_column='Publisher',
         field_type=FieldType.LIST,
-        filterable=True,
+        filterable=False, # T-88: decoupled filtering ensures inclusive search but strict editing
         id3_tag='TPUB',
-        # Logic: Track Override > Album Publisher > Recording/Archival Publisher
+        # STRICT MODE: Only display Direct/Master owners (RecordingPublishers).
+        # We also include legacy TrackOverrides to prevent data loss during migration.
+        # We explicitly EXCLUDE AlbumPublishers to force users to edit those in Album Manager.
         query_expression="""
             COALESCE(
                 (SELECT P_SUB.PublisherName FROM SongAlbums SA_SUB JOIN Publishers P_SUB ON SA_SUB.TrackPublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
-                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM SongAlbums SA_SUB JOIN AlbumPublishers AP_SUB ON SA_SUB.AlbumID = AP_SUB.AlbumID JOIN Publishers P_SUB ON AP_SUB.PublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
                 (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM RecordingPublishers RP_SUB JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID WHERE RP_SUB.SourceID = MS.SourceID)
             ) AS Publisher
         """,
         required=True,
         strategy='list',
         ui_search=True,
-        zone='amber', # IDENTITY
+        zone='amber', 
+    ),
+    FieldDef(
+        name='any_publisher',
+        ui_header='Publisher', # UI Label for the Filter Tree
+        db_column='AnyPublisher',
+        field_type=FieldType.LIST,
+        visible=False, # Shadow field, not for table/editor
+        editable=False,
+        filterable=True, # This is the search powerhouse
+        portable=False, # Virtual field, not written to tags
+        strategy='list',
+        # SHADOW QUERY: Aggregates BOTH Master (Direct) and Album (Inherited) publishers for search
+        query_expression="""
+            (
+                SELECT GROUP_CONCAT(PubName, '|||') FROM (
+                    -- 1. Direct Master Owners
+                    SELECT P.PublisherName as PubName 
+                    FROM RecordingPublishers RP 
+                    JOIN Publishers P ON RP.PublisherID = P.PublisherID 
+                    WHERE RP.SourceID = MS.SourceID
+                    
+                    UNION
+                    
+                    -- 2. Inherited Album Publishers
+                    SELECT P.PublisherName 
+                    FROM SongAlbums SA
+                    JOIN AlbumPublishers AP ON SA.AlbumID = AP.AlbumID
+                    JOIN Publishers P ON AP.PublisherID = P.PublisherID
+                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    
+                    UNION
+                    
+                    -- 3. Legacy Overrides
+                    SELECT P.PublisherName
+                    FROM SongAlbums SA 
+                    JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
+                    WHERE SA.SourceID = MS.SourceID
+                )
+            ) AS AnyPublisher
+        """
     ),
 
     FieldDef(

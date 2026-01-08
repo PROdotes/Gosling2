@@ -137,14 +137,60 @@ class SongFieldAdapter(ContextAdapter):
         return []
 
     def link(self, child_id: int, **kwargs) -> bool:
-        """Add entity to field for all selected songs."""
+        """Add entity to field for all selected songs (Immediate DB Write)."""
         if not self.songs:
             return False
         
-        entity = self.service.get_by_id(child_id)
-        if not entity:
-            return False
+        # T-92: IMMEDIATE WRITE MODE
+        success_any = False
         
+        # 1. Album (Specific)
+        if self.field_name == 'album':
+             for song in self.songs:
+                 if self.service.set_primary_album(song.source_id, child_id):
+                     success_any = True
+
+        # 2. Tags (Specific)
+        elif self.field_name == 'tags' and hasattr(self.service, 'add_tag_to_source'):
+             for song in self.songs:
+                 if self.service.add_tag_to_source(song.source_id, child_id):
+                     success_any = True
+                     
+        # 3. Publisher
+        elif hasattr(self.service, 'add_publisher_to_song') and self.field_name == 'publisher':
+             for song in self.songs:
+                 if self.service.add_publisher_to_song(song.source_id, child_id):
+                     success_any = True
+        
+        # 4. Roles (Generic Fallback)
+        elif hasattr(self.service, 'add_song_role'):
+            # Dynamic Role Mapping
+            role_map = {
+                'performers': 'Performer',
+                'composers': 'Composer',
+                'producers': 'Producer',
+                'remixers': 'Remixer',
+                'lyricists': 'Lyricist',
+                'arrangers': 'Arranger',
+                'engineers': 'Engineer',
+            }
+            role = role_map.get(self.field_name, self.field_name[:-1].title() if self.field_name.endswith('s') else self.field_name.title())
+
+            for song in self.songs:
+                if self.service.add_song_role(song.source_id, child_id, role):
+                    success_any = True
+
+        # 5. Fallback: Generic Staging (Raw Text Fields)
+        else:
+             return self._legacy_link_staged(child_id, **kwargs)
+        
+        self.on_data_changed()
+        return success_any
+
+    def _legacy_link_staged(self, child_id, **kwargs):
+        """Original Staging Logic (Preserved for text fields)."""
+        entity = self.service.get_by_id(child_id)
+        if not entity: return False
         name = self._get_entity_name(entity)
         
         for song in self.songs:
@@ -160,41 +206,71 @@ class SongFieldAdapter(ContextAdapter):
             if name not in current:
                 new_list = current + [name]
                 if self._stage_change:
-                    # Differential Stage if supported by callback
-                    if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
-                        self._stage_change(self.field_name, new_list, song_id=song.source_id)
-                    else:
-                        self._stage_change(self.field_name, new_list)
-                    
-                    # Sync album_id if adding an album
-                    if self.field_name == 'album':
-                        curr_ids = self._get_value(song.source_id, 'album_id', getattr(song, 'album_id', [])) if self._get_value else getattr(song, 'album_id', [])
-                        if isinstance(curr_ids, int): curr_ids = [curr_ids]
-                        if not curr_ids: curr_ids = []
-                        
-                        if child_id not in curr_ids:
-                             new_ids = curr_ids + [child_id]
-                             if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
-                                 self._stage_change('album_id', new_ids, song_id=song.source_id)
-                             else:
-                                 self._stage_change('album_id', new_ids)
-        
-        self.on_data_changed()
+                     if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+                         self._stage_change(self.field_name, new_list, song_id=song.source_id)
+                     else:
+                         self._stage_change(self.field_name, new_list)
         return True
+
+    def _stage(self, song_id, field, value):
+        """Helper for safe staging call."""
+        if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
+             self._stage_change(field, value, song_id=song_id)
+        else:
+             self._stage_change(field, value)
     
     def unlink(self, child_id: int) -> bool:
-        """Remove entity from field for all selected songs."""
-        if not self.songs:
-            return False
+        """Remove entity (Immediate DB Write)."""
+        if not self.songs: return False
         
+        success_any = False
+        
+        # 1. Album
+        if self.field_name == 'album':
+             for song in self.songs:
+                 if self.service.remove_song_from_album(song.source_id, child_id):
+                     success_any = True
+
+        # 2. Tags
+        elif self.field_name == 'tags' and hasattr(self.service, 'remove_tag_from_source'):
+             for song in self.songs:
+                 if self.service.remove_tag_from_source(song.source_id, child_id):
+                     success_any = True
+        
+        # 3. Publisher
+        elif hasattr(self.service, 'remove_publisher_from_song') and self.field_name == 'publisher':
+             for song in self.songs:
+                 if self.service.remove_publisher_from_song(song.source_id, child_id):
+                     success_any = True
+
+        # 4. Roles
+        elif hasattr(self.service, 'remove_song_role'):
+            role_map = {
+                'performers': 'Performer',
+                'composers': 'Composer',
+                'producers': 'Producer',
+                'remixers': 'Remixer',
+                'lyricists': 'Lyricist'
+            }
+            role = role_map.get(self.field_name, self.field_name[:-1].title() if self.field_name.endswith('s') else self.field_name.title())
+            
+            for song in self.songs:
+                if self.service.remove_song_role(song.source_id, child_id, role):
+                    success_any = True
+                     
+        # 5. Fallback
+        else:
+             return self._legacy_unlink_staged(child_id)
+             
+        self.on_data_changed()
+        return success_any
+
+    def _legacy_unlink_staged(self, child_id):
         entity = self.service.get_by_id(child_id)
-        if not entity:
-            return False
-        
+        if not entity: return False
         name = self._get_entity_name(entity)
         
         for song in self.songs:
-            # Get current value (prioritize staging)
             if self._get_value:
                 current = self._get_value(song.source_id, self.field_name, getattr(song, self.field_name, []))
             else:
@@ -204,28 +280,7 @@ class SongFieldAdapter(ContextAdapter):
                 current = [current] if current else []
             
             new_list = [p for p in current if p != name]
-            if self._stage_change:
-                # Differential Stage if supported by callback
-                if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
-                    self._stage_change(self.field_name, new_list, song_id=song.source_id)
-                else:
-                    self._stage_change(self.field_name, new_list)
-                
-                # Sync album_id if removing an album
-                if self.field_name == 'album':
-                    curr_ids = self._get_value(song.source_id, 'album_id', getattr(song, 'album_id', [])) if self._get_value else getattr(song, 'album_id', [])
-                    if isinstance(curr_ids, int): curr_ids = [curr_ids]
-                    if not curr_ids: curr_ids = []
-                    
-                    if child_id in curr_ids:
-                        new_ids = [x for x in curr_ids if x != child_id]
-                        final_ids = new_ids if len(new_ids) > 1 else (new_ids[0] if new_ids else None)
-                        if hasattr(self._stage_change, '__code__') and 'song_id' in self._stage_change.__code__.co_varnames:
-                            self._stage_change('album_id', final_ids, song_id=song.source_id)
-                        else:
-                            self._stage_change('album_id', final_ids)
-        
-        self.on_data_changed()
+            self._stage(song.source_id, self.field_name, new_list)
         return True
     
     def get_parent_for_dialog(self) -> Any:
@@ -573,28 +628,8 @@ class AlbumContributorAdapter(ContextAdapter):
         if not self.album:
             return False
             
-        contributor = self.service.get_by_id(child_id)
-        if not contributor:
-            return False
-
-        # If we have a staging function, use it
-        if self._stage_change:
-            current = []
-            if hasattr(self.album, '_staged_contributors'):
-                current = self.album._staged_contributors
-            elif self.album.album_id:
-                from src.data.repositories.album_repository import AlbumRepository
-                current = AlbumRepository().get_contributors_for_album(self.album.album_id)
-            
-            if child_id not in [c.contributor_id for c in current]:
-                new_list = current + [contributor]
-                self._stage_change('contributors', new_list)
-                self.album._staged_contributors = new_list
-                self.on_data_changed()
-                return True
-            return False
-
-        # Immediate Save (Legacy)
+        # T-92: IMMEDIATE WRITE MODE
+        # Chip interactions are direct object manipulations. Staging is removed.
         if not self.album.album_id:
             return False
             
@@ -610,22 +645,7 @@ class AlbumContributorAdapter(ContextAdapter):
         if not self.album:
             return False
             
-        # If we have a staging function, use it
-        if self._stage_change:
-            current = []
-            if hasattr(self.album, '_staged_contributors'):
-                current = self.album._staged_contributors
-            elif self.album.album_id:
-                from src.data.repositories.album_repository import AlbumRepository
-                current = AlbumRepository().get_contributors_for_album(self.album.album_id)
-            
-            new_list = [c for c in current if c.contributor_id != child_id]
-            self._stage_change('contributors', new_list)
-            self.album._staged_contributors = new_list
-            self.on_data_changed()
-            return True
-
-        # Immediate Save (Legacy)
+        # T-92: IMMEDIATE WRITE MODE
         if not self.album.album_id:
             return False
             
@@ -702,24 +722,7 @@ class AlbumPublisherAdapter(ContextAdapter):
         pub = self.service.get_by_id(child_id)
         if not pub: return False
 
-        # If we have a staging function, use it
-        if self._stage_change:
-            current = []
-            if hasattr(self.album, '_staged_publishers'):
-                current = self.album._staged_publishers
-            elif self.album.album_id:
-                from src.data.repositories.album_repository import AlbumRepository
-                current = AlbumRepository().get_publishers_for_album(self.album.album_id)
-            
-            if child_id not in [p.publisher_id for p in current]:
-                new_list = current + [pub]
-                self._stage_change('publishers', new_list)
-                self.album._staged_publishers = new_list
-                self.on_data_changed()
-                return True
-            return False
-
-        # Immediate Save (Legacy)
+        # T-92: IMMEDIATE WRITE MODE
         if not self.album.album_id:
             return False
             
@@ -735,22 +738,7 @@ class AlbumPublisherAdapter(ContextAdapter):
         if not self.album:
             return False
             
-        # If we have a staging function, use it
-        if self._stage_change:
-            current = []
-            if hasattr(self.album, '_staged_publishers'):
-                current = self.album._staged_publishers
-            elif self.album.album_id:
-                from src.data.repositories.album_repository import AlbumRepository
-                current = AlbumRepository().get_publishers_for_album(self.album.album_id)
-            
-            new_list = [p for p in current if p.publisher_id != child_id]
-            self._stage_change('publishers', new_list)
-            self.album._staged_publishers = new_list
-            self.on_data_changed()
-            return True
-
-        # Immediate Save (Legacy)
+        # T-92: IMMEDIATE WRITE MODE
         if not self.album.album_id:
             return False
             

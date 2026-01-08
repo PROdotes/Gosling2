@@ -1,10 +1,10 @@
 from typing import List, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
-    QScrollArea, QFrame, QSizePolicy, QMessageBox
+    QScrollArea, QFrame, QSizePolicy, QMessageBox, QMenu
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl
-from PyQt6.QtGui import QFont, QDesktopServices
+from PyQt6.QtGui import QFont, QDesktopServices, QAction
 from ...core import yellberus
 from ...core.registries.id3_registry import ID3Registry
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED, GlowToggle
@@ -1688,18 +1688,6 @@ class SidePanelWidget(QFrame):
                 pub, created = self.publisher_service.get_or_create(str(n))
                 pid = pub.publisher_id if pub else 0
                 
-                # Ghost Chips Logic (T-63)
-                is_inherited = False
-                if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
-                    alb_id = self.current_songs[0].album_id
-                    if isinstance(alb_id, list):
-                        alb_id = alb_id[0] if alb_id else None
-                    
-                    if alb_id:
-                        alb_pub = self.album_service.get_publisher(alb_id)
-                        if alb_pub and str(n) in [p.strip() for p in alb_pub.split('|||')]:
-                            is_inherited = True
-                
                 if pub:
                     display_name = pub.publisher_name
                     if pub.parent_publisher_id:
@@ -1707,17 +1695,9 @@ class SidePanelWidget(QFrame):
                         if parent:
                             display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
                     
-                    if is_inherited:
-                        raw_alb_name = self.current_songs[0].album
-                        alb_name = "Album"
-                        if isinstance(raw_alb_name, list):
-                            alb_name = raw_alb_name[0] if raw_alb_name else "Album"
-                        else:
-                            alb_name = raw_alb_name or "Album"
-                            
-                        chips.append((pid, display_name, "🔗", False, True, f"Inherited from {alb_name}", field_def.zone or "amber", False)) 
-                    else:
-                        chips.append((pid, display_name, "🏢", False, False, "", field_def.zone or "amber", False))
+                    # STRICT MODE: Yellberus now filters 'publisher' to ONLY Direct/Master owners.
+                    # Therefore, everything here is Direct by definition.
+                    chips.append((pid, display_name, "🏢", False, False, "Master Owner (Direct)", field_def.zone or "amber", False))
             elif field_name == 'album':
                 aid = 0
                 is_p = (i == 0)
