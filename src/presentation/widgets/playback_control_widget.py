@@ -142,6 +142,7 @@ class PlaybackControlWidget(QWidget):
         self.volume_slider.setObjectName("VolumeSlider")  # For QSS styling
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setFixedWidth(80)
+        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         
         footer_row.addWidget(self.lbl_time_passed)
         footer_row.addStretch()

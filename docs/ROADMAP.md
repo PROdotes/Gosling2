@@ -184,7 +184,7 @@ tags:
 *   [ ] [**Universal "Data Editor" Refactor**](tasks/T-85_universal_input_dialog.md) (T-85)
     *   *Task*: Evolve `TagRenameDialog` into a generic `UniversalDataEditor`.
     *   *Goal*: Eliminate duplicate picker code. Support Artists, Publishers, Tags, and plain text in one unified widget.
-*   [ ] **Unify Entity Creation UI**
+*   [x] **Unify Entity Creation UI**
     *   *Task*: Ensure all "Add Person" buttons (Creator, Artist, Group Member) use the standard `EntityPickerDialog` UI (same as Composer).
     *   *Goal*: Eliminate formatting discrepancies between different creation dialogs.
 
@@ -194,7 +194,6 @@ Quick reference for remaining tasks.
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
 | **High** | **Fix Publisher Multi-Edit** (Schema Gap) | ~2.0h |
-| **Med** | **Unify Entity Creation UI** (Cleanup) | ~1.0h |
 | **Med** | **Fix Filter Tree LEDs** (Bug) | ~0.5h |
 | Low | Chip Sorting Stability (Polish) | ~0.5h |
 | Low | Universal Data Editor (Refactor) | ~3.0h |

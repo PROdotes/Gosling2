@@ -529,14 +529,13 @@ class ArtistDetailsDialog(QDialog):
                 self._refresh_data()
 
     def _edit_alias(self, alias_id, old_name):
-        diag = ArtistCreatorDialog(initial_name=old_name, button_text="UPDATE", parent=self)
-        diag.setWindowTitle("Rename Alias")
-        diag.radio_person.hide(); diag.radio_group.hide()
-        if diag.exec():
-            new_name, _ = diag.get_data()
-            if new_name and new_name != old_name:
-                self.service.update_alias(alias_id, new_name)
-                self._refresh_data()
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Alias", "New Name:", 
+            QLineEdit.EchoMode.Normal, old_name
+        )
+        if ok and new_name and new_name.strip() != old_name:
+            self.service.update_alias(alias_id, new_name.strip())
+            self._refresh_data()
 
     def _delete_alias(self, alias_id):
         # Unused now, replaced by confirm version

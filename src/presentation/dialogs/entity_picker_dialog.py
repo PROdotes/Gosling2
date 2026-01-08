@@ -203,17 +203,18 @@ class EntityPickerDialog(QDialog):
         
         self.type_buttons = {}
         
-        # --- Add "ALL" Button ---
-        btn_all = GlowButton("★ ALL")
-        btn_all.setCheckable(True)
-        btn_all.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        btn_all.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        btn_all.setGlowColor("#FFFFFF")
-        if self._current_type_filter is None:
-            btn_all.setChecked(True)
-        btn_all.clicked.connect(lambda: self._on_type_clicked(None))
-        type_layout.addWidget(btn_all)
-        self.type_buttons[None] = btn_all
+        # --- Add "ALL" Button (only if multiple types) ---
+        if len(self.config.type_buttons) > 1:
+            btn_all = GlowButton("★ ALL")
+            btn_all.setCheckable(True)
+            btn_all.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            btn_all.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+            btn_all.setGlowColor("#FFFFFF")
+            if self._current_type_filter is None:
+                btn_all.setChecked(True)
+            btn_all.clicked.connect(lambda: self._on_type_clicked(None))
+            type_layout.addWidget(btn_all)
+            self.type_buttons[None] = btn_all
         
         for type_name in self.config.type_buttons:
             icon = self.config.type_icons.get(type_name, "📦")
@@ -242,43 +243,56 @@ class EntityPickerDialog(QDialog):
         self.txt_search.returnPressed.connect(self._on_select)
         self.list_results.itemActivated.connect(lambda: self._on_select())
         self.list_results.currentRowChanged.connect(self._on_selection_changed)
-        self.txt_search.installEventFilter(self)
+        
+        # Install filter on the actual interactive parts
+        self.txt_search.edit.installEventFilter(self)
+        self.list_results.installEventFilter(self)
     
     def _focus_search(self):
         self.txt_search.edit.setFocus()
         self.txt_search.edit.setCursorPosition(len(self.txt_search.text()))
     
     def eventFilter(self, obj, event):
-        """Arrow keys in search box navigate the list and switch categories."""
+        """Keyboard shortcuts for list navigation and category switching."""
         from PyQt6.QtCore import QEvent
         
-        if obj == self.txt_search and event.type() == QEvent.Type.KeyPress:
+        if event.type() == QEvent.Type.KeyPress:
             key = event.key()
             modifiers = event.modifiers()
+            is_alt = bool(modifiers & Qt.KeyboardModifier.AltModifier)
             
-            if key == Qt.Key.Key_Down:
-                current = self.list_results.currentRow()
-                if current < self.list_results.count() - 1:
-                    self.list_results.setCurrentRow(current + 1)
-                return True
-            
-            elif key == Qt.Key.Key_Up:
-                current = self.list_results.currentRow()
-                if current > 0:
-                    self.list_results.setCurrentRow(current - 1)
-                return True
-            
-            elif key == Qt.Key.Key_Left and (modifiers & Qt.KeyboardModifier.AltModifier):
+            # --- GLOBAL SHORTCUTS (List or Search) ---
+            if key == Qt.Key.Key_Left and is_alt:
                 self._cycle_category(-1)
                 return True
-            
-            elif key == Qt.Key.Key_Right and (modifiers & Qt.KeyboardModifier.AltModifier):
+            elif key == Qt.Key.Key_Right and is_alt:
                 self._cycle_category(1)
                 return True
             
-            elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                self._on_select()
-                return True
+            # --- SEARCH BOX SPECIFIC ---
+            if obj == self.txt_search.edit:
+                if key == Qt.Key.Key_Down:
+                    current = self.list_results.currentRow()
+                    if current < self.list_results.count() - 1:
+                        self.list_results.setCurrentRow(current + 1)
+                    return True
+                
+                elif key == Qt.Key.Key_Up:
+                    current = self.list_results.currentRow()
+                    if current > 0:
+                        self.list_results.setCurrentRow(current - 1)
+                    return True
+                
+                elif key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    self._on_select()
+                    return True
+            
+            # --- LIST SPECIFIC ---
+            elif obj == self.list_results:
+                if key == Qt.Key.Key_Escape:
+                    self.reject()
+                    return True
+                # Standard items (Return/Enter) are handled by itemActivated
         
         return super().eventFilter(obj, event)
 
@@ -287,8 +301,11 @@ class EntityPickerDialog(QDialog):
         if not self.type_buttons:
             return
             
-        # 1. Get ordered list of keys (None first, then others)
-        keys = [None] + self.config.type_buttons
+        # 1. Get ordered list of keys (None first IF it exists in our map, then others)
+        keys = []
+        if None in self.type_buttons:
+            keys.append(None)
+        keys.extend(self.config.type_buttons)
         
         # 2. Find current index
         try:
@@ -408,7 +425,8 @@ class EntityPickerDialog(QDialog):
                 
                 # Check if we should filter the search results by type
                 if self._current_type_filter:
-                    entities = [e for e in entities if self.config.type_fn(e) == self._current_type_filter]
+                    # T-Fix: Case-insensitive comparison (DB='group' vs UI='Group')
+                    entities = [e for e in entities if self.config.type_fn(e).lower() == self._current_type_filter.lower()]
                 
                 # Double-check match for safety, but be inclusive (check aliases for artists)
                 def matches(e):
@@ -474,20 +492,30 @@ class EntityPickerDialog(QDialog):
         if not current_name:
             return
         
-        current_type = self._current_type_filter or self.config.default_type
-        
-        # Check for exact match in current type
-        exact_match = any(
-            self.config.display_fn(e).lower() == current_name.lower() 
-            and self.config.type_fn(e) == current_type
-            for e in entities
-        )
-        
-        if not exact_match:
-            type_suffix = f" in {current_type}" if current_type else ""
-            item = QListWidgetItem(f"➕ Create \"{current_name}\"{type_suffix}")
-            item.setData(Qt.ItemDataRole.UserRole, ("CREATE", current_name, current_type))
-            self.list_results.addItem(item)
+        # Determine types to offer
+        # If a category is selected, only offer creation in that category.
+        # If ALL is selected, offer all available categories.
+        if self._current_type_filter:
+            types_to_offer = [self._current_type_filter]
+        else:
+            types_to_offer = self.config.type_buttons or [self.config.default_type]
+            
+        for t in types_to_offer:
+            if not t: continue
+            
+            # Check for exact match in this specific type
+            # (Allows creating 'Queen' as Person even if 'Queen' Group exists)
+            exact_match = any(
+                self.config.display_fn(e).lower() == current_name.lower() 
+                and self.config.type_fn(e).lower() == t.lower()
+                for e in entities
+            )
+            
+            if not exact_match:
+                type_suffix = f" as {t}" if len(types_to_offer) > 1 or t else ""
+                item = QListWidgetItem(f"➕ Create \"{current_name}\"{type_suffix}")
+                item.setData(Qt.ItemDataRole.UserRole, ("CREATE", current_name, t))
+                self.list_results.addItem(item)
     
     def _add_entity_item(self, entity: Any):
         """Add an entity to the list."""

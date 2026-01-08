@@ -245,9 +245,6 @@ class EntityClickRouter:
                 exclude_ids=exclude_ids,
                 parent=self.parent
             )
-            # Set the current type filter (will be auto-set if only one button, but be explicit)
-            if filter_type:
-                dialog._current_type_filter = filter_type.title()
                 
             if dialog.exec() == 1:
                 return dialog.get_selected()

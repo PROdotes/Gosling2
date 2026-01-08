@@ -38,6 +38,10 @@ class GlowWidget(QWidget):
         self.layout.addWidget(self.child, 1)
         self.child.installEventFilter(self)
         
+        # Default behavior for Workstation: Don't allow Tab to land on UI junk (buttons, frames)
+        # Mouse interaction still works (ClickFocus), but Tab skips them.
+        self.child.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        
         # Ensure glow is behind
         self.glow_frame.lower()
 

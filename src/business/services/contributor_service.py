@@ -104,16 +104,38 @@ class ContributorService:
                 )
         return None
 
+    def validate_identity(self, name: str, exclude_id: Optional[int] = None) -> Tuple[Optional[int], Optional[str]]:
+        """Check if a name already exists and return conflict info (ID, Message)."""
+        existing = self.get_by_name(name)
+        if existing and existing.contributor_id != exclude_id:
+            return existing.contributor_id, f"Artist '{name}' already exists as a {existing.type}."
+        return None, None
+
     def create(self, name: str, type: str = 'person', batch_id: Optional[str] = None) -> Contributor:
         """Create new contributor (Identity + Primary ArtistName)."""
-        identity = self._identity_service.create_identity(type, legal_name=name)
+        type_lower = type.lower()
+        identity = self._identity_service.create_identity(type_lower, legal_name=name)
         artist_name = self._name_service.create_name(name, owner_identity_id=identity.identity_id, is_primary=True)
         return Contributor(
             contributor_id=artist_name.name_id,
             name=artist_name.display_name,
             sort_name=artist_name.sort_name,
-            type=type
+            type=type_lower
         )
+
+    def get_or_create(self, name: str, type: str = 'person') -> Tuple[Contributor, bool]:
+        """Get existing contributor or create a new one, respecting the identity type."""
+        type_lower = type.lower()
+        
+        # Check if we already have an entity of THIS type with THIS name
+        # We search for the name and then filter by the requested type
+        matches = self.search(name)
+        for m in matches:
+            if m.name.lower() == name.lower() and m.type.lower() == type_lower:
+                return m, False
+                
+        # Not found for this specific type, so create a new one
+        return self.create(name, type_lower), True
 
     def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
         """Merge contributor source_id into target_id (Identity Merge)."""
@@ -255,12 +277,50 @@ class ContributorService:
         return list(resolved_names)
 
     def update(self, contributor: Contributor) -> bool:
-        """Update an existing contributor record (ArtistName)."""
+        """Update an existing contributor record (ArtistName and Identity)."""
         name = self._name_service.get_name(contributor.contributor_id)
         if not name: return False
+        
+        # 1. Update Name/SortName
         name.display_name = contributor.name
         name.sort_name = contributor.sort_name
-        return self._name_service.update_name(name)
+        success = self._name_service.update_name(name)
+        
+        # 2. Update Identity Type if it has one
+        if success and name.owner_identity_id:
+            identity = self._identity_service.get_identity(name.owner_identity_id)
+            if identity and identity.identity_type != contributor.type:
+                identity.identity_type = contributor.type.lower()
+                from src.data.repositories.identity_repository import IdentityRepository
+                IdentityRepository(db_path=self._db_path).update(identity)
+                
+        return success
+
+    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
+        """Merge contributor source_id into target_id (Identity Merge). Alias for merge."""
+        return self.merge(source_id, target_id, create_alias=create_alias, batch_id=batch_id)
+
+    def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
+        """Merge contributor source_id into target_id (Identity Merge)."""
+        import uuid
+        batch_id = batch_id or str(uuid.uuid4())
+        
+        # In new model, source_id and target_id are NameIDs. 
+        # We need to find their identities and merge them.
+        s_name = self._name_service.get_name(source_id)
+        t_name = self._name_service.get_name(target_id)
+        
+        if not s_name or not t_name:
+            return False
+        
+        if not s_name.owner_identity_id or not t_name.owner_identity_id:
+            # Orphan merge: just link source name to target identity
+            if not t_name.owner_identity_id:
+                return False # Cannot merge into an orphan target identity-wise
+            s_name.owner_identity_id = t_name.owner_identity_id
+            return self._name_service.update_name(s_name, batch_id=batch_id)
+            
+        return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
         
     # ==========================
     # Group & Alias Management
@@ -302,6 +362,60 @@ class ContributorService:
                     sort_name=row[2],
                     type=row[3] or 'person',
                     matched_alias=row[4]
+                ) for row in cursor.fetchall()
+            ]
+
+    def get_all_by_type(self, type_name: str) -> List[Contributor]:
+        """Fetch all contributors of a primary identity type (person, group), including aliases."""
+        if not type_name:
+            return self.get_all()
+            
+        type_lower = type_name.lower()
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            # T-Fix: Include both Primary and Alias names (IsPrimaryName 1 or 0) 
+            # as long as they belong to the correct Identity type.
+            cursor.execute("""
+                SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType, an.IsPrimaryName
+                FROM ArtistNames an
+                JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE i.IdentityType = ? COLLATE NOCASE
+                ORDER BY an.SortName
+            """, (type_lower,))
+            return [
+                Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3] or 'person',
+                    matched_alias=row[1] if row[4] == 0 else None  # Mark as alias if not primary
+                ) for row in cursor.fetchall()
+            ]
+
+    def search(self, query: str) -> List[Contributor]:
+        """Search for contributors by name or alias, resolving their identity type."""
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            # T-Fix: Detailed search that resolves IdentityType so the UI picker 
+            # knows which category (Person/Group) to highlight for each result.
+            q = f"%{query}%"
+            cursor.execute("""
+                SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType, an.IsPrimaryName
+                FROM ArtistNames an
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE an.DisplayName LIKE ? COLLATE NOCASE
+                ORDER BY 
+                   CASE WHEN an.DisplayName LIKE ? THEN 0 ELSE 1 END,
+                   an.SortName
+            """, (q, query))
+            
+            return [
+                Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3] or 'person',
+                    matched_alias=row[1] if row[4] == 0 else None
                 ) for row in cursor.fetchall()
             ]
 
@@ -430,6 +544,13 @@ class ContributorService:
     def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias."""
         return self._name_service.delete_name(alias_id, batch_id=batch_id)
+
+    def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
+        """Rename an alias."""
+        name = self._name_service.get_name(alias_id)
+        if not name: return False
+        name.display_name = new_name
+        return self._name_service.update_name(name, batch_id=batch_id)
 
     def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
         """

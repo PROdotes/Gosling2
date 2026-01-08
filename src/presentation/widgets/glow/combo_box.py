@@ -15,6 +15,9 @@ class GlowComboBox(GlowWidget):
         self.combo.setEditable(True)
         super().__init__(self.combo, trigger_mode="focus", parent=parent)
         
+        # Override Base: Inputs MUST have StrongFocus for tabbing between fields
+        self.combo.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
         # Forward signals
         self.combo.currentIndexChanged.connect(self.currentIndexChanged.emit)
         self.combo.currentTextChanged.connect(self.currentTextChanged.emit)

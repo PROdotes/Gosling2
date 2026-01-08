@@ -121,9 +121,9 @@ def get_artist_picker_config(allowed_types: Optional[List[str]] = None, default_
                        If None, includes all ["Person", "Group", "Alias"].
         default_type: Optional default selected type.
     """
-    all_types = ["Person", "Group", "Alias"]
-    all_icons = {"Person": "👤", "Group": "👥", "Alias": "📝"}
-    all_colors = {"Person": "#4FC3F7", "Group": "#81C784", "Alias": "#FFB74D"}
+    all_types = ["Person", "Group"]
+    all_icons = {"Person": "👤", "Group": "👥"}
+    all_colors = {"Person": "#4FC3F7", "Group": "#81C784"}
     
     # Filter types if requested
     types = allowed_types if allowed_types is not None else all_types
@@ -131,18 +131,17 @@ def get_artist_picker_config(allowed_types: Optional[List[str]] = None, default_
     return PickerConfig(
         title_add="Add Artist",
         title_edit="Edit Artist",
-        search_placeholder="Search or type type:name (e.g., alias:pink)",
+        search_placeholder="Search or type name...",
         
         type_buttons=types,
         type_icons={k: v for k, v in all_icons.items() if k in types},
         type_colors={k: v for k, v in all_colors.items() if k in types},
         allow_new_types=False,  # Cannot invent new types
-        default_type=default_type or (types[0] if types else "Person"),
+        default_type=default_type or (types[0] if len(types) == 1 else None),
         
         prefix_map={
             "p": "Person", "person": "Person",
             "g": "Group", "group": "Group",
-            "a": "Alias", "alias": "Alias",
         },
         
         service_attr="contributor_service",

@@ -11,6 +11,9 @@ class GlowLineEdit(GlowWidget):
         self.edit.setObjectName("GlowInput")
         super().__init__(self.edit, trigger_mode="focus", parent=parent)
         
+        # Override Base: Inputs MUST have StrongFocus for tabbing between fields
+        self.edit.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
         # Preview capability
         self._preview_tip = None
         self._use_preview = False 

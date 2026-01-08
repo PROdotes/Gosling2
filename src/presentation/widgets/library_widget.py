@@ -744,6 +744,10 @@ class LibraryWidget(QWidget):
         self.table_view.setHorizontalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
         self.table_view.setVerticalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
         
+        # T-92: Industrial Safety - Take the table off the TAB path to avoid accidental key triggers.
+        # ClickFocus allows navigation if clicked, but Tab skips it.
+        self.table_view.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        
         # Use custom header with drop indicator
         custom_header = DropIndicatorHeaderView(Qt.Orientation.Horizontal, self.table_view)
         self.table_view.setHorizontalHeader(custom_header)
@@ -2167,11 +2171,10 @@ class LibraryWidget(QWidget):
         
         # Also filter the filter tree
         if hasattr(self, 'filter_widget') and self.filter_widget:
-            if not text:
-                # Restore full tree and expansion state on clear
-                self.filter_widget.populate()
-            else:
-                self._filter_tree_items(text)
+            # We used to call self.filter_widget.populate() on empty text,
+            # but that nukes the tree and visual check states.
+            # Recursive filtering with empty text unhides everything efficiently.
+            self._filter_tree_items(text)
 
     def _filter_tree_items(self, search_text: str) -> None:
         """Filter filter tree items based on search text. Hides leaf items that don't match,

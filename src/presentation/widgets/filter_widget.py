@@ -259,6 +259,7 @@ class FilterWidget(QFrame):
         self.tree_view.setObjectName("FilterTree")
         self.tree_view.setModel(self.tree_model)
         self.tree_view.setHeaderHidden(True)
+        self.tree_view.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.tree_view.setExpandsOnDoubleClick(False)
         self.tree_view.setIndentation(0)
         self.tree_view.clicked.connect(self._on_tree_clicked)
@@ -349,6 +350,9 @@ class FilterWidget(QFrame):
         
         self._block_signals = False
         
+        # Restore active check states
+        self.restore_check_state()
+
         # Restore saved expansion state
         self.restore_expansion_state()
         
@@ -940,3 +944,33 @@ class FilterWidget(QFrame):
         state = self.settings_manager.get_filter_tree_expansion_state()
         state[key] = is_expanded
         self.settings_manager.set_filter_tree_expansion_state(state)
+
+    def restore_check_state(self):
+        """Walk the tree and check items that are in _active_filters."""
+        self._block_signals = True
+        try:
+            for row in range(self.tree_model.rowCount()):
+                root_item = self.tree_model.item(row)
+                if root_item:
+                    self._recursive_restore_check(root_item)
+        finally:
+            self._block_signals = False
+
+    def _recursive_restore_check(self, item):
+        field_name = item.data(Qt.ItemDataRole.UserRole + 1)
+        val = item.data(Qt.ItemDataRole.UserRole)
+        
+        if field_name in self._active_filters and val in self._active_filters[field_name]:
+            item.setCheckState(Qt.CheckState.Checked)
+        
+        # Special handling for Tags (Category:TagName)
+        elif field_name == 'tags':
+            # Leaf items for tags store the full "Category:TagName" in UserRole
+            val_str = str(val)
+            if 'tags' in self._active_filters and val_str in self._active_filters['tags']:
+                item.setCheckState(Qt.CheckState.Checked)
+
+        for row in range(item.rowCount()):
+            child = item.child(row)
+            if child:
+                self._recursive_restore_check(child)

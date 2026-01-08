@@ -95,6 +95,7 @@ links: []
 | T-47 | **Duplicate Quality Upgrade Prompt** | 3 | 2 | 9 | 📋 | Duplicate Detection (T-48) | When ISRC duplicate found with higher bitrate, prompt user: "Higher quality version found. Replace existing?" instead of auto-importing both. |
 | T-84 | **System SVGs** | 4 | 2 | 8 | 📋 | UI | Replace Unicode icons in TitleBar/SystemIsland with crisp SVGs. |
 | T-97 | **Surgery Safety Integration** | 5 | 2 | 15 | 💡 | T-54 | **The Lockout Protocol**. When `[SURGERY]` is active: Transport outlines turn "Caution Yellow"; Hotkeys disabled; Buttons require Long-Press. |
+| T-101 | **Surgical Credits (Jobs)** | 3 | 4 | 12 | 💡 | Core | [spec](docs/tasks/T-101_surgical_credits_plan.md) — Multi-role support (e.g. Guitarist) via TMCL/TIPL. |
 | T-66 | **Scrubber Window** | 4 | 3 | 12 | 💡 | — | Double-click (or modifier-click TBD) on library song opens floating scrubber window. Allows preview playback, timeline jumping, without affecting main playback. Like a mini-player popup. |
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | 📋 | — | Add cyber-glow effect to the count LCDs in the filter tree for consistent aesthetics. |
 

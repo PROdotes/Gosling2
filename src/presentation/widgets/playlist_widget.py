@@ -166,6 +166,7 @@ class PlaylistWidget(QListWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("PlaylistWidget")
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self._init_setup()
     
     def _init_setup(self):
