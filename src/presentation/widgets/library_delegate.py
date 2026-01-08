@@ -154,7 +154,7 @@ class WorkstationDelegate(QStyledItemDelegate):
                     pip_color = QColor(constants.COLOR_MAGENTA)
                 elif is_wav:
                     show_pip = True
-                    pip_color = QColor(constants.COLOR_AMBER)
+                    pip_color = QColor(constants.COLOR_RED)
                 elif is_virtual:
                     show_pip = True
                     pip_color = QColor(constants.COLOR_CYAN)
