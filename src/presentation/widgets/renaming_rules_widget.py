@@ -87,7 +87,8 @@ class RenamingRulesWidget(QWidget):
         
         # Header / Explanation
         info = QLabel("Rules are processed in order. The first matching rule wins.")
-        info.setObjectName("FieldLabel")
+        info.setObjectName("InfoLabel") 
+        info.setStyleSheet("color: #888888; font-style: italic; margin-bottom: 10px;")
         layout.addWidget(info)
         
         # Default Rule Row

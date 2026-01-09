@@ -72,6 +72,16 @@ class SettingsDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
         
+        # --- HEADER ---
+        header = QLabel("SYSTEM CONFIGURATION")
+        header.setObjectName("SidePanelHeader")
+        layout.addWidget(header)
+        
+        # --- SEPARATOR ---
+        line = QFrame()
+        line.setObjectName("FieldGroupLine")
+        layout.addWidget(line)
+        
         # --- 1. LIBRARY ORGANIZATION ---
         lib_label = QLabel("LIBRARY ORGANIZATION")
         lib_label.setObjectName("FieldLabel")

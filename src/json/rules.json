@@ -5,19 +5,19 @@
                 "patriotic",
                 "domoljubne"
             ],
-            "target_path": "Cro/Domoljubne/{filename}"
+            "target_path": "Cro/Domoljubne/{artist} - {title}"
         },
         {
             "match_genres": [
                 "cro pop"
             ],
-            "target_path": "Cro/{year}/{filename}"
+            "target_path": "Cro/{year}/{artist} - {title}"
         },
         {
             "match_genres": [
                 "pop"
             ],
-            "target_path": "{year}/{filename}"
+            "target_path": "{year}/{artist} - {title}"
         },
         {
             "match_genres": [
@@ -37,20 +37,20 @@
                 "blues",
                 "reggae"
             ],
-            "target_path": "{genre}/{filename}"
+            "target_path": "{genre}/{artist} - {title}"
         },
         {
             "match_genres": [
                 "acoustic"
             ],
-            "target_path": "akustika/{filename}"
+            "target_path": "akustika/{artist} - {title}"
         },
         {
             "match_genres": [
                 "club"
             ],
-            "target_path": "clubbing/{filename}"
+            "target_path": "clubbing/{artist} - {title}"
         }
     ],
-    "default_rule": "{genre}/{year}/{filename}"
+    "default_rule": "{genre}/{year}/{artist} - {title}"
 }
