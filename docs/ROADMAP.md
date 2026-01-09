@@ -122,8 +122,11 @@ tags:
     *   *Task*: Visual marker in grid showing missing required fields.
 *   [x] **Quick Lookup (T-105)** (~1.0 h)
     *   *Task*: Ctrl+F focuses search box for fast Title+Artist lookup.
-*   [ ] **Inline Edit (T-03)** (~2.0 h)
-    *   *Task*: Edit cells directly in grid. Critical for CD batch workflow.
+
+*   [ ] **"Missing Data" Column Filter (T-106)** (~1.5 h)
+    *   *Task*: When "Missing Data" filter is active, auto-hide optional columns and show only required fields.
+*   [ ] **Filename → Metadata Parser (T-107)** (~2.5 h)
+    *   *Task*: Custom pattern definitions (e.g., `{Artist} - {Title}`) to populate fields from filenames.
 
 ---
 
@@ -231,8 +234,11 @@ Quick reference for remaining tasks.
 
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
-| Low | Advanced Rule Editor (New Feature) | ~2.0h |
-| Low | Filename -> Metadata Parser (Custom Patterns) | ~2.5h |
+| Low | Advanced Rule Editor (T-82) | ~2.0h |
+| Low | Filename → Metadata Parser (T-107) | ~2.5h |
+| Low | Completeness Indicator (T-104) | ~2.0h |
+| Low | "Missing Data" Column Filter (T-106) | ~1.5h |
 
 **Total Critical Path:** 0.0h (Release Candidate Ready)
-**Total All:** ~2.5h
+**Total All:** ~8.0h
+
