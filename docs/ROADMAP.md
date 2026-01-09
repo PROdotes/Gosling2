@@ -123,8 +123,9 @@ tags:
 *   [x] **Quick Lookup (T-105)** (~1.0 h)
     *   *Task*: Ctrl+F focuses search box for fast Title+Artist lookup.
 
-*   [ ] **"Missing Data" Column Filter (T-106)** (~1.5 h)
+*   [x] **"Missing Data" Column Filter (T-106)** (~1.5h)
     *   *Task*: When "Missing Data" filter is active, auto-hide optional columns and show only required fields.
+    *   *Status*: **Done** - Strict "Required Fields Only" view implemented in LibraryWidget.
 *   [ ] **Filename → Metadata Parser (T-107)** (~2.5 h)
     *   *Task*: Custom pattern definitions (e.g., `{Artist} - {Title}`) to populate fields from filenames.
 
@@ -237,7 +238,7 @@ Quick reference for remaining tasks.
 | Low | Advanced Rule Editor (T-82) | ~2.0h |
 | Low | Filename → Metadata Parser (T-107) | ~2.5h |
 
-| Low | "Missing Data" Column Filter (T-106) | ~1.5h |
+| Done | "Missing Data" Column Filter (T-106) | ~1.5h |
     
 **Total Critical Path:** 0.0h (Release Candidate Ready)
 **Total All:** ~6.0h

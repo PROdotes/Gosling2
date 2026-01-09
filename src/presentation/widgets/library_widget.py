@@ -1161,14 +1161,20 @@ class LibraryWidget(QWidget):
         self.table_view.viewport().update()
 
     def _apply_incomplete_view_columns(self) -> None:
-        """Show only columns that are required by the criteria."""
-        for col in range(self.library_model.columnCount()):
-            if col < len(yellberus.FIELDS):
-                field_def = yellberus.FIELDS[col]
-                # Hide if not visible (e.g. ID, Path)
-                self.table_view.setColumnHidden(col, not field_def.visible)
+        """
+        Show ONLY columns that are marked required=True in the schema.
+        This focuses the user on missing data entry.
+        """
+        for col_idx in range(self.library_model.columnCount()):
+            if col_idx < len(yellberus.FIELDS):
+                field_def = yellberus.FIELDS[col_idx]
+                
+                # T-106: Show ONLY if required AND normally visible (don't show hidden IDs)
+                should_show = field_def.required and field_def.visible
+                
+                self.table_view.setColumnHidden(col_idx, not should_show)
             else:
-                self.table_view.setColumnHidden(col, True)
+                self.table_view.setColumnHidden(col_idx, True)
 
     def _on_type_tab_changed(self, index: int) -> None:
         """Handle type tab change"""

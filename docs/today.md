@@ -12,11 +12,18 @@
 - 🟠 **Amber (Ready)**: Valid + Processed.
 - Logic resides in `Yellberus` and uses standard `LibraryWidget` checks.
 
+#### 2. "Missing Data" Column Filter (T-106)
+**Strict Triage View Implemented:**
+- Triggers when filtering by "Missing Data" (Incomplete).
+- **Auto-Hides** all optional columns (ISRC, Tags, Notes, etc.).
+- **Shows** only Required columns (Title, Artist, Album, Publisher, Year, Duration).
+- **Auto-Restores** previous user layout when filter is cleared.
+
 ---
 
 ### ⚠️ PARTIALLY IMPLEMENTED
 
-#### 2. Advanced Rule Editor (T-82) - ~2.0h
+#### 3. Advanced Rule Editor (T-82) - ~2.0h
 **Backend fully working:**
 - `rules.json` exists at `docs/configs/rules.json`
 - `renaming_service.py` loads/parses rules dynamically
@@ -29,15 +36,6 @@
 ---
 
 ### ❌ NOT IMPLEMENTED
-
-#### 3. "Missing Data" Column Filter (T-106) - ~1.5h
-When the **Missing Data** filter is active:
-- Save the current column layout.
-- Hide all **optional** columns, showing only fields marked `required=True`.
-- Disable persistence.
-- Restore layout when disabled.
-
----
 
 #### 4. Filename → Metadata Parser (T-107) - ~2.5h
 Parse filename patterns to auto-populate metadata on import:
@@ -59,8 +57,8 @@ Parse filename patterns to auto-populate metadata on import:
 | Task | Estimate | Status |
 |------|----------|--------|
 | **Completeness Indicator (T-104)** | ~2.0h | ✅ Done |
+| **"Missing Data" Column Filter (T-106)** | ~1.5h | ✅ Done |
 | Advanced Rule Editor (T-82) | ~2.0h | ⚠️ Partial |
-| "Missing Data" Column Filter (T-106) | ~1.5h | ❌ Not Started |
 | Filename → Metadata Parser (T-107) | ~2.5h | ❌ Not Started |
 
 **Total Remaining:** ~6.0h
