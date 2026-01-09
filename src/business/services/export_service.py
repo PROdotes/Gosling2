@@ -84,7 +84,7 @@ class ExportService:
             
         except Exception as e:
             logger.error(f"Export failed for {song.path}: {e}")
-            return ExportResult(success=False, error=str(e))
+            return ExportResult(success=False, error=f"Error exporting {song.name or 'file'}:\n{e}")
     
     def export_songs(self, 
                      songs: List[Song], 

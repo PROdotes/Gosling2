@@ -126,7 +126,7 @@ tags:
 *   [x] **"Missing Data" Column Filter (T-106)** (~1.5h)
     *   *Task*: When "Missing Data" filter is active, auto-hide optional columns and show only required fields.
     *   *Status*: **Done** - Strict "Required Fields Only" view implemented in LibraryWidget.
-*   [ ] **Filename → Metadata Parser (T-107)** (~2.5 h)
+*   [x] **Filename → Metadata Parser (T-107)** (~2.5 h)
     *   *Task*: Custom pattern definitions (e.g., `{Artist} - {Title}`) to populate fields from filenames.
 
 ---
@@ -236,7 +236,7 @@ Quick reference for remaining tasks.
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
 | Low | Advanced Rule Editor (T-82) | ~2.0h |
-| Low | Filename → Metadata Parser (T-107) | ~2.5h |
+| Done | Filename → Metadata Parser (T-107) | ~2.5h |
 
 | Done | "Missing Data" Column Filter (T-106) | ~1.5h |
     

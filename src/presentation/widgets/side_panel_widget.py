@@ -81,11 +81,27 @@ class SidePanelWidget(QFrame):
         layout.setContentsMargins(10, 0, 10, 0) # Slammed to the top
         
         # 1. Header Area
+        # 1. Header Area (Label + Magic Wand)
+        header_container = QWidget()
+        header_layout = QHBoxLayout(header_container)
+        header_layout.setContentsMargins(0, 5, 0, 5)
+        
         self.header_label = QLabel("No Selection")
         self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.header_label)
+        
+        # T-107: Parse from Filename (Magic Wand) - Moved to Header
+        self.btn_parse = GlowButton("🪄")
+        self.btn_parse.setObjectName("ParseButton")
+        self.btn_parse.setFixedSize(30, 24)
+        self.btn_parse.setToolTip("Parse Metadata from Filename")
+        self.btn_parse.clicked.connect(self._open_filename_parser)
+        
+        header_layout.addWidget(self.btn_parse)
+        header_layout.addWidget(self.header_label, 1)
+        
+        layout.addWidget(header_container)
         
         
         # 3. Scroll Area for Fields
@@ -184,6 +200,7 @@ class SidePanelWidget(QFrame):
         footer_layout.addWidget(self.save_led)
         footer_layout.addWidget(self.btn_discard)
         footer_layout.addStretch(1)
+        # self.btn_parse moved to Header
         footer_layout.addWidget(search_container)
         footer_layout.addWidget(self.btn_save)
 
@@ -2282,3 +2299,98 @@ class SidePanelWidget(QFrame):
             self._icons_magnifier = (draw_icon("#CCCCCC", glow=False), draw_icon("#FFC66D", glow=True))
             
         return self._icons_magnifier
+
+    def _open_filename_parser(self):
+        """
+        Open the Filename -> Metadata parser for CURRENTLY STAGED songs.
+        Applies results to STAGING, not DB.
+        """
+        if not self.current_songs: return
+        
+        # We pass the original song objects, but we want the parser to 
+        # potentially see staged Path changes? 
+        # Actually pattern engine reads song.path.
+        # If user renamed text in SidePanel (path is read-only usually), it won't affect this.
+        # So we just use self.current_songs.
+        
+        from ..dialogs.filename_parser_dialog import FilenameParserDialog
+        dlg = FilenameParserDialog(self.current_songs, self)
+        if dlg.exec():
+            results = dlg.get_parsed_data()
+            if results:
+                self._apply_parsed_staging(results)
+
+    def _apply_parsed_staging(self, results: dict):
+        """
+        Apply parsed metadata to STAGING BUFFER and update UI.
+        results: {source_id: {field: value}}
+        """
+        updates_count = 0
+        
+        # Map IDs to Song objects for DB fallback
+        song_map = {s.source_id: s for s in self.current_songs}
+        
+        for source_id, data in results.items():
+            updates_count += 1
+            
+            # Helper to stage a value
+            def stage(field, new_val):
+                if source_id not in self._staged_changes:
+                    self._staged_changes[source_id] = {}
+                self._staged_changes[source_id][field] = new_val
+
+            # Title
+            if "title" in data:
+                new_title = data["title"]
+                if new_title and str(new_title).strip():
+                    stage("title", new_title)
+            
+            # Artist (Unified / Performers)
+            if "performers" in data:
+                # SidePanel treats performers as list
+                stage("performers", [data["performers"]])
+            
+            # Album
+            if "album" in data:
+                 stage("album", [data["album"]]) # Album is List field in UI (Chips)
+
+            # Year
+            if "recording_year" in data:
+                try:
+                    stage("recording_year", int(data["recording_year"]))
+                except: pass
+
+            # BPM
+            if "bpm" in data:
+                try:
+                    stage("bpm", int(data["bpm"]))
+                except: pass
+                
+            # Genre (Tag)
+            if "genre" in data:
+                genre = data["genre"]
+                new_tag = f"Genre:{genre}"
+                
+                # Get DB value for fallback
+                song_obj = song_map.get(source_id)
+                db_tags = getattr(song_obj, 'tags', []) if song_obj else []
+                
+                # Get effective tags (Staged or DB)
+                current_tags = self._get_effective_value(source_id, "tags", db_tags) or []
+                
+                # Ensure list (safety)
+                if not isinstance(current_tags, list): 
+                    current_tags = list(current_tags) if current_tags else []
+                
+                # Append if not present
+                if new_tag not in current_tags:
+                    updated_tags = list(current_tags) + [new_tag]
+                    stage("tags", updated_tags)
+
+        if updates_count > 0:
+            # Refresh UI to show new staged values
+            self._refresh_field_values()
+            self._update_save_state()
+            self._validate_done_gate()
+            
+            self.staging_changed.emit(list(self._staged_changes.keys()))

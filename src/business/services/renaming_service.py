@@ -161,6 +161,7 @@ class RenamingService:
         base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         paths = [
             os.path.join(base_dir, "docs", "configs", "rules.json"),
+            os.path.join(base_dir, "src", "json", "rules.json"),
             os.path.join(base_dir, "design", "configs", "rules.json")
         ]
         

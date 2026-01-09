@@ -113,7 +113,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
                 return self._update_logic(entity, conn, batch_id)
         except Exception as e:
             logger.error(f"GenericRepository Update Failed ({self.table_name}): {e}")
-            return False
+            raise e
 
     def _update_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str]) -> bool:
         """Internal logic for update, allowing connection sharing."""

@@ -40,7 +40,7 @@ class ID3Registry:
         try:
             # Resolve path: src/core/registries/ -> src/resources/
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(base_dir, '..', '..', 'resources', 'id3_frames.json')
+            json_path = os.path.join(base_dir, '..', '..', 'json', 'id3_frames.json')
             json_path = os.path.normpath(json_path)
             
             if not os.path.exists(json_path):

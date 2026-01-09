@@ -1807,6 +1807,13 @@ class LibraryWidget(QWidget):
         rename_action.triggered.connect(self.rename_selection)
         menu.addAction(rename_action)
 
+        # T-107: Filename Parser Action
+        menu.addSeparator()
+        parse_action = QAction("Parse Metadata from Filename...", self)
+        parse_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        parse_action.triggered.connect(self._open_filename_parser)
+        menu.addAction(parse_action)
+
         delete_action = QAction("Delete from Library", self)
         delete_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_TrashIcon))
         delete_action.triggered.connect(self._delete_selected)
@@ -2754,3 +2761,101 @@ class LibraryWidget(QWidget):
         except (ValueError, TypeError):
             pass
         return None
+
+    def _open_filename_parser(self):
+        """Open the Filename -> Metadata parser dialog (T-107)."""
+        indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes: return
+        
+        selected_songs = []
+        for index in indexes:
+            song = self._get_song_from_index(index)
+            if song and song.path:
+                selected_songs.append(song)
+        
+        if not selected_songs: return
+        
+        from ..dialogs.filename_parser_dialog import FilenameParserDialog
+        dlg = FilenameParserDialog(selected_songs, self)
+        if dlg.exec():
+            results = dlg.get_parsed_data()
+            if results:
+                self._apply_parsed_metadata(results)
+
+    def _apply_parsed_metadata(self, results: dict):
+        """
+        Apply parsed metadata to songs and save.
+        results: {source_id: {field: value}}
+        """
+        updated_count = 0
+        
+        for source_id, data in results.items():
+            song = self.library_service.get_song_by_id(source_id)
+            if not song: continue
+            
+            changed = False
+            
+            # 1. Update Song Object
+            # Mapping from PatternEngine tokens to Song attributes
+            
+            # Title
+            if "title" in data:
+                if song.title != data["title"]:
+                    song.title = data["title"]
+                    changed = True
+            
+            # Artist (Unified / Performers)
+            if "performers" in data:
+                val = data["performers"]
+                if not song.performers or (len(song.performers) == 1 and song.performers[0] != val):
+                    song.performers = [val]
+                    song.unified_artist = val
+                    changed = True
+            
+            # Album
+            if "album" in data:
+                 val = data["album"]
+                 # Just set the string/list if different?
+                 current = song.album if isinstance(song.album, str) else (song.album[0] if song.album else "")
+                 if current != val:
+                     song.album = val 
+                     changed = True
+
+            # Year
+            if "recording_year" in data:
+                try:
+                    y = int(data["recording_year"])
+                    if song.recording_year != y:
+                        song.recording_year = y
+                        changed = True
+                except: pass
+
+            # BPM
+            if "bpm" in data:
+                try:
+                    b = int(data["bpm"])
+                    if song.bpm != b:
+                        song.bpm = b
+                        changed = True
+                except: pass
+                
+            # Genre (Tag)
+            if "genre" in data:
+                genre = data["genre"]
+                tag_str = f"Genre:{genre}"
+                if tag_str not in song.tags:
+                    song.tags.append(tag_str)
+                    changed = True
+
+            if changed:
+                # 2. Persist to DB
+                self.library_service.update_song(song)
+                
+                # 3. Persist to File (ID3) - Immediate write
+                self.metadata_service.write_tags(song)
+                updated_count += 1
+
+        if updated_count > 0:
+            self.load_library()
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "Metadata Parsed", f"Successfully updated {updated_count} songs from filenames.")
