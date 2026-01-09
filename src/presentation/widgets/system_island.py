@@ -43,7 +43,9 @@ class SystemIsland(QFrame):
         btn = GlowButton(text)
         btn.setObjectName(obj_name)
         btn.setProperty("class", "SystemButton")
-        btn.setGlowRadius(6)
+        btn.setGlowRadius(2)  # Smaller glow to keep button size stable
+        # No explicit glowMargin/blur; let defaults handle subtle glow
+
         return btn
 
     def update_maximize_icon(self, is_maximized: bool):

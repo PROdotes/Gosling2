@@ -62,6 +62,10 @@ class GlowButton(GlowWidget):
 
     def _update_size(self):
         """Force the internal button to be wide enough for its labels."""
+        # T-Fix: If fixed size is set, do NOT auto-resize based on text content
+        if self.btn.minimumWidth() == self.btn.maximumWidth() and self.btn.minimumWidth() > 0:
+            return
+
         self.lbl_main.adjustSize()
         hint = self.lbl_main.sizeHint()
         # 24px padding (12px per side) for the pill look

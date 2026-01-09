@@ -225,6 +225,9 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
             
             return required_val in self._tag_cache[cache_key]
         
+
+
+
         # 1. Identify Target Columns
         target_indices = []
         if field_name == 'all_contributors':
@@ -294,33 +297,23 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                  elif required_val is False: # "Not Done"
                      return has_status_tag
                  
-                 # 3. Handle Procedural states (Pending/Incomplete) - both require a Status tag
-                 if not has_status_tag: return False # If it's done, it can't be Pending or Incomplete
-                 
-                 # Validate Row Completeness for Pending/Incomplete
-                 validation_row = []
+                 # Check Row Completeness (only required fields)
+                 completeness_row = []
                  for f in yellberus.FIELDS:
                      f_idx = self._field_indices.get(f.name, -1)
                      val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole) if f_idx >= 0 else None
-                     validation_row.append(val)
-                     
-                 error_count = len(yellberus.validate_row(validation_row))
+                     completeness_row.append(val)
                  
-                 # DEBUG: Trace why specific items are failing
-                 if required_val == "INCOMPLETE" and error_count > 0 and not has_status_tag:
-                     # Only log if it's "Done" physically (no tag) but logically Incomplete? 
-                     # No, logic is: Pending/Incomplete REQUIRE status tag.
-                     pass 
+                 incomplete_fields = yellberus.check_completeness(completeness_row)
+                 incomplete_count = len(incomplete_fields)
                  
-                 if required_val == "INCOMPLETE" and has_status_tag:
-                     # It has the tag, so it's a candidate. If errors > 0, it matches.
-                     if error_count > 0:
-                         pass # Match found
-
-                 if required_val == "READY": # "Pending"
-                     return error_count == 0
-                 elif required_val == "INCOMPLETE":
-                     return error_count > 0
+                 # "Missing Data" - Shows songs missing REQUIRED data
+                 if required_val == "INCOMPLETE":
+                     return incomplete_count > 0
+                 
+                 # "Ready to Finalize" - Complete data AND has Unprocessed tag
+                 if required_val == "READY":
+                     return has_status_tag and incomplete_count == 0
 
             # B. Normalize Row Data (Handle Lists and CSV Strings)
             if isinstance(row_val, str) and ',' in row_val:
@@ -1802,6 +1795,11 @@ class LibraryWidget(QWidget):
         for visual_idx in range(header.count()):
             logical_idx = header.logicalIndex(visual_idx)
             
+            # Prevent hiding the Status Deck (Column 0)
+            # This column is mandatory for system feedback
+            if logical_idx == 0:
+                continue
+
             # T-17: Hard-ban columns that Yellberus says are not visible
             if logical_idx < len(yellberus.FIELDS):
                 if not yellberus.FIELDS[logical_idx].visible:

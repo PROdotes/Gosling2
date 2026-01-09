@@ -114,13 +114,13 @@ tags:
 *   [x] **Virtual File System (VFS)** (T-90)
     *   *Task*: Index ZIP contents without explosion; virtual playback via temp files.
     *   *Status*: **Done** - Full implementation (Core, Import, Playback, UI Pip).
-*   [ ] **"Show Truncated" Filter (T-102)** (~2.0 h) 🔴 *Gosling 1 Parity*
+*   [x] **"Show Truncated" Filter (T-102)** (~2.0 h) 🔴 *Gosling 1 Parity*
     *   *Task*: Filter songs missing Composer/Publisher. Weekly workflow essential.
-*   [ ] **ZAMP Search Button (T-103)** (~0.5 h) 🔴 *Gosling 1 Parity*
+*   [x] **ZAMP Search Button (T-103)** (~0.5 h) 🔴 *Gosling 1 Parity*
     *   *Task*: Add ZAMP.hr to web search buttons for Croatian rights lookup.
 *   [ ] **Completeness Indicator (T-104)** (~2.0 h)
     *   *Task*: Visual marker in grid showing missing required fields.
-*   [ ] **Quick Lookup (T-105)** (~1.0 h)
+*   [x] **Quick Lookup (T-105)** (~1.0 h)
     *   *Task*: Ctrl+F focuses search box for fast Title+Artist lookup.
 *   [ ] **Inline Edit (T-03)** (~2.0 h)
     *   *Task*: Edit cells directly in grid. Critical for CD batch workflow.
@@ -232,6 +232,7 @@ Quick reference for remaining tasks.
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
 | Low | Advanced Rule Editor (New Feature) | ~2.0h |
+| Low | Filename -> Metadata Parser (Custom Patterns) | ~2.5h |
 
 **Total Critical Path:** 0.0h (Release Candidate Ready)
 **Total All:** ~2.5h

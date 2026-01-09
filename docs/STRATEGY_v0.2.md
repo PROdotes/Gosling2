@@ -76,3 +76,6 @@ These are targeted refactors to improve abstraction and reduce boilerplate, sche
 *   **Smart Playlist Infrastructure**:
     - **Issue**: String-based JSON/MIME payloads for Drag & Drop are heavy and brittle.
     - **Goal**: Shift to **Identity-Based Intake**. Store full data dictionaries or DB references per item. This is the prerequisite for Cue In/Out, Album Art, and advanced playback marker support.
+*   **Unified Artist Deprecation**:
+    *   **Issue**: `unified_artist` was a computed field combining `performers` + `groups`. Now that `performers` is strictly required and `groups` is deprecated, `unified_artist` is redundant.
+    *   **Goal**: Make `performers` directly filterable. Migrate ~40 references from `unified_artist` to `performers`. Remove from Song model and Yellberus FIELDS.

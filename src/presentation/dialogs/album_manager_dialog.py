@@ -502,6 +502,32 @@ class AlbumManagerDialog(QDialog):
              AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
         )
         
+        # Populate Trays from Initial Data (New Feature Fix)
+        # Populate Trays from Initial Data (New Feature Fix)
+        if self.initial_data.get('artist'):
+            art_val = self.initial_data.get('artist')
+            # If string, resolve or wrap
+            if isinstance(art_val, str):
+                art_obj = self.contributor_service.get_by_name(art_val)
+                if art_obj:
+                    self.tray_artist.set_items([art_obj])
+                else:
+                    # Ghost Chip
+                    self.tray_artist.set_items([(0, art_val, "👤", False, False, "New Artist", "amber", False)])
+            elif isinstance(art_val, list):
+                 self.tray_artist.set_items(art_val)
+            
+        if self.initial_data.get('publisher'):
+            pub_val = self.initial_data.get('publisher')
+            if isinstance(pub_val, str):
+                # Publisher lookup by name not exposed directly on service usually, assume new or use id
+                # But here we only have name string from SidePanel
+                # Try to find ID?
+                # For now, just show as ghost chip
+                 self.tray_publisher.set_items([(0, pub_val, "🏢", False, False, "New Publisher", "amber", False)])
+            else:
+                 self.tray_publisher.set_items([pub_val] if not isinstance(pub_val, list) else pub_val)
+        
         # Populate UI
         self.inp_title.setText(self.current_album.title)
         self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")

@@ -55,23 +55,38 @@ class FieldDef:
     query_expression: Optional[str] = None  # Full SQL expression (for GROUP_CONCAT etc). If None, uses db_column.
     id3_tag: Optional[str] = None # Direct ID3 tag mapping (e.g. "TIT2")
 
+    def is_complete(self, value: Any) -> bool:
+        """
+        Check if this required field has data.
+        Used for "Missing Data" filter and "Ready to Finalize" checks.
+        Does NOT check format validity - only presence of data.
+        """
+        if not self.required:
+            return True  # Non-required fields are always "complete"
+        
+        if value is None:
+            return False
+        if isinstance(value, str) and not value.strip():
+            return False
+        if isinstance(value, (list, tuple)) and not value:
+            return False
+        
+        return True  # Has data = complete
+
     def is_valid(self, value: Any) -> bool:
         """
-        Check if a value satisfies this field's constraints.
+        Check if a value satisfies this field's format constraints.
+        Used when SAVING data to DB/tags.
         Does NOT throw, just returns True/False.
         """
-        # 1. Required Check
-        if self.required:
-            if value is None: return False
-            if isinstance(value, str) and not value.strip(): return False
-            if isinstance(value, (list, tuple)) and not value: return False
-            
+        # Empty values are always valid (nothing to save)
         if value is None:
-            return True # If not required, None is valid
+            return True
+        if isinstance(value, str) and not value.strip():
+            return True
             
-        # 2. String-based Checks (Length / Regex)
-        if self.field_type in (FieldType.TEXT, FieldType.LIST): # List check applies to items or count... 
-            # Current policy: min_length on List means "Number of Items"
+        # String-based Checks (Length / Regex)
+        if self.field_type in (FieldType.TEXT, FieldType.LIST):
             if self.field_type == FieldType.LIST:
                 if isinstance(value, (list, tuple)):
                     if self.min_length is not None and len(value) < self.min_length:
@@ -93,7 +108,7 @@ class FieldDef:
                     if not re.match(self.validation_pattern, s_val):
                         return False
                         
-        # 3. Numeric Range Checks
+        # Numeric Range Checks
         if self.field_type in (FieldType.INTEGER, FieldType.REAL, FieldType.DURATION):
             try:
                 num_val = float(value)
@@ -169,11 +184,9 @@ FIELDS: List[FieldDef] = [
         id3_tag='TPE1',
         min_length=1,
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer') AS Performers",
+        required=True,
         searchable=False,
-        strategy='list',
         ui_search=True,
-        visible=True,
-        zone='amber',
     ),
     FieldDef(
         name='groups',
@@ -182,6 +195,7 @@ FIELDS: List[FieldDef] = [
         id3_tag='TIT1',
         searchable=False,
         visible=False,
+        portable=False,
     ),
     FieldDef(
         name='unified_artist',
@@ -192,8 +206,6 @@ FIELDS: List[FieldDef] = [
         portable=False,
         visible=False,
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer') AS UnifiedArtist",
-        strategy='list',
-        zone='amber',
     ),
     FieldDef(
         name='title',
@@ -204,7 +216,6 @@ FIELDS: List[FieldDef] = [
         max_length=1000,
         required=True,
         ui_search=True,
-        zone='amber',
     ),
     FieldDef(
         name='album',
@@ -215,9 +226,7 @@ FIELDS: List[FieldDef] = [
         id3_tag='TALB',
         query_expression="(SELECT GROUP_CONCAT(A_SUB.AlbumTitle, '|||') FROM SongAlbums SA_SUB JOIN Albums A_SUB ON SA_SUB.AlbumID = A_SUB.AlbumID WHERE SA_SUB.SourceID = MS.SourceID ORDER BY SA_SUB.IsPrimary DESC) AS AlbumTitle",
         required=True,
-        strategy='list',
         ui_search=True,
-        zone='amber', # IDENTITY
     ),
     FieldDef(
         name='album_id',
@@ -240,42 +249,48 @@ FIELDS: List[FieldDef] = [
         min_length=1,
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Composer') AS Composers",
         required=True,
-        strategy='list',
         ui_search=True,
-        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='publisher',
         ui_header='Publisher',
         db_column='Publisher',
         field_type=FieldType.LIST,
-        filterable=False, # T-88: decoupled filtering ensures inclusive search but strict editing
         id3_tag='TPUB',
-        # STRICT MODE: Only display Direct/Master owners (RecordingPublishers).
-        # We also include legacy TrackOverrides to prevent data loss during migration.
-        # We explicitly EXCLUDE AlbumPublishers to force users to edit those in Album Manager.
+        # STRICT MODE: Only direct song publishers (RecordingPublishers).
         query_expression="""
-            COALESCE(
-                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM RecordingPublishers RP_SUB JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID WHERE RP_SUB.SourceID = MS.SourceID),
-                (SELECT P_SUB.PublisherName FROM SongAlbums SA_SUB JOIN Publishers P_SUB ON SA_SUB.TrackPublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1),
-                (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') FROM SongAlbums SA_SUB JOIN AlbumPublishers AP_SUB ON SA_SUB.AlbumID = AP_SUB.AlbumID JOIN Publishers P_SUB ON AP_SUB.PublisherID = P_SUB.PublisherID WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1)
-            ) AS Publisher
+            (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') 
+             FROM RecordingPublishers RP_SUB 
+             JOIN Publishers P_SUB ON RP_SUB.PublisherID = P_SUB.PublisherID 
+             WHERE RP_SUB.SourceID = MS.SourceID) AS Publisher
         """,
         required=True,
-        strategy='list',
         ui_search=True,
-        zone='amber', 
+    ),
+    FieldDef(
+        name='album_publisher',
+        ui_header='Publisher (Album)',
+        db_column='AlbumPublisher',
+        field_type=FieldType.LIST,
+        editable=False,
+        portable=False,
+        query_expression="""
+            (SELECT GROUP_CONCAT(P_SUB.PublisherName, '|||') 
+             FROM SongAlbums SA_SUB 
+             JOIN AlbumPublishers AP_SUB ON SA_SUB.AlbumID = AP_SUB.AlbumID 
+             JOIN Publishers P_SUB ON AP_SUB.PublisherID = P_SUB.PublisherID 
+             WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1) AS AlbumPublisher
+        """,
     ),
     FieldDef(
         name='any_publisher',
-        ui_header='Publisher', # UI Label for the Filter Tree
+        ui_header='Publisher',
         db_column='AnyPublisher',
         field_type=FieldType.LIST,
-        visible=False, # Shadow field, not for table/editor
+        visible=False,
         editable=False,
-        filterable=True, # This is the search powerhouse
-        portable=False, # Virtual field, not written to tags
-        strategy='list',
+        filterable=True,
+        portable=False,
         # SHADOW QUERY: Aggregates BOTH Master (Direct) and Album (Inherited) publishers for search
         query_expression="""
             (
@@ -316,10 +331,8 @@ FIELDS: List[FieldDef] = [
         id3_tag='TDRC',
         min_value=1860,
         required=True,
-        strategy='list',  # Flat list, not grouped by decade
         ui_search=True,
-        validation_pattern=r'^\d{4}$', # Enforce 4 digits (e.g. 1999) to catch typos like "199"
-        zone='amber', # ATTRIBUTE
+        validation_pattern=r'^\d{4}$',
     ),
 
     FieldDef(
@@ -328,9 +341,8 @@ FIELDS: List[FieldDef] = [
         db_column='AllTags',
         field_type=FieldType.LIST,
         filterable=True,
-        portable=False,  # Virtual container for TCON/TMOO
+        portable=False,
         query_expression="(SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||') FROM MediaSourceTags MST JOIN Tags TG ON MST.TagID = TG.TagID WHERE MST.SourceID = MS.SourceID) AS AllTags",
-        strategy='list',
         zone='gray',
     ),
 
@@ -363,9 +375,7 @@ FIELDS: List[FieldDef] = [
         filterable=True,
         id3_tag='TIPL',
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Producer') AS Producers",
-        strategy='list',
         ui_search=True,
-        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='lyricists',
@@ -376,17 +386,14 @@ FIELDS: List[FieldDef] = [
         id3_tag='TEXT',
         portable=False,
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Lyricist') AS Lyricists",
-        strategy='list',
         ui_search=True,
-        zone='amber', # ATTRIBUTE
     ),
     FieldDef(
         name='album_artist',
         ui_header='Album Artist',
-        db_column='AlbumArtist', # Still maps to legacy col for basic sorting/writes if needed
+        db_column='AlbumArtist',
         id3_tag='TPE2',
         query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM AlbumCredits AC_SUB JOIN ArtistNames AN_SUB ON AC_SUB.CreditedNameID = AN_SUB.NameID WHERE AC_SUB.AlbumID = (SELECT SA_SUB.AlbumID FROM SongAlbums SA_SUB WHERE SA_SUB.SourceID = MS.SourceID AND SA_SUB.IsPrimary = 1 LIMIT 1)) AS AlbumArtist",
-        strategy='list',
         visible=False,
     ),
     FieldDef(
@@ -407,7 +414,7 @@ FIELDS: List[FieldDef] = [
         searchable=False,
         strategy='boolean',
         visible=False,
-        zone='magenta', # Console Magenta (Matches Surgical Highlights)
+        zone='magenta',
     ),
 
     FieldDef(
@@ -454,7 +461,7 @@ FIELDS: List[FieldDef] = [
         min_value=0,
         searchable=False,
         strategy='range',
-        zone='gray', # SYSTEM
+        zone='gray',
     ),
     FieldDef(
         name='audio_hash',
@@ -470,14 +477,7 @@ FIELDS: List[FieldDef] = [
 # ==================== CROSS-FIELD VALIDATION RULES ====================
 # Rules that span multiple fields (can't be expressed per-field)
 
-VALIDATION_GROUPS = [
-    {
-        "name": "unified_artist",
-        "rule": "at_least_one",  # At least one of these fields must be populated
-        "fields": ["performers", "groups"],
-        "message": "Song must have at least one performer or group"
-    },
-]
+VALIDATION_GROUPS = []
 
 # ==================== QUERY GENERATION ====================
 
@@ -526,17 +526,12 @@ def get_required_fields() -> List[FieldDef]:
 
 def validate_row(row_data: list) -> set:
     """
-    Validate a row of data against Yellberus field definitions.
+    Validate a row of data against Yellberus field FORMAT constraints.
+    Used when SAVING data.
     Returns a set of field names that failed validation.
-    
-    Checks:
-    1. Per-field: required, min_length, min_value
-    2. Cross-field: rules defined in VALIDATION_GROUPS
     """
     failed_fields = set()
-    field_indices = {f.name: i for i, f in enumerate(FIELDS)}
     
-    # Per-field validation
     for col_idx, cell_value in enumerate(row_data):
         if col_idx >= len(FIELDS):
             break
@@ -545,28 +540,26 @@ def validate_row(row_data: list) -> set:
         if not field_def.is_valid(cell_value):
             failed_fields.add(field_def.name)
     
-    # Cross-field validation from VALIDATION_GROUPS
-    for group in VALIDATION_GROUPS:
-        rule = group.get("rule")
-        fields = group.get("fields", [])
-        
-        if rule == "at_least_one":
-            # Check if at least one of the fields has a value
-            has_any = False
-            for field_name in fields:
-                idx = field_indices.get(field_name)
-                if idx is not None and idx < len(row_data):
-                    val = row_data[idx]
-                    if val and str(val).strip():
-                        has_any = True
-                        break
-            
-            if not has_any:
-                # Mark all fields in the group as failing
-                for field_name in fields:
-                    failed_fields.add(field_name)
-    
     return failed_fields
+
+
+def check_completeness(row_data: list) -> set:
+    """
+    Check which REQUIRED fields are missing data.
+    Used for "Missing Data" filter and "Ready to Finalize" checks.
+    Returns a set of field names that are incomplete (missing required data).
+    """
+    incomplete_fields = set()
+    
+    for col_idx, cell_value in enumerate(row_data):
+        if col_idx >= len(FIELDS):
+            break
+            
+        field_def = FIELDS[col_idx]
+        if not field_def.is_complete(cell_value):
+            incomplete_fields.add(field_def.name)
+    
+    return incomplete_fields
 
 
 # ==================== SCHEMA VALIDATION ====================

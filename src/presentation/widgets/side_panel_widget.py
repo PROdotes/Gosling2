@@ -385,7 +385,7 @@ class SidePanelWidget(QFrame):
                         item_h_layout.setSpacing(4)
 
                         if field.ui_search:
-                            btn_search = GlowButton("🔍")
+                            btn_search = GlowButton("")
                             btn_search.setObjectName("SearchInlineButton")
                             self._configure_micro_button(btn_search)
                             # Left Click: Instant Search
@@ -1127,6 +1127,9 @@ class SidePanelWidget(QFrame):
                     "handle_album_click",
                     lambda eid, name: self._handle_album_click(eid, name) or True
                 )
+                
+                # T-Fix: Override generic Add button to use SidePanel's context-aware launcher
+                ew.set_custom_add_handler(lambda: self._open_album_manager(mode='add', clean_slate=False))
 
             if field_def.name == 'publisher':
                 ew.click_router.register_custom_handler(
@@ -1205,6 +1208,12 @@ class SidePanelWidget(QFrame):
             # Determine initial values based on Clean Slate request
             init_title = "" if clean_slate else (self._get_effective_value(sid, 'album', song.album) or "")
             init_id = None if clean_slate else self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None))
+            
+            # T-Fix: If Creating New ('add'), do NOT pre-select the existing album ID. 
+            # We want the context strings (Artist/Title) but not the ID link.
+            if mode == 'add':
+                init_id = None
+                init_title = "" # Also clear title so we don't search for 'Unknown Album' or current context
             
             initial_data = {
                 'title': init_title,
@@ -1366,67 +1375,47 @@ class SidePanelWidget(QFrame):
         
     def _on_album_picked_context(self, data, mode, target_id=None):
         if not data: return
-
-        # 1. Extract Selection
-        new_ids = [item['id'] for item in data]
         
-        # 2. Get Current State
-        sid = self.current_songs[0].source_id
-        curr_ids = self._get_effective_value(sid, 'album_id', getattr(self.current_songs[0], 'album_id', []))
-        if isinstance(curr_ids, int): curr_ids = [curr_ids]
-        if not curr_ids: curr_ids = []
+        # T-Atomic: Write directly to DB via Service (No Staging) to prevent side-effects on other fields
+        new_ids = {item['id'] for item in data}
         
-        # 3. Merge Logic
-        final_ids = []
-        if mode == 'add':
-             # Append new unique IDs
-             final_ids = list(curr_ids)
-             for nid in new_ids:
-                 if nid not in final_ids: final_ids.append(nid)
-                 
-        elif mode == 'edit':
-             if target_id and target_id in curr_ids:
-                 # Replace target_id with new_ids
-                 idx = curr_ids.index(target_id)
-                 final_ids = curr_ids[:idx] + new_ids + curr_ids[idx+1:]
-             else:
-                 # Standard Replace All (or fallthrough)
-                 final_ids = new_ids
-        
-        else:
-             final_ids = new_ids
-             
-        # 4. Sync Names (Rebuild derived list)
-        all_names = []
-        for xid in final_ids:
-            found = False
-            for item in data:
-                if item['id'] == xid:
-                    all_names.append(item['title'])
-                    found = True
-                    break
-            if not found:
-                alb = self.album_service.get_by_id(xid)
-                all_names.append(alb.title if alb else "Unknown")
-                
-        self._on_field_changed('album_id', final_ids)
-        self._on_field_changed('album', all_names)
-        self._refresh_field_values()
-        
-        # 5. Metadata Auto-Fill (From PRIMARY Only) via Services
-        # T-46: Artist & Year
-        full_album = self.album_service.get_by_id(primary['id'])
-        if full_album:
-             if full_album.album_artist:
-                 self._on_field_changed("album_artist", full_album.album_artist)
-             if full_album.release_year:
-                 self._on_field_changed("recording_year", full_album.release_year)
-
-
-
+        # Apply to ALL selected songs
+        for song in self.current_songs:
+            sid = song.source_id
             
-        # Ensure UI reflects the new managed state (Enabling/Disabling)
-        self._refresh_field_values()
+            # 1. Get current state (DB Truth)
+            curr_albums = self.album_service.get_albums_for_song(sid)
+            curr_ids = {a.album_id for a in curr_albums}
+            
+            # 2. Add New Items
+            for nid in new_ids:
+                if nid not in curr_ids:
+                    self.album_service.link_song_to_album(sid, nid)
+            
+            # 3. Remove/Replace Logic
+            if mode != 'add':
+                if target_id and target_id in curr_ids:
+                     # Targeted Replace
+                     if target_id not in new_ids:
+                          self.album_service.remove_song_from_album(sid, target_id)
+                elif not target_id:
+                    # Global Replace (replace all old with new)
+                    for oid in curr_ids:
+                        if oid not in new_ids:
+                            self.album_service.remove_song_from_album(sid, oid)
+        
+        # 4. Metadata Update (Artist/Year) - Keep this STAGED (Side Effect behavior)
+        if data:
+            primary_id = data[0]['id']
+            full_album = self.album_service.get_by_id(primary_id)
+            if full_album:
+                 if full_album.album_artist:
+                     self._on_field_changed("album_artist", full_album.album_artist)
+                 if full_album.release_year:
+                     self._on_field_changed("recording_year", full_album.release_year)
+        
+        # 5. Refresh UI (Reload from DB to show new links)
+        self.set_songs(self.current_songs, force=True)
 
     def _on_save_select_picked(self, album_data):
         """Callback from Dialog requesting an immediate atomic save."""
@@ -1694,6 +1683,16 @@ class SidePanelWidget(QFrame):
                 # Add "X Mixed" dummy chip
                 chips.append((-1, f"{mixed_count} Mixed", "🔀", True, False, "", "gray", False))
             return chips
+
+        # T-Clean: Fetch LIVE from DB for Album (Atomic Attribute)
+        if field_name == 'album':
+            if not self.current_songs: return []
+            # Atomic Fetch from DB
+            live_albums = self.album_service.get_albums_for_song(self.current_songs[0].source_id)
+            chips = []
+            for i, alb in enumerate(live_albums):
+                chips.append((alb.album_id, alb.title, "💿", False, False, alb.title, field_def.zone or "amber", i==0))
+            return chips
             
         # Convert to identities for the Chip Tray
         chips = []
@@ -1744,49 +1743,6 @@ class SidePanelWidget(QFrame):
                             display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
                     
                     chips.append((pid, display_name, "🏢", False, False, "Master Owner (Direct)", field_def.zone or "amber", False))
-            elif field_name == 'album':
-                aid = 0
-                is_p = (i == 0)
-                
-                # Extract title from Album object or dict, or use string directly
-                # Check type first to avoid confusion with str.title() method
-                if isinstance(n, str):
-                    # It's already a string
-                    label = n
-                elif isinstance(n, dict) and 'title' in n:
-                    # It's a dict
-                    label = n['title']
-                elif hasattr(n, 'title') and not callable(getattr(n, 'title', None)):
-                    # It's an Album object with a title attribute (not a method)
-                    label = n.title
-                else:
-                    # Fallback
-                    label = str(n)
-                
-                # T-Fix: Direct ID Lookup via Index
-                # Instead of searching by name (risky/ambiguous), grab the ID directly from the source song
-                # knowing that 'album' (names) and 'album_id' (ids) are kept in sync 1:1.
-                try:
-                    src = self.current_songs[0]
-                    # Get effective/staged ID if possible, else DB
-                    eff_ids = self._get_effective_value(src.source_id, 'album_id', getattr(src, 'album_id', []))
-                    
-                    if isinstance(eff_ids, int): eff_ids = [eff_ids]
-                    if not eff_ids: eff_ids = []
-                    
-                    if i < len(eff_ids):
-                        aid = eff_ids[i]
-                except Exception:
-                    pass
-                
-                # Fallback: Search (Only if ID lookups failed)
-                if not aid:
-                    results = self.album_service.search(label)
-                    aid = results[0].album_id if results else 0
-                
-
-                chips.append((aid, label, "💿", False, False, "", field_def.zone or "amber", is_p))
-
             else:
                 # Standard Contributor (Artist) via Service
                 # FIX: Use get_by_name to prevent 'Ghost Creation' when rendering stale 'performers' strings 
@@ -2205,7 +2161,7 @@ class SidePanelWidget(QFrame):
     def _show_search_menu_internal(self, global_pos, field_def=None):
         """Shared Menu Builder. field_def: if provided, adds 'Search [Field] on...' action."""
         menu = QMenu(self)
-        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]
+        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs", "ZAMP"]
         
         # Get current provider dynamically
         # Get current provider dynamically
@@ -2239,18 +2195,21 @@ class SidePanelWidget(QFrame):
         menu.exec(global_pos)
 
     def _on_web_search(self, field_def=None):
-        """Launch web search. If field_def is provided, adds it to context."""
+        """Launch web search using SearchService."""
         if not self.current_songs: return
         song = self.current_songs[0]
-
-        # T-81: Always read latest provider from settings
-        # T-81: Always read latest provider from settings
-        # FIX: Check injected settings_manager first, falling back to library_service (legacy)
-        s_mgr = getattr(self, 'settings_manager', None) or getattr(self.library_service, 'settings_manager', None)
-        if s_mgr:
-             self._search_provider = s_mgr.get_search_provider()
         
-        # Helper to extract text from various widget types
+        # 1. Resolve Search Service
+        search_svc = getattr(self.library_service, 'search_service', None)
+        if not search_svc: return
+
+        # 2. Determine Provider
+        s_mgr = getattr(self, 'settings_manager', None) or getattr(self.library_service, 'settings_manager', None)
+        provider = self._search_provider
+        if s_mgr:
+             provider = s_mgr.get_search_provider() or provider
+        
+        # 3. Gather Draft State (Pure UI Scraping)
         def get_widget_text(fname):
             w = self._field_widgets.get(fname)
             if not w: return ""
@@ -2261,60 +2220,28 @@ class SidePanelWidget(QFrame):
                 return w.text()
             return ""
 
-        # Context Gathering
-        artist = get_widget_text('performers') or get_widget_text('unified_artist')
-        if not artist:
-             p = getattr(song, 'performers', [])
-             artist = p[0] if p and isinstance(p, list) else (getattr(song, 'unified_artist', "") or getattr(song, 'artist', ""))
-             
-        title = get_widget_text('title') or getattr(song, 'title', "")
-
-        if not artist and not title:
-             return 
+        # Dump all relevant fields to draft dict
+        # We only really need performers, unified_artist, title, and the target field
+        draft_values = {
+            'title': get_widget_text('title'),
+            'performers': get_widget_text('performers'),
+            'unified_artist': get_widget_text('unified_artist'),
+        }
         
-        base_query = ""
-        field_val = get_widget_text(field_def.name) if field_def else ""
-        
-        if field_val and field_def and field_def.name in ['isrc', 'recording_year']:
-             # Priority: Search the technical code directly (Verifying ISRC/Year)
-             base_query = field_val
-        else:
-             # Default: Artist + Title context
-             base_query = f"{artist} {title}".strip()
-
-        # Logic: If field_def is present (Micro Button), we force Google.
-        # Rationale: Searching "Year" or "ISRC" on Spotify/Discogs is often useless.
-        eff_provider = self._search_provider
         if field_def:
-            eff_provider = "Google"
+            draft_values[field_def.name] = get_widget_text(field_def.name)
 
-        if eff_provider == "Google" and field_def:
-             # Google searches get the header qualifier for better results
-             query = f"{base_query} {field_def.ui_header}"
-        else:
-             query = base_query
-        
-        # Launch
-        url = self._get_search_url(eff_provider, query)
+        # 4. Delegate to Service (URL Generation + Logic)
+        url = search_svc.prepare_search(
+            song=song,
+            draft_values=draft_values,
+            preferred_provider=provider,
+            field_def=field_def
+        )
+
+        # 5. Launch
         if url:
             QDesktopServices.openUrl(QUrl(url))
-
-    def _get_search_url(self, provider, query_text):
-        """Helper to construct search URL based on provider."""
-        import urllib.parse
-        q_clean = urllib.parse.quote(query_text)
-        
-        if provider == "Google":
-             return f"https://www.google.com/search?q={q_clean}"
-        elif provider == "Spotify":
-             return f"https://open.spotify.com/search/{q_clean}"
-        elif provider == "YouTube":
-             return f"https://www.youtube.com/results?search_query={q_clean}"
-        elif provider == "MusicBrainz":
-             return f"https://musicbrainz.org/search?query={q_clean}&type=release&method=indexed"
-        elif provider == "Discogs":
-             return f"https://www.discogs.com/search/?q={q_clean}&type=release"
-        return ""
 
 
 

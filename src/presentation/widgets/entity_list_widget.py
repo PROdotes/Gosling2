@@ -106,7 +106,8 @@ class EntityListWidget(QWidget):
         # Optional: Callback to get filter_type for picker at runtime
         # e.g., lambda: "person" if artist.type == "group" else "group"
         self._picker_filter_fn: Optional[Callable[[], str]] = None
-        
+        self._custom_add_handler: Optional[Callable[[], None]] = None
+
         # Get entity config from registry
         self.entity_config = get_entity_config(entity_type)
         
@@ -308,9 +309,17 @@ class EntityListWidget(QWidget):
         """Public slot to trigger the add item flow (picker)."""
         self._on_add_clicked()
 
+    def set_custom_add_handler(self, handler: Callable[[], None]):
+        """Override the default add/picker behavior with a custom callback."""
+        self._custom_add_handler = handler
+
     def _on_add_clicked(self):
         """Handle add button click - open picker dialog."""
         if not self.allow_add:
+            return
+            
+        if self._custom_add_handler:
+            self._custom_add_handler()
             return
         
         # Get current IDs to exclude

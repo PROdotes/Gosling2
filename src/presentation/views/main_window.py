@@ -170,6 +170,9 @@ class MainWindow(QMainWindow):
         self.publisher_service = PublisherService(self.publisher_repository)
         self.tag_service = TagService(self.tag_repository)
         
+        from ...business.services.search_service import SearchService
+        self.search_service = SearchService()
+        
         # Initialize Audit Repository and Service
         from ...data.repositories.audit_repository import AuditRepository
         self.audit_repository = AuditRepository(db_path)
@@ -182,6 +185,7 @@ class MainWindow(QMainWindow):
             self.album_service,
             self.publisher_service,
             self.tag_service,
+            self.search_service,
             self.spotify_parsing_service
         )
         self.metadata_service = MetadataService()

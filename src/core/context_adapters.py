@@ -792,3 +792,5 @@ class AlbumPublisherAdapter(ContextAdapter):
     def on_data_changed(self):
         if self._refresh:
             self._refresh()
+
+# =============================================================================

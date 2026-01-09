@@ -530,6 +530,8 @@ class FilterWidget(QFrame):
         except Exception as e:
             logger.error(f"Error populating decade filter: {e}")
 
+
+
     def _add_unified_tags_filter(self):
         """T-83: Add dynamic Tags filter with categories from database."""
         from src.core import logger
@@ -611,14 +613,14 @@ class FilterWidget(QFrame):
 
         # Procedural: READY option (Valid but Not Done)
         if field.name == "is_done":
-            item_ready = QStandardItem("Pending")
+            item_ready = QStandardItem("Ready to Finalize")
             item_ready.setFlags(item_ready.flags() & ~Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)
             item_ready.setCheckState(Qt.CheckState.Unchecked)
             item_ready.setData("READY", Qt.ItemDataRole.UserRole)
             item_ready.setData(field.name, Qt.ItemDataRole.UserRole + 1)
             root_item.appendRow(item_ready)
 
-            item_incomplete = QStandardItem("Incomplete")
+            item_incomplete = QStandardItem("Missing Data")
             item_incomplete.setFlags(item_incomplete.flags() & ~Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)
             item_incomplete.setCheckState(Qt.CheckState.Unchecked)
             item_incomplete.setData("INCOMPLETE", Qt.ItemDataRole.UserRole)
@@ -778,8 +780,8 @@ class FilterWidget(QFrame):
             for val in values:
                 display_val = str(val)
                 if field_name == "is_done":
-                    if val == "READY": display_val = "Pending"
-                    elif val == "INCOMPLETE": display_val = "Incomplete"
+                    if val == "READY": display_val = "Ready to Finalize"
+                    elif val == "INCOMPLETE": display_val = "Missing Data"
                     elif val is False: display_val = "Not Done"
                     elif val is True: display_val = "Done"
                 elif "active" in field_name.lower():

@@ -1,27 +1,27 @@
 # Today's Focus - January 9, 2026
 
-## 🐛 BUG: Ctrl+F Not Working
-**Priority: HIGH** - Quick Lookup shortcut isn't focusing the search box.
-
-**Code exists but may be broken:**
-- `main_window.py` line 422-426: Shortcut is wired up
-- `library_widget.py` line 2176-2179: `focus_search()` emits signal
-- Signal connected at line 399: `self.library_widget.focus_search_requested.connect(lambda: self.title_bar.search_box.setFocus())`
-
-**To investigate:**
-1. Is the signal being emitted? (Add debug print in `focus_search()`)
-2. Is `self.title_bar.search_box` the correct reference?
-3. Is focus being stolen by the table view?
+## ✅ FIXED: Ctrl+F Not Working
+**Status: DONE** - `setFocus` proxy was missing in `GlowLineEdit`. Added it.
 
 ---
 
 ## 📊 Roadmap Deep Dive: Unchecked Features Analysis
 
-### ✅ SHOULD BE MARKED DONE (if Ctrl+F bug is fixed)
+### ✅ SHOULD BE MARKED DONE
 
 #### Quick Lookup (T-105) - `Ctrl+F` focuses search box
-- Code is in place, but currently not working (bug above)
-- Once fixed, mark as `[x]` in roadmap
+- [x] Code is in place and verified working.
+- [x] **Fix Album Manager Crash**: Resolved NameError in `_on_album_picked_context`.
+- [x] **Fix Album Manager Population**: Correctly handle string context data for Create New mode.
+- [ ] **T-Tools**: Planned "Inventory Management" suite for v0.2 to handle orphaned entities and global browsing (See `docs/T_TOOLS.md`).
+
+### Known Issues (v0.1)
+- [x] **Album Chip Refresh**: Fixed by connecting `data_changed` signal to panel refresh.
+
+
+#### 4. ZAMP Search Button (T-103) - ~30 min 🔴 Gosling 1 Parity
+- [x] Added "ZAMP" to providers list in `side_panel_widget.py`
+- [x] Added URL template logic.
 
 ---
 
@@ -51,53 +51,28 @@
 
 ---
 
-#### 3. "Show Truncated" Filter (T-102) - ~2.0h 🔴 Gosling 1 Parity
-**Filtering mechanism supports this:**
-- `_show_incomplete` flag exists
-- `_get_incomplete_fields()` identifies validation failures
-- INCOMPLETE status filtering works in proxy model
-
-**Missing:**
-- Dedicated filter tree node or toggle for "Show Truncated"
-- Currently is_done filter shows INCOMPLETE but that's Status tag based, not Composer/Publisher specific
+#### 3. "Show Truncated" Filter (T-102) - ✅ DONE
+**Implemented:**
+- ✅ Split `is_complete()` (for filters) vs `is_valid()` (for save validation)
+- ✅ "Missing Data" filter shows songs missing REQUIRED fields only
+- ✅ "Ready to Finalize" filter shows complete songs with Unprocessed tag
+- ✅ Filter labels updated: "Pending" → "Ready to Finalize", "Incomplete" → "Missing Data"
+- ✅ Publisher split: Song-level (required) vs Album-level (informational)
+- ✅ `performers` is now strictly required
+- ✅ `groups` field deprecated (hidden, non-portable)
 
 ---
 
 ### ❌ NOT IMPLEMENTED
 
-#### 4. ZAMP Search Button (T-103) - ~30 min 🔴 Gosling 1 Parity
-**Quick win!**
-
-Current providers: `["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs"]`
-
-**To implement:**
-1. Add "ZAMP" to providers list in `side_panel_widget.py` line 2208
-2. Add URL template in `_get_search_url()` around line 2302:
-```python
-elif provider == "ZAMP":
-    return f"https://www.zamp.hr/pretraga?q={q_clean}"
-```
+#### 6. "Missing Data" Filter Column Restriction (T-??) - 🛠️
+When the **Missing Data** filter is active:
+- Save the current column layout (order, visibility, width) to a temporary cache.
+- Hide all **optional** columns, showing only fields marked `required=True` in Yellberus.
+- Disable column‑layout persistence while the filter remains on.
+- When the filter is turned off, restore the original column layout and re‑enable saving.
 
 ---
-
-#### 5. Inline Edit (T-03) - ~2.0h (Major work)
-Grid is explicitly read-only:
-- `setEditTriggers(NoEditTriggers)` on table
-- All items have `setEditable(False)`
-- Requires delegate changes and edit commit logic
-
----
-
-## 📋 Priority Order for Today/This Week
-
-| # | Task | Time | Impact |
-|---|------|------|--------|
-| 1 | 🐛 Fix Ctrl+F bug | 15min | Unblocks T-105 |
-| 2 | ZAMP Search (T-103) | 30min | Quick win, Gosling 1 parity |
-| 3 | Show Truncated Filter (T-102) | 2h | Gosling 1 parity |
-| 4 | Completeness Indicator (T-104) | 2h | Visual improvement |
-| 5 | Rule Editor UI (T-82) | 2h | Power user feature |
-| 6 | Inline Edit (T-03) | 2h+ | Nice to have |
 
 ---
 

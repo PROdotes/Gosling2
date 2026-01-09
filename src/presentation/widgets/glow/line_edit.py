@@ -117,3 +117,7 @@ class GlowLineEdit(GlowWidget):
     def textChanged(self): return self.edit.textChanged
     @property
     def returnPressed(self): return self.edit.returnPressed
+
+    def setFocus(self, reason=Qt.FocusReason.OtherFocusReason):
+        """Pass focus to the inner QLineEdit."""
+        self.edit.setFocus(reason)

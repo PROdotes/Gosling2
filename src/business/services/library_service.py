@@ -5,6 +5,7 @@ from .contributor_service import ContributorService
 from .album_service import AlbumService
 from .publisher_service import PublisherService
 from .tag_service import TagService
+from .search_service import SearchService
 from ...data.models.song import Song
 from ...data.models.album import Album
 
@@ -20,12 +21,14 @@ class LibraryService:
                  album_service: AlbumService,
                  publisher_service: PublisherService,
                  tag_service: TagService,
+                 search_service: SearchService,
                  spotify_parsing_service=None):
         self.song_service = song_service
         self.contributor_service = contributor_service
         self.album_service = album_service
         self.publisher_service = publisher_service
         self.tag_service = tag_service
+        self.search_service = search_service
         self.spotify_parsing_service = spotify_parsing_service
 
 

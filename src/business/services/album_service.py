@@ -5,6 +5,7 @@ Handles business logic for Album management.
 """
 from typing import List, Optional, Tuple
 from ...data.models.album import Album
+from ...data.models.publisher import Publisher
 from ...data.repositories.album_repository import AlbumRepository
 
 class AlbumService:
@@ -67,7 +68,11 @@ class AlbumService:
 
     def link_song_to_album(self, source_id: int, album_id: int, is_primary: int = 0) -> bool:
         """Link a song to an album."""
-        return self._repo.link_source_to_album(source_id, album_id, is_primary)
+        # Fix: Method name in repo is 'add_song_to_album'
+        self._repo.add_song_to_album(source_id, album_id)
+        if is_primary:
+             self._repo.set_primary_album(source_id, album_id)
+        return True
 
     def get_albums_for_song(self, song_id: int) -> List[Album]:
         """Get all albums linked to a song."""
