@@ -103,8 +103,8 @@ class RenamingRulesWidget(QWidget):
         
         # The List
         self.list_widget = QListWidget()
-        self.list_widget.setObjectName("EntityList") # Reuse existing style
-        self.list_widget.setAlternatingRowColors(True)
+        self.list_widget.setObjectName("FilterTree")  # Reuse existing dark list style
+        self.list_widget.setAlternatingRowColors(False)  # FilterTree style doesn't use alternating
         self.list_widget.doubleClicked.connect(self._edit_current_item)
         layout.addWidget(self.list_widget)
         

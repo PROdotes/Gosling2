@@ -162,10 +162,7 @@ class RenamingService:
         """Public API: Save rules configuration to JSON."""
         import json
         
-        # Determine strict save path (don't try multiple like load)
-        # We prioritize src/json/rules.json as the ship location, 
-        # or docs/configs/rules.json if user customized it there?
-        # Let's stick to the location where we found them, or default to src/json/rules.json
+        # Canonical save path: src/json/rules.json
         
         target_path = self._resolve_rules_path()
         if not target_path:
@@ -184,16 +181,11 @@ class RenamingService:
             return False
 
     def _resolve_rules_path(self) -> str:
-        """Determine where rules.json lives."""
+        """Determine where rules.json lives. Canonical location: src/json/rules.json"""
         base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        paths = [
-            os.path.join(base_dir, "docs", "configs", "rules.json"),
-            os.path.join(base_dir, "src", "json", "rules.json"),
-            os.path.join(base_dir, "design", "configs", "rules.json")
-        ]
-        for p in paths:
-            if os.path.exists(p):
-                return p
+        path = os.path.join(base_dir, "src", "json", "rules.json")
+        if os.path.exists(path):
+            return path
         return None
 
     def _load_rules(self) -> dict:

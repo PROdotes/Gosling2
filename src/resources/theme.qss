@@ -703,6 +703,46 @@ QPushButton:checked {
     padding: 6px 14px;
 }
 
+/* --- 7. TAB WIDGET (Inherits Button Style) --- */
+QTabWidget::pane {
+    background: transparent;
+    border: none;
+}
+
+QTabBar::tab {
+    /* Same gradient as QPushButton */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #555555, 
+        stop:0.08 #3D3D3D, 
+        stop:0.15 #2D2D2D,
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    border-radius: 10px;
+    padding: 6px 14px;
+    color: #DDDDDD;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+QTabBar::tab:hover {
+    border: 1px solid #111111;
+}
+
+QTabBar::tab:selected {
+    /* Same as QPushButton:checked + amber accent */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #151515, 
+        stop:0.3 #1A1A1A,
+        stop:1 #2A2A2A);
+    border: 1px solid #FFC66D;
+    color: #FFC66D;
+}
+
+/* Tab Content Widgets - Transparent to show dialog background */
+#GeneralTabContent, #RulesTabContent {
+    background: transparent;
+}
+
 /* --- 8. PRO MODULE CHIPS (T-70) --- */
 #ChipTrayContainer {
     /* Match the "Inset Readout" well of QLineEdits */

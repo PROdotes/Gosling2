@@ -1,7 +1,6 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QFileDialog, QFrame, QCheckBox, QComboBox, QSpinBox, QMessageBox,
-    QTabWidget, QWidget, QScrollArea
+    QPushButton, QFileDialog, QFrame, QCheckBox, QComboBox, QSpinBox, QMessageBox
 )
 from PyQt6.QtCore import Qt
 from ..widgets.glow_factory import GlowButton, GlowLineEdit, GlowToggle
@@ -13,65 +12,21 @@ class SettingsDialog(QDialog):
     Focused on library organization and renaming rules.
     """
     
-    def __init__(self, settings_manager, renaming_service, parent=None):
+    def __init__(self, settings_manager, parent=None):
         super().__init__(parent)
         self.settings_manager = settings_manager
-        self.renaming_service = renaming_service
-        
         self.setWindowTitle("OPERATIONS CONFIG")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(500)
+        self.setMinimumWidth(500)
         self.setObjectName("AlbumManagerDialog") # Reuse standard dialog style
+        
+        # Frameless/Custom style support if needed, 
+        # but standard dialog is fine if we style it in QSS.
         
         self._init_ui()
         self._load_settings()
 
     def _init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        
-        # --- TAB WIDGET (Styled via theme.qss) ---
-        self.tabs = QTabWidget()
-        self.tabs.setObjectName("MainTabs")
-        
-        # Tab 1: General (Existing Settings)
-        self.tab_general = QWidget()
-        self.tab_general.setObjectName("GeneralTabContent")
-        self._init_general_tab()
-        self.tabs.addTab(self.tab_general, "General")
-        
-        # Tab 2: Renaming Rules (New)
-        from ..widgets.renaming_rules_widget import RenamingRulesWidget
-        self.tab_rules = RenamingRulesWidget(self.renaming_service)
-        self.tab_rules.setObjectName("RulesTabContent")
-        self.tabs.addTab(self.tab_rules, "Renaming Rules")
-        
-        main_layout.addWidget(self.tabs)
-        
-        # --- BOTTOM BAR (Common) ---
-        bottom_frame = QFrame()
-        bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(20, 10, 20, 10)
-        
-        self.btn_cancel = GlowButton("CANCEL")
-        self.btn_cancel.setFixedWidth(100)
-        self.btn_cancel.clicked.connect(self.reject)
-        
-        self.btn_save = GlowButton("APPLY")
-        self.btn_save.setFixedWidth(100)
-        self.btn_save.setObjectName("SaveAllButton")
-        self.btn_save.setDefault(True)
-        self.btn_save.clicked.connect(self._on_save_clicked)
-        
-        bottom_layout.addStretch()
-        bottom_layout.addWidget(self.btn_cancel)
-        bottom_layout.addWidget(self.btn_save)
-        
-        main_layout.addWidget(bottom_frame)
-
-    def _init_general_tab(self):
-        layout = QVBoxLayout(self.tab_general)
+        layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
         
@@ -102,6 +57,7 @@ class SettingsDialog(QDialog):
         
         root_layout.addWidget(self.txt_root_dir, 1)
         root_layout.addWidget(self.btn_browse)
+
         layout.addLayout(root_layout)
 
         # Database Path Row (Advanced)
@@ -134,7 +90,7 @@ class SettingsDialog(QDialog):
         log_layout.addWidget(self.btn_log_browse)
         layout.addLayout(log_layout)
 
-        # --- 2. FILE MANAGEMENT ---
+        # --- 2. FILE MANAGEMENT (T-52) ---
         line_ren = QFrame()
         line_ren.setObjectName("FieldGroupLine")
         layout.addWidget(line_ren)
@@ -148,6 +104,7 @@ class SettingsDialog(QDialog):
         self.chk_rename_enabled.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("ENABLE AUTO-RENAMING", self.chk_rename_enabled))
 
+
         self.chk_write_tags = GlowToggle()
         self.chk_write_tags.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("WRITE TO TAGS", self.chk_write_tags, "If disabled, metadata changes will only be saved to the database."))
@@ -156,7 +113,32 @@ class SettingsDialog(QDialog):
         self.chk_delete_zip.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("DELETE ZIP AFTER IMPORT", self.chk_delete_zip, "Delete ZIP files after successful import."))
         
-        # Note: Pattern Input removed from here - it's handled via Rules Tab now
+        # Pattern (Conditional)
+        # Check for Rules JSON (T-52 Conflict Resolution)
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        rules_path = os.path.join(base_dir, "docs", "configs", "rules.json")
+        has_rules = os.path.exists(rules_path)
+
+        if has_rules:
+             # External Rules Detected - Hide Pattern Input to prevent confusion
+             rules_label = QLabel("✨ Renaming Logic Managed by rules.json")
+             rules_label.setStyleSheet("color: #FFC66D; font-style: italic;")
+             rules_label.setToolTip(f"Rules found at: {rules_path}")
+             layout.addWidget(rules_label)
+             # We still need self.txt_pattern for _load_settings/save to not crash
+             self.txt_pattern = GlowLineEdit() 
+             self.txt_pattern.setVisible(False)
+        else:
+             # Standard Pattern Input
+             pat_layout = QHBoxLayout()
+             pat_label = QLabel("PATTERN")
+             pat_label.setFixedWidth(120)
+             self.txt_pattern = GlowLineEdit()
+             self.txt_pattern.setPlaceholderText("{Artist}/{Album}/{Title}")
+             
+             pat_layout.addWidget(pat_label)
+             pat_layout.addWidget(self.txt_pattern, 1)
+             layout.addLayout(pat_layout)
 
         # --- 3. TRANSCODING ---
         line_trans = QFrame()
@@ -252,6 +234,24 @@ class SettingsDialog(QDialog):
         layout.addLayout(year_layout)
         
         layout.addStretch()
+        
+        # --- BUTTONS ---
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        
+        self.btn_cancel = GlowButton("CANCEL")
+        self.btn_cancel.setFixedWidth(100)
+        self.btn_cancel.clicked.connect(self.reject)
+        
+        self.btn_save = GlowButton("APPLY")
+        self.btn_save.setFixedWidth(100)
+        self.btn_save.setObjectName("SaveAllButton")
+        self.btn_save.setDefault(True)
+        self.btn_save.clicked.connect(self._on_save_clicked)
+        
+        button_row.addWidget(self.btn_cancel)
+        button_row.addWidget(self.btn_save)
+        layout.addLayout(button_row)
 
     def _add_toggle_row(self, label_text, toggle_obj, tooltip=""):
         """Helper to create a standard left-aligned toggle row."""
@@ -269,28 +269,42 @@ class SettingsDialog(QDialog):
         return row
 
     def _load_settings(self):
-        # General Load
         self.txt_root_dir.setText(self.settings_manager.get_root_directory())
         self.txt_db_path.setText(self.settings_manager.get_database_path() or "")
         self.txt_log_path.setText(self.settings_manager.get_log_path() or "")
         
+        # File Management
         self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
+
         self.chk_delete_zip.setChecked(self.settings_manager.get_delete_zip_after_import())
         self.chk_write_tags.setChecked(self.settings_manager.get_write_tags())
-        
+        self.txt_pattern.setText(self.settings_manager.get_rename_pattern())
+
+        # Conversion
         self.chk_conversion_enabled.setChecked(self.settings_manager.get_conversion_enabled())
         self.chk_delete_wav.setChecked(self.settings_manager.get_delete_wav_after_conversion())
 
+        # Match bitrate to combo
         current_bitrate = self.settings_manager.get_conversion_bitrate()
         index = self.cmb_bitrate.findText(current_bitrate)
-        if index >= 0: self.cmb_bitrate.setCurrentIndex(index)
-        
+        if index >= 0:
+            self.cmb_bitrate.setCurrentIndex(index)
+        else:
+            # Fallback for old custom values
+            if "VBR" in current_bitrate.upper():
+                self.cmb_bitrate.setCurrentIndex(0)
+            else:
+                self.cmb_bitrate.setCurrentText("320k")
+                
         self.txt_ffmpeg_path.setText(self.settings_manager.get_ffmpeg_path())
         
+        # Search Provider
         current_provider = self.settings_manager.get_search_provider()
         idx = self.cmb_search_provider.findText(current_provider)
-        if idx >= 0: self.cmb_search_provider.setCurrentIndex(idx)
+        if idx >= 0:
+            self.cmb_search_provider.setCurrentIndex(idx)
 
+        # Default Year
         val = self.settings_manager.get_default_year()
         if val > 0:
             self.chk_default_year.setChecked(True)
@@ -298,74 +312,100 @@ class SettingsDialog(QDialog):
             self.spin_default_year.setEnabled(True)
         else:
             self.chk_default_year.setChecked(False)
-            self.spin_default_year.setValue(2000)
+            self.spin_default_year.setValue(2000) # User requested default
             self.spin_default_year.setEnabled(False)
-
+            
     def _on_year_toggled(self, checked):
         self.spin_default_year.setEnabled(checked)
 
     def _on_browse_clicked(self):
         current = self.txt_root_dir.text() or "."
         path = QFileDialog.getExistingDirectory(self, "Select Root Directory", current)
-        if path: self.txt_root_dir.setText(os.path.normpath(path))
+        if path:
+            self.txt_root_dir.setText(os.path.normpath(path))
 
     def _on_ffmpeg_browse_clicked(self):
         current = self.txt_ffmpeg_path.text() or "."
         path, _ = QFileDialog.getOpenFileName(self, "Select FFmpeg Executable", current, "Executables (*.exe);;All Files (*)")
-        if path: self.txt_ffmpeg_path.setText(os.path.normpath(path))
+        if path:
+            self.txt_ffmpeg_path.setText(os.path.normpath(path))
 
     def _on_db_browse_clicked(self):
         current = self.txt_db_path.text() or "."
         path, _ = QFileDialog.getOpenFileName(self, "Select Database Location", current, "SQLite Database (*.db);;All Files (*)")
-        if path: self.txt_db_path.setText(os.path.normpath(path))
+        if path:
+            self.txt_db_path.setText(os.path.normpath(path))
 
     def _on_log_browse_clicked(self):
         current = self.txt_log_path.text() or "."
         path, _ = QFileDialog.getOpenFileName(self, "Select Log Location", current, "Log Files (*.log);;All Files (*)")
-        if path: self.txt_log_path.setText(os.path.normpath(path))
+        if path:
+            self.txt_log_path.setText(os.path.normpath(path))
             
     def _on_save_clicked(self):
-        # 1. Save General Settings
+        # Validate Default Year against Yellberus Schema
+        def_year = 0
         if self.chk_default_year.isChecked():
+            def_year = self.spin_default_year.value()
+            
+            # Additional Safety Check against Yellberus
             from ...core import yellberus
             fdef = next((f for f in yellberus.FIELDS if f.name == 'recording_year'), None)
-            if fdef and self.spin_default_year.value() < fdef.min_value:
+            if fdef and fdef.min_value is not None and def_year < fdef.min_value:
                  QMessageBox.warning(self, "Invalid configuration", f"Default Year must be at least {fdef.min_value}.")
                  return
 
+
+        # Library
         root = self.txt_root_dir.text().strip()
         if root:
-            self.settings_manager.set_root_directory(os.path.normpath(root))
+            # Normalize to handle trailing slashes or mixed separators
+            normalized_root = os.path.normpath(root)
+            self.settings_manager.set_root_directory(normalized_root)
+            self.txt_root_dir.setText(normalized_root) # Update UI to show normalized path
             
+        # Database
         db_path = self.txt_db_path.text().strip()
-        if db_path and db_path != self.settings_manager.get_database_path():
-             QMessageBox.information(self, "Restart Required", "Database path changed. Restart required.")
+        if db_path:
+             # Check if changed to warn user?
+             old_path = self.settings_manager.get_database_path() or ""
+             if db_path != old_path:
+                 QMessageBox.information(self, "Restart Required", "Database path changed. Please restart the application to apply.")
              self.settings_manager.set_database_path(db_path)
-             
-        log_path = self.txt_log_path.text().strip()
-        if log_path and log_path != self.settings_manager.get_log_path():
-             QMessageBox.information(self, "Restart Required", "Log path changed. Restart required.")
-             self.settings_manager.set_log_path(log_path)
+        else:
+             self.settings_manager.set_database_path("") # Reset to default
 
+        # Log
+        log_path = self.txt_log_path.text().strip()
+        if log_path:
+             old_log = self.settings_manager.get_log_path() or ""
+             if log_path != old_log:
+                 QMessageBox.information(self, "Restart Required", "Log path changed. Please restart the application to apply.")
+             self.settings_manager.set_log_path(log_path)
+        else:
+             self.settings_manager.set_log_path("")
+            
+        # File Management
         self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())
+
         self.settings_manager.set_delete_zip_after_import(self.chk_delete_zip.isChecked())
         self.settings_manager.set_write_tags(self.chk_write_tags.isChecked())
+        self.settings_manager.set_rename_pattern(self.txt_pattern.text().strip())
 
+        # Conversion
         self.settings_manager.set_conversion_enabled(self.chk_conversion_enabled.isChecked())
         self.settings_manager.set_delete_wav_after_conversion(self.chk_delete_wav.isChecked())
         self.settings_manager.set_conversion_bitrate(self.cmb_bitrate.currentText())
         self.settings_manager.set_ffmpeg_path(self.txt_ffmpeg_path.text().strip())
         
+        # Metadata
         self.settings_manager.set_search_provider(self.cmb_search_provider.currentText())
         
+        # Default Year
         if self.chk_default_year.isChecked():
             self.settings_manager.set_default_year(self.spin_default_year.value())
         else:
             self.settings_manager.set_default_year(0)
 
         self.settings_manager.sync()
-        
-        # 2. Save Rules
-        self.tab_rules.save_changes()
-        
         self.accept()
