@@ -96,7 +96,7 @@ tags:
 *   [x] **Audit Log (History)** (T-05) (~1.0 h)
     *   *Task*: Record INSERT/UPDATE events and expose via UI.
     *   *Status*: **Done** - Full stack implementation (Repo, Service, Dialog) working and tested.
-*   [ ] **Advanced Rule Editor** (T-82) (~2.0 h)
+*   [x] **Advanced Rule Editor** (T-82) (~2.0 h)
     *   *Task*: UI for managing `rules.json` (Genre Routing, Profiles) inside Settings.
 *   [x] **Settings UI** (T-52) (~1.5 h)
     *   *Task*: UI for Root Directory, Renaming Rules, Transcoding, and Metadata defaults.
@@ -235,7 +235,7 @@ Quick reference for remaining tasks.
 
 | Priority | Task | Estimate |
 | :--- | :--- | :--- |
-| Low | Advanced Rule Editor (T-82) | ~2.0h |
+| Done | Advanced Rule Editor (T-82) | ~2.0h |
 | Done | Filename → Metadata Parser (T-107) | ~2.5h |
 
 | Done | "Missing Data" Column Filter (T-106) | ~1.5h |

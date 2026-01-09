@@ -941,7 +941,7 @@ class MainWindow(QMainWindow):
 
     def _open_settings(self):
         """Open the Settings Dialog (T-52 MVP)."""
-        dlg = SettingsDialog(self.settings_manager, self)
+        dlg = SettingsDialog(self.settings_manager, self.renaming_service, self)
         if dlg.exec():
             # Refresh components that might depend on root path or rules
             self.library_widget.load_library()

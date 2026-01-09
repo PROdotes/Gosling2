@@ -152,26 +152,61 @@ class RenamingService:
             
         return result
 
-    def _load_rules(self) -> dict:
-        """Load external rules from JSON."""
+    # ==================== RULES API (T-82) ====================
+    
+    def get_rules(self) -> dict:
+        """Public API: Get current rules configuration."""
+        return self._load_rules()
+
+    def save_rules(self, rules_data: dict) -> bool:
+        """Public API: Save rules configuration to JSON."""
         import json
-        # Primary: docs/configs/rules.json (As per user location)
-        # Secondary: design/configs/rules.json (Legacy fallback)
         
+        # Determine strict save path (don't try multiple like load)
+        # We prioritize src/json/rules.json as the ship location, 
+        # or docs/configs/rules.json if user customized it there?
+        # Let's stick to the location where we found them, or default to src/json/rules.json
+        
+        target_path = self._resolve_rules_path()
+        if not target_path:
+            # Fallback for new create
+            base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            target_path = os.path.join(base_dir, "src", "json", "rules.json")
+            
+        try:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, 'w', encoding='utf-8') as f:
+                json.dump(rules_data, f, indent=4)
+            return True
+        except Exception as e:
+            from ...core import logger
+            logger.error(f"Failed to save rules.json: {e}")
+            return False
+
+    def _resolve_rules_path(self) -> str:
+        """Determine where rules.json lives."""
         base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         paths = [
             os.path.join(base_dir, "docs", "configs", "rules.json"),
             os.path.join(base_dir, "src", "json", "rules.json"),
             os.path.join(base_dir, "design", "configs", "rules.json")
         ]
+        for p in paths:
+            if os.path.exists(p):
+                return p
+        return None
+
+    def _load_rules(self) -> dict:
+        """Load external rules from JSON."""
+        import json
         
-        for rules_path in paths:
+        path = self._resolve_rules_path()
+        if path:
             try:
-                if os.path.exists(rules_path):
-                    with open(rules_path, 'r', encoding='utf-8') as f:
-                        return json.load(f)
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
             except Exception as e:
-                print(f"Warning: Failed to load rules.json at {rules_path}: {e}")
+                print(f"Warning: Failed to load rules.json at {path}: {e}")
         return {}
 
 
