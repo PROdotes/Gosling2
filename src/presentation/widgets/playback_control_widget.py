@@ -168,6 +168,8 @@ class PlaybackControlWidget(QWidget):
         elif command_id == "play":
             # Tape Logic: Direct interception for 'Latched' start/resume
             btn.clicked.connect(lambda: self._handle_play_click())
+        elif command_id == "pause":
+            btn.clicked.connect(lambda: self._handle_pause_click())
         else:
             btn.clicked.connect(lambda: self.transport_command.emit(command_id))
             
@@ -175,6 +177,14 @@ class PlaybackControlWidget(QWidget):
 
     def _handle_play_click(self):
         """Play acts as a latched start/resume. Ignore redundant off-toggles."""
+        # Guard: Prevent play toggle if nothing is armed
+        has_media = not self.playback_service.active_player.source().isEmpty()
+        has_playlist = len(self.playback_service.get_playlist()) > 0
+        
+        if not has_media and not has_playlist:
+            self.btn_play.setChecked(False)
+            return
+
         state = self.playback_service.active_player.playbackState()
         
         if state == QMediaPlayer.PlaybackState.PlayingState:
@@ -184,6 +194,16 @@ class PlaybackControlWidget(QWidget):
             self.transport_command.emit("play")
         else:
             self.transport_command.emit("play")
+
+    def _handle_pause_click(self):
+        """Pause logic: Only valid if actively playing/latched."""
+        # Guard: Can't pause if not playing (Tape Deck logic)
+        # We check the UI state of 'Play' as the proxy for 'Deck Activated'
+        if not self.btn_play.isChecked():
+            self.btn_pause.setChecked(False)
+            return
+            
+        self.transport_command.emit("pause")
 
     def _emit_transition(self, cmd):
         dur_str = self.combo_fade.currentText().rstrip('s')

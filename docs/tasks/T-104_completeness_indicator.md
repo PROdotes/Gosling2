@@ -1,71 +1,57 @@
-# T-104: Completeness Indicator
+# T-104: Completeness Indicator (The Traffic Light Deck)
 
-**Status**: Partially Implemented
+**Status**: Spec Defined
 **Priority**: Medium
-**Complexity**: Low-Medium
-**Estimate**: ~2.0h
+**Complexity**: Medium
 
 ## 🎯 Goal
-Add a dedicated visual column in the main grid showing song completeness at a glance, allowing quick identification of records missing required fields.
+Eliminate "Hidden Errors" by repurposing the existing Status Deck (LED) to indicate Metadata Health via color, while preserving File Type info via shape.
 
-## 📊 Current Architecture Support
+## 🚦 The Traffic Light Logic
 
-### ✅ Already Implemented
-The backend infrastructure is fully in place:
+We replace the existing "Asset Type" color logic with a stricter "Health Status" logic.
 
-1. **Validation Logic**: `yellberus.validate_row()` provides comprehensive field validation.
-2. **Incompleteness Detection**: `_get_incomplete_fields()` method already exists in the library widget.
-3. **Completeness Calculation**: Every row's completeness is calculated during load.
-4. **Gating Logic**: The "Done" toggle is disabled when required fields are missing.
-5. **Error Messages**: Validation errors are surfaced in dialogs when save is attempted.
+### 1. The Color Spectrum (Health)
+Priority Order (Top Breakdown overrides lower states):
 
-### ❌ Missing
-- **Visual Column**: No dedicated column with LED/icon showing completeness state.
-- **At-a-Glance Status**: Currently, users must attempt to save or hover to discover missing fields.
+| Priority | State | Color | Meaning |
+| :--- | :--- | :--- | :--- |
+| **1** | **DIRTY** | **Magenta** (`#FF00FF`) | Unsaved changes in memory. |
+| **2** | **INVALID** | **Red** (`#FF4444`) | Missing REQUIRED fields (Title, Artist, etc.). |
+| **3** | **UNPROCESSED** | **Tele-Green** (`#00E5FF`) | Valid data, but has `TXXX:Status=Unprocessed` tag. |
+| **4** | **READY** | **Amber** (`#FFC66D`) | Valid, Processed, Ready for Air. |
 
-## 🎨 Proposed UI Design
+### 2. The Shape System (File Container)
+Orthogonal to color. Tells you "What/Where is this file?"
 
-### Option A: LED Indicator Column
-Add a narrow column (similar to Status Deck) with a `GlowLED`:
-- 🟢 **Green**: All required fields populated
-- 🟡 **Yellow**: Some required fields missing (partial)
-- 🔴 **Red**: Critical fields missing (Title, Duration, etc.)
+| Shape | Meaning | Context |
+| :--- | :--- | :--- |
+| **Square** | **Virtual (VFS)** | File resides inside a ZIP/archive. |
+| **Triangle** | **Raw / WAV** | Uncompressed source file (needs conversion). |
+| **Circle** | **Standard** | Standard MP3/AAC file on disk. |
 
-### Option B: Completeness Percentage
-Display a small percentage or progress bar:
-- `100%` = Complete
-- `75%` = Missing some fields
-- Tooltip shows which fields are missing
+### 3. Examples
+*   **Red Square**: A file inside a ZIP that is missing its Artist tag.
+*   **Green Triangle**: A WAV file that has data but hasn't been marked "Done" (Unprocessed).
+*   **Amber Circle**: A perfect MP3, ready to broadcast.
 
-### Option C: Icon-Based
-Simple icon in a narrow column:
-- ✅ Complete
-- ⚠️ Incomplete (with tooltip listing missing fields)
+## 🛠️ Implementation Plan
 
-## 🛠️ Implementation Steps
+### Phase 1: Logic (Yellberus)
+*   Add `get_health_status(row_data) -> Enum` to Yellberus.
+*   Must check:
+    1.  `yellberus.validate_row()` (Invalid check)
+    2.  `TXXX:Status` tag presence (Unprocessed check)
 
-### Phase 1: Backend (~30 min)
-1. Add `get_completeness_status(song_id) -> Tuple[Completeness, List[str]]` to `YellberusService`
-   - Returns enum (COMPLETE, PARTIAL, CRITICAL) and list of missing field names
-2. Ensure this is cached per-row to avoid repeated validation calls
+### Phase 2: data Persistence (Model)
+*   Do NOT calculate in `paint()`.
+*   Calculate Health State at:
+    *   **Import/Load**
+    *   **Edit (setData)**
+*   Store result in `Active` Column (Index 0) user data role (e.g. `UserRole + 1`).
 
-### Phase 2: UI Column (~1.0 h)
-1. Add new column "Status" or "✓" to the grid model
-2. Create custom delegate that renders `GlowLED` based on completeness
-3. Wire tooltip to show missing field names on hover
+### Phase 3: Rendering (Delegate)
+*   Update `_draw_status_deck` in `library_delegate.py`.
+*   Implement the Priority Color switch.
+*   Preserve existing Shape logic.
 
-### Phase 3: Integration (~30 min)
-1. Connect to existing refresh logic so indicator updates on edit
-2. Ensure column is sortable (complete first/last)
-3. Add column to default visible columns
-
-## 📁 Files to Modify
-- `src/business/yellberus.py` - Add completeness status method
-- `src/presentation/widgets/library_table_model.py` - Add column
-- `src/presentation/delegates/` - Add completeness delegate (or reuse LED delegate)
-- `src/presentation/widgets/library_widget.py` - Wire up column
-
-## 🔗 Related
-- **T-102**: "Show Truncated" Filter (uses same validation logic)
-- **T-106**: "Missing Data" Column Filter (complements this feature)
-- **Status Deck (T-92)**: Similar LED-based visual indicator pattern

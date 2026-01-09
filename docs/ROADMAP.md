@@ -118,8 +118,8 @@ tags:
     *   *Task*: Filter songs missing Composer/Publisher. Weekly workflow essential.
 *   [x] **ZAMP Search Button (T-103)** (~0.5 h) 🔴 *Gosling 1 Parity*
     *   *Task*: Add ZAMP.hr to web search buttons for Croatian rights lookup.
-*   [ ] **Completeness Indicator (T-104)** (~2.0 h)
-    *   *Task*: Visual marker in grid showing missing required fields.
+*   [x] **Completeness Indicator (T-104)** (~2.0 h)
+    *   *Task*: Traffic Light System implemented in Status Deck.
 *   [x] **Quick Lookup (T-105)** (~1.0 h)
     *   *Task*: Ctrl+F focuses search box for fast Title+Artist lookup.
 
@@ -236,9 +236,9 @@ Quick reference for remaining tasks.
 | :--- | :--- | :--- |
 | Low | Advanced Rule Editor (T-82) | ~2.0h |
 | Low | Filename → Metadata Parser (T-107) | ~2.5h |
-| Low | Completeness Indicator (T-104) | ~2.0h |
-| Low | "Missing Data" Column Filter (T-106) | ~1.5h |
 
+| Low | "Missing Data" Column Filter (T-106) | ~1.5h |
+    
 **Total Critical Path:** 0.0h (Release Candidate Ready)
-**Total All:** ~8.0h
+**Total All:** ~6.0h
 

@@ -2,19 +2,19 @@
 
 ## 🎯 Remaining Items for v0.1.0
 
-### ⚠️ PARTIALLY IMPLEMENTED
+### ✅ IMPLEMENTED (Verified)
 
-#### 1. Completeness Indicator (T-104) - ~2.0h remaining
-**Infrastructure exists:**
-- `_get_incomplete_fields()` uses `yellberus.validate_row()`
-- Completeness calculated for every row during load
-- Used to gate "Done" toggle + validation errors
-
-**Missing:**
-- Dedicated visual column with LED/icon showing completeness
-- Currently only expressed via disabled buttons and error messages
+#### 1. Completeness Indicator (T-104)
+**Traffic Light System Implemented:**
+- **Status Deck (Column 0)** now indicates logical health.
+- 🔴 **Red (Invalid)**: Missing required fields (overrides everything).
+- 🥬 **Cyan/Tele-Green (Unprocessed)**: Valid data, but tagged "Unprocessed".
+- 🟠 **Amber (Ready)**: Valid + Processed.
+- Logic resides in `Yellberus` and uses standard `LibraryWidget` checks.
 
 ---
+
+### ⚠️ PARTIALLY IMPLEMENTED
 
 #### 2. Advanced Rule Editor (T-82) - ~2.0h
 **Backend fully working:**
@@ -32,36 +32,35 @@
 
 #### 3. "Missing Data" Column Filter (T-106) - ~1.5h
 When the **Missing Data** filter is active:
-- Save the current column layout (order, visibility, width) to a temporary cache.
-- Hide all **optional** columns, showing only fields marked `required=True` in Yellberus.
-- Disable column‑layout persistence while the filter remains on.
-- When the filter is turned off, restore the original column layout and re‑enable saving.
+- Save the current column layout.
+- Hide all **optional** columns, showing only fields marked `required=True`.
+- Disable persistence.
+- Restore layout when disabled.
 
 ---
 
 #### 4. Filename → Metadata Parser (T-107) - ~2.5h
 Parse filename patterns to auto-populate metadata on import:
-- Custom pattern definitions (e.g., `{Artist} - {Title}`, `{Track}. {Title}`)
-- Fallback when ID3 tags are missing or empty
-- UI in Settings to define/test patterns
+- Custom pattern definitions (e.g., `{Artist} - {Title}`).
+- Fallback when ID3 tags are missing.
+- UI in Settings to define patterns.
 
 ---
 
 ## v0.2+ Items (Correctly Deferred)
-- T-28 Leviathans Split (library_widget.py = 2732 lines!)
+- T-28 Leviathans Split
 - T-62 Async Background Save
 - MS Access Migration
-- T-Tools: Planned "Inventory Management" suite for orphaned entities and global browsing
+- T-Tools: "Inventory Management" suite
 
 ---
 
 ## 📊 Summary
 | Task | Estimate | Status |
 |------|----------|--------|
-| Completeness Indicator (T-104) | ~2.0h | ⚠️ Partial |
+| **Completeness Indicator (T-104)** | ~2.0h | ✅ Done |
 | Advanced Rule Editor (T-82) | ~2.0h | ⚠️ Partial |
 | "Missing Data" Column Filter (T-106) | ~1.5h | ❌ Not Started |
 | Filename → Metadata Parser (T-107) | ~2.5h | ❌ Not Started |
 
-**Total Remaining:** ~8.0h
-
+**Total Remaining:** ~6.0h

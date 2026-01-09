@@ -1,11 +1,12 @@
 """Constants and configuration"""
+from PyQt6.QtCore import Qt
 
 # UI Colors (The Core 5 Console Palette)
 COLOR_AMBER = "#FFC66D"       # Main Accent / Signal
 COLOR_MUTED_AMBER = "#FF8C00" # Secondary / Tactical
 COLOR_MAGENTA = "#FF00FF"     # Critical / Surgical Highlights
-COLOR_CYAN = "#00E5FF"        # Virtual/Cloud Data
-COLOR_RED = "#FF4444"         # Raw/Action Required (WAV)
+COLOR_CYAN = "#00E5FF"        # Virtual/Cloud Data / Unprocessed
+COLOR_RED = "#FF4444"         # Raw/Action Required (WAV) / Invalid
 COLOR_BLACK = "#000000"       # Chassis / Void
 COLOR_GRAY = "#888888"        # Ghost Data / Muted Text
 
@@ -24,3 +25,6 @@ DEFAULT_ROLES = ["Performer", "Composer", "Lyricist", "Producer"]
 
 # File extensions
 SUPPORTED_AUDIO_FORMATS = ['.mp3']
+
+# Custom Data Roles
+ROLE_HEALTH_STATUS = Qt.ItemDataRole.UserRole + 1

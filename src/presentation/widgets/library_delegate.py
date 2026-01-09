@@ -2,6 +2,8 @@ from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle, Q
 from PyQt6.QtCore import Qt, QRect, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QFont, QBrush, QPen, QLinearGradient
 from ...resources import constants
+from ...resources.constants import ROLE_HEALTH_STATUS
+from ...core.yellberus import HealthStatus
 from .glow.led import GlowLED
 
 
@@ -204,10 +206,21 @@ class WorkstationDelegate(QStyledItemDelegate):
         active_col = self.field_indices.get('is_active', -1)
         
         is_active = False
+        health_status = HealthStatus.READY # Default
+
         if active_col != -1:
-             val = model.index(row, active_col).data(Qt.ItemDataRole.UserRole)
+             idx = model.index(row, active_col)
+             val = idx.data(Qt.ItemDataRole.UserRole)
              # Handle bool or string "1"/"True"
              is_active = str(val).lower() in ('true', '1')
+             
+             # Retrieve Health Status (T-104)
+             h_val = idx.data(ROLE_HEALTH_STATUS)
+             if h_val is not None:
+                 try:
+                     health_status = HealthStatus(int(h_val))
+                 except (ValueError, TypeError):
+                     pass
              
         path_val = ""
         if path_idx != -1:
@@ -223,14 +236,16 @@ class WorkstationDelegate(QStyledItemDelegate):
         elif is_virtual:
             shape = GlowLED.SHAPE_SQUARE
             
-        # 3. Determine Color (Priority: Dirty > Wav > Virtual > Standard)
+        # 3. Determine Color (Priority: Dirty > Invalid > Unprocessed > Standard)
+        # T-104: Traffic Light Logic
         color = QColor(constants.COLOR_AMBER)
+        
         if is_dirty:
             color = QColor(constants.COLOR_MAGENTA)
-        elif is_wav:
+        elif health_status == HealthStatus.INVALID:
             color = QColor(constants.COLOR_RED)
-        elif is_virtual:
-            color = QColor(constants.COLOR_CYAN)
+        elif health_status == HealthStatus.UNPROCESSED:
+            color = QColor(constants.COLOR_CYAN) # Tele-Green
             
         # 4. Draw
         GlowLED.draw_led(

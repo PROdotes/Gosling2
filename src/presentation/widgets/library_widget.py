@@ -11,8 +11,10 @@ from PyQt6.QtWidgets import (
 )
 import json
 from ...resources import constants
+from ...resources.constants import ROLE_HEALTH_STATUS
 from .filter_widget import FilterWidget
 from ...core import yellberus
+from ...core.yellberus import HealthStatus
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
@@ -1248,6 +1250,22 @@ class LibraryWidget(QWidget):
                 # Always calculate completeness for validation
                 failing_fields = self._get_incomplete_fields(row_data)
 
+                # Determine Health Status (T-104)
+                # Priority: INVALID > UNPROCESSED > READY
+                health = HealthStatus.READY
+                if failing_fields:
+                    health = HealthStatus.INVALID
+                else:
+                    # Check is_done column for "Unprocessed" state
+                    try:
+                        is_done_idx = self.field_indices['is_done']
+                        is_done_val = row_data[is_done_idx]
+                        is_done = bool(is_done_val) if is_done_val is not None else False
+                        if not is_done:
+                            health = HealthStatus.UNPROCESSED
+                    except (KeyError, IndexError):
+                        pass
+
                 items = []
                 for col_idx, cell in enumerate(row_data):
                     display_text = str(cell) if cell is not None else ""
@@ -1280,6 +1298,9 @@ class LibraryWidget(QWidget):
                         
                         is_active_bool = bool(cell) if cell is not None else False
                         item.setData(is_active_bool, Qt.ItemDataRole.UserRole)
+                        # Store Health Status for Delegate
+                        item.setData(int(health), ROLE_HEALTH_STATUS)
+                        
                         item.setToolTip("Status: ACTIVE" if is_active_bool else "Status: INACTIVE")
                         item.setText("")
 
@@ -2707,7 +2728,7 @@ class LibraryWidget(QWidget):
         """Identify which fields are incomplete based on Yellberus registry.
         Returns a set of field names that failed validation.
         """
-        return yellberus.validate_row(row_data)
+        return yellberus.check_completeness(row_data)
 
     def _get_song_from_index(self, index: QModelIndex) -> Optional[Song]:
         """Helper to fetch a Song object from a TableView index (proxy)."""

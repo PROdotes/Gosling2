@@ -8,7 +8,7 @@ validation rules, and UI behavior. It replaces scattered constants and configura
 
 from dataclasses import dataclass
 from typing import Optional, Callable, List, Any
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 
 class FieldType(Enum):
     TEXT = auto()
@@ -18,6 +18,17 @@ class FieldType(Enum):
     LIST = auto()      # Comma-separated or multiple values
     DURATION = auto()  # Seconds, display as mm:ss
     DATETIME = auto()
+
+class HealthStatus(IntEnum):
+    """
+    Traffic Light Health Status for Status Deck (T-104).
+    Lower value = Higher Priority (overrides others).
+    """
+    DIRTY = 0         # Magenta: Unsaved changes
+    INVALID = 1       # Red: Missing required data
+    UNPROCESSED = 2   # Tele-Green: Valid but tagged Unprocessed
+    READY = 3         # Amber: Ready for air
+
 
 @dataclass
 class FieldDef:
@@ -560,6 +571,36 @@ def check_completeness(row_data: list) -> set:
             incomplete_fields.add(field_def.name)
     
     return incomplete_fields
+    
+
+def get_health_status(row_data: list, tags: set = None) -> HealthStatus:
+    """
+    Determine the Health Status of a row (T-104).
+    Calculates priority: INVALID > UNPROCESSED > READY.
+    (DIRTY is handled by the UI layer).
+    
+    Args:
+        row_data: The full list of cell values for the row.
+        tags: Set of tag strings "{Category}:{Name}" (e.g. "Status:Unprocessed").
+    """
+    # 1. Check Completeness (INVALID)
+    # We use check_completeness which checks REQUIRED fields
+    missing_fields = check_completeness(row_data)
+    if missing_fields:
+        return HealthStatus.INVALID
+        
+    # 2. Check Processing Status (UNPROCESSED)
+    # If valid but specifically marked Unprocessed
+    if tags:
+        # Check for any "Status:*" tag, or specifically Unprocessed?
+        # Logic from library_delegate: "Status:Unprocessed"
+        # T-89: Any tag in 'Status' category implies NOT ready?
+        # Let's stick to the specific "Status:Unprocessed" for now to be safe
+        if "Status:Unprocessed" in tags:
+            return HealthStatus.UNPROCESSED
+            
+    # 3. Default (READY)
+    return HealthStatus.READY
 
 
 # ==================== SCHEMA VALIDATION ====================
