@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
     QSizeGrip, QSizePolicy
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
@@ -387,6 +387,9 @@ class MainWindow(QMainWindow):
         # Access inner Playlist widget
         playlist = self.right_panel.playlist_widget
         playlist.itemDoubleClicked.connect(self._on_playlist_double_click)
+        playlist.playlist_changed.connect(self._sync_playlist_to_service)
+        # Initial sync
+        self._sync_playlist_to_service()
 
         # Legacy signals (if still emitted, but now covered by transport_command)
         self.playback_widget.play_pause_clicked.connect(self._toggle_play_pause)
@@ -439,6 +442,32 @@ class MainWindow(QMainWindow):
         # Update widget with new count
         self.playback_widget.set_playlist_count(self.playlist_widget.count())
 
+    def _sync_playlist_to_service(self):
+        """Sync the playback service playlist with the UI playlist"""
+        paths = []
+        for i in range(self.playlist_widget.count()):
+            item = self.playlist_widget.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and "path" in data:
+                paths.append(data["path"])
+
+        # Check if current playing song is still in playlist
+        current_index = self.playback_service.get_current_index()
+        if current_index >= 0 and current_index < len(paths):
+            current_path = self.playback_service.get_playlist()[current_index]
+            if current_path not in paths:
+                # Current song was removed, stop playback
+                self.playback_service.stop()
+                self.playback_service.active_player.setSource(QUrl())
+                self._update_song_label("NO MEDIA ARMED")
+        elif not paths:
+            # Playlist is now empty, stop and clear
+            self.playback_service.stop()
+            self.playback_service.active_player.setSource(QUrl())
+            self._update_song_label("NO MEDIA ARMED")
+
+        self.playback_service.set_playlist(paths)
+
     def _add_to_playlist(self, items) -> None:
         """Add items from library to playlist"""
         from PyQt6.QtWidgets import QListWidgetItem
@@ -467,11 +496,11 @@ class MainWindow(QMainWindow):
         data = item.data(Qt.ItemDataRole.UserRole)
         if data and "path" in data:
             path = data["path"]
-            self.playback_service.load(path)
-            self.playback_service.play()
+            row = self.playlist_widget.row(item)
+            self.playback_service.play_at_index(row)  # This sets current_index and loads/plays
             self._update_song_label(path)
             # Sync active row for visual sweep
-            self.playlist_widget._active_row = self.playlist_widget.row(item)
+            self.playlist_widget._active_row = row
 
     def _toggle_play_pause(self) -> None:
         """Toggle play/pause/resume"""

@@ -1,5 +1,5 @@
 """Playback management service"""
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Dict
 from PyQt6.QtCore import QObject, pyqtSignal, QUrl, QTimer
 from PyQt6.QtMultimedia import QMediaPlayer, QAudioOutput
 from typing import TYPE_CHECKING
@@ -54,8 +54,9 @@ class PlaybackService(QObject):
 
         self._playlist: List[str] = []
         self._current_index: int = -1
-        
+
         self._temp_files: List[str] = [] # Track temp copies for cleanup
+        self._temp_cache: Dict[str, str] = {} # Cache: song_path -> temp_path for top songs
         
         # Connect signals for the initial active player
         self._connect_signals(self.active_player)
@@ -130,33 +131,37 @@ class PlaybackService(QObject):
     # --- Playback Control ---
 
     def _get_temp_copy(self, file_path: str) -> str:
-        """Create a temp copy to avoid file locking"""
+        """Create a temp copy to avoid file locking, or return cached copy"""
+        # Check cache first
+        if file_path in self._temp_cache:
+            return self._temp_cache[file_path]
+
         is_virtual = VFS.is_virtual(file_path)
         if not is_virtual and not os.path.exists(file_path):
             return file_path # Fallback
-            
+
         try:
             # Create a unique temp file with same extension
             ext = os.path.splitext(file_path)[1]
             fd, temp_path = tempfile.mkstemp(suffix=ext, prefix="gosling_play_")
             os.close(fd) # Close file descriptor immediately
-            
+
             # Copy content (Handle Physical vs Virtual)
             if is_virtual:
                 with open(temp_path, 'wb') as f:
                     f.write(VFS.read_bytes(file_path))
             else:
                 shutil.copy2(file_path, temp_path)
-                
+
             self._temp_files.append(temp_path)
-            
+
             # Auto-cleanup old temps if list gets too big (e.g. > 50)
             if len(self._temp_files) > 50:
                 oldest = self._temp_files.pop(0)
                 try:
                     if os.path.exists(oldest): os.remove(oldest)
                 except: pass
-                
+
             return temp_path
         except Exception as e:
             # Fallback to original if copy fails
@@ -243,6 +248,35 @@ class PlaybackService(QObject):
     def set_playlist(self, playlist: List[str]) -> None:
         self._playlist = playlist
         self._current_index = -1
+        self._update_temp_cache()
+
+    def _update_temp_cache(self) -> None:
+        """Cache temp files for the top 2 songs in playlist"""
+        cache_limit = 2
+        needed_paths = set(self._playlist[:cache_limit])
+
+        # Remove cache entries for songs no longer in top
+        to_remove = []
+        for path in self._temp_cache:
+            if path not in needed_paths:
+                to_remove.append(path)
+
+        for path in to_remove:
+            temp_path = self._temp_cache.pop(path)
+            # Remove from temp_files and delete file
+            if temp_path in self._temp_files:
+                self._temp_files.remove(temp_path)
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except:
+                pass
+
+        # Add cache entries for new top songs
+        for path in needed_paths:
+            if path not in self._temp_cache:
+                temp_path = self._get_temp_copy(path)
+                self._temp_cache[path] = temp_path
 
     def play_at_index(self, index: int) -> None:
         """Play song at index, deciding between Hard Switch or Crossfade"""
@@ -379,6 +413,9 @@ class PlaybackService(QObject):
             except:
                 pass
         self._temp_files.clear()
+
+        # Clean cache
+        self._temp_cache.clear()
 
         self._stop_crossfade()
         for player in self._players:

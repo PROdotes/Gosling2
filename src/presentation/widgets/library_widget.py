@@ -10,11 +10,13 @@ from PyQt6.QtWidgets import (
     QAbstractItemView, QTableWidgetItem, QPushButton, QProgressBar
 )
 import json
+import subprocess
 from ...resources import constants
 from ...resources.constants import ROLE_HEALTH_STATUS
 from .filter_widget import FilterWidget
 from ...core import yellberus
 from ...core.yellberus import HealthStatus
+from ...core.vfs import VFS
 from .library_delegate import WorkstationDelegate
 from .history_drawer import HistoryDrawer
 from .jingle_curtain import JingleCurtain
@@ -1581,6 +1583,23 @@ class LibraryWidget(QWidget):
         
         return QIcon(QPixmap.fromImage(img))
 
+    def _reveal_in_explorer(self, path: str) -> None:
+        """Reveal the file in Windows Explorer. If path is virtual (in a ZIP), reveal the ZIP itself."""
+        if not path:
+            return
+        if VFS.is_virtual(path):
+            zip_path, _ = VFS.split_path(path)
+            target = zip_path
+        else:
+            target = path
+        if os.name != 'nt':
+            return
+        target = os.path.normpath(target)
+        try:
+            subprocess.Popen(f'explorer /select,"{target}"', shell=True)
+        except Exception:
+            pass
+
     def _show_table_context_menu(self, position) -> None:
         menu = QMenu()
         
@@ -1818,7 +1837,19 @@ class LibraryWidget(QWidget):
         delete_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_TrashIcon))
         delete_action.triggered.connect(self._delete_selected)
         menu.addAction(delete_action)
-        
+
+        if indexes:
+            path_col = self.field_indices.get('path', -1)
+            if path_col >= 0:
+                source_idx = self.proxy_model.mapToSource(indexes[0])
+                item_path = self.library_model.item(source_idx.row(), path_col)
+                if item_path:
+                    reveal_path = item_path.data(Qt.ItemDataRole.DisplayRole)
+                    if reveal_path:
+                        reveal_action = QAction("Reveal in Explorer", self)
+                        reveal_action.triggered.connect(lambda: self._reveal_in_explorer(str(reveal_path)))
+                        menu.addAction(reveal_action)
+
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 
     def _show_column_context_menu(self, position) -> None:

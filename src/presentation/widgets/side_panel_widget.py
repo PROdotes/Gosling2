@@ -1836,20 +1836,29 @@ class SidePanelWidget(QFrame):
                 attr = field.model_attr or field.name
                 val = self._get_effective_value(song.source_id, field.name, getattr(song, attr, ""))
                 validation_row.append(val)
-            
-            # 2. Call Validation
+
+            # 2. Check Completeness
+            incomplete_fields = yellberus.check_completeness(validation_row)
+            for f_name in incomplete_fields:
+                field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
+                if field_def and field_def.ui_header:
+                    missing_reasons.add(f"Missing: {field_def.ui_header}")
+                else:
+                    missing_reasons.add(f"Missing: {f_name}")
+
+            # 3. Call Format Validation
             failed_fields = yellberus.validate_row(validation_row)
-            
-            # 3. Format Errors
+
+            # 4. Format Errors
             for f_name in failed_fields:
                 field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
                 if not field_def: continue
-                
+
                 # Special phrasing for Groups
                 if f_name in ['performers', 'groups']:
                     missing_reasons.add("Required: Performers / Groups")
                 elif field_def.ui_header:
-                    missing_reasons.add(f"Missing: {field_def.ui_header}")
+                    missing_reasons.add(f"Invalid: {field_def.ui_header}")
                 else:
                     missing_reasons.add(f"Invalid: {field_def.name}")
             

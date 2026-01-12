@@ -490,6 +490,9 @@ FIELDS: List[FieldDef] = [
 
 VALIDATION_GROUPS = []
 
+# Required tag prefixes (e.g., ['Genre:'] means at least one tag starting with 'Genre:' is required)
+REQUIRED_TAG_PREFIXES = ['Genre:']
+
 # ==================== QUERY GENERATION ====================
 
 def get_field(name: str) -> Optional[FieldDef]:
@@ -518,10 +521,6 @@ QUERY_SELECT = build_query_select()
 BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
 
 # ==================== HELPERS ====================
-
-def get_field(name: str) -> Optional[FieldDef]:
-    """Lookup a field by name."""
-    return next((f for f in FIELDS if f.name == name), None)
 
 def get_visible_fields() -> List[FieldDef]:
     """Get fields that should appear in the table."""
@@ -561,15 +560,33 @@ def check_completeness(row_data: list) -> set:
     Returns a set of field names that are incomplete (missing required data).
     """
     incomplete_fields = set()
-    
+
     for col_idx, cell_value in enumerate(row_data):
         if col_idx >= len(FIELDS):
             break
-            
+
         field_def = FIELDS[col_idx]
         if not field_def.is_complete(cell_value):
             incomplete_fields.add(field_def.name)
-    
+
+    # Additional check: Required tag prefixes
+    tags_field = get_field('tags')
+    if tags_field and REQUIRED_TAG_PREFIXES:
+        tags_idx = FIELDS.index(tags_field)
+        if tags_idx < len(row_data):
+            tags_value = row_data[tags_idx]
+            if tags_value:
+                if isinstance(tags_value, str):
+                    tags_list = [t.strip() for t in tags_value.split('|||') if t.strip()]
+                elif isinstance(tags_value, list):
+                    tags_list = tags_value
+                else:
+                    tags_list = []
+                for prefix in REQUIRED_TAG_PREFIXES:
+                    has_tag = any(t.startswith(prefix) for t in tags_list)
+                    if not has_tag:
+                        incomplete_fields.add(prefix.rstrip(':').lower())
+
     return incomplete_fields
     
 
