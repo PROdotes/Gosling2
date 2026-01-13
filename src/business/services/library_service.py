@@ -36,9 +36,9 @@ class LibraryService:
         """Add a file to the library (Legacy)"""
         return self.song_service._repo.insert(file_path)
 
-    def add_song(self, song: Song) -> Optional[int]:
+    def add_song(self, song: Song, **kwargs) -> Optional[int]:
         """Add a song with full metadata to the library (Atomic Audit)"""
-        return self.song_service._repo.insert(song)
+        return self.song_service._repo.insert(song, **kwargs)
 
     def get_all_songs(self) -> Tuple[List[str], List[Tuple]]:
         """Get all songs from the library"""
@@ -48,9 +48,9 @@ class LibraryService:
         """Delete a song from the library"""
         return self.song_service.delete(file_id)
 
-    def update_song(self, song: Song, batch_id: Optional[str] = None) -> bool:
+    def update_song(self, song: Song, batch_id: Optional[str] = None, **kwargs) -> bool:
         """Update song metadata."""
-        return self.song_service.update(song, batch_id=batch_id)
+        return self.song_service.update(song, batch_id=batch_id, **kwargs)
 
     def log_action(self, action_type: str, target_table: str = None, target_id: int = None, details: Any = None) -> None:
         """Log a high-level systemic or user action."""

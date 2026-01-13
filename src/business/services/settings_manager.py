@@ -27,6 +27,7 @@ class SettingsManager:
     KEY_DATABASE_PATH = "library/databasePath"
     KEY_LOG_PATH = "library/logPath"
     KEY_DEFAULT_YEAR = "library/defaultYear"
+    KEY_DEFAULT_ALBUM_TYPE = "library/defaultAlbumType"
     
     # Renaming/Moving settings
     KEY_RENAME_PATTERN = "rules/renamePattern"
@@ -54,6 +55,9 @@ class SettingsManager:
     
     # Filter Tree Settings
     KEY_FILTER_TREE_EXPANSION = "filter_tree/expansion_state"
+
+    # Filename Parser Settings
+    KEY_FILENAME_PARSER_PRESETS = "filename_parser/presets"
     
     # Default values
     DEFAULT_VOLUME = 50
@@ -72,6 +76,7 @@ class SettingsManager:
     DEFAULT_FFMPEG_PATH = "ffmpeg"
     DEFAULT_SEARCH_PROVIDER = "Google"
     DEFAULT_YEAR = 0 # 0 = Dynamic (Current Year)
+    DEFAULT_ALBUM_TYPE = "Album"
     
     def __init__(self, organization: str = "Prodo", application: str = "Gosling2"):
         """
@@ -208,6 +213,14 @@ class SettingsManager:
     def set_default_year(self, year: int) -> None:
         """Set default year for auto-fill."""
         self._settings.setValue(self.KEY_DEFAULT_YEAR, year)
+
+    def get_default_album_type(self) -> str:
+        """Get default album type (Single, Album, EP)."""
+        return self._settings.value(self.KEY_DEFAULT_ALBUM_TYPE, self.DEFAULT_ALBUM_TYPE, type=str)
+
+    def set_default_album_type(self, album_type: str) -> None:
+        """Set default album type."""
+        self._settings.setValue(self.KEY_DEFAULT_ALBUM_TYPE, album_type)
 
     # ===== Renaming Rules =====
     
@@ -400,6 +413,23 @@ class SettingsManager:
         import json
         state_json = json.dumps(state)
         self._settings.setValue(self.KEY_FILTER_TREE_EXPANSION, state_json)
+
+    # ===== Filename Parser Settings =====
+
+    def get_filename_parser_presets(self) -> list[str]:
+        """Get saved filename parser presets."""
+        import json
+        presets_json = self._settings.value(self.KEY_FILENAME_PARSER_PRESETS, "[]", type=str)
+        try:
+            return json.loads(presets_json)
+        except:
+            return []
+
+    def set_filename_parser_presets(self, presets: list[str]) -> None:
+        """Save filename parser presets."""
+        import json
+        presets_json = json.dumps(presets)
+        self._settings.setValue(self.KEY_FILENAME_PARSER_PRESETS, presets_json)
     
     # ===== Utility Methods =====
     

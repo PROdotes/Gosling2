@@ -61,8 +61,48 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
         ))
 
     def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
-        """Execute DELETE statement."""
+        """Execute DELETE statement. Clean up credits first."""
+        cursor.execute("DELETE FROM SongCredits WHERE CreditedNameID = ?", (record_id,))
+        cursor.execute("DELETE FROM AlbumCredits WHERE CreditedNameID = ?", (record_id,))
         cursor.execute("DELETE FROM ArtistNames WHERE NameID = ?", (record_id,))
+
+    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """
+        Merge source name piece into target name piece.
+        Redirects all SongCredits and AlbumCredits.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn)
+            
+            # 1. Update SongCredits
+            # PK is (SourceID, CreditedNameID, RoleID). 
+            # If target already has that role for that song, we just delete the source link.
+            target_conn.execute("""
+                INSERT OR IGNORE INTO SongCredits (SourceID, CreditedNameID, RoleID)
+                SELECT SourceID, ?, RoleID FROM SongCredits WHERE CreditedNameID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM SongCredits WHERE CreditedNameID = ?", (source_id,))
+            
+            # 2. Update AlbumCredits
+            target_conn.execute("""
+                INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID)
+                SELECT AlbumID, ?, RoleID FROM AlbumCredits WHERE CreditedNameID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM AlbumCredits WHERE CreditedNameID = ?", (source_id,))
+            
+            # 3. Delete Source Piece
+            target_conn.execute("DELETE FROM ArtistNames WHERE NameID = ?", (source_id,))
+            return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            success = _execute(conn)
+            if success:
+                conn.commit()
+            return success
 
     def get_by_owner(self, identity_id: int) -> List[ArtistName]:
         """Fetch all names owned by a specific identity."""
@@ -88,7 +128,7 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
                 cursor.execute("""
                     SELECT NameID, OwnerIdentityID, DisplayName, SortName, IsPrimaryName, DisambiguationNote
                     FROM ArtistNames 
-                    WHERE DisplayName COLLATE NOCASE LIKE ?
+                    WHERE DisplayName COLLATE UTF8_NOCASE LIKE ?
                     ORDER BY DisplayName ASC
                 """, (f"%{query}%",))
                 return [ArtistName.from_row(row) for row in cursor.fetchall()]

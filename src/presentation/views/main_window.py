@@ -891,7 +891,8 @@ class MainWindow(QMainWindow):
                 
                 # Orchestration Layer: Delegate save to ExportService, but tell it our preference.
                 write_tags = self.settings_manager.get_write_tags()
-                result = self.export_service.export_song(song, write_tags=write_tags, batch_id=batch_id)
+                album_type = self.settings_manager.get_default_album_type()
+                result = self.export_service.export_song(song, write_tags=write_tags, batch_id=batch_id, album_type=album_type)
                 
                 if result.success:
                     successful_ids.append(song_id)
@@ -932,7 +933,8 @@ class MainWindow(QMainWindow):
                                 sm.select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
                 
                 self._on_library_selection_changed(None, None)
-                self.statusBar().showMessage(f"Successfully saved {len(successful_ids)} songs.", 3000)
+                # T-Fix: Do NOT use self.statusBar() as it recreates the hidden bar and breaks layout.
+                logger.info(f"Successfully saved {len(successful_ids)} songs.")
             
         except Exception as e:
             import traceback

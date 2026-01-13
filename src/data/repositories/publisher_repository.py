@@ -30,7 +30,7 @@ class PublisherRepository(GenericRepository[Publisher]):
 
     def find_by_name(self, name: str) -> Optional[Publisher]:
         """Retrieve publisher by exact name match."""
-        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE NOCASE"
+        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (name,))
             row = cursor.fetchone()
@@ -94,8 +94,8 @@ class PublisherRepository(GenericRepository[Publisher]):
         return self.create(name, conn=conn), True
 
     def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
-        """Retrieve tag by exact name."""
-        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE NOCASE"
+        """Retrieve publisher by exact name match."""
+        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE"
         if conn:
             cursor = conn.execute(query, (name,))
             row = cursor.fetchone()
@@ -107,6 +107,47 @@ class PublisherRepository(GenericRepository[Publisher]):
             if row:
                 return Publisher.from_row(row)
         return None
+
+    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """
+        Merge source publisher into target publisher.
+        Moves all album and song links, and child publishers to the target.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn)
+            
+            # 1. Update AlbumPublishers
+            # We use INSERT OR IGNORE and then DELETE to handle potential primary key conflicts
+            target_conn.execute("""
+                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
+                SELECT AlbumID, ? FROM AlbumPublishers WHERE PublisherID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM AlbumPublishers WHERE PublisherID = ?", (source_id,))
+            
+            # 2. Update RecordingPublishers
+            target_conn.execute("""
+                INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID)
+                SELECT SourceID, ? FROM RecordingPublishers WHERE PublisherID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM RecordingPublishers WHERE PublisherID = ?", (source_id,))
+            
+            # 3. Update Child Publishers
+            target_conn.execute("UPDATE Publishers SET ParentPublisherID = ? WHERE ParentPublisherID = ?", (target_id, source_id))
+            
+            # 4. Delete Source
+            target_conn.execute("DELETE FROM Publishers WHERE PublisherID = ?", (source_id,))
+            
+            return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            success = _execute(conn)
+            if success:
+                conn.commit()
+            return success
 
     def add_publisher_to_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
         """Link a publisher ID to an album."""

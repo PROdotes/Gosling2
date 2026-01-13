@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#FFC66D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- File Icon (Left) -->
+  <path d="M3 4h6v12H3z" />
+  <line x1="5" y1="8" x2="7" y2="8" />
+  <line x1="5" y1="12" x2="7" y2="12" />
+  
+  <!-- Arrow (Center) -->
+  <path d="M10 10h4" />
+  <path d="M12 8l2 2-2 2" />
+  
+  <!-- Tag Icon (Right, Angled) -->
+  <path d="M16 6l5 0v5l-5 5l-5-5z" />
+  <circle cx="19" cy="8" r="1" fill="#FFC66D" stroke="none"/>
+</svg>

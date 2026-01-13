@@ -162,8 +162,8 @@ class EntityListWidget(QWidget):
         if self.allow_edit:
             self._inner_widget.chip_clicked.connect(self._on_item_clicked, Qt.ConnectionType.UniqueConnection)
             
-        # Context menu should always work if there are handlers
-        self._inner_widget.chip_context_menu_requested.connect(self.chip_context_menu_requested.emit)
+        # Context menu handler (Intercept for smart actions)
+        self._inner_widget.chip_context_menu_requested.connect(self._show_cloud_context_menu)
         
         if self.allow_remove:
             self._inner_widget.chip_remove_requested.connect(self._on_item_remove_requested)
@@ -403,6 +403,15 @@ class EntityListWidget(QWidget):
         entity_id = item.data(Qt.ItemDataRole.UserRole)
         label = item.text()
         
+        # Unwrap icon from label if present
+        # List items are "Icon Label", we want just logic on label?
+        # Actually label passed to _fix_case should be the clean name.
+        # But item.text() includes icon. item.data() has raw entity? No.
+        # We need to rely on the fact that ContextAdapter refreshes...
+        # Wait, get_names() returns clean names?
+        # Let's just fix Cloud Mode first where label is clean.
+        # For stack mode logic we might need to fetch the entity name again.
+        
         menu = QMenu(self)
         
         if self.allow_edit:
@@ -410,7 +419,11 @@ class EntityListWidget(QWidget):
             edit_action.triggered.connect(
                 lambda: self._on_item_clicked(entity_id, label)
             )
-        
+            
+            # Smart Fix (experimental for stack)
+            # Need to clean label first (remove emoji)
+            # clean_label = ... (Skip for now to avoid complexity, focusing on SidePanel Cloud)
+
         if self.allow_remove:
             menu.addSeparator()
             remove_action = menu.addAction("Remove")
@@ -419,7 +432,84 @@ class EntityListWidget(QWidget):
             )
         
         menu.exec(self._inner_widget.mapToGlobal(pos))
-    
+        
+    def _show_cloud_context_menu(self, entity_id: int, label: str, global_pos):
+        """Show context menu for chips (SidePanel)."""
+        menu = QMenu(self)
+        
+        # Priority Actions (Restore "Set Primary" functionality)
+        if hasattr(self.context_adapter, 'set_primary'):
+            # Only relevant for Genres/Albums usually
+            # We can check if it's already primary? 
+            # ChipTray knows, but we are here.
+            # Just offer it.
+            menu.addAction("Set as Primary ★").triggered.connect(lambda: self._set_primary_internal(entity_id))
+            menu.addSeparator()
+        
+        # Edit
+        if self.allow_edit:
+             menu.addAction("Edit...").triggered.connect(lambda: self._on_item_clicked(entity_id, label))
+        
+        # Smart Fixes (Title Case)
+        # Only show if case conversion changes something
+        if self.allow_edit and label != label.title():
+             menu.addAction(f"Fix Case: {label.title()}").triggered.connect(lambda: self._fix_case(entity_id, label))
+
+        if self.allow_remove:
+            menu.addSeparator()
+            menu.addAction("Remove").triggered.connect(lambda: self._do_remove(entity_id))
+            
+        menu.exec(global_pos)
+        
+    def _set_primary_internal(self, entity_id: int):
+        """Handle Set Primary request via Adapter."""
+        if self.context_adapter and hasattr(self.context_adapter, 'set_primary'):
+            if self.context_adapter.set_primary(entity_id):
+                self.refresh_from_adapter()
+                self.data_changed.emit()
+
+    def _fix_case(self, entity_id: int, label: str):
+        """Updates the entity name to Title Case."""
+        new_name = label.title()
+        if new_name == label: return
+        
+        success = False
+        try:
+            if self.entity_type == EntityType.ARTIST:
+                 svc = self.services.contributor_service
+                 c = svc.get_by_id(entity_id)
+                 if c:
+                     c.name = new_name
+                     # update() now handles smart merging and case fixes
+                     success = svc.update(c)
+            elif self.entity_type == EntityType.PUBLISHER:
+                  svc = self.services.publisher_service
+                  p = svc.get_by_id(entity_id)
+                  if p:
+                      p.publisher_name = new_name
+                      success = svc.update(p)
+            elif self.entity_type == EntityType.ALBUM:
+                  svc = self.services.album_service
+                  a = svc.get_by_id(entity_id)
+                  if a:
+                      a.title = new_name
+                      success = svc.update(a)
+            elif self.entity_type == EntityType.TAG:
+                 svc = self.services.tag_service
+                 t = svc.get_by_id(entity_id)
+                 if t:
+                     # rename_tag handles merges
+                     success = svc.rename_tag(t.tag_name, new_name, t.category)
+                     
+            if success:
+                 self.refresh_from_adapter()
+                 self.data_changed.emit()
+            else:
+                 QMessageBox.warning(self, "Update Failed", f"Could not rename to '{new_name}'. Name strictly taken?")
+                 
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error fixing case: {e}")
+
     def _get_entity_id(self, entity: Any) -> int:
         """Get ID from entity object or dictionary."""
         # Handle Dictionary

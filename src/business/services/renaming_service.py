@@ -24,21 +24,38 @@ class RenamingService:
         # Check Rules
         # Extract genres from Unified Tags (e.g., "Genre:Rock" -> "rock")
         song_genres = []
-        if hasattr(song, 'tags') and song.tags:
+        
+        # 1. Try to get ORDERED tags from DB (Source of Truth for Primary)
+        if hasattr(song, 'source_id') and song.source_id:
+             try:
+                 from ...business.services.tag_service import TagService
+                 from ...core.registries.id3_registry import ID3Registry
+                 ts = TagService()
+                 db_tags = ts.get_tags_for_source(song.source_id)
+                 for t in db_tags:
+                     if t.category and ID3Registry.get_id3_frame(t.category) == "TCON":
+                         song_genres.append(t.tag_name.lower().strip())
+             except Exception:
+                 pass
+
+        # 2. Fallback for Transient Songs (No DB ID) or basic strings
+        if not song_genres and hasattr(song, 'tags') and song.tags:
             from ...core.registries.id3_registry import ID3Registry
             for tag in song.tags:
                 if ":" in tag:
                     cat, val = tag.split(":", 1)
-                    # Check if this category is Genre (maps to TCON frame)
+                     # Check if this category is Genre (maps to TCON frame)
                     if ID3Registry.get_id3_frame(cat) == "TCON":
                         song_genres.append(val.lower().strip())
-        
-
-
-        if rules and song_genres:    
+        # 2. Priority Check: Genre Tag Order
+        # STRICT PRIMARY: Only check rules for the FIRST genre.
+        # We use strict primary (song_genres[0]) to prevent secondary tags from hijacking the rule.
+        if rules and song_genres:
+            genre = song_genres[0] # Strict Primary
             for rule in rules.get("routing_rules", []):
+                # Rules are implicitly genre-based via 'match_genres'
                 matches = [m.lower().strip() for m in rule.get("match_genres", [])]
-                if any(g in matches for g in song_genres):
+                if genre in matches:
                     pattern = rule.get("target_path", "")
                     break
         
@@ -55,7 +72,8 @@ class RenamingService:
             pattern = "{Artist}/{Album}/{Title}"
             
         # 3. Resolve components
-        rel_path = self._resolve_pattern(pattern, song)
+        primary_genre = song_genres[0] if song_genres else None
+        rel_path = self._resolve_pattern(pattern, song, overrides={'genre': primary_genre})
         
         # 4. Attach extension (preserve original if possible, else mp3)
         ext = ".mp3"
@@ -70,7 +88,7 @@ class RenamingService:
             
         return os.path.join(root, rel_path)
 
-    def _resolve_pattern(self, pattern: str, song) -> str:
+    def _resolve_pattern(self, pattern: str, song, overrides: dict = None) -> str:
         """Replace tokens {Artist}, {Genre}, {Year}, etc."""
         # Data Preparation
         
@@ -102,18 +120,21 @@ class RenamingService:
             album = album[0]
         
         # Resolve Genre (Handle list from tags or legacy field)
-        genre_name = "Uncategorized"
+        genre_name = overrides.get('genre') if overrides else None
         
-        # 1. Try Unified Tags
-        if hasattr(song, 'tags') and song.tags:
-            from ...core.registries.id3_registry import ID3Registry
-            for tag in song.tags:
-                if ":" in tag:
-                     cat, val = tag.split(":", 1)
-                     # Check if this category is Genre (maps to TCON frame)
-                     if ID3Registry.get_id3_frame(cat) == "TCON":
-                         genre_name = val.strip()
-                         break # Take first genre as primary
+        if not genre_name:
+            genre_name = "Uncategorized"
+            
+            # 1. Try Unified Tags
+            if hasattr(song, 'tags') and song.tags:
+                from ...core.registries.id3_registry import ID3Registry
+                for tag in song.tags:
+                    if ":" in tag:
+                         cat, val = tag.split(":", 1)
+                         # Check if this category is Genre (maps to TCON frame)
+                         if ID3Registry.get_id3_frame(cat) == "TCON":
+                             genre_name = val.strip()
+                             break # Take first genre as primary
         
 
 

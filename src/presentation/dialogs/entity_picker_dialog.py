@@ -102,10 +102,26 @@ class EntityPickerDialog(QDialog):
 
         # Dynamic type buttons (for Tags)
         if not self.config.type_buttons and hasattr(self.service, "get_distinct_categories"):
-            self.config.type_buttons = self.service.get_distinct_categories()
-            
-            # Fetch icons and colors from ID3Registry
             from src.core.registries.id3_registry import ID3Registry
+            all_cats = self.service.get_distinct_categories()
+            
+            # 1. Start with base categories (ensure TCON-mapped category is always an option)
+            cats = []
+            if self.config.default_type:
+                cats.append(self.config.default_type)
+            
+            # 2. Add others from DB/Registry, excluding internal-only ones
+            registry_cats = ID3Registry.get_tag_categories()
+            for cat in all_cats:
+                cat_def = registry_cats.get(cat, {})
+                if cat_def.get('internal_only'):
+                    continue
+                if cat not in cats:
+                    cats.append(cat)
+            
+            self.config.type_buttons = cats
+
+            # Fetch icons and colors from ID3Registry
             for cat in self.config.type_buttons:
                 self.config.type_icons[cat] = ID3Registry.get_category_icon(cat, default="📌")
                 self.config.type_colors[cat] = ID3Registry.get_category_color(cat, default="#FFC66D")
@@ -360,12 +376,8 @@ class EntityPickerDialog(QDialog):
         return None, text
     
     def _resolve_prefix(self, prefix: str):
-        """Resolve prefix to type name."""
-        # Direct match in prefix map
-        if prefix in self.config.prefix_map:
-            return self.config.prefix_map[prefix]
-        
-        # Partial match in type buttons
+        """Resolve prefix to type name dynamically."""
+        # Partial match in type buttons (starts with)
         matches = [t for t in self.config.type_buttons if t.lower().startswith(prefix)]
         if len(matches) == 1:
             return matches[0]
@@ -387,22 +399,25 @@ class EntityPickerDialog(QDialog):
     def _refresh_list(self, query: str = ""):
         """Refresh the results list."""
         self.list_results.clear()
-        query = query.strip().lower()
+        query = query.strip()
+        
+        # T-Spotify: Strip trigger characters once for cleaner downstream logic
+        clean_query = query[:-1] if query.endswith(',') else query
         
         try:
-            # Get entities
-            entities = self._get_entities(query)
+            # Get entities (use cleaned query for DB search and exact matches)
+            entities = self._get_entities(clean_query)
             
             # Filter by exclusions
             entities = [e for e in entities if self.config.id_fn(e) not in self.exclude_ids]
             
             # --- EDIT MODE: Add Rename option ---
             if self.target_entity:
-                self._maybe_add_rename_option(query)
+                self._maybe_add_rename_option(clean_query)
             
             # --- Add Create option ---
             if self.config.allow_create:
-                self._maybe_add_create_option(query, entities)
+                self._maybe_add_create_option(query, clean_query, entities)
             
             # --- Add existing entities ---
             for entity in entities:
@@ -417,6 +432,7 @@ class EntityPickerDialog(QDialog):
     
     def _get_entities(self, query: str) -> List[Any]:
         """Get entities based on current filter."""
+        query_lower = query.lower()
         if query:
             # 1. Search (Universal/Specialized)
             if hasattr(self.service, self.config.search_fn):
@@ -431,10 +447,10 @@ class EntityPickerDialog(QDialog):
                 # Double-check match for safety, but be inclusive (check aliases for artists)
                 def matches(e):
                     display_name = self.config.display_fn(e).lower()
-                    if query in display_name:
+                    if query_lower in display_name:
                         return True
                     # Specialized check for contributors with matched_alias
-                    if hasattr(e, 'matched_alias') and e.matched_alias and query in e.matched_alias.lower():
+                    if hasattr(e, 'matched_alias') and e.matched_alias and query_lower in e.matched_alias.lower():
                         return True
                     return False
                     
@@ -465,7 +481,8 @@ class EntityPickerDialog(QDialog):
         original_name = self.config.display_fn(self.target_entity).lower()
         original_type = self.config.type_fn(self.target_entity)
         
-        current_name = self.txt_search.text().strip()
+        # FIX: Use processed query (stripped of prefix)
+        current_name = query.strip()
         current_name_lower = current_name.lower() if current_name else ""
         current_type = self._current_type_filter or original_type
         
@@ -486,47 +503,39 @@ class EntityPickerDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, ("RENAME", display_name, current_type))
             self.list_results.addItem(item)
     
-    def _maybe_add_create_option(self, query: str, entities: List[Any]):
+    def _maybe_add_create_option(self, raw_query: str, clean_name: str, entities: List[Any]):
         """Add Create option if no exact match."""
-        current_name = self.txt_search.text().strip()
-        if not current_name:
+        if not clean_name:
             return
-        
+            
         # Determine types to offer
-        # If a category is selected, only offer creation in that category.
-        # If ALL is selected, offer all available categories.
         if self._current_type_filter:
             types_to_offer = [self._current_type_filter]
         else:
             types_to_offer = self.config.type_buttons or [self.config.default_type]
-
-
             
         for t in types_to_offer:
-            # if not t: continue  <-- REMOVED: support empty type strings (Publishers)
-
-            
-            # Check for exact match in this specific type
-            # (Allows creating 'Queen' as Person even if 'Queen' Group exists)
+            # Check for exact match using CLEAN name
             exact_match = any(
-                self.config.display_fn(e).lower() == current_name.lower() 
+                self.config.display_fn(e).lower() == clean_name.lower() 
                 and self.config.type_fn(e).lower() == t.lower()
                 for e in entities
             )
             
             if not exact_match:
                 type_suffix = f" as {t}" if len(types_to_offer) > 1 or t else ""
-                item = QListWidgetItem(f"➕ Create \"{current_name}\"{type_suffix}")
-                item.setData(Qt.ItemDataRole.UserRole, ("CREATE", current_name, t))
+                item = QListWidgetItem(f"➕ Create \"{clean_name}\"{type_suffix}")
+                item.setData(Qt.ItemDataRole.UserRole, ("CREATE", clean_name, t))
                 self.list_results.addItem(item)
 
-        # T-82/92: Spotify CamelCase Splitter Shortcut (Move outside loop to de-duplicate)
+        # T-82/92: Spotify Shortcut
         service = getattr(self.services, 'spotify_parsing_service', None)
-        if service and service.is_camel_case(current_name):
-            # Use the current filter type, or fallback to the config default (usually 'Person')
+        if service and service.is_camel_case(raw_query):
+            # Use the raw name with comma for the splitter service
             target_t = self._current_type_filter or self.config.default_type
-            spotify_item = QListWidgetItem(f"🎵 Create from Spotify (Split \"{current_name}\")")
-            spotify_item.setData(Qt.ItemDataRole.UserRole, ("CREATE_SPOTIFY", current_name, target_t))
+            preview = service.get_preview(raw_query)
+            spotify_item = QListWidgetItem(f"🎵 Create Multiple: {preview}")
+            spotify_item.setData(Qt.ItemDataRole.UserRole, ("CREATE_SPOTIFY", raw_query, target_t))
             self.list_results.addItem(spotify_item)
     
     def _add_entity_item(self, entity: Any):
@@ -560,6 +569,8 @@ class EntityPickerDialog(QDialog):
                     self.btn_select.setText("RENAME")
             elif action == "CREATE":
                 self.btn_select.setText("UPDATE" if self.target_entity else "Create")
+            elif action == "CREATE_SPOTIFY":
+                self.btn_select.setText("Create Multiple")
         else:
             self.btn_select.setText("UPDATE" if self.target_entity else "Select")
     

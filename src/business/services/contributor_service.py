@@ -54,16 +54,6 @@ class ContributorService:
                 ) for row in cursor.fetchall()
             ]
 
-    def search(self, query: str) -> List[Contributor]:
-        """Search for contributors by name or alias."""
-        names = self._name_service.search_names(query)
-        return [
-            Contributor(
-                contributor_id=n.name_id,
-                name=n.display_name,
-                sort_name=n.sort_name
-            ) for n in names
-        ]
 
     def get_by_id(self, contributor_id: int) -> Optional[Contributor]:
         """Fetch a specific contributor by its ID. (Maps to ArtistName)"""
@@ -111,9 +101,9 @@ class ContributorService:
             return existing.contributor_id, f"Artist '{name}' already exists as a {existing.type}."
         return None, None
 
-    def create(self, name: str, type: str = 'person', batch_id: Optional[str] = None) -> Contributor:
+    def create(self, name: str, type: Optional[str] = 'person', batch_id: Optional[str] = None) -> Contributor:
         """Create new contributor (Identity + Primary ArtistName)."""
-        type_lower = type.lower()
+        type_lower = (type or 'person').lower()
         identity = self._identity_service.create_identity(type_lower, legal_name=name)
         artist_name = self._name_service.create_name(name, owner_identity_id=identity.identity_id, is_primary=True)
         return Contributor(
@@ -123,18 +113,26 @@ class ContributorService:
             type=type_lower
         )
 
-    def get_or_create(self, name: str, type: str = 'person') -> Tuple[Contributor, bool]:
-        """Get existing contributor or create a new one, respecting the identity type."""
-        type_lower = type.lower()
+    def get_or_create(self, name: str, type: Optional[str] = 'person') -> Tuple[Contributor, bool]:
+        """Get existing contributor or create a new one. Enforces strict name uniqueness."""
+        type_lower = (type or 'person').lower()
         
-        # Check if we already have an entity of THIS type with THIS name
-        # We search for the name and then filter by the requested type
+        # 1. Search for name (Case Insensitive / LIKE)
         matches = self.search(name)
+        
+        # 2. Try to find exact type match first (Best match)
         for m in matches:
             if m.name.lower() == name.lower() and m.type.lower() == type_lower:
                 return m, False
                 
-        # Not found for this specific type, so create a new one
+        # 3. T-Fix: Even if type differs, if the name matches exactly, reuse it.
+        # This prevents the "4 Queens" issue where Queen (Artist) and Queen (Composer) 
+        # end up as separate records due to minor type or role discrepancies.
+        for m in matches:
+            if m.name.lower() == name.lower():
+                return m, False
+                
+        # 4. Truly new name, create it
         return self.create(name, type_lower), True
 
     def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
@@ -252,7 +250,7 @@ class ContributorService:
             # 1. Find Identity IDs matching the Name (Fuzzy Match)
             # This allows searching "Farrokh" to find "Farrokh Bulsara" -> Identity -> "Freddie Mercury"
             term_wild = f"%{search_term}%"
-            cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE DisplayName LIKE ? COLLATE NOCASE", (term_wild,))
+            cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE DisplayName LIKE ? COLLATE UTF8_NOCASE", (term_wild,))
             identity_ids = {row[0] for row in cursor.fetchall() if row[0] is not None}
             
             if not identity_ids:
@@ -277,18 +275,35 @@ class ContributorService:
         return list(resolved_names)
 
     def update(self, contributor: Contributor) -> bool:
-        """Update an existing contributor record (ArtistName and Identity)."""
-        name = self._name_service.get_name(contributor.contributor_id)
-        if not name: return False
+        """
+        Smart Update: Updates name/type, or merges if the new name already exists.
+        This enforces strict identity uniqueness at the service level.
+        """
+        name_rec = self._name_service.get_name(contributor.contributor_id)
+        if not name_rec: 
+            return False
         
-        # 1. Update Name/SortName
-        name.display_name = contributor.name
-        name.sort_name = contributor.sort_name
-        success = self._name_service.update_name(name)
+        new_name = contributor.name.strip()
         
-        # 2. Update Identity Type if it has one
-        if success and name.owner_identity_id:
-            identity = self._identity_service.get_identity(name.owner_identity_id)
+        # 1. Handle Name Change & Possible Merge
+        # Check if ANOTHER contributor already has this name (case-insensitive)
+        with self._repo.get_connection() as conn:
+            query = "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND NameID != ?"
+            cursor = conn.execute(query, (new_name, contributor.contributor_id))
+            collision = cursor.fetchone()
+            
+        if collision:
+            # COLLISION: Merge our current record INTO the existing one
+            return self.merge(source_id=contributor.contributor_id, target_id=collision[0])
+
+        # 2. No collision: Perform physical update
+        name_rec.display_name = new_name
+        name_rec.sort_name = contributor.sort_name
+        success = self._name_service.update_name(name_rec)
+        
+        # 3. Update Identity Type
+        if success and name_rec.owner_identity_id:
+            identity = self._identity_service.get_identity(name_rec.owner_identity_id)
             if identity and identity.identity_type != contributor.type:
                 identity.identity_type = contributor.type.lower()
                 from src.data.repositories.identity_repository import IdentityRepository
@@ -320,6 +335,11 @@ class ContributorService:
             s_name.owner_identity_id = t_name.owner_identity_id
             return self._name_service.update_name(s_name, batch_id=batch_id)
             
+        # T-Fix: If they share the SAME identity, we are merging duplicate NAME entries for that identity
+        if s_name.owner_identity_id == t_name.owner_identity_id:
+            return self._name_repo.merge(source_id, target_id)
+            
+        # Different identities: Perform deep identity merge
         return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
         
     # ==========================
@@ -379,7 +399,7 @@ class ContributorService:
                 SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType, an.IsPrimaryName
                 FROM ArtistNames an
                 JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
-                WHERE i.IdentityType = ? COLLATE NOCASE
+                WHERE i.IdentityType = ? COLLATE UTF8_NOCASE
                 ORDER BY an.SortName
             """, (type_lower,))
             return [
@@ -393,19 +413,21 @@ class ContributorService:
             ]
 
     def search(self, query: str) -> List[Contributor]:
-        """Search for contributors by name or alias, resolving their identity type."""
+        """
+        Search for contributors by name or alias, resolving their identity type.
+        Uses Unicode-aware case-insensitivity (py_lower).
+        """
         with self._credit_repo.get_connection() as conn:
             cursor = conn.cursor()
-            # T-Fix: Detailed search that resolves IdentityType so the UI picker 
-            # knows which category (Person/Group) to highlight for each result.
+            # T-Fix: Use py_lower for Unicode-aware case-insensitive search (Ć vs ć)
             q = f"%{query}%"
             cursor.execute("""
                 SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType, an.IsPrimaryName
                 FROM ArtistNames an
                 LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
-                WHERE an.DisplayName LIKE ? COLLATE NOCASE
+                WHERE py_lower(an.DisplayName) LIKE py_lower(?)
                 ORDER BY 
-                   CASE WHEN an.DisplayName LIKE ? THEN 0 ELSE 1 END,
+                   CASE WHEN py_lower(an.DisplayName) = py_lower(?) THEN 0 ELSE 1 END,
                    an.SortName
             """, (q, query))
             

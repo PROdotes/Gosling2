@@ -47,7 +47,7 @@ class AlbumRepository(GenericRepository[Album]):
 
     def find_by_title(self, title: str) -> Optional[Album]:
         """Retrieve album by exact title match (case-insensitive)."""
-        query = "SELECT AlbumID, AlbumTitle, AlbumType, ReleaseYear FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+        query = "SELECT AlbumID, AlbumTitle, AlbumType, ReleaseYear FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE"
         with self.get_connection() as conn:
             cursor = conn.execute(query, (title,))
             row = cursor.fetchone()
@@ -103,7 +103,7 @@ class AlbumRepository(GenericRepository[Album]):
             if not a_name: continue
             
             # 1. Resolve NameID from ArtistNames
-            cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ?", (a_name,))
+            cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE", (a_name,))
             row = cursor.fetchone()
             if row:
                 name_id = row[0]
@@ -144,20 +144,67 @@ class AlbumRepository(GenericRepository[Album]):
         # 2. Cleanup links
         cursor.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (record_id,))
         cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (record_id,))
+        cursor.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (record_id,))
         cursor.execute("DELETE FROM Albums WHERE AlbumID = ?", (record_id,))
+
+    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+        """
+        Merge source album info target album.
+        Moves all songs, artists and publishers to the target.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn)
+            
+            # 1. Update SongAlbums (Move songs)
+            # Use INSERT OR IGNORE and then DELETE to handle potential primary key conflicts
+            target_conn.execute("""
+                INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, DiscNumber, IsPrimary, TrackPublisherID)
+                SELECT SourceID, ?, TrackNumber, DiscNumber, IsPrimary, TrackPublisherID FROM SongAlbums WHERE AlbumID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM SongAlbums WHERE AlbumID = ?", (source_id,))
+            
+            # 2. Update AlbumCredits (Artists)
+            target_conn.execute("""
+                INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID)
+                SELECT ?, CreditedNameID, RoleID FROM AlbumCredits WHERE AlbumID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (source_id,))
+            
+            # 3. Update AlbumPublishers
+            target_conn.execute("""
+                INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID)
+                SELECT ?, PublisherID FROM AlbumPublishers WHERE AlbumID = ?
+            """, (target_id, source_id))
+            target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (source_id,))
+            
+            # 4. Delete Source
+            target_conn.execute("DELETE FROM Albums WHERE AlbumID = ?", (source_id,))
+            
+            return True
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            success = _execute(conn)
+            if success:
+                conn.commit()
+            return success
 
     def find_by_key(
         self, 
         title: str, 
         album_artist: Optional[str] = None, 
-        release_year: Optional[int] = None
+        release_year: Optional[int] = None,
+        exclude_id: Optional[int] = None
     ) -> Optional[Album]:
         """
         Find album by unique key (Title, AlbumArtist, ReleaseYear).
         Uses M2M AlbumCredits for artist comparison.
         """
         # 1. Find candidates matching Title + Year
-        base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+        base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE"
         base_params = [title]
         
         if release_year:
@@ -168,7 +215,7 @@ class AlbumRepository(GenericRepository[Album]):
             
         with self.get_connection() as conn:
             cursor = conn.execute(base_query, base_params)
-            candidates = [row[0] for row in cursor.fetchall()]
+            candidates = [row[0] for row in cursor.fetchall() if row[0] != exclude_id]
             
             if not candidates:
                 return None
@@ -243,13 +290,18 @@ class AlbumRepository(GenericRepository[Album]):
         self, 
         title: str, 
         album_artist: Optional[str] = None,
-        album_type: str = 'Album', 
+        album_type: Optional[str] = None, 
         release_year: Optional[int] = None
     ) -> Album:
         """
         Create a new album.
         Uses GenericRepository.insert() for Audit Logging.
         """
+        if album_type is None:
+            # Note: The service should ideally provide this from settings. 
+            # We keep 'Album' as the absolute hard fallback here for safety.
+            album_type = 'Album'
+
         album = Album(
             album_id=None, 
             title=title, 
@@ -268,7 +320,8 @@ class AlbumRepository(GenericRepository[Album]):
         self, 
         title: str,
         album_artist: Optional[str] = None,
-        release_year: Optional[int] = None
+        release_year: Optional[int] = None,
+        album_type: Optional[str] = None
     ) -> Tuple[Album, bool]:
         """
         Find an existing album by (Title, AlbumArtist, ReleaseYear) or create a new one.
@@ -280,7 +333,7 @@ class AlbumRepository(GenericRepository[Album]):
         if existing:
             return existing, False
         
-        return self.create(title, album_artist=album_artist, release_year=release_year), True
+        return self.create(title, album_artist=album_artist, release_year=release_year, album_type=album_type), True
 
 
 
@@ -398,7 +451,7 @@ class AlbumRepository(GenericRepository[Album]):
         """Get albums linked to a source item."""
         return self.get_albums_for_song(source_id)
 
-    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None, batch_id: Optional[str] = None) -> Album:
+    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None, batch_id: Optional[str] = None, album_type: Optional[str] = None) -> Album:
         """
         Link a song to an album by title, artist, and year (Find or Create).
         This prevents different artists with the same album title from merging.
@@ -415,15 +468,18 @@ class AlbumRepository(GenericRepository[Album]):
             album = self.find_by_key(album_title.strip(), artist, year)
             created = False
             if not album:
+                if album_type is None:
+                    album_type = 'Album'
+                    
                 cursor.execute(
-                    "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, 'Album', ?)",
-                    (album_title.strip(), year)
+                    "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
+                    (album_title.strip(), album_type, year)
                 )
                 new_id = cursor.lastrowid
-                album = Album(album_id=new_id, title=album_title.strip(), album_artist=artist, release_year=year, album_type='Album')
+                album = Album(album_id=new_id, title=album_title.strip(), album_artist=artist, release_year=year, album_type=album_type)
                 created = True
                 # Audit Album INSERT
-                auditor.log_insert("Albums", new_id, {"AlbumTitle": album_title.strip(), "AlbumArtist": artist, "AlbumType": "Album", "ReleaseYear": year})
+                auditor.log_insert("Albums", new_id, {"AlbumTitle": album_title.strip(), "AlbumArtist": artist, "AlbumType": album_type, "ReleaseYear": year})
 
             # T-91: If newly created, also link the provided artist via M2M
             if created and artist:

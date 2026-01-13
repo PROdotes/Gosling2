@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
     QScrollArea, QFrame, QSizePolicy, QMessageBox, QMenu
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl
-from PyQt6.QtGui import QFont, QDesktopServices, QAction
+from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl, QSize
+from PyQt6.QtGui import QFont, QDesktopServices, QAction, QIcon
 from ...core import yellberus
 from ...core.registries.id3_registry import ID3Registry
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED, GlowToggle
@@ -91,8 +91,16 @@ class SidePanelWidget(QFrame):
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # T-107: Parse from Filename (Magic Wand) - Moved to Header
-        self.btn_parse = GlowButton("🪄")
+        # T-107: Parse from Filename (File -> Tag) - Moved to Header
+        self.btn_parse = GlowButton("")
+        # Use absolute path resolution relative to this file or root
+        icon_path = os.path.join(os.path.dirname(__file__), "../../../src/resources/parse_filename.svg")
+        # Fallback to direct path if running from root
+        if not os.path.exists(icon_path):
+             icon_path = "src/resources/parse_filename.svg"
+             
+        self.btn_parse.setIcon(QIcon(icon_path))
+        self.btn_parse.setIconSize(QSize(20, 20))
         self.btn_parse.setObjectName("ParseButton")
         self.btn_parse.setFixedSize(30, 24)
         self.btn_parse.setToolTip("Parse Metadata from Filename")
@@ -1249,6 +1257,7 @@ class SidePanelWidget(QFrame):
             self.album_service, 
             self.publisher_service,
             self.contributor_service,
+            self.settings_manager,
             initial_data, 
             self, 
             staged_deletions=self._hidden_album_ids
@@ -2328,6 +2337,8 @@ class SidePanelWidget(QFrame):
             results = dlg.get_parsed_data()
             if results:
                 self._apply_parsed_staging(results)
+                # Auto-Save: Commit changes immediately (T-UserRequest)
+                self._on_save_clicked()
 
     def _apply_parsed_staging(self, results: dict):
         """
@@ -2362,6 +2373,11 @@ class SidePanelWidget(QFrame):
             # Album
             if "album" in data:
                  stage("album", [data["album"]]) # Album is List field in UI (Chips)
+                 
+            # Publisher
+            if "publisher" in data:
+                # Publisher is List field in UI (Chips)
+                stage("publisher", [data["publisher"]])
 
             # Year
             if "recording_year" in data:

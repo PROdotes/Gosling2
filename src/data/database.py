@@ -18,6 +18,19 @@ class BaseRepository:
         conn = sqlite3.connect(self.db_path)
         conn.execute("PRAGMA journal_mode=WAL") # Enable write-ahead logging
         conn.execute("PRAGMA foreign_keys = ON")
+        
+        # T-Fix: Add Unicode-aware search/collation (SQLite's NOCASE and LOWER are ASCII-only)
+        # 1. Function for use in queries like py_lower(Name)
+        conn.create_function("py_lower", 1, lambda x: x.lower() if x is not None else None)
+        
+        # 2. Collation for use in Table Definitions (COLLATE UTF8_NOCASE)
+        def unicode_compare(s1, s2):
+            l1, l2 = s1.lower(), s2.lower()
+            if l1 < l2: return -1
+            if l1 > l2: return 1
+            return 0
+        conn.create_collation("UTF8_NOCASE", unicode_compare)
+        
         conn.row_factory = sqlite3.Row
         try:
             yield conn
@@ -106,11 +119,15 @@ class BaseRepository:
                     SortName TEXT,
                     IsPrimaryName BOOLEAN DEFAULT 0,
                     DisambiguationNote TEXT,
-                    FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID) ON DELETE SET NULL
+                    FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID) ON DELETE SET NULL,
+                    UNIQUE(DisplayName COLLATE UTF8_NOCASE)
                 )
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_artistnames_owner ON ArtistNames(OwnerIdentityID)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_artistnames_display ON ArtistNames(DisplayName)")
+            # Upgrade existing index to UNIQUE and Unicode-aware
+            cursor.execute("DROP INDEX IF EXISTS idx_artistnames_display")
+            cursor.execute("DROP INDEX IF EXISTS idx_artistnames_display_unique")
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_artistnames_display_v2 ON ArtistNames(DisplayName COLLATE UTF8_NOCASE)")
 
             # 6. GroupMemberships (Links persons to groups)
             cursor.execute("""
@@ -235,6 +252,8 @@ class BaseRepository:
                     ReleaseYear INTEGER
                 )
             """)
+            # T-Fix: Add unique constraint to Albums (Title + Year)
+            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_title_year_v2 ON Albums(AlbumTitle COLLATE UTF8_NOCASE, ReleaseYear)")
 
             # 31. AlbumContributors (Junction)
             cursor.execute("""
@@ -268,9 +287,10 @@ class BaseRepository:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS Publishers (
                     PublisherID INTEGER PRIMARY KEY,
-                    PublisherName TEXT NOT NULL UNIQUE,
+                    PublisherName TEXT NOT NULL,
                     ParentPublisherID INTEGER,
-                    FOREIGN KEY (ParentPublisherID) REFERENCES Publishers(PublisherID)
+                    FOREIGN KEY (ParentPublisherID) REFERENCES Publishers(PublisherID),
+                    UNIQUE(PublisherName COLLATE UTF8_NOCASE)
                 )
             """)
 
@@ -302,7 +322,7 @@ class BaseRepository:
                     TagID INTEGER PRIMARY KEY,
                     TagName TEXT NOT NULL,
                     TagCategory TEXT,
-                    UNIQUE(TagName, TagCategory)
+                    UNIQUE(TagName COLLATE UTF8_NOCASE, TagCategory COLLATE UTF8_NOCASE)
                 )
             """)
 

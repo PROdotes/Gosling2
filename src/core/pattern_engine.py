@@ -18,7 +18,7 @@ class PatternEngine:
     """
     
     # Supported Tokens
-    TOKENS = ["{Artist}", "{Title}", "{Album}", "{Year}", "{BPM}", "{Genre}"]
+    TOKENS = ["{Artist}", "{Title}", "{Album}", "{Year}", "{BPM}", "{Genre}", "{Publisher}"]
     
     # Token -> Regex Group Name map
     # We use TitleCase for UI tokens, lowercase for Yellberus fields (mostly)
@@ -28,7 +28,8 @@ class PatternEngine:
         "{Album}": "album",
         "{Year}": "recording_year",
         "{BPM}": "bpm",
-        "{Genre}": "genre", # specific handling
+        "{Genre}": "genre",
+        "{Publisher}": "publisher",
     }
 
     # ==================== EXPANSION (Rename) ====================

@@ -11,6 +11,7 @@ from ..widgets.glow.button import GlowButton
 from ...core import yellberus
 from ...resources import constants
 from ...core.pattern_engine import PatternEngine
+from ...business.services.settings_manager import SettingsManager
 
 class FilenameParserDialog(QDialog):
     """
@@ -30,6 +31,7 @@ class FilenameParserDialog(QDialog):
         # State
         self.current_pattern = "{Artist} - {Title}"
         self.parsed_results = {} # {song_source_id: {field: value}}
+        self.settings_manager = SettingsManager()
         
         self._init_ui()
         self._on_pattern_changed(self.current_pattern) # Initial parse
@@ -65,6 +67,13 @@ class FilenameParserDialog(QDialog):
         self.pattern_edit.textChanged.connect(self._on_pattern_text_changed)
         input_layout.addWidget(self.pattern_edit)
         
+        # Save Button (Between Input and Combo)
+        self.btn_save_preset = QPushButton("Save")
+        self.btn_save_preset.setToolTip("Save current pattern as a new preset")
+        self.btn_save_preset.setFixedWidth(50)
+        self.btn_save_preset.clicked.connect(self._save_preset)
+        input_layout.addWidget(self.btn_save_preset)
+        
         # Preset Buttons
         self.presets = [
             "{Artist} - {Title}",
@@ -73,10 +82,16 @@ class FilenameParserDialog(QDialog):
             "{Title}"
         ]
         
-        preset_combo = QComboBox()
-        preset_combo.addItems(["Load Preset..."] + self.presets)
-        preset_combo.currentIndexChanged.connect(lambda idx: self._apply_preset(preset_combo, idx))
-        input_layout.addWidget(preset_combo)
+        # Load user presets
+        user_presets = self.settings_manager.get_filename_parser_presets()
+        for p in user_presets:
+            if p not in self.presets:
+                self.presets.append(p)
+        
+        self.preset_combo = QComboBox()
+        self.preset_combo.addItems(["Load Preset..."] + self.presets)
+        self.preset_combo.currentIndexChanged.connect(lambda idx: self._apply_preset(self.preset_combo, idx))
+        input_layout.addWidget(self.preset_combo)
         
         layout.addLayout(input_layout)
         
@@ -233,3 +248,26 @@ class FilenameParserDialog(QDialog):
                 final_results[song.source_id] = data
         
         return final_results
+
+    def _save_preset(self):
+        pattern = self.pattern_edit.text().strip()
+        if not pattern: return
+        
+        if pattern in self.presets:
+            QMessageBox.information(self, "Already Saved", "This preset already exists.")
+            return
+
+        self.presets.append(pattern)
+        self.preset_combo.addItem(pattern)
+        
+        # Save ONLY custom presets to avoid duplicating defaults in settings
+        defaults = [
+            "{Artist} - {Title}",
+            "{Artist} - {Album} - {Title}",
+            "{Ignore} - {Artist} - {Title}",
+            "{Title}"
+        ]
+        to_save = [p for p in self.presets if p not in defaults]
+        self.settings_manager.set_filename_parser_presets(to_save)
+        
+        QMessageBox.information(self, "Saved", "Preset saved successfully.")

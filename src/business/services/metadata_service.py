@@ -137,9 +137,15 @@ class MetadataService:
                 s_item = str(item).strip()
                 if not s_item: continue
                 
-                # ID3v2.3 Splitter Fix: Mutagen may return "A/B" as one item for v2.3
-                if field_type == "list" and "/" in s_item:
-                    split_items = [x.strip() for x in s_item.split("/") if x.strip()]
+                # ID3v2.3 Splitter Fix & Human Input Handling
+                # Mutagen may return "A/B" as one item for v2.3
+                # Users often type "A, B, C" or "A; B; C" ignoring standards
+                if field_type == "list":
+                    # Normalize separators to /
+                    s_clean = s_item.replace(";", "/").replace(",", "/")
+                    
+                    # Split and clean
+                    split_items = [x.strip() for x in s_clean.split("/") if x.strip()]
                     values.extend(split_items)
                 else:
                     values.append(s_item)
@@ -247,7 +253,10 @@ class MetadataService:
             if cat and tags and frame_key in tags:
                 values = get_values(tags[frame_key], 'list')
                 for v in values:
-                    tags_list.append(f"{cat}:{v}")
+                    # Clean and Title Case (Standardize "pop" -> "Pop")
+                    clean_v = str(v).strip().title()
+                    if clean_v:
+                        tags_list.append(f"{cat}:{clean_v}")
                     
         song_data['tags'] = list(dict.fromkeys(tags_list))
         

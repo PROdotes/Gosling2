@@ -28,20 +28,24 @@ class TagRepository(GenericRepository[Tag]):
                 return Tag.from_row(row)
         return None
 
-    def find_by_name(self, name: str, category: Optional[str] = None) -> Optional[Tag]:
+    def find_by_name(self, name: str, category: Optional[str] = None, exclude_id: Optional[int] = None) -> Optional[Tag]:
         """
         Retrieve tag by exact name and category.
         If category is None, it matches where Category IS NULL.
         """
         if category:
-            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory = ?"
-            params = (name, category)
+            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ?"
+            params = [name, category]
         else:
-            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory IS NULL"
-            params = (name,)
+            query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory IS NULL"
+            params = [name]
+            
+        if exclude_id is not None:
+            query += " AND TagID != ?"
+            params.append(exclude_id)
             
         with self.get_connection() as conn:
-            cursor = conn.execute(query, params)
+            cursor = conn.execute(query, tuple(params))
             row = cursor.fetchone()
             if row:
                 return Tag.from_row(row)

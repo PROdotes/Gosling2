@@ -60,10 +60,8 @@ class TagService:
         if new_name:
             new_name = new_name[0].upper() + new_name[1:]
             
-        existing = self._repo.find_by_name(new_name, category)
+        existing = self._repo.find_by_name(new_name, category, exclude_id=tag.tag_id)
         if existing:
-            if existing.tag_id == tag.tag_id:
-                return True
             return self._repo.merge_tags(tag.tag_id, existing.tag_id)
             
         tag.tag_name = new_name

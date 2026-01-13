@@ -59,7 +59,8 @@ class SongRepository(GenericRepository[Song]):
         # 3. Handle Relationships (if provided)
         # Temporarily set ID on object so helpers can use it
         song.source_id = source_id 
-        self.sync_service.sync_all(song, cursor, auditor=auditor)
+        album_type = kwargs.get('album_type')
+        self.sync_service.sync_all(song, cursor, auditor=auditor, album_type=album_type)
         
         return source_id
 
@@ -149,7 +150,8 @@ class SongRepository(GenericRepository[Song]):
         """, (song.bpm, song.recording_year, song.isrc, groups_str, song.source_id))
 
         # Delegated Sync Logic (Moved to SongSyncService to reduce file size)
-        self.sync_service.sync_all(song, cursor, auditor=auditor)
+        album_type = kwargs.get('album_type')
+        self.sync_service.sync_all(song, cursor, auditor=auditor, album_type=album_type)
 
     def update_status(self, file_id: int, is_done: bool, batch_id: Optional[str] = None) -> bool:
         """Update the status of a song (Tag-Driven, Flag-Synced)"""

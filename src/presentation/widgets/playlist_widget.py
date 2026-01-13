@@ -1,4 +1,4 @@
-﻿"""Custom playlist widget with drag and drop support"""
+"""Custom playlist widget with drag and drop support"""
 import os
 import json
 from PyQt6.QtWidgets import QListWidget, QListWidgetItem, QStyledItemDelegate, QStyle

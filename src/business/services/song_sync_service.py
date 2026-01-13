@@ -18,11 +18,11 @@ class SongSyncService:
         # But for now we can use the cursor passed in
         self._contributor_repo = contributor_repository
 
-    def sync_all(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None) -> None:
+    def sync_all(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None, album_type: Optional[str] = None) -> None:
         """Sync all relationships for a song."""
         self.sync_contributor_roles(song, cursor, auditor)
         if song.album is not None:
-            self.sync_album(song, cursor, auditor)
+            self.sync_album(song, cursor, auditor, album_type=album_type)
         if song.publisher is not None:
             self.sync_publisher(song, cursor, auditor)
         self.sync_tags(song, cursor, auditor)
@@ -39,7 +39,11 @@ class SongSyncService:
             'producers': 'Producer'
         }
         
+        # V2 Goals (SongCredits -> ArtistNames)
         desired_links = set() # Set of (NameID, RoleID)
+
+        # V1 Goals (MediaSourceContributorRoles -> Contributors)
+        v1_desired_links = set() # (ContributorID, RoleID)
         
         for attr, role_name in role_map.items():
             contributors = getattr(song, attr, [])
@@ -54,21 +58,24 @@ class SongSyncService:
             for contributor_name in contributors:
                 if not contributor_name.strip(): continue
 
-                # Resolve Name to NameID
+                # A. Resolve V2 (ArtistNames)
                 name_id = self._resolve_identity(cursor, contributor_name, auditor)
-                
                 desired_links.add((name_id, role_id))
 
-        # 2. Get Current State
+                # B. Legacy V1 Resolution (Contributors) - Bridge to UI
+                contributor_id = self._resolve_identity_legacy(cursor, contributor_name, auditor)
+                v1_desired_links.add((contributor_id, role_id))
+
+        # 2. Get Current State (V2)
         cursor.execute("SELECT CreditedNameID, RoleID FROM SongCredits WHERE SourceID = ?", (song.source_id,))
         current_links_raw = cursor.fetchall()
         current_links = set((n, r) for n, r in current_links_raw)
             
-        # 3. Calculate Diff
+        # 3. Calculate Diff (V2)
         to_add = desired_links - current_links
         to_remove = current_links - desired_links
         
-        # 4. Execute Changes
+        # 4. Execute Changes (V2)
         # DELETE
         for n_id, r_id in to_remove:
             cursor.execute(
@@ -95,10 +102,66 @@ class SongSyncService:
                     "RoleID": r_id
                 })
 
+        # --- 5. EXECUTE V1 SYNC (MediaSourceContributorRoles) ---
+        cursor.execute("SELECT ContributorID, RoleID FROM MediaSourceContributorRoles WHERE SourceID = ?", (song.source_id,))
+        current_v1 = set((c, r) for c, r in cursor.fetchall())
+        
+        v1_to_add = v1_desired_links - current_v1
+        v1_to_remove = current_v1 - v1_desired_links
+        
+        for c_id, r_id in v1_to_remove:
+            cursor.execute(
+                "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?",
+                (song.source_id, c_id, r_id)
+            )
+            if auditor:
+                auditor.log_delete("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                    "SourceID": song.source_id, "ContributorID": c_id, "RoleID": r_id
+                })
+
+        for c_id, r_id in v1_to_add:
+            cursor.execute(
+                "INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID) VALUES (?, ?, ?)",
+                (song.source_id, c_id, r_id)
+            )
+            if auditor:
+                # We don't have new ID because it's M2M, using PK composite
+                auditor.log_insert("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
+                    "SourceID": song.source_id, "ContributorID": c_id, "RoleID": r_id
+                })
+
+    def _resolve_identity_legacy(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> int:
+        """Helper to resolve a name to a Legacy ContributorID."""
+        # 1. Exact Match on ContributorName (case-insensitive)
+        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE", (name,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+            
+        # 2. Check Aliases (Legacy)
+        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE UTF8_NOCASE", (name,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+
+        # 3. Create New Legacy Contributor
+        # Auto-generate sort name
+        sort_name = name
+        if name.lower().startswith("the "):
+            sort_name = name[4:] + ", The"
+            
+        cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (name, sort_name))
+        new_id = cursor.lastrowid
+        
+        if auditor:
+            auditor.log_insert("Contributors", new_id, {"ContributorName": name, "SortName": sort_name, "ContributorType": 'person'})
+            
+        return new_id
+
     def _resolve_identity(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> int:
         """Helper to resolve a name to a NameID."""
         # 1. Exact Match on DisplayName (case-insensitive)
-        cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE NOCASE", (name,))
+        cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE", (name,))
         row = cursor.fetchone()
         if row:
             return row[0]
@@ -110,17 +173,24 @@ class SongSyncService:
             auditor.log_insert("ArtistNames", name_id, {"DisplayName": name, "SortName": name, "IsPrimaryName": 0})
         return name_id
 
-    def sync_album(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None) -> None:
+    def sync_album(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None, album_type: Optional[str] = None) -> None:
         """Sync album relationship (Find or Create with Artist Disambiguation)."""
         # 0. Normalize Inputs -> Determine Target IDs
         effective_title = None
         all_titles = []
+        
+        # Helper to filter garbage
+        def is_valid_title(t):
+            if not t: return False
+            s = str(t).strip()
+            return s and s.upper() != "N/A"
+
         if isinstance(song.album, list):
-            all_titles = [str(t).strip() for t in song.album if t]
+            all_titles = [str(t).strip() for t in song.album if is_valid_title(t)]
             effective_title = all_titles[0] if all_titles else ""
         elif song.album:
              t = str(song.album).strip()
-             if t:
+             if is_valid_title(t):
                  all_titles = [t]
                  effective_title = t
 
@@ -152,7 +222,7 @@ class SongSyncService:
             
             for album_title in all_titles:
                 # 1. Find candidates by Title + Year
-                base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE NOCASE"
+                base_query = "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE"
                 base_params = [album_title]
                 if release_year:
                     base_query += " AND ReleaseYear = ?"
@@ -189,11 +259,14 @@ class SongSyncService:
                     target_ids.append(found_id)
                 else:
                     # Create New
-                    cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, 'Album', ?)", (album_title, release_year))
+                    if album_type is None:
+                        album_type = 'Album'
+                        
+                    cursor.execute("INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)", (album_title, album_type, release_year))
                     new_album_id = cursor.lastrowid
                     target_ids.append(new_album_id)
                     if auditor:
-                        auditor.log_insert("Albums", new_album_id, {"AlbumTitle": album_title, "AlbumArtist": album_artist, "AlbumType": "Album", "ReleaseYear": release_year})
+                        auditor.log_insert("Albums", new_album_id, {"AlbumTitle": album_title, "AlbumArtist": album_artist, "AlbumType": album_type, "ReleaseYear": release_year})
                     
                     # T-91: Link Album Artist via M2M if artist provided
                     if album_artist:
@@ -268,7 +341,7 @@ class SongSyncService:
                     publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
 
             for pub_name in publisher_names:
-                cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ?", (pub_name,))
+                cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE", (pub_name,))
                 row = cursor.fetchone()
                 if row:
                     pid = row[0]
@@ -331,7 +404,7 @@ class SongSyncService:
             
             if not name: continue
             
-            cursor.execute("SELECT TagID FROM Tags WHERE TagName = ? COLLATE NOCASE AND TagCategory = ?", (name, category))
+            cursor.execute("SELECT TagID FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ?", (name, category))
             row = cursor.fetchone()
             if row:
                 desired_ids.add(row[0])

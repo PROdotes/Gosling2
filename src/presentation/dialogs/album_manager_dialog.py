@@ -42,11 +42,12 @@ class AlbumManagerDialog(QDialog):
             self.release_year = None
             self.album_type = "Album"
 
-    def __init__(self, album_service, publisher_service, contributor_service, initial_data=None, parent=None, staged_deletions=None):
+    def __init__(self, album_service, publisher_service, contributor_service, settings_manager, initial_data=None, parent=None, staged_deletions=None):
         super().__init__(parent)
         self.album_service = album_service
         self.publisher_service = publisher_service
         self.contributor_service = contributor_service
+        self.settings_manager = settings_manager
         self.initial_data = initial_data or {}
         self.staged_deletions = staged_deletions or set()
         
@@ -532,7 +533,10 @@ class AlbumManagerDialog(QDialog):
         self.inp_title.setText(self.current_album.title)
         self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
             
-        self.cmb_type.setCurrentText("Single")
+        if self.settings_manager:
+            self.cmb_type.setCurrentText(self.settings_manager.get_default_album_type())
+        else:
+            self.cmb_type.setCurrentText("Single")
         self.selected_pub_name = ""
         
         self.inp_title.setFocus()
@@ -780,10 +784,8 @@ class AlbumManagerDialog(QDialog):
         
         # Default to configured year if empty
         if not year_str:
-            from ...business.services.settings_manager import SettingsManager
-            
-            sm = SettingsManager()
-            def_year = sm.get_default_year()
+            sm = self.settings_manager
+            def_year = sm.get_default_year() if sm else 0
             if def_year > 0:
                 year_str = str(def_year)
             # Else leave empty (No default year)
@@ -795,9 +797,9 @@ class AlbumManagerDialog(QDialog):
         try:
             if self.is_creating_new:
                 # Create
-                album, created = self.album_service.get_or_create(title, artist, year)
-                album.album_type = alb_type
-                self.album_service.update(album)
+                album, created = self.album_service.get_or_create(title, artist, year, album_type=alb_type)
+                # album.album_type = alb_type # No longer needed if passed to get_or_create
+                # self.album_service.update(album)
                 
                 # Save Publishers (M2M)
                 pub_names = self.tray_publisher.get_names()

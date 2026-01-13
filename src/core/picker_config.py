@@ -5,7 +5,7 @@ Defines configuration for the universal EntityPickerDialog.
 This allows TagPickerDialog's UX pattern to be reused for Artists, Publishers, etc.
 Each entity type has a PickerConfig that defines:
 - Type buttons (categories for Tags, types for Artists)
-- Prefix syntax support
+- Dynamic prefix syntax support (e.g., 'g:rock' looks for 'Genre')
 - Whether new types can be created
 - Service methods for searching
 """
@@ -30,10 +30,6 @@ class PickerConfig:
     type_colors: Dict[str, str]         # Glow colors for each button
     allow_new_types: bool               # True for Tags, False for Artists
     default_type: str                   # Default selection (e.g., "Genre" or "Person")
-    
-    # === Prefix Parsing ===
-    # Short prefixes: {"g": "Genre", "m": "Mood"} or {"p": "Person", "a": "Alias"}
-    prefix_map: Dict[str, str] = field(default_factory=dict)
     
     # === Actions ===
     allow_create: bool = True
@@ -87,14 +83,7 @@ def get_tag_picker_config() -> PickerConfig:
         type_icons={},    # Will be populated from ID3Registry
         type_colors={},   # Will be populated from ID3Registry
         allow_new_types=True,  # Can create "vacation:beach"
-        default_type="Genre",
-        
-        prefix_map={
-            "g": "Genre", "genre": "Genre",
-            "m": "Mood", "mood": "Mood",
-            "s": "Status", "status": "Status",
-            "c": "Custom", "custom": "Custom",
-        },
+        default_type=ID3Registry.get_category_for_frame("TCON") or "Genre",
         
         service_attr="tag_service",
         get_by_type_fn="get_all_by_category",
@@ -139,11 +128,6 @@ def get_artist_picker_config(allowed_types: Optional[List[str]] = None, default_
         allow_new_types=False,  # Cannot invent new types
         default_type=default_type or (types[0] if len(types) == 1 else None),
         
-        prefix_map={
-            "p": "Person", "person": "Person",
-            "g": "Group", "group": "Group",
-        },
-        
         service_attr="contributor_service",
         get_by_type_fn="get_all_by_type",  # T-Fix: Initial population
         get_by_id_fn="get_by_id",
@@ -169,8 +153,6 @@ def get_publisher_picker_config() -> PickerConfig:
         type_colors={},
         allow_new_types=False,
         default_type="",
-        
-        prefix_map={},  # No prefix support for publishers
         
         service_attr="publisher_service",
         get_by_type_fn="search",

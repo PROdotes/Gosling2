@@ -22,25 +22,45 @@ class AlbumService:
         """Fetch a specific album by its ID."""
         return self._repo.get_by_id(album_id)
 
-    def create(self, title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
+    def create(self, title: str, artist: Optional[str] = None, year: Optional[int] = None, album_type: Optional[str] = None) -> Album:
         """Create a new album record."""
-        return self._repo.create(title, album_artist=artist, release_year=year)
+        return self._repo.create(title, album_artist=artist, release_year=year, album_type=album_type)
 
-    def get_or_create(self, title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Tuple[Album, bool]:
+    def get_or_create(self, title: str, artist: Optional[str] = None, year: Optional[int] = None, album_type: Optional[str] = None) -> Tuple[Album, bool]:
         """Find an existing album or create a new one."""
-        return self._repo.get_or_create(title, album_artist=artist, release_year=year)
+        return self._repo.get_or_create(title, album_artist=artist, release_year=year, album_type=album_type)
 
     def update(self, album: Album) -> bool:
-        """Update an existing album record."""
+        """
+        Smart Update: Updates title/year, or merges if the new key already exists.
+        """
+        if not album.album_id:
+            return False
+            
+        current = self.get_by_id(album.album_id)
+        if not current:
+            return False
+            
+        # 1. Check for collision
+        # Note: comparison uses key (Title, Artist, Year)
+        existing = self._repo.find_by_key(album.title, album.album_artist, album.release_year, exclude_id=album.album_id)
+        if existing:
+            # COLLISION: Merge our current record INTO the existing one
+            return self.merge(source_id=album.album_id, target_id=existing.album_id)
+                
         return self._repo.update(album)
+
+    def merge(self, source_id: int, target_id: int) -> bool:
+        """Merge two albums into one."""
+        return self._repo.merge(source_id, target_id)
 
     def delete(self, album_id: int) -> bool:
         """Delete an album record."""
         return self._repo.delete(album_id)
 
-    def assign_to_song(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
+    def assign_to_song(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None, album_type: Optional[str] = None) -> Album:
         """Link a song to an album by title, artist, and year."""
-        return self._repo.assign_album(source_id, album_title, artist, year)
+        return self._repo.assign_album(source_id, album_title, artist, year, album_type=album_type)
 
     def get_publisher_name(self, album_id: int) -> Optional[str]:
         """Get the publisher name(s) associated with an album."""

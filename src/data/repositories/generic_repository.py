@@ -72,50 +72,50 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
 
     # --- PUBLIC TRANSACTIONAL METHODS ---
 
-    def insert(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> Optional[int]:
+    def insert(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None, **kwargs) -> Optional[int]:
         """
         Transactional Insert with Audit.
         Returns: New ID on success, None on failure.
         """
         if conn:
-            return self._insert_logic(entity, conn, batch_id)
+            return self._insert_logic(entity, conn, batch_id, **kwargs)
             
         try:
             with self.get_connection() as conn:
-                return self._insert_logic(entity, conn, batch_id)
+                return self._insert_logic(entity, conn, batch_id, **kwargs)
         except Exception as e:
             logger.error(f"GenericRepository Insert Failed ({self.table_name}): {e}")
             return None
 
-    def _insert_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str]) -> Optional[int]:
+    def _insert_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str], **kwargs) -> Optional[int]:
         """Internal logic for insert, allowing connection sharing."""
         from src.core.audit_logger import AuditLogger
         cursor = conn.cursor()
         auditor = AuditLogger(conn, batch_id=batch_id)
         
-        new_id = self._insert_db(cursor, entity, auditor=auditor)
+        new_id = self._insert_db(cursor, entity, auditor=auditor, **kwargs)
         
         if hasattr(entity, 'to_dict') and new_id:
             auditor.log_insert(self.table_name, new_id, entity.to_dict())
         
         return new_id
 
-    def update(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
+    def update(self, entity: T, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None, **kwargs) -> bool:
         """
         Transactional Update with Audit (Diffing).
         Returns: True on success, False on failure.
         """
         if conn:
-            return self._update_logic(entity, conn, batch_id)
+            return self._update_logic(entity, conn, batch_id, **kwargs)
             
         try:
             with self.get_connection() as conn:
-                return self._update_logic(entity, conn, batch_id)
+                return self._update_logic(entity, conn, batch_id, **kwargs)
         except Exception as e:
             logger.error(f"GenericRepository Update Failed ({self.table_name}): {e}")
             raise e
 
-    def _update_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str]) -> bool:
+    def _update_logic(self, entity: T, conn: sqlite3.Connection, batch_id: Optional[str], **kwargs) -> bool:
         """Internal logic for update, allowing connection sharing."""
         from src.core.audit_logger import AuditLogger
         
@@ -135,7 +135,7 @@ class GenericRepository(BaseRepository, Generic[T], ABC):
         cursor = conn.cursor()
         auditor = AuditLogger(conn, batch_id=batch_id)
         
-        self._update_db(cursor, entity, auditor=auditor)
+        self._update_db(cursor, entity, auditor=auditor, **kwargs)
         
         if hasattr(entity, 'to_dict'):
             auditor.log_update(self.table_name, record_id, old_snapshot, entity.to_dict())

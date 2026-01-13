@@ -86,7 +86,9 @@ class ImportService:
             # USER 614: Toggle is_active False on import (Staging Mode)
             temp_song.is_active = False
             
-            file_id = self.library_service.add_song(temp_song)
+            # T-Default: Use configured album type for auto-created albums
+            album_type = self.settings_manager.get_default_album_type()
+            file_id = self.library_service.add_song(temp_song, album_type=album_type)
             
             if file_id:
                 # Update local ID for subsequent steps

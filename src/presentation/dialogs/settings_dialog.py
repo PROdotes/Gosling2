@@ -227,12 +227,26 @@ class SettingsDialog(QDialog):
         search_layout.addWidget(self.cmb_search_provider, 1)
         layout.addLayout(search_layout)
 
+        # Default Album Type Row
+        album_type_layout = QHBoxLayout()
+        album_type_label = QLabel("DEFAULT ALBUM TYPE")
+        album_type_label.setFixedWidth(160)
+        album_type_label.setObjectName("FieldLabel")
+        
+        self.cmb_default_album_type = QComboBox()
+        self.cmb_default_album_type.addItems(["Album", "Single", "EP", "Compilation"])
+        self.cmb_default_album_type.setObjectName("SidePanelCombo")
+        
+        album_type_layout.addWidget(album_type_label)
+        album_type_layout.addWidget(self.cmb_default_album_type, 1)
+        layout.addLayout(album_type_layout)
+
         # Default Year Row
         year_layout = QHBoxLayout()
 
         # Checkbox for Default Year
         self.chk_default_year = QCheckBox("DEFAULT YEAR")
-        self.chk_default_year.setFixedWidth(120)
+        self.chk_default_year.setFixedWidth(160)
         self.chk_default_year.setObjectName("FieldLabel")
         self.chk_default_year.toggled.connect(self._on_year_toggled)
         
@@ -290,6 +304,10 @@ class SettingsDialog(QDialog):
         current_provider = self.settings_manager.get_search_provider()
         idx = self.cmb_search_provider.findText(current_provider)
         if idx >= 0: self.cmb_search_provider.setCurrentIndex(idx)
+
+        current_album_type = self.settings_manager.get_default_album_type()
+        a_idx = self.cmb_default_album_type.findText(current_album_type)
+        if a_idx >= 0: self.cmb_default_album_type.setCurrentIndex(a_idx)
 
         val = self.settings_manager.get_default_year()
         if val > 0:
@@ -357,6 +375,7 @@ class SettingsDialog(QDialog):
         self.settings_manager.set_ffmpeg_path(self.txt_ffmpeg_path.text().strip())
         
         self.settings_manager.set_search_provider(self.cmb_search_provider.currentText())
+        self.settings_manager.set_default_album_type(self.cmb_default_album_type.currentText())
         
         if self.chk_default_year.isChecked():
             self.settings_manager.set_default_year(self.spin_default_year.value())

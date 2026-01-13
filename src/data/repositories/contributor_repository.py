@@ -34,13 +34,13 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor = conn.cursor()
                 
                 # Try primary name match (case-insensitive)
-                cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
+                cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE", (name,))
                 row = cursor.fetchone()
                 if row:
                     return self.get_by_id(row[0], conn=conn)
                 
                 # try alias match (case-insensitive)
-                cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE NOCASE", (name,))
+                cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE UTF8_NOCASE", (name,))
                 row = cursor.fetchone()
                 if row:
                     return self.get_by_id(row[0], conn=conn)
@@ -317,7 +317,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor.execute("""
                     SELECT ContributorID, ContributorName, SortName, ContributorType 
                     FROM Contributors 
-                    WHERE ContributorType = ? COLLATE NOCASE 
+                    WHERE ContributorType = ? COLLATE UTF8_NOCASE 
                     ORDER BY SortName ASC
                 """, (type_lower,))
                 return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
@@ -431,13 +431,13 @@ class ContributorRepository(GenericRepository[Contributor]):
     def _get_or_create_logic(self, name: str, type: str, conn, batch_id: Optional[str] = None) -> Tuple[Contributor, bool]:
         cursor = conn.cursor()
         # 1. Check direct name match (NOCASE)
-        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE NOCASE", (name,))
+        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE", (name,))
         row = cursor.fetchone()
         if row:
             return self.get_by_id(row[0], conn=conn), False
         
         # 2. Check alias match (NOCASE)
-        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE NOCASE", (name,))
+        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE UTF8_NOCASE", (name,))
         row = cursor.fetchone()
         if row:
             return self.get_by_id(row[0], conn=conn), False
@@ -455,7 +455,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                 cursor = conn.cursor()
                 
                 # Check Name Conflict
-                query = "SELECT ContributorID, ContributorName FROM Contributors WHERE ContributorName = ? COLLATE NOCASE"
+                query = "SELECT ContributorID, ContributorName FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE"
                 params = [name]
                 if exclude_id:
                     query += " AND ContributorID != ?"
@@ -471,7 +471,7 @@ class ContributorRepository(GenericRepository[Contributor]):
                     SELECT C.ContributorID, C.ContributorName 
                     FROM ContributorAliases CA
                     JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                    WHERE CA.AliasName = ? COLLATE NOCASE
+                    WHERE CA.AliasName = ? COLLATE UTF8_NOCASE
                 """
                 params = [name]
                 if exclude_id:

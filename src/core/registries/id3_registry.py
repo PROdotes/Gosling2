@@ -117,6 +117,17 @@ class ID3Registry:
         return cats.get(category, {}).get('id3_frame')
     
     @classmethod
+    def get_category_for_frame(cls, frame_code: str) -> Optional[str]:
+        """
+        Find the category name associated with an ID3 frame (e.g., 'TCON' -> 'Genre').
+        """
+        cats = cls.get_tag_categories()
+        for name, d in cats.items():
+            if d.get('id3_frame') == frame_code:
+                return name
+        return None
+    
+    @classmethod
     def get_all_category_names(cls) -> List[str]:
         """
         Get list of all valid category names.

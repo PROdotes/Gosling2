@@ -38,12 +38,39 @@ class PublisherService:
         return self._repo.get_or_create(name)
 
     def update(self, publisher: Publisher) -> bool:
-        """Update an existing publisher record."""
-        # Safety Check: Prevent circular parent-child relationships
-        if publisher.publisher_id and publisher.parent_publisher_id:
+        """
+        Smart Update: Updates name/parent, or merges if the new name already exists.
+        """
+        if not publisher.publisher_id:
+            return False
+            
+        current = self.get_by_id(publisher.publisher_id)
+        if not current: 
+            return False
+            
+        new_name = publisher.publisher_name.strip()
+        
+        # 1. Handle Name Change & Possible Merge
+        # Check if ANOTHER publisher already has this name (case-insensitive)
+        with self._repo.get_connection() as conn:
+            query = "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND PublisherID != ?"
+            cursor = conn.execute(query, (new_name, publisher.publisher_id))
+            collision = cursor.fetchone()
+            
+        if collision:
+            # COLLISION: Merge our current record INTO the existing one
+            return self.merge(source_id=publisher.publisher_id, target_id=collision[0])
+
+        # 2. Safety Check: Prevent circular parent-child relationships
+        if publisher.parent_publisher_id:
             if self.would_create_cycle(publisher.publisher_id, publisher.parent_publisher_id):
                 return False
+                
         return self._repo.update(publisher)
+
+    def merge(self, source_id: int, target_id: int) -> bool:
+        """Merge two publishers into one."""
+        return self._repo.merge(source_id, target_id)
 
     def delete(self, publisher_id: int) -> bool:
         """Delete a publisher record."""
