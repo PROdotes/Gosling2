@@ -56,7 +56,8 @@ class EntityPickerDialog(QDialog):
         config: PickerConfig,
         target_entity: Any = None,
         exclude_ids: set = None,
-        parent: QWidget = None
+        parent: QWidget = None,
+        suggested_items: List[str] = None
     ):
         """
         Args:
@@ -65,6 +66,7 @@ class EntityPickerDialog(QDialog):
             target_entity: Existing entity for edit mode, None for add mode
             exclude_ids: IDs to exclude from the list
             parent: Parent widget
+            suggested_items: List of string suggestions (names) to display if empty
         """
         super().__init__(parent)
         
@@ -72,6 +74,7 @@ class EntityPickerDialog(QDialog):
         self.config = config
         self.target_entity = target_entity
         self.exclude_ids = exclude_ids or set()
+        self.suggested_items = suggested_items or []
         
         self._selected_entity = None
         self._rename_info = None
@@ -128,7 +131,15 @@ class EntityPickerDialog(QDialog):
         
         self._init_ui()
         self._connect_signals()
-        self._refresh_list()
+        
+        # Pre-fill with first suggestion if applicable (Add Mode)
+        if not self.target_entity and self.suggested_items:
+            # We want to show the suggestion ready to be created/selected
+            # Setting text here triggers search in _refresh_list
+            first_suggestion = self.suggested_items[0]
+            self.txt_search.setText(first_suggestion)
+        else:
+            self._refresh_list()
         
         # Defer focus
         from PyQt6.QtCore import QTimer
@@ -405,6 +416,37 @@ class EntityPickerDialog(QDialog):
         clean_query = query[:-1] if query.endswith(',') else query
         
         try:
+            # SUGGESTIONS LOGIC:
+            # If query is empty and we have suggestions, show them at the top
+            # Usually only relevant in Add Mode, but can be helpful generally if desired.
+            # User requirement: "If suggested_items are provided and the list results would otherwise be empty (or just always at the top)"
+            # Let's show them if query is empty.
+            if not query and self.suggested_items:
+                 for suggestion in self.suggested_items:
+                      # Check if suggestion is already in excluded ids? Validating strings vs IDs is hard without lookup.
+                      # Just show them as clickable options that fill the search box or act as Create.
+                      # Ideally, we check if they exist in DB.
+                      
+                      # Try to find if it exists
+                      exists = False
+                      if hasattr(self.service, "get_by_name"):
+                           existing = self.service.get_by_name(suggestion)
+                           if existing:
+                                display = self.config.display_fn(existing)
+                                item = QListWidgetItem(f"⭐ {display}")
+                                item.setData(Qt.ItemDataRole.UserRole, existing)
+                                self.list_results.addItem(item)
+                                exists = True
+                      
+                      if not exists:
+                           # Offer to create/select as new
+                           # If we just put it in search, it might be easier?
+                           # Let's add it as a "Quick Fill" item
+                           item = QListWidgetItem(f"⭐ Use \"{suggestion}\"")
+                           # Action: Fill search box specific to this suggestion
+                           item.setData(Qt.ItemDataRole.UserRole, ("FILL_SEARCH", suggestion))
+                           self.list_results.addItem(item)
+
             # Get entities (use cleaned query for DB search and exact matches)
             entities = self._get_entities(clean_query)
             
@@ -571,6 +613,8 @@ class EntityPickerDialog(QDialog):
                 self.btn_select.setText("UPDATE" if self.target_entity else "Create")
             elif action == "CREATE_SPOTIFY":
                 self.btn_select.setText("Create Multiple")
+            elif action == "FILL_SEARCH":
+                self.btn_select.setText("Select")
         else:
             self.btn_select.setText("UPDATE" if self.target_entity else "Select")
     
@@ -617,6 +661,13 @@ class EntityPickerDialog(QDialog):
                     create_method = getattr(self.service, self.config.get_or_create_fn)
                     self._selected_entity, _ = create_method(name, type_name)
                 self.accept()
+                
+            elif action == "FILL_SEARCH":
+                _, suggestion = data
+                self.txt_search.setText(suggestion)
+                # The text change triggers _on_search_changed -> _refresh_list
+                # So we just update the text and stay in the dialog
+                return
         else:
             self._selected_entity = data
             self.accept()

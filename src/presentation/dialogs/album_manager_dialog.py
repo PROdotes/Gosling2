@@ -66,6 +66,8 @@ class AlbumManagerDialog(QDialog):
         # State
         if not hasattr(self, 'current_album'):
             self.current_album = None # The album object currently loaded in Inspector
+        
+        self._current_context_songs = [] # T-Suggestions
             
         # T-Multi: Persistence for Search Refreshes
         init_ids = self.initial_data.get('album_id')
@@ -356,6 +358,7 @@ class AlbumManagerDialog(QDialog):
             allow_add=True,
             parent=self
         )
+        self.tray_artist.set_suggestion_provider(self._get_artist_suggestions)
         input_layout_art.addWidget(self.tray_artist, 1)
         
         module_layout_art.addWidget(input_row_art)
@@ -396,6 +399,7 @@ class AlbumManagerDialog(QDialog):
             allow_add=True,
             parent=self
         )
+        self.tray_publisher.set_suggestion_provider(self._get_publisher_suggestions)
         input_layout_pub.addWidget(self.tray_publisher, 1)
         
         module_layout_pub.addWidget(input_row_pub)
@@ -639,6 +643,7 @@ class AlbumManagerDialog(QDialog):
     def _refresh_context(self, album_id):
         self.list_context.clear()
         songs = self.album_service.get_songs_in_album(album_id)
+        self._current_context_songs = songs # Store for suggestions
         
         if not songs:
             item = QListWidgetItem(" (No Songs) ")
@@ -683,6 +688,42 @@ class AlbumManagerDialog(QDialog):
         if not self.current_album: return
         self.album_service.set_primary_album(source_id, self.current_album.album_id)
         self._refresh_context(self.current_album.album_id)
+
+    def _get_artist_suggestions(self) -> list:
+        """Provide artist suggestions from context songs."""
+        if not self._current_context_songs:
+            return []
+        
+        suggestions = set()
+        for song in self._current_context_songs:
+            art = song.get('artist')
+            if art and art != 'Unknown':
+                suggestions.add(art)
+        
+        return sorted(list(suggestions))
+
+    def _get_publisher_suggestions(self) -> list:
+        """Provide publisher suggestions from context songs."""
+        if not self._current_context_songs:
+            return []
+            
+        suggestions = set()
+        for song in self._current_context_songs:
+            source_id = song.get('source_id')
+            if not source_id: continue
+            
+            # Use service to fetch publisher for this song
+            # Assuming AlbumService has a helper or we can get it via other means
+            # Since I don't see the service code, I'll try a likely method name based on convention
+            # or try to get metadata.
+            try:
+                if hasattr(self.album_service, 'get_song_publisher'):
+                    pub = self.album_service.get_song_publisher(source_id)
+                    if pub: suggestions.add(pub)
+            except:
+                pass
+                
+        return sorted(list(suggestions))
 
     def _on_vault_selection_changed(self):
         # T-Multi: Capture state to persist across searches

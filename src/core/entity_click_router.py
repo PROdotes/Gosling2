@@ -219,7 +219,8 @@ class EntityClickRouter:
         self,
         entity_type: EntityType,
         exclude_ids: set = None,
-        filter_type: str = None
+        filter_type: str = None,
+        suggested_items: list = None
     ) -> Optional[Any]:
         """
         Open a picker dialog for selecting/creating an entity.
@@ -243,7 +244,8 @@ class EntityClickRouter:
                 service_provider=self.services,
                 config=picker_config,
                 exclude_ids=exclude_ids,
-                parent=self.parent
+                parent=self.parent,
+                suggested_items=suggested_items
             )
                 
             if dialog.exec() == 1:

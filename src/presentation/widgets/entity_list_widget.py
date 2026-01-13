@@ -107,6 +107,7 @@ class EntityListWidget(QWidget):
         # e.g., lambda: "person" if artist.type == "group" else "group"
         self._picker_filter_fn: Optional[Callable[[], str]] = None
         self._custom_add_handler: Optional[Callable[[], None]] = None
+        self._suggestion_provider: Optional[Callable[[], list]] = None
 
         # Get entity config from registry
         self.entity_config = get_entity_config(entity_type)
@@ -137,6 +138,13 @@ class EntityListWidget(QWidget):
             widget.set_picker_filter(lambda: "person" if self.artist.type == "group" else "group")
         """
         self._picker_filter_fn = filter_fn
+
+    def set_suggestion_provider(self, provider_fn: Callable[[], list]):
+        """
+        Set a callback to provide suggested items (strings) for the picker.
+        Invoked when the user clicks Add.
+        """
+        self._suggestion_provider = provider_fn
     
     def _init_ui(self, add_tooltip: str):
         """Build the UI based on layout mode."""
@@ -331,12 +339,18 @@ class EntityListWidget(QWidget):
         filter_type = None
         if self._picker_filter_fn:
             filter_type = self._picker_filter_fn()
+            
+        # Get suggestions if provider is set
+        suggested_items = []
+        if self._suggestion_provider:
+             suggested_items = self._suggestion_provider() or []
         
         # Open picker
         selected = self.click_router.open_picker(
             self.entity_type,
             exclude_ids=exclude_ids,
-            filter_type=filter_type
+            filter_type=filter_type,
+            suggested_items=suggested_items
         )
         
         if selected:

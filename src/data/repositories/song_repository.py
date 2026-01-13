@@ -64,7 +64,7 @@ class SongRepository(GenericRepository[Song]):
         
         return source_id
 
-    def insert(self, entity_or_path: Union[Song, str]) -> Optional[int]:
+    def insert(self, entity_or_path: Union[Song, str], **kwargs) -> Optional[int]:
         """
         Overridden insert to support legacy path-string argument.
         Delegates to GenericRepository.insert(Song).
@@ -79,9 +79,9 @@ class SongRepository(GenericRepository[Song]):
                 name=os.path.basename(path),
                 is_active=True
             )
-            return super().insert(song)
+            return super().insert(song, **kwargs)
         else:
-            return super().insert(entity_or_path)
+            return super().insert(entity_or_path, **kwargs)
 
     def get_all(self) -> Tuple[List[str], List[Tuple]]:
         """Get all songs from the library"""
