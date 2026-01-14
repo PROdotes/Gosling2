@@ -910,7 +910,12 @@ class SidePanelWidget(QFrame):
                     delims = r',|;| & '
                     if field_name == 'composers': delims += r'|/'
                     import re
-                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
+                if field_name in ['album', 'publisher']:
+                    current = [str(current)] if current else []
+                else:
+                    # T-Fix: Do NOT split on punctuation. Respect DB/Staging.
+                    # delimiters = r',|;| & ' (REMOVED)
+                    current = [current] if current and isinstance(current, str) else (current or [])
             
             if name in current:
                 new_list = [p for p in current if p != name]
@@ -1000,7 +1005,11 @@ class SidePanelWidget(QFrame):
                     delims = r',|;| & '
                     if field_name == 'composers': delims += r'|/'
                     import re
-                    current = [p.strip() for p in re.split(delims, str(current))] if current else []
+                if field_name in ['album', 'publisher']:
+                    current = [str(current)] if current else []
+                else:
+                    # T-Fix: Do NOT split on punctuation. Respect DB/Staging.
+                    current = [current] if current and isinstance(current, str) else (current or [])
             
             if name not in current:
                 new_list = list(current)
@@ -1602,7 +1611,7 @@ class SidePanelWidget(QFrame):
                     names_val = self._get_effective_value(song.source_id, 'publisher', getattr(song, 'publisher', []))
                     if isinstance(names_val, str):
                         import re
-                        names_val = [n.strip() for n in re.split(r',|\|\|\|', names_val) if n.strip()]
+                        names_val = [names_val] if names_val.strip() else []
                     elif not isinstance(names_val, list):
                         names_val = []
                     
@@ -1623,9 +1632,8 @@ class SidePanelWidget(QFrame):
         if field_def.field_type == yellberus.FieldType.LIST:
              all_sets = []
              import re
-             delimiters = r',|;| & |\|\|\|'
-             if field_def.name == 'composers':
-                  delimiters += r'|/'
+             # T-Fix: Only split on internal delimiter |||, never on text content.
+             delimiters = r'\|\|\|'
 
              for song in self.current_songs:
                   val = self._get_effective_value(song.source_id, field_def.name, getattr(song, attr, ""))
@@ -1722,9 +1730,7 @@ class SidePanelWidget(QFrame):
             
         # Convert to identities for the Chip Tray
         chips = []
-        delimiters = r',|;| & '
-        if field_name == 'composers':
-            delimiters += r'|/'
+        # T-Fix: Delimiters removed. Strict List adherence.
             
         raw_names = effective_val if isinstance(effective_val, list) else ([effective_val] if effective_val else [])
         names = []
@@ -1739,13 +1745,10 @@ class SidePanelWidget(QFrame):
                 names.extend([p.strip() for p in split_parts if p.strip()])
                 continue
 
-            # Legacy splitting for other fields (not album/publisher which might contain commas)
-            if field_name not in ['album', 'publisher'] and (',' in rn or ';' in rn or ' & ' in rn or (field_name == 'composers' and '/' in rn)):
-                import re
-                split_parts = re.split(delimiters, rn)
-                names.extend([p.strip() for p in split_parts if p.strip()])
-            else:
-                names.append(rn)
+            # T-Fix: Removed legacy splitting logic.
+            # We strictly respect the data structure (List vs String).
+            # If it's a string, it's ONE chip.
+            names.append(rn)
 
         chips = []
         for i, n in enumerate(names):
