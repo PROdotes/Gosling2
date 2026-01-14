@@ -137,7 +137,8 @@ class SongRepository(GenericRepository[Song]):
         normalized_path = os.path.normcase(os.path.abspath(song.source))
         cursor.execute("""
             UPDATE MediaSources
-            SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, AudioHash = ?
+            SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, 
+                AudioHash = COALESCE(?, AudioHash)
             WHERE SourceID = ?
         """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, song.audio_hash, song.source_id))
 
@@ -320,7 +321,7 @@ class SongRepository(GenericRepository[Song]):
             SELECT 
                 MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
                 S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
-                MS.SourceNotes, MS.IsActive,
+                MS.SourceNotes, MS.IsActive, MS.AudioHash,
                 (
                     SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
                     FROM Albums A 
@@ -385,7 +386,7 @@ class SongRepository(GenericRepository[Song]):
         for row in rows:
             try:
                 (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-                 notes, is_active_int, album_title, album_id, publisher_name, 
+                 notes, is_active_int, audio_hash, album_title, album_id, publisher_name, 
                  album_artist, all_tags_str, publisher_id) = row
 
                 groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
@@ -400,6 +401,7 @@ class SongRepository(GenericRepository[Song]):
                     recording_year=recording_year,
                     isrc=isrc,
                     notes=notes,
+                    audio_hash=audio_hash,
                     is_active=bool(is_active_int),
                     album=[a.strip() for a in album_title.split('|||')] if album_title else [],
                     album_id=album_id,

@@ -41,6 +41,7 @@ from src.core.entity_registry import (
 )
 from src.core.entity_click_router import EntityClickRouter, ClickAction
 from src.core.context_adapters import ContextAdapter
+from src.presentation.dialogs.visual_split_dialog import VisualSplitDialog
 
 
 class LayoutMode(Enum):
@@ -468,6 +469,10 @@ class EntityListWidget(QWidget):
         # Only show if case conversion changes something
         if self.allow_edit and label != label.title():
              menu.addAction(f"Fix Case: {label.title()}").triggered.connect(lambda: self._fix_case(entity_id, label))
+        
+        # Visual Split
+        if self.allow_edit and self.entity_type == EntityType.ARTIST:
+             menu.addAction("Split Artists...").triggered.connect(lambda: self._on_visual_split(entity_id, label))
 
         if self.allow_remove:
             menu.addSeparator()
@@ -538,6 +543,68 @@ class EntityListWidget(QWidget):
             if hasattr(entity, attr):
                 return getattr(entity, attr)
         return 0
+    
+    def _on_visual_split(self, entity_id: int, label: str):
+        """Open the Visual Split dialog and process results."""
+        dlg = VisualSplitDialog(label, self.services, self)
+        if dlg.exec():
+            results = dlg.get_result()
+            if not results:
+                return
+            
+            # If no actual change (single result same as original), ignore
+            if len(results) == 1 and results[0] == label:
+                return
+
+            # Process splits
+            added_any = False
+            
+            # Resolve and add each new name
+            for name in results:
+                if self._resolve_and_add_name(name):
+                    added_any = True
+            
+            # Remove original if we successfully added new items
+            if added_any:
+                self._do_remove(entity_id)
+                self.refresh_from_adapter()
+                self.data_changed.emit()
+                
+                # CLEANUP: Check if original entity is now orphaned (0 usages)
+                # If so, delete it silently as requested by USER
+                if self.entity_type == EntityType.ARTIST:
+                    self._cleanup_orphaned_artist(entity_id)
+
+    def _cleanup_orphaned_artist(self, entity_id: int):
+        """Delete artist if they have no remaining links."""
+        try:
+            svc = self.services.contributor_service
+            usage_count = svc.get_usage_count(entity_id)
+            if usage_count == 0:
+                print(f"DEBUG: Auto-deleting orphaned artist ID={entity_id} after split.")
+                svc.delete(entity_id)
+        except Exception as e:
+            print(f"Error during orphaned cleanup: {e}")
+                
+    def _resolve_and_add_name(self, name: str) -> bool:
+        """Resolve a name string to an entity and link it."""
+        try:
+            entity = None
+            if self.entity_type == EntityType.ARTIST:
+                svc = self.services.contributor_service
+                # Use get_or_create to ensure we have a valid artist
+                entity, _ = svc.get_or_create(name)
+            
+            # TODO: Add support for Publisher/Tags if needed
+                
+            if entity and self.context_adapter:
+                eid = self._get_entity_id(entity)
+                return self.context_adapter.link(eid)
+            
+            return False
+        except Exception as e:
+            print(f"Error resolving name '{name}': {e}")
+            return False
     
     # =========================================================================
     # PASS-THROUGH METHODS for ChipTrayWidget compatibility

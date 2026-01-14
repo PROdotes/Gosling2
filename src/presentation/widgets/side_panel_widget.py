@@ -1232,12 +1232,13 @@ class SidePanelWidget(QFrame):
             eff_performers = self._get_effective_value(sid, 'performers', song.performers)
             eff_title = self._get_effective_value(sid, 'title', song.name)
             
-            # Helper: Get primary artist string
-            # Handle both list (normal) and string (fallback/bug) cases just to be safe
+            # Helper: Get performers (all or primary)
             if isinstance(eff_performers, list):
-                d_artist = eff_performers[0] if eff_performers else "Unknown"
+                d_artist = eff_performers
+                disp_artist = ", ".join(d_artist) if d_artist else "Unknown"
             else:
                 d_artist = str(eff_performers) if eff_performers else "Unknown"
+                disp_artist = d_artist
             
             # Determine initial values based on Clean Slate request
             init_title = "" if clean_slate else (self._get_effective_value(sid, 'album', song.album) or "")
@@ -1255,7 +1256,7 @@ class SidePanelWidget(QFrame):
                 'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
                 'album_id': init_id,
-                'song_display': f"{d_artist} - {eff_title}",
+                'song_display': f"{disp_artist} - {eff_title}",
                 'focus_publisher': focus_publisher
             }
             

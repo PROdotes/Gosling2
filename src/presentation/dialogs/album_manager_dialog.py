@@ -507,31 +507,41 @@ class AlbumManagerDialog(QDialog):
              AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
         )
         
-        # Populate Trays from Initial Data (New Feature Fix)
-        # Populate Trays from Initial Data (New Feature Fix)
+        # Populate Trays from Initial Data
         if self.initial_data.get('artist'):
             art_val = self.initial_data.get('artist')
-            # If string, resolve or wrap
-            if isinstance(art_val, str):
-                art_obj = self.contributor_service.get_by_name(art_val)
+            # If string, resolve or wrap. If list, resolve each.
+            names = art_val if isinstance(art_val, list) else [art_val]
+            resolved = []
+            for name in names:
+                if not isinstance(name, str):
+                     resolved.append(name)
+                     continue
+                
+                art_obj = self.contributor_service.get_by_name(name)
                 if art_obj:
-                    self.tray_artist.set_items([art_obj])
+                    resolved.append(art_obj)
                 else:
                     # Ghost Chip
-                    self.tray_artist.set_items([(0, art_val, "👤", False, False, "New Artist", "amber", False)])
-            elif isinstance(art_val, list):
-                 self.tray_artist.set_items(art_val)
+                    resolved.append((0, name, "👤", False, False, "New Artist", "amber", False))
+            self.tray_artist.set_items(resolved)
             
         if self.initial_data.get('publisher'):
             pub_val = self.initial_data.get('publisher')
-            if isinstance(pub_val, str):
-                # Publisher lookup by name not exposed directly on service usually, assume new or use id
-                # But here we only have name string from SidePanel
-                # Try to find ID?
-                # For now, just show as ghost chip
-                 self.tray_publisher.set_items([(0, pub_val, "🏢", False, False, "New Publisher", "amber", False)])
-            else:
-                 self.tray_publisher.set_items([pub_val] if not isinstance(pub_val, list) else pub_val)
+            names = pub_val if isinstance(pub_val, list) else [pub_val]
+            resolved = []
+            for name in names:
+                if not isinstance(name, str):
+                    resolved.append(name)
+                    continue
+                
+                pub_obj = self.publisher_service.find_by_name(name)
+                if pub_obj:
+                    resolved.append(pub_obj)
+                else:
+                    # Ghost Chip
+                    resolved.append((0, name, "🏢", False, False, "New Publisher", "amber", False))
+            self.tray_publisher.set_items(resolved)
         
         # Populate UI
         self.inp_title.setText(self.current_album.title)
@@ -709,17 +719,27 @@ class AlbumManagerDialog(QDialog):
             
         suggestions = set()
         for song in self._current_context_songs:
+            # 1. Try to get staged or DB publisher names directly from song dict
+            # Song dict in _current_context_songs comes from album_service.get_songs_in_album
+            # or is a raw MediaSource dict.
+            pub = song.get('publisher')
+            if pub:
+                if isinstance(pub, list):
+                    for p in pub: suggestions.add(p)
+                else:
+                    suggestions.add(pub)
+                    
+            # 2. Try falling back to service if needed (expensive but robust)
             source_id = song.get('source_id')
             if not source_id: continue
             
-            # Use service to fetch publisher for this song
-            # Assuming AlbumService has a helper or we can get it via other means
-            # Since I don't see the service code, I'll try a likely method name based on convention
-            # or try to get metadata.
             try:
-                if hasattr(self.album_service, 'get_song_publisher'):
-                    pub = self.album_service.get_song_publisher(source_id)
-                    if pub: suggestions.add(pub)
+                # Use publisher_service directly if available
+                # Many songs might share same publishers, set handles deduplication
+                if hasattr(self.publisher_service, 'get_publishers_for_song'):
+                    pubs = self.publisher_service.get_publishers_for_song(source_id)
+                    for p in pubs:
+                        suggestions.add(p.publisher_name)
             except:
                 pass
                 
@@ -875,8 +895,6 @@ class AlbumManagerDialog(QDialog):
                 self.txt_search.blockSignals(False)
                 
                 self._refresh_vault() 
-                if not silent: 
-                    QMessageBox.information(self, "Success", "Album Created")
                 success = True
             else:
                 # Update (Edit Mode)
@@ -907,8 +925,6 @@ class AlbumManagerDialog(QDialog):
                 self.txt_search.blockSignals(False)
                 
                 self._refresh_vault() 
-                if not silent and not close_on_success: 
-                    QMessageBox.information(self, "Success", "Album Updated")
                 success = True
                 
         except Exception as e:
