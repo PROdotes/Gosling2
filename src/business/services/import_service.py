@@ -47,6 +47,12 @@ class ImportService:
             Tuple of (Success, SID, ErrorMessage)
         """
         try:
+            # -1. Safety Check: Is this EXACT file already in the library?
+            # If so, we must prevent the user from "deleting duplicate" as it would delete the master copy.
+            existing_record = self.library_service.get_song_by_path(file_path)
+            if existing_record:
+                return False, existing_record.source_id, "ALREADY_IMPORTED: File is already tracked in library"
+
             # 0. Handle WAV conversion (Optional via Policy)
             if file_path.lower().endswith('.wav') and self.conversion_service and conversion_policy:
                 if conversion_policy.get('convert', False):
@@ -152,3 +158,15 @@ class ImportService:
                             discovery_list.append(full_path)
         
         return list(dict.fromkeys(discovery_list)) # Dedupe results
+
+    def delete_file(self, file_path: str) -> bool:
+        """Safely delete a file from disk (e.g. for failed imports)."""
+        try:
+            if os.path.exists(file_path) and os.path.isfile(file_path):
+                os.remove(file_path)
+                logger.info(f"Deleted file: {file_path}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to delete file {file_path}: {e}")
+        return False
+

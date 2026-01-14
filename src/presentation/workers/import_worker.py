@@ -16,8 +16,8 @@ class ImportWorker(QThread):
     # Emitted for each file processed: (current_index, total_count, file_name, success)
     progress = pyqtSignal(int, int, str, bool)
     
-    # Emitted when a batch of imports is finished: (success_count, error_count)
-    finished_batch = pyqtSignal(int, int)
+    # Emitted when a batch of imports is finished: (success_list, failure_list)
+    finished_batch = pyqtSignal(list, list)
     
     # Emitted on critical failure
     error = pyqtSignal(str)
@@ -36,12 +36,12 @@ class ImportWorker(QThread):
     def run(self):
         """Execute the import process in the background."""
         if not self.files:
-            self.finished_batch.emit(0, 0)
+            self.finished_batch.emit([], [])
             return
 
         total = len(self.files)
-        success_count = 0
-        error_count = 0
+        success_list = []
+        failure_list = []
 
         for i, file_path in enumerate(self.files):
             if not self._is_running:
@@ -50,11 +50,17 @@ class ImportWorker(QThread):
             import_success, sid, err = self.import_service.import_single_file(file_path, conversion_policy=self.conversion_policy)
             
             if import_success:
-                success_count += 1
+                success_list.append({
+                    'path': file_path,
+                    'id': sid
+                })
             else:
-                error_count += 1
+                failure_list.append({
+                    'path': file_path,
+                    'error': err
+                })
             
-            # Emit progress update
+            # Emit progress update (Legacy int interface for LCD)
             self.progress.emit(i + 1, total, file_path, import_success)
 
-        self.finished_batch.emit(success_count, error_count)
+        self.finished_batch.emit(success_list, failure_list)

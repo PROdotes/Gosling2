@@ -1475,14 +1475,15 @@ class LibraryWidget(QWidget):
             status_text = "SKIPPED: " + file_name
         self.import_label.setText(status_text[:50])
 
-    def _on_import_finished(self, success_count: int, error_count: int) -> None:
+    def _on_import_finished(self, success_list: list, failure_list: list) -> None:
         """Cleanup LCD and refresh library after background import."""
         self.status_lcd.hide()
         self.load_library()
         
-        if success_count > 0 or error_count > 0:
-            msg = f"Import Finished.\nSuccess: {success_count}\nDuplicates Skipped: {error_count}"
-            QMessageBox.information(self, "Operation Complete", msg)
+        if success_list or failure_list:
+            from ..dialogs.import_result_dialog import ImportResultDialog
+            dlg = ImportResultDialog(success_list, failure_list, self.import_service, parent=self)
+            dlg.exec()
 
     def _import_files(self) -> None:
         """
