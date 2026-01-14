@@ -19,8 +19,8 @@ class SettingsDialog(QDialog):
         self.renaming_service = renaming_service
         
         self.setWindowTitle("OPERATIONS CONFIG")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(500)
+        self.setMinimumWidth(550)
+        self.setMinimumHeight(400)
         self.setObjectName("AlbumManagerDialog") # Reuse standard dialog style
         
         self._init_ui()
@@ -71,9 +71,25 @@ class SettingsDialog(QDialog):
         main_layout.addWidget(bottom_frame)
 
     def _init_general_tab(self):
-        layout = QVBoxLayout(self.tab_general)
+        # Create a main layout for the tab and a scroll area
+        tab_layout = QVBoxLayout(self.tab_general)
+        tab_layout.setContentsMargins(0, 0, 0, 0)
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        
+        # Create a widget to hold the form contents
+        content_widget = QWidget()
+        content_widget.setObjectName("SettingsContent")
+        
+        # Apply the original layout logic to the content widget instead of self.tab_general
+        layout = QVBoxLayout(content_widget)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
+        
+        scroll_area.setWidget(content_widget)
+        tab_layout.addWidget(scroll_area)
         
         # --- HEADER ---
         header = QLabel("SYSTEM CONFIGURATION")

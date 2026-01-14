@@ -50,6 +50,12 @@
                 "club"
             ],
             "target_path": "clubbing/{artist} - {title}"
+        },
+        {
+            "match_genres": [
+                "Zabavne"
+            ],
+            "target_path": "Cro {genre}/{year}/{artist} - {title}"
         }
     ],
     "default_rule": "{genre}/{year}/{artist} - {title}"

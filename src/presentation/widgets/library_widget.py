@@ -1457,8 +1457,14 @@ class LibraryWidget(QWidget):
         self.import_progress.setValue(0)
         self.import_count_label.setText(f"0/{len(files)}")
 
+        # Build Conversion Policy based on Settings
+        conversion_policy = {
+            'convert': self.settings_manager.get_conversion_enabled(),
+            'delete_original': self.settings_manager.get_delete_wav_after_conversion()
+        }
+
         # Create and start worker
-        self._import_worker = ImportWorker(self.import_service, files)
+        self._import_worker = ImportWorker(self.import_service, files, conversion_policy=conversion_policy)
         self._import_worker.progress.connect(self._on_import_progress)
         self._import_worker.finished_batch.connect(self._on_import_finished)
         self._import_worker.error.connect(lambda err: QMessageBox.critical(self, "Critial Import Error", err))
