@@ -36,7 +36,7 @@ class ImportService:
         self.settings_manager = settings_manager
         self.conversion_service = conversion_service
 
-    def import_single_file(self, file_path: str, conversion_policy: dict = None) -> Tuple[bool, Optional[int], Optional[str]]:
+    def import_single_file(self, file_path: str, conversion_policy: dict = None) -> Tuple[bool, Optional[int], Optional[str], str]:
         """
         Import a single file into the library.
         Handle WAV conversion interactivity or via policy.
@@ -44,14 +44,14 @@ class ImportService:
         conversion_policy: {'convert': bool, 'delete_original': bool} (Optional)
         
         Returns:
-            Tuple of (Success, SID, ErrorMessage)
+            Tuple of (Success, SID, ErrorMessage, FinalFilePath)
         """
         try:
             # -1. Safety Check: Is this EXACT file already in the library?
             # If so, we must prevent the user from "deleting duplicate" as it would delete the master copy.
             existing_record = self.library_service.get_song_by_path(file_path)
             if existing_record:
-                return False, existing_record.source_id, "ALREADY_IMPORTED: File is already tracked in library"
+                return False, existing_record.source_id, "ALREADY_IMPORTED: File is already tracked in library", file_path
 
             # 0. Handle WAV conversion (Optional via Policy)
             if file_path.lower().endswith('.wav') and self.conversion_service and conversion_policy:
@@ -74,7 +74,7 @@ class ImportService:
             # 2. Check for Hash-based duplicates
             existing_by_hash = self.duplicate_scanner.check_audio_duplicate(audio_hash)
             if existing_by_hash:
-                return False, None, f"Duplicate audio found: {os.path.basename(file_path)}"
+                return False, None, f"Duplicate audio found: {os.path.basename(file_path)}", file_path
 
             # 3. Extract Metadata (Enforce Source of Truth)
             # Use source_id=0 as temporary placeholder
@@ -84,7 +84,7 @@ class ImportService:
             if temp_song.isrc:
                 existing_by_isrc = self.duplicate_scanner.check_isrc_duplicate(temp_song.isrc)
                 if existing_by_isrc:
-                    return False, None, f"Duplicate ISRC found: {temp_song.isrc}"
+                    return False, None, f"Duplicate ISRC found: {temp_song.isrc}", file_path
 
             # 5. Create Database Record (Consolidated Insert)
             temp_song.audio_hash = audio_hash
@@ -113,13 +113,13 @@ class ImportService:
                 if self.settings_manager.get_write_tags():
                     self.metadata_service.write_tags(temp_song)
                 
-                return True, file_id, None
+                return True, file_id, None, file_path
             else:
-                return False, None, "Failed to create database record"
+                return False, None, "Failed to create database record", file_path
                 
         except Exception as e:
             logger.error(f"Error importing {file_path}: {e}", exc_info=True)
-            return False, None, str(e)
+            return False, None, str(e), file_path
 
 
 

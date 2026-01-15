@@ -81,32 +81,16 @@ class SidePanelWidget(QFrame):
         layout.setContentsMargins(10, 0, 10, 0) # Slammed to the top
         
         # 1. Header Area
-        # 1. Header Area (Label + Magic Wand)
+        # 1. Header Area (Just the label, parse button moved to Title field)
         header_container = QWidget()
         header_layout = QHBoxLayout(header_container)
         header_layout.setContentsMargins(0, 5, 0, 5)
-        
+
         self.header_label = QLabel("No Selection")
         self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # T-107: Parse from Filename (File -> Tag) - Moved to Header
-        self.btn_parse = GlowButton("")
-        # Use absolute path resolution relative to this file or root
-        icon_path = os.path.join(os.path.dirname(__file__), "../../../src/resources/parse_filename.svg")
-        # Fallback to direct path if running from root
-        if not os.path.exists(icon_path):
-             icon_path = "src/resources/parse_filename.svg"
-             
-        self.btn_parse.setIcon(QIcon(icon_path))
-        self.btn_parse.setIconSize(QSize(20, 20))
-        self.btn_parse.setObjectName("ParseButton")
-        self.btn_parse.setFixedSize(30, 24)
-        self.btn_parse.setToolTip("Parse Metadata from Filename")
-        self.btn_parse.clicked.connect(self._open_filename_parser)
-        
-        header_layout.addWidget(self.btn_parse)
+
         header_layout.addWidget(self.header_label, 1)
         
         layout.addWidget(header_container)
@@ -338,7 +322,9 @@ class SidePanelWidget(QFrame):
         all_visible = {f.name: f for f in yellberus.FIELDS if f.visible and f.editable}
         
         # Define Explicit Layout Sections (Order Matters)
-        identity_names = ['title', 'performers', 'album', 'composers', 'publisher', ['recording_year', 'isrc']]
+        # Define Explicit Layout Sections (Order Matters)
+        identity_names_top = ['title', 'performers']
+        identity_names_bottom = ['publisher', 'album', 'composers', ['recording_year', 'isrc']]
         attribute_names = ['tags', 'is_active'] # Virtual field merging Genre & Mood + Toggle
         
         core_names_flat = set() # Track handled fields
@@ -363,7 +349,8 @@ class SidePanelWidget(QFrame):
                     core_names_flat.add(item)
             return struct
 
-        identity_struct = build_struct(identity_names)
+        identity_struct_top = build_struct(identity_names_top)
+        identity_struct_bottom = build_struct(identity_names_bottom)
         attribute_struct = build_struct(attribute_names)
                 
         # Advanced is everything else
@@ -499,12 +486,29 @@ class SidePanelWidget(QFrame):
                     header_layout.setContentsMargins(0, 0, 0, 0)
                     header_layout.setSpacing(4)
 
-                    if field.ui_search:
-                         btn_search = GlowButton("")
-                         btn_search.setObjectName("SearchInlineButton")
-                         self._configure_micro_button(btn_search)
-                         btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
-                         header_layout.addWidget(btn_search)
+                    # Special case: Title field gets Parse button instead of Search
+                    if field.name == 'title':
+                        btn_parse_inline = GlowButton("")
+                        # Use absolute path resolution relative to this file or root
+                        icon_path = os.path.join(os.path.dirname(__file__), "../../../src/resources/parse_filename.svg")
+                        if not os.path.exists(icon_path):
+                            icon_path = "src/resources/parse_filename.svg"
+                        btn_parse_inline.setIcon(QIcon(icon_path))
+                        btn_parse_inline.setIconSize(QSize(20, 20))  # Larger icon for better visibility
+                        btn_parse_inline.setObjectName("ParseInlineButton")
+                        # Make it bigger than micro buttons for easy clicking
+                        btn_parse_inline.setFixedHeight(28)  # Match footer button height
+                        btn_parse_inline.setFixedWidth(36)   # Same as search action button
+                        btn_parse_inline.setToolTip("Parse Metadata from Filename")
+                        btn_parse_inline.clicked.connect(self._open_filename_parser)
+                        header_layout.addWidget(btn_parse_inline)
+                    elif field.ui_search:
+                        # Other fields keep their search button
+                        btn_search = GlowButton("")
+                        btn_search.setObjectName("SearchInlineButton")
+                        self._configure_micro_button(btn_search)
+                        btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                        header_layout.addWidget(btn_search)
 
                     header_layout.addWidget(label, 1)
                     module_layout.addWidget(header_row)
@@ -530,7 +534,8 @@ class SidePanelWidget(QFrame):
                 continue
                 # Spacing handled via CSS margin-bottom
 
-        add_group(identity_struct, "Identity", show_line=False)
+        add_group(identity_struct_top, "Identity", show_line=False)
+        add_group(identity_struct_bottom, "Identity Extended", show_line=True)
         add_group(attribute_struct, "Tags", show_line=True)
         add_group(adv_fields, "Advanced Details", show_line=True, compact=True)
         
@@ -698,7 +703,9 @@ class SidePanelWidget(QFrame):
                     if field.required:
                         val = self._get_effective_value(song.source_id, field.name, getattr(song, field.model_attr or field.name, ""))
                         
-                        is_field_error = field.name in raw_failed
+                        is_format_invalid = field.name in raw_failed
+                        is_missing = not field.is_complete(val)
+                        is_field_error = is_format_invalid or is_missing
                         icon = "❌" if is_field_error else "✅"
                         
                         display_val = f"'{val}'" if val and str(val).strip() else "[EMPTY]"
@@ -2365,13 +2372,14 @@ class SidePanelWidget(QFrame):
         results: {source_id: {field: value}}
         """
         updates_count = 0
-        
+        isrc_conflicts = []  # Track ISRC conflicts for warning
+
         # Map IDs to Song objects for DB fallback
         song_map = {s.source_id: s for s in self.current_songs}
-        
+
         for source_id, data in results.items():
             updates_count += 1
-            
+
             # Helper to stage a value
             def stage(field, new_val):
                 if source_id not in self._staged_changes:
@@ -2383,20 +2391,113 @@ class SidePanelWidget(QFrame):
                 new_title = data["title"]
                 if new_title and str(new_title).strip():
                     stage("title", new_title)
-            
-            # Artist (Unified / Performers)
+
+            # Artist (Unified / Performers) - APPEND if not exists
             if "performers" in data:
-                # SidePanel treats performers as list
-                stage("performers", [data["performers"]])
-            
-            # Album
+                val = data["performers"].strip()
+                if val:
+                    # Get DB value for fallback
+                    song_obj = song_map.get(source_id)
+                    db_performers = getattr(song_obj, 'performers', []) if song_obj else []
+
+                    # Get effective performers (Staged or DB)
+                    current_performers = self._get_effective_value(source_id, "performers", db_performers) or []
+
+                    # Ensure list
+                    if not isinstance(current_performers, list):
+                        current_performers = list(current_performers) if current_performers else []
+
+                    # Append if not present
+                    if val not in current_performers:
+                        updated_performers = list(current_performers) + [val]
+                        stage("performers", updated_performers)
+
+            # Album - APPEND if not exists
             if "album" in data:
-                 stage("album", [data["album"]]) # Album is List field in UI (Chips)
-                 
-            # Publisher
+                val = data["album"].strip()
+                if val:
+                    # Get DB value for fallback
+                    song_obj = song_map.get(source_id)
+                    db_album = getattr(song_obj, 'album', []) if song_obj else []
+
+                    # Normalize to list
+                    if isinstance(db_album, str):
+                        db_album = [db_album] if db_album else []
+
+                    # Get effective album (Staged or DB)
+                    current_album = self._get_effective_value(source_id, "album", db_album) or []
+
+                    # Ensure list
+                    if not isinstance(current_album, list):
+                        current_album = [current_album] if current_album else []
+
+                    # Append if not present
+                    if val not in current_album:
+                        updated_album = list(current_album) + [val]
+                        stage("album", updated_album)
+
+            # Publisher - APPEND if not exists (get-or-create)
             if "publisher" in data:
-                # Publisher is List field in UI (Chips)
-                stage("publisher", [data["publisher"]])
+                val = data["publisher"].strip()
+                if val:
+                    # Get or create publisher entity
+                    from ...business.services.publisher_service import PublisherService
+                    pub_service = PublisherService()
+                    publisher, _ = pub_service.get_or_create(val)
+
+                    # Get DB value for fallback
+                    song_obj = song_map.get(source_id)
+                    db_publisher = getattr(song_obj, 'publisher', []) if song_obj else []
+
+                    # Normalize to list
+                    if isinstance(db_publisher, str):
+                        db_publisher = [db_publisher] if db_publisher else []
+
+                    # Get effective publisher (Staged or DB)
+                    current_publisher = self._get_effective_value(source_id, "publisher", db_publisher) or []
+
+                    # Ensure list
+                    if not isinstance(current_publisher, list):
+                        current_publisher = [current_publisher] if current_publisher else []
+
+                    # Append if not present
+                    if val not in current_publisher:
+                        updated_publisher = list(current_publisher) + [val]
+                        stage("publisher", updated_publisher)
+
+                        # Also track publisher_id for precise linking (T-180)
+                        db_publisher_id = getattr(song_obj, 'publisher_id', []) if song_obj else []
+                        if isinstance(db_publisher_id, int):
+                            db_publisher_id = [db_publisher_id]
+                        current_publisher_id = self._get_effective_value(source_id, "publisher_id", db_publisher_id) or []
+                        if not isinstance(current_publisher_id, list):
+                            current_publisher_id = [current_publisher_id] if current_publisher_id else []
+
+                        if publisher.publisher_id not in current_publisher_id:
+                            updated_publisher_id = list(current_publisher_id) + [publisher.publisher_id]
+                            stage("publisher_id", updated_publisher_id)
+
+            # ISRC - Warn on conflicts
+            if "isrc" in data:
+                val = data["isrc"].strip().upper()  # ISRC should be uppercase
+                if val:
+                    # Get DB value for fallback
+                    song_obj = song_map.get(source_id)
+                    db_isrc = getattr(song_obj, 'isrc', None) if song_obj else None
+
+                    # Get effective ISRC (Staged or DB)
+                    current_isrc = self._get_effective_value(source_id, "isrc", db_isrc)
+
+                    if current_isrc and current_isrc != val:
+                        # Conflict detected
+                        isrc_conflicts.append({
+                            'song': song_obj,
+                            'source_id': source_id,
+                            'existing': current_isrc,
+                            'new': val
+                        })
+                    elif not current_isrc:
+                        stage("isrc", val)
 
             # Year
             if "recording_year" in data:
@@ -2409,32 +2510,107 @@ class SidePanelWidget(QFrame):
                 try:
                     stage("bpm", int(data["bpm"]))
                 except: pass
-                
+
             # Genre (Tag)
             if "genre" in data:
                 genre = data["genre"]
                 new_tag = f"Genre:{genre}"
-                
+
                 # Get DB value for fallback
                 song_obj = song_map.get(source_id)
                 db_tags = getattr(song_obj, 'tags', []) if song_obj else []
-                
+
                 # Get effective tags (Staged or DB)
                 current_tags = self._get_effective_value(source_id, "tags", db_tags) or []
-                
+
                 # Ensure list (safety)
-                if not isinstance(current_tags, list): 
+                if not isinstance(current_tags, list):
                     current_tags = list(current_tags) if current_tags else []
-                
+
                 # Append if not present
                 if new_tag not in current_tags:
                     updated_tags = list(current_tags) + [new_tag]
                     stage("tags", updated_tags)
+
+        # Handle ISRC conflicts
+        if isrc_conflicts:
+            self._handle_isrc_conflicts_staging(isrc_conflicts)
 
         if updates_count > 0:
             # Refresh UI to show new staged values
             self._refresh_field_values()
             self._update_save_state()
             self._validate_done_gate()
-            
+
             self.staging_changed.emit(list(self._staged_changes.keys()))
+
+    def _handle_isrc_conflicts_staging(self, conflicts: list):
+        """
+        Handle ISRC conflicts in staging mode by asking user which value to use.
+        conflicts: List of dicts with keys: 'song', 'source_id', 'existing', 'new'
+        """
+        from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QLabel, QRadioButton, QDialogButtonBox
+
+        if not conflicts:
+            return
+
+        # Build summary message
+        conflict_count = len(conflicts)
+        summary = f"Found {conflict_count} ISRC conflict(s). ISRC codes should be unique identifiers.\n\n"
+
+        for i, conflict in enumerate(conflicts[:5], 1):  # Show first 5
+            song_title = conflict['song'].title if conflict['song'] else "Unknown"
+            summary += f"{i}. '{song_title}':\n"
+            summary += f"   Existing: {conflict['existing']}\n"
+            summary += f"   From filename: {conflict['new']}\n\n"
+
+        if conflict_count > 5:
+            summary += f"... and {conflict_count - 5} more.\n\n"
+
+        summary += "What would you like to do?"
+
+        # Create choice dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("ISRC Conflicts Detected")
+        dialog.resize(600, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        msg_label = QLabel(summary)
+        msg_label.setWordWrap(True)
+        layout.addWidget(msg_label)
+
+        # Options
+        keep_existing = QRadioButton("Keep existing ISRC values (recommended)")
+        keep_existing.setChecked(True)
+        layout.addWidget(keep_existing)
+
+        overwrite = QRadioButton("Overwrite with values from filenames")
+        layout.addWidget(overwrite)
+
+        skip = QRadioButton("Skip these songs entirely")
+        layout.addWidget(skip)
+
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if overwrite.isChecked():
+                # Stage the new ISRC values
+                for conflict in conflicts:
+                    source_id = conflict['source_id']
+                    if source_id not in self._staged_changes:
+                        self._staged_changes[source_id] = {}
+                    self._staged_changes[source_id]['isrc'] = conflict['new']
+
+                # Refresh UI
+                self._refresh_field_values()
+                self._update_save_state()
+                QMessageBox.information(self, "ISRCs Staged", f"Staged {len(conflicts)} ISRC updates. Click Save to apply.")
+            elif skip.isChecked():
+                # Do nothing, conflicts are already skipped
+                QMessageBox.information(self, "Skipped", f"Skipped {len(conflicts)} songs with ISRC conflicts.")
+            # else keep_existing: already handled (nothing done during initial processing)

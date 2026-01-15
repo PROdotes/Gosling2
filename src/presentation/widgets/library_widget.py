@@ -2810,38 +2810,98 @@ class LibraryWidget(QWidget):
         results: {source_id: {field: value}}
         """
         updated_count = 0
-        
+        isrc_conflicts = []  # Track ISRC conflicts for warning
+
         for source_id, data in results.items():
             song = self.library_service.get_song_by_id(source_id)
             if not song: continue
-            
+
             changed = False
-            
+
             # 1. Update Song Object
             # Mapping from PatternEngine tokens to Song attributes
-            
+
             # Title
             if "title" in data:
                 if song.title != data["title"]:
                     song.title = data["title"]
                     changed = True
-            
-            # Artist (Unified / Performers)
+
+            # Artist (Unified / Performers) - APPEND if not exists
             if "performers" in data:
-                val = data["performers"]
-                if not song.performers or (len(song.performers) == 1 and song.performers[0] != val):
-                    song.performers = [val]
-                    song.unified_artist = val
-                    changed = True
-            
-            # Album
+                val = data["performers"].strip()
+                if val:
+                    # Ensure performers is a list
+                    if not song.performers:
+                        song.performers = []
+
+                    # Add only if not already present
+                    if val not in song.performers:
+                        song.performers.append(val)
+                        # Update unified_artist if it was the first performer
+                        if len(song.performers) == 1:
+                            song.unified_artist = val
+                        changed = True
+
+            # Album - APPEND if not exists
             if "album" in data:
-                 val = data["album"]
-                 # Just set the string/list if different?
-                 current = song.album if isinstance(song.album, str) else (song.album[0] if song.album else "")
-                 if current != val:
-                     song.album = val 
-                     changed = True
+                val = data["album"].strip()
+                if val:
+                    # Normalize to list
+                    if song.album is None:
+                        song.album = []
+                    elif isinstance(song.album, str):
+                        song.album = [song.album] if song.album else []
+
+                    # Add only if not already present
+                    if val not in song.album:
+                        song.album.append(val)
+                        changed = True
+
+            # Publisher - APPEND if not exists (get-or-create)
+            if "publisher" in data:
+                val = data["publisher"].strip()
+                if val:
+                    # Get or create publisher entity
+                    from ...business.services.publisher_service import PublisherService
+                    pub_service = PublisherService()
+                    publisher, _ = pub_service.get_or_create(val)
+
+                    # Normalize to list
+                    if song.publisher is None:
+                        song.publisher = []
+                    elif isinstance(song.publisher, str):
+                        song.publisher = [song.publisher] if song.publisher else []
+
+                    # Add only if not already present
+                    if val not in song.publisher:
+                        song.publisher.append(val)
+
+                        # Also track publisher_id for precise linking (T-180)
+                        if not hasattr(song, 'publisher_id') or song.publisher_id is None:
+                            song.publisher_id = []
+                        elif isinstance(song.publisher_id, int):
+                            song.publisher_id = [song.publisher_id]
+
+                        if publisher.publisher_id not in song.publisher_id:
+                            song.publisher_id.append(publisher.publisher_id)
+
+                        changed = True
+
+            # ISRC - Warn on conflicts
+            if "isrc" in data:
+                val = data["isrc"].strip().upper()  # ISRC should be uppercase
+                if val:
+                    if song.isrc and song.isrc != val:
+                        # Conflict detected
+                        isrc_conflicts.append({
+                            'song': song,
+                            'existing': song.isrc,
+                            'new': val
+                        })
+                    elif not song.isrc:
+                        song.isrc = val
+                        changed = True
 
             # Year
             if "recording_year" in data:
@@ -2860,7 +2920,7 @@ class LibraryWidget(QWidget):
                         song.bpm = b
                         changed = True
                 except: pass
-                
+
             # Genre (Tag)
             if "genre" in data:
                 genre = data["genre"]
@@ -2872,12 +2932,93 @@ class LibraryWidget(QWidget):
             if changed:
                 # 2. Persist to DB
                 self.library_service.update_song(song)
-                
+
                 # 3. Persist to File (ID3) - Immediate write
-                self.metadata_service.write_tags(song)
+                try:
+                    self.metadata_service.write_tags(song)
+                except Exception as e:
+                    # Handle validation errors from yellberus gracefully
+                    print(f"Warning: Could not write tags for {song.title}: {e}")
+
                 updated_count += 1
+
+        # Handle ISRC conflicts
+        if isrc_conflicts:
+            self._handle_isrc_conflicts(isrc_conflicts)
 
         if updated_count > 0:
             self.load_library()
             from PyQt6.QtWidgets import QMessageBox
             QMessageBox.information(self, "Metadata Parsed", f"Successfully updated {updated_count} songs from filenames.")
+
+    def _handle_isrc_conflicts(self, conflicts: list):
+        """
+        Handle ISRC conflicts by asking user which value to use.
+        conflicts: List of dicts with keys: 'song', 'existing', 'new'
+        """
+        from PyQt6.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QLabel, QRadioButton, QDialogButtonBox
+
+        if not conflicts:
+            return
+
+        # Build summary message
+        conflict_count = len(conflicts)
+        summary = f"Found {conflict_count} ISRC conflict(s). ISRC codes should be unique identifiers.\n\n"
+
+        for i, conflict in enumerate(conflicts[:5], 1):  # Show first 5
+            song_title = conflict['song'].title or "Unknown"
+            summary += f"{i}. '{song_title}':\n"
+            summary += f"   Existing: {conflict['existing']}\n"
+            summary += f"   From filename: {conflict['new']}\n\n"
+
+        if conflict_count > 5:
+            summary += f"... and {conflict_count - 5} more.\n\n"
+
+        summary += "What would you like to do?"
+
+        # Create choice dialog
+        dialog = QDialog(self)
+        dialog.setWindowTitle("ISRC Conflicts Detected")
+        dialog.resize(600, 400)
+
+        layout = QVBoxLayout(dialog)
+
+        msg_label = QLabel(summary)
+        msg_label.setWordWrap(True)
+        layout.addWidget(msg_label)
+
+        # Options
+        keep_existing = QRadioButton("Keep existing ISRC values (recommended)")
+        keep_existing.setChecked(True)
+        layout.addWidget(keep_existing)
+
+        overwrite = QRadioButton("Overwrite with values from filenames")
+        layout.addWidget(overwrite)
+
+        skip = QRadioButton("Skip these songs entirely")
+        layout.addWidget(skip)
+
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if overwrite.isChecked():
+                # Apply the new ISRC values
+                for conflict in conflicts:
+                    song = conflict['song']
+                    song.isrc = conflict['new']
+                    self.library_service.update_song(song)
+                    try:
+                        self.metadata_service.write_tags(song)
+                    except Exception as e:
+                        print(f"Warning: Could not write ISRC for {song.title}: {e}")
+
+                self.load_library()
+                QMessageBox.information(self, "ISRCs Updated", f"Updated {len(conflicts)} ISRC values from filenames.")
+            elif skip.isChecked():
+                # Do nothing, conflicts are already skipped
+                QMessageBox.information(self, "Skipped", f"Skipped {len(conflicts)} songs with ISRC conflicts.")
+            # else keep_existing: already handled (nothing done during initial processing)

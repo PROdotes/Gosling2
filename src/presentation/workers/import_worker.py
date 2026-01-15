@@ -47,16 +47,16 @@ class ImportWorker(QThread):
             if not self._is_running:
                 break
 
-            import_success, sid, err = self.import_service.import_single_file(file_path, conversion_policy=self.conversion_policy)
+            import_success, sid, err, final_path = self.import_service.import_single_file(file_path, conversion_policy=self.conversion_policy)
             
             if import_success:
                 success_list.append({
-                    'path': file_path,
+                    'path': final_path,
                     'id': sid
                 })
             else:
                 failure_list.append({
-                    'path': file_path,
+                    'path': final_path,
                     'error': err
                 })
             
