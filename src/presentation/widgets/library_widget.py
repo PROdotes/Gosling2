@@ -1609,160 +1609,53 @@ class LibraryWidget(QWidget):
 
     def _show_table_context_menu(self, position) -> None:
         menu = QMenu()
+        indexes = self.table_view.selectionModel().selectedRows()
         
-        # 1. Global / Library Actions
-        import_action = QAction("Import File(s)", self)
-        import_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
-        import_action.triggered.connect(self._import_files)
-        menu.addAction(import_action)
-
-        scan_action = QAction("Scan Folder", self)
-        scan_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_DirIcon))
-        scan_action.triggered.connect(self._scan_folder)
-        menu.addAction(scan_action)
-
-        refresh_action = QAction("Refresh Library", self)
-        refresh_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_BrowserReload))
-        refresh_action.triggered.connect(lambda: self.load_library())
-        menu.addAction(refresh_action)
-
-        menu.addSeparator()
-
-        # 2. Playback / Primary Actions
-        play_now_action = QAction("Play Now", self)
-        play_now_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay))
+        # ═══════════════════════════════════════════════════════════════════════
+        # 1. PLAYBACK & QUEUE (Top Priority)
+        # ═══════════════════════════════════════════════════════════════════════
+        play_now_action = QAction("▶  Play Now", self)
         play_now_action.triggered.connect(self._on_play_selected_immediately)
         menu.addAction(play_now_action)
 
-        add_to_playlist_action = QAction("Add to Playlist", self)
-        add_to_playlist_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
+        add_to_playlist_action = QAction("➕  Add to Playlist", self)
         add_to_playlist_action.triggered.connect(self._emit_add_to_playlist)
         menu.addAction(add_to_playlist_action)
         
-        # Smart Status Toggle
-        indexes = self.table_view.selectionModel().selectedRows()
+        menu.addSeparator()
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # 2. FILE OPERATIONS (Reveal, Rename, Convert)
+        # ═══════════════════════════════════════════════════════════════════════
         if indexes:
+            # Reveal in Explorer
+            path_col = self.field_indices.get('path', -1)
+            if path_col >= 0:
+                source_idx = self.proxy_model.mapToSource(indexes[0])
+                item_path = self.library_model.item(source_idx.row(), path_col)
+                if item_path:
+                    reveal_path = item_path.data(Qt.ItemDataRole.DisplayRole)
+                    if reveal_path:
+                        reveal_action = QAction("🗂️  Reveal in Explorer", self)
+                        reveal_action.triggered.connect(lambda: self._reveal_in_explorer(str(reveal_path)))
+                        menu.addAction(reveal_action)
+
+            # Analyze Status for Rename Validation (Must be Done)
             statuses = []
             for idx in indexes:
                 source_idx = self.proxy_model.mapToSource(idx)
-                # COL_IS_DONE is column 9
-                item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
-                # Checkbox state: Checked=2, Unchecked=0
-                is_done = (item.checkState() == Qt.CheckState.Checked) if item else False
-                statuses.append(is_done)
-            
+                item_stat = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
+                is_done_val = (item_stat.checkState() == Qt.CheckState.Checked) if item_stat else False
+                statuses.append(is_done_val)
             all_done = all(statuses)
-            all_not_done = all(not s for s in statuses)
-            
-            status_action = QAction(self)
-            if all_done:
-                status_action.setText("Mark as Not Done")
-                status_action.triggered.connect(lambda: self._toggle_status(False))
-            elif all_not_done:
-                status_action.setText("Mark as Done")
-                # Check if all selected items are valid (Enabled)
-                all_valid = True
-                for idx in indexes:
-                    source_idx = self.proxy_model.mapToSource(idx)
-                    item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
-                    if not item.isEnabled():
-                        all_valid = False
-                        break
-                
-                if not all_valid:
-                    status_action.setEnabled(False)
-                    status_action.setToolTip("Cannot mark as Done: Some selected items are incomplete")
-                    status_action.setText("Mark as Done (Fix Errors First)")
-                
-                status_action.triggered.connect(lambda: self._toggle_status(True))
-            else:
-                status_action.setText("Mixed Status (Cannot Toggle)")
-                status_action.setEnabled(False)
-            
-            menu.addAction(status_action)
 
-        # T-92: Active Toggle Action (Obvious Path)
-        active_col = self.field_indices.get('is_active', -1)
-        if active_col != -1 and indexes:
-             actives = []
-             for idx in indexes:
-                 source_idx = self.proxy_model.mapToSource(idx)
-                 item = self.library_model.item(source_idx.row(), active_col)
-                 if item:
-                    val = item.data(Qt.ItemDataRole.UserRole)
-                    actives.append(str(val).lower() in ('true', '1'))
-             
-             all_active = all(actives)
-             all_inactive = all(not a for a in actives)
-             
-             active_action = QAction(self)
-             if all_active:
-                 active_action.setText("Set Inactive")
-                 active_action.triggered.connect(lambda: self._toggle_active(False))
-             elif all_inactive:
-                 active_action.setText("Set Active")
-                 active_action.triggered.connect(lambda: self._toggle_active(True))
-             else:
-                 # Mixed: Default to Promoting to Active
-                 active_action.setText("Set Active")
-                 active_action.triggered.connect(lambda: self._toggle_active(True))
+            # Rename Action (with full validation logic)
+            rename_action = QAction("📝  Rename File(s)", self)
+            can_rename = True
+            rename_reason = ""
             
-             menu.addAction(active_action)
-        
-        menu.addSeparator()
-
-        # 2. Information / Tools
-        show_id3_action = QAction("Show ID3 Data", self)
-        show_id3_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
-        show_id3_action.triggered.connect(self._show_id3_tags)
-        menu.addAction(show_id3_action)
-
-        # 2b. Converter Surgery (WAV -> MP3)
-        if indexes and self.conversion_service:
-            # Check if any WAVs are selected
-            has_wav = False
-            path_col = self.field_indices.get('path', -1)
-            for idx in indexes:
-                source_idx = self.proxy_model.mapToSource(idx)
-                item = self.library_model.item(source_idx.row(), path_col)
-                if item and item.text().lower().endswith(".wav"):
-                    has_wav = True
-                    break
-            
-            if has_wav:
-                menu.addSeparator()
-                convert_action = QAction("CONVERT TO MP3", self)
-                # Amber themed icon or just standard
-                convert_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_MediaPlay)) 
-                convert_action.triggered.connect(self._on_convert_selected)
-                
-                if not self.settings_manager.get_conversion_enabled():
-                    convert_action.setEnabled(False)
-                    convert_action.setToolTip("Conversion disabled in settings.")
-                
-                menu.addAction(convert_action)
-        
-        # 2c. Audit History (T-82)
-        if len(indexes) == 1:
-            menu.addSeparator()
-            audit_action = QAction("Show Audit History", self)
-            audit_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogInfoView))
-            audit_action.triggered.connect(self._show_selected_audit_history)
-            menu.addAction(audit_action)
-        
-        menu.addSeparator()
-        
-        # 3. Destructive Actions
-        rename_action = QAction("Rename File(s)", self)
-        rename_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileIcon))
-        
-        # Safety Check: Rename requires DONE and CLEAN state
-        can_rename = True
-        rename_reason = ""
-        
-        if indexes:
-            # 1. Check Completeness (Must be Done)
-            if 'all_done' in locals() and not all_done:
+            # 1. Check Completeness
+            if not all_done:
                 can_rename = False
                 rename_reason = "Files must be marked DONE"
             
@@ -1779,26 +1672,18 @@ class LibraryWidget(QWidget):
                         except ValueError:
                             sid = str(raw_val)
                         
-                            if sid in self._dirty_ids:
-                                can_rename = False
-                                rename_reason = "Unsaved changes pending"
-                                break
+                        if sid in self._dirty_ids:
+                            can_rename = False
+                            rename_reason = "Unsaved changes pending"
+                            break
 
-            # 3. Check Uniqueness (File System Conflict)
+            # 3. Check Uniqueness
             if can_rename:
-                # We need to check if target paths exist
-                # This requires fetching the Song objects to perform precise calculation
                 id_col = self.field_indices.get('file_id', -1)
-                
-                # Limit check to first 50 items to prevent UI freeze on massive selection
-                # (Renaming 1000 items via context menu is an edge case we accept lag for, or we just check first few)
                 check_limit = 50
                 checked_count = 0
-                
                 for idx in indexes:
-                    if checked_count >= check_limit:
-                        break
-                        
+                    if checked_count >= check_limit: break
                     source_idx = self.proxy_model.mapToSource(idx)
                     item = self.library_model.item(source_idx.row(), id_col)
                     if item:
@@ -1809,53 +1694,151 @@ class LibraryWidget(QWidget):
                                 song = self.library_service.get_song_by_id(sid)
                                 if song:
                                     target = self.renaming_service.calculate_target_path(song)
-                                    # Skip if target is same as current (already renamed)
-                                    # Normalize paths for comparison
                                     if song.path and os.path.normpath(song.path) == os.path.normpath(target):
                                         continue
-                                        
                                     if self.renaming_service.check_conflict(target):
                                         can_rename = False
                                         rename_reason = f"Target exists: {os.path.basename(target)}"
                                         break
-                                        
                             checked_count += 1
-                         except Exception:
-                            # If we can't fetch or calculate, assume safe? Or fail safe?
-                            # Fail safe -> Don't rename what you can't verify
-                            pass
+                         except Exception: pass
 
-        if not can_rename:
-            rename_action.setEnabled(False)
-            rename_action.setText(f"Rename File(s) ({rename_reason})")
-            rename_action.setToolTip(f"Disabled: {rename_reason}")
+            if not can_rename:
+                rename_action.setEnabled(False)
+                rename_action.setText(f"📝  Rename File(s) ({rename_reason})")
+                rename_action.setToolTip(f"Disabled: {rename_reason}")
 
-        rename_action.triggered.connect(self.rename_selection)
-        menu.addAction(rename_action)
+            rename_action.triggered.connect(self.rename_selection)
+            menu.addAction(rename_action)
 
-        # T-107: Filename Parser Action
+            # Convert to MP3
+            if self.conversion_service:
+                has_wav = False
+                path_col_c = self.field_indices.get('path', -1)
+                for idx in indexes:
+                    source_idx = self.proxy_model.mapToSource(idx)
+                    item = self.library_model.item(source_idx.row(), path_col_c)
+                    if item and item.text().lower().endswith(".wav"):
+                        has_wav = True
+                        break
+                
+                if has_wav:
+                    convert_action = QAction("🔧  Convert to MP3", self)
+                    convert_action.triggered.connect(self._on_convert_selected)
+                    if not self.settings_manager.get_conversion_enabled():
+                        convert_action.setEnabled(False)
+                        convert_action.setToolTip("Conversion disabled in settings.")
+                    menu.addAction(convert_action)
+
         menu.addSeparator()
-        parse_action = QAction("Parse Metadata from Filename...", self)
-        parse_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
-        parse_action.triggered.connect(self._open_filename_parser)
-        menu.addAction(parse_action)
 
-        delete_action = QAction("Delete from Library", self)
-        delete_action.setIcon(self._get_colored_icon(QStyle.StandardPixmap.SP_TrashIcon))
+        # ═══════════════════════════════════════════════════════════════════════
+        # 3. WORKFLOW STATUS
+        # ═══════════════════════════════════════════════════════════════════════
+        if indexes:
+            # Re-calculate stats for action text logic from above
+            # (We already have 'statuses' and 'all_done' from previous block)
+            all_not_done = all(not s for s in statuses)
+            
+            status_action = QAction(self)
+            if all_done:
+                status_action.setText("☑️  Mark as Not Done")
+                status_action.triggered.connect(lambda: self._toggle_status(False))
+            elif all_not_done:
+                status_action.setText("✅  Mark as Done")
+                # Check validity
+                all_valid = True
+                for idx in indexes:
+                    source_idx = self.proxy_model.mapToSource(idx)
+                    item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
+                    if not item.isEnabled():
+                        all_valid = False
+                        break
+                if not all_valid:
+                    status_action.setEnabled(False)
+                    status_action.setToolTip("Cannot mark as Done: Some selected items are incomplete")
+                    status_action.setText("✅  Mark as Done (Fix Errors First)")
+                status_action.triggered.connect(lambda: self._toggle_status(True))
+            else:
+                status_action.setText("⚠️  Mixed Status (Cannot Toggle)")
+                status_action.setEnabled(False)
+            
+            menu.addAction(status_action)
+
+            # Active/Inactive
+            active_col = self.field_indices.get('is_active', -1)
+            if active_col != -1:
+                 actives = []
+                 for idx in indexes:
+                     source_idx = self.proxy_model.mapToSource(idx)
+                     item = self.library_model.item(source_idx.row(), active_col)
+                     if item:
+                        val = item.data(Qt.ItemDataRole.UserRole)
+                        actives.append(str(val).lower() in ('true', '1'))
+                 
+                 all_active = all(actives)
+                 all_inactive = all(not a for a in actives)
+                 
+                 active_action = QAction(self)
+                 if all_active:
+                     active_action.setText("⏸️  Set Inactive")
+                     active_action.triggered.connect(lambda: self._toggle_active(False))
+                 elif all_inactive:
+                     active_action.setText("⚡  Set Active")
+                     active_action.triggered.connect(lambda: self._toggle_active(True))
+                 else:
+                     active_action.setText("⚡  Set Active")
+                     active_action.triggered.connect(lambda: self._toggle_active(True))
+                
+                 menu.addAction(active_action)
+
+            menu.addSeparator()
+
+        # ═══════════════════════════════════════════════════════════════════════
+        # 4. DATA & TOOLS (Submenus)
+        # ═══════════════════════════════════════════════════════════════════════
+        
+        # Metadata Submenu
+        meta_menu = menu.addMenu("📋  Metadata")
+        
+        show_id3_action = QAction("Show ID3 Data", self)
+        show_id3_action.triggered.connect(self._show_id3_tags)
+        meta_menu.addAction(show_id3_action)
+        
+        parse_action = QAction("Parse from Filename...", self)
+        parse_action.triggered.connect(self._open_filename_parser)
+        meta_menu.addAction(parse_action)
+        
+        if len(indexes) == 1:
+            audit_action = QAction("Show Audit History", self)
+            audit_action.triggered.connect(self._show_selected_audit_history)
+            meta_menu.addAction(audit_action)
+
+        # Library Tools Submenu
+        lib_menu = menu.addMenu("📚  Library Tools")
+        
+        import_action = QAction("Import File(s)...", self)
+        import_action.triggered.connect(self._import_files)
+        lib_menu.addAction(import_action)
+
+        scan_action = QAction("Scan Folder...", self)
+        scan_action.triggered.connect(self._scan_folder)
+        lib_menu.addAction(scan_action)
+        
+        lib_menu.addSeparator()
+        
+        refresh_action = QAction("Refresh Library", self)
+        refresh_action.triggered.connect(lambda: self.load_library())
+        lib_menu.addAction(refresh_action)
+
+        menu.addSeparator()
+        
+        # ═══════════════════════════════════════════════════════════════════════
+        # 5. DESTRUCTIVE
+        # ═══════════════════════════════════════════════════════════════════════
+        delete_action = QAction("🗑️  Delete from Library", self)
         delete_action.triggered.connect(self._delete_selected)
         menu.addAction(delete_action)
-
-        if indexes:
-            path_col = self.field_indices.get('path', -1)
-            if path_col >= 0:
-                source_idx = self.proxy_model.mapToSource(indexes[0])
-                item_path = self.library_model.item(source_idx.row(), path_col)
-                if item_path:
-                    reveal_path = item_path.data(Qt.ItemDataRole.DisplayRole)
-                    if reveal_path:
-                        reveal_action = QAction("Reveal in Explorer", self)
-                        reveal_action.triggered.connect(lambda: self._reveal_in_explorer(str(reveal_path)))
-                        menu.addAction(reveal_action)
 
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 

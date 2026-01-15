@@ -158,6 +158,12 @@ class EntityListWidget(QWidget):
         else:
             self._init_stack_mode(layout, add_tooltip)
     
+    # Delimiters that suggest multiple artists in a single field
+    ARTIST_SPLIT_DELIMITERS = [
+        ',', ' feat.', ' feat ', ' ft.', ' ft ', ' & ', ' featuring ', 
+        ' with ', ' vs ', ' vs. ', ' and ', ' x ', ' w/', ' pres.', ' presents '
+    ]
+    
     def _init_cloud_mode(self, layout: QVBoxLayout, add_tooltip: str):
         """Initialize horizontal chip flow mode."""
         self._inner_widget = ChipTrayWidget(
@@ -180,6 +186,18 @@ class EntityListWidget(QWidget):
             self._inner_widget.add_requested.connect(self._on_add_clicked)
         
         layout.addWidget(self._inner_widget)
+        
+        # Split button (for ARTISTs only) - shows when delimiters detected
+        if self.entity_type == EntityType.ARTIST and self.allow_edit:
+            self._split_btn = GlowButton("✂️ Split")
+            self._split_btn.setObjectName("SplitSuggestionButton")
+            self._split_btn.setToolTip("Multiple artists detected - click to split")
+            self._split_btn.setFixedHeight(22)
+            self._split_btn.clicked.connect(self._on_split_button_clicked)
+            self._split_btn.setVisible(False)  # Hidden by default
+            layout.addWidget(self._split_btn)
+        else:
+            self._split_btn = None
     
     def _init_stack_mode(self, layout: QVBoxLayout, add_tooltip: str):
         """Initialize vertical list mode using QListWidget."""
@@ -233,18 +251,26 @@ class EntityListWidget(QWidget):
     def _set_cloud_items(self, items: list):
         """Set items in chip tray mode."""
         chips = []
+        labels = []  # Track labels for delimiter detection
         for item in items:
             if isinstance(item, tuple):
                 # Already in chip format
                 chips.append(item)
+                labels.append(item[1] if len(item) > 1 else "")
             else:
                 # Convert entity to chip tuple
                 entity_id = self._get_entity_id(item)
                 label = get_entity_display(self.entity_type, item)
                 icon = get_entity_icon(self.entity_type, item)
                 chips.append((entity_id, label, icon, False, False, "", "amber", False))
+                labels.append(label)
         
         self._inner_widget.set_chips(chips)
+        
+        # Update split button visibility (ARTIST only)
+        if self._split_btn is not None:
+            needs_split = self._has_splittable_items(labels)
+            self._split_btn.setVisible(needs_split)
     
     def _set_stack_items(self, items: list):
         """Set items in list mode."""
@@ -544,6 +570,45 @@ class EntityListWidget(QWidget):
                 return getattr(entity, attr)
         return 0
     
+    def _has_splittable_items(self, labels: list) -> bool:
+        """Check if any label contains split delimiters."""
+        for label in labels:
+            if self._has_delimiter(label):
+                return True
+        return False
+    
+    def _has_delimiter(self, text: str) -> bool:
+        """Check if text contains common artist delimiters."""
+        if not text:
+            return False
+        text_lower = text.lower()
+        return any(delim in text_lower for delim in self.ARTIST_SPLIT_DELIMITERS)
+    
+    def _on_split_button_clicked(self):
+        """Handle split button click - find first splittable chip and open dialog."""
+        if self.layout_mode != LayoutMode.CLOUD:
+            return
+            
+        # Find the first chip with delimiters
+        names = self._inner_widget.get_names() if hasattr(self._inner_widget, 'get_names') else []
+        
+        for label in names:
+            if self._has_delimiter(label):
+                # Find the entity_id for this label
+                # We need to search the chips
+                entity_id = self._find_entity_id_by_label(label)
+                if entity_id:
+                    self._on_visual_split(entity_id, label)
+                    return
+    
+    def _find_entity_id_by_label(self, label: str) -> Optional[int]:
+        """Find entity ID by label in the current chip set."""
+        if hasattr(self._inner_widget, '_chips'):
+            for chip in self._inner_widget._chips:
+                if hasattr(chip, '_label') and chip._label == label:
+                    return chip._entity_id
+        return None
+
     def _on_visual_split(self, entity_id: int, label: str):
         """Open the Visual Split dialog and process results."""
         dlg = VisualSplitDialog(label, self.services, self)

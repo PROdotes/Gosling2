@@ -1888,6 +1888,43 @@ QPushButton#SecondaryHeaderButton:hover {
     font-style: italic;
 }
 
+/* --- 10. MENUS & DROPDOWNS --- */
+QMenu {
+    background-color: #121212; /* Deep Dark */
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 5px;
+}
+
+QMenu::item {
+    background-color: transparent;
+    color: #CCCCCC;
+    padding: 6px 24px 6px 28px; /* Extra left padding for checkmarks/icons */
+    border-radius: 4px;
+    margin: 1px;
+    font-size: 10pt;
+    font-weight: 500;
+}
+
+QMenu::item:selected {
+    background-color: #252525; /* Subtle highlight */
+    color: #FFC66D; /* Amber Focus */
+}
+
+QMenu::item:disabled {
+    color: #444444; 
+}
+
+QMenu::separator {
+    height: 1px;
+    background-color: #222222;
+    margin: 4px 10px;
+}
+
+QMenu::icon {
+    padding-left: 10px;
+}
+
 /* --- 10. SYSTEM DROPDOWN MENU --- */
 QMenu#SystemDropdownMenu {
     background-color: #111111;
