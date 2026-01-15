@@ -279,6 +279,20 @@ FIELDS: List[FieldDef] = [
         ui_search=True,
     ),
     FieldDef(
+        name='publisher_id',
+        ui_header='Publisher ID',
+        db_column='PublisherID',
+        field_type=FieldType.LIST,
+        editable=False,
+        portable=False,
+        query_expression="""
+            (SELECT GROUP_CONCAT(RP_SUB.PublisherID, '|||') 
+             FROM RecordingPublishers RP_SUB 
+             WHERE RP_SUB.SourceID = MS.SourceID) AS PublisherID
+        """,
+        visible=False,
+    ),
+    FieldDef(
         name='album_publisher',
         ui_header='Publisher (Album)',
         db_column='AlbumPublisher',

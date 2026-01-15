@@ -45,6 +45,7 @@ class PublisherDetailsDialog(QDialog):
         lbl_name.setObjectName("FieldLabel")  # Same as side panel for tight proximity
         self.txt_name = GlowLineEdit()
         self.txt_name.setText(self.pub.publisher_name)
+        self.txt_name.returnPressed.connect(self._save) # Snappy: Enter to Update
         self.layout.addWidget(lbl_name)
         self.layout.addWidget(self.txt_name)
         self.layout.addSpacing(16)  # Gap between field groups
@@ -114,18 +115,21 @@ class PublisherDetailsDialog(QDialog):
             self.btn_delete = GlowButton("Remove")
             self.btn_delete.setObjectName("PublisherActionPill")
             self.btn_delete.setProperty("action_role", "destructive")
+            self.btn_delete.setAutoDefault(False)
             self.btn_delete.clicked.connect(lambda: self.done(2)) 
             btn_box.addWidget(self.btn_delete)
         
         btn_cancel = GlowButton("Cancel")
         btn_cancel.setObjectName("PublisherActionPill")
         btn_cancel.setProperty("action_role", "secondary")
+        btn_cancel.setAutoDefault(False)
         btn_cancel.clicked.connect(self.reject)
         btn_box.addWidget(btn_cancel)
 
         btn_save = GlowButton("UPDATE")
         btn_save.setObjectName("PublisherActionPill")
         btn_save.setProperty("action_role", "primary")
+        btn_save.setDefault(True)
         btn_save.clicked.connect(self._save)
         btn_box.addWidget(btn_save)
         self.layout.addLayout(btn_box)
@@ -164,11 +168,21 @@ class PublisherDetailsDialog(QDialog):
                                "Cannot set this parent - it would create a circular relationship.")
             return
 
+        # Check for potential merge to set merged_target (helps router)
+        collision_id = None
+        with self.service._repo.get_connection() as conn:
+             query = "SELECT PublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE AND PublisherID != ?"
+             cursor = conn.execute(query, (new_name, self.pub.publisher_id))
+             row = cursor.fetchone()
+             if row: collision_id = row[0]
+
         self.pub.publisher_name = new_name
         self.pub.parent_publisher_id = parent_id
         
         if self.service.update(self.pub):
-            self.accept()
+            if collision_id:
+                self.merged_target = collision_id
+            self.done(3) # Signal 3: Data Changed (Forces precise re-sync)
         else:
             QMessageBox.warning(self, "Error", "Failed to update publisher.")
 

@@ -28,15 +28,23 @@ class PublisherRepository(GenericRepository[Publisher]):
                 return Publisher.from_row(row)
         return None
 
-    def find_by_name(self, name: str) -> Optional[Publisher]:
-        """Retrieve publisher by exact name match."""
-        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE"
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (name,))
+    def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
+        """Retrieve publisher by name match (resilient to whitespaces)."""
+        if not name: return None
+        
+        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE"
+        
+        def _execute(target_conn):
+            cursor = target_conn.execute(query, (name.strip(),))
             row = cursor.fetchone()
             if row:
                 return Publisher.from_row(row)
-        return None
+            return None
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as conn:
+            return _execute(conn)
 
     def _insert_db(self, cursor: sqlite3.Cursor, publisher: Publisher, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
@@ -75,7 +83,8 @@ class PublisherRepository(GenericRepository[Publisher]):
         Create a new publisher.
         Uses GenericRepository.insert() for Audit Logging.
         """
-        pub = Publisher(publisher_id=None, publisher_name=name, parent_publisher_id=parent_id)
+        # T-Fix: Always trim whitespace to prevent duplicates
+        pub = Publisher(publisher_id=None, publisher_name=name.strip(), parent_publisher_id=parent_id)
         new_id = self.insert(pub, conn=conn)
         if new_id:
             pub.publisher_id = new_id

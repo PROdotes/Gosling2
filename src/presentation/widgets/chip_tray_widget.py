@@ -163,6 +163,7 @@ class ChipTrayWidget(QWidget):
         self.btn_add.setParent(self.container)
         self.btn_add.setObjectName("AddInlineButton")
         self.btn_add.setToolTip(add_tooltip)
+        self.btn_add.setAutoDefault(False)
         self.btn_add.clicked.connect(self.add_requested.emit)
         
         if self.is_add_visible:

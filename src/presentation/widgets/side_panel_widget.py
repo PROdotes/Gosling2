@@ -1081,6 +1081,14 @@ class SidePanelWidget(QFrame):
                             widget.context_adapter.songs = self.current_songs
         
         self._refresh_field_values()
+        
+        # BROADCAST: Ensure Library Refresh to prevent re-seeding stale names from memory
+        try:
+            win = self.window()
+            if hasattr(win, 'library_widget'):
+                win.library_widget.refresh(refresh_filters=False)
+        except:
+            pass
 
     def _create_field_widget(self, field_def, value, is_multiple):
         # Determine strict type or strategy

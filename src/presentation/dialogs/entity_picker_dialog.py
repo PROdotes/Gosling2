@@ -133,11 +133,10 @@ class EntityPickerDialog(QDialog):
         self._connect_signals()
         
         # Pre-fill with first suggestion if applicable (Add Mode)
+        # Note: Suggestions are only provided when the list is empty (handled by caller)
         if not self.target_entity and self.suggested_items:
-            # We want to show the suggestion ready to be created/selected
-            # Setting text here triggers search in _refresh_list
-            first_suggestion = self.suggested_items[0]
-            self.txt_search.setText(first_suggestion)
+            # Use the first suggestion to pre-fill the search box
+            self.txt_search.setText(self.suggested_items[0])
         else:
             self._refresh_list()
         
@@ -495,7 +494,7 @@ class EntityPickerDialog(QDialog):
                     if hasattr(e, 'matched_alias') and e.matched_alias and query_lower in e.matched_alias.lower():
                         return True
                     return False
-                    
+                
                 entities = [e for e in entities if matches(e)]
             else:
                 entities = []

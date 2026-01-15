@@ -210,6 +210,7 @@ class EntityListWidget(QWidget):
             self.btn_add = GlowButton("")
             self.btn_add.setObjectName("AddInlineButton")
             self.btn_add.setToolTip(add_tooltip)
+            self.btn_add.setAutoDefault(False)
             self.btn_add.clicked.connect(self._on_add_clicked)
             header.addWidget(self.btn_add)
             
@@ -367,10 +368,11 @@ class EntityListWidget(QWidget):
         if self._picker_filter_fn:
             filter_type = self._picker_filter_fn()
             
-        # Get suggestions if provider is set
+        # Get suggestions ONLY if the list is currently empty
+        # This means: first add gets the suggestion, subsequent adds start empty
         suggested_items = []
-        if self._suggestion_provider:
-             suggested_items = self._suggestion_provider() or []
+        if self._suggestion_provider and len(exclude_ids) == 0:
+            suggested_items = self._suggestion_provider() or []
         
         # Open picker
         selected = self.click_router.open_picker(

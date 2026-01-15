@@ -340,16 +340,13 @@ class SongSyncService:
                 else:
                     publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
 
+            from src.data.repositories.publisher_repository import PublisherRepository
+            pub_repo = PublisherRepository()
+
             for pub_name in publisher_names:
-                cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE", (pub_name,))
-                row = cursor.fetchone()
-                if row:
-                    pid = row[0]
-                else:
-                    cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (pub_name,))
-                    pid = cursor.lastrowid
-                    if auditor:
-                        auditor.log_insert("Publishers", pid, {"PublisherName": pub_name})
+                # T-Fix: Use Repository's get_or_create which handles whitespaces consistently (trim)
+                publisher, _ = pub_repo.get_or_create(pub_name, conn=cursor.connection)
+                pid = publisher.publisher_id
                 
                 desired_ids.add(pid)
                 publisher_ids_ordered.append(pid)

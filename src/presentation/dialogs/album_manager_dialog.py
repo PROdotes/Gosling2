@@ -701,48 +701,63 @@ class AlbumManagerDialog(QDialog):
 
     def _get_artist_suggestions(self) -> list:
         """Provide artist suggestions from context songs."""
-        if not self._current_context_songs:
-            return []
-        
         suggestions = set()
-        for song in self._current_context_songs:
-            art = song.get('artist')
+        
+        # 1. Try from context songs (existing album)
+        if self._current_context_songs:
+            for song in self._current_context_songs:
+                art = song.get('artist')
+                if art and art != 'Unknown':
+                    suggestions.add(art)
+        
+        # 2. Fallback to initial_data (new album creation)
+        if not suggestions and hasattr(self, 'initial_data') and self.initial_data:
+            art = self.initial_data.get('artist')
             if art and art != 'Unknown':
-                suggestions.add(art)
+                if isinstance(art, list):
+                    for a in art: suggestions.add(a)
+                else:
+                    suggestions.add(art)
         
         return sorted(list(suggestions))
 
     def _get_publisher_suggestions(self) -> list:
         """Provide publisher suggestions from context songs."""
-        if not self._current_context_songs:
-            return []
-            
         suggestions = set()
-        for song in self._current_context_songs:
-            # 1. Try to get staged or DB publisher names directly from song dict
-            # Song dict in _current_context_songs comes from album_service.get_songs_in_album
-            # or is a raw MediaSource dict.
-            pub = song.get('publisher')
+        
+        # 1. Try from context songs (existing album)
+        if self._current_context_songs:
+            for song in self._current_context_songs:
+                # Try to get staged or DB publisher names directly from song dict
+                pub = song.get('publisher')
+                if pub:
+                    if isinstance(pub, list):
+                        for p in pub: suggestions.add(p)
+                    else:
+                        suggestions.add(pub)
+                        
+                # Try falling back to service if needed (expensive but robust)
+                source_id = song.get('source_id')
+                if not source_id: continue
+                
+                try:
+                    # Use publisher_service directly if available
+                    if hasattr(self.publisher_service, 'get_for_song'):
+                        pubs = self.publisher_service.get_for_song(source_id)
+                        for p in pubs:
+                            suggestions.add(p.publisher_name)
+                except:
+                    pass
+        
+        # 2. Fallback to initial_data (new album creation)
+        if not suggestions and hasattr(self, 'initial_data') and self.initial_data:
+            pub = self.initial_data.get('publisher')
             if pub:
                 if isinstance(pub, list):
                     for p in pub: suggestions.add(p)
                 else:
                     suggestions.add(pub)
                     
-            # 2. Try falling back to service if needed (expensive but robust)
-            source_id = song.get('source_id')
-            if not source_id: continue
-            
-            try:
-                # Use publisher_service directly if available
-                # Many songs might share same publishers, set handles deduplication
-                if hasattr(self.publisher_service, 'get_publishers_for_song'):
-                    pubs = self.publisher_service.get_publishers_for_song(source_id)
-                    for p in pubs:
-                        suggestions.add(p.publisher_name)
-            except:
-                pass
-                
         return sorted(list(suggestions))
 
     def _on_vault_selection_changed(self):

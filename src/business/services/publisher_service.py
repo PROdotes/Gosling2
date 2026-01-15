@@ -32,6 +32,10 @@ class PublisherService:
     def find_by_name(self, name: str) -> Optional[Publisher]:
         """Fetch a specific publisher by its exact name."""
         return self._repo.find_by_name(name)
+    
+    def get_by_name(self, name: str) -> Optional[Publisher]:
+        """Alias for find_by_name to support EntityPickerDialog."""
+        return self.find_by_name(name)
 
     def get_or_create(self, name: str, _type: str = None) -> Tuple[Publisher, bool]:
         """Find an existing publisher or create a new one."""
@@ -53,7 +57,7 @@ class PublisherService:
         # 1. Handle Name Change & Possible Merge
         # Check if ANOTHER publisher already has this name (case-insensitive)
         with self._repo.get_connection() as conn:
-            query = "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND PublisherID != ?"
+            query = "SELECT PublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE AND PublisherID != ?"
             cursor = conn.execute(query, (new_name, publisher.publisher_id))
             collision = cursor.fetchone()
             
