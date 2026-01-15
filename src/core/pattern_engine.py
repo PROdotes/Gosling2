@@ -14,11 +14,12 @@ class PatternEngine:
     - {Year}: Recording Year
     - {BPM}: Tempo
     - {Genre}: Genre (First if multiple)
+    - {ISRC}: International Standard Recording Code
     - {Ignore}: Wildcard (Extraction Only)
     """
     
     # Supported Tokens
-    TOKENS = ["{Artist}", "{Title}", "{Album}", "{Year}", "{BPM}", "{Genre}", "{Publisher}"]
+    TOKENS = ["{Artist}", "{Title}", "{Album}", "{Year}", "{BPM}", "{Genre}", "{Publisher}", "{ISRC}"]
     
     # Token -> Regex Group Name map
     # We use TitleCase for UI tokens, lowercase for Yellberus fields (mostly)
@@ -30,6 +31,7 @@ class PatternEngine:
         "{BPM}": "bpm",
         "{Genre}": "genre",
         "{Publisher}": "publisher",
+        "{ISRC}": "isrc",
     }
 
     # ==================== EXPANSION (Rename) ====================

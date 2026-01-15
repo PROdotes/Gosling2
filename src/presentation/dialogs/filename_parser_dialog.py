@@ -226,28 +226,30 @@ class FilenameParserDialog(QDialog):
         else:
             self.status_lbl.setText(f"Examples: {match_count}/{len(self.preview_songs)} matched.")
 
-    def get_parsed_data(self):
-        """
-        Returns full result set for ALL selected items.
-        Re-runs regex on everything.
-        """
-        compiled_re = PatternEngine.compile_extraction_regex(self.current_pattern)
+    def accept(self):
+        """Cache results before closing to ensure data persistence."""
+        self._cached_results = self._compute_results()
+        super().accept()
+
+    def _compute_results(self):
+        """Internal logic to run regex and get data."""
+        pattern = self.pattern_edit.text()
+        compiled_re = PatternEngine.compile_extraction_regex(pattern)
         if not compiled_re: return {}
         
-        final_results = {}
+        results = {}
         for song in self.selected_songs:
             if not song.path: continue
-            
-            # Use actual filename for final extraction too
             filename = self._get_actual_filename(song.path)
             name_only, _ = os.path.splitext(filename)
-            
             data = PatternEngine.extract_metadata(name_only, compiled_re)
-            
             if data:
-                final_results[song.source_id] = data
-        
-        return final_results
+                results[song.source_id] = data
+        return results
+
+    def get_parsed_data(self):
+        """Returns the results cached at the moment of acceptance."""
+        return getattr(self, '_cached_results', {})
 
     def _save_preset(self):
         pattern = self.pattern_edit.text().strip()

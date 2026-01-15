@@ -1698,7 +1698,8 @@ class LibraryWidget(QWidget):
                                         continue
                                     if self.renaming_service.check_conflict(target):
                                         can_rename = False
-                                        rename_reason = f"Target exists: {os.path.basename(target)}"
+                                        rename_reason = "Target exists"
+                                        rename_action.setToolTip(f"Conflict: {os.path.basename(target)}")
                                         break
                             checked_count += 1
                          except Exception: pass

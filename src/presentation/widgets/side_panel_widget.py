@@ -1198,11 +1198,18 @@ class SidePanelWidget(QFrame):
                 text_val = str(value) if value is not None else ""
             edit.setText(text_val)
             
-        edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, text))
-        
         # Add ISRC validation (real-time text color feedback)
         if field_def.name == 'isrc':
+            # T-Sanity: Sanitize input for Staging so that strict validation passes
+            # (Visual validation is handled separately by _validate_isrc_field)
+            from ...utils.validation import sanitize_isrc
+            edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, sanitize_isrc(text)))
+            
+            # Visual Feedback on the Widget itself (Red/Amber/Green)
             edit.textChanged.connect(lambda text: self._validate_isrc_field(edit, text))
+        else:
+             # Standard Field
+             edit.textChanged.connect(lambda text: self._on_field_changed(field_def.name, text))
         
         # Escape to revert
         edit.installEventFilter(self)

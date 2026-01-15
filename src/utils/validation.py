@@ -30,8 +30,8 @@ def sanitize_isrc(isrc: Optional[str]) -> str:
     if not isrc:
         return ""
     
-    # Strip dashes and spaces, convert to uppercase
-    sanitized = re.sub(r'[-\s]', '', str(isrc)).upper()
+    # Strip everything except alphanumeric, convert to uppercase
+    sanitized = re.sub(r'[^A-Z0-9]', '', str(isrc)).upper()
     
     return sanitized
 
