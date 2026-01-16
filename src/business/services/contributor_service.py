@@ -301,11 +301,47 @@ class ContributorService:
         name_rec.sort_name = contributor.sort_name
         success = self._name_service.update_name(name_rec)
         
-        # 3. Update Identity Type
+        # 3. Update Identity Type (with membership cleanup)
         if success and name_rec.owner_identity_id:
             identity = self._identity_service.get_identity(name_rec.owner_identity_id)
             if identity and identity.identity_type != contributor.type:
-                identity.identity_type = contributor.type.lower()
+                old_type = identity.identity_type
+                new_type = contributor.type.lower()
+                identity_id = name_rec.owner_identity_id
+                
+                # Clean up GroupMemberships BEFORE changing type
+                # This prevents orphaned records and circular references
+                with self._credit_repo.get_connection() as conn:
+                    cursor = conn.cursor()
+                    from src.core.audit_logger import AuditLogger
+                    auditor = AuditLogger(conn)
+                    
+                    if old_type == "group" and new_type == "person":
+                        # Was a group, now a person: remove all members from this "group"
+                        cursor.execute("""
+                            SELECT MembershipID, GroupIdentityID, MemberIdentityID 
+                            FROM GroupMemberships WHERE GroupIdentityID = ?
+                        """, (identity_id,))
+                        for row in cursor.fetchall():
+                            auditor.log_delete("GroupMemberships", row[0], {
+                                "GroupIdentityID": row[1], "MemberIdentityID": row[2]
+                            })
+                        cursor.execute("DELETE FROM GroupMemberships WHERE GroupIdentityID = ?", (identity_id,))
+                        
+                    elif old_type == "person" and new_type == "group":
+                        # Was a person, now a group: remove this person from all groups
+                        cursor.execute("""
+                            SELECT MembershipID, GroupIdentityID, MemberIdentityID 
+                            FROM GroupMemberships WHERE MemberIdentityID = ?
+                        """, (identity_id,))
+                        for row in cursor.fetchall():
+                            auditor.log_delete("GroupMemberships", row[0], {
+                                "GroupIdentityID": row[1], "MemberIdentityID": row[2]
+                            })
+                        cursor.execute("DELETE FROM GroupMemberships WHERE MemberIdentityID = ?", (identity_id,))
+                
+                # Now update the type
+                identity.identity_type = new_type
                 from src.data.repositories.identity_repository import IdentityRepository
                 IdentityRepository(db_path=self._db_path).update(identity)
                 
