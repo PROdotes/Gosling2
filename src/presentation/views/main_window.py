@@ -149,9 +149,8 @@ class MainWindow(QMainWindow):
         db_path = self.settings_manager.get_database_path()
 
         # 2. Initialize Data Access Layer with injected path
-        from ...data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
+        from ...data.repositories import SongRepository, AlbumRepository, PublisherRepository, TagRepository
         self.song_repository = SongRepository(db_path)
-        self.contributor_repository = ContributorRepository(db_path)
         self.album_repository = AlbumRepository(db_path)
         self.publisher_repository = PublisherRepository(db_path)
         self.tag_repository = TagRepository(db_path)
@@ -165,7 +164,7 @@ class MainWindow(QMainWindow):
         from ...business.services.audit_service import AuditService
 
         self.song_service = SongService(self.song_repository)
-        self.contributor_service = ContributorService(self.contributor_repository)
+        self.contributor_service = ContributorService(db_path=db_path)
         self.album_service = AlbumService(self.album_repository)
         self.publisher_service = PublisherService(self.publisher_repository)
         self.tag_service = TagService(self.tag_repository)

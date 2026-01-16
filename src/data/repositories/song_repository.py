@@ -19,8 +19,6 @@ class SongRepository(GenericRepository[Song]):
     def __init__(self, db_path: Optional[str] = None):
         super().__init__(db_path, "Songs", "source_id")
         self.album_repository = AlbumRepository(db_path)
-        from .contributor_repository import ContributorRepository
-        self.contributor_repository = ContributorRepository(db_path)
         from ...business.services.song_sync_service import SongSyncService
         self.sync_service = SongSyncService()
         
@@ -503,17 +501,19 @@ class SongRepository(GenericRepository[Song]):
             return []
 
     def get_contributors_for_song(self, song_id: int, role_name: Optional[str] = None) -> List[Contributor]:
-        """Fetch all performers/composers linked to a song as formal objects."""
+        """Fetch all performers/composers linked to a song as formal objects (Uses new SongCredits/ArtistNames)."""
         from ..models.contributor import Contributor
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 query = """
-                    SELECT DISTINCT c.ContributorID, c.ContributorName, c.SortName, c.ContributorType
-                    FROM Contributors c
-                    JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
-                    JOIN Roles r ON mscr.RoleID = r.RoleID
-                    WHERE mscr.SourceID = ?
+                    SELECT DISTINCT an.NameID, an.DisplayName, an.SortName, 
+                           COALESCE(i.IdentityType, 'person') as ContributorType
+                    FROM ArtistNames an
+                    JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                    JOIN Roles r ON sc.RoleID = r.RoleID
+                    LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                    WHERE sc.SourceID = ?
                 """
                 params = [song_id]
                 if role_name:
@@ -521,8 +521,15 @@ class SongRepository(GenericRepository[Song]):
                     params.append(role_name)
                     
                 cursor.execute(query, params)
-                # Use from_row which handles either tuple or dict-like Row
-                return [Contributor.from_row(r) for r in cursor.fetchall()]
+                results = []
+                for row in cursor.fetchall():
+                    results.append(Contributor(
+                        contributor_id=row[0],
+                        name=row[1],
+                        sort_name=row[2],
+                        type=row[3]
+                    ))
+                return results
         except Exception as e:
             logger.error(f"Error fetching song contributors: {e}")
             return []

@@ -41,9 +41,6 @@ class SongSyncService:
         
         # V2 Goals (SongCredits -> ArtistNames)
         desired_links = set() # Set of (NameID, RoleID)
-
-        # V1 Goals (MediaSourceContributorRoles -> Contributors)
-        v1_desired_links = set() # (ContributorID, RoleID)
         
         for attr, role_name in role_map.items():
             contributors = getattr(song, attr, [])
@@ -58,13 +55,9 @@ class SongSyncService:
             for contributor_name in contributors:
                 if not contributor_name.strip(): continue
 
-                # A. Resolve V2 (ArtistNames)
+                # Resolve to ArtistNames (V2)
                 name_id = self._resolve_identity(cursor, contributor_name, auditor)
                 desired_links.add((name_id, role_id))
-
-                # B. Legacy V1 Resolution (Contributors) - Bridge to UI
-                contributor_id = self._resolve_identity_legacy(cursor, contributor_name, auditor)
-                v1_desired_links.add((contributor_id, role_id))
 
         # 2. Get Current State (V2)
         cursor.execute("SELECT CreditedNameID, RoleID FROM SongCredits WHERE SourceID = ?", (song.source_id,))
@@ -101,62 +94,6 @@ class SongSyncService:
                     "CreditedNameID": n_id,
                     "RoleID": r_id
                 })
-
-        # --- 5. EXECUTE V1 SYNC (MediaSourceContributorRoles) ---
-        cursor.execute("SELECT ContributorID, RoleID FROM MediaSourceContributorRoles WHERE SourceID = ?", (song.source_id,))
-        current_v1 = set((c, r) for c, r in cursor.fetchall())
-        
-        v1_to_add = v1_desired_links - current_v1
-        v1_to_remove = current_v1 - v1_desired_links
-        
-        for c_id, r_id in v1_to_remove:
-            cursor.execute(
-                "DELETE FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ? AND RoleID = ?",
-                (song.source_id, c_id, r_id)
-            )
-            if auditor:
-                auditor.log_delete("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
-                    "SourceID": song.source_id, "ContributorID": c_id, "RoleID": r_id
-                })
-
-        for c_id, r_id in v1_to_add:
-            cursor.execute(
-                "INSERT OR IGNORE INTO MediaSourceContributorRoles (SourceID, ContributorID, RoleID) VALUES (?, ?, ?)",
-                (song.source_id, c_id, r_id)
-            )
-            if auditor:
-                # We don't have new ID because it's M2M, using PK composite
-                auditor.log_insert("MediaSourceContributorRoles", f"{song.source_id}-{c_id}-{r_id}", {
-                    "SourceID": song.source_id, "ContributorID": c_id, "RoleID": r_id
-                })
-
-    def _resolve_identity_legacy(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> int:
-        """Helper to resolve a name to a Legacy ContributorID."""
-        # 1. Exact Match on ContributorName (case-insensitive)
-        cursor.execute("SELECT ContributorID FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE", (name,))
-        row = cursor.fetchone()
-        if row:
-            return row[0]
-            
-        # 2. Check Aliases (Legacy)
-        cursor.execute("SELECT ContributorID FROM ContributorAliases WHERE AliasName = ? COLLATE UTF8_NOCASE", (name,))
-        row = cursor.fetchone()
-        if row:
-            return row[0]
-
-        # 3. Create New Legacy Contributor
-        # Auto-generate sort name
-        sort_name = name
-        if name.lower().startswith("the "):
-            sort_name = name[4:] + ", The"
-            
-        cursor.execute("INSERT INTO Contributors (ContributorName, SortName, ContributorType) VALUES (?, ?, 'person')", (name, sort_name))
-        new_id = cursor.lastrowid
-        
-        if auditor:
-            auditor.log_insert("Contributors", new_id, {"ContributorName": name, "SortName": sort_name, "ContributorType": 'person'})
-            
-        return new_id
 
     def _resolve_identity(self, cursor: sqlite3.Cursor, name: str, auditor: Optional[AuditLogger]) -> int:
         """Helper to resolve a name to a NameID."""

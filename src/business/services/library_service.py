@@ -179,7 +179,7 @@ class LibraryService:
 
     def get_types_for_names(self, names: List[str]) -> dict:
         """Get contributor types (person/group) for a list of names."""
-        return self.contributor_service._repo.get_types_for_names(names)
+        return self.contributor_service.get_types_for_names(names)
 
 
     def get_human_name(self, table_name: str, record_id: int) -> Optional[str]:

@@ -5,17 +5,15 @@ Handles business logic for Contributors (Artists, Musicians, Composers).
 """
 from typing import List, Optional, Tuple, Any
 from ...data.models.contributor import Contributor
-from ...data.repositories.contributor_repository import ContributorRepository
 
 class ContributorService:
     """
     Service for managing contributor identities and their metadata.
+    Uses the new Identity/ArtistName/Credit architecture (not legacy Contributors table).
     """
     
-    def __init__(self, contributor_repository: Optional[ContributorRepository] = None, credit_repository: Optional[any] = None, db_path: Optional[str] = None):
-        # Keep old repo for legacy fallback if needed, but primary logic uses new services
+    def __init__(self, db_path: Optional[str] = None, credit_repository: Optional[any] = None, **kwargs):
         self._db_path = db_path
-        self._repo = contributor_repository or ContributorRepository(db_path=db_path)
         
         from .identity_service import IdentityService
         from .artist_name_service import ArtistNameService
@@ -24,14 +22,24 @@ class ContributorService:
         from ...data.repositories.artist_name_repository import ArtistNameRepository
         
         # Inject repositories to services to ensure they use the same DB
+        self._identity_repo = IdentityRepository(db_path=db_path)
+        self._name_repo = ArtistNameRepository(db_path=db_path)
+        
         self._identity_service = IdentityService(
-            identity_repository=IdentityRepository(db_path=db_path),
-            name_repository=ArtistNameRepository(db_path=db_path)
+            identity_repository=self._identity_repo,
+            name_repository=self._name_repo
         )
         self._name_service = ArtistNameService(
-            repository=ArtistNameRepository(db_path=db_path)
+            repository=self._name_repo
         )
         self._credit_repo = credit_repository or CreditRepository(db_path=db_path)
+
+    def _get_identity_id(self, contributor_id: int) -> Optional[int]:
+        """Helper to resolve NameID (contributor_id) to IdentityID."""
+        name = self._name_service.get_name(contributor_id)
+        if name:
+            return name.owner_identity_id
+        return None
 
     def get_all(self) -> List[Contributor]:
         """Fetch all contributors (Mapped to all ArtistNames)."""
@@ -235,6 +243,21 @@ class ContributorService:
              cursor.execute("SELECT DisplayName FROM ArtistNames WHERE IsPrimaryName = 1 ORDER BY DisplayName ASC")
              return [row[0] for row in cursor.fetchall()]
 
+    def get_types_for_names(self, names: List[str]) -> dict:
+        """Fetch identity types for a list of names."""
+        if not names: return {}
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            placeholders = ','.join(['?'] * len(names))
+            query = f"""
+                SELECT an.DisplayName, COALESCE(i.IdentityType, 'person')
+                FROM ArtistNames an
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE an.DisplayName IN ({placeholders})
+            """
+            cursor.execute(query, names)
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
     def resolve_identity_graph(self, search_term: str) -> List[str]:
         """
         Resolve a search term to a complete list of related artist names (Identity Graph).
@@ -287,7 +310,7 @@ class ContributorService:
         
         # 1. Handle Name Change & Possible Merge
         # Check if ANOTHER contributor already has this name (case-insensitive)
-        with self._repo.get_connection() as conn:
+        with self._credit_repo.get_connection() as conn:
             query = "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND NameID != ?"
             cursor = conn.execute(query, (new_name, contributor.contributor_id))
             collision = cursor.fetchone()
@@ -644,4 +667,58 @@ class ContributorService:
         
         # heir_id is already a NameID, not a ContributorID that needs resolution
         return self._identity_service.abdicate(old_ident, heir_id, adopter_ident, batch_id=batch_id)
+
+    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
+        """Alias for merge (Legacy Wrapper)."""
+        return self.merge(source_id, target_id, create_alias, batch_id)
+
+    def swap_song_contributor(self, song_id: int, old_contributor_id: int, new_contributor_id: int) -> bool:
+        """
+        Swap one contributor for another on a specific song (Fix This Song Only).
+        Operates on SongCredits.
+        """
+        try:
+            with self._credit_repo.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Check collision first (Prevent PK violation if new guy already exists on song with same role)
+                # But since we are swapping ALL roles for this person, we might hit multiple collisions.
+                # Strategy:
+                # 1. Get all roles the old guy has on this song.
+                # 2. For each role, check if new guy has it.
+                # 3. If new guy has it -> Delete old guy (Merge/Absorb)
+                # 4. If new guy NOT has it -> Update old guy ID to new guy ID.
+                
+                cursor.execute("""
+                    SELECT RoleID FROM SongCredits 
+                    WHERE SourceID = ? AND CreditedNameID = ?
+                """, (song_id, old_contributor_id))
+                roles = [row[0] for row in cursor.fetchall()]
+                
+                for role_id in roles:
+                    # Check if target already has this role
+                    cursor.execute("""
+                        SELECT 1 FROM SongCredits 
+                        WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                    """, (song_id, new_contributor_id, role_id))
+                    
+                    if cursor.fetchone():
+                        # Target already has role: Just delete source
+                        cursor.execute("""
+                            DELETE FROM SongCredits 
+                            WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                        """, (song_id, old_contributor_id, role_id))
+                    else:
+                        # Target doesn't have role: Move source to target
+                        cursor.execute("""
+                            UPDATE SongCredits 
+                            SET CreditedNameID = ? 
+                            WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                        """, (new_contributor_id, song_id, old_contributor_id, role_id))
+                        
+                return True
+        except Exception as e:
+            from ...core import logger
+            logger.error(f"Error swapping song contributor: {e}")
+            return False
 

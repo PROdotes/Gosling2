@@ -239,10 +239,18 @@ If things go wrong:
 
 | Step | Status | Notes |
 |------|--------|-------|
-| Phase 1: Database Schema | ⬜ Not Started | |
-| Phase 2: Repository Cleanup | ⬜ Not Started | |
-| Phase 3: Service Refactoring | ⬜ Not Started | |
-| Phase 4: Credit Repository | ⬜ Not Started | |
-| Phase 5: Presentation Layer | ⬜ Not Started | |
-| Phase 6: Song Sync | ⬜ Not Started | |
-| Phase 7: Testing | ⬜ Not Started | |
+| Phase 1: Database Schema | ⬜ Not Started | Legacy tables still exist (no harm) |
+| Phase 2: Repository Cleanup | ⬜ Deferred | ContributorRepository still exists but no longer imported in main code |
+| Phase 3: Service Refactoring | ✅ DONE | ContributorService no longer uses ContributorRepository |
+| Phase 4: Credit Repository | ✅ DONE | Already using SongCredits |
+| Phase 5: Presentation Layer | ✅ DONE | main_window.py updated |
+| Phase 6: Song Sync | ✅ DONE | Removed V1 legacy sync from song_sync_service.py |
+| Phase 7: Testing | ✅ DONE | All 9 identity/artist tests pass |
+
+## Files Modified
+
+- `src/business/services/contributor_service.py` - Removed ContributorRepository dependency
+- `src/business/services/song_sync_service.py` - Removed V1 legacy sync (MediaSourceContributorRoles)
+- `src/data/repositories/song_repository.py` - Removed ContributorRepository, updated get_contributors_for_song
+- `src/data/repositories/__init__.py` - Removed ContributorRepository export
+- `src/presentation/views/main_window.py` - Removed ContributorRepository usage
