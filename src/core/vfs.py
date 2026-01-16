@@ -85,3 +85,125 @@ class VFS:
                 return sum(1 for name in zr.namelist() if not name.endswith('/'))
         except Exception:
             return 0
+
+    @classmethod
+    def update_file_in_zip(cls, virtual_path: str, new_data: bytes) -> bool:
+        """
+        Update a single file inside a ZIP archive.
+        NOTE: ZIP structure is immutable. This creates a temporary ZIP, 
+        copies all other files, replaces the target, and then overwrites the original.
+        """
+        if not cls.is_virtual(virtual_path):
+            return False
+            
+        zip_path, member_path = cls.split_path(virtual_path)
+        
+        if not os.path.exists(zip_path):
+            return False
+            
+        # Use a temp file for the rewrite
+        temp_zip_path = zip_path + ".tmp"
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zin:
+                with zipfile.ZipFile(temp_zip_path, 'w') as zout:
+                    # Iterate through all items
+                    # We need to find the specific member to replace
+                    # Handle case-insensitive matching if needed (like read_bytes)
+                    target_member = member_path
+                    
+                    found = False
+                    # Check exact match first, then lenient
+                    if target_member in zin.namelist():
+                        found = True
+                    else:
+                        # Try to resolve case-insensitive
+                        target_lower = target_member.replace('\\', '/').lower()
+                        for name in zin.namelist():
+                            if name.lower() == target_lower:
+                                target_member = name
+                                found = True
+                                break
+                    
+                    for item in zin.infolist():
+                        if found and item.filename == target_member:
+                            # Write new data
+                            zout.writestr(target_member, new_data)
+                        else:
+                            # Copy existing data
+                            zout.writestr(item, zin.read(item.filename))
+                            
+            # Atomic Swap
+            os.replace(temp_zip_path, zip_path)
+            return True
+            
+        except Exception as e:
+            from ..core import logger
+            try:
+                logger.error(f"VFS Update Failed for {virtual_path}: {e}")
+            except:
+                pass # Avoid circular imports if logger fails
+                
+            if os.path.exists(temp_zip_path):
+                try: os.remove(temp_zip_path)
+                except: pass
+            return False
+
+    @classmethod
+    def update_file_in_zip(cls, virtual_path: str, new_data: bytes) -> bool:
+        """
+        Update a single file inside a ZIP archive.
+        NOTE: ZIP structure is immutable. This creates a temporary ZIP, 
+        copies all other files, replaces the target, and then overwrites the original.
+        """
+        if not cls.is_virtual(virtual_path):
+            return False
+            
+        zip_path, member_path = cls.split_path(virtual_path)
+        
+        if not os.path.exists(zip_path):
+            return False
+            
+        # Use a temp file for the rewrite
+        temp_zip_path = zip_path + ".tmp"
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zin:
+                with zipfile.ZipFile(temp_zip_path, 'w') as zout:
+                    # Iterate through all items
+                    # We need to find the specific member to replace
+                    # Handle case-insensitive matching if needed (like read_bytes)
+                    target_member = member_path
+                    
+                    found = False
+                    # Check exact match first, then lenient
+                    if target_member in zin.namelist():
+                        found = True
+                    else:
+                        # Try to resolve case-insensitive
+                        target_lower = target_member.replace('\\', '/').lower()
+                        for name in zin.namelist():
+                            if name.lower() == target_lower:
+                                target_member = name
+                                found = True
+                                break
+                    
+                    for item in zin.infolist():
+                        if found and item.filename == target_member:
+                            # Write new data
+                            zout.writestr(target_member, new_data)
+                        else:
+                            # Copy existing data
+                            zout.writestr(item, zin.read(item.filename))
+                            
+            # Atomic Swap
+            os.replace(temp_zip_path, zip_path)
+            return True
+            
+        except Exception as e:
+            from ..core import logger
+            logger.error(f"VFS Update Failed for {virtual_path}: {e}")
+            if os.path.exists(temp_zip_path):
+                try: os.remove(temp_zip_path)
+                except: pass
+            return False

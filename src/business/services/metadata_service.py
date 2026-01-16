@@ -344,8 +344,27 @@ class MetadataService:
                 if isinstance(info, dict) and 'field' in info:
                     field_to_frame[info['field']] = frame
             
-            # Open File
-            audio = MP3(song.path, ID3=ID3)
+            # Open File (Physical or Virtual handling)
+            temp_path = None
+            target_path = song.path
+            
+            if VFS.is_virtual(song.path):
+                # VFS Write Strategy: Extract -> Edit -> Inject
+                import tempfile
+                ext = os.path.splitext(song.path)[1]
+                if VFS.SEPARATOR in ext: ext = "." + ext.split(".")[-1] # Safety
+                
+                fd, temp_path = tempfile.mkstemp(suffix=ext)
+                os.close(fd)
+                
+                # Write current VFS content to temp
+                with open(temp_path, 'wb') as f:
+                    f.write(VFS.read_bytes(song.path))
+                
+                target_path = temp_path
+            
+            # Load Mutagen on physical file (real or temp)
+            audio = MP3(target_path, ID3=ID3)
             if audio.tags is None: audio.add_tags()
 
             # --- DYNAMIC WRITE LOOP ---
@@ -510,9 +529,27 @@ class MetadataService:
             # Save
             # User Directive: Output MUST be ID3v2.4
             audio.save(v1=1, v2_version=4)
+            
+            # VFS Commit Strategy
+            if temp_path and VFS.is_virtual(song.path):
+                # Read modified bytes
+                with open(temp_path, 'rb') as f:
+                    new_data = f.read()
+                
+                # Inject back into ZIP
+                if not VFS.update_file_in_zip(song.path, new_data):
+                     raise IOError(f"Failed to update VFS archive: {song.path}")
+                     
+                # Cleanup handled in finally/teardown usually, but here explicit:
+                try: os.remove(temp_path)
+                except: pass
+                
             return True
 
         except Exception as e:
             from src.core import logger
             logger.error(f"Error writing tags to {song.path}: {e}")
+            if temp_path and os.path.exists(temp_path):
+                try: os.remove(temp_path)
+                except: pass
             return False
