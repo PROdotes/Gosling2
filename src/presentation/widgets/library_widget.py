@@ -562,6 +562,7 @@ class LibraryWidget(QWidget):
         
         # Flags
         self._show_incomplete = False
+        self._edit_mode_enabled = False  # When True, double-click opens scrubber instead of adding to playlist
         
         # Flag to suppress auto-save during programmatic resize
         self._suppress_layout_save = False
@@ -2450,8 +2451,13 @@ class LibraryWidget(QWidget):
             QMessageBox.warning(self, "Conversion Failed", "Conversion failed. Check log or FFmpeg path in settings.")
 
     def _on_table_double_click(self, index) -> None:
-        """Double click adds to playlist, but intercepts WAVs for conversion."""
+        """Double click: open scrubber in edit mode, else add to playlist."""
         song = self._get_song_from_index(index)
+        
+        # Edit Mode: Open scrubber dialog
+        if self._edit_mode_enabled and song:
+            self._open_scrubber_for_song(song)
+            return
         
         # Intercept WAV files
         if song and song.path and song.path.lower().endswith(".wav"):
@@ -2468,6 +2474,22 @@ class LibraryWidget(QWidget):
 
         # Standard behavior
         self._emit_add_to_playlist()
+    
+    def set_edit_mode(self, enabled: bool) -> None:
+        """Enable/disable edit mode (affects double-click behavior)."""
+        self._edit_mode_enabled = enabled
+    
+    def _open_scrubber_for_song(self, song) -> None:
+        """Open the scrubber dialog for previewing and tagging a song."""
+        from ..dialogs.scrubber_dialog import ScrubberDialog
+        
+        dlg = ScrubberDialog(
+            song=song,
+            settings_manager=self.settings_manager,
+            library_service=self.library_service,
+            parent=self
+        )
+        dlg.exec()
 
     def _emit_add_to_playlist(self) -> None:
         """Gather selected items and emit signal"""

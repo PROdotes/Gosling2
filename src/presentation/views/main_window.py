@@ -229,6 +229,11 @@ class MainWindow(QMainWindow):
         
         self._restore_volume()
         self._restore_playlist()
+        
+        # Sync edit mode state from right panel's button
+        if hasattr(self.right_panel, 'header') and hasattr(self.right_panel.header, 'btn_edit'):
+            initial_edit_mode = self.right_panel.header.btn_edit.isChecked()
+            self.library_widget.set_edit_mode(initial_edit_mode)
 
     def _init_ui(self) -> None:
         """Initialize the user interface"""
@@ -382,6 +387,8 @@ class MainWindow(QMainWindow):
         
         # T-Feature: Dynamic Width Persistence
         self.right_panel.editor_mode_changed.connect(self._on_editor_mode_changed)
+        # T-Feature: Edit mode enables scrubber dialog on double-click
+        self.right_panel.editor_mode_changed.connect(self.library_widget.set_edit_mode)
         
         # --- Playlist Signals (Transient Wiring) ---
         # Access inner Playlist widget

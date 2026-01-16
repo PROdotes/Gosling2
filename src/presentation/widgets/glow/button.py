@@ -208,6 +208,7 @@ class GlowButton(GlowWidget):
     def isVisible(self): return self.btn.isVisible()
     def text(self): return self.lbl_main.text()
     def click(self): self.btn.click()
+    def toggle(self): self.btn.toggle()
     def setCheckable(self, c): self.btn.setCheckable(c)
     def setChecked(self, c): self.btn.setChecked(c)
     def setIcon(self, i): self.btn.setIcon(i)
