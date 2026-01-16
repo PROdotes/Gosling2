@@ -140,3 +140,16 @@ class TestChipTrayWidget:
         qtbot.addWidget(tray)
         
         assert tray.get_names() == []
+
+    def test_get_entity_id_by_name(self, qtbot):
+        """Test retrieving entity ID by chip label."""
+        tray = ChipTrayWidget()
+        qtbot.addWidget(tray)
+        
+        tray.add_chip(101, "Target Artist", "🎯")
+        tray.add_chip(102, "Other Artist", "🎨")
+        
+        assert tray.get_entity_id_by_name("Target Artist") == 101
+        assert tray.get_entity_id_by_name("Other Artist") == 102
+        assert tray.get_entity_id_by_name("Nonexistent") is None
+

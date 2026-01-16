@@ -605,10 +605,8 @@ class EntityListWidget(QWidget):
     
     def _find_entity_id_by_label(self, label: str) -> Optional[int]:
         """Find entity ID by label in the current chip set."""
-        if hasattr(self._inner_widget, '_chips'):
-            for chip in self._inner_widget._chips:
-                if hasattr(chip, '_label') and chip._label == label:
-                    return chip._entity_id
+        if hasattr(self._inner_widget, 'get_entity_id_by_name'):
+            return self._inner_widget.get_entity_id_by_name(label)
         return None
 
     def _on_visual_split(self, entity_id: int, label: str):

@@ -323,3 +323,11 @@ class ChipTrayWidget(QWidget):
             if isinstance(widget, Chip):
                 names.append(widget.label_text)
         return names
+
+    def get_entity_id_by_name(self, name: str) -> int | None:
+        """Find entity ID for a given label/name."""
+        for i in range(self.flow_layout.count()):
+            widget = self.flow_layout.itemAt(i).widget()
+            if isinstance(widget, Chip) and widget.label_text == name:
+                return widget.entity_id
+        return None
