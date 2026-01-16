@@ -20,7 +20,8 @@ class SongRepository(GenericRepository[Song]):
         super().__init__(db_path, "Songs", "source_id")
         self.album_repository = AlbumRepository(db_path)
         from ...business.services.song_sync_service import SongSyncService
-        self.sync_service = SongSyncService()
+        from .publisher_repository import PublisherRepository
+        self.sync_service = SongSyncService(publisher_repository=PublisherRepository(db_path))
         
         # Check for orphan columns in DB (runtime yell)
         try:

@@ -13,10 +13,16 @@ from src.core import logger
 class SongSyncService:
     """Service for synchronizing song relationships (Contributors, Albums, Publishers, Tags)."""
 
-    def __init__(self, contributor_repository=None):
+    def __init__(self, contributor_repository=None, publisher_repository=None):
         # We might need a contributor_repository for identity resolution
         # But for now we can use the cursor passed in
         self._contributor_repo = contributor_repository
+        
+        if publisher_repository:
+            self._publisher_repo = publisher_repository
+        else:
+            from src.data.repositories.publisher_repository import PublisherRepository
+            self._publisher_repo = PublisherRepository()
 
     def sync_all(self, song: Song, cursor: sqlite3.Cursor, auditor: Optional[AuditLogger] = None, album_type: Optional[str] = None) -> None:
         """Sync all relationships for a song."""
@@ -277,8 +283,11 @@ class SongSyncService:
                 else:
                     publisher_names = [p.strip() for p in raw_val.split(',') if p.strip()]
 
-            from src.data.repositories.publisher_repository import PublisherRepository
-            pub_repo = PublisherRepository()
+            pub_repo = self._publisher_repo
+            if pub_repo is None:
+                # Fallback if somehow not initialized (redundant safety)
+                from src.data.repositories.publisher_repository import PublisherRepository
+                pub_repo = PublisherRepository()
 
             for pub_name in publisher_names:
                 # T-Fix: Use Repository's get_or_create which handles whitespaces consistently (trim)
