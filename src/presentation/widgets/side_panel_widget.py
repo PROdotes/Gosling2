@@ -2614,3 +2614,18 @@ class SidePanelWidget(QFrame):
                 # Do nothing, conflicts are already skipped
                 QMessageBox.information(self, "Skipped", f"Skipped {len(conflicts)} songs with ISRC conflicts.")
             # else keep_existing: already handled (nothing done during initial processing)
+
+    def refresh_content(self):
+        """Refetch current songs from DB and update UI to match latest state."""
+        if not self.current_songs:
+            return
+        
+        fresh_songs = []
+        for s in self.current_songs:
+            if s.source_id:
+                fresh = self.library_service.get_song_by_id(s.source_id)
+                if fresh:
+                    fresh_songs.append(fresh)
+        
+        # set_songs triggers _refresh_field_values() which updates all UI fields
+        self.set_songs(fresh_songs)

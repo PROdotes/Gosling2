@@ -352,7 +352,12 @@ class EntityPickerDialog(QDialog):
             btn.setChecked(t == type_name)
         
         self._current_type_filter = type_name
-        self._refresh_list()
+        
+        # Trigger full refresh logic (re-using current search text)
+        # This ensures search results are re-fetched and re-filtered by the new type
+        current_text = self.txt_search.text()
+        self._refresh_list(current_text)
+        
         self.txt_search.edit.setFocus()
     
     def _on_search_changed(self, text: str):

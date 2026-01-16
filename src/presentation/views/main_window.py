@@ -385,6 +385,9 @@ class MainWindow(QMainWindow):
 
         editor.filter_refresh_requested.connect(lambda: self.library_widget.load_library(refresh_filters=True))
         
+        # T-Feature: Sync Side Panel when Scrubber updates tags
+        self.library_widget.metadata_changed.connect(lambda: editor.refresh_content())
+        
         # T-Feature: Dynamic Width Persistence
         self.right_panel.editor_mode_changed.connect(self._on_editor_mode_changed)
         # T-Feature: Edit mode enables scrubber dialog on double-click

@@ -546,6 +546,7 @@ class LibraryWidget(QWidget):
     remove_from_playlist = pyqtSignal(list) # List of paths to remove from playlist
     play_immediately = pyqtSignal(str) # Path to play
     focus_search_requested = pyqtSignal()
+    metadata_changed = pyqtSignal() # Emitted when external dialogs change metadata
 
     def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, import_service=None, parent=None) -> None:
         super().__init__(parent)
@@ -2489,7 +2490,13 @@ class LibraryWidget(QWidget):
             library_service=self.library_service,
             parent=self
         )
+        # T-Feature: Emit signal when genre/metadata changes in scrubber
+        dlg.genre_changed.connect(lambda _: self.metadata_changed.emit())
+        
         dlg.exec()
+        
+        # Ensure final refresh of library table after dialog closes
+        self.load_library(refresh_filters=False)
 
     def _emit_add_to_playlist(self) -> None:
         """Gather selected items and emit signal"""
