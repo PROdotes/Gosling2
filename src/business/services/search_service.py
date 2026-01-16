@@ -16,17 +16,16 @@ class SearchService:
         """Return list of supported search providers."""
         return self.PROVIDERS
 
-    def get_search_url(self, provider: str, title: str = "", artist: str = "", field_value: str = "", field_name: str = "", field_header: str = "") -> str:
+    def get_search_url(self, provider: str, title: str = "", artist: str = "", field_name: str = "", field_header: str = "") -> str:
         """
         Construct search URL based on provider and context.
-        Centralizes all formatting logic here.
         """
-        # Clean Inputs
+        # Clean Inputs for structured providers
         a_clean = urllib.parse.quote(artist.strip()) if artist else ""
         t_clean = urllib.parse.quote(title.strip()) if title else ""
         
         # Generic Query String (Fallback for Google/YouTube)
-        # Format: "Artist Title" (or just Title)
+        # Format: "Artist Title [Field]"
         raw_query_parts = []
         if artist: raw_query_parts.append(artist.strip())
         if title: raw_query_parts.append(title.strip())
@@ -34,9 +33,8 @@ class SearchService:
         # Add Field Context (e.g. "Year", "Composer") if searching a specific field
         # WE DONT DO THIS FOR CORE IDENTITY (Artist/Title buttons)
         is_core = field_name in ['title', 'performers', 'unified_artist', 'artist']
-        if field_value and not is_core:
-             raw_query_parts.append(str(field_value).strip())
-        if field_header and not is_core and provider == "Google":
+        
+        if field_header and not is_core:
              raw_query_parts.append(field_header.strip())
              
         generic_query = " ".join(raw_query_parts).strip()
@@ -75,20 +73,16 @@ class SearchService:
         """
         # 1. Resolve Effective Provider
         effective_provider = preferred_provider
-        
-        # Logic: If searching specific metadata (Composer, Lyrics, Year), Force Google.
-        # But if searching Core Identity (Artist/Title), treat as Main Search (Respect Provider).
-        is_core_identity = False
         field_name = ""
         field_header = ""
-        field_value = ""
         
         if field_def:
             field_name = field_def.name
             field_header = field_def.ui_header
-            if field_name in ['title', 'performers', 'unified_artist']:
-                is_core_identity = True
-            else:
+            
+            # Logic: If searching specific metadata (Composer, Lyrics, Year), Force Google.
+            # But if searching Core Identity (Artist/Title), treat as Main Search (Respect Provider).
+            if field_name not in ['title', 'performers', 'unified_artist', 'artist']:
                 effective_provider = "Google"
 
         # 2. Resolve Context (Draft Priority > Model Fallback)
@@ -106,9 +100,6 @@ class SearchService:
             else: 
                 artist = getattr(song, 'unified_artist', "") or getattr(song, 'artist', "")
         artist = str(artist)
-        
-        if field_def:
-            field_value = str(resolve(field_name))
 
         # 3. Delegate to centralized URL builder
         return self.get_search_url(
@@ -116,7 +107,6 @@ class SearchService:
             title=title, 
             artist=artist, 
             field_name=field_name,
-            field_value=field_value,
             field_header=field_header
         )
 
