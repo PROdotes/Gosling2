@@ -46,12 +46,21 @@ class GlowWidget(QWidget):
         self.glow_frame.lower()
 
     def _update_glow_style(self):
+        radius_part = getattr(self, "_custom_radius_css", None)
+        if not radius_part:
+            radius_part = f"border-radius: {self.glow_radius}px;"
+            
         self.glow_frame.setStyleSheet(f"""
             #GlowFocusFrame {{
                 background-color: {self.glow_color};
-                border-radius: {self.glow_radius}px;
+                {radius_part}
             }}
         """)
+
+    def setGlowShape(self, css):
+        """Allow passing complex border-radius strings (e.g. for split buttons)."""
+        self._custom_radius_css = css
+        self._update_glow_style()
 
     def setGlowRadius(self, r):
         self.glow_radius = r

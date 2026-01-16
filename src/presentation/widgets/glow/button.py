@@ -86,6 +86,7 @@ class GlowButton(GlowWidget):
     def set_radius_style(self, css_string):
         """Override the default 10px border radius (e.g. for split buttons)."""
         self._radius_css = css_string
+        self.setGlowShape(css_string)
         self._update_text_styles()
 
     def set_text_align(self, alignment):
