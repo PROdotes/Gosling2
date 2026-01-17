@@ -502,6 +502,14 @@ class SidePanelWidget(QFrame):
                         btn_parse_inline.setToolTip("Parse Metadata from Filename")
                         btn_parse_inline.clicked.connect(self._open_filename_parser)
                         header_layout.addWidget(btn_parse_inline)
+                    elif field.name == 'tags':
+                        btn_music = GlowButton("🎵")
+                        btn_music.setObjectName("MusicInlineButton")
+                        # Match Title Parse / Footer Search button size
+                        btn_music.setFixedSize(36, 28)
+                        btn_music.setToolTip("Open Scrubber")
+                        btn_music.clicked.connect(self._open_scrubber)
+                        header_layout.addWidget(btn_music)
                     elif field.ui_search:
                         # Other fields keep their search button
                         btn_search = GlowButton("")
@@ -2614,6 +2622,20 @@ class SidePanelWidget(QFrame):
                 # Do nothing, conflicts are already skipped
                 QMessageBox.information(self, "Skipped", f"Skipped {len(conflicts)} songs with ISRC conflicts.")
             # else keep_existing: already handled (nothing done during initial processing)
+
+    def _open_scrubber(self):
+        """Open the ScrubberDialog for the current song."""
+        if not self.current_songs:
+            return
+            
+        song = self.current_songs[0]
+        from ..dialogs.scrubber_dialog import ScrubberDialog
+        
+        dlg = ScrubberDialog(song, self.settings_manager, self.library_service, parent=self)
+        dlg.exec()
+        
+        self._refresh_field_values()
+        self.filter_refresh_requested.emit()
 
     def refresh_content(self):
         """Refetch current songs from DB and update UI to match latest state."""
