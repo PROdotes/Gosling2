@@ -2772,8 +2772,7 @@ class LibraryWidget(QWidget):
                 error_msg = "\n".join(errors[:10])
                 if len(errors) > 10: error_msg += "\n...and more."
                 QMessageBox.warning(self, "Rename Results", f"Renamed {success_count} files.\n\nErrors:\n{error_msg}")
-            elif success_count > 0:
-                 QMessageBox.information(self, "Success", f"Successfully renamed and moved {success_count} files.")
+
             
             # Refresh to show new paths
             if success_count > 0 and refresh:

@@ -556,6 +556,16 @@ class EntityPickerDialog(QDialog):
         else:
             types_to_offer = self.config.type_buttons or [self.config.default_type]
             
+        # T-82/92: Spotify Shortcut
+        service = getattr(self.services, 'spotify_parsing_service', None)
+        if service and service.is_camel_case(raw_query):
+            # Use the raw name with comma for the splitter service
+            target_t = self._current_type_filter or self.config.default_type
+            preview = service.get_preview(raw_query)
+            spotify_item = QListWidgetItem(f"🎵 Create Multiple: {preview}")
+            spotify_item.setData(Qt.ItemDataRole.UserRole, ("CREATE_SPOTIFY", raw_query, target_t))
+            self.list_results.addItem(spotify_item)
+
         for t in types_to_offer:
             # Check for exact match using CLEAN name
             exact_match = any(
@@ -569,16 +579,6 @@ class EntityPickerDialog(QDialog):
                 item = QListWidgetItem(f"➕ Create \"{clean_name}\"{type_suffix}")
                 item.setData(Qt.ItemDataRole.UserRole, ("CREATE", clean_name, t))
                 self.list_results.addItem(item)
-
-        # T-82/92: Spotify Shortcut
-        service = getattr(self.services, 'spotify_parsing_service', None)
-        if service and service.is_camel_case(raw_query):
-            # Use the raw name with comma for the splitter service
-            target_t = self._current_type_filter or self.config.default_type
-            preview = service.get_preview(raw_query)
-            spotify_item = QListWidgetItem(f"🎵 Create Multiple: {preview}")
-            spotify_item.setData(Qt.ItemDataRole.UserRole, ("CREATE_SPOTIFY", raw_query, target_t))
-            self.list_results.addItem(spotify_item)
     
     def _add_entity_item(self, entity: Any):
         """Add an entity to the list."""
