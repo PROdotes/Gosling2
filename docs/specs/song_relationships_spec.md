@@ -10,13 +10,15 @@ This plan details the implementation of a song relationship system for Gosling2,
 2. **Sample** - Link songs that sample from other songs (Sampled Song = Parent, Sampling Song = Child)
 3. **Cover** - Link cover versions to originals (Original = Parent, Cover = Child)
 4. **Medley/Mashup** - Link medleys to multiple source songs (Source Songs = Parents, Medley = Child)
+5. **Parody** - Link parodies to the original song (Original = Parent, Parody = Child)
+6. **Version** - Link alternate versions (Instrumental, Acapella, Radio Edit) to the main track (Main Track = Parent, Version = Child)
 
 ## Parent/Child Directionality
 
 **Key Concept:** While relationships are **queryable bidirectionally** (both songs see each other), they are **stored directionally** with clear parent/child semantics:
 
-- **SourceSongID** = Child (the derivative work: remix, cover, sample-user, medley)
-- **TargetSongID** = Parent (the original: source material, sampled song)
+- **SourceSongID** = Child (the derivative work: remix, cover, sample-user, medley, parody, instrumental)
+- **TargetSongID** = Parent (the original: source material, sampled song, main mix)
 
 **Why this matters:**
 - User creates relationship FROM the child TO the parent
@@ -29,7 +31,7 @@ This plan details the implementation of a song relationship system for Gosling2,
 **Visual Indicators:**
 - Forward arrow (→) shown when viewing child pointing to parent
 - Backward arrow (←) shown when viewing parent pointing to child
-- Icons differentiate: 🎧 Remix, 🎹 Sample, 🎤 Cover, 🎶 Medley
+- Icons differentiate: 🎧 Remix, 🎹 Sample, 🎤 Cover, 🎶 Medley, 🎭 Parody, 💿 Version
 
 ---
 
@@ -53,6 +55,8 @@ CREATE TABLE RelationshipTypes (
 - Sample: "samples from" / "sampled in"
 - Cover: "covers" / "covered by"
 - Medley: "includes" / "included in"
+- Parody: "parodies" / "parodied by"
+- Version: "version of" / "has version" (e.g. Instrumental -> Main Mix)
 
 #### SongRelationships (Junction Table)
 ```sql
@@ -585,3 +589,21 @@ EntityListWidget renders chips in CLOUD layout
 - No schema migration tool needed - tables auto-created on next app launch
 - Relationships NOT exported to ID3 tags (internal metadata only)
 - Search performance acceptable for <10k songs; FTS5 optimization available for larger libraries
+
+## Future Consideration: Version Folding (The "Cleaner Library" Goal)
+
+User Request: "It's annoying to see 5 rows for the same song (Main, Instrumental, Acapella). I want to quickly find them, but not clutter the view."
+
+**Concept:**
+Using the `Version` relationship type (Main Track = Parent, Instrumental = Child), we can eventually implement **"Version Folding"** in the main library grid.
+
+**Workflow:**
+1. **Link:** User links "Song A (Instrumental)" to "Song A" as a **Version**.
+2. **Fold:** The Library Widget detects this hierarchy.
+3. **Display:** 
+   - The grid hides the Instrumental row.
+   - The Main Track row shows a `[+Versions]` badge or icon.
+   - Clicking the badge expands to show the satellite versions.
+
+**Benefit:**
+This allows users to keep their library clean without manually renaming files or relying on "Title Suffixes" (which look messy), matching the behavior of premium players like Roon.

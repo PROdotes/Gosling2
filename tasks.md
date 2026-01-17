@@ -102,6 +102,7 @@ links: []
 | T-101 | **Surgical Credits (Jobs)** | 3 | 4 | 12 | 💡 | Core | [spec](docs/tasks/T-101_surgical_credits_plan.md) — Multi-role support for ZAMP. |
 | T-66 | **Scrubber Window** | 4 | 3 | 12 | ⏸️ Post-0.1 | — | Playback feature. Defer to v0.2. |
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | ⏸️ Post-0.1 | — | UI polish. Defer to v0.2. |
+| T-106 | **Song Relationships** | 3 | 3 | 9 | 📋 | — | [spec](docs/specs/song_relationships_spec.md) — Link songs (remixes, samples, covers, parodies). Includes Version Folding plan. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
