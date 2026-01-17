@@ -103,6 +103,7 @@ links: []
 | T-66 | **Scrubber Window** | 4 | 3 | 12 | ⏸️ Post-0.1 | — | Playback feature. Defer to v0.2. |
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | ⏸️ Post-0.1 | — | UI polish. Defer to v0.2. |
 | T-106 | **Song Relationships** | 3 | 3 | 9 | 📋 | — | [spec](docs/specs/song_relationships_spec.md) — Link songs (remixes, samples, covers, parodies). Includes Version Folding plan. |
+| T-107 | **Portable Metadata (TXXX)** | 5 | 4 | 15 | 💡 | — | [spec](docs/specs/portable_metadata_spec.md) — "Entity Anchors". Persist Identity/Graph IDs in ID3 tags to survive DB deletion. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |
