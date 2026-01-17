@@ -479,43 +479,39 @@ class EntityPickerDialog(QDialog):
     def _get_entities(self, query: str) -> List[Any]:
         """Get entities based on current filter."""
         query_lower = query.lower()
-        if query:
-            # 1. Search (Universal/Specialized)
-            if hasattr(self.service, self.config.search_fn):
-                search_method = getattr(self.service, self.config.search_fn)
-                entities = search_method(query)
-                
-                # Check if we should filter the search results by type
-                if self._current_type_filter:
-                    # T-Fix: Case-insensitive comparison (DB='group' vs UI='Group')
-                    entities = [e for e in entities if self.config.type_fn(e).lower() == self._current_type_filter.lower()]
-                
-                # Double-check match for safety, but be inclusive (check aliases for artists)
+        
+        # Unified Search Logic:
+        # Always use search() if available. This ensures that whatever can be found matches
+        # what is displayed when "browsing" (query="").
+        # This fixes issues where get_all() might exclude Aliases or differ from search results.
+        if hasattr(self.service, self.config.search_fn):
+            search_method = getattr(self.service, self.config.search_fn)
+            entities = search_method(query)
+            
+            # 1. Filter by Type (Button Selection)
+            if self._current_type_filter:
+                # Case-insensitive comparison
+                entities = [e for e in entities if self.config.type_fn(e).lower() == self._current_type_filter.lower()]
+            
+            # 2. Filter by Query Match (redundant for DB search but good for safety)
+            # Only apply if query has content (otherwise "" in "str" is always true)
+            if query:
                 def matches(e):
                     display_name = self.config.display_fn(e).lower()
                     if query_lower in display_name:
                         return True
-                    # Specialized check for contributors with matched_alias
                     if hasattr(e, 'matched_alias') and e.matched_alias and query_lower in e.matched_alias.lower():
                         return True
                     return False
-                
                 entities = [e for e in entities if matches(e)]
-            else:
-                entities = []
+                
+        # Fallback for services without search (should be rare)
+        elif hasattr(self.service, 'get_all'):
+             entities = self.service.get_all()
         else:
-            # 2. Browsing (By Category or All)
-            if self._current_type_filter and hasattr(self.service, self.config.get_by_type_fn):
-                method = getattr(self.service, self.config.get_by_type_fn)
-                entities = method(self._current_type_filter)
-            elif hasattr(self.service, 'get_all'):
-                entities = self.service.get_all()
-            else:
-                entities = []
+             entities = []
         
-        # FILTER: Respect allowed types from config.type_buttons
-        # This ensures "ALL" only shows allowed types when picker is restricted
-        # Use case-insensitive comparison (type_fn may return 'person', buttons have 'Person')
+        # Final Strict Filter: Respect allowed types from config.type_buttons
         if self.config.type_buttons:
             allowed_types_lower = {t.lower() for t in self.config.type_buttons}
             entities = [e for e in entities if self.config.type_fn(e).lower() in allowed_types_lower]
