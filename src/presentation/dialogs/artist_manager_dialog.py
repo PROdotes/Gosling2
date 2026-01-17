@@ -114,7 +114,13 @@ class ArtistDetailsDialog(QDialog):
     """
     def __init__(self, artist, service, context_song=None, allow_remove_from_context=False, parent=None):
         super().__init__(parent)
-        self.artist = artist
+        
+        # 0. RESOLVE IDENTITY: Always edit the Master Record
+        # If user clicked "Gabry Ponte" (Alias), we switch to "Gabriele Ponte" (Primary)
+        # This prevents the confusing "Alias Rename Mode" and ensures we manage the full Identity.
+        primary = service.get_primary_contributor(artist.contributor_id)
+        self.artist = primary if primary else artist
+        
         self.context_song = context_song
         self.original_type = artist.type
         self.service = service

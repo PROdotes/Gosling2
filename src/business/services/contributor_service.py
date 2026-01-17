@@ -258,6 +258,27 @@ class ContributorService:
             cursor.execute(query, names)
             return {row[0]: row[1] for row in cursor.fetchall()}
 
+    def get_primary_contributor(self, contributor_id: int) -> Optional[Contributor]:
+        """
+        Redirect to the Primary Identity record.
+        If 'contributor_id' is an alias (e.g. 'Gabry Ponte'), returns the primary ('Gabriele Ponte').
+        """
+        # 1. Get the Name record
+        name = self._name_service.get_name(contributor_id)
+        if not name: return None
+        
+        # 2. If it has an owner (Identity), find the primary name for that identity
+        if name.owner_identity_id:
+            names = self._name_service.get_by_owner(name.owner_identity_id)
+            for n in names:
+                if n.is_primary_name:
+                    # Found the Master Name (Primary)
+                    # We return the full Contributor object for this ID
+                    return self.get_by_id(n.name_id)
+                    
+        # 3. Fallback: If no owner or no primary found (orphan?), return self
+        return self.get_by_id(contributor_id)
+
     def resolve_identity_graph(self, search_term: str) -> List[str]:
         """
         Resolve a search term to a complete list of related artist names (Identity Graph).
