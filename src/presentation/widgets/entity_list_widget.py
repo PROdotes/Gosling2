@@ -404,7 +404,9 @@ class EntityListWidget(QWidget):
                 # T-Polish: Use "Append Mode" for additive types to prevent sorting jumps
                 # Albums are usually exclusive/replacing, so they need full refresh.
                 if self.entity_type != EntityType.ALBUM:
-                    self._append_local_item(entity)
+                    # Only append if it wasn't already added (e.g. by a side-effect refresh from the adapter)
+                    if not self._has_item(entity_id):
+                        self._append_local_item(entity)
                 else:
                     self.refresh_from_adapter()
                 
@@ -412,6 +414,25 @@ class EntityListWidget(QWidget):
             else:
                 QMessageBox.warning(self, "Action Failed", 
                                    "Could not complete the link. This might be due to a circular relationship or validation error.")
+
+    def _has_item(self, entity_id: int) -> bool:
+        """Check if item with entity_id already exists in the widget."""
+        if self.layout_mode == LayoutMode.CLOUD:
+            if not self._inner_widget: return False
+            # Check ChipTray
+            layout = self._inner_widget.flow_layout
+            for i in range(layout.count()):
+                widget = layout.itemAt(i).widget()
+                if hasattr(widget, 'entity_id') and widget.entity_id == entity_id:
+                    return True
+        else:
+            # Check QListWidget
+            if not self._inner_widget: return False
+            for i in range(self._inner_widget.count()):
+                item = self._inner_widget.item(i)
+                if item.data(Qt.ItemDataRole.UserRole) == entity_id:
+                    return True
+        return False
     
     def _append_local_item(self, entity: Any):
         """Manually append a new item to avoid resort."""
