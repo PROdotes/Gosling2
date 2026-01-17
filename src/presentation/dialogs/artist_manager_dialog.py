@@ -423,48 +423,54 @@ class ArtistDetailsDialog(QDialog):
 
             # Match Type 2: PRIMARY IDENTITY MATCH (Person/Group)
             aliases = self.service.get_aliases(target.contributor_id)
-            alias_count = len(aliases)
-            song_count = self.service.get_usage_count(target.contributor_id)
             
-            is_abdication = False
-            heir_id = None
-            heir_name = ""
-
-            # CASE 3: IDENTITY with ALIASES (Freddie -> Queen)
-            if alias_count > 0:
-                is_abdication = True
-                heir_id = aliases[0].alias_id
-                heir_name = aliases[0].alias_name
-
-                header = "SEPARATE IDENTITY?"
-                btn_label = "SEPARATE & MOVE"
-                desc = f"'{real_target.name}' has {alias_count} aliases (e.g. '{heir_name}').\n\n"
-                desc += f"• All aliases (inc. {heir_name}) will STAY with the ID.\n"
-                desc += f"• Only '{real_target.name}' will move to '{self.artist.name}'."
-                desc += f"\n\nEffectively: '{real_target.name}' becomes '{heir_name}'."
-
-            # CASE 4: IDENTITY (SIMPLE) (Ziggy -> Bowie)
-            else:
-                header = "DELETE PROFILE?"
-                btn_label = "DELETE & MERGE"
-                desc = f"Deleting '{real_target.name}' profile.\n\n"
-                desc += f"• '{real_target.name}' becomes an alias of '{self.artist.name}'.\n"
+            # Check for structural connections (Aliases OR Memberships/Groups)
+            has_structural_links = False
+            structure_desc = []
+            
+            # 1. Aliases
+            if aliases:
+                has_structural_links = True
+                structure_desc.append(f"{len(aliases)} aliases")
                 
-                if song_count > 0:
-                     desc += f"• {song_count} songs mixed into '{self.artist.name}'."
-                else:
-                     desc += "• Empty profile removed."
-                     
-                desc += "\n\nCannot be undone."
+            # 2. Group/Member connections
+            if target.type == "group":
+                members = self.service.get_members(target.contributor_id)
+                if members:
+                    has_structural_links = True
+                    structure_desc.append(f"{len(members)} members")
+            else:
+                groups = self.service.get_groups(target.contributor_id)
+                if groups:
+                    has_structural_links = True
+                    structure_desc.append(f"{len(groups)} group memberships")
+
+            # SKIP PROMPT if no structural links (User rule: Don't care about songs, only aliases/groups)
+            if not has_structural_links:
+                 # Implicit Merge
+                 if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                        from src.core import logger
+                        logger.info(f"Identity Absorbed (Implicit): '{target.name}' merged into '{self.artist.name}'.")
+                        self._refresh_data()
+                 return
+
+            # PROMPT if we have structural stuff to move
+            header = "TRANSFER DATA?"
+            btn_label = "TRANSFER & MERGE"
+            
+            items_str = " and ".join(structure_desc)
+            desc = f"'{real_target.name}' has {items_str}.\n\n"
+            desc += f"These will be transferred to '{self.artist.name}'.\n"
+            desc += "\nCannot be undone."
 
             # Execute Dialog
             resolver = IdentityCollisionDialog(
                 target_name=real_target.name,
-                song_count=song_count,
+                song_count=0, # Irrelevant per user request
                 has_context_song=False,
                 title="Merge Artist?",
                 header=header,
-                primary_label=None, # Hide Primary
+                primary_label=None, 
                 secondary_label=btn_label,
                 description=desc,
                 parent=self
@@ -475,22 +481,13 @@ class ArtistDetailsDialog(QDialog):
                 return
             
             # Execution
-            if is_abdication:
-                 # Case 3: Abdicate
-                 if self.service.abdicate_identity(target.contributor_id, heir_id, self.artist.contributor_id):
-                      from src.core import logger
-                      logger.info(f"Identity Abdicated: '{real_target.name}' renamed to '{heir_name}'; Name moved to '{self.artist.name}'.")
-                      self._refresh_data()
-                 else:
-                      QMessageBox.warning(self, "Error", f"Failed to abdicate '{real_target.name}'.")
+            # Execution
+            if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                from src.core import logger
+                logger.info(f"Identity Absorbed: '{target.name}' merged into '{self.artist.name}'.")
+                self._refresh_data()
             else:
-                 # Case 4: Standard Merge
-                 if self.service.merge(target.contributor_id, self.artist.contributor_id):
-                        from src.core import logger
-                        logger.info(f"Identity Absorbed via Alias Add: '{target.name}' merged into '{self.artist.name}'.")
-                        self._refresh_data()
-                 else:
-                        QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+                QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
             
 
 
