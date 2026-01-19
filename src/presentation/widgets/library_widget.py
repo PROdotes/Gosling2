@@ -1839,9 +1839,15 @@ class LibraryWidget(QWidget):
         # ═══════════════════════════════════════════════════════════════════════
         # 5. DESTRUCTIVE
         # ═══════════════════════════════════════════════════════════════════════
-        delete_action = QAction("🗑️  Delete from Library", self)
-        delete_action.triggered.connect(self._delete_selected)
-        menu.addAction(delete_action)
+        delete_menu = menu.addMenu("🗑️  Delete")
+        
+        del_lib_action = QAction("Delete from Library Only", self)
+        del_lib_action.triggered.connect(lambda: self._delete_resources(delete_files=False))
+        delete_menu.addAction(del_lib_action)
+        
+        del_all_action = QAction("⚠️ Delete Library + File", self)
+        del_all_action.triggered.connect(lambda: self._delete_resources(delete_files=True))
+        delete_menu.addAction(del_all_action)
 
         menu.exec(self.table_view.viewport().mapToGlobal(position))
 
@@ -2307,13 +2313,19 @@ class LibraryWidget(QWidget):
         if count > 0:
             self.table_view.viewport().update()
 
-    def _delete_selected(self) -> None:
+    def _delete_resources(self, delete_files: bool) -> None:
+        """
+        Delete selected items from library, and optionally from disk.
+        """
         indexes = self.table_view.selectionModel().selectedRows()
         if not indexes:
             return
             
+        action_text = "Delete Library + File" if delete_files else "Delete from Library"
+        warning_text = f"Delete {len(indexes)} song(s) and their files from DISK?\nThis cannot be undone." if delete_files else f"Delete {len(indexes)} song(s) from the library?"
+        
         reply = QMessageBox.question(
-            self, "Confirm Delete", f"Delete {len(indexes)} song(s)?",
+            self, f"Confirm {action_text}", warning_text,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -2325,28 +2337,55 @@ class LibraryWidget(QWidget):
             potential_empty_zips = set()
             from ...core.vfs import VFS
 
+            deleted_count = 0
+            file_errors = []
+
             for index in indexes:
                 source_index = self.proxy_model.mapToSource(index)
                 file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])
-                # Get path to check for virtual content
+                # Get path to check for virtual content or deletion
                 path_item = self.library_model.item(source_index.row(), self.field_indices['path'])
                 
                 if file_id_item:
-                    file_id = int(file_id_item.text())
-                    
-                    if path_item:
-                        path_str = path_item.text()
-                        if VFS.is_virtual(path_str):
+                    try:
+                        file_id = int(file_id_item.text())
+                        path_str = path_item.text() if path_item else None
+                        
+                        # 1. File Deletion (Optional)
+                        if delete_files and path_str:
+                            if VFS.is_virtual(path_str):
+                                # Virtual File: Cannot delete properly without rebuild
+                                # Just track it for cleanup
+                                zip_path, _ = VFS.split_path(path_str)
+                                potential_empty_zips.add(zip_path)
+                            else:
+                                # Physical File: Delete
+                                if os.path.exists(path_str):
+                                    try:
+                                        os.remove(path_str)
+                                    except Exception as e:
+                                        file_errors.append(f"{os.path.basename(path_str)}: {str(e)}")
+                        
+                        # 2. Virtual cleanup tracking
+                        if path_str and VFS.is_virtual(path_str):
                             zip_path, _ = VFS.split_path(path_str)
                             potential_empty_zips.add(zip_path)
-                            
-                    self.library_service.delete_song(file_id)
+                                
+                        # 3. DB Deletion
+                        self.library_service.delete_song(file_id)
+                        deleted_count += 1
+                        
+                    except Exception:
+                        pass
             
             self.load_library()
             
             # Post-delete: Check for empty containers (T-Cleanup)
-            # Post-delete: Check for empty containers (T-Cleanup)
             self._check_and_cleanup_zips(potential_empty_zips)
+            
+            if file_errors:
+                 QMessageBox.warning(self, "Deletion Errors", "Some files could not be deleted:\n" + "\n".join(file_errors[:10]))
+
 
     def _check_and_cleanup_zips(self, zip_paths: set) -> None:
         """Check provided ZIP paths for emptiness and prompt user to delete."""
@@ -2750,7 +2789,9 @@ class LibraryWidget(QWidget):
                             # Capture old path for VFS Clean Check
                             old_path = song.path
 
-                        if self.renaming_service.rename_song(song, target_path=target):
+                        success, error_msg = self.renaming_service.rename_song(song, target_path=target)
+
+                        if success:
                             # Success! Persist new path to DB
                             self.library_service.update_song(song)
                             success_count += 1
@@ -2760,7 +2801,7 @@ class LibraryWidget(QWidget):
                                 zp, _ = VFS.split_path(old_path)
                                 potential_empty_zips.add(zp)
                         else:
-                            errors.append(f"{song.title}: Rename failed (Conflict or Access Denied)")
+                            errors.append(f"{song.title}: {error_msg}")
                             error_count += 1
 
                 except Exception as e:

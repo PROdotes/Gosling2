@@ -230,16 +230,16 @@ class RenamingService:
         """
         return os.path.exists(target_path)
 
-    def rename_song(self, song, target_path: str = None) -> bool:
+    def rename_song(self, song, target_path: str = None) -> tuple[bool, str]:
         """
-        Executes the move.
+        Executes the move. Returns (Success, Error Message).
         """
         if not target_path:
             target_path = self.calculate_target_path(song)
 
         # 1. Validate Constraints
         if self.check_conflict(target_path):
-            return False
+            return False, f"Destination already exists: {os.path.basename(target_path)}"
             
         # Extension Check check to ensure we don't do something weird
         
@@ -260,12 +260,12 @@ class RenamingService:
                 # Note: We do NOT delete from ZIP (expensive/risky). 
                 # We leave the artifact and let Cleanup Logic handle the ZIP deletion if empty.
                 song.path = target_path
-                return True
+                return True, None
 
             # CASE B: Physical File (Move)
             # Ensure source exists
             if not song.path or not os.path.exists(song.path):
-                return False
+                return False, f"Source file not found: {song.path}"
 
             # 2. Create parent directories
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
@@ -275,12 +275,12 @@ class RenamingService:
             
             # 4. Update Model (Caller must persist to DB)
             song.path = target_path
-            return True
+            return True, None
             
         except (OSError, shutil.Error, Exception) as e:
             from src.core import logger
             logger.error(f"Rename Error during file move: {e}")
-            return False
+            return False, f"System Error: {str(e)}"
 
     def _sanitize(self, component: str) -> str:
         """Internal helper to strip bad chars."""
