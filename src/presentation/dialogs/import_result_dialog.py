@@ -48,16 +48,8 @@ class ImportResultDialog(QDialog):
         self.setObjectName("ImportResultDialog")
 
         # Apply theme styling
-        self.setStyleSheet(f"""
-            QDialog#ImportResultDialog {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2A2A2A,
-                    stop:0.02 #222222,
-                    stop:1 #080808);
-                color: #AAAAAA;
-                font-family: "Bahnschrift Condensed", "Segoe UI", sans-serif;
-            }}
-        """)
+        # No hardcoded QSS allowed per Skill instructions
+        self.setObjectName("ImportResultDialog")
 
         self._init_ui()
 
@@ -71,44 +63,18 @@ class ImportResultDialog(QDialog):
 
         # Enhanced Header Bar
         header = QFrame()
-        header.setObjectName("DialogHeader")
-        header.setStyleSheet(f"""
-            QFrame#DialogHeader {{
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #2A2A2A,
-                    stop:0.02 #222222,
-                    stop:1 #080808);
-                border: 1px solid #333333;
-                border-radius: 8px;
-                border-bottom: 2px solid #1A1A1A;
-            }}
-        """)
+        header.setObjectName("ImportResultHeader")
         header_layout = QVBoxLayout(header)
         header_layout.setContentsMargins(20, 15, 20, 15)
 
         # Title
         lbl_title = QLabel("IMPORT RESULTS")
-        lbl_title.setObjectName("DialogTitleLarge")
-        lbl_title.setStyleSheet(f"""
-            QLabel#DialogTitleLarge {{
-                color: {constants.COLOR_AMBER};
-                font-size: 16pt;
-                font-weight: bold;
-                background: transparent;
-            }}
-        """)
+        lbl_title.setObjectName("ImportResultTitle")
         header_layout.addWidget(lbl_title)
 
         # Subtitle with summary
         lbl_hint = QLabel(f"{success_count} IMPORTED  |  {failure_count} FAILED")
-        lbl_hint.setObjectName("DialogHint")
-        lbl_hint.setStyleSheet("""
-            QLabel#DialogHint {{
-                color: #888888;
-                font-size: 10pt;
-                background: transparent;
-            }}
-        """)
+        lbl_hint.setObjectName("ImportResultSubtitle")
         header_layout.addWidget(lbl_hint)
 
         layout.addWidget(header)
@@ -136,67 +102,56 @@ class ImportResultDialog(QDialog):
         if failure_count > 0:
             self.tabs.setCurrentWidget(self.failure_tab)
             
-        # Footer
-        footer = QHBoxLayout()
-        footer.addStretch()
+        # Footer with Industrial Separator
+        footer_container = QWidget()
+        footer_layout_main = QVBoxLayout(footer_container)
+        footer_layout_main.setContentsMargins(0, 0, 0, 0)
+        footer_layout_main.setSpacing(0)
+
+        # Industrial Separator (7px Black)
+        sep = QFrame()
+        sep.setObjectName("ImportFooterSeparator")
+        sep.setFixedHeight(7)
+        footer_layout_main.addWidget(sep)
+
+        footer_actions_widget = QWidget()
+        footer_actions_widget.setObjectName("ImportFooterContainer")
+        footer_actions = QHBoxLayout(footer_actions_widget)
+        footer_actions.setContentsMargins(20, 10, 20, 15)
         
-        close_btn = QPushButton("Close")
+        from ..widgets.glow import GlowButton
+        close_btn = GlowButton("CLOSE")
+        close_btn.setObjectName("ImportResultCloseButton")
+        close_btn.setFixedWidth(120)
         close_btn.clicked.connect(self.accept)
-        close_btn.setFixedSize(100, 30)
-        footer.addWidget(close_btn)
         
-        layout.addLayout(footer)
+        footer_actions.addStretch()
+        footer_actions.addWidget(close_btn)
+        
+        footer_layout_main.addWidget(footer_actions_widget)
+        layout.addWidget(footer_container)
 
     def _create_celebration_widget(self, count: int) -> QFrame:
         """Create success celebration widget with animation."""
         celebration_frame = QFrame()
         celebration_frame.setObjectName("CelebrationFrame")
-        celebration_frame.setStyleSheet(f"""
-            QFrame#CelebrationFrame {{
-                background-color: #111111;
-                border: 1px solid {constants.COLOR_AMBER};
-                border-radius: 6px;
-                margin: 10px;
-                padding: 15px;
-            }}
-        """)
 
         celebration_layout = QHBoxLayout(celebration_frame)
 
         # Large checkmark icon
         icon_label = QLabel("✓")
-        icon_label.setStyleSheet(f"""
-            QLabel {{
-                color: {constants.COLOR_AMBER};
-                font-size: 48pt;
-                font-weight: bold;
-                background: transparent;
-            }}
-        """)
+        icon_label.setObjectName("CelebrationIcon")
         celebration_layout.addWidget(icon_label)
 
         # Text section
         text_layout = QVBoxLayout()
 
         status_label = QLabel("INTAKE COMPLETE")
-        status_label.setStyleSheet(f"""
-            QLabel {{
-                color: {constants.COLOR_AMBER};
-                font-size: 18pt;
-                font-weight: bold;
-                background: transparent;
-            }}
-        """)
+        status_label.setObjectName("CelebrationStatus")
         text_layout.addWidget(status_label)
 
         count_label = QLabel(f"{count} FILES SECURED")
-        count_label.setStyleSheet(f"""
-            QLabel {{
-                color: {constants.COLOR_MUTED_AMBER};
-                font-size: 12pt;
-                background: transparent;
-            }}
-        """)
+        count_label.setObjectName("CelebrationCount")
         text_layout.addWidget(count_label)
 
         celebration_layout.addLayout(text_layout)
@@ -224,22 +179,6 @@ class ImportResultDialog(QDialog):
 
         list_widget = QListWidget()
         list_widget.setObjectName("SuccessListWidget")
-        list_widget.setStyleSheet(f"""
-            QListWidget#SuccessListWidget {{
-                background-color: #111111;
-                border: 1px solid #333333;
-                color: #AAAAAA;
-                font-size: 10pt;
-                outline: none;
-            }}
-            QListWidget#SuccessListWidget::item {{
-                padding: 8px;
-                border-bottom: 1px solid #1A1A1A;
-            }}
-            QListWidget#SuccessListWidget::item:hover {{
-                background-color: #1A1A1A;
-            }}
-        """)
 
         for item in self.success_list:
             path = item.get('path', '')
@@ -262,7 +201,7 @@ class ImportResultDialog(QDialog):
         filter_layout.setSpacing(5)
 
         filter_label = QLabel("Filter:")
-        filter_label.setStyleSheet("color: #888888; font-size: 10pt;")
+        filter_label.setObjectName("ImportResultFilterLabel")
         filter_layout.addWidget(filter_label)
 
         # Create filter buttons
@@ -270,53 +209,17 @@ class ImportResultDialog(QDialog):
         filter_options = ['ALL', 'DUPLICATE', 'ACCESS', 'MISSING', 'FORMAT', 'UNKNOWN']
 
         for filter_key in filter_options:
-            btn = QPushButton(ERROR_CATEGORIES.get(filter_key, {}).get('label', filter_key).upper() if filter_key != 'ALL' else 'ALL')
+            btn_text = ERROR_CATEGORIES.get(filter_key, {}).get('label', filter_key).upper() if filter_key != 'ALL' else 'ALL'
+            btn = QPushButton(btn_text)
             btn.setObjectName(f"FilterButton_{filter_key}")
             btn.setFixedHeight(28)
             btn.setCheckable(True)
             btn.setChecked(filter_key == 'ALL')
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda checked, key=filter_key: self._apply_filter(key))
 
-            # Button styling
-            if filter_key == 'ALL':
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: #1A1A1A;
-                        color: #AAAAAA;
-                        border: 1px solid #333333;
-                        border-radius: 4px;
-                        padding: 4px 12px;
-                    }}
-                    QPushButton:checked {{
-                        background-color: {constants.COLOR_AMBER};
-                        color: #000000;
-                        border: 1px solid {constants.COLOR_AMBER};
-                        font-weight: bold;
-                    }}
-                    QPushButton:hover {{
-                        border: 1px solid #555555;
-                    }}
-                """)
-            else:
-                category_color = ERROR_CATEGORIES[filter_key]['color']
-                btn.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: #1A1A1A;
-                        color: #AAAAAA;
-                        border: 1px solid #333333;
-                        border-radius: 4px;
-                        padding: 4px 12px;
-                    }}
-                    QPushButton:checked {{
-                        background-color: {category_color};
-                        color: #000000;
-                        border: 1px solid {category_color};
-                        font-weight: bold;
-                    }}
-                    QPushButton:hover {{
-                        border: 1px solid #555555;
-                    }}
-                """)
+            # Unified Industrial Button Styling (Logic Based Property)
+            btn.setProperty("error_type", filter_key)
 
             self.filter_buttons[filter_key] = btn
             filter_layout.addWidget(btn)
@@ -338,57 +241,18 @@ class ImportResultDialog(QDialog):
         self.fail_table.setAlternatingRowColors(True)
 
         # Table styling
-        self.fail_table.setStyleSheet(f"""
-            QTableWidget {{
-                background-color: #111111;
-                border: 1px solid #333333;
-                color: #AAAAAA;
-                gridline-color: #1A1A1A;
-                outline: none;
-            }}
-            QTableWidget::item {{
-                padding: 8px;
-                border: none;
-            }}
-            QTableWidget::item:selected {{
-                background-color: #2A2A2A;
-            }}
-            QHeaderView::section {{
-                background-color: #1A1A1A;
-                color: {constants.COLOR_AMBER};
-                padding: 6px;
-                border: none;
-                border-bottom: 2px solid #333333;
-                font-weight: bold;
-            }}
-            QTableWidget::item:alternate {{
-                background-color: #0D0D0D;
-            }}
-        """)
+        self.fail_table.setObjectName("ImportFailTable")
 
         self._populate_fail_table()
         layout.addWidget(self.fail_table)
 
-        # Action Bar for Failures
+        # Action Bar for Failures with Magenta highlight
         actions = QHBoxLayout()
 
-        del_all_btn = QPushButton("Delete All Failed Files")
-        del_all_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {constants.COLOR_RED};
-                color: white;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #FF6666;
-            }}
-            QPushButton:pressed {{
-                background-color: #CC0000;
-            }}
-        """)
+        from ..widgets.glow import GlowButton
+        del_all_btn = GlowButton("PURGE ALL FAILED FILES")
+        del_all_btn.setGlowColor(constants.COLOR_MAGENTA)
+        del_all_btn.setFixedWidth(220)
         del_all_btn.clicked.connect(self._delete_all_failed)
         actions.addWidget(del_all_btn)
 
@@ -479,20 +343,7 @@ class ImportResultDialog(QDialog):
         is_already_imported = str(error).startswith("ALREADY_IMPORTED")
 
         menu = QMenu(self)
-        menu.setStyleSheet(f"""
-            QMenu {{
-                background-color: #1A1A1A;
-                color: #AAAAAA;
-                border: 1px solid #333333;
-            }}
-            QMenu::item:selected {{
-                background-color: {constants.COLOR_AMBER};
-                color: #000000;
-            }}
-            QMenu::item:disabled {{
-                color: #555555;
-            }}
-        """)
+        menu.setObjectName("ImportResultContextMenu")
 
         del_action = menu.addAction("Delete File")
 
@@ -577,6 +428,6 @@ class ImportResultDialog(QDialog):
         success_count = len(self.success_list)
         # Find the DialogHint label and update it
         for child in self.findChildren(QLabel):
-            if child.objectName() == "DialogHint":
+            if child.objectName() == "ImportResultSubtitle":
                 child.setText(f"{success_count} IMPORTED  |  {count} FAILED")
                 break

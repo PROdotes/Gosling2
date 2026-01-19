@@ -2086,3 +2086,209 @@ QMenu#SystemDropdownMenu::separator {
     text-transform: uppercase;
     letter-spacing: 1.5px;
 }
+
+/* --- IMPORT RESULT DIALOG (T-Industrial Upgrade) --- */
+#ImportResultDialog {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:0.02 #222222,
+        stop:1 #080808);
+    color: #AAAAAA;
+}
+
+#ImportResultHeader {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:0.02 #222222,
+        stop:1 #080808);
+    border: 1px solid #333333;
+    border-radius: 8px;
+    border-bottom: 2px solid #1A1A1A;
+}
+
+#ImportResultTitle {
+    color: #FFC66D;
+    font-size: 16pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+#ImportResultSubtitle {
+    color: #888888;
+    font-size: 10pt;
+    background: transparent;
+}
+
+/* Celebration Widget */
+#CelebrationFrame {
+    background-color: #111111;
+    border: 1px solid #FFC66D;
+    border-radius: 6px;
+    margin: 10px;
+    padding: 15px;
+}
+
+#CelebrationIcon {
+    color: #FFC66D;
+    font-size: 48pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+#CelebrationStatus {
+    color: #FFC66D;
+    font-size: 18pt;
+    font-weight: bold;
+    background: transparent;
+}
+
+#CelebrationCount {
+    color: #FF8C00; /* Muted Amber */
+    font-size: 12pt;
+    background: transparent;
+}
+
+#SuccessListWidget {
+    background-color: #111111;
+    border: 1px solid #333333;
+    color: #AAAAAA;
+    font-size: 10pt;
+    outline: none;
+}
+
+#SuccessListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #1A1A1A;
+}
+
+#SuccessListWidget::item:hover {
+    background-color: #1A1A1A;
+}
+
+#ImportResultFilterLabel {
+    color: #888888;
+    font-size: 10pt;
+}
+
+/* Error Type Filter Buttons (Dynamic Property) */
+QPushButton[error_type] {
+    background-color: #1A1A1A;
+    color: #888888;
+    border: 1px solid #333333;
+    border-radius: 2px;
+    padding: 4px 12px;
+    font-family: "Bahnschrift Condensed", "Segoe UI", sans-serif;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+QPushButton[error_type]:hover {
+    color: #FFFFFF;
+}
+
+QPushButton[error_type]:checked {
+    color: #000000;
+}
+
+/* Specific Error Colors */
+QPushButton[error_type="ALL"]:hover { border-color: #FFC66D; }
+QPushButton[error_type="ALL"]:checked { background-color: #FFC66D; border-color: #FFC66D; }
+
+QPushButton[error_type="DUPLICATE"]:hover { border-color: #888888; }
+QPushButton[error_type="DUPLICATE"]:checked { background-color: #888888; border-color: #888888; }
+
+QPushButton[error_type="ACCESS"]:hover { border-color: #FF4444; }
+QPushButton[error_type="ACCESS"]:checked { background-color: #FF4444; border-color: #FF4444; }
+
+QPushButton[error_type="MISSING"]:hover { border-color: #00E5FF; }
+QPushButton[error_type="MISSING"]:checked { background-color: #00E5FF; border-color: #00E5FF; }
+
+QPushButton[error_type="FORMAT"]:hover { border-color: #FF00FF; }
+QPushButton[error_type="FORMAT"]:checked { background-color: #FF00FF; border-color: #FF00FF; }
+
+QPushButton[error_type="UNKNOWN"]:hover { border-color: #FF4444; }
+QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-color: #FF4444; }
+
+#ImportFailTable {
+    background-color: #111111;
+    border: 1px solid #333333;
+    color: #AAAAAA;
+    gridline-color: #1A1A1A;
+    outline: none;
+}
+
+#ImportFailTable::item {
+    padding: 8px;
+    border: none;
+}
+
+#ImportFailTable::item:selected {
+    background-color: #2A2A2A;
+}
+
+#ImportFailTable QHeaderView::section {
+    background-color: #1A1A1A;
+    color: #FFC66D;
+    padding: 6px;
+    border: none;
+    border-bottom: 2px solid #333333;
+    font-weight: bold;
+}
+
+#ImportFailTable::item:alternate {
+    background-color: #0D0D0D;
+}
+
+/* --- IMPORT RESULT DIALOG (T-Industrial) --- */
+#ImportResultDialog {
+    background: #000000;
+}
+
+#ImportResultHeader {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:0.02 #222222,
+        stop:1 #080808);
+    border: 1px solid #333333;
+    border-radius: 8px;
+    border-bottom: 2px solid #1A1A1A;
+}
+
+#ImportResultTitle {
+    color: #FFC66D;
+    font-size: 16pt;
+    font-weight: bold;
+}
+
+#ImportResultSubtitle {
+    color: #888888;
+    font-size: 10pt;
+}
+
+#SuccessListWidget, #ImportFailTable {
+    background-color: #111111;
+    border: 1px solid #333333;
+    color: #AAAAAA;
+    outline: none;
+}
+
+#ImportFooterSeparator {
+    background-color: #000000;
+    border-top: 1px solid #333333;
+}
+
+#ImportFooterContainer {
+    background-color: #000000;
+}
+
+/* Specific context menu for this dialog */
+#ImportResultContextMenu {
+    background-color: #1A1A1A;
+    color: #AAAAAA;
+    border: 1px solid #333333;
+}
+
+#ImportResultContextMenu::item:selected {
+    background-color: #FFC66D;
+    color: #000000;
+}

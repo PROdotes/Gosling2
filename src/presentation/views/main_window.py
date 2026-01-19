@@ -606,6 +606,9 @@ class MainWindow(QMainWindow):
         geometry = self.settings_manager.get_window_geometry()
         if geometry:
             self.restoreGeometry(geometry)
+            # T-Fix: Never start maximized (User Request)
+            if self.isMaximized():
+                self.showNormal()
         else:
             # Use default size from settings manager
             width, height = self.settings_manager.get_default_window_size()

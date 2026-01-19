@@ -124,6 +124,21 @@ class CustomTitleBar(QWidget):
 
     def mouseMoveEvent(self, event):
         if event.buttons() == Qt.MouseButton.LeftButton:
+            if self.window().isMaximized():
+                # T-Fix: Restore on drag (User Request)
+                # Calculate grab ratio to keep mouse in same relative spot on narrower title bar
+                old_width = self.window().width()
+                local_x = self._drag_pos.x()
+                ratio = local_x / max(1, old_width)
+                
+                self.window().showNormal()
+                
+                # Update drag offset for the restored size
+                new_width = self.window().width()
+                new_local_x = int(new_width * ratio)
+                # Keep original Y offset (vertical grab point)
+                self._drag_pos = QPoint(new_local_x, self._drag_pos.y())
+
             self.window().move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
 

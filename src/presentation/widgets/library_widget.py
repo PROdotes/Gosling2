@@ -536,7 +536,19 @@ class EventFilterProxy(QObject):
 
 class LibraryTable(QTableView):
     """Table view for the library."""
-    pass
+    
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Delete:
+            # Delegate to parent LibraryWidget if it exists
+            # We need to find the LibraryWidget instance
+            parent = self.parent()
+            while parent:
+                if isinstance(parent, LibraryWidget):
+                    parent._delete_resources(delete_files=False)
+                    return
+                parent = parent.parent()
+        
+        super().keyPressEvent(event)
 
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
