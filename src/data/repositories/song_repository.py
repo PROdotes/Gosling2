@@ -738,8 +738,16 @@ class SongRepository(GenericRepository[Song]):
             for row in cursor.fetchall():
                 val = row[0]
                 if val:
-                    if isinstance(val, str) and ',' in val:
-                        for item in val.split(','):
+                    if isinstance(val, str):
+                        # Handle both standard CSV and Yellberus custom ||| separator (used for tags)
+                        if '|||' in val:
+                            items = val.split('|||')
+                        elif ',' in val:
+                            items = val.split(',')
+                        else:
+                            items = [val]
+                            
+                        for item in items:
                             item = item.strip()
                             if item: results.add(item)
                     else:

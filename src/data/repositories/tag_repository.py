@@ -340,7 +340,7 @@ class TagRepository(GenericRepository[Tag]):
                     FROM Tags t
                     JOIN MediaSourceTags mst ON t.TagID = mst.TagID
                     JOIN MediaSources ms ON mst.SourceID = ms.SourceID
-                    WHERE ms.IsActive = 1 AND t.TagCategory IS NOT NULL
+                    WHERE t.TagCategory IS NOT NULL
                     ORDER BY t.TagCategory, t.TagName
                 """)
                 categories = {}

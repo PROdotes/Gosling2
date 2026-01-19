@@ -365,7 +365,7 @@ FIELDS: List[FieldDef] = [
         ui_header='Tags',
         db_column='AllTags',
         field_type=FieldType.LIST,
-        filterable=True,
+        filterable=False,
         portable=False,
         query_expression="(SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||') FROM MediaSourceTags MST JOIN Tags TG ON MST.TagID = TG.TagID WHERE MST.SourceID = MS.SourceID) AS AllTags",
         zone='gray',
