@@ -453,6 +453,12 @@ class MainWindow(QMainWindow):
         self.action_rename.triggered.connect(self.library_widget.rename_selection)
         self.addAction(self.action_rename)
 
+        # Ctrl+Space - Trigger Metadata Search Menu (Side Panel)
+        self.action_search_meta = QAction(self)
+        self.action_search_meta.setShortcut("Ctrl+Space")
+        self.action_search_meta.triggered.connect(self.right_panel.editor_widget.trigger_search)
+        self.addAction(self.action_search_meta)
+
     def _on_playlist_changed(self, parent, start, end):
         # Update widget with new count
         self.playback_widget.set_playlist_count(self.playlist_widget.count())

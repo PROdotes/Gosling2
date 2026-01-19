@@ -542,7 +542,11 @@ class ArtistDetailsDialog(QDialog):
         new_type = "group" if self.radio_group.isChecked() else "person"
         
         # Validation for name change (Service handles merges silently if name exists)
+        # User Feedback: "Only warn on data loss". Renaming to existing = Intentional Merge.
         pass
+
+        # Safety check for type change (Data integrity)
+
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:

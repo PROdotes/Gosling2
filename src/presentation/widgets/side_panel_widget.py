@@ -504,7 +504,7 @@ class SidePanelWidget(QFrame):
                         if not os.path.exists(icon_path):
                             icon_path = "src/resources/parse_filename.svg"
                         btn_parse_inline.setIcon(QIcon(icon_path))
-                        btn_parse_inline.setIconSize(QSize(20, 20))  # Larger icon for better visibility
+                        btn_parse_inline.setIconSize(QSize(22, 22))  # Larger icon for better visibility
                         btn_parse_inline.setObjectName("ParseInlineButton")
                         # Make it bigger than micro buttons for easy clicking
                         btn_parse_inline.setFixedHeight(28)  # Match footer button height
@@ -529,6 +529,28 @@ class SidePanelWidget(QFrame):
                         header_layout.addWidget(btn_search)
 
                     header_layout.addWidget(label, 1)
+                    
+                    # TITLE TOOLS: Casing Buttons (Right Side)
+                    if field.name == 'title':
+                        # Sentence Case
+                        btn_sentence = QPushButton("Aa")
+                        btn_sentence.setFixedSize(28, 20)
+                        btn_sentence.setCursor(Qt.CursorShape.PointingHandCursor)
+                        # Reuse micro styling roughly
+                        btn_sentence.setStyleSheet("border-radius: 4px; padding: 0px; font-size: 8pt; font-weight: bold; color: #888;")
+                        btn_sentence.setToolTip("To Sentence Case")
+                        btn_sentence.clicked.connect(self._sentence_case_title)
+                        header_layout.addWidget(btn_sentence)
+
+                        # Title Case
+                        btn_title = QPushButton("Abc")
+                        btn_title.setFixedSize(32, 20)
+                        btn_title.setCursor(Qt.CursorShape.PointingHandCursor)
+                        btn_title.setStyleSheet("border-radius: 4px; padding: 0px; font-size: 8pt; font-weight: bold; color: #888;")
+                        btn_title.setToolTip("To Title Case")
+                        btn_title.clicked.connect(self._title_case_title)
+                        header_layout.addWidget(btn_title)
+
                     module_layout.addWidget(header_row)
                 else:
                     # Boolean layout: [Label] [Toggle] [Stretch]
@@ -2218,6 +2240,11 @@ class SidePanelWidget(QFrame):
                  self.lbl_projected_path.setProperty("alert", False)
                  self.save_led.setActive(False)
 
+    def trigger_search(self):
+        """Public slot to trigger the search menu (e.g. from shortcuts)."""
+        # T-96 Shortcut calls the ACTION, not the MENU
+        self._on_web_search()
+
     def _show_search_menu_btn(self):
         """Handle Left-Click on the Menu Button."""
         # Show menu anchored to bottom-left of the menu button
@@ -2635,9 +2662,14 @@ class SidePanelWidget(QFrame):
         from ..dialogs.scrubber_dialog import ScrubberDialog
         
         dlg = ScrubberDialog(song, self.settings_manager, self.library_service, parent=self)
+        
+        # T-Fix: mimic LibraryWidget behavior
+        # Ensure genre changes in scrubber immediately update this panel (e.g. status status)
+        dlg.genre_changed.connect(lambda _: self.refresh_content())
+        
         dlg.exec()
         
-        self._refresh_field_values()
+        self.refresh_content()
         self.filter_refresh_requested.emit()
 
     def refresh_content(self):
@@ -2677,6 +2709,52 @@ class SidePanelWidget(QFrame):
         menu.addAction(action_stats)
         
         menu.exec(self.header_label.mapToGlobal(pos))
+
+    def _show_title_context_menu(self, global_pos):
+        """Show tools menu for the Title field."""
+        if not self.current_songs: return
+        
+        menu = QMenu(self)
+        
+        act_sentence = QAction("To Sentence Case", self)
+        act_sentence.triggered.connect(self._sentence_case_title)
+        menu.addAction(act_sentence)
+        
+        act_title = QAction("To Title Case", self)
+        act_title.triggered.connect(self._title_case_title)
+        menu.addAction(act_title)
+        
+        menu.exec(global_pos)
+
+    def _sentence_case_title(self):
+        """Convert title to Sentence case (First letter upper, rest lower) with protections."""
+        w = self._field_widgets.get('title')
+        if not w or not hasattr(w, 'text'): return
+        
+        txt = w.text().strip()
+        if not txt: return
+        
+        # Simple Sentence Case: First char upper, rest lower
+        # Protection: Keep known acronyms? For now, simple logic.
+        new_text = txt.capitalize()
+        
+        w.setText(new_text)
+        # Manually trigger change since we set programmatically
+        self._on_field_changed('title', new_text)
+
+    def _title_case_title(self):
+        """Convert title to Title Case."""
+        w = self._field_widgets.get('title')
+        if not w or not hasattr(w, 'text'): return
+        
+        txt = w.text().strip()
+        if not txt: return
+        
+        import string
+        new_text = string.capwords(txt)
+        
+        w.setText(new_text)
+        self._on_field_changed('title', new_text)
         
     def _open_artist_stats(self, artist_name: str):
         """Open the Genre Pie Chart dialog (T-108)."""
