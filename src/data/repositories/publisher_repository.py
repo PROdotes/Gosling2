@@ -28,23 +28,7 @@ class PublisherRepository(GenericRepository[Publisher]):
                 return Publisher.from_row(row)
         return None
 
-    def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
-        """Retrieve publisher by name match (resilient to whitespaces)."""
-        if not name: return None
-        
-        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE"
-        
-        def _execute(target_conn):
-            cursor = target_conn.execute(query, (name.strip(),))
-            row = cursor.fetchone()
-            if row:
-                return Publisher.from_row(row)
-            return None
 
-        if conn:
-            return _execute(conn)
-        with self.get_connection() as conn:
-            return _execute(conn)
 
     def _insert_db(self, cursor: sqlite3.Cursor, publisher: Publisher, **kwargs) -> int:
         """Execute SQL INSERT for GenericRepository"""
@@ -103,19 +87,26 @@ class PublisherRepository(GenericRepository[Publisher]):
         return self.create(name, conn=conn), True
 
     def find_by_name(self, name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]:
-        """Retrieve publisher by exact name match."""
-        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE"
-        if conn:
-            cursor = conn.execute(query, (name,))
-            row = cursor.fetchone()
-            return Publisher.from_row(row) if row else None
-            
-        with self.get_connection() as main_conn:
-            cursor = main_conn.execute(query, (name,))
+        """
+        Retrieve publisher by name match.
+        T-Fix: Use resilient whitespace/case matching as the single source of truth.
+        """
+        if not name: return None
+        
+        # Combined Logic: Trim + Unicode NOCASE
+        query = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE"
+        
+        def _execute(target_conn):
+            cursor = target_conn.execute(query, (name.strip(),))
             row = cursor.fetchone()
             if row:
                 return Publisher.from_row(row)
-        return None
+            return None
+
+        if conn:
+            return _execute(conn)
+        with self.get_connection() as main_conn:
+            return _execute(main_conn)
 
     def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
         """

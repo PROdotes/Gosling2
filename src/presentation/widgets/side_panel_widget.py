@@ -1077,6 +1077,32 @@ class SidePanelWidget(QFrame):
 
     def _on_entity_data_changed(self):
         """Called when EntityListWidget reports a data change (e.g. rename/edit)."""
+        
+        # T-Fix: Identify the field that changed and clear its staging
+        # We deduce the field name by finding which widget sent the signal
+        sender = self.sender()
+        target_field = None
+        if sender:
+            for name, widget in self._field_widgets.items():
+                if widget == sender:
+                    target_field = name
+                    break
+        
+        # Clear staging for this field to ensure we display/save fresh DB data
+        if target_field and self.current_songs:
+             for song in self.current_songs:
+                  sid = song.source_id
+                  if sid in self._staged_changes:
+                       self._staged_changes[sid].pop(target_field, None)
+                       # Also clear potential ID companion (e.g. publisher -> publisher_id)
+                       self._staged_changes[sid].pop(f"{target_field}_id", None)
+                       
+                       if not self._staged_changes[sid]:
+                            del self._staged_changes[sid]
+             
+             self._update_save_state()
+             self.staging_changed.emit(list(self._staged_changes.keys()))
+
         # Reload current songs to reflect potential renames (e.g. cached 'performers' string)
         if self.current_songs:
              updated_songs = []
@@ -1791,8 +1817,9 @@ class SidePanelWidget(QFrame):
                     pid = n
                     pub = self.publisher_service.get_by_id(pid)
                 else:
-                    # Fallback for legacy staged names
-                    pub, _ = self.publisher_service.get_or_create(str(n))
+                    # Fallback for legacy staged names (Read-Only)
+                    # T-Fix: Use find_by_name to avoid creating duplicates when rendering stale names (e.g. during rename)
+                    pub = self.publisher_service.find_by_name(str(n))
                     pid = pub.publisher_id if pub else 0
                 
                 if pub:
