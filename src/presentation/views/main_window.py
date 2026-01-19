@@ -412,6 +412,9 @@ class MainWindow(QMainWindow):
         self.playback_service.media_status_changed.connect(self._on_media_status_changed)
         self.playback_service.position_changed.connect(self._on_playback_position_changed)
         
+        # T-OPTIMIZATION: Auto-save main splitter layout
+        self.main_splitter.splitterMoved.connect(lambda p, i: self._save_splitter_states())
+        
         # --- Global Search & Intake Wiring ---
         self.title_bar.search_text_changed.connect(self.library_widget.set_search_text)
         self.title_bar.import_requested.connect(self.library_widget._import_files)

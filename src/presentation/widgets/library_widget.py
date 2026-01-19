@@ -588,6 +588,11 @@ class LibraryWidget(QWidget):
             btn.setChecked(True)
             self._on_type_tab_changed(saved_index)
             
+        # Restore Library Splitter State
+        lib_splitter_state = self.settings_manager.get_library_splitter_state()
+        if lib_splitter_state:
+            self.splitter.restoreState(lib_splitter_state)
+            
         # State Tracking
         self._sort_column = -1
         self._sort_order = Qt.SortOrder.AscendingOrder
@@ -1090,6 +1095,9 @@ class LibraryWidget(QWidget):
         self.table_view.selectionModel().selectionChanged.connect(lambda: self.table_view.viewport().update())
         self.table_view.horizontalHeader().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.horizontalHeader().customContextMenuRequested.connect(self._show_column_context_menu)
+        
+        # T-OPTIMIZATION: Auto-save internal library splitter layout (Filters vs Table)
+        self.splitter.splitterMoved.connect(lambda p, i: self._save_splitter_state())
 
     # Method moved to top of class (near init) for state tracking
 
@@ -1917,10 +1925,15 @@ class LibraryWidget(QWidget):
         if not self._suppress_layout_save:
             self._save_column_layout()
 
-    def _on_column_resized(self, logical_index: int, old_size: int, new_size: int) -> None:
-        """Save column layout when user resizes a column."""
+    def _on_column_resized(self, logical_index: int, old_size: int, new_size: int):
+        # Save column layout when user resizes a column.
         if not self._suppress_layout_save:
             self._save_column_layout()
+            
+    def _save_splitter_state(self):
+        """Save internal library splitter state (Filters vs Table)."""
+        if self.settings_manager:
+            self.settings_manager.set_library_splitter_state(self.splitter.saveState())
 
     def _load_column_layout(self) -> None:
         """Load and apply column layout (order, visibility, widths) from settings."""

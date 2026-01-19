@@ -17,6 +17,7 @@ class SettingsManager:
     KEY_RIGHT_PANEL_TAB = "window/rightPanelTab"
     KEY_RIGHT_PANEL_WIDTH_EDITOR = "window/rightPanelWidthEditor"
     KEY_RIGHT_PANEL_WIDTH_NORMAL = "window/rightPanelWidthNormal"
+    KEY_LIBRARY_SPLITTER_STATE = "window/librarySplitterState"
     
     # Library settings
 
@@ -137,6 +138,14 @@ class SettingsManager:
     def set_right_panel_splitter_state(self, state: QByteArray) -> None:
         """Save right panel vertical splitter state"""
         self._settings.setValue(self.KEY_RIGHT_PANEL_SPLITTER_STATE, state)
+        
+    def get_library_splitter_state(self) -> Optional[QByteArray]:
+        """Get saved library splitter state"""
+        return self._settings.value(self.KEY_LIBRARY_SPLITTER_STATE)
+
+    def set_library_splitter_state(self, state: QByteArray) -> None:
+        """Save library horizontal splitter state"""
+        self._settings.setValue(self.KEY_LIBRARY_SPLITTER_STATE, state)
         
     def get_right_panel_width_editor(self) -> int:
         return int(self._settings.value(self.KEY_RIGHT_PANEL_WIDTH_EDITOR, 500))
