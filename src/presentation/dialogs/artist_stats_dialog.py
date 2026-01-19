@@ -1,9 +1,12 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QFrame, QHBoxLayout, QSizePolicy
+from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QFrame, QHBoxLayout, QSizePolicy
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QColor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
+
+# Import GlowButton from the factory
+from ..widgets.glow import GlowButton
 
 class ArtistStatsDialog(QDialog):
     """
@@ -18,10 +21,9 @@ class ArtistStatsDialog(QDialog):
         
         self.setWindowTitle(f"Statistics: {artist_name}")
         self.resize(600, 500)
-        self.setStyleSheet("""
-            QDialog { background-color: #1e1e1e; color: #e0e0e0; }
-            QLabel { color: #e0e0e0; }
-        """)
+        
+        # Industrial Amber Compliance: Set Object Name
+        self.setObjectName("ArtistStatsDialog")
         
         self._init_ui()
         self._load_data()
@@ -33,21 +35,25 @@ class ArtistStatsDialog(QDialog):
         
         # 1. Header
         header = QLabel(f"Genre Distribution: {self.artist_name}")
-        header.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        header.setObjectName("ArtistStatsHeader") # Styling via theme.qss
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(header)
         
         # 2. Chart Area
         self.canvas_frame = QFrame()
+        self.canvas_frame.setObjectName("StatsChartFrame") # Styling via theme.qss
         self.canvas_frame.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.canvas_frame.setStyleSheet("background-color: #2d2d2d; border-radius: 8px;")
         
         self.canvas_layout = QVBoxLayout(self.canvas_frame)
         
         # Create Matplotlib Figure
         self.figure = Figure(figsize=(5, 4), dpi=100)
-        self.figure.patch.set_facecolor('#2d2d2d') # Match chart bg
+        # Note: We must hardcode Matplotlib bg color because it doesn't read QSS
+        # But we match it to the theme variable #2d2d2d manually for now
+        self.figure.patch.set_facecolor('#2d2d2d') 
+        
         self.canvas = FigureCanvas(self.figure)
+        # Transparent canvas background to blend with figure
         self.canvas.setStyleSheet("background-color: transparent;")
         
         self.canvas_layout.addWidget(self.canvas)
@@ -57,19 +63,11 @@ class ArtistStatsDialog(QDialog):
         footer_layout = QHBoxLayout()
         footer_layout.addStretch()
         
-        self.btn_close = QPushButton("Close")
+        # Industrial Amber Compliance: Use GlowButton
+        self.btn_close = GlowButton("CLOSE")
+        self.btn_close.setObjectName("StatsCloseButton")
         self.btn_close.setFixedSize(100, 30)
         self.btn_close.clicked.connect(self.accept)
-        # Simple styling for the button if not using GlowButton
-        self.btn_close.setStyleSheet("""
-            QPushButton {
-                background-color: #444;
-                color: white;
-                border: 1px solid #555;
-                border-radius: 4px;
-            }
-            QPushButton:hover { background-color: #555; }
-        """)
         
         footer_layout.addWidget(self.btn_close)
         layout.addLayout(footer_layout)
@@ -82,8 +80,7 @@ class ArtistStatsDialog(QDialog):
     def _plot_pie_chart(self, stats: dict):
         self.figure.clear()
         
-        # Match overall dialog background
-        bg_color = '#1e1e1e'
+        bg_color = '#1e1e1e' # Matches #ArtistStatsDialog background
         self.figure.patch.set_facecolor(bg_color)
         
         if not stats:
@@ -96,11 +93,12 @@ class ArtistStatsDialog(QDialog):
             for spine in ax.spines.values():
                 spine.set_visible(False)
 
-            ax.text(0.5, 0.5, "No Genre Data Available", 
+            ax.text(0.5, 0.5, "NO GENRE DATA AVAILABLE", 
                     horizontalalignment='center', 
                     verticalalignment='center',
                     color='#888888',
                     fontsize=12,
+                    fontweight='bold',
                     transform=ax.transAxes)
             self.canvas.draw()
             return

@@ -2292,3 +2292,25 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
     background-color: #FFC66D;
     color: #000000;
 }
+
+/* --- ARTIST STATS DIALOG (T-108) --- */
+#ArtistStatsDialog {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:0.02 #222222,
+        stop:1 #080808);
+}
+
+#ArtistStatsHeader {
+    color: #E0E0E0;
+    font-size: 16pt;
+    font-weight: bold;
+    font-family: "Segoe UI", sans-serif;
+    margin-bottom: 5px;
+}
+
+#StatsChartFrame {
+    background-color: #2d2d2d;
+    border: 1px solid #333333;
+    border-radius: 8px;
+}
