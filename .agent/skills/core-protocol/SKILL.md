@@ -20,8 +20,9 @@ This skill defines the **Non-Negotiable Operating System** for the Agent. It mus
     *   Focus only on the active Objective.
 
 ## 2. Git Discipline
-*   **Local Commits**: You may propose local commits.
-*   **Network Ops**: `push`, `pull`, and `reset` commands are **FORBIDDEN** without explicit user confirmation.
+*   **No Auto-Commits**: You are **FORBIDDEN** from running `git commit` autonomously. You must always ask the user to commit or provide the command for them to run.
+*   **Network Ops**: `push`, `pull`, and `reset` commands are **FORBIDDEN**.
+*   **The Checkpoint Rule**: When a feature is verified and working, you MUST **remind the user** to commit their changes to save the progress.
 *   **Receipts**: Always show a diff or summary of "Before vs. After" when making changes.
 
 ## 3. The Tomorrow Rule (Philosophy)
