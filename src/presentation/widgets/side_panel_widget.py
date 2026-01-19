@@ -779,51 +779,17 @@ class SidePanelWidget(QFrame):
             # --- CASE 2: Global Rename / Merge ---
             if diag.is_rename_requested():
                 new_name, new_category = diag.get_rename_info()
-                new_name = new_name.strip()
                 
-                conflict = self.tag_service.find_by_name(new_name, new_category)
-                if conflict and conflict.tag_id != tag.tag_id:
-                    affected_count = self.tag_service.count_sources_for_tag(tag.tag_id)
-                    
-                    from ..dialogs.artist_manager_dialog import IdentityCollisionDialog
-                    if affected_count > 1:
-                        desc = f"'{new_name}' already exists in {new_category}.\nWould you like to move these {len(self.current_songs)} items, or combine all {affected_count} occurrences in your library?"
-                    else:
-                        desc = f"'{new_name}' already exists in {new_category}.\nWould you like to switch to the existing tag?"
-
-                    resolver = IdentityCollisionDialog(
-                        target_name=f"{new_name}",
-                        song_count=affected_count,
-                        has_context_song=True,
-                        title="Tag Exists",
-                        header="TAG CONFLICT",
-                        primary_label="USE EXISTING TAG" if len(self.current_songs) == 1 else "APPLY TO SELECTION",
-                        secondary_label="MERGE GLOBALLY" if affected_count > 1 else None,
-                        description=desc,
-                        parent=self
-                    )
-                    res_conflict = resolver.exec()
-                    
-                    if res_conflict == 3:  # Local Swap
-                        for song in self.current_songs:
-                            self.tag_service.remove_tag_from_source(song.source_id, tag.tag_id)
-                            self.tag_service.add_tag_to_source(song.source_id, conflict.tag_id)
-                    elif res_conflict == 1:  # Global Merge
-                        self.tag_service.merge_tags(tag.tag_id, conflict.tag_id)
-                    else:
-                        return True
-                    
+                # Let the service handle the rename (including merges if the name is taken)
+                if self.tag_service.rename_tag(tag.tag_name, new_name, new_category):
                     self._refresh_field_values()
                     self.filter_refresh_requested.emit()
-                    return ClickResult(ClickAction.DATA_CHANGED, conflict.tag_id)
-
-                # NO CONFLICT: Safe Global Rename
-                tag.tag_name = new_name
-                tag.category = new_category
-                if self.tag_service.update(tag):
-                    self._refresh_field_values()
-                    self.filter_refresh_requested.emit()
-                    return ClickResult(ClickAction.UPDATED, tag.tag_id)
+                    
+                    # Try to find the tag again (it might have a new ID if it was merged)
+                    final_tag = self.tag_service.find_by_name(new_name, new_category)
+                    return ClickResult(ClickAction.UPDATED, final_tag.tag_id if final_tag else tag.tag_id)
+                
+                return ClickResult(ClickAction.CANCELLED, tag.tag_id)
             return ClickResult(ClickAction.CANCELLED, tag.tag_id)
 
         elif res == 2:

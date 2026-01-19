@@ -122,6 +122,15 @@ class EntityClickRouter:
         entity = service.get_by_id(entity_id)
         if not entity:
             return ClickResult(ClickAction.CANCELLED, entity_id)
+            
+        # T-Fix: If we clicked an Artist, redirect to the PRIMARY identity record
+        # This prevents opening "Alias Managers" which cause confusion and duplicates.
+        if entity_type == EntityType.ARTIST:
+            if hasattr(service, 'get_primary_contributor'):
+                primary = service.get_primary_contributor(entity_id)
+                if primary and primary.contributor_id != entity_id:
+                    entity = primary
+                    entity_id = primary.contributor_id
         
         # Resolve and open the dialog
         dialog_class = resolve_dialog_class(config.editor_dialog)

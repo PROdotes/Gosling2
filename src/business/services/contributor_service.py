@@ -143,27 +143,7 @@ class ContributorService:
         # 4. Truly new name, create it
         return self.create(name, type_lower), True
 
-    def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """Merge contributor source_id into target_id (Identity Merge)."""
-        import uuid
-        batch_id = batch_id or str(uuid.uuid4())
-        
-        # In new model, source_id and target_id are NameIDs. 
-        # We need to find their identities and merge them.
-        s_name = self._name_service.get_name(source_id)
-        t_name = self._name_service.get_name(target_id)
-        
-        if not s_name or not t_name:
-            return False
-        
-        if not s_name.owner_identity_id or not t_name.owner_identity_id:
-            # Orphan merge: just link source name to target identity
-            if not t_name.owner_identity_id:
-                return False # Cannot merge into an orphan target identity-wise
-            s_name.owner_identity_id = t_name.owner_identity_id
-            return self._name_service.update_name(s_name, batch_id=batch_id)
-            
-        return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
+    # Merge logic moved to unified section below to avoid duplication.
 
     def get_by_role(self, role_name: str) -> List[Contributor]:
         """Fetch all contributors who have a specific role assigned at least once."""
@@ -391,36 +371,47 @@ class ContributorService:
                 
         return success
 
-    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """Merge contributor source_id into target_id (Identity Merge). Alias for merge."""
-        return self.merge(source_id, target_id, create_alias=create_alias, batch_id=batch_id)
+    # --- MERGE & DELETE ---
 
     def merge(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """Merge contributor source_id into target_id (Identity Merge)."""
+        """
+        Merge contributor source_id into target_id (Identity Merge).
+        source_id and target_id are NameIDs.
+        """
+        if source_id == target_id:
+            return True # No-op
+            
         import uuid
         batch_id = batch_id or str(uuid.uuid4())
         
-        # In new model, source_id and target_id are NameIDs. 
-        # We need to find their identities and merge them.
         s_name = self._name_service.get_name(source_id)
         t_name = self._name_service.get_name(target_id)
         
         if not s_name or not t_name:
             return False
         
-        if not s_name.owner_identity_id or not t_name.owner_identity_id:
-            # Orphan merge: just link source name to target identity
-            if not t_name.owner_identity_id:
-                return False # Cannot merge into an orphan target identity-wise
+        # Scenario 1: Identify Merge (Ensure target has an identity)
+        if not t_name.owner_identity_id:
+            # Create a missing identity for the target if it's an orphan
+            new_ident = self._identity_service.create_identity(identity_type="person", legal_name=t_name.display_name)
+            t_name.owner_identity_id = new_ident.identity_id
+            self._name_service.update_name(t_name, batch_id=batch_id)
+            
+        # If source has no identity, just link its name to target identity
+        if not s_name.owner_identity_id:
             s_name.owner_identity_id = t_name.owner_identity_id
             return self._name_service.update_name(s_name, batch_id=batch_id)
             
-        # T-Fix: If they share the SAME identity, we are merging duplicate NAME entries for that identity
+        # Same identity already?
         if s_name.owner_identity_id == t_name.owner_identity_id:
-            return self._name_repo.merge(source_id, target_id)
+            return True # Already linked
             
         # Different identities: Perform deep identity merge
         return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
+
+    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
+        """Alias for merge (Legacy Wrapper)."""
+        return self.merge(source_id, target_id, create_alias, batch_id)
         
     # ==========================
     # Group & Alias Management
@@ -648,11 +639,27 @@ class ContributorService:
         return self._name_service.delete_name(alias_id, batch_id=batch_id)
 
     def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
-        """Rename an alias."""
-        name = self._name_service.get_name(alias_id)
-        if not name: return False
-        name.display_name = new_name
-        return self._name_service.update_name(name, batch_id=batch_id)
+        """
+        Smart Rename: Rename an alias, or merge if the new name exists.
+        """
+        name_rec = self._name_service.get_name(alias_id)
+        if not name_rec: return False
+        
+        new_name = new_name.strip()
+        if not new_name: return False
+        
+        # Check for collision
+        with self._credit_repo.get_connection() as conn:
+            query = "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND NameID != ?"
+            cursor = conn.execute(query, (new_name, alias_id))
+            collision = cursor.fetchone()
+            
+        if collision:
+            # COLLISION: Merge our current alias record INTO the existing one (identity merge)
+            return self.merge(source_id=alias_id, target_id=collision[0], batch_id=batch_id)
+            
+        name_rec.display_name = new_name
+        return self._name_service.update_name(name_rec, batch_id=batch_id)
 
     def move_alias(self, alias_name: str, old_owner_id: int, new_owner_id: int, batch_id: Optional[str] = None) -> bool:
         """
@@ -689,9 +696,7 @@ class ContributorService:
         # heir_id is already a NameID, not a ContributorID that needs resolution
         return self._identity_service.abdicate(old_ident, heir_id, adopter_ident, batch_id=batch_id)
 
-    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """Alias for merge (Legacy Wrapper)."""
-        return self.merge(source_id, target_id, create_alias, batch_id)
+    # Legcy alias removed as it is now defined in the unified section above.
 
     def swap_song_contributor(self, song_id: int, old_contributor_id: int, new_contributor_id: int) -> bool:
         """

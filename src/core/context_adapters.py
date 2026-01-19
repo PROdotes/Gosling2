@@ -370,7 +370,7 @@ class ArtistAliasAdapter(ContextAdapter):
         aliases = self.service.get_aliases(self.artist.contributor_id)
         return [
             (a.alias_id, a.alias_name, "📝", False, False, "", "amber", False)
-            for a in aliases
+            for a in aliases if a.alias_name.lower() != self.artist.name.lower()
         ]
     
     def link(self, child_id: int, **kwargs) -> bool:

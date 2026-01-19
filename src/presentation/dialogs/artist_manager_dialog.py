@@ -44,7 +44,7 @@ class IdentityCollisionDialog(QDialog):
         if description:
             desc = description
         elif has_context_song:
-            desc = f"Link this song to the existing entry or all {song_count} songs?" if song_count > 1 else "Link this song to the existing entry?"
+            desc = f"Link this song to the existing entry or all {song_count} songs?" if song_count > 1 else "Combine these entries or link this song only?"
         else:
             desc = f"Merge all {song_count} songs into the existing identity?" if song_count > 1 else "Merge into the existing identity?"
 
@@ -71,8 +71,8 @@ class IdentityCollisionDialog(QDialog):
             btns.addWidget(self.btn_this)
             
         # OPTION B: Merge
-        # Show if multiple songs exist, OR if we are in a Global context (no specific song to link)
-        show_all = (song_count > 1) or (not has_context_song)
+        # Show if any songs exist, OR if we are in a Global context (no specific song to link)
+        show_all = (song_count >= 1) or (not has_context_song)
         if show_all:
             if secondary_label:
                 label = secondary_label
@@ -400,9 +400,8 @@ class ArtistDetailsDialog(QDialog):
             real_target = self.service.get_by_id(target.contributor_id)
             if not real_target: return
             
-            # CASE 2: ALIAS RE-LINKING (Stealing a name)
+            # CASE 1: ALIAS RE-LINKING (Stealing a name)
             # If the picker returned name is NOT the primary name, the user selected an ALIAS string.
-            # We should move that alias, NOT merge the identity.
             if target.name != real_target.name:
                 alias_name = target.name
                 parent_name = real_target.name
@@ -410,90 +409,56 @@ class ArtistDetailsDialog(QDialog):
                 # Prompt for "Move Alias"
                 resolver = IdentityCollisionDialog(
                     target_name=alias_name,
-                    song_count=0, # Not impactful for just moving a name
+                    song_count=0,
                     has_context_song=False,
                     title="Move Alias?",
                     header="ALIAS OWNERSHIP CONFLICT",
-                    primary_label=None,
-                    secondary_label=f"STEAL ALIAS & LINK HERE",
+                    secondary_label="STEAL ALIAS & LINK HERE",
                     description=f"'{alias_name}' is currently linked to '{parent_name}'.\n\nDo you want to break that link and move the alias here?",
                     parent=self
                 )
                 
-                if resolver.exec() != 1: return
-                
-        # Execute Move
-                if self.service.move_alias(alias_name, real_target.contributor_id, self.artist.contributor_id):
-                     self._refresh_data()
+                if resolver.exec() == 1:
+                    if self.service.move_alias(alias_name, real_target.contributor_id, self.artist.contributor_id):
+                        self._refresh_data()
                 return
 
-            # Match Type 2: PRIMARY IDENTITY MATCH (Person/Group)
+            # CASE 2: PRIMARY IDENTITY MATCH (Merge)
             aliases = self.service.get_aliases(target.contributor_id)
+            usage_count = self.service.get_usage_count(target.contributor_id)
             
-            # Check for structural connections (Aliases OR Memberships/Groups)
-            has_structural_links = False
-            structure_desc = []
+            # Check for structural connections
+            has_groups = self.service.get_member_count(target.contributor_id) > 0
             
-            # 1. Aliases
-            if aliases:
-                has_structural_links = True
-                structure_desc.append(f"{len(aliases)} aliases")
-                
-            # 2. Group/Member connections
-            if target.type == "group":
-                members = self.service.get_members(target.contributor_id)
-                if members:
-                    has_structural_links = True
-                    structure_desc.append(f"{len(members)} members")
-            else:
-                groups = self.service.get_groups(target.contributor_id)
-                if groups:
-                    has_structural_links = True
-                    structure_desc.append(f"{len(groups)} group memberships")
-
-            # SKIP PROMPT if no structural links (User rule: Don't care about songs, only aliases/groups)
-            if not has_structural_links:
-                 # Implicit Merge
+            # SILENT MERGE if no "baggage" (No aliases, no songs, no group memberships)
+            if not aliases and usage_count == 0 and not has_groups:
                  if self.service.merge(target.contributor_id, self.artist.contributor_id):
-                        from src.core import logger
-                        logger.info(f"Identity Absorbed (Implicit): '{target.name}' merged into '{self.artist.name}'.")
                         self._refresh_data()
                  return
 
-            # PROMPT if we have structural stuff to move
-            header = "TRANSFER DATA?"
-            btn_label = "TRANSFER & MERGE"
-            
-            items_str = " and ".join(structure_desc)
-            desc = f"'{real_target.name}' has {items_str}.\n\n"
-            desc += f"These will be transferred to '{self.artist.name}'.\n"
-            desc += "\nCannot be undone."
+            # PROMPT if we have baggage to transfer
+            desc = f"'{real_target.name}' already exists in your library.\n\n"
+            if usage_count > 0: desc += f"• {usage_count} songs/credits\n"
+            if aliases: desc += f"• {len(aliases)} existing aliases\n"
+            if has_groups: desc += f"• Group memberships\n"
+            desc += f"\nTransfer everything to '{self.artist.name}' and merge identities?"
 
-            # Execute Dialog
             resolver = IdentityCollisionDialog(
                 target_name=real_target.name,
-                song_count=0, # Irrelevant per user request
+                song_count=usage_count,
                 has_context_song=False,
                 title="Merge Artist?",
-                header=header,
-                primary_label=None, 
-                secondary_label=btn_label,
+                header="IDENTITY CONFLICT",
+                secondary_label="TRANSFER & MERGE",
                 description=desc,
                 parent=self
             )
             
-            res = resolver.exec()
-            if res != 1: # 1 = Merge/Secondary
-                return
-            
-            # Execution
-            # Execution
-            if self.service.merge(target.contributor_id, self.artist.contributor_id):
-                from src.core import logger
-                logger.info(f"Identity Absorbed: '{target.name}' merged into '{self.artist.name}'.")
-                self._refresh_data()
-            else:
-                QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+            if resolver.exec() == 1:
+                if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                    self._refresh_data()
+                else:
+                    QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
             
 
 
@@ -560,17 +525,6 @@ class ArtistDetailsDialog(QDialog):
                 new_name = new_name.strip() if new_name else ""
                 
                 if new_name and new_name != old_name:
-                    # Check for existence (any person, group, or alias)
-                    existing = self.service.get_by_name(new_name)
-                    if existing:
-                        QMessageBox.warning(
-                            self, 
-                            "Name in Use", 
-                            f"The name '{new_name}' is already in use by another artist or alias.\n\n"
-                            "If you want to merge these identities, please use the standard 'Add Alias' button to trigger the merge flow."
-                        )
-                        return
-                        
                     if self.service.update_alias(alias_id, new_name):
                         self._refresh_data()
 
@@ -587,45 +541,8 @@ class ArtistDetailsDialog(QDialog):
         
         new_type = "group" if self.radio_group.isChecked() else "person"
         
-        # Validation for name change
-        if new_name != self.artist.name:
-            conflict_id, msg = self.service.validate_identity(new_name, exclude_id=self.artist.contributor_id)
-            if conflict_id:
-                # HUMAN RESOLVER: Just ask the simple question
-                usage_count = self.service.get_usage_count(self.artist.contributor_id)
-                resolver = IdentityCollisionDialog(
-                    target_name=new_name,
-                    song_count=usage_count,
-                    has_context_song=(self.context_song is not None),
-                    title="Artist Exists",
-                    header="IDENTITY CONFLICT",
-                    parent=self
-                )
-
-                
-                res = resolver.exec()
-                if res == 0: # Cancel
-                    return
-
-                if res == 1: # Fix Typo (Clean Merge)
-                    if self.service.merge_contributors(self.artist.contributor_id, conflict_id, create_alias=False):
-                        self.done(3) # Signal 3: Data Changed (Sync Required)
-                        return
-                    else:
-                        QMessageBox.warning(self, "Error", "Merge failed.")
-                        return
-
-
-                if res == 3 and self.context_song: # Fix This Song Only
-                    if self.service.swap_song_contributor(self.context_song.source_id, self.artist.contributor_id, conflict_id):
-                        # Signal Code 3 to trigger UI refresh for the new ID
-                        self.done(3)
-                        return
-                    else:
-                        QMessageBox.warning(self, "Error", "Local link failed.")
-                        return
-                
-                return # Halt save, merge/swap handled it.
+        # Validation for name change (Service handles merges silently if name exists)
+        pass
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:

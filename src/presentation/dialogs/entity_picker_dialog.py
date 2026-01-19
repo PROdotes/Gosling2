@@ -188,7 +188,7 @@ class EntityPickerDialog(QDialog):
         self.btn_cancel.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.btn_cancel.clicked.connect(self.reject)
         
-        self.btn_select = GlowButton("UPDATE" if self.target_entity else "Select")
+        self.btn_select = GlowButton("Select")
         self.btn_select.setObjectName("TagPickerPill")
         self.btn_select.setProperty("action_role", "primary")
         self.btn_select.btn.setDefault(True)
@@ -459,7 +459,7 @@ class EntityPickerDialog(QDialog):
             
             # --- EDIT MODE: Add Rename option ---
             if self.target_entity:
-                self._maybe_add_rename_option(clean_query)
+                self._maybe_add_rename_option(clean_query, entities)
             
             # --- Add Create option ---
             if self.config.allow_create:
@@ -518,7 +518,7 @@ class EntityPickerDialog(QDialog):
         
         return entities
     
-    def _maybe_add_rename_option(self, query: str):
+    def _maybe_add_rename_option(self, query: str, entities: List[Any] = None):
         """Add Rename option if name or type changed."""
         original_name = self.config.display_fn(self.target_entity).lower()
         original_type = self.config.type_fn(self.target_entity)
@@ -534,10 +534,21 @@ class EntityPickerDialog(QDialog):
         if name_changed or type_changed:
             display_name = current_name if current_name else self.config.display_fn(self.target_entity)
             
+            # Check if this rename targets an EXISTING record
+            is_conflict = False
+            if name_changed and entities:
+                clean_name = display_name.lower()
+                for e in entities:
+                    if self.config.display_fn(e).lower() == clean_name and self.config.type_fn(e).lower() == current_type.lower():
+                        is_conflict = True
+                        break
+
             if name_changed and type_changed:
                 label = f"✏️ Rename & Move to \"{display_name}\" in {current_type}"
             elif type_changed:
                 label = f"📦 Move to {current_type}" # Keep name, just move
+            elif is_conflict:
+                label = f"📎 Combine with existing \"{display_name}\""
             else:
                 label = f"✏️ Rename to \"{display_name}\""
             
@@ -549,7 +560,16 @@ class EntityPickerDialog(QDialog):
         """Add Create option if no exact match."""
         if not clean_name:
             return
-            
+
+        # T-Refinement: In EDIT MODE, suppress "Create" if it matches the current category.
+        # This prevents accidental "Create then Link Swap" which leaves orphans.
+        # If the user wants to add a NEW tag, they should use the Add button, not click an existing chip.
+        if self.target_entity:
+            original_type = self.config.type_fn(self.target_entity)
+            target_type = self._current_type_filter or original_type
+            if target_type.lower() == original_type.lower():
+                return
+
         # Determine types to offer
         if self._current_type_filter:
             types_to_offer = [self._current_type_filter]
@@ -605,18 +625,20 @@ class EntityPickerDialog(QDialog):
         if isinstance(data, tuple):
             action = data[0]
             if action == "RENAME":
-                if "Move to" in item.text(): # Matches "Move to" or "Rename & Move to"
+                if "Combine" in item.text():
+                    self.btn_select.setText("COMBINE")
+                elif "Move to" in item.text(): # Matches "Move to" or "Rename & Move to"
                     self.btn_select.setText("MOVE")
                 else:
                     self.btn_select.setText("RENAME")
             elif action == "CREATE":
-                self.btn_select.setText("UPDATE" if self.target_entity else "Create")
+                self.btn_select.setText("CREATE" if self.target_entity else "Create")
             elif action == "CREATE_SPOTIFY":
                 self.btn_select.setText("Create Multiple")
             elif action == "FILL_SEARCH":
                 self.btn_select.setText("Select")
         else:
-            self.btn_select.setText("UPDATE" if self.target_entity else "Select")
+            self.btn_select.setText("Select")
     
     def _on_select(self):
         """Handle selection."""

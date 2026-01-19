@@ -168,20 +168,10 @@ class PublisherDetailsDialog(QDialog):
                                "Cannot set this parent - it would create a circular relationship.")
             return
 
-        # Check for potential merge to set merged_target (helps router)
-        collision_id = None
-        with self.service._repo.get_connection() as conn:
-             query = "SELECT PublisherID FROM Publishers WHERE trim(PublisherName) = ? COLLATE UTF8_NOCASE AND PublisherID != ?"
-             cursor = conn.execute(query, (new_name, self.pub.publisher_id))
-             row = cursor.fetchone()
-             if row: collision_id = row[0]
-
         self.pub.publisher_name = new_name
         self.pub.parent_publisher_id = parent_id
         
         if self.service.update(self.pub):
-            if collision_id:
-                self.merged_target = collision_id
             self.done(3) # Signal 3: Data Changed (Forces precise re-sync)
         else:
             QMessageBox.warning(self, "Error", "Failed to update publisher.")
