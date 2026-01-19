@@ -229,6 +229,9 @@ class MainWindow(QMainWindow):
         self._restore_volume()
         self._restore_playlist()
         
+        # T-OPTIMIZATION: Cache selection to prevent lag during filtering
+        self._last_selected_paths = []
+        
         # Sync edit mode state from right panel's button
         if hasattr(self.right_panel, 'header') and hasattr(self.right_panel.header, 'btn_edit'):
             initial_edit_mode = self.right_panel.header.btn_edit.isChecked()
@@ -681,7 +684,9 @@ class MainWindow(QMainWindow):
         indexes = selection_model.selectedRows()
         
         if not indexes:
-            self.right_panel.update_selection([])
+            if self._last_selected_paths:
+                self._last_selected_paths = []
+                self.right_panel.update_selection([])
             return
 
         # 1. Collect paths without hitting the DB (Memory operation)
@@ -694,6 +699,12 @@ class MainWindow(QMainWindow):
              path_item = self.library_widget.library_model.item(source_idx.row(), path_idx)
              if path_item:
                  paths.append(path_item.text())
+
+        # T-OPTIMIZATION: Early return if selection hasn't changed
+        if paths == self._last_selected_paths:
+            return
+            
+        self._last_selected_paths = paths
 
         # 2. Bulk fetch all song objects in ONE database trip
         # This eliminates the 3-second freeze during multi-selection!

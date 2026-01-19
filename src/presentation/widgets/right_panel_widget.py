@@ -278,6 +278,8 @@ class RightPanelWidget(QWidget):
         
     def _on_toggle_editor(self, checked):
         self.editor_widget.setVisible(checked)
+        if checked and self.editor_widget.current_songs:
+            self.editor_widget.set_songs(self.editor_widget.current_songs, force=True)
         self.editor_mode_changed.emit(checked)
 
     def _on_toggle_compact(self, checked):

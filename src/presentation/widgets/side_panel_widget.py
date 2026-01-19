@@ -207,6 +207,12 @@ class SidePanelWidget(QFrame):
 
     def set_songs(self, songs: List[Any], force: bool = False):
         """Update the editor with fresh song selection."""
+        # T-OPTIMIZATION: If hidden, do NOT rebuild UI or refresh fields.
+        # This prevents search lag when a song is selected but editor is closed.
+        if not self.isVisible() and not force:
+            self.current_songs = songs
+            return
+
         # Capture scroll if specific update (same ID set)
         scroll_pos = 0
         same_selection = False
