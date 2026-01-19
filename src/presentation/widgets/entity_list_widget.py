@@ -503,10 +503,6 @@ class EntityListWidget(QWidget):
         
         # Priority Actions (Restore "Set Primary" functionality)
         if hasattr(self.context_adapter, 'set_primary'):
-            # Only relevant for Genres/Albums usually
-            # We can check if it's already primary? 
-            # ChipTray knows, but we are here.
-            # Just offer it.
             menu.addAction("Set as Primary ★").triggered.connect(lambda: self._set_primary_internal(entity_id))
             menu.addSeparator()
         
@@ -515,7 +511,6 @@ class EntityListWidget(QWidget):
              menu.addAction("Edit...").triggered.connect(lambda: self._on_item_clicked(entity_id, label))
         
         # Smart Fixes (Title Case)
-        # Only show if case conversion changes something
         if self.allow_edit and label != label.title():
              menu.addAction(f"Fix Case: {label.title()}").triggered.connect(lambda: self._fix_case(entity_id, label))
         
@@ -523,12 +518,47 @@ class EntityListWidget(QWidget):
         if self.allow_edit and self.entity_type == EntityType.ARTIST:
              menu.addAction("Split Artists...").triggered.connect(lambda: self._on_visual_split(entity_id, label))
 
+        # T-108: Statistics
+        if self.entity_type == EntityType.ARTIST:
+            menu.addAction("View Statistics...").triggered.connect(lambda: self._open_artist_stats(label))
+
         if self.allow_remove:
             menu.addSeparator()
             menu.addAction("Remove").triggered.connect(lambda: self._do_remove(entity_id))
             
         menu.exec(global_pos)
-        
+
+    def _cleanup_orphaned_artist(self, entity_id: int):
+        """Delete artist if they have no remaining links."""
+        try:
+            svc = self.services.contributor_service
+            usage_count = svc.get_usage_count(entity_id)
+            if usage_count == 0:
+                print(f"DEBUG: Auto-deleting orphaned artist ID={entity_id} after split.")
+                svc.delete(entity_id)
+        except Exception as e:
+            print(f"Error during orphaned cleanup: {e}")
+                
+    def _resolve_and_add_name(self, name: str) -> bool:
+        """Resolve a name string to an entity and link it."""
+        try:
+            entity = None
+            if self.entity_type == EntityType.ARTIST:
+                svc = self.services.contributor_service
+                # Use get_or_create to ensure we have a valid artist
+                entity, _ = svc.get_or_create(name)
+            
+            # TODO: Add support for Publisher/Tags if needed
+                
+            if entity and self.context_adapter:
+                eid = self._get_entity_id(entity)
+                return self.context_adapter.link(eid)
+            
+            return False
+        except Exception as e:
+            print(f"Error resolving name '{name}': {e}")
+            return False
+    
     def _set_primary_internal(self, entity_id: int):
         """Handle Set Primary request via Adapter."""
         if self.context_adapter and hasattr(self.context_adapter, 'set_primary'):
@@ -593,6 +623,24 @@ class EntityListWidget(QWidget):
                 return getattr(entity, attr)
         return 0
     
+    def _open_artist_stats(self, artist_name: str):
+        """Open the Genre Pie Chart dialog (T-108)."""
+        from ..dialogs.artist_stats_dialog import ArtistStatsDialog
+        # Need to find library_service. It's usually inside 'services' (ServiceProvider)
+        if hasattr(self.services, 'library_service'):
+            svc = self.services.library_service
+        elif hasattr(self.services, 'get_artist_genre_stats'): # Maybe self.services IS the library service?
+             svc = self.services
+        else:
+             print("Error: Could not find library_service for statistics.")
+             return
+
+        try:
+            dlg = ArtistStatsDialog(artist_name, svc, parent=self)
+            dlg.exec()
+        except ImportError:
+            QMessageBox.warning(self, "Missing Dependency", "Matplotlib is required for statistics features.")
+
     def _has_splittable_items(self, labels: list) -> bool:
         """Check if any label contains split delimiters."""
         for label in labels:
@@ -661,37 +709,6 @@ class EntityListWidget(QWidget):
                 if self.entity_type == EntityType.ARTIST:
                     self._cleanup_orphaned_artist(entity_id)
 
-    def _cleanup_orphaned_artist(self, entity_id: int):
-        """Delete artist if they have no remaining links."""
-        try:
-            svc = self.services.contributor_service
-            usage_count = svc.get_usage_count(entity_id)
-            if usage_count == 0:
-                print(f"DEBUG: Auto-deleting orphaned artist ID={entity_id} after split.")
-                svc.delete(entity_id)
-        except Exception as e:
-            print(f"Error during orphaned cleanup: {e}")
-                
-    def _resolve_and_add_name(self, name: str) -> bool:
-        """Resolve a name string to an entity and link it."""
-        try:
-            entity = None
-            if self.entity_type == EntityType.ARTIST:
-                svc = self.services.contributor_service
-                # Use get_or_create to ensure we have a valid artist
-                entity, _ = svc.get_or_create(name)
-            
-            # TODO: Add support for Publisher/Tags if needed
-                
-            if entity and self.context_adapter:
-                eid = self._get_entity_id(entity)
-                return self.context_adapter.link(eid)
-            
-            return False
-        except Exception as e:
-            print(f"Error resolving name '{name}': {e}")
-            return False
-    
     # =========================================================================
     # PASS-THROUGH METHODS for ChipTrayWidget compatibility
     # =========================================================================

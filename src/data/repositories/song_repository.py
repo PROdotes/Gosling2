@@ -275,9 +275,9 @@ class SongRepository(GenericRepository[Song]):
                             FROM SongCredits SC
                             JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
                             JOIN Roles R ON SC.RoleID = R.RoleID
-                            WHERE AN.DisplayName IN ({placeholders}) AND R.RoleName = 'Performer'
+                            WHERE AN.DisplayName IN ({placeholders}) COLLATE NOCASE AND R.RoleName = 'Performer'
                         )
-                    ) AND MS.IsActive = 1
+                    )
                     {yellberus.QUERY_GROUP_BY}
                     ORDER BY MS.SourceID DESC
                 """

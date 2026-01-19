@@ -90,6 +90,10 @@ class SidePanelWidget(QFrame):
         self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # T-108: Context menu for Artist Stats
+        self.header_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.header_label.customContextMenuRequested.connect(self._show_header_context_menu)
 
         header_layout.addWidget(self.header_label, 1)
         
@@ -2675,6 +2679,41 @@ class SidePanelWidget(QFrame):
                 fresh = self.library_service.get_song_by_id(s.source_id)
                 if fresh:
                     fresh_songs.append(fresh)
+
+        # Update reference and refresh UI values
+        if fresh_songs:
+            self.current_songs = fresh_songs
+            self._update_header()
+            self._refresh_field_values()
+
+    def _show_header_context_menu(self, pos):
+        """Show context menu for Side Panel Header (T-108)."""
+        if not self.current_songs:
+            return
+            
+        menu = QMenu(self)
+        
+        # Determine current artist name displayed
+        current_text = self.header_label.text()
+        if " - " in current_text:
+            display_artist = current_text.split(" - ")[0].strip()
+        else:
+            display_artist = current_text # Fallback
+            
+        action_stats = QAction(f"View Statistics: {display_artist}", self)
+        action_stats.triggered.connect(lambda: self._open_artist_stats(display_artist))
+        menu.addAction(action_stats)
+        
+        menu.exec(self.header_label.mapToGlobal(pos))
+        
+    def _open_artist_stats(self, artist_name: str):
+        """Open the Genre Pie Chart dialog (T-108)."""
+        from ..dialogs.artist_stats_dialog import ArtistStatsDialog
+        try:
+            dlg = ArtistStatsDialog(artist_name, self.library_service, parent=self)
+            dlg.exec()
+        except ImportError:
+            QMessageBox.warning(self, "Missing Dependency", "Matplotlib is required for statistics features.")
         
         # set_songs triggers _refresh_field_values() which updates all UI fields
         self.set_songs(fresh_songs)

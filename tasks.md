@@ -104,7 +104,7 @@ links: []
 | T-67 | **Filter Tree LCD Glow** | 4 | 2 | 8 | ⏸️ Post-0.1 | — | UI polish. Defer to v0.2. |
 | T-106 | **Song Relationships** | 3 | 3 | 9 | 📋 | — | [spec](docs/specs/song_relationships_spec.md) — Link songs (remixes, samples, covers, parodies). Includes Version Folding plan. |
 | T-107 | **Portable Metadata (TXXX)** | 5 | 4 | 15 | 💡 | — | [spec](docs/specs/portable_metadata_spec.md) — "Entity Anchors". Persist Identity/Graph IDs in ID3 tags to survive DB deletion. |
-| T-108 | **Artist Genre Pie Chart** | 3 | 2 | 12 | 📋 | — | [spec](docs/specs/T-108_ARTIST_GENRE_PIE_CHART.md) — Visualize artist genre distribution. |
+| T-108 | **Artist Genre Pie Chart** | 3 | 2 | 12 | ✅ Done | — | [spec](docs/specs/T-108_ARTIST_GENRE_PIE_CHART.md) — Visualize artist genre distribution. |
 
 ### Heavy Lift (Defer)
 | ID | Task | Pri | Cmplx | Score | Status | Blocked By | Spec |

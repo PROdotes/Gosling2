@@ -73,6 +73,31 @@ class LibraryService:
         related_names = self.contributor_service.resolve_identity_graph(artist_name)
         return self.song_service._repo.get_by_unified_artists(related_names)
 
+    def get_artist_genre_stats(self, artist_name: str) -> dict:
+        """
+        Calculate genre distribution for an artist (T-108).
+        Leverages the unified identity graph to find all related songs, 
+        then parses their tags to find Genre distributions.
+        """
+        headers, rows = self.get_songs_by_unified_artist(artist_name)
+        stats = {}
+        
+        for row in rows:
+            try:
+                song = Song.from_row(row)
+                
+                for tag in song.tags:
+                    if tag.startswith("Genre:"):
+                        parts = tag.split(':', 1)
+                        if len(parts) == 2:
+                            genre = parts[1].strip()
+                            if genre:
+                                stats[genre] = stats.get(genre, 0) + 1
+            except Exception as e:
+                pass
+                
+        return stats
+
 
     def get_songs_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific composer"""

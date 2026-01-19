@@ -32,22 +32,23 @@ class TestLibraryService:
     @pytest.fixture
     def service(self, temp_db):
         """Create a service instance with a clean DB"""
-        from src.data.repositories import SongRepository, ContributorRepository, AlbumRepository, PublisherRepository, TagRepository
+        from src.data.repositories import SongRepository, AlbumRepository, PublisherRepository, TagRepository
         from src.business.services import SongService, ContributorService, AlbumService, PublisherService, TagService
+        from unittest.mock import MagicMock
         
         song_repo = SongRepository(temp_db)
-        cont_repo = ContributorRepository(temp_db)
         alb_repo = AlbumRepository(temp_db)
         pub_repo = PublisherRepository(temp_db)
         tag_repo = TagRepository(temp_db)
         
         song_service = SongService(song_repo)
-        cont_service = ContributorService(cont_repo)
+        cont_service = ContributorService(db_path=temp_db)
         alb_service = AlbumService(alb_repo)
         pub_service = PublisherService(pub_repo)
         tag_service = TagService(tag_repo)
+        search_service = MagicMock()
         
-        return LibraryService(song_service, cont_service, alb_service, pub_service, tag_service)
+        return LibraryService(song_service, cont_service, alb_service, pub_service, tag_service, search_service)
 
     def test_add_file(self, service):
         """Test adding a file to the library"""
@@ -117,3 +118,40 @@ class TestLibraryService:
         # The exact implementation of get_by_performer isn't shown, but we know it returns a list of lists/tuples
         # One of the fields should be "Target performer" or the song title
         assert "Test Song" in [str(x) for x in data[0]] or "test.mp3" in [str(x) for x in data[0]]
+
+    def test_get_artist_genre_stats(self, service):
+        """
+        T-108: Verify artist genre statistics calculation.
+        Should return a dict of {Genre: count}.
+        """
+        # Setup: Create songs for "Queen" with specific genres
+        # Song 1: Rock
+        s1 = Song(source="path/1.mp3", name="Bohemian Rhapsody")
+        s1.performers = ["Queen"]
+        s1.tags = ["Genre: Rock", "Mood: Epic"]
+        service.add_song(s1)
+        
+        # Song 2: Rock
+        s2 = Song(source="path/2.mp3", name="We Will Rock You")
+        s2.performers = ["Queen"]
+        s2.tags = ["Genre: Rock"]
+        service.add_song(s2)
+        
+        # Song 3: Pop
+        s3 = Song(source="path/3.mp3", name="Radio Ga Ga")
+        s3.performers = ["Queen"]
+        s3.tags = ["Genre: Pop"]
+        service.add_song(s3)
+        
+        # Song 4: Opera (Different Artist check)
+        s4 = Song(source="path/4.mp3", name="Nessun Dorma")
+        s4.performers = ["Pavarotti"]
+        s4.tags = ["Genre: Opera"]
+        service.add_song(s4)
+        
+        # Action
+        stats = service.get_artist_genre_stats("Queen")
+        
+        # Assert
+        assert stats == {"Rock": 2, "Pop": 1}
+        assert "Opera" not in stats
