@@ -152,6 +152,7 @@ class SidePanelWidget(QFrame):
             "border-top-left-radius: 8px; border-bottom-left-radius: 8px; border-top-right-radius: 2px; border-bottom-right-radius: 2px;"
         )
         self.btn_search_action.setToolTip("Search Metadata")
+        self.btn_search_action.setGlowMargins(5, 5, 0, 5) # No right margin for split effect
         self.btn_search_action.clicked.connect(self._on_web_search)
         self.btn_search_action.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.btn_search_action.customContextMenuRequested.connect(self._show_search_menu)
@@ -164,6 +165,7 @@ class SidePanelWidget(QFrame):
             "border-top-left-radius: 2px; border-bottom-left-radius: 2px; border-top-right-radius: 8px; border-bottom-right-radius: 8px;"
         )
         self.btn_search_menu.setToolTip("Select Search Provider")
+        self.btn_search_menu.setGlowMargins(0, 5, 5, 5) # No left margin for split effect
         self.btn_search_menu.clicked.connect(self._show_search_menu_btn)
 
         search_layout.addWidget(self.btn_search_action)
@@ -532,24 +534,27 @@ class SidePanelWidget(QFrame):
                     
                     # TITLE TOOLS: Casing Buttons (Right Side)
                     if field.name == 'title':
-                        # Sentence Case
-                        btn_sentence = QPushButton("Aa")
-                        btn_sentence.setFixedSize(28, 20)
-                        btn_sentence.setCursor(Qt.CursorShape.PointingHandCursor)
-                        # Reuse micro styling roughly
-                        btn_sentence.setStyleSheet("border-radius: 4px; padding: 0px; font-size: 8pt; font-weight: bold; color: #888;")
-                        btn_sentence.setToolTip("To Sentence Case")
-                        btn_sentence.clicked.connect(self._sentence_case_title)
-                        header_layout.addWidget(btn_sentence)
-
-                        # Title Case
-                        btn_title = QPushButton("Abc")
+                        # Title Case (Abc)
+                        btn_title = GlowButton("Abc")
                         btn_title.setFixedSize(32, 20)
                         btn_title.setCursor(Qt.CursorShape.PointingHandCursor)
-                        btn_title.setStyleSheet("border-radius: 4px; padding: 0px; font-size: 8pt; font-weight: bold; color: #888;")
+                        btn_title.set_radius_style("border-radius: 4px;")
+                        btn_title.set_font_size(8)
+                        btn_title.set_font_weight("bold")
                         btn_title.setToolTip("To Title Case")
                         btn_title.clicked.connect(self._title_case_title)
                         header_layout.addWidget(btn_title)
+
+                        # Sentence Case (Aa)
+                        btn_sentence = GlowButton("Aa")
+                        btn_sentence.setFixedSize(28, 20)
+                        btn_sentence.setCursor(Qt.CursorShape.PointingHandCursor)
+                        btn_sentence.set_radius_style("border-radius: 4px;")
+                        btn_sentence.set_font_size(8)
+                        btn_sentence.set_font_weight("bold")
+                        btn_sentence.setToolTip("To Sentence Case")
+                        btn_sentence.clicked.connect(self._sentence_case_title)
+                        header_layout.addWidget(btn_sentence)
 
                     module_layout.addWidget(header_row)
                 else:

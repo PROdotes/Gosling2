@@ -26,6 +26,11 @@ class ImportWorker(QThread):
         super().__init__()
         self.import_service = import_service
         self.files = files
+        
+        # Sort to prioritize non-WAVs (fast parsing) before WAVs (slow conversion)
+        # False (MP3) < True (WAV)
+        self.files.sort(key=lambda f: f.lower().endswith('.wav'))
+        
         self.conversion_policy = conversion_policy
         self._is_running = True
 

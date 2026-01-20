@@ -11,14 +11,15 @@ class GlowWidget(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         
         # Balanced margin for the halo
-        self._glow_margin = 5
+        self._glow_margins = (5, 5, 5, 5)
         self.trigger_mode = trigger_mode
         self.child = child_widget
         self.glow_color = "#FFC66D" # Default workstation amber
         
         # Main layout
         self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(self._glow_margin, self._glow_margin, self._glow_margin, self._glow_margin)
+        l, t, r, b = self._glow_margins
+        self.layout.setContentsMargins(l, t, r, b)
         self.layout.setSpacing(0)
         
         # 1. THE GLOW FRAME
@@ -74,12 +75,15 @@ class GlowWidget(QWidget):
     def setGlowBlur(self, b):
         self.glow_blur.setBlurRadius(b)
 
-    def setGlowMargin(self, m):
-        self._glow_margin = m
-        self.layout.setContentsMargins(m, m, m, m)
-        # Update geometry if we have fixed sizes
+    def setGlowMargins(self, left, top, right, bottom):
+        self._glow_margins = (left, top, right, bottom)
+        self.layout.setContentsMargins(left, top, right, bottom)
+        # Update geometry if we have fixed sizes (handled by resizeEvent mostly, but good to trigger)
         if self.child:
             self.updateGeometry()
+
+    def setGlowMargin(self, m):
+        self.setGlowMargins(m, m, m, m)
 
     @pyqtProperty(int)
     def glowBlur(self): return int(self.glow_blur.blurRadius())
@@ -87,7 +91,7 @@ class GlowWidget(QWidget):
     def glowBlur(self, b): self.setGlowBlur(b)
 
     @pyqtProperty(int)
-    def glowMargin(self): return self._glow_margin
+    def glowMargin(self): return self._glow_margins[0] # Return left margin as approximation
     @glowMargin.setter
     def glowMargin(self, m): self.setGlowMargin(m)
 

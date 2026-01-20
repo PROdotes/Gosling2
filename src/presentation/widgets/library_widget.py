@@ -1033,6 +1033,15 @@ class LibraryWidget(QWidget):
             for url in mime.urls():
                 if url.isLocalFile():
                     path = url.toLocalFile()
+                    
+                    # Allow Folders
+                    if os.path.isdir(path):
+                        event.acceptProposedAction()
+                        self.table_view.setProperty("drag_status", "accept")
+                        self.table_view.style().unpolish(self.table_view)
+                        self.table_view.style().polish(self.table_view)
+                        return
+                    
                     ext = path.lower().split('.')[-1]
                     if ext in ['mp3', 'zip', 'wav']:
                         event.acceptProposedAction()
@@ -1139,6 +1148,9 @@ class LibraryWidget(QWidget):
         # T-89: Clear Proxy Cache to ensure tag filters are fresh
         if hasattr(self.proxy_model, '_tag_cache'):
             self.proxy_model._tag_cache.clear()
+        # Also clear the filter cache which holds tag data for multiselect
+        if hasattr(self.proxy_model, '_filter_cache'):
+            self.proxy_model._filter_cache = {}
             
         self._populate_table(headers, data)
 
@@ -1498,7 +1510,11 @@ class LibraryWidget(QWidget):
         self.import_progress.setValue(int((current / total) * 100))
         self.import_count_label.setText(f"{current}/{total}")
         
-        status_text = "IMPORTING: " + file_name
+        verb = "IMPORTING"
+        if file_path.lower().endswith('.wav') and self.settings_manager.get_conversion_enabled():
+            verb = "CONVERTING"
+            
+        status_text = f"{verb}: {file_name}"
         if not success:
             status_text = "SKIPPED: " + file_name
         self.import_label.setText(status_text[:50])
@@ -1761,30 +1777,35 @@ class LibraryWidget(QWidget):
         if indexes:
             # Re-calculate stats for action text logic from above
             # (We already have 'statuses' and 'all_done' from previous block)
-            all_not_done = all(not s for s in statuses)
             
             status_action = QAction(self)
+            
+            # Logic Update: Allow fixing "Mixed" selections by defaulting to "Mark as Done"
+            # if ANY item is not done. Only show "Mark as Not Done" if ALL are already done.
             if all_done:
                 status_action.setText("☑️  Mark as Not Done")
                 status_action.triggered.connect(lambda: self._toggle_status(False))
-            elif all_not_done:
+            else:
                 status_action.setText("✅  Mark as Done")
-                # Check validity
+                # Check validity (ensure all items are valid to be marked done)
                 all_valid = True
                 for idx in indexes:
                     source_idx = self.proxy_model.mapToSource(idx)
                     item = self.library_model.item(source_idx.row(), self.field_indices['is_done'])
                     if not item.isEnabled():
+                        # Even in mixed mode, if an item is incomplete, we can't mark it done
                         all_valid = False
                         break
+                
                 if not all_valid:
                     status_action.setEnabled(False)
                     status_action.setToolTip("Cannot mark as Done: Some selected items are incomplete")
                     status_action.setText("✅  Mark as Done (Fix Errors First)")
+                else:
+                    # Add simple tooltip for clarity in mixed cases
+                    status_action.setToolTip("Mark all selected items as Processed")
+                    
                 status_action.triggered.connect(lambda: self._toggle_status(True))
-            else:
-                status_action.setText("⚠️  Mixed Status (Cannot Toggle)")
-                status_action.setEnabled(False)
             
             menu.addAction(status_action)
 

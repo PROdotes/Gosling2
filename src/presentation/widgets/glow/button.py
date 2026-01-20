@@ -21,7 +21,6 @@ class GlowButton(GlowWidget):
         self.btn.setText("") # Ensure native text is never shown
         
         super().__init__(self.btn, trigger_mode="hover", parent=parent)
-        self._glow_margin = self.glowMargin
         policy = self.btn.sizePolicy()
         self.setSizePolicy(policy.horizontalPolicy(), policy.verticalPolicy())
         
@@ -232,31 +231,46 @@ class GlowButton(GlowWidget):
     def setGlowBlur(self, b):
         super().setGlowBlur(b)
 
+    def setGlowMargins(self, l, t, r, b):
+        super().setGlowMargins(l, t, r, b)
+
     def setGlowMargin(self, m):
-        self._glow_margin = m
-        super().setGlowMargin(m)
+        self.setGlowMargins(m, m, m, m)
 
     def setMinimumWidth(self, w): 
         self.btn.setMinimumWidth(w)
-        super().setMinimumWidth(w + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setMinimumWidth(w + l + r)
+
     def setMinimumHeight(self, h):
         self.btn.setMinimumHeight(h)
-        super().setMinimumHeight(h + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setMinimumHeight(h + t + b)
+
     def setMaximumWidth(self, w):
         self.btn.setMaximumWidth(w)
-        super().setMaximumWidth(w + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setMaximumWidth(w + l + r)
+
     def setMaximumHeight(self, h):
         self.btn.setMaximumHeight(h)
-        super().setMaximumHeight(h + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setMaximumHeight(h + t + b)
+
     def setFixedSize(self, w, h):
         self.btn.setFixedSize(w, h)
-        super().setFixedSize(w + (self._glow_margin * 2), h + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setFixedSize(w + l + r, h + t + b)
+
     def setFixedWidth(self, w): 
         self.btn.setFixedWidth(w)
-        super().setFixedWidth(w + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setFixedWidth(w + l + r)
+
     def setFixedHeight(self, h): 
         self.btn.setFixedHeight(h)
-        super().setFixedHeight(h + (self._glow_margin * 2))
+        l, t, r, b = self._glow_margins
+        super().setFixedHeight(h + t + b)
     def setSizePolicy(self, *args):
         if len(args) == 1:
             super().setSizePolicy(args[0])

@@ -181,9 +181,11 @@ class SongRepository(GenericRepository[Song]):
                     if tag_row:
                         tag_id = tag_row[0]
                         # Check if link exists before deleting
-                        cursor.execute("SELECT 1 FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
-                        if cursor.fetchone():
-                            cursor.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
+                        # OPTIMIZATION: Just run the DELETE. If it exists, it goes. If not, no harm done.
+                        # This avoids race conditions or logic gaps where SELECT says yes but DELETE fails.
+                        cursor.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
+                        
+                        if cursor.rowcount > 0:
                             from src.core.audit_logger import AuditLogger
                             AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
 
