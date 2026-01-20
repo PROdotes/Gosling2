@@ -59,10 +59,11 @@ class SongSyncService:
             role_id = role_row[0]
 
             for contributor_name in contributors:
-                if not contributor_name.strip(): continue
+                clean_name = contributor_name.strip()
+                if not clean_name: continue
 
                 # Resolve to ArtistNames (V2)
-                name_id = self._resolve_identity(cursor, contributor_name, auditor)
+                name_id = self._resolve_identity(cursor, clean_name, auditor)
                 desired_links.add((name_id, role_id))
 
         # 2. Get Current State (V2)

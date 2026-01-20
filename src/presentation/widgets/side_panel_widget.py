@@ -17,6 +17,9 @@ from ...core.picker_config import get_tag_picker_config, get_artist_picker_confi
 
 import copy
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
 
 class SidePanelWidget(QFrame):
@@ -29,6 +32,7 @@ class SidePanelWidget(QFrame):
     save_requested = pyqtSignal(dict, set) 
     staging_changed = pyqtSignal(list) # list of song_ids in staging
     filter_refresh_requested = pyqtSignal() # Request rebuild of sidebar filters
+    status_message_requested = pyqtSignal(str, str) # Emitted for user feedback (message, type)
     
     def __init__(self, library_service, metadata_service, renaming_service, duplicate_scanner, settings_manager, spotify_parsing_service=None, parent=None) -> None:
         super().__init__(parent)
@@ -190,16 +194,13 @@ class SidePanelWidget(QFrame):
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
 
-        # NOTE: btn_status removed - "Ready" functionality now handled via Unprocessed tag chip
-        # Create a dummy reference so old code doesn't break
+        # Status button (REMOVED - now handled via Status chip in Tag tray for cleaner UI)
         self.btn_status = None
 
-        # Layout: LED | Discard | stretch | Search | Save
+        # Layout: LED | stretch | Discard | Save
         footer_layout.addWidget(self.save_led)
-        footer_layout.addWidget(self.btn_discard)
         footer_layout.addStretch(1)
-        # self.btn_parse moved to Header
-        footer_layout.addWidget(search_container)
+        footer_layout.addWidget(self.btn_discard)
         footer_layout.addWidget(self.btn_save)
 
         layout.addWidget(footer_frame)
@@ -261,17 +262,11 @@ class SidePanelWidget(QFrame):
     def _update_header(self):
         if not self.current_songs:
             self.header_label.setText("No Selection")
-            if self.btn_status:
-                self.btn_status.setChecked(False)
-                self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
             return
 
         if len(self.current_songs) > 1:
             self.header_label.setText(f"{len(self.current_songs)} Songs Selected")
-            if self.btn_status:
-                self.btn_status.setChecked(False)
-                self.btn_status.setEnabled(False)
             self._update_status_visuals(False)
             return
 
@@ -288,25 +283,13 @@ class SidePanelWidget(QFrame):
         
         artist = artist or "Unknown Artist"
         self.header_label.setText(f"{artist} - {song.title}")
-        
-        # Determine current state: READY if NO Status tags AND SongIsDone (staged or DB)
+        # Determine current state: READY if ProcessingStatus=1
         try:
-            # Status check: The Tag is the Law
-            # Ready = No 'Status:Unprocessed' tag
-            is_ready = True
-            if hasattr(self, 'tag_service') and self.tag_service:
-                is_ready = not self.tag_service.is_unprocessed(song.source_id)
-            
-            # Update Button State (if it exists)
-            if self.btn_status:
-                self.btn_status.setEnabled(True)
-                self.btn_status.setChecked(is_ready)
+            is_ready = song.is_done
             self._update_status_visuals(is_ready)
             
         except Exception as e:
-            print(f"Error updating status button: {e}")
-            if self.btn_status:
-                self.btn_status.setEnabled(False)
+            logger.error(f"Error updating status visuals: {e}")
 
     def _configure_micro_button(self, btn):
         """Helper to enforce styling on tiny 22x18 buttons."""
@@ -689,96 +672,62 @@ class SidePanelWidget(QFrame):
         
         # T-89: Status Tags are locked and informational.
         # Clicking them shows a Metadata Audit instead of Rename.
-        if category == "Status":
+        if category == "Status" or entity_id == -99:
             if not self.current_songs:
                 return ClickResult(ClickAction.CANCELLED, entity_id)
-            
+
+            # Calculate current state
+            statuses = []
+            for song in self.current_songs:
+                st = self._get_effective_value(song.source_id, 'is_done', song.processing_status)
+                statuses.append(bool(st) if st is not None else True)
+            all_done = all(statuses)
+
+            # 1. If currently READY, toggle back to PENDING immediately
+            if all_done:
+                self._on_status_toggled()
+                return ClickResult(ClickAction.DATA_CHANGED, entity_id)
+
+            # 2. If PENDING, run validation check
             errors = self._get_validation_errors()
             from PyQt6.QtWidgets import QMessageBox
             
-            # Format a detailed data audit report
-            lines = []
-            
-            # T-89: Streamlined Workflow
-            # If validation passes, offer immediate action instead of just info.
             if not errors:
-               # Prompt user to mark as ready
+                # Validation Passed: Ask to Mark Ready
                 reply = QMessageBox.question(
                     self, 
                     "Validation Passed", 
-                    "✅ All metadata requirements are met.\n\nMark this item as READY now?",
+                    "✅ All metadata requirements are met.\n\nMark as READY for broadcast?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.Yes
                 )
                 
                 if reply == QMessageBox.StandardButton.Yes:
-                    # Remove 'Unprocessed' status tag via Service
-                    self.tag_service.remove_tag_from_source(self.current_songs[0].source_id, entity_id)
-                    
-                    # Refresh UI
-                    self.filter_refresh_requested.emit()
-                    self._refresh_field_values()
-                    
+                    self._on_status_toggled() # Toggle to READY
                     return ClickResult(ClickAction.DATA_CHANGED, entity_id)
                 else:
                     return ClickResult(ClickAction.CANCELLED, entity_id)
-
             else:
-                lines.append("❌ The following requirements are missing or invalid:")
+                # Validation Failed: Show Audit report
+                lines = ["❌ Requirements missing for 'READY' status:"]
                 for e in errors:
                     lines.append(f"• {e}")
-            
-            lines.append("")
-            lines.append("Current Data used for Validation:")
+                
+                lines.append("")
+                lines.append("Current Metadata used for Validation:")
+                if len(self.current_songs) == 1:
+                    s = self.current_songs[0]
+                    for field in yellberus.get_required_fields():
+                        val = getattr(s, field.model_attr or field.name, "")
+                        lines.append(f"[{field.ui_header}]: {val if val else '<EMPTY>'}")
+                
+                QMessageBox.warning(self, "Metadata Audit", "\n".join(lines))
+                return ClickResult(ClickAction.CANCELLED, entity_id)
+
+
             
             # Single song context is easiest for labels
-            if self.current_songs:
-                song = self.current_songs[0]
-                
-                # Re-run validation to get raw field names for UI matching
-                v_row = []
-                for field in yellberus.FIELDS:
-                    attr = field.model_attr or field.name
-                    val = self._get_effective_value(song.source_id, field.name, getattr(song, attr, ""))
-                    v_row.append(val)
-                
-                raw_failed = yellberus.validate_row(v_row)
 
-                for field in yellberus.FIELDS:
-                    if field.required:
-                        val = self._get_effective_value(song.source_id, field.name, getattr(song, field.model_attr or field.name, ""))
-                        
-                        is_format_invalid = field.name in raw_failed
-                        is_missing = not field.is_complete(val)
-                        is_field_error = is_format_invalid or is_missing
-                        icon = "❌" if is_field_error else "✅"
-                        
-                        display_val = f"'{val}'" if val and str(val).strip() else "[EMPTY]"
-                        lines.append(f"  {icon} {field.ui_header}: {display_val}")
-
-            msg = "\n".join(lines)
-            
-            # T-89: Explain "Phantom Incomplete" status
-            # If valid in editor but invalid in DB, warn the user.
-            if not errors and self._staged_changes:
-                # Check purely DB-based validation
-                db_errors = []
-                if self.current_songs:
-                    song = self.current_songs[0]
-                    # Create a mock row from the song object (DB state)
-                    # This mimics what the LibraryFilter sees
-                    db_row = []
-                    for f in yellberus.FIELDS:
-                        db_val = getattr(song, f.model_attr or f.name, None)
-                        db_row.append(db_val)
-                    db_errors = yellberus.validate_row(db_row)
-                
-                if db_errors:
-                    db_reasons = ", ".join(sorted(list(db_errors)))
-                    msg += f"\n\n⚠️ Note: This item appears in 'Incomplete' because the Library sees these fields as missing:\n[{db_reasons}]\n\n(Save changes to fix this sync issue)"
-            
-            QMessageBox.information(self, f"Metadata Audit: {actual_name}", msg)
-            return ClickResult(ClickAction.CANCELLED, entity_id)
         
         # If we have an entity ID (best case)
         if entity_id and entity_id > 0:
@@ -882,24 +831,10 @@ class SidePanelWidget(QFrame):
 
     def _on_chip_removed(self, field_name, entity_id, name):
         """T-70: Generic chip removal handling."""
-        
-        # T-89: Enforcement Gate for 'Status: Unprocessed'
-        # Blocks removal if metadata is incomplete according to Yellberus
-        if field_name == 'tags' and "Status: Unprocessed" in name:
-            errors = self._get_validation_errors()
-            if errors:
-                from PyQt6.QtWidgets import QMessageBox
-                reasons_list = "\n".join([f"• {e}" for e in errors])
-                QMessageBox.warning(
-                    self, "Metadata Incomplete",
-                    f"Cannot remove 'Unprocessed' tag until documentation is complete:\n\n{reasons_list}"
-                )
-                return
 
         if field_name == 'tags':
             # Tags use the entity_id which is the tag_id
             if entity_id and entity_id > 0:
-                is_status_tag = "Status: Unprocessed" in name
                 for song in self.current_songs:
                     self.tag_service.remove_tag_from_source(song.source_id, entity_id)
                 self._refresh_field_values()
@@ -1610,6 +1545,16 @@ class SidePanelWidget(QFrame):
                      
                      chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, is_primary))
                 
+                # 3. Add Virtual Status Chip (T-89)
+                is_done_eff = self._get_effective_value(song.source_id, 'is_done', song.processing_status)
+                is_done = bool(is_done_eff) if is_done_eff is not None else True
+                
+                # TRANSIENT: Only show the "Pending" task chip. Once marked READY, it disappears.
+                if not is_done:
+                    status_chip = (-99, "Status: PENDING", "⏳", False, False, 
+                                   "Click to toggle processing status", "amber", False)
+                    chips.insert(0, status_chip)
+                
                 return chips, False, 0
 
             # CASE B: Bulk Selection - Intersection Logic (Sorting enforced, no Primary)
@@ -1643,6 +1588,23 @@ class SidePanelWidget(QFrame):
                  # In bulk mode, we don't show primary stars to avoid implying specific order
                  
                  chips.append((tid, f"{cat}: {name}", icon, False, False, "", zone, False))
+            
+            # 3. Add Virtual Status Chip (Bulk)
+            statuses = []
+            for song in self.current_songs:
+                st = self._get_effective_value(song.source_id, 'is_done', song.processing_status)
+                statuses.append(bool(st) if st is not None else True)
+            
+            all_done = all(statuses)
+            none_done = not any(statuses)
+            
+            # TRANSIENT: If everything is READY, don't clutter the tray.
+            if not all_done:
+                if none_done:
+                    status_chip = (-99, "Status: PENDING", "⏳", False, False, "All songs PENDING", "amber", False)
+                else:
+                    status_chip = (-99, "Status: MIXED", "🔀", True, False, "Mixed processing states", "gray", False)
+                chips.insert(0, status_chip)
             
             mixed_count = len(union_strings - common_strings)
             return chips, (mixed_count > 0), mixed_count
@@ -1822,7 +1784,7 @@ class SidePanelWidget(QFrame):
                 else:
                     # Fallback for legacy staged names (Read-Only)
                     # T-Fix: Use find_by_name to avoid creating duplicates when rendering stale names (e.g. during rename)
-                    pub = self.publisher_service.find_by_name(str(n))
+                    pub = self.publisher_service.find_by_name(str(n).strip())
                     pid = pub.publisher_id if pub else 0
                 
                 if pub:
@@ -1837,7 +1799,7 @@ class SidePanelWidget(QFrame):
                 # Standard Contributor (Artist) via Service
                 # FIX: Use get_by_name to prevent 'Ghost Creation' when rendering stale 'performers' strings 
                 # (e.g. during a rename operation before the refresh completes).
-                artist = self.contributor_service.get_by_name(str(n))
+                artist = self.contributor_service.get_by_name(str(n).strip())
                 
                 if artist:
                     icon = "👤" if artist.type == "person" else "👥"
@@ -1853,46 +1815,31 @@ class SidePanelWidget(QFrame):
         return chips
 
     def _on_status_toggled(self):
-        """Toggle the ready/pending state using the unified Tags system."""
-        if not self.btn_status:
-            return
-        is_ready = self.btn_status.isChecked()
-        
-        # 1. Update Tags via Service (Immediate effect for now)
+        """Toggle the ready/pending state via the staging system (T-89)."""
+        # Determine the target state (toggle based on selection)
+        statuses = []
         for song in self.current_songs:
-            if is_ready:
-                # MARKING DONE -> Remove all Status tags via Service
-                self.tag_service.remove_all_tags_from_source(song.source_id, category="Status")
-            else:
-                # MARKING PENDING -> Add 'Unprocessed' Status tag via Service
-                self.tag_service.add_tag_to_source(song.source_id, "Unprocessed", category="Status")
+            st = self._get_effective_value(song.source_id, 'is_done', song.processing_status)
+            statuses.append(bool(st) if st is not None else True)
+            
+        all_done = all(statuses)
+        new_status = not all_done # Toggle: If all are done, make them pending. Else make them all done.
+        
+        # Stage the change
+        self._on_field_changed("is_done", 1 if new_status else 0)
 
         # 2. Sync legacy column via staging (REMOVED - Field is Legacy)
         # self._on_field_changed("is_done", 1 if is_ready else 0)
 
         # 3. Update UI
-        self._update_status_visuals(is_ready)
+        self._update_status_visuals(new_status)
         self._refresh_field_values() # Update the tag tray
         self._validate_done_gate()   # Re-check if it can be marked done again (safety)
         self.filter_refresh_requested.emit()
 
     def _update_status_visuals(self, is_done):
-        """Apply Pro Radio styling: Green for AIR, Gray for PENDING via QSS dynamic property."""
-        if not self.btn_status:
-            return
-        if is_done:
-            self.btn_status.setText("READY [AIR]")
-            self.btn_status.setProperty("state", "ready")
-        else:
-            self.btn_status.setText("PENDING")
-            self.btn_status.setProperty("state", "pending")
-        
-        # Force style refresh for dynamic property change
-        try:
-            self.btn_status.style().unpolish(self.btn_status)
-            self.btn_status.style().polish(self.btn_status)
-        except:
-            pass
+        """Visual state is now handled by the Status Chip in the tags tray."""
+        pass
 
     def _get_validation_errors(self) -> List[str]:
         """Centralized validation logic driven by Yellberus Registry."""
@@ -1942,19 +1889,8 @@ class SidePanelWidget(QFrame):
         return sorted(list(missing_reasons))
 
     def _validate_done_gate(self):
-        """Disable MARK DONE if required fields are missing, showing why in tooltip."""
-        if not self.btn_status:
-            return
-            
-        errors = self._get_validation_errors()
-        valid = len(errors) == 0
-        self.btn_status.setEnabled(valid)
-        
-        if not valid:
-             reasons_list = "\n".join([f"• {r}" for r in errors])
-             self.btn_status.setToolTip(f"Cannot Mark Ready:\n{reasons_list}")
-        else:
-             self.btn_status.setToolTip("Mark as Ready for Air")
+        """Validation state is now informative via the Status Chip audit."""
+        pass
 
     def _update_save_state(self):
         has_staged = len(self._staged_changes) > 0
@@ -2091,6 +2027,7 @@ class SidePanelWidget(QFrame):
             
         self.set_songs(self.current_songs, force=True)
         self.staging_changed.emit([]) # Clear highlights in library
+        self.status_message_requested.emit("Changes discarded", "info")
 
     def clear_staged(self, song_ids=None):
         """Remove IDs from staging (post-save cleanup)."""
@@ -2771,4 +2708,5 @@ class SidePanelWidget(QFrame):
             QMessageBox.warning(self, "Missing Dependency", "Matplotlib is required for statistics features.")
         
         # set_songs triggers _refresh_field_values() which updates all UI fields
-        self.set_songs(fresh_songs)
+        # Refresh UI
+        self.refresh_content()

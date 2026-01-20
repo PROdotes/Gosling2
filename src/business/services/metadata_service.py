@@ -480,17 +480,18 @@ class MetadataService:
             # NOTE: Status is now managed by TagRepository. The caller must pass
             # is_unprocessed if they want to bake the status into ID3.
             # If song has 'is_unprocessed' attr (set by caller), use it.
+            is_done = song.is_done
             audio.tags.delall('TXXX:STATUS')
             audio.tags.delall('TKEY')
             audio.tags.delall('TXXX:GOSLING_DONE') # Cleanup legacy
 
-            is_unprocessed = getattr(song, 'is_unprocessed', None)
-            if is_unprocessed is True:
-                # Permission NOT granted. Mark as Unprocessed.
-                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Unprocessed']))
-            elif is_unprocessed is False:
-                # Permission GRANTED (Done). Write Legacy code for compatibility.
-                audio.tags.add(TKEY(encoding=1, text=['true']))
+            if not is_done:
+                # MARK AS PENDING (0)
+                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Pending']))
+            else:
+                # MARK AS READY (1)
+                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Ready']))
+                audio.tags.add(TKEY(encoding=1, text=['true'])) # Legacy compatibility for external players
             # If is_unprocessed is None, we don't touch the status tags (sparse update)
 
             # 4. Author Union (Legacy: TCOM = Composers + Lyricists)

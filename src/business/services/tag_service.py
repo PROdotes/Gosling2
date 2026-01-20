@@ -67,13 +67,6 @@ class TagService:
         tag.tag_name = new_name
         return self._repo.update(tag)
 
-    def is_unprocessed(self, song_id: int) -> bool:
-        """Check if a song has the 'Status:Unprocessed' tag."""
-        return self._repo.is_unprocessed(song_id)
-
-    def set_unprocessed(self, song_id: int, unprocessed: bool) -> bool:
-        """Set the 'Status:Unprocessed' state for a song."""
-        return self._repo.set_unprocessed(song_id, unprocessed)
 
     def get_or_create(self, name: str, category: Optional[str] = None) -> Tuple[Any, bool]:
         """Find or create a tag."""

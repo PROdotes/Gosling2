@@ -1,58 +1,49 @@
 # Logic: Artist Merging & Alias Linking
 
-This document defines the rules for handling artist merges and alias linking in the `ArtistDetailsDialog` and `ArtistPickerDialog` workflow. The goal is to separate user-intent (Linking/Moving Names) from database reality (Merging IDs), prioritized by **User Perspective Data Loss**.
+This document defines the rules for how the system handles artist names. The priority is **User Intent** and **Searchability**. From the user's perspective, no information is ever lost during a merge because names are simply consolidated into a single searchable identity.
 
 ## Core Concept
-The user wants to "Link Name A to Person B". The system must determine if this actions is:
-1.  **Trivial:** Just adding a new string.
-2.  **Redirection:** Moving a string from one person to another (Safe).
-3.  **Destructive:** Destroying a distinct person's profile to merge it (Unsafe).
+1.  **Search is King**: If you link "Freddie Mercury" to "Farrokh Bulsara", searching for either name will return all the same songs.
+2.  **Names are Preserved**: Merging does not delete names. It transforms a "Primary Name" into an "Alias".
+3.  **Action = Intent**: If a user renames an artist or links a name to another artist, they have already expressed their intent. The system should execute that intent silently.
 
 ## Scenarios & Handling
 
-### 1. The "Dead Alias" (Empty Shell)
-**Scenario:** User adds "Ziggy Stardust". "Ziggy" exists in the DB but has 0 Songs, 0 Aliases, no Group Memberships, and no custom Notes.
-*   **User Intent:** "Use this name."
-*   **System State:** Independent Contributor #99 (Empty).
-*   **Action:** **Silent Merge.** Absorb ID #99 into Current Artist.
-*   **Data Loss:** None (Shell is disposable).
-*   **UI:** No Popup. Instant success.
+### 1. The Trivial Link (Silent)
+**Scenario:** Linking a name (e.g., "The Ghost") that is currently independent or an empty shell.
+*   **User Goal:** "This name belongs to this artist."
+*   **Result:** The name is linked. All songs previously under that name are now searchable under the main artist. 
+*   **UI:** **Silent.** The action is the confirmation.
 
-### 2. The "Alias Re-Link" (Stealing a Name)
-**Scenario:** User searches for "The Ghost of Mixes". System finds it is currently an alias for "DJ Someone".
-*   **User Intent:** "The Ghost of Mixes is actually an alias for Me, not DJ Someone."
-*   **System State:** "The Ghost" is an alias string record owned by Contributor #50 ("DJ Someone").
-*   **Action:** **Move Alias.** Update `ContributorAliases` to point "The Ghost" to Current Artist.
-*   **Data Loss:** None. "DJ Someone" remains intact. "The Ghost" just points to a new home.
-*   **UI:** " 'The Ghost' is currently linked to 'DJ Someone'. **[Move Alias]** "
+### 2. The Alias Re-Link (Move Name)
+**Scenario:** A user wants to use a name that is currently linked as an alias to someone else.
+*   **User Goal:** "This name actually belongs here, not there."
+*   **Result:** The name is moved to the new artist.
+*   **UI:** **Prompt.** Small confirmation: " '{name}' is linked to '{artist}'. Link it here instead? "
 
-### 3. The "Person with Alias" (Identity Demotion)
-**Scenario:** User adds "Freddie Mercury" (ID #10). "Freddie" has an alias "Farrokh" (ID #10a). User links him to "Queen".
-*   **User Intent:** "Freddie belongs to Queen." (Or "Freddie is Queen" in a merge context).
-*   **System State:** Independent Contributor #10 with child data.
-*   **Action:** **Merge/Absorb.** ID #10 is deleted. ID #10's songs move to "Queen". "Freddie" becomes an alias of "Queen". "Farrokh" becomes an alias of "Queen".
-*   **Data Loss:** Segregation is lost. You cannot easily split them later.
-*   **UI:** **Warning.** "Merging 'Freddie' will break links to his aliases. Songs will be mixed."
+### 3. The Identity Merge (Silent)
+**Scenario:** Merging "Freddie Mercury" into "Queen".
+*   **User Goal:** "Consolidate these."
+*   **Result:** All songs are unified. "Freddie Mercury" becomes an alias of "Queen". Search remains perfect.
+*   **UI:** **Silent.** Intent is implied.
 
-### 4. The "Independent Person" (Destructive Merge)
-**Scenario:** User adds "David Bowie" (ID #20) to "David Jones" (ID #21). Bowie has songs, notes, and a biography.
-*   **User Intent:** "These are the same person."
-*   **System State:** Two distinct profiles with data.
-*   **Action:** **Merge/Absorb.** ID #20 is deleted.
-*   **Data Loss:** **Profile Metadata Lost** (Bio, Notes, Birthday). **Song Separation Lost** (All songs mixed into ID #21).
-*   **UI:** **PERMANENT DATA LOSS WARNING.** "Merging will DELETE profile notes. Songs will be mixed and cannot be separated."
+### 4. The Baggage Merge (Prompt)
+**Scenario:** Merging Artist A into Artist B, where both already have their own lists of aliases.
+*   **User Goal:** "Combine these identities."
+*   **Result:** The two groups of aliases are combined into one.
+*   **UI:** **Prompt.** Single question: "Combine them?" (Only shown because we are merging two existing structures of names).
 
-## Implementation Details
+## Safety Principles
+*   **Never warn about songs**: Songs are never "lost" or "deleted" during a merge; they are simply unified under a more accurate searchable identity.
+*   **Never mention IDs**: The user doesn't care about database keys. Focus on the Names.
 
-### Required Checks (`ArtistDetailsDialog._add_alias`)
-1.  **Alias Check:** Did the picker return a `matched_alias` string?
-    *   **Yes:** Trigger **Scenario 2 (Move Alias)**.
-2.  **Impact Check:** If no alias string, check the Target Contributor object.
-    *   `song_count > 0`? -> **Destructive.**
-    *   `has_aliases`? -> **Destructive (Complexity).**
-    *   `has_members`? -> **Destructive (Complexity).**
-    *   `has_metadata` (Sort Name != Name)? -> **Destructive.**
-3.  **Fallback:** If all false -> **Scenario 1 (SIlent Merge).**
+### 5. Click Redirection (The "Gustavo Rule")
+*   **Rule**: Clicking an Alias or Group Member in the UI MUST redirect to the **Primary Identity**.
+    *   *Example*: Clicking "Noelle" (Alias) redirects to "Gustavo" (Primary).
+    *   *Mechanism*: The system automatically resolves ownership.
 
-### Required Methods
-*   `ContributorService.move_alias(alias_name, old_owner_id, new_owner_id)`: Needed for Scenario 2.
+### 6. Unlinking Logic (The "Splitting Rule")
+*   **Action**: "Removing" a name from an identity.
+*   **Result**: The system **SPLITS** the name into a NEW, independent Identity.
+    *   **NEVER DELETE**: Removing an alias MUST NOT delete the name record or its credits.
+    *   **Outcome**: The name becomes a standalone artist again, preserving its history.

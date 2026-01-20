@@ -174,12 +174,13 @@ class LibraryService:
     # ==================== WORKFLOW (T-89) ====================
 
     def is_song_unprocessed(self, song_id: int) -> bool:
-        """Check if a song has the 'Status:Unprocessed' tag."""
-        return self.tag_service.is_unprocessed(song_id)
+        """Check if a song is unprocessed (Status=0)."""
+        song = self.get_song_by_id(song_id)
+        return not song.is_done if song else True
 
     def set_song_unprocessed(self, song_id: int, unprocessed: bool) -> bool:
-        """Set the 'Status:Unprocessed' state for a song."""
-        return self.tag_service.set_unprocessed(song_id, unprocessed)
+        """Set the processing status (Status column) for a song."""
+        return self.update_song_status(song_id, not unprocessed)
 
     def get_virtual_member_count(self, zip_path: str) -> int:
         """Count how many library items belong to this ZIP container."""

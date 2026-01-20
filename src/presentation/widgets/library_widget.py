@@ -272,34 +272,14 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
             # A. Special Case: Status Workflow (Done, Not Done, Pending, Incomplete)
             if field_name == 'is_done':
-                 # T-89: "Done" is determined by the absence of ANY 'Status' category tags.
-                 # 1. Identify if item carries any 'Status' tags
-                 id_col = self._field_indices.get('file_id', -1)
-                 source_id_val = model.data(model.index(row, id_col, parent), Qt.ItemDataRole.UserRole)
-                 try: source_id = int(float(source_id_val)) if source_id_val is not None else None
-                 except: source_id = None
-                 
-                 if source_id is None: return False
-                 
-                 # Check tag cache
-                 if not hasattr(self, '_tag_cache'): self._tag_cache = {}
-                 cache_key = f"{source_id}"
-                 if cache_key not in self._tag_cache:
-                     source_widget = self.parent() # The LibraryWidget
-                     if source_widget and hasattr(source_widget, 'library_service'):
-                         tags = source_widget.library_service.tag_service.get_tags_for_source(source_id)
-                         self._tag_cache[cache_key] = {f"{t.category}:{t.tag_name}" for t in tags}
-                     else:
-                         self._tag_cache[cache_key] = set()
-                 
-                 # Logic change: Check for ANY tag in the Status category
-                 has_status_tag = any(t.startswith("Status:") for t in self._tag_cache[cache_key])
+                 # T-89: "Done" is now determined by the ProcessingStatus column (0=Unprocessed, 1=Done)
+                 is_done_val = bool(row_val) if row_val is not None else True
                  
                  # 2. Match based on required_val
                  if required_val is True: # "Done"
-                     return not has_status_tag
-                 elif required_val is False: # "Not Done"
-                     return has_status_tag
+                     return is_done_val
+                 elif required_val is False: # "Not Done / Unprocessed"
+                     return not is_done_val
                  
                  # Check Row Completeness (only required fields)
                  completeness_row = []
@@ -315,9 +295,9 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                  if required_val == "INCOMPLETE":
                      return incomplete_count > 0
                  
-                 # "Ready to Finalize" - Complete data AND has Unprocessed tag
+                 # "Ready to Finalize" - Complete data AND is currently Unprocessed
                  if required_val == "READY":
-                     return has_status_tag and incomplete_count == 0
+                     return (not is_done_val) and incomplete_count == 0
 
             # B. Normalize Row Data (Handle Lists and CSV Strings)
             if isinstance(row_val, str) and ',' in row_val:
@@ -559,6 +539,8 @@ class LibraryWidget(QWidget):
     play_immediately = pyqtSignal(str) # Path to play
     focus_search_requested = pyqtSignal()
     metadata_changed = pyqtSignal() # Emitted when external dialogs change metadata
+    library_reloaded = pyqtSignal() # When the entire library model is rebuilt
+    status_message_requested = pyqtSignal(str, str) # Emitted for user feedback (message, type)
 
     def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, import_service=None, parent=None) -> None:
         super().__init__(parent)
@@ -1186,9 +1168,12 @@ class LibraryWidget(QWidget):
                     proxy_idx = self.proxy_model.mapFromSource(source_idx)
                     if proxy_idx.isValid():
                         selection_model.select(
-                            proxy_idx, 
+                            proxy_idx,
                             QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
                         )
+        
+        # 5. Notify Listeners (e.g. SidePanelWidget)
+        self.library_reloaded.emit()
 
     def update_dirty_rows(self, dirty_ids: list):
         """Highlight rows that have unsaved changes in the side panel."""
@@ -2345,6 +2330,9 @@ class LibraryWidget(QWidget):
         
             if count > 0:
                 self.load_library()
+                # T-Feedback: Visual Confirmation
+                status_text = "Done" if new_status else "Incomplete"
+                self.status_message_requested.emit(f"Marked {count} songs as {status_text}", "success")
 
 
 
@@ -2779,10 +2767,8 @@ class LibraryWidget(QWidget):
                         song = self.library_service.get_song_by_id(sid)
                         if not song: continue
                         
-                        # Check if song is processed (not unprocessed)
-                        tag_service = self.library_service.tag_service if hasattr(self.library_service, 'tag_service') else None
-                        is_unprocessed = tag_service.is_unprocessed(sid) if tag_service else True
-                        if not is_unprocessed:
+                        # Check if song is processed (Status=1)
+                        if song.is_done:
                             # Check if path differs from target
                             target = self.renaming_service.calculate_target_path(song)
                             if song.path:
@@ -2829,11 +2815,9 @@ class LibraryWidget(QWidget):
                         song = self.library_service.get_song_by_id(sid)
                         if not song: continue
 
-                        # Gate 1: Status Check (The Tag is the Law) via Service
-                        tag_service = self.library_service.tag_service if hasattr(self.library_service, 'tag_service') else None
-                        is_unprocessed = tag_service.is_unprocessed(sid) if tag_service else True
-                        if is_unprocessed: 
-                            errors.append(f"{song.title}: Not marked as Ready (has Unprocessed tag)")
+                        # Gate 1: Status Check (ProcessingStatus column is the Law)
+                        if not song.is_done: 
+                            errors.append(f"{song.title}: Not marked as Ready (Status is Unprocessed)")
                             error_count += 1
                             continue
 
@@ -2878,8 +2862,10 @@ class LibraryWidget(QWidget):
 
             
             # Refresh to show new paths
-            if success_count > 0 and refresh:
-                self.load_library()
+            if success_count > 0:
+                if refresh:
+                    self.load_library()
+                self.status_message_requested.emit(f"Successfully renamed {success_count} songs", "success")
                 # Run Cleanup Check
                 if potential_empty_zips:
                     self._check_and_cleanup_zips(potential_empty_zips)
@@ -2969,8 +2955,10 @@ class LibraryWidget(QWidget):
                     # Add only if not already present
                     if val not in song.performers:
                         song.performers.append(val)
-                        # Update unified_artist if it was the first performer
-                        if len(song.performers) == 1:
+                        # T-Fix: If we are adding a performer via Parse, and Unified Artist is empty or generic/unknown,
+                        # we should likely update it to reflect this new (likely primary) artist.
+                        # For now, let's stick to simple logic: If Unified Artist is empty, set it.
+                        if not song.unified_artist:
                             song.unified_artist = val
                         changed = True
 

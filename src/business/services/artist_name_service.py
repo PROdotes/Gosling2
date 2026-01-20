@@ -1,14 +1,41 @@
-"""ArtistName Service Module"""
+import logging
 from typing import Optional, List
 from ...data.models.artist_name import ArtistName
 from ...data.repositories.artist_name_repository import ArtistNameRepository
 
+logger = logging.getLogger(__name__)
 
 class ArtistNameService:
     """Service for managing artist names."""
 
     def __init__(self, repository: Optional[ArtistNameRepository] = None):
         self._repo = repository or ArtistNameRepository()
+
+    # ... [keep existing methods] ...
+
+    def update_name(self, name: ArtistName, batch_id: Optional[str] = None) -> bool:
+        """Update artist name details."""
+        success = self._repo.update(name, batch_id=batch_id)
+        if success and name.owner_identity_id:
+            self._enforce_primary_integrity(name.owner_identity_id)
+        return success
+
+    def _enforce_primary_integrity(self, identity_id: int):
+        """
+        RAILGUARD: Ensure this identity has exactly one primary name.
+        If zero found, auto-promote the oldest name.
+        """
+        names = self.get_by_owner(identity_id)
+        if not names: return
+        
+        primary_count = sum(1 for n in names if n.is_primary_name)
+        
+        if primary_count == 0:
+            # HEAL: Promote oldest
+            oldest = min(names, key=lambda n: n.name_id)
+            oldest.is_primary_name = True
+            logger.warning(f"Integrity Heal: Promoting '{oldest.display_name}' to Primary for Identity {identity_id}")
+            self._repo.update(oldest)
 
     def get_name(self, name_id: int) -> Optional[ArtistName]:
         """Fetch artist name by ID."""

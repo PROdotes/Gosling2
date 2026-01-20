@@ -225,6 +225,8 @@ class SongFieldAdapter(ContextAdapter):
     
     def unlink(self, child_id: int) -> bool:
         """Remove entity (Immediate DB Write)."""
+        if child_id == -99:
+            return False # Status chip is not removable via unlink logic
         if not self.songs: return False
         
         success_any = False
@@ -386,8 +388,8 @@ class ArtistAliasAdapter(ContextAdapter):
         return False
     
     def unlink(self, child_id: int) -> bool:
-        """Delete an alias."""
-        if self.service.delete_alias(child_id):
+        """Unlink (Split) an alias into its own identity."""
+        if self.service.unlink_alias(child_id):
             self.on_data_changed()
             return True
         return False
@@ -439,7 +441,6 @@ class ArtistMemberAdapter(ContextAdapter):
         alias_id = None
         
         if alias_name:
-            # Resolve Alias Name to ID for the target contributor
             aliases = self.service.get_aliases(child_id)
             for a in aliases:
                 if a.alias_name.lower() == alias_name.lower():
@@ -450,6 +451,7 @@ class ArtistMemberAdapter(ContextAdapter):
             self.service.add_member(self.artist.contributor_id, child_id, member_alias_id=alias_id)
         else:
             self.service.add_member(child_id, self.artist.contributor_id) # Reverse direction
+            
         self.on_data_changed()
         return True
     

@@ -12,4 +12,5 @@ from .chip_tray_widget import ChipTrayWidget
 from .flow_layout import FlowLayout
 from .glow_factory import GlowWidget, GlowButton, GlowLineEdit, GlowComboBox, GlowLED
 from .entity_list_widget import EntityListWidget, LayoutMode
+from .toast_overlay import ToastOverlay
 

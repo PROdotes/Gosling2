@@ -17,8 +17,8 @@ class IdentityCollisionDialog(QDialog):
     """
     def __init__(
         self, target_name, song_count=0, has_context_song=False,
-        title="Conflict Detected", header="IDENTITY CONFLICT", 
-        primary_label=None, secondary_label=None, description=None,
+        title="Check Name", header="ALREADY EXISTS", 
+        primary_label="Combine", secondary_label=None, description=None,
         parent=None
     ):
         super().__init__(parent)
@@ -28,7 +28,6 @@ class IdentityCollisionDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setObjectName("CollisionLayout")
         
-        # 1. Human-Readable Explanation
         layout.addStretch(1)
         
         self.lbl_header = QLabel(header)
@@ -44,9 +43,9 @@ class IdentityCollisionDialog(QDialog):
         if description:
             desc = description
         elif has_context_song:
-            desc = f"Link this song to the existing entry or all {song_count} songs?" if song_count > 1 else "Combine these entries or link this song only?"
+            desc = f"Combine all {song_count} songs or link this one only?" if song_count > 1 else "Combine them?"
         else:
-            desc = f"Merge all {song_count} songs into the existing identity?" if song_count > 1 else "Merge into the existing identity?"
+            desc = f"Combine all {song_count} songs?" if song_count > 1 else "Combine them?"
 
         self.lbl_desc = QLabel(desc)
         self.lbl_desc.setObjectName("CollisionDescription")
@@ -56,37 +55,26 @@ class IdentityCollisionDialog(QDialog):
 
         layout.addStretch(1)
         
-        # 2. Sequential Options (Safest to Broadest)
         btns = QVBoxLayout()
         btns.setObjectName("CollisionButtonLayout")
         
-        # OPTION A: Primary Action (Link or Consume)
-        if has_context_song or primary_label:
-            label = primary_label or "LINK THIS SONG"
-            self.btn_this = GlowButton(label)
-            self.btn_this.setObjectName("ActionPill")
-            self.btn_this.setProperty("action_role", "primary")
-            self.btn_this.clicked.connect(lambda: self.done(3))
-            self.btn_this.setDefault(True) 
-            btns.addWidget(self.btn_this)
+        # Primary Action
+        self.btn_primary = GlowButton(primary_label)
+        self.btn_primary.setObjectName("ActionPill")
+        self.btn_primary.setProperty("action_role", "primary")
+        self.btn_primary.clicked.connect(lambda: self.done(3))
+        self.btn_primary.setDefault(True) 
+        btns.addWidget(self.btn_primary)
             
-        # OPTION B: Merge
-        # Show if any songs exist, OR if we are in a Global context (no specific song to link)
-        # SUPPRESSION: If secondary_label is explicitly False, do not show.
-        show_all = ((song_count >= 1) or (not has_context_song)) and (secondary_label is not False)
-        
-        if show_all:
-            if secondary_label:
-                label = secondary_label
-            else:
-                label = f"ALL {song_count} SONGS" if song_count > 1 else "MERGE GLOBALLY"
-            self.btn_all = GlowButton(label)
-            self.btn_all.setObjectName("ActionPill")
-            self.btn_all.setProperty("action_role", "secondary")
-            self.btn_all.clicked.connect(lambda: self.done(1))
-            btns.addWidget(self.btn_all)
-            
-        # OPTION C: Cancel (The "I made a mistake" exit)
+        # Secondary Action (Optional)
+        if secondary_label:
+            self.btn_secondary = GlowButton(secondary_label)
+            self.btn_secondary.setObjectName("ActionPill")
+            self.btn_secondary.setProperty("action_role", "secondary")
+            self.btn_secondary.clicked.connect(lambda: self.done(1))
+            btns.addWidget(self.btn_secondary)
+
+        # Cancel
         self.btn_cancel = GlowButton("Cancel")
         self.btn_cancel.setObjectName("ActionPill")
         self.btn_cancel.setProperty("action_role", "ghost")
@@ -96,11 +84,7 @@ class IdentityCollisionDialog(QDialog):
         layout.addLayout(btns)
         layout.addStretch(1)
         
-        # Initial Focus
-        if has_context_song or primary_label:
-            self.btn_this.setFocus()
-        elif hasattr(self, 'btn_all'):
-            self.btn_all.setFocus()
+        self.btn_primary.setFocus()
 
 
 
@@ -270,7 +254,11 @@ class ArtistDetailsDialog(QDialog):
         self.list_members.set_picker_filter(
             lambda: "person" if self.artist.type == "group" else "group"
         )
-        
+        # Override the add behavior for Person-to-Person merging
+        if self.list_members.tray:
+            self.list_members.tray.add_requested.disconnect()
+            self.list_members.tray.add_requested.connect(self._add_member)
+            
         layout.addWidget(self.list_members)
         
         btns = QHBoxLayout()
@@ -402,65 +390,41 @@ class ArtistDetailsDialog(QDialog):
             real_target = self.service.get_by_id(target.contributor_id)
             if not real_target: return
             
-            # CASE 1: ALIAS RE-LINKING (Stealing a name)
-            # If the picker returned name is NOT the primary name, the user selected an ALIAS string.
+            # CASE 1: ALIAS RE-LINKING (Scenario 2)
             if target.name != real_target.name:
                 alias_name = target.name
                 parent_name = real_target.name
                 
-                # Prompt for "Move Alias"
                 resolver = IdentityCollisionDialog(
-                    target_name=alias_name,
-                    song_count=0,
-                    has_context_song=False,
-                    title="Move Alias?",
-                    header="ALIAS OWNERSHIP CONFLICT",
-                    secondary_label="STEAL ALIAS & LINK HERE",
-                    description=f"'{alias_name}' is currently linked to '{parent_name}'.\n\nDo you want to break that link and move the alias here?",
+                    description=f"'{alias_name}' is linked to '{parent_name}'.\n\nLink it to '{self.artist.name}' instead?",
                     parent=self
                 )
                 
-                if resolver.exec() == 1:
+                if resolver.exec() == 3: 
                     if self.service.move_alias(alias_name, real_target.contributor_id, self.artist.contributor_id):
                         self._refresh_data()
                 return
 
-            # CASE 2: PRIMARY IDENTITY MATCH (Merge)
-            aliases = self.service.get_aliases(target.contributor_id)
-            usage_count = self.service.get_usage_count(target.contributor_id)
+            # CASE 2: IDENTITY MERGE (Scenario 3/4)
+            aliases = self.service.get_aliases(target.contributor_id) # The "Baggage"
             
-            # Check for structural connections
-            has_groups = self.service.get_member_count(target.contributor_id) > 0
-            
-            # SILENT MERGE if no "baggage" (No aliases, no songs, no group memberships)
-            if not aliases and usage_count == 0 and not has_groups:
-                 if self.service.merge(target.contributor_id, self.artist.contributor_id):
-                        self._refresh_data()
-                 return
+            # SCENARIO 3: IDENTITY MERGE - SILENT
+            if not aliases:
+                if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                    self._refresh_data()
+                return
 
-            # PROMPT if we have baggage to transfer
-            desc = f"'{real_target.name}' already exists in your library.\n\n"
-            if usage_count > 0: desc += f"• {usage_count} songs/credits\n"
-            if aliases: desc += f"• {len(aliases)} existing aliases\n"
-            if has_groups: desc += f"• Group memberships\n"
-            desc += f"\nTransfer everything to '{self.artist.name}' and merge identities?"
-
+            # SCENARIO 4: BAGGAGE MERGE (Existing Aliases) - Prompt once
             resolver = IdentityCollisionDialog(
-                target_name=real_target.name,
-                song_count=usage_count,
-                has_context_song=False,
-                title="Merge Artist?",
-                header="IDENTITY CONFLICT",
-                secondary_label="TRANSFER & MERGE",
-                description=desc,
+                description="Combine them?",
                 parent=self
             )
             
-            if resolver.exec() == 1:
+            if resolver.exec() == 3:
                 if self.service.merge(target.contributor_id, self.artist.contributor_id):
                     self._refresh_data()
                 else:
-                    QMessageBox.warning(self, "Error", f"Failed to merge '{target.name}'.")
+                    QMessageBox.warning(self, "Error", "Could not combine artists.")
             
 
 
@@ -468,6 +432,58 @@ class ArtistDetailsDialog(QDialog):
         """Handle mouse click on alias chip - trigger rename."""
         self._edit_alias(alias_id, name)
 
+
+    def _add_member(self):
+        """Handle adding a member/group, with Person->Person merge bypass."""
+        from .entity_picker_dialog import EntityPickerDialog
+        from src.core.picker_config import get_artist_picker_config
+        
+        # Determine allowed types based on current artist
+        # Person: Can join 'Group' OR merge with 'Person'
+        # Group: Can have 'Person' members
+        allowed = ["Group", "Person"] if self.artist.type == "person" else ["Person"]
+        
+        diag = EntityPickerDialog(
+            service_provider=self._service_adapter,
+            config=get_artist_picker_config(allowed_types=allowed),
+            parent=self
+        )
+        
+        if diag.exec():
+            target = diag.get_selected()
+            if not target: return
+            
+            # 1. Check types for Person->Person merge (The Gabriel/Gustavo Rule)
+            # Fetch fresh model to be sure of type
+            real_target = self.service.get_by_id(target.contributor_id)
+            if not real_target: return
+            
+            if self.artist.type == "person" and real_target.type == "person":
+                # They are the same artist? Merge identities.
+                # Apply Baggage Rule
+                aliases = self.service.get_aliases(target.contributor_id)
+                
+                if not aliases:
+                    # SILENT
+                    if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                        self._refresh_data()
+                    return
+
+                # PROMPT
+                resolver = IdentityCollisionDialog(
+                    target_name=real_target.name,
+                    description="Combine them?",
+                    parent=self
+                )
+                if resolver.exec() == 3:
+                     if self.service.merge(target.contributor_id, self.artist.contributor_id):
+                        self._refresh_data()
+                return
+
+            # 2. Normal Membership link (Group involved)
+            # Use the adapter to handle the link correctly (handles alias names too)
+            self._member_adapter.link(target.contributor_id, matched_alias=getattr(target, 'matched_alias', None))
+            self._refresh_data()
 
     def _show_alias_chip_menu(self, alias_id, alias_name, global_pos):
         """Show context menu for alias chips."""
@@ -494,11 +510,11 @@ class ArtistDetailsDialog(QDialog):
             self._refresh_data()
 
     def _promote_alias(self, alias_id, name):
-        msg = f"This will swap the primary identity '{self.artist.name}' with the alias '{name}'.\n\n"
-        msg += f"'{name}' will become the MASTER name for all songs, and '{self.artist.name}' will be kept as an alias.\n\n"
-        msg += "Proceed with this Hot Swap?"
+        msg = f"This will make '{name}' the main artist name.\n\n"
+        msg += f"'{self.artist.name}' will be kept as an alternative name.\n\n"
+        msg += "Continue?"
         
-        if QMessageBox.question(self, "Promote to Primary", msg,
+        if QMessageBox.question(self, "Change Main Name", msg,
                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
             if self.service.promote_alias(self.artist.contributor_id, alias_id):
                 # We need to reload the whole artist object because the name changed
@@ -551,38 +567,26 @@ class ArtistDetailsDialog(QDialog):
             if target_collision:
                 # IT EXISTS! Prompt the user.
                 
-                # Gather stats for the dialog
-                usage_count = self.service.get_usage_count(target_collision.contributor_id)
-                aliases = self.service.get_aliases(target_collision.contributor_id)
-                has_groups = self.service.get_member_count(target_collision.contributor_id) > 0
+                # Scenario 3: Identity Merge (Silent)
+                target_aliases = self.service.get_aliases(target_collision.contributor_id)
                 
-                # User Rule: Keep it simple. "Night Shift DJ" mode.
-                desc = "Do you want to combine them?"
-                
-                # Use our fancy dialog
+                if not target_aliases:
+                    if self.service.merge(self.artist.contributor_id, target_collision.contributor_id):
+                        self.done(3)
+                    return
+
+                # Scenario 4: Baggage Merge (Prompt once)
                 resolver = IdentityCollisionDialog(
-                    target_name=target_collision.name,
-                    song_count=usage_count,
-                    has_context_song=False,
-                    title="Combine Artists?",
-                    header="ALREADY EXISTS",
-                    primary_label="Combine", # Simple affirmative
-                    secondary_label=False, # SUPPRESS confusing second option
-                    description=desc,
+                    description="Combine them?",
                     parent=self
                 )
-                
-                result = resolver.exec()
-                
-                if result == 3: # Primary Button (Combine -> Consume)
-                     if self.service.consume(self.artist.contributor_id, target_collision.contributor_id):
-                         self.done(3)
-                         return
-                     else:
-                         QMessageBox.warning(self, "Error", "Could not combine artists.")
-                         return
-                         
-                # If Cancelled
+                if resolver.exec() == 3:
+                    if self.service.merge(self.artist.contributor_id, target_collision.contributor_id):
+                        self.done(3)
+                        return
+                    else:
+                        QMessageBox.warning(self, "Error", "Could not combine artists.")
+                        return
                 return
 
         # Safety check for type change (Data integrity)

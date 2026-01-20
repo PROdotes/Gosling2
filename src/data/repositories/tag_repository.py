@@ -243,35 +243,6 @@ class TagRepository(GenericRepository[Tag]):
                     categories.append(row[0])
         return categories
 
-    def is_unprocessed(self, source_id: int) -> bool:
-        """
-        Check if a source has the 'Status:Unprocessed' tag.
-        This is THE source of truth for workflow status.
-        Returns True if unprocessed, False if ready/done.
-        """
-        query = """
-            SELECT 1 FROM MediaSourceTags mst
-            JOIN Tags t ON mst.TagID = t.TagID
-            WHERE mst.SourceID = ? AND t.TagCategory = 'Status' AND t.TagName = 'Unprocessed'
-            LIMIT 1
-        """
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (source_id,))
-            return cursor.fetchone() is not None
-
-    def set_unprocessed(self, source_id: int, unprocessed: bool) -> None:
-        """
-        Set the unprocessed state for a source.
-        unprocessed=True → adds the tag
-        unprocessed=False → removes the tag (permission granted)
-        """
-        if unprocessed:
-            self.add_tag_to_source(source_id, "Unprocessed", category="Status")
-        else:
-            # Find and remove the tag
-            tag = self.find_by_name("Unprocessed", "Status")
-            if tag:
-                self.remove_tag_from_source(source_id, tag.tag_id)
 
     def merge_tags(self, source_id: int, target_id: int, batch_id: Optional[str] = None) -> bool:
         """

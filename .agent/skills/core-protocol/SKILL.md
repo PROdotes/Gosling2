@@ -23,3 +23,12 @@ This skill defines extended context on how to interpret those directives.
 *   **Stop & Report**: If a requested user task involves editing a file that currently violates architectural boundaries (e.g., zip logic in `MainWindow`, SQL in `View`), you must **STOP**.
 *   **Propose Cleanup**: Do not build new features on top of broken foundations. Ask the user for permission to move the offending logic to its correct layer (Service/Repository) **FIRST**.
 *   **Fix Then Feature**: Only proceed with the user's original request once the structural integrity is restored.
+
+## 6. The Immutable Laws (Regression Guard)
+The following features have been fixed repeatedly and are now LOCKED by Regression Tests in `tests/laws/`.
+**YOU MUST NOT BREAK THESE INVARIANTS**:
+
+1.  **Alias Redirection**: Clicking an Alias/Member chip MUST redirect to the Primary Identity. (Check: `tests/laws/test_law_001_alias_integrity.py`)
+2.  **Unlink = Split**: Removing an alias MUST split it into a NEW Identity. NEVER DELETE the Name record.
+3.  **Merge = Combine**: Adding a Person to a Person MUST merge their Identities.
+

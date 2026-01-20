@@ -590,45 +590,46 @@ def check_completeness(row_data: list) -> set:
         tags_idx = FIELDS.index(tags_field)
         if tags_idx < len(row_data):
             tags_value = row_data[tags_idx]
+            
+            # Normalize tags to list
+            tags_list = []
             if tags_value:
                 if isinstance(tags_value, str):
                     tags_list = [t.strip() for t in tags_value.split('|||') if t.strip()]
                 elif isinstance(tags_value, list):
                     tags_list = tags_value
-                else:
-                    tags_list = []
-                for prefix in REQUIRED_TAG_PREFIXES:
-                    has_tag = any(t.startswith(prefix) for t in tags_list)
-                    if not has_tag:
-                        incomplete_fields.add(prefix.rstrip(':'))
+
+            # Check for required prefixes (e.g. at least one "Genre:...")
+            for prefix in REQUIRED_TAG_PREFIXES:
+                has_tag = any(t.startswith(prefix) for t in tags_list)
+                if not has_tag:
+                    incomplete_fields.add(prefix.rstrip(':'))
 
     return incomplete_fields
     
 
-def get_health_status(row_data: list, tags: set = None) -> HealthStatus:
+def get_health_status(row_data: list) -> HealthStatus:
     """
     Determine the Health Status of a row (T-104).
     Calculates priority: INVALID > UNPROCESSED > READY.
-    (DIRTY is handled by the UI layer).
-    
-    Args:
-        row_data: The full list of cell values for the row.
-        tags: Set of tag strings "{Category}:{Name}" (e.g. "Status:Unprocessed").
     """
     # 1. Check Completeness (INVALID)
-    # We use check_completeness which checks REQUIRED fields
     missing_fields = check_completeness(row_data)
     if missing_fields:
         return HealthStatus.INVALID
         
     # 2. Check Processing Status (UNPROCESSED)
-    # If valid but specifically marked Unprocessed
-    if tags:
-        # Check for any "Status:*" tag, or specifically Unprocessed?
-        # Logic from library_delegate: "Status:Unprocessed"
-        # T-89: Any tag in 'Status' category implies NOT ready?
-        # Let's stick to the specific "Status:Unprocessed" for now to be safe
-        if "Status:Unprocessed" in tags:
+    # If valid but specifically marked Unprocessed (Status=0)
+    is_done_idx = -1
+    for i, field in enumerate(FIELDS):
+        if field.name == 'is_done':
+            is_done_idx = i
+            break
+            
+    if is_done_idx != -1 and is_done_idx < len(row_data):
+        is_done_val = row_data[is_done_idx]
+        is_done = bool(is_done_val) if is_done_val is not None else True
+        if not is_done:
             return HealthStatus.UNPROCESSED
             
     # 3. Default (READY)

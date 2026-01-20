@@ -91,6 +91,7 @@ class ImportService:
             
             # USER 614: Toggle is_active False on import (Staging Mode)
             temp_song.is_active = False
+            temp_song.processing_status = 0 # Mark as Unprocessed for the new status system
             
             # T-Default: Use configured album type for auto-created albums
             album_type = self.settings_manager.get_default_album_type()
@@ -100,8 +101,8 @@ class ImportService:
                 # Update local ID for subsequent steps
                 temp_song.source_id = file_id
 
-                # 7. Apply Initial Status Tag: "Unprocessed" (The Truth)
-                self.library_service.set_song_unprocessed(file_id, True)
+                # 7. Initial Status Tag is now handled by the column above.
+                # self.library_service.set_song_unprocessed(file_id, True) - REMOVED
                 
                 # 8. Log high-level action
                 self.library_service.log_action(

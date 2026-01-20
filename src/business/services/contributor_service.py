@@ -425,6 +425,7 @@ class ContributorService:
         # If source has no identity, just link its name to target identity
         if not s_name.owner_identity_id:
             s_name.owner_identity_id = t_name.owner_identity_id
+            s_name.is_primary_name = False # Merged names become aliases (T-207)
             return self._name_service.update_name(s_name, batch_id=batch_id)
             
         # Same identity already?
@@ -729,6 +730,28 @@ class ContributorService:
     def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias."""
         return self._name_service.delete_name(alias_id, batch_id=batch_id)
+
+    def unlink_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Unlink an alias from its current identity by splitting it into a NEW independent identity.
+        This preserves credits linked to this Name/Alias.
+        """
+        # 1. Get the Name Record
+        name_rec = self._name_service.get_name(alias_id)
+        if not name_rec:
+            return False
+            
+        # 2. Create the Split (New Identity)
+        # We reuse the name as the legal name
+        new_ident = self._identity_service.create_identity("person", name_rec.display_name, batch_id=batch_id)
+        if not new_ident:
+            return False
+            
+        # 3. Move the Name to the New Identity and make it Primary
+        name_rec.owner_identity_id = new_ident.identity_id
+        name_rec.is_primary_name = True
+        
+        return self._name_service.update_name(name_rec, batch_id=batch_id)
 
     def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
         """

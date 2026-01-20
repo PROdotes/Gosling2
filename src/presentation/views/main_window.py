@@ -11,7 +11,7 @@ from PyQt6.QtGui import QAction
 
 from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
-    SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland
+    SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland, ToastOverlay
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
@@ -363,6 +363,9 @@ class MainWindow(QMainWindow):
         # Position it in the bottom-right corner
         self.size_grip.raise_()
 
+        # Feedback Toast (Independent of Layout)
+        self.toast = ToastOverlay(self)
+
 
     def _setup_connections(self) -> None:
         """Setup signal/slot connections"""
@@ -389,6 +392,10 @@ class MainWindow(QMainWindow):
         
         # T-Feature: Sync Side Panel when Scrubber updates tags
         self.library_widget.metadata_changed.connect(lambda: editor.refresh_content())
+
+        # T-Fix: Ensure Side Panel refreshes when Library reloads (e.g. after "Parse from Filename")
+        # Forces re-fetch from DB to get updated relationships (Artists, Tags)
+        self.library_widget.library_reloaded.connect(self._on_library_reloaded)
         
         # T-Feature: Dynamic Width Persistence
         self.right_panel.editor_mode_changed.connect(self._on_editor_mode_changed)
@@ -424,6 +431,10 @@ class MainWindow(QMainWindow):
         self.title_bar.settings_requested.connect(self._open_settings)
         self.title_bar.logs_requested.connect(self._open_logs)
         self.title_bar.history_requested.connect(self._open_audit_history)
+        
+        # --- T-Feedback: Toast Routing ---
+        self.library_widget.status_message_requested.connect(self.toast.show_message)
+        editor.status_message_requested.connect(self.toast.show_message)
 
 
     def _setup_shortcuts(self) -> None:
@@ -723,7 +734,22 @@ class MainWindow(QMainWindow):
         songs = self.library_service.get_songs_by_paths(paths)
             
         # 3. Facade Pattern: Pass data to Right Panel
+        # 3. Facade Pattern: Pass data to Right Panel
         self.right_panel.update_selection(songs)
+
+    def _on_library_reloaded(self):
+        """
+        Handle library reload (e.g. after 'Parse from Filename').
+        Forces a fresh fetch of the current selection to ensure SidePanel receives updated metadata.
+        """
+        # Invalidate cache to force update even if file path hasn't changed
+        self._last_selected_paths = [] 
+        
+        # Manually trigger selection update with current selection
+        selection = self.library_widget.table_view.selectionModel().selection()
+        # Pass dummy deselected (empty)
+        from PyQt6.QtCore import QItemSelection
+        self._on_library_selection_changed(selection, QItemSelection())
 
     def _handle_transport_command(self, cmd: str) -> None:
         """Route transport commands with Tape Recorder logic."""
@@ -966,6 +992,7 @@ class MainWindow(QMainWindow):
                 
                 self._on_library_selection_changed(None, None)
                 # T-Fix: Do NOT use self.statusBar() as it recreates the hidden bar and breaks layout.
+                self.toast.show_message(f"Successfully saved {len(successful_ids)} songs", "success")
                 logger.info(f"Successfully saved {len(successful_ids)} songs.")
             
         except Exception as e:
