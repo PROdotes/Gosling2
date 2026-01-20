@@ -335,9 +335,9 @@ class ContributorService:
         new_name = contributor.name.strip()
         
         # 1. Handle Name Change & Possible Merge
-        # Check if ANOTHER contributor already has this name (case-insensitive)
+        # Check if ANOTHER contributor already has this name (Unicode-aware case-insensitive)
         with self._credit_repo.get_connection() as conn:
-            query = "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND NameID != ?"
+            query = "SELECT NameID FROM ArtistNames WHERE py_lower(DisplayName) = py_lower(?) AND NameID != ?"
             cursor = conn.execute(query, (new_name, contributor.contributor_id))
             collision = cursor.fetchone()
             
@@ -763,9 +763,9 @@ class ContributorService:
         new_name = new_name.strip()
         if not new_name: return False
         
-        # Check for collision
+        # Check for collision (Unicode-aware case-insensitive)
         with self._credit_repo.get_connection() as conn:
-            query = "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND NameID != ?"
+            query = "SELECT NameID FROM ArtistNames WHERE py_lower(DisplayName) = py_lower(?) AND NameID != ?"
             cursor = conn.execute(query, (new_name, alias_id))
             collision = cursor.fetchone()
             

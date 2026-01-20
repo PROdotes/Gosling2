@@ -565,29 +565,8 @@ class ArtistDetailsDialog(QDialog):
             # Check if target exists (excluding self)
             target_collision = self.service.get_collision(new_name, self.artist.contributor_id)
             if target_collision:
-                # IT EXISTS! Prompt the user.
-                
-                # Scenario 3: Identity Merge (Silent)
-                target_aliases = self.service.get_aliases(target_collision.contributor_id)
-                
-                if not target_aliases:
-                    if self.service.merge(self.artist.contributor_id, target_collision.contributor_id):
-                        self.done(3)
-                    return
-
-                # Scenario 4: Baggage Merge (Prompt once)
-                resolver = IdentityCollisionDialog(
-                    description="Combine them?",
-                    parent=self
-                )
-                if resolver.exec() == 3:
-                    if self.service.merge(self.artist.contributor_id, target_collision.contributor_id):
-                        self.done(3)
-                        return
-                    else:
-                        QMessageBox.warning(self, "Error", "Could not combine artists.")
-                        return
-                return
+                if self._resolve_collision(target_collision):
+                     return # Done (Merged)
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:
@@ -610,8 +589,51 @@ class ArtistDetailsDialog(QDialog):
         self.artist.sort_name = self.txt_sort.text().strip()
         self.artist.type = new_type
         
-        if self.service.update(self.artist):
-            self.done(3) # Signal 3: Data Changed (Sync Required)
-        else:
-            QMessageBox.warning(self, "Error", "Failed to save artist changes.")
+        try:
+            if self.service.update(self.artist):
+                self.done(3) # Signal 3: Data Changed (Sync Required)
+            else:
+                 QMessageBox.warning(self, "Error", "Failed to save artist changes.")
+        except Exception as e:
+            # REACTIVE COLLISION HANDLING
+            # If proactive check failed but DB constraint hit, catch it here.
+            err_msg = str(e).lower()
+            if "unique constraint" in err_msg or "integrityerror" in err_msg:
+                 # Try to find who we collided with
+                 target = self.service.get_by_name(new_name)
+                 if target and target.contributor_id != self.artist.contributor_id:
+                     if self._resolve_collision(target):
+                         return
+                 
+                 QMessageBox.warning(self, "Name Already Exists", 
+                                     f"The name '{new_name}' is already taken and could not be automatically merged.\n\nError: {e}")
+            else:
+                 QMessageBox.warning(self, "Error", f"An unexpected error occurred: {e}")
+
+    def _resolve_collision(self, target_collision) -> bool:
+        """
+        Handle a collision with another artist during rename.
+        ALWAYS prompts the user - this is a rename workflow, not an intentional alias add.
+        Returns True if resolved (merged), False if cancelled/failed.
+        """
+        # ALWAYS prompt the user when renaming causes a collision
+        # This is different from adding an alias, which is intentional
+        resolver = IdentityCollisionDialog(
+            target_name=target_collision.name,
+            description=f"'{target_collision.name}' already exists.\n\nCombine them?",
+            parent=self
+        )
+
+        if resolver.exec() == 3:  # User clicked "Combine"
+            # Use consume() for rename workflow - transfers credits and deletes source
+            # This is different from merge() which creates an alias relationship
+            if self.service.consume(self.artist.contributor_id, target_collision.contributor_id):
+                self.done(3)
+                return True
+            else:
+                QMessageBox.warning(self, "Error", "Could not combine artists.")
+                return False
+
+        # User clicked "Cancel" - don't proceed with rename
+        return False
 

@@ -138,14 +138,14 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
             return []
 
     def find_exact(self, name: str) -> List[ArtistName]:
-        """Find names matching exactly (using strict UTF8 collation)."""
+        """Find names matching exactly (using Unicode-aware case-insensitive comparison)."""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT NameID, OwnerIdentityID, DisplayName, SortName, IsPrimaryName, DisambiguationNote
-                    FROM ArtistNames 
-                    WHERE DisplayName = ? COLLATE UTF8_NOCASE
+                    FROM ArtistNames
+                    WHERE py_lower(DisplayName) = py_lower(?)
                 """, (name,))
                 return [ArtistName.from_row(row) for row in cursor.fetchall()]
         except Exception as e:
