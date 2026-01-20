@@ -19,8 +19,12 @@ class ArtistNameService:
         return self._repo.get_by_owner(identity_id)
 
     def search_names(self, query: str) -> List[ArtistName]:
-        """Search for artist names."""
+        """Search for artist names (LIKE match)."""
         return self._repo.search(query)
+
+    def find_exact(self, name: str) -> List[ArtistName]:
+        """Find exact name matches (UTF8_NOCASE)."""
+        return self._repo.find_exact(name)
 
     def create_name(self, display_name: str, owner_identity_id: Optional[int] = None, 
                     is_primary: bool = False, batch_id: Optional[str] = None) -> ArtistName:

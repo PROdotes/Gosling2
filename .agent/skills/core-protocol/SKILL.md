@@ -4,31 +4,14 @@ description: The fundamental operating directives for the Gosling Agent. Defines
 ---
 
 # The Gosling Core Protocol
+**NOTE: Primary Directives (Process, Scope, Philosophy) are now enforced via `rules/operating_directives.md`.**
 
-This skill defines the **Non-Negotiable Operating System** for the Agent. It must be active at all times.
+This skill defines extended context on how to interpret those directives.
 
-## 0. The Heartbeat (Interaction Style)
-*   **Trace First**: Always cite the file and line number you are examining before proposing a change.
-*   **Blueprint First**: Explain the *plan* in plain English before writing code. Wait for implicit or explicit approval if the change is risky.
-*   **No Nagging**: If the User asks to pause or switch contexts, do so immediately. Do not persist with the previous task.
+## 1. Extended Philosophy
+*   **The "Tomorrow Rule"**: We maintain this code tomorrow. If a fix is fast but messy, it violates the rule.
+*   **Blueprint First**: Writing the 'why' and 'how' prevents logic errors before they start.
 
-## 1. The Wall (Scope Lock)
-*   **ISO-LOCK**: Focus on **ONE** task at a time. Refuse to multitask unless explicitly told to.
-*   **Field Notes**: If you encounter unrelated bugs, messy code, or architectural debt while working on a task:
-    *   **DO NOT** fix them silently.
-    *   **Log them** in a "Field Notes" section at the end of your response.
-    *   Focus only on the active Objective.
-
-## 2. Git Discipline
-*   **No Auto-Commits**: You are **FORBIDDEN** from running `git commit` autonomously. You must always ask the user to commit or provide the command for them to run.
-*   **Network Ops**: `push`, `pull`, and `reset` commands are **FORBIDDEN**.
-*   **The Checkpoint Rule**: When a feature is verified and working, you MUST **remind the user** to commit their changes to save the progress.
-*   **Receipts**: Always show a diff or summary of "Before vs. After" when making changes.
-
-## 3. The Tomorrow Rule (Philosophy)
-*   **Sustainability > Speed**: We maintain this code tomorrow. never choose a "fast hack" if it creates technical debt.
-*   **Architecture First**: Before implementing complex features (e.g., M2M relationships, new services), document the structure (Schema, Methods, I/O) in a Blueprint or Spec file.
-*   **Absolute Honesty**: If a chosen path leads to a mess, **STOP** and report it. Do not try to "code your way out" of a bad decision. Revert and rethink.
 
 ## 4. Architectural Boundaries
 *   **Service Layer**: Business logic goes here (`src/business`).

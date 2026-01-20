@@ -544,10 +544,11 @@ class ArtistDetailsDialog(QDialog):
         new_type = "group" if self.radio_group.isChecked() else "person"
         
         # 1. COLLISION DETECTION & MERGE PROMPT
-        if new_name.lower() != self.artist.name.lower():
-            # Check if target exists
-            target_collision = self.service.get_by_name(new_name)
-            if target_collision and target_collision.contributor_id != self.artist.contributor_id:
+        # Check if name CHANGED (Case-sensitive check effectively, but we handle casing logic below)
+        if new_name != self.artist.name:
+            # Check if target exists (excluding self)
+            target_collision = self.service.get_collision(new_name, self.artist.contributor_id)
+            if target_collision:
                 # IT EXISTS! Prompt the user.
                 
                 # Gather stats for the dialog

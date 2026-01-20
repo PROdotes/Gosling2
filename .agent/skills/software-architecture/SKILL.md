@@ -4,17 +4,15 @@ description: The blueprints and structural laws of Gosling2. Enforces strict lay
 ---
 
 # Gosling2 Architecture Standards
+**NOTE: Core Architectural Laws (Strict Layering, God Object Ban, Service Bus) are enforced via `rules/architecture.md`.**
 
-This skill governs the *structural* decisions of the codebase. It is the "Building Code" that prevents spaghetti logic.
+This skill provides the **detailed blueprints** for implementing those laws.
 
-## 1. The Layered Hierarchy
-Data flows strictly **Down**, events flow **Up**.
-
-### Level 1: Presentation (UI)
-*   **Location**: `src/presentation/`
-*   **Responsibility**: Displaying data, capturing input, animations.
-*   **Forbidden**: Direct SQL, File I/O, Business Logic.
-*   **Dependencies**: Can import `src/business` (Services). **Cannot** import `src/data` (Repositories).
+## 1. The Layered Hierarchy (Detail)
+1.  **Presentation (UI)**: `src/presentation/`
+    *   *Can Import*: Services (`src/business`).
+    *   *Cannot Import*: Repositories (`src/data`).
+    *   *Forbidden*: SQL, Business Orchestration.
 
 ### Level 2: Business (Services)
 *   **Location**: `src/business/`

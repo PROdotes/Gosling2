@@ -102,10 +102,35 @@ class ContributorService:
                 )
         return None
 
+    def get_collision(self, name: str, exclude_id: Optional[int] = None) -> Optional[Contributor]:
+        """Check for existing exact name matches, excluding a specific ID."""
+        # Use STRICT equality match from DB to handle Unicode correctly
+        names = self._name_service.find_exact(name)
+        if not names: return None
+        
+        for n in names:
+            # If we found ourselves, skip
+            if exclude_id and n.name_id == exclude_id:
+                continue
+                
+            # Found someone else!
+            c_type = 'person'
+            if n.owner_identity_id:
+                    ident = self._identity_service.get_identity(n.owner_identity_id)
+                    if ident: c_type = ident.identity_type
+            
+            return Contributor(
+                contributor_id=n.name_id,
+                name=n.display_name,
+                sort_name=n.sort_name,
+                type=c_type
+            )
+        return None
+
     def validate_identity(self, name: str, exclude_id: Optional[int] = None) -> Tuple[Optional[int], Optional[str]]:
         """Check if a name already exists and return conflict info (ID, Message)."""
-        existing = self.get_by_name(name)
-        if existing and existing.contributor_id != exclude_id:
+        existing = self.get_collision(name, exclude_id)
+        if existing:
             return existing.contributor_id, f"Artist '{name}' already exists as a {existing.type}."
         return None, None
 

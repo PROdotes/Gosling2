@@ -137,6 +137,22 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
             logger.error(f"Error searching artist names with query '{query}': {e}")
             return []
 
+    def find_exact(self, name: str) -> List[ArtistName]:
+        """Find names matching exactly (using strict UTF8 collation)."""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT NameID, OwnerIdentityID, DisplayName, SortName, IsPrimaryName, DisambiguationNote
+                    FROM ArtistNames 
+                    WHERE DisplayName = ? COLLATE UTF8_NOCASE
+                """, (name,))
+                return [ArtistName.from_row(row) for row in cursor.fetchall()]
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error finding exact name '{name}': {e}")
+            return []
+
     def create(self, entity: ArtistName, batch_id: Optional[str] = None) -> int:
         """Alias for insert() to maintain consistency."""
         return self.insert(entity, batch_id=batch_id)

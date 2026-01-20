@@ -5,23 +5,11 @@ description: Guidelines and components for the Gosling2 "Industrial Amber" works
 
 # Industrial Amber Design System
 
-This skill provides the aesthetic and technical guidelines for maintaining the "Industrial Amber" workstation look in Gosling2. Every UI component MUST follow these rules to ensure the "Premium Workstation" feel.
+This skill provides component references and implementation guides for the "Industrial Amber" workstation look.
 
-## 1. Style Primacy: No Hardcoded QSS
+**NOTE**: Strict design rules (No Hardcoded QSS, Use GlowFactory) are enforced by `rules/architecture.md`.
 
-**CRITICAL RULE:** Never hardcode QSS strings (StyleSheets) directly in Python code. 
-*   All styling must reside in `src/resources/theme.qss`.
-*   Refer to components by their `objectName` (e.g., `self.setObjectName("CustomPanel")`) or `setProperty("class", "Class")`.
-*   **Exception:** Dynamic properties that change at runtime (like setting a specific color from a user picker) may use inline styles if no other mechanism exists.
-
-## 2. Palette Primacy: theme.qss over constants.py
-
-**CRITICAL RULE:** `src/resources/constants.py` is for **LOGIC FALLBACKS** and internal code-only colors (like table delegates). It must **NEVER** be used to style UI components.
-*   The source of truth for all visual colors is `theme.qss`.
-*   If you need a specific Amber tone, use the CSS class or ID defined in `theme.qss`.
-*   Do not import `constants` just to get `#FFC66D` for a `setStyleSheet` call.
-
-## 3. Core Palette (Logic Fallbacks Only)
+## 1. Core Palette (Logic Fallbacks Only)
 
 | Element | Color | Usage |
 | :--- | :--- | :--- |
