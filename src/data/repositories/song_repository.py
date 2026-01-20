@@ -41,10 +41,10 @@ class SongRepository(GenericRepository[Song]):
         # 1. Insert into MediaSources
         cursor.execute(
             """
-            INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive, SourceDuration, SourceNotes, AudioHash) 
-            VALUES (1, ?, ?, ?, ?, ?, ?)
+            INSERT INTO MediaSources (TypeID, MediaName, SourcePath, IsActive, SourceDuration, SourceNotes, AudioHash, ProcessingStatus) 
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (file_title, file_path, 1 if song.is_active else 0, song.duration, song.notes, song.audio_hash)
+            (file_title, file_path, 1 if song.is_active else 0, song.duration, song.notes, song.audio_hash, song.processing_status)
         )
         source_id = cursor.lastrowid
         
@@ -76,7 +76,8 @@ class SongRepository(GenericRepository[Song]):
                 source_id=0, # Placeholder
                 source=path,
                 name=os.path.basename(path),
-                is_active=True
+                is_active=True,
+                processing_status=0  # Default NEW imports to Unprocessed (User Flow)
             )
             return super().insert(song, **kwargs)
         else:
@@ -137,9 +138,10 @@ class SongRepository(GenericRepository[Song]):
         cursor.execute("""
             UPDATE MediaSources
             SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, 
-                AudioHash = COALESCE(?, AudioHash)
+                AudioHash = COALESCE(?, AudioHash), ProcessingStatus = ?
             WHERE SourceID = ?
-        """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, song.audio_hash, song.source_id))
+        """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, 
+              song.audio_hash, song.processing_status, song.source_id))
 
         # 2. Update Songs
         groups_str = ", ".join(song.groups) if song.groups else None
@@ -154,47 +156,168 @@ class SongRepository(GenericRepository[Song]):
         self.sync_service.sync_all(song, cursor, auditor=auditor, album_type=album_type)
 
     def update_status(self, file_id: int, is_done: bool, batch_id: Optional[str] = None) -> bool:
-        """Update the status of a song (Tag-Driven, Flag-Synced)"""
+        """Update the status of a song (Direct Column Update)"""
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
-                
-                # 1. Sync Tag (The New Truth)
-                if not is_done:
-                    # Add 'Unprocessed' status tag
-                    cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'")
-                    row = cursor.fetchone()
-                    if not row:
-                        cursor.execute("INSERT INTO Tags (TagCategory, TagName) VALUES ('Status', 'Unprocessed')")
-                        tag_id = cursor.lastrowid
-                    else:
-                        tag_id = row[0]
-                    cursor = cursor.execute("INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID) VALUES (?, ?)", (file_id, tag_id))
-                    if cursor.rowcount > 0:
-                        from src.core.audit_logger import AuditLogger
-                        AuditLogger(conn, batch_id=batch_id).log_insert("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
-                else:
-                    # Remove 'Unprocessed' status tag
-                    # First get the tag ID for auditing
-                    cursor.execute("SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'")
-                    tag_row = cursor.fetchone()
-                    if tag_row:
-                        tag_id = tag_row[0]
-                        # Check if link exists before deleting
-                        # OPTIMIZATION: Just run the DELETE. If it exists, it goes. If not, no harm done.
-                        # This avoids race conditions or logic gaps where SELECT says yes but DELETE fails.
-                        cursor.execute("DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (file_id, tag_id))
-                        
-                        if cursor.rowcount > 0:
-                            from src.core.audit_logger import AuditLogger
-                            AuditLogger(conn, batch_id=batch_id).log_delete("MediaSourceTags", f"{file_id}-{tag_id}", {"SourceID": file_id, "TagID": tag_id})
-
-                # 2. Sync LEGACY (Skip - DB cleanup in progress)
-                # (The column likely still exists but we don't write to it)
+                new_status = 1 if is_done else 0
+                cursor.execute("UPDATE MediaSources SET ProcessingStatus = ? WHERE SourceID = ?", (new_status, file_id))
                 return True
         except Exception as e:
             logger.error(f"Error updating song status: {e}")
             return False
+
+    def update_status_batch(self, file_ids: List[int], is_done: bool, batch_id: Optional[str] = None) -> int:
+        """Batch update processing status (High Performance)."""
+        if not file_ids: return 0
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                new_status = 1 if is_done else 0
+                placeholders = ",".join(["?"] * len(file_ids))
+                params = [new_status] + file_ids
+                
+                cursor.execute(f"UPDATE MediaSources SET ProcessingStatus = ? WHERE SourceID IN ({placeholders})", params)
+                return cursor.rowcount
+        except Exception as e:
+            logger.error(f"Error updating batch status: {e}")
+            return 0
+
+    # Sync methods removed (Moved to SongSyncService)
+
+
+
+    # ... skipping to bulk logic ...
+
+    def _get_songs_by_ids_logic(self, source_ids: List[int], conn: sqlite3.Connection) -> List[Song]:
+        """Internal logic for bulk fetching songs by their SourceID."""
+        cursor = conn.cursor()
+        
+        # 1. Fetch main song data using efficient IN clause
+        placeholders = ",".join(["?"] * len(source_ids))
+        query = f"""
+            SELECT 
+                MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
+                S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
+                MS.SourceNotes, MS.IsActive, MS.AudioHash, MS.ProcessingStatus,
+                (
+                    SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
+                    FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    WHERE SA.SourceID = MS.SourceID
+                    ORDER BY SA.IsPrimary DESC
+                ) as AlbumTitle,
+                (
+                    SELECT A.AlbumID FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    LIMIT 1
+                ) as AlbumID,
+                COALESCE(
+                    (
+                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
+                        FROM RecordingPublishers RP
+                        JOIN Publishers P ON RP.PublisherID = P.PublisherID
+                        WHERE RP.SourceID = MS.SourceID
+                    ),
+                    (
+                        SELECT P.PublisherName 
+                        FROM SongAlbums SA 
+                        JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
+                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    )
+                ) as PublisherName,
+
+                (
+                    SELECT GROUP_CONCAT(AN.DisplayName, '|||')
+                    FROM Albums A 
+                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
+                    JOIN AlbumCredits AC ON A.AlbumID = AC.AlbumID
+                    JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
+                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                ) as AlbumArtist,
+                (
+                    SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
+                    FROM MediaSourceTags MST
+                    JOIN Tags TG ON MST.TagID = TG.TagID
+                    WHERE MST.SourceID = MS.SourceID
+                ) as AllTags,
+                COALESCE(
+                    (
+                        SELECT GROUP_CONCAT(RP.PublisherID, '|||')
+                        FROM RecordingPublishers RP
+                        WHERE RP.SourceID = MS.SourceID
+                    ),
+                    (
+                        SELECT TrackPublisherID 
+                        FROM SongAlbums SA 
+                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
+                    )
+                ) as PublisherID
+            FROM MediaSources MS
+            JOIN Songs S ON MS.SourceID = S.SourceID
+            WHERE MS.SourceID IN ({placeholders})
+        """
+        cursor.execute(query, source_ids)
+        rows = cursor.fetchall()
+        songs_map = {}
+        for row in rows:
+            try:
+                (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
+                 notes, is_active_int, audio_hash, processing_status, album_title, album_id, publisher_name, 
+                 album_artist, all_tags_str, publisher_id) = row
+
+                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
+                tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
+                
+                song = Song(
+                    source_id=source_id,
+                    source=path,
+                    name=name,
+                    duration=duration,
+                    bpm=bpm,
+                    recording_year=recording_year,
+                    isrc=isrc,
+                    notes=notes,
+                    audio_hash=audio_hash,
+                    is_active=bool(is_active_int),
+                    processing_status=processing_status if processing_status is not None else 1,
+                    album=[a.strip() for a in album_title.split('|||')] if album_title else [],
+                    album_id=album_id,
+                    album_artist=album_artist,
+                    publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
+                    publisher_id=[int(p) for p in str(publisher_id).split('|||') if p] if publisher_id else [],
+                    groups=groups,
+                    tags=tags
+                )
+                songs_map[source_id] = song
+            except Exception:
+                import traceback
+                traceback.print_exc()
+
+        # ... rest of method ...
+
+    def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by their Done status (ProcessingStatus flag)"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
+                    WHERE MS.IsActive = 1 AND MS.ProcessingStatus = ?
+                    {yellberus.QUERY_GROUP_BY}
+                    ORDER BY MS.SourceID DESC
+                """
+                # 1 = Done, 0 = Unprocessed
+                status_val = 1 if is_done else 0
+                cursor.execute(query, (status_val,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            logger.error(f"Error fetching songs by status: {e}")
+            return [], []
 
     # Sync methods removed (Moved to SongSyncService)
 
@@ -322,7 +445,7 @@ class SongRepository(GenericRepository[Song]):
             SELECT 
                 MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
                 S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
-                MS.SourceNotes, MS.IsActive, MS.AudioHash,
+                MS.SourceNotes, MS.IsActive, MS.AudioHash, MS.ProcessingStatus,
                 (
                     SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
                     FROM Albums A 
@@ -387,7 +510,7 @@ class SongRepository(GenericRepository[Song]):
         for row in rows:
             try:
                 (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-                 notes, is_active_int, audio_hash, album_title, album_id, publisher_name, 
+                 notes, is_active_int, audio_hash, processing_status, album_title, album_id, publisher_name, 
                  album_artist, all_tags_str, publisher_id) = row
 
                 groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
@@ -404,6 +527,7 @@ class SongRepository(GenericRepository[Song]):
                     notes=notes,
                     audio_hash=audio_hash,
                     is_active=bool(is_active_int),
+                    processing_status=processing_status if processing_status is not None else 1,
                     album=[a.strip() for a in album_title.split('|||')] if album_title else [],
                     album_id=album_id,
                     album_artist=album_artist,
@@ -616,28 +740,7 @@ class SongRepository(GenericRepository[Song]):
             logger.error(f"Error counting virtual members: {e}")
             return 0
 
-    def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by their Done status"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                query = f"""
-                    {yellberus.QUERY_SELECT}
-                    {yellberus.QUERY_FROM}
-                    WHERE MS.IsActive = 1
-                    {yellberus.QUERY_GROUP_BY}
-                    HAVING is_done = ?
-                    ORDER BY MS.SourceID DESC
-                """
-                # Convert bool to int (0/1) for SQLite
-                status_val = 1 if is_done else 0
-                cursor.execute(query, (status_val,))
-                headers = [description[0] for description in cursor.description]
-                data = cursor.fetchall()
-                return headers, data
-        except Exception as e:
-            logger.error(f"Error fetching songs by status: {e}")
-            return [], []
+
 
     def get_by_isrc(self, isrc: str) -> Optional[Song]:
         """Get song by ISRC code (for duplicate detection)"""

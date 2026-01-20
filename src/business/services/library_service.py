@@ -60,6 +60,10 @@ class LibraryService:
         """Update song status"""
         return self.song_service.update_status(file_id, is_done)
 
+    def update_songs_status(self, file_ids: List[int], is_done: bool) -> int:
+        """Batch update song status"""
+        return self.song_service.update_status_batch(file_ids, is_done)
+
     def get_contributors_by_role(self, role_name: str) -> List[Any]:
         """Get all contributors for a specific role"""
         return self.contributor_service.get_by_role(role_name)

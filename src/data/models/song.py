@@ -160,6 +160,16 @@ class Song(MediaSource):
         minutes, seconds = divmod(int(self.duration), 60)
         return f"{minutes:02d}:{seconds:02d}"
 
+    @property
+    def is_done(self) -> bool:
+        """Check if song is processed (Status=1)."""
+        return self.processing_status == 1
+
+    @is_done.setter
+    def is_done(self, value: bool):
+        """Set processing status."""
+        self.processing_status = 1 if value else 0
+
     def to_dict(self) -> dict:
         """
         Convert to dictionary for Audit Logging (View Snapshot).

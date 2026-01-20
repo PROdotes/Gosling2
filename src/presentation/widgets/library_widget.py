@@ -1463,12 +1463,10 @@ class LibraryWidget(QWidget):
                 temp_song.audio_hash = audio_hash
                 
                 # Save full metadata
+                temp_song.processing_status = 0 # Mark as Unprocessed
                 self.library_service.update_song(temp_song)
 
-                # T-83: Primary Migration Point - Mark new imports as Unprocessed via Service
-                if hasattr(self.library_service, 'tag_service'):
-                    self.library_service.tag_service.add_tag_to_source(file_id, "Unprocessed", category="Status")
-                
+                # T-83: Primary Migration Point - New column handles status (No Tag needed)
                 return True
         except Exception as e:
             from ...core import logger
@@ -2287,27 +2285,51 @@ class LibraryWidget(QWidget):
         self.focus_search_requested.emit()
 
     def _toggle_status(self, new_status: bool) -> None:
-        """Bulk update status for selected rows with validation"""
+        """Bulk update status for selected rows with validation against FRESH database state."""
         indexes = self.table_view.selectionModel().selectedRows()
+        if not indexes:
+            return
+
+        # 1. Collect IDs
+        ids_to_process = []
+        id_col = self.field_indices.get('file_id', -1)
+        for index in indexes:
+             source_index = self.proxy_model.mapToSource(index)
+             item = self.library_model.item(source_index.row(), id_col)
+             if item:
+                 try:
+                     val = item.data(Qt.ItemDataRole.UserRole)
+                     if val is not None:
+                         ids_to_process.append(int(float(val)))
+                 except (ValueError, TypeError):
+                     pass
+
+        if not ids_to_process:
+            return
         
-        # Validation Check (Only when marking as Done)
+        # 2. Validation Check (Only when marking as Done)
+        # We must fetch fresh data from DB because the UI model might be stale 
+        # (e.g. if user just removed a genre via SidePanel but table didn't refresh yet).
         if new_status:
             failed_items = []
             
-            for index in indexes:
-                source_index = self.proxy_model.mapToSource(index)
+            for sid in ids_to_process:
+                song = self.library_service.get_song_by_id(sid)
+                if not song:
+                    continue
                 
-                # Get full row data for validation
+                # Construct pseudo-row-data from Song object for Yellberus validation
+                # Yellberus expects a list of values matching FIELDS order
                 row_data = []
-                for col in range(self.library_model.columnCount()):
-                     item = self.library_model.item(source_index.row(), col)
-                     row_data.append(item.data(Qt.ItemDataRole.UserRole) if item else None)
+                for field in yellberus.FIELDS:
+                    # Prefer model_attr, fallback to name
+                    attr = field.model_attr or field.name
+                    val = getattr(song, attr, None)
+                    row_data.append(val)
 
                 incomplete = self._get_incomplete_fields(row_data)
                 if incomplete:
-                    title_item = self.library_model.item(source_index.row(), self.field_indices['title'])
-                    title = title_item.text() if title_item else "Unknown"
-                    failed_items.append(f"- {title}: Missing {', '.join(incomplete)}")
+                    failed_items.append(f"- {song.title}: Missing {', '.join(incomplete)}")
             
             if failed_items:
                 msg = "Cannot mark selection as Done because some items are incomplete:\n\n"
@@ -2317,18 +2339,12 @@ class LibraryWidget(QWidget):
                 QMessageBox.warning(self, "Validation Failed", msg)
                 return
 
-        # Proceed with update
-        count = 0
-        for index in indexes:
-            source_index = self.proxy_model.mapToSource(index)
-            file_id_item = self.library_model.item(source_index.row(), self.field_indices['file_id'])
-            if file_id_item:
-                file_id = int(file_id_item.text())
-                if self.library_service.update_song_status(file_id, new_status):
-                    count += 1
+        # 3. Proceed with update
+        if ids_to_process:
+            count = self.library_service.update_songs_status(ids_to_process, new_status)
         
-        if count > 0:
-            self.load_library()
+            if count > 0:
+                self.load_library()
 
 
 

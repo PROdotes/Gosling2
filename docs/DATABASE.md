@@ -62,7 +62,8 @@ Any change to Tables or Columns (adding, removing, renaming) **MUST** be accompa
 
 ## ✅ Completeness Criteria (IsDone Flag)
 
-A song is considered "Done" if it has no **Unprocessed** tag. This status is calculated dynamically based on tags, not stored as a flag.
+A song is considered "Done" if its `ProcessingStatus` column is `1`. 
+Historically this was a calculated "Unprocessed" tag, but it is now a dedicated, indexed database column for performance and reliability.
 
 ### Mandatory Fields (All Types)
 | Field | Requirement | Notes |
@@ -441,10 +442,12 @@ The base table for all playable content. Every audio item starts here.
 | `SourceDuration` | REAL | - | Duration in seconds (NULL for streams) |
 | `AudioHash` | TEXT | INDEXED | Hash of MP3 audio frames only (excludes ID3 tags) for duplicate detection |
 | `IsActive` | BOOLEAN | DEFAULT 1 | Show in library (0 = hidden/inactive) |
+| `ProcessingStatus` | INTEGER | DEFAULT 1 | 0 = Unprocessed, 1 = Done (Workflow State) |
 
 **Notes:**
 - `Source` field holds either a local file path or stream URL
 - `IsActive = 0` hides the item from library without deleting
+- `ProcessingStatus`: Core workflow state. Replaces legacy "Unprocessed" tag.
 - Use for seasonal content, expired ads, or soft-delete
 - `AudioHash` is calculated from MP3 audio data only (ID3v2 header and ID3v1 footer are excluded) to detect duplicates even when metadata differs
 

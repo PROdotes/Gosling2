@@ -431,11 +431,12 @@ FIELDS: List[FieldDef] = [
     FieldDef(
         name='is_done',
         ui_header='Status',
-        db_column='is_done',
+        db_column='MS.ProcessingStatus',  # Hard column map
         field_type=FieldType.BOOLEAN,
         filterable=True,
         portable=False,
-        query_expression="(CASE WHEN EXISTS (SELECT 1 FROM MediaSourceTags MST_SUB JOIN Tags TG_SUB ON MST_SUB.TagID = TG_SUB.TagID WHERE MST_SUB.SourceID = MS.SourceID AND TG_SUB.TagCategory = 'Status' AND TG_SUB.TagName = 'Unprocessed') THEN 0 ELSE 1 END) AS is_done",
+        # Default to 1 (Done) if null, though DB defaults to 1
+        query_expression="MS.ProcessingStatus AS is_done",
         searchable=False,
         strategy='boolean',
         visible=False,

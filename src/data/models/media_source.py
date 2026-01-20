@@ -15,3 +15,4 @@ class MediaSource:
     audio_hash: Optional[str] = None  # Hash of MP3 audio frames (excludes ID3 tags)
     notes: Optional[str] = None
     is_active: bool = True
+    processing_status: int = 1  # 0=Unprocessed, 1=Done

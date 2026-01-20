@@ -41,6 +41,10 @@ class SongService:
         """Update the 'Done' status of a song."""
         return self._repo.update_status(song_id, is_done)
 
+    def update_status_batch(self, song_ids: List[int], is_done: bool) -> int:
+        """Batch update 'Done' status."""
+        return self._repo.update_status_batch(song_ids, is_done)
+
     def get_songs_by_ids(self, song_ids: List[int]) -> List[Song]:
         """Bulk fetch songs."""
         return self._repo.get_songs_by_ids(song_ids)

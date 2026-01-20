@@ -78,6 +78,7 @@ class BaseRepository:
                     SourceDuration REAL,
                     AudioHash TEXT,
                     IsActive BOOLEAN DEFAULT 1,
+                    ProcessingStatus INTEGER DEFAULT 1,
                     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
                 )
             """)
@@ -421,6 +422,36 @@ class BaseRepository:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mscr_roleid ON MediaSourceContributorRoles(RoleID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_albumcontributor_albumid ON AlbumContributors(AlbumID)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON Tags(TagCategory)")
+
+            # ProcessingStatus Migration (Workflow Redesign)
+            cursor.execute("PRAGMA table_info(MediaSources)")
+            ms_cols_v2 = [row[1] for row in cursor.fetchall()]
+            if 'ProcessingStatus' not in ms_cols_v2:
+                # 1. Add Column (Default 1 = Done)
+                cursor.execute("ALTER TABLE MediaSources ADD COLUMN ProcessingStatus INTEGER DEFAULT 1")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_status ON MediaSources(ProcessingStatus)")
+                
+                # 2. Migrate Data: Find 'Unprocessed' tags and set Status=0
+                cursor.execute("""
+                    UPDATE MediaSources 
+                    SET ProcessingStatus = 0 
+                    WHERE SourceID IN (
+                        SELECT MST.SourceID 
+                        FROM MediaSourceTags MST
+                        JOIN Tags T ON MST.TagID = T.TagID
+                        WHERE T.TagCategory = 'Status' AND T.TagName = 'Unprocessed'
+                    )
+                """)
+                
+                # 3. Cleanup: Remove the specific 'Unprocessed' tag links
+                # (We do this safely by subquery in case IDs shift)
+                cursor.execute("""
+                    DELETE FROM MediaSourceTags 
+                    WHERE TagID IN (SELECT TagID FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed')
+                """)
+                
+                # 4. Remove the Tag Definition
+                cursor.execute("DELETE FROM Tags WHERE TagCategory = 'Status' AND TagName = 'Unprocessed'")
 
 
 
