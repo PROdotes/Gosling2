@@ -414,6 +414,73 @@ class ContributorService:
         return self.merge(source_id, target_id, create_alias, batch_id)
         
     # ==========================
+    # Consume (Absorb without Alias)
+    # ==========================
+
+    def consume(self, source_id: int, target_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Consume source_id into target_id.
+        1. Moves all CREDITS from source_name to target_name.
+        2. Merges source_identity into target_identity (preserving other aliases/groups).
+        3. Deletes source_name.
+        """
+        import uuid
+        batch_id = batch_id or str(uuid.uuid4())
+        
+        if source_id == target_id: return True
+        
+        # Resolve Identities
+        s_ident_id = self._get_identity_id(source_id)
+        t_ident_id = self._get_identity_id(target_id)
+        
+        if not s_ident_id or not t_ident_id:
+            return False
+
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            from src.core.audit_logger import AuditLogger
+            auditor = AuditLogger(conn, batch_id=batch_id)
+            auditor.log_action("CONSUME", "Contributor", source_id, f"Consumed by {target_id}")
+
+            # 1. Transfer Credits (Re-point references from SourceName to TargetName)
+            # This allows us to delete SourceName later without FK violations.
+            
+            # 1a. Song Credits
+            cursor.execute("SELECT SourceID, RoleID FROM SongCredits WHERE CreditedNameID=?", (source_id,))
+            for sid, rid in cursor.fetchall():
+                # Check conflict
+                cursor.execute("SELECT 1 FROM SongCredits WHERE SourceID=? AND RoleID=? AND CreditedNameID=?", (sid, rid, target_id))
+                if cursor.fetchone():
+                     cursor.execute("DELETE FROM SongCredits WHERE SourceID=? AND RoleID=? AND CreditedNameID=?", (sid, rid, source_id))
+                else:
+                     cursor.execute("UPDATE SongCredits SET CreditedNameID=? WHERE SourceID=? AND RoleID=? AND CreditedNameID=?", (target_id, sid, rid, source_id))
+
+            # 1b. Album Credits
+            cursor.execute("SELECT AlbumID, RoleID FROM AlbumCredits WHERE CreditedNameID=?", (source_id,))
+            for aid, rid in cursor.fetchall():
+                cursor.execute("SELECT 1 FROM AlbumCredits WHERE AlbumID=? AND RoleID=? AND CreditedNameID=?", (aid, rid, target_id))
+                if cursor.fetchone():
+                    cursor.execute("DELETE FROM AlbumCredits WHERE AlbumID=? AND RoleID=? AND CreditedNameID=?", (aid, rid, source_id))
+                else:
+                    cursor.execute("UPDATE AlbumCredits SET CreditedNameID=? WHERE AlbumID=? AND RoleID=? AND CreditedNameID=?", (target_id, aid, rid, source_id))
+            
+            # 1c. Group Memberships (CreditedAsNameID)
+            # If 'Abb' was used as the specific credited name for a membership, update it to 'Abba'
+            cursor.execute("UPDATE GroupMemberships SET CreditedAsNameID=? WHERE CreditedAsNameID=?", (target_id, source_id))
+
+        # 2. Merge Identities (Moves Aliases, Memberships, Bio, etc.)
+        # This acts as the safety net for "everything else" associated with the entity.
+        if s_ident_id != t_ident_id:
+             if not self._identity_service.merge(s_ident_id, t_ident_id, batch_id=batch_id):
+                 return False
+        
+        # 3. Delete the Source Name
+        # Now that it has no credits, we can safely remove it.
+        # Note: IdentityService.merge moved it to the target identity, so we are deleting it from there.
+        return self._name_service.delete_name(source_id, batch_id=batch_id)
+
+    # ==========================
+
     # Group & Alias Management
     # ==========================
 

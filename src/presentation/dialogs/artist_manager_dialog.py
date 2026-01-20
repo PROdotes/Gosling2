@@ -36,7 +36,7 @@ class IdentityCollisionDialog(QDialog):
         self.lbl_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_header)
 
-        self.lbl_msg = QLabel(f'"{target_name}" is already in your library.')
+        self.lbl_msg = QLabel(f"'{target_name}' already exists.")
         self.lbl_msg.setObjectName("CollisionMessage")
         self.lbl_msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.lbl_msg)
@@ -60,8 +60,8 @@ class IdentityCollisionDialog(QDialog):
         btns = QVBoxLayout()
         btns.setObjectName("CollisionButtonLayout")
         
-        # OPTION A: Link
-        if has_context_song:
+        # OPTION A: Primary Action (Link or Consume)
+        if has_context_song or primary_label:
             label = primary_label or "LINK THIS SONG"
             self.btn_this = GlowButton(label)
             self.btn_this.setObjectName("ActionPill")
@@ -72,7 +72,9 @@ class IdentityCollisionDialog(QDialog):
             
         # OPTION B: Merge
         # Show if any songs exist, OR if we are in a Global context (no specific song to link)
-        show_all = (song_count >= 1) or (not has_context_song)
+        # SUPPRESSION: If secondary_label is explicitly False, do not show.
+        show_all = ((song_count >= 1) or (not has_context_song)) and (secondary_label is not False)
+        
         if show_all:
             if secondary_label:
                 label = secondary_label
@@ -95,9 +97,9 @@ class IdentityCollisionDialog(QDialog):
         layout.addStretch(1)
         
         # Initial Focus
-        if has_context_song:
+        if has_context_song or primary_label:
             self.btn_this.setFocus()
-        else:
+        elif hasattr(self, 'btn_all'):
             self.btn_all.setFocus()
 
 
@@ -541,12 +543,46 @@ class ArtistDetailsDialog(QDialog):
         
         new_type = "group" if self.radio_group.isChecked() else "person"
         
-        # Validation for name change (Service handles merges silently if name exists)
-        # User Feedback: "Only warn on data loss". Renaming to existing = Intentional Merge.
-        pass
-
-        # Safety check for type change (Data integrity)
-
+        # 1. COLLISION DETECTION & MERGE PROMPT
+        if new_name.lower() != self.artist.name.lower():
+            # Check if target exists
+            target_collision = self.service.get_by_name(new_name)
+            if target_collision and target_collision.contributor_id != self.artist.contributor_id:
+                # IT EXISTS! Prompt the user.
+                
+                # Gather stats for the dialog
+                usage_count = self.service.get_usage_count(target_collision.contributor_id)
+                aliases = self.service.get_aliases(target_collision.contributor_id)
+                has_groups = self.service.get_member_count(target_collision.contributor_id) > 0
+                
+                # User Rule: Keep it simple. "Night Shift DJ" mode.
+                desc = "Do you want to combine them?"
+                
+                # Use our fancy dialog
+                resolver = IdentityCollisionDialog(
+                    target_name=target_collision.name,
+                    song_count=usage_count,
+                    has_context_song=False,
+                    title="Combine Artists?",
+                    header="ALREADY EXISTS",
+                    primary_label="Combine", # Simple affirmative
+                    secondary_label=False, # SUPPRESS confusing second option
+                    description=desc,
+                    parent=self
+                )
+                
+                result = resolver.exec()
+                
+                if result == 3: # Primary Button (Combine -> Consume)
+                     if self.service.consume(self.artist.contributor_id, target_collision.contributor_id):
+                         self.done(3)
+                         return
+                     else:
+                         QMessageBox.warning(self, "Error", "Could not combine artists.")
+                         return
+                         
+                # If Cancelled
+                return
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:
