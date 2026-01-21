@@ -2457,6 +2457,7 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
         stop:1 #5C0000);
     color: #FFAAAA;
     border: 1px solid #660000;
+    qproperty-glowColor: #FF4444;
 }
 
 #NukeButton:hover {
@@ -2509,6 +2510,7 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
     border: 1px solid #333333;
     border-radius: 6px;
     margin: 4px 0;
+    min-height: 70px;
 }
 
 #HealthRowLabel {

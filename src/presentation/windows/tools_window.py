@@ -1310,7 +1310,7 @@ class ToolsWindow(QMainWindow):
         frame = QFrame()
         frame.setObjectName("HealthRow")
         layout = QHBoxLayout(frame)
-        layout.setContentsMargins(15, 10, 15, 10)
+        layout.setContentsMargins(15, 12, 15, 12)
         layout.setSpacing(15)
 
         # Label with count placeholder
