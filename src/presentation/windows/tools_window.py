@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QSplitter, QFrame, QLabel, QPushButton, QLineEdit, QCheckBox,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-    QMessageBox
+    QMessageBox, QStackedWidget, QButtonGroup
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QIcon, QAction
@@ -83,47 +83,79 @@ class ToolsWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Tab Widget
-        self.tabs = QTabWidget()
-        self.tabs.setObjectName("ToolsTabs")
-        self.tabs.setDocumentMode(True)  # Cleaner look
+        # Tab pills container
+        self._tab_button_group = QButtonGroup(self)
+        self._tab_button_group.setExclusive(True)
+        self._tab_buttons = []
+        self._tab_counts = {}
+
+        # Tab header layout
+        tab_header = QWidget()
+        tab_header.setObjectName("ToolsTabHeader")
+        self._tab_header_layout = QHBoxLayout(tab_header)
+        self._tab_header_layout.setContentsMargins(10, 8, 10, 8)
+        self._tab_header_layout.setSpacing(6)
+
+        # Stacked widget for tab content
+        self.tab_content = QStackedWidget()
+        self.tab_content.setObjectName("ToolsTabContent")
 
         # Create tabs (Phase 1: Tags + Health)
         self.tags_tab = self._create_tags_tab()
-        self.health_tab = self._create_health_tab()
-
-        # Add tabs with icons - Health is last (final pill)
-        self.tabs.addTab(self.tags_tab, "🏷️ Tags")
+        self.tab_content.addWidget(self.tags_tab)
+        self._create_tab_pill("Tags", "🏷️ Tags", 0, color="#FF00FF")  # Magenta
 
         # Artists tab (Phase 2)
         if self.contributor_service:
             self.artists_tab = self._create_artists_tab()
-            self.tabs.addTab(self.artists_tab, "🎭 Artists")
+            self.tab_content.addWidget(self.artists_tab)
+            self._create_tab_pill("Artists", "🎭 Artists", 1, color="#00E5FF")  # Cyan
         else:
-            self._add_placeholder_tab("🎭 Artists", "Service not available")
+            placeholder = self._create_placeholder_tab("Artists")
+            self.tab_content.addWidget(placeholder)
+            self._create_tab_pill("Artists", "🎭 Artists", 1, enabled=False)
 
         # Albums tab (Phase 3)
         if self.album_service:
             self.albums_tab = self._create_albums_tab()
-            self.tabs.addTab(self.albums_tab, "💿 Albums")
+            self.tab_content.addWidget(self.albums_tab)
+            self._create_tab_pill("Albums", "💿 Albums", 2, color="#FFC66D")  # Amber
         else:
-            self._add_placeholder_tab("💿 Albums", "Service not available")
+            placeholder = self._create_placeholder_tab("Albums")
+            self.tab_content.addWidget(placeholder)
+            self._create_tab_pill("Albums", "💿 Albums", 2, enabled=False)
 
         # Publishers tab (Phase 2)
         if self.publisher_service:
             self.publishers_tab = self._create_publishers_tab()
-            self.tabs.addTab(self.publishers_tab, "🏢 Publishers")
+            self.tab_content.addWidget(self.publishers_tab)
+            self._create_tab_pill("Publishers", "🏢 Publishers", 3, color="#4DFFB8")  # Green
         else:
-            self._add_placeholder_tab("🏢 Publishers", "Service not available")
+            placeholder = self._create_placeholder_tab("Publishers")
+            self.tab_content.addWidget(placeholder)
+            self._create_tab_pill("Publishers", "🏢 Publishers", 3, enabled=False)
 
         # Health tab is always last
-        self.tabs.addTab(self.health_tab, "⚠️ Health")
+        self.health_tab = self._create_health_tab()
+        self.tab_content.addWidget(self.health_tab)
+        self._create_tab_pill("Health", "⚠️ Health", 4, color="#FF4444")  # Red
 
-        layout.addWidget(self.tabs)
+        # Add stretch after all pills to push them left
+        self._tab_header_layout.addStretch()
 
-    def _add_placeholder_tab(self, title: str, message: str):
+        # Connect tab switching signal (only once, after all pills created)
+        self._tab_button_group.idClicked.connect(self._on_tab_pill_clicked)
+
+        # Tab header (pills)
+        layout.addWidget(tab_header)
+
+        # Tab content (stacked)
+        layout.addWidget(self.tab_content)
+
+    def _add_placeholder_tab(self, category: str, message: str) -> QWidget:
         """Add a placeholder tab for features not yet implemented."""
         widget = QWidget()
+        widget.setObjectName(f"{category}Tab")
         layout = QVBoxLayout(widget)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -132,7 +164,79 @@ class ToolsWindow(QMainWindow):
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(lbl)
 
-        self.tabs.addTab(widget, title)
+        return widget
+
+    def _create_tab_pill(self, category: str, label: str, index: int, color: str = None, enabled: bool = True):
+        """Create a GlowButton pill for tab navigation and add it to the header."""
+        btn = GlowButton(label)
+        btn.setObjectName("ToolTabPill")
+        btn.setProperty("category", category)
+        btn.setCheckable(True)
+        btn.setEnabled(enabled)
+
+        if color:
+            btn.setGlowColor(color)
+
+        if index == 0:
+            btn.setChecked(True)
+
+        # Add to button group (for exclusive selection) and tracking list
+        self._tab_button_group.addButton(btn.btn, index)
+        self._tab_buttons.append(btn)
+
+        # Add the pill widget to the header layout (this was missing!)
+        self._tab_header_layout.addWidget(btn)
+
+        return btn
+
+    def _on_tab_pill_clicked(self, index: int):
+        """Handle tab pill click - switch content and save state."""
+        self.tab_content.setCurrentIndex(index)
+        self.settings_manager.set_setting(self.ACTIVE_TAB_KEY, index)
+        self._update_tab_counts()
+
+    def _update_tab_counts(self):
+        """Update item counts displayed on all tab pills."""
+        try:
+            tags_count = len(self.tag_service.get_all()) if self.tag_service else 0
+            self._set_tab_text("Tags", f"🏷️ Tags ({tags_count})")
+        except:
+            self._set_tab_text("Tags", "🏷️ Tags")
+
+        try:
+            artists_count = len(self.contributor_service.get_all()) if self.contributor_service else 0
+            self._set_tab_text("Artists", f"🎭 Artists ({artists_count})")
+        except:
+            self._set_tab_text("Artists", "🎭 Artists")
+
+        try:
+            albums_count = len(self.album_service.get_all()) if self.album_service else 0
+            self._set_tab_text("Albums", f"💿 Albums ({albums_count})")
+        except:
+            self._set_tab_text("Albums", "💿 Albums")
+
+        try:
+            publishers_count = len(self.publisher_service.get_all()) if self.publisher_service else 0
+            self._set_tab_text("Publishers", f"🏢 Publishers ({publishers_count})")
+        except:
+            self._set_tab_text("Publishers", "🏢 Publishers")
+
+        try:
+            orphan_tags = self.tag_service.get_orphan_count() if self.tag_service else 0
+            orphan_artists = self.contributor_service.get_orphan_count() if self.contributor_service else 0
+            orphan_albums = self.album_service.get_orphan_count() if self.album_service else 0
+            orphan_publishers = self.publisher_service.get_orphan_count() if self.publisher_service else 0
+            total = orphan_tags + orphan_artists + orphan_albums + orphan_publishers
+            self._set_tab_text("Health", f"⚠️ Health ({total})")
+        except:
+            self._set_tab_text("Health", "⚠️ Health")
+
+    def _set_tab_text(self, category: str, text: str):
+        """Update text for a specific tab pill."""
+        for btn in self._tab_buttons:
+            if btn.property("category") == category:
+                btn.setText(text)
+                break
 
     # ─────────────────────────────────────────────────────────────────
     # TAGS TAB
@@ -320,6 +424,8 @@ class ToolsWindow(QMainWindow):
         orphan_count = self.tag_service.get_orphan_count(category=category)
         self.btn_nuke_orphan_tags.setText(f"🗑️ Nuke All Orphans ({orphan_count})")
         self.btn_nuke_orphan_tags.setEnabled(orphan_count > 0)
+
+        self._update_tab_counts()
 
     def _on_tags_filter_changed(self, text: str):
         """Handle search text change."""
@@ -664,6 +770,8 @@ class ToolsWindow(QMainWindow):
         self.btn_nuke_orphan_artists.setText(f"🗑️ Nuke All Orphans ({orphan_count})")
         self.btn_nuke_orphan_artists.setEnabled(orphan_count > 0)
 
+        self._update_tab_counts()
+
     def _on_artist_selected(self):
         """Handle artist selection in the table."""
         rows = self.artists_table.selectedItems()
@@ -885,6 +993,8 @@ class ToolsWindow(QMainWindow):
         orphan_count = self.publisher_service.get_orphan_count()
         self.btn_nuke_orphan_publishers.setText(f"🗑️ Nuke All Orphans ({orphan_count})")
         self.btn_nuke_orphan_publishers.setEnabled(orphan_count > 0)
+
+        self._update_tab_counts()
 
     def _on_publisher_selected(self):
         """Handle publisher selection in the table."""
@@ -1139,6 +1249,8 @@ class ToolsWindow(QMainWindow):
         orphan_count = self.album_service.get_orphan_count()
         self.btn_nuke_orphan_albums.setText(f"🗑️ Nuke All Empty ({orphan_count})")
         self.btn_nuke_orphan_albums.setEnabled(orphan_count > 0)
+
+        self._update_tab_counts()
 
     def _on_album_selected(self):
         """Handle album selection in the table."""
@@ -1498,9 +1610,12 @@ class ToolsWindow(QMainWindow):
     def _restore_active_tab(self):
         """Restore the last active tab."""
         tab_index = self.settings_manager.get_setting(self.ACTIVE_TAB_KEY, 0)
-        if isinstance(tab_index, int) and 0 <= tab_index < self.tabs.count():
-            self.tabs.setCurrentIndex(tab_index)
+        if isinstance(tab_index, int) and 0 <= tab_index < len(self._tab_buttons):
+            self._tab_buttons[tab_index].setChecked(True)
+            self.tab_content.setCurrentIndex(tab_index)
+        self._update_tab_counts()
 
     def _save_active_tab(self):
         """Save the current active tab."""
-        self.settings_manager.set_setting(self.ACTIVE_TAB_KEY, self.tabs.currentIndex())
+        current_index = self.tab_content.currentIndex()
+        self.settings_manager.set_setting(self.ACTIVE_TAB_KEY, current_index)

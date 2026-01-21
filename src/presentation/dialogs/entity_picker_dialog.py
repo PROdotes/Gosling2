@@ -137,8 +137,9 @@ class EntityPickerDialog(QDialog):
         if not self.target_entity and self.suggested_items:
             # Use the first suggestion to pre-fill the search box
             self.txt_search.setText(self.suggested_items[0])
-        else:
-            self._refresh_list()
+        
+        # Always refresh to populate suggestions and existing entities
+        self._refresh_list()
         
         # Defer focus
         from PyQt6.QtCore import QTimer
@@ -450,6 +451,36 @@ class EntityPickerDialog(QDialog):
                            # Action: Fill search box specific to this suggestion
                            item.setData(Qt.ItemDataRole.UserRole, ("FILL_SEARCH", suggestion))
                            self.list_results.addItem(item)
+
+            # Auto-select if only FILL_SEARCH items exist (no existing entities to show)
+            # This provides the "auto-select" behavior for new entity suggestions
+            auto_select_triggered = False
+            if not query and self.suggested_items:
+                has_real_entity = False
+                fill_search_items = []
+                for i in range(self.list_results.count()):
+                    data = self.list_results.item(i).data(Qt.ItemDataRole.UserRole)
+                    if isinstance(data, tuple) and data[0] == "FILL_SEARCH":
+                        fill_search_items.append((self.list_results.item(i), data))
+                    else:
+                        has_real_entity = True
+                
+                # If only FILL_SEARCH items exist, auto-trigger creation of the first one
+                if fill_search_items and not has_real_entity:
+                    # Directly handle the FILL_SEARCH action to create the entity
+                    item, data = fill_search_items[0]
+                    _, suggestion = data
+                    
+                    # Determine the type for creation
+                    create_type = self._current_type_filter or self.config.default_type
+                    
+                    # Create the entity
+                    if hasattr(self.service, self.config.get_or_create_fn):
+                        create_method = getattr(self.service, self.config.get_or_create_fn)
+                        self._selected_entity, _ = create_method(suggestion, create_type)
+                    
+                    self.accept()
+                    auto_select_triggered = True
 
             # Get entities (use cleaned query for DB search and exact matches)
             entities = self._get_entities(clean_query)

@@ -708,7 +708,23 @@ class AlbumManagerDialog(QDialog):
             for song in self._current_context_songs:
                 art = song.get('artist')
                 if art and art != 'Unknown':
-                    suggestions.add(art)
+                    # Handle ||| separator from GROUP_CONCAT
+                    for a in art.split('|||'):
+                        if a.strip():
+                            suggestions.add(a.strip())
+                
+                # Fallback: Query SongRepository directly (mirrors publisher logic)
+                if not suggestions:
+                    source_id = song.get('source_id')
+                    if source_id:
+                        try:
+                            from src.data.repositories.song_repository import SongRepository
+                            repo = SongRepository()
+                            performers = repo.get_contributors_for_song(source_id, role_name='Performer')
+                            for p in performers:
+                                suggestions.add(p.name)
+                        except:
+                            pass
         
         # 2. Fallback to initial_data (new album creation)
         if not suggestions and hasattr(self, 'initial_data') and self.initial_data:

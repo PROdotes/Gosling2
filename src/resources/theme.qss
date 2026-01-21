@@ -2326,55 +2326,17 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
         stop:1 #080808);
 }
 
-/* Tab Widget Container */
-#ToolsTabs {
+/* Tool Window Tab Content */
+#ToolsTabContent {
     background: transparent;
 }
 
-#ToolsTabs::pane {
-    border: 1px solid #333333;
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #1A1A1A,
-        stop:1 #0A0A0A);
-    border-radius: 6px;
-    margin-top: -1px;  /* Overlap tab bar slightly */
-}
-
-#ToolsTabs::tab-bar {
-    left: 10px;  /* Left padding for tab bar */
-}
-
-/* Individual Tabs - Pill Button Style */
-#ToolsTabs QTabBar::tab {
-    /* Same gradient as main app QPushButton */
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-        stop:0 #555555, 
-        stop:0.08 #3D3D3D, 
-        stop:0.15 #2D2D2D,
-        stop:1 #1A1A1A);
-    border: 1px solid #000000;
-    border-radius: 10px;
-    padding: 6px 14px;
-    color: #DDDDDD;
-    font-weight: bold;
-    margin: 4px 2px 0 2px;  /* Top margin for glow space */
-    min-width: 70px;
-}
-
-#ToolsTabs QTabBar::tab:hover:!selected {
-    border: 1px solid #444444;
-    color: #FFFFFF;
-}
-
-#ToolsTabs QTabBar::tab:selected {
-    /* Same as QPushButton:checked + amber accent */
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
-        stop:0 #151515, 
-        stop:0.3 #1A1A1A,
-        stop:1 #2A2A2A);
-    border: 1px solid #FFC66D;
-    color: #FFC66D;
-}
+/* Tool Window Tab Pills */
+GlowButton#ToolTabPill[category="Tags"] { qproperty-glowColor: #FF00FF; }
+GlowButton#ToolTabPill[category="Artists"] { qproperty-glowColor: #00E5FF; }
+GlowButton#ToolTabPill[category="Albums"] { qproperty-glowColor: #FFC66D; }
+GlowButton#ToolTabPill[category="Publishers"] { qproperty-glowColor: #4DFFB8; }
+GlowButton#ToolTabPill[category="Health"] { qproperty-glowColor: #FF4444; }
 
 /* Entity Tabs */
 #TagsTab, #ArtistsTab, #AlbumsTab, #PublishersTab, #HealthTab {
@@ -2451,23 +2413,28 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
 }
 
 /* Nuke Button (Red Destructive) */
-#NukeButton {
+/* GlowButton wrapper gets the glow color */
+GlowButton#NukeButton {
+    qproperty-glowColor: #FF4444;
+}
+
+/* Style the internal QPushButton (visual appearance) */
+QPushButton#NukeButton {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 #8B0000,
         stop:1 #5C0000);
     color: #FFAAAA;
     border: 1px solid #660000;
-    qproperty-glowColor: #FF4444;
 }
 
-#NukeButton:hover {
+QPushButton#NukeButton:hover {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 #A00000,
         stop:1 #700000);
     color: #FFFFFF;
 }
 
-#NukeButton:disabled {
+QPushButton#NukeButton:disabled {
     background: #2A2A2A;
     color: #555555;
     border-color: #333333;
