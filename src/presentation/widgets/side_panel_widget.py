@@ -791,13 +791,14 @@ class SidePanelWidget(QFrame):
 
         # T-180: If the publisher is explicitly linked to the song, manage it here.
         # Don't jump to the album if it is a direct recording-level owner.
+        # BUG FIX: Query DB directly instead of relying on stale song.publisher_id attribute
         if self.current_songs:
             song = self.current_songs[0]
-            # Check staged/effective IDs 
-            explicit_ids = self._get_effective_value(song.source_id, 'publisher_id', getattr(song, 'publisher_id', []))
-            if isinstance(explicit_ids, int): explicit_ids = [explicit_ids]
-            if explicit_ids and entity_id in explicit_ids:
-                return False # Direct link exists - open standard editor.
+            # Query DB for actual direct links (RecordingPublishers junction table)
+            direct_publishers = self.publisher_service.get_for_song(song.source_id)
+            direct_pub_ids = [p.publisher_id for p in direct_publishers]
+            if entity_id in direct_pub_ids:
+                return False  # Direct link exists - open standard editor.
 
         # Check Inherited Status for Deep Link
         is_inherited = False
