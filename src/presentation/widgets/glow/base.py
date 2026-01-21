@@ -135,7 +135,18 @@ class GlowWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.glow_frame.setGeometry(self.child.geometry())
+        self._sync_glow_geometry()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Defer geometry sync to after layout settles
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, self._sync_glow_geometry)
+
+    def _sync_glow_geometry(self):
+        """Sync glow frame to child widget geometry."""
+        if self.child:
+            self.glow_frame.setGeometry(self.child.geometry())
 
     def blockSignals(self, b):
         self.child.blockSignals(b)
