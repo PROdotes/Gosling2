@@ -1354,10 +1354,11 @@ class ToolsWindow(QMainWindow):
         if tag_label:
             if tag_orphans == 0:
                 tag_label.setText("🏷️ Orphan Tags: ✓ Clean")
-                tag_label.setStyleSheet("color: #4CAF50;")
+                tag_label.setProperty("status", "clean")
             else:
                 tag_label.setText(f"🏷️ Orphan Tags: {tag_orphans}")
-                tag_label.setStyleSheet("color: #FF6B6B;")
+                tag_label.setProperty("status", "alert")
+            tag_label.style().polish(tag_label)
 
             self.health_tags_row._btn_show.setEnabled(tag_orphans > 0)
             self.health_tags_row._btn_nuke.setEnabled(tag_orphans > 0)
@@ -1369,10 +1370,11 @@ class ToolsWindow(QMainWindow):
             if artist_label:
                 if artist_orphans == 0:
                     artist_label.setText("🎭 Empty Artists: ✓ Clean")
-                    artist_label.setStyleSheet("color: #4CAF50;")
+                    artist_label.setProperty("status", "clean")
                 else:
                     artist_label.setText(f"🎭 Empty Artists: {artist_orphans}")
-                    artist_label.setStyleSheet("color: #FF6B6B;")
+                    artist_label.setProperty("status", "alert")
+                artist_label.style().polish(artist_label)
 
                 self.health_artists_row._btn_show.setEnabled(artist_orphans > 0)
                 self.health_artists_row._btn_nuke.setEnabled(artist_orphans > 0)
@@ -1384,10 +1386,11 @@ class ToolsWindow(QMainWindow):
             if pub_label:
                 if pub_orphans == 0:
                     pub_label.setText("🏢 Orphan Publishers: ✓ Clean")
-                    pub_label.setStyleSheet("color: #4CAF50;")
+                    pub_label.setProperty("status", "clean")
                 else:
                     pub_label.setText(f"🏢 Orphan Publishers: {pub_orphans}")
-                    pub_label.setStyleSheet("color: #FF6B6B;")
+                    pub_label.setProperty("status", "alert")
+                pub_label.style().polish(pub_label)
 
                 self.health_publishers_row._btn_show.setEnabled(pub_orphans > 0)
                 self.health_publishers_row._btn_nuke.setEnabled(pub_orphans > 0)
@@ -1399,10 +1402,11 @@ class ToolsWindow(QMainWindow):
             if album_label:
                 if album_orphans == 0:
                     album_label.setText("💿 Empty Albums: ✓ Clean")
-                    album_label.setStyleSheet("color: #4CAF50;")
+                    album_label.setProperty("status", "clean")
                 else:
                     album_label.setText(f"💿 Empty Albums: {album_orphans}")
-                    album_label.setStyleSheet("color: #FF6B6B;")
+                    album_label.setProperty("status", "alert")
+                album_label.style().polish(album_label)
 
                 self.health_albums_row._btn_show.setEnabled(album_orphans > 0)
                 self.health_albums_row._btn_nuke.setEnabled(album_orphans > 0)

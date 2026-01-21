@@ -2321,54 +2321,68 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
 
 #ToolsWindow {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #2A2A2A,
-        stop:0.02 #222222,
+        stop:0 #1A1A1A,
+        stop:0.02 #151515,
         stop:1 #080808);
 }
 
-/* Tab Bar */
+/* Tab Widget Container */
+#ToolsTabs {
+    background: transparent;
+}
+
 #ToolsTabs::pane {
     border: 1px solid #333333;
-    background-color: #1A1A1A;
-    border-radius: 4px;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1A1A1A,
+        stop:1 #0A0A0A);
+    border-radius: 6px;
+    margin-top: -1px;  /* Overlap tab bar slightly */
 }
 
 #ToolsTabs::tab-bar {
-    alignment: center;
+    left: 10px;  /* Left padding for tab bar */
 }
 
+/* Individual Tabs - Pill Button Style */
 #ToolsTabs QTabBar::tab {
-    background: #1A1A1A;
-    color: #888888;
-    padding: 8px 16px;
-    margin: 2px;
-    border: 1px solid #333333;
-    border-bottom: none;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    min-width: 80px;
-}
-
-#ToolsTabs QTabBar::tab:selected {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #3A3A3A,
-        stop:1 #2A2A2A);
-    color: #FFC66D;
-    border-color: #FFC66D;
+    /* Same gradient as main app QPushButton */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #555555, 
+        stop:0.08 #3D3D3D, 
+        stop:0.15 #2D2D2D,
+        stop:1 #1A1A1A);
+    border: 1px solid #000000;
+    border-radius: 10px;
+    padding: 6px 14px;
+    color: #DDDDDD;
+    font-weight: bold;
+    margin: 4px 2px 0 2px;  /* Top margin for glow space */
+    min-width: 70px;
 }
 
 #ToolsTabs QTabBar::tab:hover:!selected {
-    background: #2A2A2A;
-    color: #AAAAAA;
+    border: 1px solid #444444;
+    color: #FFFFFF;
+}
+
+#ToolsTabs QTabBar::tab:selected {
+    /* Same as QPushButton:checked + amber accent */
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, 
+        stop:0 #151515, 
+        stop:0.3 #1A1A1A,
+        stop:1 #2A2A2A);
+    border: 1px solid #FFC66D;
+    color: #FFC66D;
 }
 
 /* Entity Tabs */
-#TagsTab, #ArtistsTab, #PublishersTab, #HealthTab {
+#TagsTab, #ArtistsTab, #AlbumsTab, #PublishersTab, #HealthTab {
     background-color: transparent;
 }
 
 /* Entity Tables (shared style) */
-#TagsTable, #ArtistsTable, #PublishersTable {
+#TagsTable, #ArtistsTable, #AlbumsTable, #PublishersTable {
     background-color: #1A1A1A;
     alternate-background-color: #222222;
     border: 1px solid #333333;
@@ -2376,16 +2390,16 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
     gridline-color: #2A2A2A;
 }
 
-#TagsTable::item, #ArtistsTable::item, #PublishersTable::item {
+#TagsTable::item, #ArtistsTable::item, #AlbumsTable::item, #PublishersTable::item {
     padding: 4px 8px;
 }
 
-#TagsTable::item:selected, #ArtistsTable::item:selected, #PublishersTable::item:selected {
+#TagsTable::item:selected, #ArtistsTable::item:selected, #AlbumsTable::item:selected, #PublishersTable::item:selected {
     background-color: #FFC66D;
     color: #000000;
 }
 
-#TagsTable QHeaderView::section, #ArtistsTable QHeaderView::section, #PublishersTable QHeaderView::section {
+#TagsTable QHeaderView::section, #ArtistsTable QHeaderView::section, #AlbumsTable QHeaderView::section, #PublishersTable QHeaderView::section {
     background-color: #2A2A2A;
     color: #888888;
     padding: 6px 8px;
@@ -2395,7 +2409,7 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
 }
 
 /* Inspector Panels (shared style) */
-#TagInspector, #ArtistInspector, #PublisherInspector {
+#TagInspector, #ArtistInspector, #AlbumInspector, #PublisherInspector {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 #2A2A2A,
         stop:1 #1A1A1A);
@@ -2500,6 +2514,14 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
 #HealthRowLabel {
     color: #AAAAAA;
     font-size: 11pt;
+}
+
+#HealthRowLabel[status="clean"] {
+    color: #4CAF50;
+}
+
+#HealthRowLabel[status="alert"] {
+    color: #FF6B6B;
 }
 
 /* Placeholder for unimplemented tabs */
