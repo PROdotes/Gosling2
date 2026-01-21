@@ -487,18 +487,18 @@ class EntityPickerDialog(QDialog):
             
             # Filter by exclusions
             entities = [e for e in entities if self.config.id_fn(e) not in self.exclude_ids]
-            
+
             # --- EDIT MODE: Add Rename option ---
             if self.target_entity:
                 self._maybe_add_rename_option(clean_query, entities)
             
-            # --- Add Create option ---
-            if self.config.allow_create:
-                self._maybe_add_create_option(query, clean_query, entities)
-            
             # --- Add existing entities ---
             for entity in entities:
                 self._add_entity_item(entity)
+           
+            # --- Add Create option ---
+            if self.config.allow_create:
+                self._maybe_add_create_option(query, clean_query, entities)
             
             # Select first item
             if self.list_results.count() > 0:
