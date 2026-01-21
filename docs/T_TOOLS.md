@@ -92,16 +92,16 @@ The Tools Window **does not replace** existing dialogs (`AlbumManagerDialog`, `A
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  🔧 LIBRARY TOOLS                                                 [_][□][X]  ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║ [ 🏷️ Tags ] [ 🎭 Artists ] [ 💿 Albums ] [ 🏢 Publishers ] [ ⚠️ Health ]      ║
+║ [ 🏷️ Tags ] [ 🎭 Artists ] [ 💿 Albums ] [ 🏢 Publishers ] [ ⚠️ Health ]   ║
 ╠═══════════════════════════════════════════════╦══════════════════════════════╣
-║ 🔍 Filter: [_______________]  [☑ Orphans Only] ║                              ║
+║🔍 Filter: [_______________] [☑ Orphans Only] ║                              ║
 ╠═══════════════════════════════════════════════╣      I N S P E C T O R       ║
-║ NAME              │ USAGE │ ACTIONS            ║                              ║
-║───────────────────┼───────┼────────────────────║  Name: [Rock_____________]   ║
-║ Rock              │  47   │ [Merge▾] [🗑️]      ║                              ║
-║ Rockk (typo!)     │   0   │ [Merge▾] [🗑️]  ←── ║  Usage: 47 songs             ║
-║ Jazz              │  12   │ [Merge▾] [🗑️]      ║                              ║
-║ ...               │       │                    ║  [ SAVE ]                    ║
+║ NAME              │ USAGE │ ACTIONS           ║                              ║
+║───────────────────┼───────┼───────────────────║   Name: [Rock_____________]  ║
+║ Rock              │  47   │ [Merge▾] [🗑️]    ║                              ║
+║ Rockk (typo!)     │   0   │ [Merge▾] [🗑️] ←──║  Usage: 47 songs             ║
+║ Jazz              │  12   │ [Merge▾] [🗑️]    ║                              ║
+║ ...               │       │                   ║  [ SAVE ]                    ║
 ╚═══════════════════════════════════════════════╩══════════════════════════════╝
 ```
 
@@ -170,14 +170,35 @@ The Tools Window **does not replace** existing dialogs (`AlbumManagerDialog`, `A
 | `publisher_repository.py` | Add `get_usage_count()`, `get_all_with_usage()` |
 
 ### 7.3 Phased Delivery
-1. **Phase 1 (MVP)**: Tags tab + Health tab (addresses "Orphan Ghost" problem)
-2. **Phase 2**: Artists tab + Publishers tab
-3. **Phase 3**: Albums tab (may share code with existing AlbumManagerDialog)
+1. **Phase 1 (MVP)**: ✅ Tags tab + Health tab (addresses "Orphan Ghost" problem)
+2. **Phase 2**: ✅ Artists tab + Publishers tab
+3. **Phase 3**: ✅ Albums tab with full inventory management
 
 ---
 
-## 8. Open Questions
-- [ ] Should merging open a confirmation showing affected songs?
-- [ ] Should "Nuke All Orphans" have a final confirmation, or truly be instant?
-- [ ] Should the Tools window remember which tab was last active?
+## 8. Implementation Status
+
+### ✅ Completed Features
+- **Tags Tab**: List, filter, search, edit, merge, delete, nuke orphans
+- **Artists Tab**: List, filter, delete, nuke orphans
+- **Albums Tab**: List, filter (with artist/title search), delete, nuke empty albums
+- **Publishers Tab**: List, filter, delete, nuke orphans
+- **Health Tab**: 
+  - Shows orphan/empty counts for Tags, Artists, Albums, Publishers
+  - SHOW button switches to relevant tab with filter active
+  - NUKE ALL button bulk-deletes orphans (no confirmation for 0-usage)
+- **Window Management**: Geometry/tab persistence, Ctrl+T shortcut, logo menu integration
+
+### 🔮 Future Enhancements
+- [ ] Merge functionality for Artists/Publishers (Tags has it)
+- [ ] Album editing in inspector (currently read-only)
+- [ ] Duplicate ISRC detection in Health tab
+- [ ] Artist type/alias management in inspector
+
+---
+
+## 9. Open Questions (Resolved)
+- [x] Should merging open a confirmation showing affected songs? → **Yes, for entities with usage > 0**
+- [x] Should "Nuke All Orphans" have a final confirmation? → **No - instant for 0-usage entities (per design)**
+- [x] Should the Tools window remember which tab was last active? → **Yes - implemented via SettingsManager**
 

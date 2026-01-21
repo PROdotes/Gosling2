@@ -97,6 +97,121 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error getting usage count for {contributor_id}: {e}")
             return 0
 
+    def get_all_with_usage(self, type_filter: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Contributor, int]]:
+        """
+        Get all contributors with their usage counts in a single query.
+
+        Args:
+            type_filter: Filter by type ('person', 'group'). None = all.
+            orphans_only: If True, only return contributors with 0 usage.
+
+        Returns:
+            List of (Contributor, usage_count) tuples, sorted by name.
+        """
+        query = """
+            SELECT c.ContributorID, c.ContributorName, c.SortName, c.ContributorType,
+                   COUNT(DISTINCT mscr.SourceID) as usage_count
+            FROM Contributors c
+            LEFT JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
+        """
+        params = []
+
+        if type_filter:
+            query += " WHERE c.ContributorType = ? COLLATE NOCASE"
+            params.append(type_filter)
+
+        query += " GROUP BY c.ContributorID, c.ContributorName, c.SortName, c.ContributorType"
+
+        if orphans_only:
+            query += " HAVING usage_count = 0"
+
+        query += " ORDER BY c.SortName COLLATE NOCASE"
+
+        results = []
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query, tuple(params))
+                for row in cursor.fetchall():
+                    contrib = Contributor(
+                        contributor_id=row[0],
+                        name=row[1],
+                        sort_name=row[2],
+                        type=row[3]
+                    )
+                    usage = row[4]
+                    results.append((contrib, usage))
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in get_all_with_usage: {e}")
+        return results
+
+    def get_orphan_count(self, type_filter: Optional[str] = None) -> int:
+        """Count contributors with zero usage (orphans)."""
+        query = """
+            SELECT COUNT(*) FROM (
+                SELECT c.ContributorID
+                FROM Contributors c
+                LEFT JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
+        """
+        params = []
+
+        if type_filter:
+            query += " WHERE c.ContributorType = ? COLLATE NOCASE"
+            params.append(type_filter)
+
+        query += " GROUP BY c.ContributorID HAVING COUNT(DISTINCT mscr.SourceID) = 0)"
+
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query, tuple(params))
+                result = cursor.fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in get_orphan_count: {e}")
+            return 0
+
+    def delete_all_orphans(self, type_filter: Optional[str] = None, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all contributors with zero usage.
+
+        Args:
+            type_filter: Only delete orphans of this type. None = all.
+            batch_id: Audit batch ID.
+
+        Returns:
+            Number of contributors deleted.
+        """
+        from src.core.audit_logger import AuditLogger
+
+        # First get the orphans
+        orphans = self.get_all_with_usage(type_filter=type_filter, orphans_only=True)
+
+        if not orphans:
+            return 0
+
+        deleted = 0
+        try:
+            with self.get_connection() as conn:
+                auditor = AuditLogger(conn, batch_id=batch_id)
+                cursor = conn.cursor()
+
+                for contrib, _ in orphans:
+                    # Log deletion
+                    auditor.log_delete("Contributors", contrib.contributor_id, contrib.to_dict())
+                    # Delete aliases first
+                    cursor.execute("DELETE FROM ContributorAliases WHERE ContributorID = ?", (contrib.contributor_id,))
+                    # Delete group memberships
+                    cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (contrib.contributor_id, contrib.contributor_id))
+                    # Delete contributor
+                    cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (contrib.contributor_id,))
+                    deleted += 1
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in delete_all_orphans: {e}")
+
+        return deleted
+
     def swap_song_contributor(self, song_id: int, old_id: int, new_id: int, batch_id: Optional[str] = None) -> bool:
         """Replace one contributor link with another for a single song. (Deduplication aware)"""
         try:

@@ -511,6 +511,104 @@ class AlbumRepository(GenericRepository[Album]):
             row = cursor.fetchone()
             return row[0] if row else 0
 
+    # ─────────────────────────────────────────────────────────────────
+    # T-TOOLS INVENTORY METHODS (Phase 3)
+    # ─────────────────────────────────────────────────────────────────
+
+    def get_all_with_usage(self, orphans_only: bool = False) -> List[Tuple[Album, int]]:
+        """
+        Get all albums with their song count (usage).
+        
+        Args:
+            orphans_only: If True, only return albums with 0 songs.
+            
+        Returns:
+            List of (Album, usage_count) tuples.
+        """
+        having_clause = "HAVING SongCount = 0" if orphans_only else ""
+        
+        query = f"""
+            SELECT 
+                a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
+                COUNT(DISTINCT sa.SourceID) as SongCount
+            FROM Albums a
+            LEFT JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
+            GROUP BY a.AlbumID
+            {having_clause}
+            ORDER BY a.AlbumTitle COLLATE NOCASE
+        """
+        
+        results = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            for row in cursor.fetchall():
+                album = Album.from_row(row)
+                album.album_artist = self._get_joined_album_artist(conn, album.album_id)
+                usage = row[4] if len(row) > 4 else 0
+                results.append((album, usage))
+        return results
+
+    def get_orphan_count(self) -> int:
+        """Get count of albums with no linked songs."""
+        query = """
+            SELECT COUNT(*) FROM Albums a
+            WHERE NOT EXISTS (
+                SELECT 1 FROM SongAlbums sa WHERE sa.AlbumID = a.AlbumID
+            )
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute(query)
+            row = cursor.fetchone()
+            return row[0] if row else 0
+
+    def delete_all_orphans(self, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all albums with no linked songs.
+        
+        Returns:
+            Number of albums deleted.
+        """
+        from src.core.audit_logger import AuditLogger
+        
+        with self.get_connection() as conn:
+            auditor = AuditLogger(conn, batch_id=batch_id)
+            
+            # 1. Find orphan album IDs
+            query = """
+                SELECT a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear
+                FROM Albums a
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM SongAlbums sa WHERE sa.AlbumID = a.AlbumID
+                )
+            """
+            cursor = conn.execute(query)
+            orphans = cursor.fetchall()
+            
+            if not orphans:
+                return 0
+            
+            deleted_count = 0
+            for row in orphans:
+                album_id = row[0]
+                snapshot = {
+                    "AlbumID": row[0],
+                    "AlbumTitle": row[1],
+                    "AlbumType": row[2],
+                    "ReleaseYear": row[3]
+                }
+                
+                # Clean up related M2M links (AlbumCredits, AlbumPublishers)
+                conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+                conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+                
+                # Delete the album
+                conn.execute("DELETE FROM Albums WHERE AlbumID = ?", (album_id,))
+                auditor.log_delete("Albums", album_id, snapshot)
+                deleted_count += 1
+            
+            conn.commit()
+            return deleted_count
+
     def add_contributor_to_album(self, album_id: int, contributor_id: int, role_name: str = "Performer", batch_id: Optional[str] = None) -> bool:
         """Link a contributor to an album with a specific role."""
         from src.core.audit_logger import AuditLogger

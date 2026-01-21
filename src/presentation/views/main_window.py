@@ -431,6 +431,7 @@ class MainWindow(QMainWindow):
         self.title_bar.settings_requested.connect(self._open_settings)
         self.title_bar.logs_requested.connect(self._open_logs)
         self.title_bar.history_requested.connect(self._open_audit_history)
+        self.title_bar.tools_requested.connect(self._open_tools)
         
         # --- T-Feedback: Toast Routing ---
         self.library_widget.status_message_requested.connect(self.toast.show_message)
@@ -469,6 +470,12 @@ class MainWindow(QMainWindow):
         self.action_search_meta.setShortcut("Ctrl+Space")
         self.action_search_meta.triggered.connect(self.right_panel.editor_widget.trigger_search)
         self.addAction(self.action_search_meta)
+
+        # Ctrl+T – Open Library Tools (T-Tools)
+        self.action_open_tools = QAction(self)
+        self.action_open_tools.setShortcut("Ctrl+T")
+        self.action_open_tools.triggered.connect(self._open_tools)
+        self.addAction(self.action_open_tools)
 
     def _on_playlist_changed(self, parent, start, end):
         # Update widget with new count
@@ -1046,11 +1053,43 @@ class MainWindow(QMainWindow):
         """Open the Audit History Flight Recorder."""
         from ..dialogs.audit_history_dialog import AuditHistoryDialog
         dlg = AuditHistoryDialog(
-            self.audit_service, 
+            self.audit_service,
             resolver=self.library_service.get_human_name,
             parent=self
         )
         dlg.exec()
+
+    def _open_tools(self):
+        """Open the Library Tools Window (T-Tools)."""
+        from ..windows import ToolsWindow
+
+        # Single instance pattern - reuse if already open
+        if hasattr(self, '_tools_window') and self._tools_window is not None:
+            try:
+                self._tools_window.show()
+                self._tools_window.raise_()
+                self._tools_window.activateWindow()
+                return
+            except RuntimeError:
+                # Window was deleted, create new one
+                pass
+
+        self._tools_window = ToolsWindow(
+            tag_service=self.library_service.tag_service,
+            settings_manager=self.settings_manager,
+            contributor_service=self.contributor_service,
+            publisher_service=self.publisher_service,
+            album_service=self.album_service,
+            parent=None  # Independent window, not parented to main
+        )
+        # Connect data_changed to refresh library if needed
+        self._tools_window.data_changed.connect(self._on_tools_data_changed)
+        self._tools_window.show()
+
+    def _on_tools_data_changed(self):
+        """Handle data changes from Tools window - refresh relevant UI."""
+        # Refresh library to reflect any tag/entity changes
+        self.library_widget.load_library(refresh_filters=True)
 
     def changeEvent(self, event):
         """Handle window state changes (Maximize/Restore) from OS or Buttons."""

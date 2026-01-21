@@ -16,6 +16,7 @@ class CustomTitleBar(QWidget):
     import_requested = pyqtSignal()
     logs_requested = pyqtSignal()
     history_requested = pyqtSignal()
+    tools_requested = pyqtSignal()  # T-Tools: Library Tools window
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -53,8 +54,14 @@ class CustomTitleBar(QWidget):
         
         act_history = QAction("🕰️ LOG HISTORY (AUDIT)", self)
         act_history.triggered.connect(self.history_requested.emit)
-        
+
+        act_tools = QAction("🔧 LIBRARY TOOLS", self)
+        act_tools.triggered.connect(self.tools_requested.emit)
+        act_tools.setShortcut("Ctrl+T")
+
         self.system_menu.addAction(act_settings)
+        self.system_menu.addSeparator()
+        self.system_menu.addAction(act_tools)
         self.system_menu.addSeparator()
         self.system_menu.addAction(act_logs)
         self.system_menu.addAction(act_history)

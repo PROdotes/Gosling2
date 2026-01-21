@@ -101,3 +101,33 @@ class AlbumService:
     def set_primary_album(self, source_id: int, album_id: int) -> bool:
         """Set the primary album for a song."""
         return self._repo.set_primary_album(source_id, album_id)
+
+    # ─────────────────────────────────────────────────────────────────
+    # T-TOOLS INVENTORY METHODS (Phase 3)
+    # ─────────────────────────────────────────────────────────────────
+
+    def get_all_with_usage(self, orphans_only: bool = False) -> List[Tuple["Album", int]]:
+        """
+        Get all albums with their song count (usage).
+        
+        Args:
+            orphans_only: If True, only return albums with 0 songs.
+            
+        Returns:
+            List of (Album, usage_count) tuples.
+        """
+        return self._repo.get_all_with_usage(orphans_only=orphans_only)
+
+    def get_orphan_count(self) -> int:
+        """Get count of albums with no linked songs."""
+        return self._repo.get_orphan_count()
+
+    def delete_all_orphans(self, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all albums with no linked songs.
+        
+        Returns:
+            Number of albums deleted.
+        """
+        return self._repo.delete_all_orphans(batch_id=batch_id)
+

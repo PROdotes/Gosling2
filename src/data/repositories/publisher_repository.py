@@ -433,3 +433,105 @@ class PublisherRepository(GenericRepository[Publisher]):
         query = "SELECT COUNT(*) FROM Publishers WHERE ParentPublisherID = ?"
         with self.get_connection() as conn:
             return conn.execute(query, (publisher_id,)).fetchone()[0]
+
+    def get_usage_count(self, publisher_id: int) -> int:
+        """Count how many albums AND recordings use this publisher."""
+        query = """
+            SELECT (SELECT COUNT(*) FROM AlbumPublishers WHERE PublisherID = ?) +
+                   (SELECT COUNT(*) FROM RecordingPublishers WHERE PublisherID = ?)
+        """
+        with self.get_connection() as conn:
+            return conn.execute(query, (publisher_id, publisher_id)).fetchone()[0]
+
+    def get_all_with_usage(self, orphans_only: bool = False) -> List[Tuple[Publisher, int]]:
+        """
+        Get all publishers with their usage counts in a single query.
+
+        Args:
+            orphans_only: If True, only return publishers with 0 usage.
+
+        Returns:
+            List of (Publisher, usage_count) tuples, sorted by name.
+        """
+        query = """
+            SELECT p.PublisherID, p.PublisherName, p.ParentPublisherID,
+                   (SELECT COUNT(*) FROM AlbumPublishers WHERE PublisherID = p.PublisherID) +
+                   (SELECT COUNT(*) FROM RecordingPublishers WHERE PublisherID = p.PublisherID) as usage_count
+            FROM Publishers p
+        """
+
+        if orphans_only:
+            query += """
+            WHERE (SELECT COUNT(*) FROM AlbumPublishers WHERE PublisherID = p.PublisherID) +
+                  (SELECT COUNT(*) FROM RecordingPublishers WHERE PublisherID = p.PublisherID) = 0
+            """
+
+        query += " ORDER BY p.PublisherName COLLATE NOCASE"
+
+        results = []
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.execute(query)
+                for row in cursor.fetchall():
+                    pub = Publisher(
+                        publisher_id=row[0],
+                        publisher_name=row[1],
+                        parent_publisher_id=row[2]
+                    )
+                    usage = row[3]
+                    results.append((pub, usage))
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in get_all_with_usage: {e}")
+        return results
+
+    def get_orphan_count(self) -> int:
+        """Count publishers with zero usage (orphans)."""
+        query = """
+            SELECT COUNT(*) FROM Publishers p
+            WHERE (SELECT COUNT(*) FROM AlbumPublishers WHERE PublisherID = p.PublisherID) +
+                  (SELECT COUNT(*) FROM RecordingPublishers WHERE PublisherID = p.PublisherID) = 0
+        """
+        try:
+            with self.get_connection() as conn:
+                result = conn.execute(query).fetchone()
+                return result[0] if result else 0
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in get_orphan_count: {e}")
+            return 0
+
+    def delete_all_orphans(self, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all publishers with zero usage.
+
+        Returns:
+            Number of publishers deleted.
+        """
+        from src.core.audit_logger import AuditLogger
+
+        # First get the orphans
+        orphans = self.get_all_with_usage(orphans_only=True)
+
+        if not orphans:
+            return 0
+
+        deleted = 0
+        try:
+            with self.get_connection() as conn:
+                auditor = AuditLogger(conn, batch_id=batch_id)
+                cursor = conn.cursor()
+
+                for pub, _ in orphans:
+                    # Log deletion
+                    auditor.log_delete("Publishers", pub.publisher_id, pub.to_dict())
+                    # Update children to have no parent
+                    cursor.execute("UPDATE Publishers SET ParentPublisherID = NULL WHERE ParentPublisherID = ?", (pub.publisher_id,))
+                    # Delete publisher
+                    cursor.execute("DELETE FROM Publishers WHERE PublisherID = ?", (pub.publisher_id,))
+                    deleted += 1
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error in delete_all_orphans: {e}")
+
+        return deleted

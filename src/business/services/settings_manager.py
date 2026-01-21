@@ -461,3 +461,18 @@ class SettingsManager:
     def remove_setting(self, key: str) -> None:
         """Remove a specific setting"""
         self._settings.remove(key)
+
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """
+        Generic setting getter for arbitrary keys.
+        Use this for settings that don't have dedicated getter/setter methods.
+        """
+        return self._settings.value(key, default)
+
+    def set_setting(self, key: str, value: Any) -> None:
+        """
+        Generic setting setter for arbitrary keys.
+        Use this for settings that don't have dedicated getter/setter methods.
+        """
+        self._settings.setValue(key, value)
+        self._settings.sync()

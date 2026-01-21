@@ -863,3 +863,111 @@ class ContributorService:
             logger.error(f"Error swapping song contributor: {e}")
             return False
 
+    # --- Inventory Management (T-Tools) ---
+
+    def get_all_with_usage(self, type_filter: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Contributor, int]]:
+        """
+        Get all contributors (ArtistNames) with their usage counts.
+
+        Args:
+            type_filter: Filter by identity type ('person', 'group'). None = all.
+            orphans_only: If True, only return contributors with 0 usage.
+
+        Returns:
+            List of (Contributor, usage_count) tuples.
+        """
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT
+                    an.NameID, an.DisplayName, an.SortName,
+                    COALESCE(i.IdentityType, 'person') as type,
+                    an.IsPrimaryName,
+                    (SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = an.NameID) +
+                    (SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = an.NameID) as usage_count
+                FROM ArtistNames an
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+            """
+            params = []
+
+            conditions = []
+            if type_filter:
+                conditions.append("COALESCE(i.IdentityType, 'person') = ? COLLATE NOCASE")
+                params.append(type_filter)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            if orphans_only:
+                if conditions:
+                    query += " AND "
+                else:
+                    query += " WHERE "
+                query += """
+                    (SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = an.NameID) +
+                    (SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = an.NameID) = 0
+                """
+
+            query += " ORDER BY an.SortName COLLATE NOCASE"
+
+            cursor.execute(query, params)
+            results = []
+            for row in cursor.fetchall():
+                contrib = Contributor(
+                    contributor_id=row[0],
+                    name=row[1],
+                    sort_name=row[2],
+                    type=row[3],
+                    matched_alias=row[1] if row[4] == 0 else None  # Mark non-primary as alias
+                )
+                usage = row[5]
+                results.append((contrib, usage))
+            return results
+
+    def get_orphan_count(self, type_filter: Optional[str] = None) -> int:
+        """Count contributors (ArtistNames) with zero usage."""
+        with self._credit_repo.get_connection() as conn:
+            cursor = conn.cursor()
+
+            query = """
+                SELECT COUNT(*) FROM ArtistNames an
+                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
+                WHERE (SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = an.NameID) +
+                      (SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = an.NameID) = 0
+            """
+            params = []
+
+            if type_filter:
+                query = query.replace("WHERE", f"WHERE COALESCE(i.IdentityType, 'person') = ? COLLATE NOCASE AND")
+                params.append(type_filter)
+
+            cursor.execute(query, params)
+            return cursor.fetchone()[0]
+
+    def delete_all_orphans(self, type_filter: Optional[str] = None, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all contributors (ArtistNames) with zero usage.
+
+        Note: This only deletes the Name records. Identities with no remaining
+        names are left behind (cleanup could be a separate operation).
+
+        Returns:
+            Number of names deleted.
+        """
+        orphans = self.get_all_with_usage(type_filter=type_filter, orphans_only=True)
+
+        if not orphans:
+            return 0
+
+        deleted = 0
+        for contrib, _ in orphans:
+            if self._name_service.delete_name(contrib.contributor_id, batch_id=batch_id):
+                deleted += 1
+
+        return deleted
+
+    def delete_contributor(self, contributor_id: int, batch_id: Optional[str] = None) -> bool:
+        """Delete a contributor (ArtistName) by ID."""
+        return self._name_service.delete_name(contributor_id, batch_id=batch_id)
+

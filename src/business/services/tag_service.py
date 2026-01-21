@@ -112,3 +112,30 @@ class TagService:
         """Get all currently used tags grouped by category."""
         return self._repo.get_active_tags()
 
+    # --- Inventory Management (T-Tools) ---
+
+    def get_all_with_usage(self, category: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Any, int]]:
+        """
+        Get all tags with their usage counts.
+
+        Args:
+            category: Filter by category. None = all.
+            orphans_only: Only return tags with 0 usage.
+
+        Returns:
+            List of (Tag, usage_count) tuples.
+        """
+        return self._repo.get_all_with_usage(category=category, orphans_only=orphans_only)
+
+    def get_orphan_count(self, category: Optional[str] = None) -> int:
+        """Count tags with zero usage."""
+        return self._repo.get_orphan_count(category=category)
+
+    def delete_all_orphans(self, category: Optional[str] = None) -> int:
+        """Delete all tags with zero usage. Returns count deleted."""
+        return self._repo.delete_all_orphans(category=category)
+
+    def delete_tag(self, tag_id: int) -> bool:
+        """Delete a tag by ID (will also unlink from all songs)."""
+        return self._repo.delete(tag_id)
+

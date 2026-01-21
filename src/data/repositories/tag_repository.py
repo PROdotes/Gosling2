@@ -298,6 +298,99 @@ class TagRepository(GenericRepository[Tag]):
             result = cursor.fetchone()
             return result[0] if result else 0
 
+    def get_all_with_usage(self, category: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Tag, int]]:
+        """
+        Get all tags with their usage counts in a single query.
+
+        Args:
+            category: Filter by category (e.g., "Genre", "Mood"). None = all categories.
+            orphans_only: If True, only return tags with 0 usage.
+
+        Returns:
+            List of (Tag, usage_count) tuples, sorted by name.
+        """
+        query = """
+            SELECT t.TagID, t.TagName, t.TagCategory,
+                   COUNT(mst.SourceID) as usage_count
+            FROM Tags t
+            LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+        """
+        params = []
+
+        if category:
+            query += " WHERE t.TagCategory = ?"
+            params.append(category)
+
+        query += " GROUP BY t.TagID, t.TagName, t.TagCategory"
+
+        if orphans_only:
+            query += " HAVING usage_count = 0"
+
+        query += " ORDER BY t.TagName COLLATE NOCASE"
+
+        results = []
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, tuple(params))
+            for row in cursor.fetchall():
+                tag = Tag(tag_id=row[0], tag_name=row[1], category=row[2])
+                usage = row[3]
+                results.append((tag, usage))
+        return results
+
+    def get_orphan_count(self, category: Optional[str] = None) -> int:
+        """Count tags with zero usage (orphans)."""
+        query = """
+            SELECT COUNT(*) FROM (
+                SELECT t.TagID
+                FROM Tags t
+                LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+        """
+        params = []
+
+        if category:
+            query += " WHERE t.TagCategory = ?"
+            params.append(category)
+
+        query += " GROUP BY t.TagID HAVING COUNT(mst.SourceID) = 0)"
+
+        with self.get_connection() as conn:
+            cursor = conn.execute(query, tuple(params))
+            result = cursor.fetchone()
+            return result[0] if result else 0
+
+    def delete_all_orphans(self, category: Optional[str] = None, batch_id: Optional[str] = None) -> int:
+        """
+        Delete all tags with zero usage.
+
+        Args:
+            category: Only delete orphans of this category. None = all.
+            batch_id: Audit batch ID.
+
+        Returns:
+            Number of tags deleted.
+        """
+        from src.core.audit_logger import AuditLogger
+
+        # First get the orphans
+        orphans = self.get_all_with_usage(category=category, orphans_only=True)
+
+        if not orphans:
+            return 0
+
+        deleted = 0
+        with self.get_connection() as conn:
+            auditor = AuditLogger(conn, batch_id=batch_id)
+            cursor = conn.cursor()
+
+            for tag, _ in orphans:
+                # Log deletion
+                auditor.log_delete("Tags", tag.tag_id, tag.to_dict())
+                # Delete
+                cursor.execute("DELETE FROM Tags WHERE TagID = ?", (tag.tag_id,))
+                deleted += 1
+
+        return deleted
+
     def get_active_tags(self) -> dict:
         """
         Get all tags that are currently linked to at least one active source.

@@ -123,3 +123,29 @@ class PublisherService:
     def get_with_descendants(self, publisher_id: int) -> List[Publisher]:
         """Fetch a publisher and all its recursive descendants."""
         return self._repo.get_with_descendants(publisher_id)
+
+    # --- Inventory Management (T-Tools) ---
+
+    def get_all_with_usage(self, orphans_only: bool = False) -> List[Tuple[Publisher, int]]:
+        """
+        Get all publishers with their usage counts.
+
+        Args:
+            orphans_only: If True, only return publishers with 0 usage.
+
+        Returns:
+            List of (Publisher, usage_count) tuples.
+        """
+        return self._repo.get_all_with_usage(orphans_only=orphans_only)
+
+    def get_orphan_count(self) -> int:
+        """Count publishers with zero usage."""
+        return self._repo.get_orphan_count()
+
+    def delete_all_orphans(self, batch_id: Optional[str] = None) -> int:
+        """Delete all publishers with zero usage. Returns count deleted."""
+        return self._repo.delete_all_orphans(batch_id=batch_id)
+
+    def get_usage_count(self, publisher_id: int) -> int:
+        """Get total usage count (albums + songs) for a publisher."""
+        return self._repo.get_usage_count(publisher_id)

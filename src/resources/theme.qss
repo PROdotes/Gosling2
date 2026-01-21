@@ -2314,3 +2314,197 @@ QPushButton[error_type="UNKNOWN"]:checked { background-color: #FF4444; border-co
     border: 1px solid #333333;
     border-radius: 8px;
 }
+
+/* ============================================================================
+   T-TOOLS: LIBRARY TOOLS WINDOW
+   ============================================================================ */
+
+#ToolsWindow {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:0.02 #222222,
+        stop:1 #080808);
+}
+
+/* Tab Bar */
+#ToolsTabs::pane {
+    border: 1px solid #333333;
+    background-color: #1A1A1A;
+    border-radius: 4px;
+}
+
+#ToolsTabs::tab-bar {
+    alignment: center;
+}
+
+#ToolsTabs QTabBar::tab {
+    background: #1A1A1A;
+    color: #888888;
+    padding: 8px 16px;
+    margin: 2px;
+    border: 1px solid #333333;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    min-width: 80px;
+}
+
+#ToolsTabs QTabBar::tab:selected {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #3A3A3A,
+        stop:1 #2A2A2A);
+    color: #FFC66D;
+    border-color: #FFC66D;
+}
+
+#ToolsTabs QTabBar::tab:hover:!selected {
+    background: #2A2A2A;
+    color: #AAAAAA;
+}
+
+/* Entity Tabs */
+#TagsTab, #ArtistsTab, #PublishersTab, #HealthTab {
+    background-color: transparent;
+}
+
+/* Entity Tables (shared style) */
+#TagsTable, #ArtistsTable, #PublishersTable {
+    background-color: #1A1A1A;
+    alternate-background-color: #222222;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    gridline-color: #2A2A2A;
+}
+
+#TagsTable::item, #ArtistsTable::item, #PublishersTable::item {
+    padding: 4px 8px;
+}
+
+#TagsTable::item:selected, #ArtistsTable::item:selected, #PublishersTable::item:selected {
+    background-color: #FFC66D;
+    color: #000000;
+}
+
+#TagsTable QHeaderView::section, #ArtistsTable QHeaderView::section, #PublishersTable QHeaderView::section {
+    background-color: #2A2A2A;
+    color: #888888;
+    padding: 6px 8px;
+    border: none;
+    border-bottom: 2px solid #333333;
+    font-weight: bold;
+}
+
+/* Inspector Panels (shared style) */
+#TagInspector, #ArtistInspector, #PublisherInspector {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:1 #1A1A1A);
+    border: 1px solid #333333;
+    border-radius: 6px;
+}
+
+#InspectorHeader {
+    color: #FFC66D;
+    font-size: 12pt;
+    font-weight: bold;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333333;
+    margin-bottom: 12px;
+}
+
+#UsageLabel {
+    color: #888888;
+    font-size: 9pt;
+    padding: 8px 0;
+}
+
+/* Orphans Only Checkbox */
+#OrphansOnlyCheckbox {
+    color: #AAAAAA;
+}
+
+#OrphansOnlyCheckbox::indicator {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #333333;
+    border-radius: 3px;
+    background: #1A1A1A;
+}
+
+#OrphansOnlyCheckbox::indicator:checked {
+    background-color: #FFC66D;
+    border-color: #FFC66D;
+}
+
+/* Nuke Button (Red Destructive) */
+#NukeButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #8B0000,
+        stop:1 #5C0000);
+    color: #FFAAAA;
+    border: 1px solid #660000;
+}
+
+#NukeButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #A00000,
+        stop:1 #700000);
+    color: #FFFFFF;
+}
+
+#NukeButton:disabled {
+    background: #2A2A2A;
+    color: #555555;
+    border-color: #333333;
+}
+
+/* Delete Button */
+#DeleteButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #5C0000,
+        stop:1 #3A0000);
+    color: #FFAAAA;
+}
+
+#DeleteButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #8B0000,
+        stop:1 #5C0000);
+    color: #FFFFFF;
+}
+
+/* Health Tab */
+#HealthHeader {
+    color: #FFC66D;
+    font-size: 18pt;
+    font-weight: bold;
+    padding: 20px;
+}
+
+#HealthFrame {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #2A2A2A,
+        stop:1 #1A1A1A);
+    border: 1px solid #333333;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+#HealthRow {
+    background-color: #222222;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    margin: 4px 0;
+}
+
+#HealthRowLabel {
+    color: #AAAAAA;
+    font-size: 11pt;
+}
+
+/* Placeholder for unimplemented tabs */
+#PlaceholderLabel {
+    color: #555555;
+    font-size: 14pt;
+    font-style: italic;
+}
