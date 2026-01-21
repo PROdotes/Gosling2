@@ -12,7 +12,7 @@ trigger: always_on
 *   **Violation is Fatal**: If a task requires breaking this (e.g. SQL in View), **STOP** and Refactor First.
 
 ## 2. Code Structure
-*   **God Object Ban**: Any file > 600 lines is a critical risk. Logic must be split (e.g., Extract Helper, Split Service).
+*   **God Object Ban**: Any file > 600 lines is a critical risk. Logic must be split (e.g., Extract Helper, Split Service). *Note: This mandates proactive prevention for new code and surgical cleaning of legacy methods being modified, not an immediate halt for wholesale refactoring.*
 *   **Service Bus**: Sibling widgets (e.g. List vs Filter) MUST NOT talk directly. Use `LibraryService` signals or Event Bus.
 
 ## 3. Industrial Amber Design System

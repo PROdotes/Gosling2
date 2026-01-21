@@ -1454,8 +1454,13 @@ class ToolsWindow(QMainWindow):
         self._nuke_orphan_publishers()
         self._refresh_health()
 
-    # ─────────────────────────────────────────────────────────────────
-    # WINDOW MANAGEMENT
+    def keyPressEvent(self, event):
+        """Handle key presses (Escape to close)."""
+        if event.key() == Qt.Key.Key_Escape:
+            self.close()
+        else:
+            super().keyPressEvent(event)
+
     # ─────────────────────────────────────────────────────────────────
 
     def showEvent(self, event):

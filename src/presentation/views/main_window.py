@@ -615,6 +615,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         """Handle window close"""
+        # Close secondary windows explicitly
+        if hasattr(self, '_tools_window') and self._tools_window:
+            self._tools_window.close()
+
         # Save current state before cleanup
         self._save_volume()
         self._save_playlist()
@@ -625,6 +629,9 @@ class MainWindow(QMainWindow):
         self.playback_service.cleanup()
         
         event.accept()
+        # Force application exit
+        from PyQt6.QtWidgets import QApplication
+        QApplication.instance().quit()
 
     def _load_window_geometry(self) -> None:
         geometry = self.settings_manager.get_window_geometry()
@@ -1080,7 +1087,7 @@ class MainWindow(QMainWindow):
             contributor_service=self.contributor_service,
             publisher_service=self.publisher_service,
             album_service=self.album_service,
-            parent=None  # Independent window, not parented to main
+            parent=self  # Parented to main hub for lifecycle sync
         )
         # Connect data_changed to refresh library if needed
         self._tools_window.data_changed.connect(self._on_tools_data_changed)
