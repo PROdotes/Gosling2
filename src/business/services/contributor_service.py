@@ -323,7 +323,7 @@ class ContributorService:
                 
         return list(resolved_names)
 
-    def update(self, contributor: Contributor) -> bool:
+    def update(self, contributor: Contributor, batch_id: Optional[str] = None) -> bool:
         """
         Smart Update: Updates name/type, or merges if the new name already exists.
         This enforces strict identity uniqueness at the service level.
@@ -369,34 +369,13 @@ class ContributorService:
                 
                 # Clean up GroupMemberships BEFORE changing type
                 # This prevents orphaned records and circular references
-                with self._credit_repo.get_connection() as conn:
-                    cursor = conn.cursor()
-                    from src.core.audit_logger import AuditLogger
-                    auditor = AuditLogger(conn)
-                    
-                    if old_type == "group" and new_type == "person":
-                        # Was a group, now a person: remove all members from this "group"
-                        cursor.execute("""
-                            SELECT MembershipID, GroupIdentityID, MemberIdentityID 
-                            FROM GroupMemberships WHERE GroupIdentityID = ?
-                        """, (identity_id,))
-                        for row in cursor.fetchall():
-                            auditor.log_delete("GroupMemberships", row[0], {
-                                "GroupIdentityID": row[1], "MemberIdentityID": row[2]
-                            })
-                        cursor.execute("DELETE FROM GroupMemberships WHERE GroupIdentityID = ?", (identity_id,))
-                        
-                    elif old_type == "person" and new_type == "group":
-                        # Was a person, now a group: remove this person from all groups
-                        cursor.execute("""
-                            SELECT MembershipID, GroupIdentityID, MemberIdentityID 
-                            FROM GroupMemberships WHERE MemberIdentityID = ?
-                        """, (identity_id,))
-                        for row in cursor.fetchall():
-                            auditor.log_delete("GroupMemberships", row[0], {
-                                "GroupIdentityID": row[1], "MemberIdentityID": row[2]
-                            })
-                        cursor.execute("DELETE FROM GroupMemberships WHERE MemberIdentityID = ?", (identity_id,))
+                if old_type == "group" and new_type == "person":
+                    # Was a group, now a person: remove all members from this "group"
+                    self._identity_repo.remove_all_group_members(identity_id, batch_id)
+
+                elif old_type == "person" and new_type == "group":
+                    # Was a person, now a group: remove this person from all groups
+                    self._identity_repo.remove_member_from_all_groups(identity_id, batch_id)
                 
                 # Now update the type
                 identity.identity_type = new_type
@@ -830,67 +809,7 @@ class ContributorService:
         Swap one contributor for another on a specific song (Fix This Song Only).
         Operates on SongCredits.
         """
-        try:
-            with self._credit_repo.get_connection() as conn:
-                cursor = conn.cursor()
-                from src.core.audit_logger import AuditLogger
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                
-                # Check collision first (Prevent PK violation if new guy already exists on song with same role)
-                # But since we are swapping ALL roles for this person, we might hit multiple collisions.
-                # Strategy:
-                # 1. Get all roles the old guy has on this song.
-                # 2. For each role, check if new guy has it.
-                # 3. If new guy has it -> Delete old guy (Merge/Absorb)
-                # 4. If new guy NOT has it -> Update old guy ID to new guy ID.
-                
-                cursor.execute("""
-                    SELECT RoleID FROM SongCredits 
-                    WHERE SourceID = ? AND CreditedNameID = ?
-                """, (song_id, old_contributor_id))
-                roles = [row[0] for row in cursor.fetchall()]
-                
-                for role_id in roles:
-                    # Check if target already has this role
-                    cursor.execute("""
-                        SELECT 1 FROM SongCredits 
-                        WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
-                    """, (song_id, new_contributor_id, role_id))
-                    
-                     if cursor.fetchone():
-                         # Target already has role: Just delete source
-                         # Get snapshot for audit logging
-                         cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
-                         snapshot = cursor.fetchone()
-                         if snapshot:
-                             auditor.log_delete("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", dict(zip([desc[0] for desc in cursor.description], snapshot)))
-
-                         cursor.execute("""
-                             DELETE FROM SongCredits
-                             WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
-                         """, (song_id, old_contributor_id, role_id))
-                    else:
-                        # Target doesn't have role: Move source to target
-                        # Get snapshot for audit logging
-                        cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
-                        snapshot = cursor.fetchone()
-                        if snapshot:
-                            old_data = dict(zip([desc[0] for desc in cursor.description], snapshot))
-                            new_data = old_data.copy()
-                            new_data['CreditedNameID'] = new_contributor_id
-                            auditor.log_update("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", old_data, new_data)
-
-                        cursor.execute("""
-                            UPDATE SongCredits
-                            SET CreditedNameID = ?
-                            WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
-                        """, (new_contributor_id, song_id, old_contributor_id, role_id))
-                        
-                return True
-        except Exception as e:
-            from ...core import logger
-            logger.error(f"Error swapping song contributor: {e}")
-            return False
+        return self._credit_repo.swap_song_contributor_credits(song_id, old_contributor_id, new_contributor_id, batch_id)
 
     # --- Inventory Management (T-Tools) ---
 

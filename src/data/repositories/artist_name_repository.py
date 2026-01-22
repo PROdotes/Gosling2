@@ -66,7 +66,7 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
         cursor.execute("DELETE FROM AlbumCredits WHERE CreditedNameID = ?", (record_id,))
         cursor.execute("DELETE FROM ArtistNames WHERE NameID = ?", (record_id,))
 
-    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None, batch_id: Optional[str] = None) -> bool:
         """
         Merge source name piece into target name piece.
         Redirects all SongCredits and AlbumCredits.
@@ -74,7 +74,7 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
         from src.core.audit_logger import AuditLogger
         
         def _execute(target_conn):
-            auditor = AuditLogger(target_conn)
+            auditor = AuditLogger(target_conn, batch_id=batch_id)
             
             # 1. Update SongCredits
             # PK is (SourceID, CreditedNameID, RoleID). 

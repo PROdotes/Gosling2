@@ -108,7 +108,7 @@ class PublisherRepository(GenericRepository[Publisher]):
         with self.get_connection() as main_conn:
             return _execute(main_conn)
 
-    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+    def merge(self, source_id: int, target_id: int, conn: Optional[sqlite3.Connection] = None, batch_id: Optional[str] = None) -> bool:
         """
         Merge source publisher into target publisher.
         Moves all album and song links, and child publishers to the target.
@@ -116,7 +116,7 @@ class PublisherRepository(GenericRepository[Publisher]):
         from src.core.audit_logger import AuditLogger
         
         def _execute(target_conn):
-            auditor = AuditLogger(target_conn)
+            auditor = AuditLogger(target_conn, batch_id=batch_id)
             
             # 1. Update AlbumPublishers
             # We use INSERT OR IGNORE and then DELETE to handle potential primary key conflicts

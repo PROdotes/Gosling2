@@ -71,3 +71,65 @@ class IdentityRepository(GenericRepository[Identity]):
     def create(self, entity: Identity, batch_id: Optional[str] = None) -> int:
         """Alias for insert() to maintain consistency with existing repositories."""
         return self.insert(entity, batch_id=batch_id)
+
+    def remove_all_group_members(self, group_identity_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Remove all members from a group (when converting group to person).
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
+
+                # Get all memberships for audit logging
+                cursor.execute("""
+                    SELECT MembershipID, GroupIdentityID, MemberIdentityID
+                    FROM GroupMemberships WHERE GroupIdentityID = ?
+                """, (group_identity_id,))
+                memberships = cursor.fetchall()
+
+                # Log deletions
+                for row in memberships:
+                    auditor.log_delete("GroupMemberships", row[0], {
+                        "GroupIdentityID": row[1], "MemberIdentityID": row[2]
+                    })
+
+                # Delete all memberships
+                cursor.execute("DELETE FROM GroupMemberships WHERE GroupIdentityID = ?", (group_identity_id,))
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error removing all group members for group {group_identity_id}: {e}")
+            return False
+
+    def remove_member_from_all_groups(self, member_identity_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Remove a member from all groups (when converting person to group).
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
+
+                # Get all memberships for audit logging
+                cursor.execute("""
+                    SELECT MembershipID, GroupIdentityID, MemberIdentityID
+                    FROM GroupMemberships WHERE MemberIdentityID = ?
+                """, (member_identity_id,))
+                memberships = cursor.fetchall()
+
+                # Log deletions
+                for row in memberships:
+                    auditor.log_delete("GroupMemberships", row[0], {
+                        "GroupIdentityID": row[1], "MemberIdentityID": row[2]
+                    })
+
+                # Delete all memberships
+                cursor.execute("DELETE FROM GroupMemberships WHERE MemberIdentityID = ?", (member_identity_id,))
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error removing member {member_identity_id} from all groups: {e}")
+            return False

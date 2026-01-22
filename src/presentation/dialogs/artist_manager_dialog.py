@@ -489,7 +489,7 @@ class ArtistDetailsDialog(QDialog):
         """Show context menu for alias chips."""
         menu = QMenu(self)
         
-        promote_act = QAction("Set as Primary ★", self)
+        promote_act = QAction("Set as Main", self)
         promote_act.triggered.connect(lambda: self._promote_alias(alias_id, alias_name))
         menu.addAction(promote_act)
         

@@ -166,3 +166,70 @@ class CreditRepository(BaseRepository):
             from src.core import logger
             logger.error(f"Error fetching album credits for {album_id}: {e}")
             return []
+
+    def swap_song_contributor_credits(self, song_id: int, old_contributor_id: int, new_contributor_id: int, batch_id: Optional[str] = None) -> bool:
+        """
+        Swap one contributor for another on a specific song.
+        Operates on SongCredits table.
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
+
+                # Check collision first (Prevent PK violation if new guy already exists on song with same role)
+                # But since we are swapping ALL roles for this person, we might hit multiple collisions.
+                # Strategy:
+                # 1. Get all roles the old guy has on this song.
+                # 2. For each role, check if new guy has it.
+                # 3. If new guy has it -> Delete old guy (Merge/Absorb)
+                # 4. If new guy NOT has it -> Update old guy ID to new guy ID.
+
+                cursor.execute("""
+                    SELECT RoleID FROM SongCredits
+                    WHERE SourceID = ? AND CreditedNameID = ?
+                """, (song_id, old_contributor_id))
+                roles = [row[0] for row in cursor.fetchall()]
+
+                for role_id in roles:
+                    # Check if target already has this role
+                    cursor.execute("""
+                        SELECT 1 FROM SongCredits
+                        WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                     """, (song_id, new_contributor_id, role_id))
+
+                    if cursor.fetchone():
+                         # Target already has role: Just delete source
+                         # Get snapshot for audit logging
+                         cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
+                         snapshot = cursor.fetchone()
+                         if snapshot:
+                             auditor.log_delete("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", dict(zip([desc[0] for desc in cursor.description], snapshot)))
+
+                         cursor.execute("""
+                             DELETE FROM SongCredits
+                             WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                         """, (song_id, old_contributor_id, role_id))
+                    else:
+                        # Target doesn't have role: Move source to target
+                        # Get snapshot for audit logging
+                        cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
+                        snapshot = cursor.fetchone()
+                        if snapshot:
+                            old_data = dict(zip([desc[0] for desc in cursor.description], snapshot))
+                            new_data = old_data.copy()
+                            new_data['CreditedNameID'] = new_contributor_id
+                            auditor.log_update("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", old_data, new_data)
+
+                        cursor.execute("""
+                            UPDATE SongCredits
+                            SET CreditedNameID = ?
+                            WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                        """, (new_contributor_id, song_id, old_contributor_id, role_id))
+
+                return True
+        except Exception as e:
+            from src.core import logger
+            logger.error(f"Error swapping song contributor credits: {e}")
+            return False

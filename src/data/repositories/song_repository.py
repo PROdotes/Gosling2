@@ -160,8 +160,24 @@ class SongRepository(GenericRepository[Song]):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
+
+                # Get old status for audit logging
+                cursor.execute("SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (file_id,))
+                old_row = cursor.fetchone()
+                if old_row:
+                    old_data = {'ProcessingStatus': old_row[0], 'SourceID': file_id}
+
                 new_status = 1 if is_done else 0
                 cursor.execute("UPDATE MediaSources SET ProcessingStatus = ? WHERE SourceID = ?", (new_status, file_id))
+
+                # Log the update
+                if old_row:
+                    new_data = old_data.copy()
+                    new_data['ProcessingStatus'] = new_status
+                    auditor.log_update("MediaSources", file_id, old_data, new_data)
+
                 return True
         except Exception as e:
             logger.error(f"Error updating song status: {e}")
@@ -173,11 +189,29 @@ class SongRepository(GenericRepository[Song]):
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
+
                 new_status = 1 if is_done else 0
                 placeholders = ",".join(["?"] * len(file_ids))
                 params = [new_status] + file_ids
-                
+
+                # Get old statuses for audit logging
+                old_statuses = {}
+                cursor.execute(f"SELECT SourceID, ProcessingStatus FROM MediaSources WHERE SourceID IN ({placeholders})", file_ids)
+                for row in cursor.fetchall():
+                    old_statuses[row[0]] = row[1]
+
                 cursor.execute(f"UPDATE MediaSources SET ProcessingStatus = ? WHERE SourceID IN ({placeholders})", params)
+
+                # Log each update
+                for file_id in file_ids:
+                    if file_id in old_statuses:
+                        old_data = {'ProcessingStatus': old_statuses[file_id], 'SourceID': file_id}
+                        new_data = old_data.copy()
+                        new_data['ProcessingStatus'] = new_status
+                        auditor.log_update("MediaSources", file_id, old_data, new_data)
+
                 return cursor.rowcount
         except Exception as e:
             logger.error(f"Error updating batch status: {e}")
