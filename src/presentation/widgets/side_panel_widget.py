@@ -94,6 +94,7 @@ class SidePanelWidget(QFrame):
         self.header_label.setObjectName("SidePanelHeader")
         self.header_label.setWordWrap(True)
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.header_label.installEventFilter(self)  # For left-click parse
         
         # T-108: Context menu for Artist Stats
         self.header_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -263,11 +264,15 @@ class SidePanelWidget(QFrame):
     def _update_header(self):
         if not self.current_songs:
             self.header_label.setText("No Selection")
+            self.header_label.setToolTip("")
+            self.header_label.setCursor(Qt.CursorShape.ArrowCursor)
             self._update_status_visuals(False)
             return
 
         if len(self.current_songs) > 1:
             self.header_label.setText(f"{len(self.current_songs)} Songs Selected")
+            self.header_label.setToolTip("Click to parse metadata from filename")
+            self.header_label.setCursor(Qt.CursorShape.PointingHandCursor)
             self._update_status_visuals(False)
             return
 
@@ -284,6 +289,8 @@ class SidePanelWidget(QFrame):
         
         artist = artist or "Unknown Artist"
         self.header_label.setText(f"{artist} - {song.title}")
+        self.header_label.setToolTip("Click to parse metadata from filename")
+        self.header_label.setCursor(Qt.CursorShape.PointingHandCursor)
         # Determine current state: READY if ProcessingStatus=1
         try:
             is_ready = song.is_done
@@ -482,23 +489,7 @@ class SidePanelWidget(QFrame):
                     header_layout.setContentsMargins(0, 0, 0, 0)
                     header_layout.setSpacing(4)
 
-                    # Special case: Title field gets Parse button instead of Search
-                    if field.name == 'title':
-                        btn_parse_inline = GlowButton("")
-                        # Use absolute path resolution relative to this file or root
-                        icon_path = os.path.join(os.path.dirname(__file__), "../../../src/resources/parse_filename.svg")
-                        if not os.path.exists(icon_path):
-                            icon_path = "src/resources/parse_filename.svg"
-                        btn_parse_inline.setIcon(QIcon(icon_path))
-                        btn_parse_inline.setIconSize(QSize(22, 22))  # Larger icon for better visibility
-                        btn_parse_inline.setObjectName("ParseInlineButton")
-                        # Make it bigger than micro buttons for easy clicking
-                        btn_parse_inline.setFixedHeight(28)  # Match footer button height
-                        btn_parse_inline.setFixedWidth(36)   # Same as search action button
-                        btn_parse_inline.setToolTip("Parse Metadata from Filename")
-                        btn_parse_inline.clicked.connect(self._open_filename_parser)
-                        header_layout.addWidget(btn_parse_inline)
-                    elif field.name == 'tags':
+                    if field.name == 'tags':
                         btn_music = GlowButton("🎵")
                         btn_music.setObjectName("MusicInlineButton")
                         # Match Title Parse / Footer Search button size
@@ -520,7 +511,7 @@ class SidePanelWidget(QFrame):
                     if field.name == 'title':
                         # Title Case (Abc Abc)
                         btn_title = GlowButton("Abc Abc")
-                        btn_title.setFixedSize(32, 20)
+                        btn_title.setFixedSize(50, 20)
                         btn_title.setCursor(Qt.CursorShape.PointingHandCursor)
                         btn_title.set_radius_style("border-radius: 4px;")
                         btn_title.set_font_size(8)
@@ -531,7 +522,7 @@ class SidePanelWidget(QFrame):
 
                         # Sentence Case (Abc abc)
                         btn_sentence = GlowButton("Abc abc")
-                        btn_sentence.setFixedSize(28, 20)
+                        btn_sentence.setFixedSize(50, 20)
                         btn_sentence.setCursor(Qt.CursorShape.PointingHandCursor)
                         btn_sentence.set_radius_style("border-radius: 4px;")
                         btn_sentence.set_font_size(8)
@@ -2053,7 +2044,7 @@ class SidePanelWidget(QFrame):
     def eventFilter(self, source, event):
         from PyQt6.QtCore import QEvent, QPoint
         # Handle LED hover for projected path display
-        if source == self.save_led:
+        if hasattr(self, 'save_led') and source == self.save_led:
             if event.type() == QEvent.Type.Enter:
                 # Reveal path on hover as an Overlay (Absolute Position)
                 if self.lbl_projected_path.text():
@@ -2078,6 +2069,13 @@ class SidePanelWidget(QFrame):
             elif event.type() == QEvent.Type.Leave:
                 # Always hide on leave
                 self.lbl_projected_path.setVisible(False)
+        # Handle header left-click for filename parser
+        elif hasattr(self, 'header_label') and source == self.header_label:
+            if event.type() == QEvent.Type.MouseButtonPress:
+                from PyQt6.QtCore import Qt
+                if event.button() == Qt.MouseButton.LeftButton:
+                    self._open_filename_parser()
+                    return True
         return super().eventFilter(source, event)
 
     def _get_staged_song(self, original_song):
@@ -2640,6 +2638,12 @@ class SidePanelWidget(QFrame):
             return
             
         menu = QMenu(self)
+        
+        # Add Parse Filename option first
+        action_parse = QAction("Parse Metadata from Filename", self)
+        action_parse.triggered.connect(self._open_filename_parser)
+        menu.addAction(action_parse)
+        menu.addSeparator()
         
         # Determine current artist name displayed
         current_text = self.header_label.text()

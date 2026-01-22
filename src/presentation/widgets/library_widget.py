@@ -2890,7 +2890,7 @@ class LibraryWidget(QWidget):
     
             # Pre-check: Determine if any files actually need renaming
             id_col = self.field_indices.get('file_id', -1)
-            rename_needed = False
+            rename_count = 0
             
             for idx in indexes:
                 source_idx = self.proxy_model.mapToSource(idx)
@@ -2910,19 +2910,18 @@ class LibraryWidget(QWidget):
                             target = self.renaming_service.calculate_target_path(song)
                             if song.path:
                                 if os.path.normcase(os.path.normpath(song.path)) != os.path.normcase(os.path.normpath(target)):
-                                    rename_needed = True
-                                    break
+                                    rename_count += 1
                 except Exception:
                     pass
             
             # If no files need renaming, silently return
-            if not rename_needed:
+            if rename_count == 0:
                 return
     
             confirm = QMessageBox.question(
-                self, 
-                "Rename Files", 
-                f"Are you sure you want to rename {len(indexes)} file(s) and move them to their library folders?",
+                self,
+                "Rename Files",
+                f"Are you sure you want to rename {rename_count} file(s) and move them to their library folders?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
 
