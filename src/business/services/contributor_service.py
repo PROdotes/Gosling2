@@ -349,11 +349,20 @@ class ContributorService:
         name_rec.display_name = new_name
         name_rec.sort_name = contributor.sort_name
         success = self._name_service.update_name(name_rec)
-        
-        # 3. Update Identity Type (with membership cleanup)
+
+        # 3. Ensure Identity Exists (Create if missing)
+        if success and not name_rec.owner_identity_id:
+            # Create identity for legacy contributor without one
+            current_type = contributor.type  # Use the desired type
+            identity = self._identity_service.create_identity(current_type, legal_name=contributor.name)
+            name_rec.owner_identity_id = identity.identity_id
+            self._name_service.update_name(name_rec)  # Save the owner_identity_id
+
+        # 4. Update Identity Type (with membership cleanup)
         if success and name_rec.owner_identity_id:
             identity = self._identity_service.get_identity(name_rec.owner_identity_id)
             if identity and identity.identity_type != contributor.type:
+                print(f"DEBUG: Types differ, will update identity")
                 old_type = identity.identity_type
                 new_type = contributor.type.lower()
                 identity_id = name_rec.owner_identity_id
@@ -393,7 +402,10 @@ class ContributorService:
                 identity.identity_type = new_type
                 from src.data.repositories.identity_repository import IdentityRepository
                 IdentityRepository(db_path=self._db_path).update(identity)
-                
+
+                # Restructure aliases after type change
+                self.restructure_aliases_on_type_change(contributor.contributor_id, new_type)
+
         return success
 
     # --- MERGE & DELETE ---
@@ -966,6 +978,47 @@ class ContributorService:
                 deleted += 1
 
         return deleted
+
+    def restructure_aliases_on_type_change(self, contributor_id: int, new_type: str) -> bool:
+        """
+        Restructure aliases when an artist's type changes.
+
+        - Single alias: Just unlink it (make it independent)
+        - Multiple aliases: Unlink all, then make alphabetically first the new main,
+          and add others as aliases of it
+        """
+        aliases = self.get_aliases(contributor_id)
+        if not aliases:
+            return True
+
+        # Case 1: Single alias - just unlink it
+        if len(aliases) == 1:
+            return self.unlink_alias(aliases[0].alias_id)
+
+        # Case 2: Multiple aliases - unlink all, then restructure
+        unlinked_artist_ids = []
+
+        # Unlink all aliases
+        for alias in aliases:
+            if self.unlink_alias(alias.alias_id):
+                # Query for the new contributor ID by name
+                new_artist = self.get_by_name(alias.alias_name)
+                if new_artist:
+                    unlinked_artist_ids.append(new_artist.contributor_id)
+
+        if len(unlinked_artist_ids) < 2:
+            return True
+
+        # Choose alphabetically first as new main
+        main_artist_id = min(unlinked_artist_ids,
+                             key=lambda aid: self.get_by_id(aid).name.lower())
+        unlinked_artist_ids.remove(main_artist_id)
+
+        # Merge remaining artists into the main (making them aliases)
+        for other_id in unlinked_artist_ids:
+            self.merge(source_id=other_id, target_id=main_artist_id, create_alias=True)
+
+        return True
 
     def delete_contributor(self, contributor_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete a contributor (ArtistName) by ID."""

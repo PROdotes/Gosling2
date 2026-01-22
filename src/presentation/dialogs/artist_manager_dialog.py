@@ -158,8 +158,8 @@ class ArtistDetailsDialog(QDialog):
         self.btn_group.addButton(self.radio_group.btn, 1)
         
         # UI Refresh logic (Safe-Toggle)
-        self.radio_person.toggled.connect(lambda checked: self._on_type_toggled("person") if checked else None)
-        self.radio_group.toggled.connect(lambda checked: self._on_type_toggled("group") if checked else None)
+        self.radio_person.btn.toggled.connect(lambda checked: self._on_type_toggled("person") if checked else None)
+        self.radio_group.btn.toggled.connect(lambda checked: self._on_type_toggled("group") if checked else None)
 
         t_row.addWidget(self.radio_person)
         t_row.addWidget(self.radio_group)
@@ -558,7 +558,7 @@ class ArtistDetailsDialog(QDialog):
         if not new_name: return
         
         new_type = "group" if self.radio_group.isChecked() else "person"
-        
+
         # 1. COLLISION DETECTION & MERGE PROMPT
         # Check if name CHANGED (Case-sensitive check effectively, but we handle casing logic below)
         if new_name != self.artist.name:
@@ -570,18 +570,19 @@ class ArtistDetailsDialog(QDialog):
 
         # Safety check for type change (Data integrity)
         if self.original_type != new_type:
+            alias_count = len(self.service.get_aliases(self.artist.contributor_id))
             if self.original_type == "group":
                 # Losing 'Children'
-                count = len(self.service.get_members(self.artist.contributor_id))
+                membership_count = len(self.service.get_members(self.artist.contributor_id))
                 relation = "member"
             else:
                 # Losing 'Parents'
-                count = len(self.service.get_groups(self.artist.contributor_id))
+                membership_count = len(self.service.get_groups(self.artist.contributor_id))
                 relation = "group membership"
 
-            if count > 0:
-                msg = f"Changing this {self.original_type.capitalize()} to a {new_type.capitalize()} will remove {count} existing {relation}(s). Are you sure?"
-                if QMessageBox.warning(self, "Confirm Type Change", msg, 
+            if alias_count > 0 or membership_count > 0:
+                msg = f"Changing this {self.original_type.capitalize()} to a {new_type.capitalize()} will remove existing aliases and group memberships. Are you sure?"
+                if QMessageBox.warning(self, "Confirm Type Change", msg,
                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                     return
         
@@ -590,10 +591,11 @@ class ArtistDetailsDialog(QDialog):
         self.artist.type = new_type
         
         try:
-            if self.service.update(self.artist):
+            update_result = self.service.update(self.artist)
+            if update_result:
                 self.done(3) # Signal 3: Data Changed (Sync Required)
             else:
-                 QMessageBox.warning(self, "Error", "Failed to save artist changes.")
+                QMessageBox.warning(self, "Error", "Failed to save artist changes.")
         except Exception as e:
             # REACTIVE COLLISION HANDLING
             # If proactive check failed but DB constraint hit, catch it here.

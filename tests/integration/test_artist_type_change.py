@@ -200,11 +200,116 @@ class TestArtistTypeChange:
         person.type = "group"
         service.update(person)
         
-        # Resolve should STILL work, but now won't include the group
-        # (since person is no longer a member)
+        # After type change, the alias becomes independent
+        # Searching for the alias should find the new independent alias artist
         resolved_after = service.resolve_identity_graph(f"TestAlias {uid}")
-        assert f"TestPerson {uid}" in resolved_after
-        assert f"TestAlias {uid}" in resolved_after
+        assert f"TestAlias {uid}" in resolved_after  # Alias is now independent
+        # TestPerson should NO LONGER appear (alias was unlinked)
+        assert f"TestPerson {uid}" not in resolved_after
         # TestGroup should NO LONGER appear (membership was cleared)
         assert f"TestGroup {uid}" not in resolved_after
+
+    def test_type_change_with_aliases_warning(self, service):
+        """
+        When changing type with aliases, warning should appear.
+        """
+        uid = str(uuid.uuid4())[:8]
+        person = service.create(f"Artist {uid}", type="person")
+        service.add_alias(person.contributor_id, f"Alias {uid}")
+
+        # This test would verify the dialog warning, but since it's UI,
+        # we test the logic that determines if warning should show
+        alias_count = len(service.get_aliases(person.contributor_id))
+        membership_count = len(service.get_groups(person.contributor_id))
+
+        # Warning should be shown
+        assert alias_count > 0 or membership_count > 0, "Warning should be shown when aliases exist"
+
+    def test_type_change_restructures_single_alias(self, service):
+        """
+        When changing type with single alias, alias becomes independent artist.
+        """
+        uid = str(uuid.uuid4())[:8]
+        person = service.create(f"Main {uid}", type="person")
+        alias_name = f"Alias {uid}"
+        service.add_alias(person.contributor_id, alias_name)
+
+        # Change type to group
+        person.type = "group"
+        result = service.update(person)
+        assert result is True
+
+        # Original artist should be group with no aliases
+        updated = service.get_by_id(person.contributor_id)
+        assert updated.type == "group"
+        assert len(service.get_aliases(person.contributor_id)) == 0
+
+        # Alias should be independent person artist
+        alias_artist = service.get_by_name(alias_name)
+        assert alias_artist is not None
+        assert alias_artist.type == "person"
+        assert alias_artist.name == alias_name
+
+    def test_type_change_restructures_multiple_aliases(self, service):
+        """
+        When changing type with multiple aliases, restructure them under alphabetically first.
+        """
+        uid = str(uuid.uuid4())[:8]
+        person = service.create(f"Main {uid}", type="person")
+
+        # Add aliases in non-alphabetical order
+        alias_z = f"ZAlias {uid}"
+        alias_a = f"Alias {uid}"
+        alias_m = f"Middle {uid}"
+
+        service.add_alias(person.contributor_id, alias_z)
+        service.add_alias(person.contributor_id, alias_a)
+        service.add_alias(person.contributor_id, alias_m)
+
+        # Change type to group
+        person.type = "group"
+        result = service.update(person)
+        assert result is True
+
+        # Original artist should be group with no aliases
+        updated = service.get_by_id(person.contributor_id)
+        assert updated.type == "group"
+        assert len(service.get_aliases(person.contributor_id)) == 0
+
+        # Alias 'A' should be the new main (alphabetically first)
+        main_alias = service.get_by_name(alias_a)
+        assert main_alias is not None
+        assert main_alias.type == "person"
+
+        # Other aliases should be aliases of the main
+        main_aliases = service.get_aliases(main_alias.contributor_id)
+        alias_names = {a.alias_name for a in main_aliases}
+        assert alias_z in alias_names
+        assert alias_m in alias_names
+        assert alias_a not in alias_names  # Not an alias of itself
+
+        # The aliases should now be linked to the main artist (verified above)
+        # get_by_name will still find the individual alias contributors
+
+    def test_type_change_preserves_data(self, service):
+        """
+        Verify that alias restructuring preserves data integrity.
+        """
+        uid = str(uuid.uuid4())[:8]
+        person = service.create(f"Artist {uid}", type="person")
+        service.add_alias(person.contributor_id, f"Alias {uid}")
+
+        # Change type
+        person.type = "group"
+        service.update(person)
+
+        # All artists should still exist and be queryable
+        original = service.get_by_id(person.contributor_id)
+        alias_artist = service.get_by_name(f"Alias {uid}")
+
+        assert original is not None
+        assert alias_artist is not None
+        assert original.type == "group"
+        assert alias_artist.type == "person"
+
 
