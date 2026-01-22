@@ -839,7 +839,6 @@ class LibraryWidget(QWidget):
         self.import_progress = QProgressBar()
         self.import_progress.setObjectName("ImportProgressBar")
         self.import_progress.setTextVisible(False)
-        self.import_progress.setFixedSize(100, 10)
         
         self.import_count_label = QLabel("0/0")
         self.import_count_label.setObjectName("LCDLabelCompact")

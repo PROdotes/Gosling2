@@ -628,19 +628,19 @@ class ContributorService:
                 SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType
                 FROM GroupMemberships gm
                 JOIN Identities i ON gm.GroupIdentityID = i.IdentityID
-                JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID
-                WHERE gm.MemberIdentityID = ? AND an.IsPrimaryName = 1
+                JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1
+                WHERE gm.MemberIdentityID = ?
                 ORDER BY an.SortName
             """
             cursor.execute(query, (member_identity_id,))
             return [
                  Contributor(
-                    contributor_id=row[0],
-                    name=row[1],
-                    sort_name=row[2],
-                    type=row[3] or 'group'
-                ) for row in cursor.fetchall()
-            ]
+                     contributor_id=row[0],
+                     name=row[1],
+                     sort_name=row[2],
+                     type=row[3] or 'group'
+                 ) for row in cursor.fetchall()
+             ]
 
     def add_member(self, group_id: int, member_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
         """Add a member to a group."""
@@ -825,7 +825,7 @@ class ContributorService:
 
     # Legcy alias removed as it is now defined in the unified section above.
 
-    def swap_song_contributor(self, song_id: int, old_contributor_id: int, new_contributor_id: int) -> bool:
+    def swap_song_contributor(self, song_id: int, old_contributor_id: int, new_contributor_id: int, batch_id: Optional[str] = None) -> bool:
         """
         Swap one contributor for another on a specific song (Fix This Song Only).
         Operates on SongCredits.
@@ -833,6 +833,8 @@ class ContributorService:
         try:
             with self._credit_repo.get_connection() as conn:
                 cursor = conn.cursor()
+                from src.core.audit_logger import AuditLogger
+                auditor = AuditLogger(conn, batch_id=batch_id)
                 
                 # Check collision first (Prevent PK violation if new guy already exists on song with same role)
                 # But since we are swapping ALL roles for this person, we might hit multiple collisions.
@@ -855,17 +857,32 @@ class ContributorService:
                         WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
                     """, (song_id, new_contributor_id, role_id))
                     
-                    if cursor.fetchone():
-                        # Target already has role: Just delete source
-                        cursor.execute("""
-                            DELETE FROM SongCredits 
-                            WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
-                        """, (song_id, old_contributor_id, role_id))
+                     if cursor.fetchone():
+                         # Target already has role: Just delete source
+                         # Get snapshot for audit logging
+                         cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
+                         snapshot = cursor.fetchone()
+                         if snapshot:
+                             auditor.log_delete("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", dict(zip([desc[0] for desc in cursor.description], snapshot)))
+
+                         cursor.execute("""
+                             DELETE FROM SongCredits
+                             WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
+                         """, (song_id, old_contributor_id, role_id))
                     else:
                         # Target doesn't have role: Move source to target
+                        # Get snapshot for audit logging
+                        cursor.execute("SELECT * FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?", (song_id, old_contributor_id, role_id))
+                        snapshot = cursor.fetchone()
+                        if snapshot:
+                            old_data = dict(zip([desc[0] for desc in cursor.description], snapshot))
+                            new_data = old_data.copy()
+                            new_data['CreditedNameID'] = new_contributor_id
+                            auditor.log_update("SongCredits", f"{song_id}-{old_contributor_id}-{role_id}", old_data, new_data)
+
                         cursor.execute("""
-                            UPDATE SongCredits 
-                            SET CreditedNameID = ? 
+                            UPDATE SongCredits
+                            SET CreditedNameID = ?
                             WHERE SourceID = ? AND CreditedNameID = ? AND RoleID = ?
                         """, (new_contributor_id, song_id, old_contributor_id, role_id))
                         

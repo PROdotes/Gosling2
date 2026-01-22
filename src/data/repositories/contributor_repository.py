@@ -318,15 +318,6 @@ class ContributorRepository(GenericRepository[Contributor]):
 
     def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
-        auditor = kwargs.get('auditor')
-        # Audit Cascades
-        if auditor:
-            cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
-            for g_id, m_id in cursor.fetchall():
-                auditor.log_delete("GroupMembers", f"{g_id}-{m_id}", {"GroupID": g_id, "MemberID": m_id})
-
-        # Manual Cascade for GroupMembers (Not enforced by Schema)
-        cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (record_id, record_id))
         cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (record_id,))
 
     def create(self, name: str, type: str = 'person', sort_name: str = None, conn=None, batch_id: Optional[str] = None) -> Contributor:
@@ -604,131 +595,15 @@ class ContributorRepository(GenericRepository[Contributor]):
 
     # Complex identity methods removed (Moved to IdentityService)
 
-    def get_member_count(self, contributor_id: int) -> int:
-        """
-        Return count of associated group memberships (as Group or as Member).
-        
-        .. deprecated::
-            Use ContributorService.get_member_count() instead (uses new GroupMemberships table).
-        """
-        import warnings
-        warnings.warn("ContributorRepository.get_member_count is deprecated. Use ContributorService.get_member_count instead.", DeprecationWarning, stacklevel=2)
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT (SELECT COUNT(*) FROM GroupMembers WHERE GroupID = ?) +
-                           (SELECT COUNT(*) FROM GroupMembers WHERE MemberID = ?)
-                """, (contributor_id, contributor_id))
-                return cursor.fetchone()[0]
-        except Exception as e:
-            return 0
 
-    def get_members(self, group_id: int) -> List[Contributor]:
-        """
-        Get all members of a Group, respecting MemberAliasID.
-        
-        .. deprecated::
-            Use ContributorService.get_members() instead (uses new GroupMemberships table).
-        """
-        import warnings
-        warnings.warn("ContributorRepository.get_members is deprecated. Use ContributorService.get_members instead.", DeprecationWarning, stacklevel=2)
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        C.ContributorID, 
-                        COALESCE(CA.AliasName, C.ContributorName) as DisplayName, 
-                        C.SortName, 
-                        C.ContributorType,
-                        CA.AliasName -- Matched Alias
-                    FROM GroupMembers GM
-                    JOIN Contributors C ON GM.MemberID = C.ContributorID
-                    LEFT JOIN ContributorAliases CA ON GM.MemberAliasID = CA.AliasID
-                    WHERE GM.GroupID = ?
-                    ORDER BY DisplayName ASC
-                """, (group_id,))
-                
-                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3], matched_alias=r[4]) for r in cursor.fetchall()]
-        except Exception as e:
-            return []
 
-    def get_groups(self, person_id: int) -> List[Contributor]:
-        """
-        Get all Groups a Person belongs to.
-        
-        .. deprecated::
-            Use ContributorService.get_groups() instead (uses new GroupMemberships table).
-        """
-        import warnings
-        warnings.warn("ContributorRepository.get_groups is deprecated. Use ContributorService.get_groups instead.", DeprecationWarning, stacklevel=2)
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT C.ContributorID, C.ContributorName, C.SortName, C.ContributorType
-                    FROM Contributors C
-                    JOIN GroupMembers GM ON C.ContributorID = GM.GroupID
-                    WHERE GM.MemberID = ?
-                    ORDER BY C.SortName ASC
-                """, (person_id,))
-                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
-        except Exception as e:
-            return []
 
-    def add_member(self, group_id: int, person_id: int, member_alias_id: Optional[int] = None, batch_id: Optional[str] = None) -> bool:
-        """
-        Add a member to a group, optionally with a specific alias.
-        
-        .. deprecated::
-            Use ContributorService.add_member() instead (uses new GroupMemberships table).
-        """
-        import warnings
-        warnings.warn("ContributorRepository.add_member is deprecated. Use ContributorService.add_member instead.", DeprecationWarning, stacklevel=2)
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT OR IGNORE INTO GroupMembers (GroupID, MemberID, MemberAliasID) VALUES (?, ?, ?)", (group_id, person_id, member_alias_id))
-                
-                if cursor.rowcount > 0:
-                    AuditLogger(conn, batch_id=batch_id).log_insert("GroupMembers", f"{group_id}-{person_id}", {
-                        "GroupID": group_id,
-                        "MemberID": person_id,
-                        "MemberAliasID": member_alias_id
-                    })
-                return cursor.rowcount > 0
-        except Exception as e:
-            return False
 
-    def remove_member(self, group_id: int, person_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        Remove a member from a group.
-        
-        .. deprecated::
-            Use ContributorService.remove_member() instead (uses new GroupMemberships table).
-        """
-        import warnings
-        warnings.warn("ContributorRepository.remove_member is deprecated. Use ContributorService.remove_member instead.", DeprecationWarning, stacklevel=2)
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Snapshot for Audit
-                cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ? AND MemberID = ?", (group_id, person_id))
-                row = cursor.fetchone()
-                if not row: return False
-                snapshot = {"GroupID": row[0], "MemberID": row[1]}
 
-                cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? AND MemberID = ?", (group_id, person_id))
-                
-                if cursor.rowcount > 0:
-                    AuditLogger(conn, batch_id=batch_id).log_delete("GroupMembers", f"{group_id}-{person_id}", snapshot)
-                return cursor.rowcount > 0
-        except Exception as e:
-            return False
+
+
+
+
 
     def get_aliases(self, contributor_id: int) -> List[ContributorAlias]:
         """Get all aliases for a contributor (ID and Name)."""

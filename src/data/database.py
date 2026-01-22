@@ -221,18 +221,7 @@ class BaseRepository:
                 )
             """)
 
-            # 7. GroupMembers
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS GroupMembers (
-                    GroupID INTEGER NOT NULL,
-                    MemberID INTEGER NOT NULL,
-                    MemberAliasID INTEGER,
-                    PRIMARY KEY (GroupID, MemberID),
-                    FOREIGN KEY (GroupID) REFERENCES Contributors(ContributorID),
-                    FOREIGN KEY (MemberID) REFERENCES Contributors(ContributorID),
-                    FOREIGN KEY (MemberAliasID) REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL
-                )
-            """)
+
 
             # 8. ContributorAliases
             cursor.execute("""
@@ -405,11 +394,7 @@ class BaseRepository:
             if 'CreditedAliasID' not in mscr_cols:
                 cursor.execute("ALTER TABLE MediaSourceContributorRoles ADD COLUMN CreditedAliasID INTEGER REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL")
             
-            # GroupMembers Migrations (MemberAliasID)
-            cursor.execute("PRAGMA table_info(GroupMembers)")
-            gm_cols = [row[1] for row in cursor.fetchall()]
-            if 'MemberAliasID' not in gm_cols:
-                cursor.execute("ALTER TABLE GroupMembers ADD COLUMN MemberAliasID INTEGER REFERENCES ContributorAliases(AliasID) ON DELETE SET NULL")
+
 
             # Create indexes for duplicate detection and performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_mediasources_audiohash ON MediaSources(AudioHash)")
