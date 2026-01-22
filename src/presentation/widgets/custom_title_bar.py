@@ -92,7 +92,7 @@ class CustomTitleBar(QWidget):
         # 2. Search
         self.search_box = GlowLineEdit()
         self.search_box.setPlaceholderText("Search Library...")
-        self.search_box.setFixedWidth(400) # Fixed width prevents it from pushing Title to center
+        self.search_box.setFixedWidth(420) # Fixed width prevents it from pushing Title to center
         self.search_box.setContentsMargins(0, 3, 0, 4)
         self.search_box.textChanged.connect(self.search_text_changed.emit)
         

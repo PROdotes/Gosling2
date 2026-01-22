@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel, QMenu, QMessageBox,
     QSizeGrip, QSizePolicy
 )
-from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtCore import Qt, QUrl, QTimer
 from PyQt6.QtMultimedia import QMediaPlayer
 from PyQt6.QtGui import QAction
 
@@ -225,7 +225,12 @@ class MainWindow(QMainWindow):
         # Setup Connections
         self._setup_connections()
         self._setup_shortcuts()
-        
+
+        self.esc_count = 0
+        self.esc_timer = QTimer(self)
+        self.esc_timer.setSingleShot(True)
+        self.esc_timer.timeout.connect(lambda: setattr(self, 'esc_count', 0))
+
         self._restore_volume()
         self._restore_playlist()
         
@@ -613,25 +618,43 @@ class MainWindow(QMainWindow):
         self._update_song_label(path)
         self.playlist_widget._active_row = -1
 
+    def keyPressEvent(self, event):
+        """Handle key press events, including triple ESC to close."""
+        if event.key() == Qt.Key.Key_Escape:
+            self.esc_count += 1
+            self.esc_timer.start(1200)  # Reset count after 1 second
+            if self.esc_count >= 3:
+                self.close()
+        else:
+            self.esc_count = 0
+        super().keyPressEvent(event)
+
     def closeEvent(self, event) -> None:
         """Handle window close"""
-        # Close secondary windows explicitly
-        if hasattr(self, '_tools_window') and self._tools_window:
-            self._tools_window.close()
+        reply = QMessageBox.question(self, 'Confirm Close',
+                                     'Are you sure you want to close the application?',
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                     QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            # Close secondary windows explicitly
+            if hasattr(self, '_tools_window') and self._tools_window:
+                self._tools_window.close()
 
-        # Save current state before cleanup
-        self._save_volume()
-        self._save_playlist()
-        self._save_window_geometry()
-        self._save_splitter_states()
-        
-        # Clean up playback service resources
-        self.playback_service.cleanup()
-        
-        event.accept()
-        # Force application exit
-        from PyQt6.QtWidgets import QApplication
-        QApplication.instance().quit()
+            # Save current state before cleanup
+            self._save_volume()
+            self._save_playlist()
+            self._save_window_geometry()
+            self._save_splitter_states()
+
+            # Clean up playback service resources
+            self.playback_service.cleanup()
+
+            event.accept()
+            # Force application exit
+            from PyQt6.QtWidgets import QApplication
+            QApplication.instance().quit()
+        else:
+            event.ignore()
 
     def _load_window_geometry(self) -> None:
         geometry = self.settings_manager.get_window_geometry()

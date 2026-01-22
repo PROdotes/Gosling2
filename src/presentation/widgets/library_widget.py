@@ -758,7 +758,7 @@ class LibraryWidget(QWidget):
         sidebar_layout.setSpacing(0)
         
         # Constraint: Prevent collapse of Filter Deck (Corridor: 180px - 350px)
-        sidebar_container.setMinimumWidth(200)
+        sidebar_container.setMinimumWidth(225)
         sidebar_container.setMaximumWidth(350)
         
         # 1. THE FRONT DECK (Filters - Pure Input)
@@ -1582,9 +1582,15 @@ class LibraryWidget(QWidget):
 
         # Initialize LCD UI
         self.status_lcd.show()
-        self.import_label.setText("INITIALIZING...")
         self.import_progress.setValue(0)
         self.import_count_label.setText(f"0/{len(files)}")
+
+        # Determine initial label based on files to process
+        has_wav_to_convert = any(f.lower().endswith('.wav') for f in files) and self.settings_manager.get_conversion_enabled()
+        if has_wav_to_convert:
+            self.import_label.setText("CONVERTING...")
+        else:
+            self.import_label.setText("IMPORTING...")
 
         # Build Conversion Policy based on Settings
         conversion_policy = {
