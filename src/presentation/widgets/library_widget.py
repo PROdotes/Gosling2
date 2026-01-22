@@ -7,7 +7,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTableView, QLineEdit, QFileDialog, QMessageBox, QMenu, QStyle, QLabel,
     QCheckBox, QHeaderView, QButtonGroup, QSizePolicy, QStackedWidget, QFrame,
-    QAbstractItemView, QTableWidgetItem, QPushButton, QProgressBar
+    QAbstractItemView, QTableWidgetItem, QPushButton, QProgressBar,
+    QDialog, QListWidget, QListWidgetItem, QTreeWidget, QTreeWidgetItem
 )
 import json
 import subprocess
@@ -529,6 +530,117 @@ class LibraryTable(QTableView):
                 parent = parent.parent()
         
         super().keyPressEvent(event)
+
+
+class ZipCleanupDialog(QDialog):
+    """Dialog for confirming ZIP deletion with detailed file listing."""
+
+    def __init__(self, zip_name: str, remaining_files: List[str], parent=None):
+        super().__init__(parent)
+        self.zip_name = zip_name
+        self.remaining_files = remaining_files
+        self.result_decision = False  # False = keep, True = delete
+
+        self.setWindowTitle("ZIP Cleanup")
+        self.resize(500, 400)
+        self.setModal(True)
+        self.setObjectName("ZipCleanupDialog")
+
+        self._init_ui()
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+
+        # Header
+        header_label = QLabel(f"Archive: {self.zip_name}")
+        header_label.setObjectName("ZipCleanupHeader")
+        layout.addWidget(header_label)
+
+        # Summary
+        file_count = len(self.remaining_files)
+        summary_label = QLabel(f"Contains {file_count} file(s) after audio extraction")
+        summary_label.setObjectName("ZipCleanupSummary")
+        layout.addWidget(summary_label)
+
+        # File tree
+        self.file_tree = QTreeWidget()
+        self.file_tree.setHeaderHidden(True)
+        self.file_tree.setObjectName("ZipCleanupTree")
+        layout.addWidget(self.file_tree)
+
+        self._populate_file_tree()
+
+        # Buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        keep_btn = QPushButton("Keep ZIP")
+        keep_btn.clicked.connect(self._keep_zip)
+        button_layout.addWidget(keep_btn)
+
+        delete_btn = QPushButton("Delete ZIP")
+        delete_btn.setObjectName("DeleteButton")  # For styling
+        delete_btn.clicked.connect(self._delete_zip)
+        button_layout.addWidget(delete_btn)
+
+        layout.addLayout(button_layout)
+
+    def _populate_file_tree(self):
+        """Populate tree with grouped files, collapsed by default."""
+        # Group files by type
+        file_groups = self._group_files_by_type(self.remaining_files)
+
+        for group_name, files in file_groups.items():
+            # Create group item
+            group_item = QTreeWidgetItem([f"{group_name} ({len(files)})"])
+            group_item.setExpanded(False)  # Start collapsed
+
+            # Add files to group
+            for file_path in sorted(files):
+                file_item = QTreeWidgetItem([file_path])
+                group_item.addChild(file_item)
+
+            self.file_tree.addTopLevelItem(group_item)
+
+    def _group_files_by_type(self, files: List[str]) -> dict:
+        """Group files by extension/type."""
+        groups = {
+            "Images": [],
+            "Documents": [],
+            "Archives": [],
+            "Other": []
+        }
+
+        image_exts = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+        doc_exts = {'.txt', '.nfo', '.pdf', '.doc', '.docx', '.rtf', '.md'}
+        archive_exts = {'.zip', '.rar', '.7z', '.tar', '.gz'}
+
+        for file_path in files:
+            ext = file_path.lower().split('.')[-1] if '.' in file_path else ''
+            ext = f'.{ext}'
+
+            if ext in image_exts:
+                groups["Images"].append(file_path)
+            elif ext in doc_exts:
+                groups["Documents"].append(file_path)
+            elif ext in archive_exts:
+                groups["Archives"].append(file_path)
+            else:
+                groups["Other"].append(file_path)
+
+        # Remove empty groups
+        return {k: v for k, v in groups.items() if v}
+
+    def _keep_zip(self):
+        self.result_decision = False
+        self.accept()
+
+    def _delete_zip(self):
+        self.result_decision = True
+        self.accept()
+
 
 class LibraryWidget(QWidget):
     """Widget for managing and displaying the music library"""
@@ -2450,21 +2562,40 @@ class LibraryWidget(QWidget):
             # 2. Check Physical Content (Are there non-audio leftovers?)
             physical_count = VFS.get_physical_member_count(zip_path)
             zip_name = os.path.basename(zip_path)
-            
-            message = ""
+
+            should_delete = False
+
             if physical_count == 0:
+                # Empty ZIP - simple confirmation
                 message = f"The archive '{zip_name}' is empty and no longer used.\nDelete it from disk?"
-            else:
+                reply = QMessageBox.question(
+                    self, "Clean Up Archive?", message,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                should_delete = (reply == QMessageBox.StandardButton.Yes)
+
+            elif physical_count <= 10:
+                # Small number of files - show detailed list in QMessageBox
+                remaining_files = VFS.get_physical_members(zip_path)
+                file_list = "\n".join(f"• {os.path.basename(f)}" for f in remaining_files)
                 message = (f"You have extracted/removed all audio from '{zip_name}'.\n"
-                           f"However, it still contains {physical_count} other file(s) (likely artwork/promo/nfo).\n\n"
-                           f"Delete the ZIP file anyway?")
-                           
-            reply = QMessageBox.question(
-                self, "Clean Up Archive?", message,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.Yes:
+                          f"However, it still contains {physical_count} other file(s):\n\n"
+                          f"{file_list}\n\n"
+                          f"Delete the ZIP file anyway?")
+                reply = QMessageBox.question(
+                    self, "Clean Up Archive?", message,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                )
+                should_delete = (reply == QMessageBox.StandardButton.Yes)
+
+            else:
+                # Large number of files - use detailed dialog
+                remaining_files = VFS.get_physical_members(zip_path)
+                dialog = ZipCleanupDialog(zip_name, remaining_files, self)
+                dialog.exec()
+                should_delete = dialog.result_decision
+
+            if should_delete:
                 try:
                     os.remove(zip_path)
                 except Exception as e:

@@ -197,8 +197,9 @@ class SidePanelWidget(QFrame):
         # Status button (REMOVED - now handled via Status chip in Tag tray for cleaner UI)
         self.btn_status = None
 
-        # Layout: LED | stretch | Discard | Save
+        # Layout: LED | Search | Discard | Save
         footer_layout.addWidget(self.save_led)
+        footer_layout.addWidget(search_container)
         footer_layout.addStretch(1)
         footer_layout.addWidget(self.btn_discard)
         footer_layout.addWidget(self.btn_save)

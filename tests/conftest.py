@@ -156,6 +156,7 @@ def mock_widget_deps():
     deps['settings_manager'].get_column_layout.return_value = None
     deps['settings_manager'].get_type_filter.return_value = 0
     deps['settings_manager'].get_default_year.return_value = 0
+    deps['settings_manager'].get_library_splitter_state.return_value = None
     
     # Default library data (Empty but structured)
     deps['library_service'].get_all_songs.return_value = ([], [])

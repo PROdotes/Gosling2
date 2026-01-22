@@ -98,6 +98,19 @@ class AlbumManagerDialog(QDialog):
     def _trigger_publisher_jump(self):
         # Open Publisher Picker immediately (T-63)
         self._on_search_publisher()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_N and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            self._toggle_create_mode()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            if self.btn_save_inspector.isEnabled():
+                self._save_inspector(close_on_success=True)
+                event.accept()
+            else:
+                super().keyPressEvent(event)
+        else:
+            super().keyPressEvent(event)
         
     def _init_ui(self):
         # ROOT LAYOUT: HBox [MainContainer] [SidecarContainer]
@@ -152,13 +165,7 @@ class AlbumManagerDialog(QDialog):
 
         header_layout.addStretch()
         
-        # T-46: View Toggle (Expert vs Focused)
-        self.btn_view_toggle = GlowButton("View: Full")
-        self.btn_view_toggle.setCheckable(True)
-        self.btn_view_toggle.setChecked(True) # Default to Full
-        self.btn_view_toggle.setFixedWidth(100)
-        self.btn_view_toggle.toggled.connect(self._toggle_view_mode)
-        header_layout.addWidget(self.btn_view_toggle)
+
         
         self.btn_create_new = GlowButton("Create New Album (+)")
         self.btn_create_new.clicked.connect(self._toggle_create_mode)

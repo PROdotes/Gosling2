@@ -302,3 +302,124 @@ class TestLibraryWidgetContextMenu:
             assert status_action is not None, f"Status action not found. Actions: {[a.text() for a in actions if a]}"
             assert not status_action.isEnabled(), f"Status action should be disabled. Text: {status_action.text()}"
             assert "Fix Errors First" in status_action.text()
+
+
+class TestLibraryWidgetZipCleanup:
+    """Level 1: Logic for ZIP cleanup functionality (Consolidated)"""
+
+    def test_check_zip_cleanup_empty_archive(self, library_widget, mock_widget_deps):
+        """Test ZIP cleanup for empty archive (no remaining files)."""
+        deps = mock_widget_deps
+        deps['library_service'].get_virtual_member_count.return_value = 0
+
+        zip_path = "/path/to/empty.zip"
+
+        with patch('src.core.vfs.VFS.get_physical_member_count', return_value=0), \
+             patch('PyQt6.QtWidgets.QMessageBox.question') as mock_question, \
+             patch('os.remove') as mock_remove:
+
+            mock_question.return_value = QMessageBox.StandardButton.Yes
+
+            library_widget._check_and_cleanup_zips({zip_path})
+
+            # Should ask to delete empty archive
+            mock_question.assert_called_once()
+            call_args = mock_question.call_args[0]
+            assert "empty and no longer used" in call_args[2]
+            assert "Delete it from disk?" in call_args[2]
+
+            # Should delete when user says Yes
+            mock_remove.assert_called_once_with(zip_path)
+
+    def test_check_zip_cleanup_small_file_list(self, library_widget, mock_widget_deps):
+        """Test ZIP cleanup for small number of remaining files (≤10)."""
+        deps = mock_widget_deps
+        deps['library_service'].get_virtual_member_count.return_value = 0
+
+        zip_path = "/path/to/archive.zip"
+        remaining_files = ["cover.jpg", "info.nfo", "readme.txt"]
+
+        with patch('src.core.vfs.VFS.get_physical_member_count', return_value=3), \
+             patch('src.core.vfs.VFS.get_physical_members', return_value=remaining_files), \
+             patch('PyQt6.QtWidgets.QMessageBox.question') as mock_question, \
+             patch('os.remove') as mock_remove:
+
+            mock_question.return_value = QMessageBox.StandardButton.Yes
+
+            library_widget._check_and_cleanup_zips({zip_path})
+
+            # Should show detailed file list
+            mock_question.assert_called_once()
+            call_args = mock_question.call_args[0]
+            message = call_args[2]  # call_args[2] is the message text
+            assert "extracted/removed all audio" in message
+            assert "3 other file(s):" in message
+            assert "• cover.jpg" in message
+            assert "• info.nfo" in message
+            assert "• readme.txt" in message
+
+            # Should delete when user says Yes
+            mock_remove.assert_called_once_with(zip_path)
+
+    def test_check_zip_cleanup_large_file_list(self, library_widget, mock_widget_deps):
+        """Test ZIP cleanup for large number of remaining files (>10)."""
+        deps = mock_widget_deps
+        deps['library_service'].get_virtual_member_count.return_value = 0
+
+        zip_path = "/path/to/big-archive.zip"
+        # Create 15 files to trigger large list behavior
+        remaining_files = [f"file{i}.jpg" for i in range(15)]
+
+        # Mock the ZipCleanupDialog
+        mock_dialog = MagicMock()
+        mock_dialog.result_decision = True  # User chooses to delete
+
+        with patch('src.core.vfs.VFS.get_physical_member_count', return_value=15), \
+             patch('src.core.vfs.VFS.get_physical_members', return_value=remaining_files), \
+             patch('src.presentation.widgets.library_widget.ZipCleanupDialog', return_value=mock_dialog) as mock_dialog_class, \
+             patch('os.remove') as mock_remove:
+
+            library_widget._check_and_cleanup_zips({zip_path})
+
+            # Should create ZipCleanupDialog
+            mock_dialog_class.assert_called_once_with("big-archive.zip", remaining_files, library_widget)
+            mock_dialog.exec.assert_called_once()
+
+            # Should delete when dialog returns True
+            mock_remove.assert_called_once_with(zip_path)
+
+    def test_check_zip_cleanup_user_cancels_delete(self, library_widget, mock_widget_deps):
+        """Test ZIP cleanup when user chooses not to delete."""
+        deps = mock_widget_deps
+        deps['library_service'].get_virtual_member_count.return_value = 0
+
+        zip_path = "/path/to/archive.zip"
+
+        with patch('src.core.vfs.VFS.get_physical_member_count', return_value=0), \
+             patch('PyQt6.QtWidgets.QMessageBox.question') as mock_question, \
+             patch('os.remove') as mock_remove:
+
+            mock_question.return_value = QMessageBox.StandardButton.No
+
+            library_widget._check_and_cleanup_zips({zip_path})
+
+            # Should ask but not delete when user says No
+            mock_question.assert_called_once()
+            mock_remove.assert_not_called()
+
+    def test_check_zip_cleanup_still_has_audio(self, library_widget, mock_widget_deps):
+        """Test ZIP cleanup skips archives that still contain audio."""
+        deps = mock_widget_deps
+        deps['library_service'].get_virtual_member_count.return_value = 2  # Still has audio files
+
+        zip_path = "/path/to/archive.zip"
+
+        with patch('src.core.vfs.VFS.get_physical_member_count', return_value=5), \
+             patch('PyQt6.QtWidgets.QMessageBox.question') as mock_question, \
+             patch('os.remove') as mock_remove:
+
+            library_widget._check_and_cleanup_zips({zip_path})
+
+            # Should not prompt or delete if ZIP still has audio
+            mock_question.assert_not_called()
+            mock_remove.assert_not_called()

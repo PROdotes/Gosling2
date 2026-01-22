@@ -87,6 +87,18 @@ class VFS:
             return 0
 
     @classmethod
+    def get_physical_members(cls, zip_path: str) -> List[str]:
+        """Return list of all files inside the ZIP (ignoring directories)."""
+        if not os.path.exists(zip_path) or not zipfile.is_zipfile(zip_path):
+            return []
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zr:
+                # Get all files (not dirs ending in /)
+                return [name for name in zr.namelist() if not name.endswith('/')]
+        except Exception:
+            return []
+
+    @classmethod
     def update_file_in_zip(cls, virtual_path: str, new_data: bytes) -> bool:
         """
         Update a single file inside a ZIP archive.
