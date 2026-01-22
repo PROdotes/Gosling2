@@ -100,10 +100,14 @@ class AlbumManagerDialog(QDialog):
         self._on_search_publisher()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_N and event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+        modifiers = event.modifiers()
+        # T-Shortcut: Support both Ctrl++ and Ctrl+= (The "DJ Speed" shortcut)
+        is_ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        
+        if is_ctrl and event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
             self._toggle_create_mode()
             event.accept()
-        elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if self.btn_save_inspector.isEnabled():
                 self._save_inspector(close_on_success=True)
                 event.accept()

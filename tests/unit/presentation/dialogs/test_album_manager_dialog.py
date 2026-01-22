@@ -37,12 +37,19 @@ def mock_publisher_service():
     return service
 
 @pytest.fixture
+def mock_settings_manager():
+    sm = MagicMock()
+    sm.get_default_album_type.return_value = "Album"
+    sm.get_default_year.return_value = 0
+    return sm
+
+@pytest.fixture
 def sample_album():
     return Album(album_id=50, title="Highway to Heck", album_artist="AC/BC", release_year=1979, album_type="Album")
 
 
 
-def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, sample_album):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         # Setup Mock Repo
         mock_repo = mock_repo_cls.return_value
@@ -58,7 +65,7 @@ def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_se
         mock_album_service.search.return_value = [sample_album]
         
         initial_data = {'album_id': 50, 'title': 'Highway to Heck'}
-        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data=initial_data)
+        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, initial_data=initial_data)
         qtbot.addWidget(dialog)
         
         qtbot.wait(50)
@@ -68,7 +75,7 @@ def test_album_manager_init_with_id(qtbot, mock_album_service, mock_publisher_se
         assert dialog.inp_year.text() == "1979"
         assert dialog.cmb_type.currentText() == "Album"
 
-def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, sample_album):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         mock_repo = mock_repo_cls.return_value
         c = MagicMock()
@@ -81,7 +88,7 @@ def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publish
         mock_album_service.search.return_value = [sample_album]
         mock_album_service.get_by_id.return_value = sample_album
         
-        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service)
+        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager)
         qtbot.addWidget(dialog)
         
         dialog.txt_search.setText("Highway")
@@ -96,7 +103,7 @@ def test_album_manager_search_and_select(qtbot, mock_album_service, mock_publish
         assert dialog.inp_title.text() == "Highway to Heck"
         assert dialog.current_album == sample_album
 
-def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, sample_album):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         mock_repo = mock_repo_cls.return_value
         c = MagicMock(contributor_id=7, type="person")
@@ -106,7 +113,7 @@ def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_s
         
         mock_album_service.get_by_id.return_value = sample_album
         mock_album_service.search.return_value = [sample_album]
-        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data={'album_id': 50})
+        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, initial_data={'album_id': 50})
         qtbot.addWidget(dialog)
         
         dialog.inp_title.setText("Highway to Heaven")
@@ -123,11 +130,11 @@ def test_album_manager_save_existing(qtbot, mock_album_service, mock_publisher_s
             
             mock_repo.sync_contributors.assert_not_called()
     
-def test_album_manager_create_new(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service):
+def test_album_manager_create_new(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         mock_repo = mock_repo_cls.return_value
         
-        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service)
+        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager)
         qtbot.addWidget(dialog)
         
         dialog._toggle_create_mode()
@@ -144,7 +151,7 @@ def test_album_manager_create_new(qtbot, mock_album_service, mock_publisher_serv
             mock_accept.assert_not_called() 
             mock_repo.sync_contributors.assert_called()
 
-def test_album_manager_delete(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, sample_album):
+def test_album_manager_delete(qtbot, mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, sample_album):
     with patch('src.data.repositories.album_repository.AlbumRepository') as mock_repo_cls:
         mock_repo = mock_repo_cls.return_value
         mock_repo.get_contributors_for_album.return_value = []
@@ -152,7 +159,7 @@ def test_album_manager_delete(qtbot, mock_album_service, mock_publisher_service,
 
         mock_album_service.get_by_id.return_value = sample_album
         mock_album_service.search.return_value = [sample_album]
-        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, initial_data={'album_id': 50})
+        dialog = AlbumManagerDialog(mock_album_service, mock_publisher_service, mock_contributor_service, mock_settings_manager, initial_data={'album_id': 50})
         qtbot.addWidget(dialog)
         
         item = dialog.list_vault.item(0)
