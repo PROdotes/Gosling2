@@ -518,8 +518,8 @@ class SidePanelWidget(QFrame):
                     
                     # TITLE TOOLS: Casing Buttons (Right Side)
                     if field.name == 'title':
-                        # Title Case (Abc)
-                        btn_title = GlowButton("Abc")
+                        # Title Case (Abc Abc)
+                        btn_title = GlowButton("Abc Abc")
                         btn_title.setFixedSize(32, 20)
                         btn_title.setCursor(Qt.CursorShape.PointingHandCursor)
                         btn_title.set_radius_style("border-radius: 4px;")
@@ -529,8 +529,8 @@ class SidePanelWidget(QFrame):
                         btn_title.clicked.connect(self._title_case_title)
                         header_layout.addWidget(btn_title)
 
-                        # Sentence Case (Aa)
-                        btn_sentence = GlowButton("Aa")
+                        # Sentence Case (Abc abc)
+                        btn_sentence = GlowButton("Abc abc")
                         btn_sentence.setFixedSize(28, 20)
                         btn_sentence.setCursor(Qt.CursorShape.PointingHandCursor)
                         btn_sentence.set_radius_style("border-radius: 4px;")

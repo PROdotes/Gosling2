@@ -157,7 +157,7 @@ class ScrubberDialog(QDialog):
         layout.setSpacing(15)
         
         # === Header: Artist - Title ===
-        artist = getattr(self.song, 'artist', '') or getattr(self.song, 'performer', '') or 'Unknown Artist'
+        artist = getattr(self.song, 'unified_artist', '') or (self.song.performers[0] if self.song.performers else '') or 'Unknown artist'
         title = getattr(self.song, 'title', '') or 'Unknown Title'
         
         self.header_label = QLabel(f"{artist} — {title}")
@@ -165,6 +165,9 @@ class ScrubberDialog(QDialog):
         self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.header_label.setWordWrap(True)
         layout.addWidget(self.header_label)
+
+        # Update header from DB if available
+        self._update_header_from_db()
         
         # === Waveform/Seek Area ===
         self.waveform = WaveformSeekWidget()
@@ -267,7 +270,25 @@ class ScrubberDialog(QDialog):
                     self.genre_tray.add_chip(tag_id, tag_name, zone="genre")
         except Exception as e:
             print(f"ScrubberDialog: Error loading genres: {e}")
-            
+
+    def _update_header_from_db(self) -> None:
+        """Update header label with fresh data from database"""
+        if not self.library_service:
+            return
+
+        source_id = getattr(self.song, 'source_id', None) or getattr(self.song, 'file_id', None)
+        if not source_id:
+            return
+
+        try:
+            fresh_song = self.library_service.get_song_by_id(source_id)
+            if fresh_song:
+                artist = getattr(fresh_song, 'unified_artist', '') or (fresh_song.performers[0] if fresh_song.performers else '') or 'Unknown artist'
+                title = getattr(fresh_song, 'title', '') or 'Unknown Title'
+                self.header_label.setText(f"{artist} — {title}")
+        except Exception as e:
+            print(f"ScrubberDialog: Error updating header from DB: {e}")
+
     def _on_play_toggled(self, checked: bool) -> None:
         if checked:
             self._playback.play()
@@ -382,6 +403,10 @@ class ScrubberDialog(QDialog):
         elif event.key() == Qt.Key.Key_Escape:
             # Close dialog
             self.close()
+            event.accept()
+        elif event.key() == Qt.Key.Key_Plus:
+            # Open new tag window
+            self._on_add_genre()
             event.accept()
         else:
             super().keyPressEvent(event)
