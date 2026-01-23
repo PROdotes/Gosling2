@@ -201,8 +201,6 @@ class ContributorRepository(GenericRepository[Contributor]):
                     auditor.log_delete("Contributors", contrib.contributor_id, contrib.to_dict())
                     # Delete aliases first
                     cursor.execute("DELETE FROM ContributorAliases WHERE ContributorID = ?", (contrib.contributor_id,))
-                    # Delete group memberships
-                    cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ? OR MemberID = ?", (contrib.contributor_id, contrib.contributor_id))
                     # Delete contributor
                     cursor.execute("DELETE FROM Contributors WHERE ContributorID = ?", (contrib.contributor_id,))
                     deleted += 1
@@ -286,35 +284,14 @@ class ContributorRepository(GenericRepository[Contributor]):
         return cursor.lastrowid
 
     def _update_db(self, cursor: sqlite3.Cursor, contributor: Contributor, **kwargs) -> None:
-        """Execute SQL UPDATE for GenericRepository"""
-        auditor = kwargs.get('auditor')
-        # Get existing type to check for change
-        cursor.execute("SELECT ContributorType FROM Contributors WHERE ContributorID = ?", (contributor.contributor_id,))
-        row = cursor.fetchone()
-        old_type = row[0] if row else None
-        
-        # 1. Update Core Identity
+        """Execute SQL UPDATE for GenericRepository.
+        Note: Type change membership cleanup is handled by ContributorService.update()
+        which uses IdentityRepository methods with the new GroupMemberships table.
+        """
         cursor.execute(
             "UPDATE Contributors SET ContributorName = ?, SortName = ?, ContributorType = ? WHERE ContributorID = ?",
             (contributor.name, contributor.sort_name, contributor.type, contributor.contributor_id)
         )
-        
-        # 2. Cleanup relationships if type changed (Audited)
-        if old_type and old_type != contributor.type:
-            if auditor:
-                # Find links that will be deleted
-                if contributor.type == "person":
-                    cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
-                else:
-                    cursor.execute("SELECT GroupID, MemberID FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
-                
-                for g_id, m_id in cursor.fetchall():
-                     auditor.log_delete("GroupMembers", f"{g_id}-{m_id}", {"GroupID": g_id, "MemberID": m_id})
-
-            if contributor.type == "person":
-                cursor.execute("DELETE FROM GroupMembers WHERE GroupID = ?", (contributor.contributor_id,))
-            else:
-                cursor.execute("DELETE FROM GroupMembers WHERE MemberID = ?", (contributor.contributor_id,))
 
     def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
@@ -696,63 +673,6 @@ class ContributorRepository(GenericRepository[Contributor]):
                 return f"{name[len(article):]}, {article.strip()}"
         return name
 
-    def resolve_identity_graph(self, search_term: str) -> List[str]:
-        """
-        Resolve a search term to a complete list of related artist identities.
-         Strategy:
-         1. Find ContributorIDs matching name (Direct) or Alias (via ContributorAliases).
-         2. Expand to find Groups these contributors belong to (if Person).
-         3. Collect ALL display names and aliases for the resolved set of IDs.
-        """
-        identities = set()
-        term = search_term.strip()
-        if not term: return []
-
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # 1. Find Seed IDs
-                cursor.execute("""
-                    SELECT C.ContributorID, C.ContributorType 
-                    FROM Contributors C
-                    WHERE C.ContributorName = ? 
-                    UNION
-                    SELECT CA.ContributorID, C.ContributorType
-                    FROM ContributorAliases CA
-                    JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                    WHERE CA.AliasName = ?
-                """, (term, term))
-                
-                seeds = cursor.fetchall()
-                final_ids = set()
-                
-                for seed_id, seed_type in seeds:
-                    final_ids.add(seed_id)
-                    
-                    if seed_type == 'person': 
-                        cursor.execute("SELECT GroupID FROM GroupMembers WHERE MemberID = ?", (seed_id,))
-                        for g in cursor.fetchall():
-                            final_ids.add(g[0])
-                            
-                if not final_ids: return [term]
-
-                # 3. Collect ALL Names
-                placeholders = ','.join('?' for _ in final_ids)
-                params = list(final_ids)
-                
-                cursor.execute(f"SELECT ContributorName FROM Contributors WHERE ContributorID IN ({placeholders})", params)
-                for row in cursor.fetchall(): identities.add(row[0])
-                    
-                cursor.execute(f"SELECT AliasName FROM ContributorAliases WHERE ContributorID IN ({placeholders})", params)
-                for row in cursor.fetchall(): identities.add(row[0])
-
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error resolving identity graph: {e}")
-            return [term]
-
-        return list(identities)
 
     def add_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
         """Instant Link: Link a contributor to a song with a specific role."""
