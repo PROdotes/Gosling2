@@ -477,13 +477,13 @@ class EntityListWidget(QWidget):
         # For stack mode logic we might need to fetch the entity name again.
         
         menu = QMenu(self)
-        
+
         if self.allow_edit:
             edit_action = menu.addAction("Edit...")
             edit_action.triggered.connect(
                 lambda: self._on_item_clicked(entity_id, label)
             )
-            
+
             # Smart Fix (experimental for stack)
             # Need to clean label first (remove emoji)
             # clean_label = ... (Skip for now to avoid complexity, focusing on SidePanel Cloud)
@@ -502,12 +502,14 @@ class EntityListWidget(QWidget):
         menu = QMenu(self)
         
         # Priority Actions (Restore "Set Primary" functionality)
-        # T-Restriction: Only show for Genres and Albums (User Request)
+        # T-Restriction: Only show for Genres, Albums, and Aliases (User Request)
         is_genre = self.entity_type == EntityType.TAG and label.startswith("Genre:")
         is_album = self.entity_type == EntityType.ALBUM
-        
-        if (is_genre or is_album) and hasattr(self.context_adapter, 'set_primary'):
-            menu.addAction("Set as Primary ★").triggered.connect(lambda: self._set_primary_internal(entity_id))
+        is_alias = self.entity_type == EntityType.ALIAS
+
+        if (is_genre or is_album or is_alias) and hasattr(self.context_adapter, 'set_primary'):
+            label_text = "Set as Main" if is_alias else "Set as Primary ★"
+            menu.addAction(label_text).triggered.connect(lambda: self._set_primary_internal(entity_id))
             menu.addSeparator()
         
         # Edit

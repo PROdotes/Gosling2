@@ -217,8 +217,7 @@ class ArtistDetailsDialog(QDialog):
             # Normal click on alias -> Rename
             self.list_aliases.tray.chip_clicked.connect(self._on_alias_chip_clicked)
 
-        # Connect to custom context menu for Promote/Rename actions
-        self.list_aliases.chip_context_menu_requested.connect(self._show_alias_chip_menu)
+
         layout.addWidget(self.list_aliases)
         
         # Membership - NOW USES EntityListWidget!
@@ -292,10 +291,16 @@ class ArtistDetailsDialog(QDialog):
         layout.addLayout(btns)
 
     def _refresh_data(self):
+        # Re-resolve the primary contributor in case of promotion
+        primary = self.service.get_primary_contributor(self.artist.contributor_id)
+        if primary:
+            self.artist = primary
+            self.setWindowTitle(f"Manager: {self.artist.name}")
+
         # Block signals to prevent recursion during programmatic check
         self.radio_person.blockSignals(True)
         self.radio_group.blockSignals(True)
-        
+
         self.txt_name.setText(self.artist.name)
         self.txt_sort.setText(self.artist.sort_name)
         if self.artist.type == "group":
@@ -510,17 +515,9 @@ class ArtistDetailsDialog(QDialog):
             self._refresh_data()
 
     def _promote_alias(self, alias_id, name):
-        msg = f"This will make '{name}' the main artist name.\n\n"
-        msg += f"'{self.artist.name}' will be kept as an alternative name.\n\n"
-        msg += "Continue?"
-        
-        if QMessageBox.question(self, "Change Main Name", msg,
-                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-            if self.service.promote_alias(self.artist.contributor_id, alias_id):
-                # We need to reload the whole artist object because the name changed
-                self.artist = self.service.get_by_id(self.artist.contributor_id)
-                self.setWindowTitle(f"Manager: {self.artist.name}")
-                self._refresh_data()
+        # Silent execution per "Baggage Rule"
+        if self.service.promote_alias(self.artist.contributor_id, alias_id):
+            self._refresh_data()
 
     def _edit_alias(self, alias_id, old_name):
         from .entity_picker_dialog import EntityPickerDialog

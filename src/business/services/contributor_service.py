@@ -956,6 +956,13 @@ class ContributorService:
 
         return True
 
+    def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None) -> bool:
+        """Promote an alias to become the primary name for this contributor's identity."""
+        identity_id = self._get_identity_id(contributor_id)
+        if not identity_id:
+            return False
+        return self._identity_service.promote_alias(identity_id, alias_id, batch_id=batch_id)
+
     def delete_contributor(self, contributor_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete a contributor (ArtistName) by ID."""
         return self._name_service.delete_name(contributor_id, batch_id=batch_id)

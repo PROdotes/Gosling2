@@ -65,9 +65,7 @@ class ArtistNameService:
         name.name_id = name_id
         return name
 
-    def update_name(self, name: ArtistName, batch_id: Optional[str] = None) -> bool:
-        """Update artist name details."""
-        return self._repo.update(name, batch_id=batch_id)
+
 
     def delete_name(self, name_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an artist name."""

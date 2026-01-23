@@ -402,6 +402,13 @@ class ArtistAliasAdapter(ContextAdapter):
             self.on_data_changed()
             return True
         return False
+
+    def set_primary(self, child_id: int) -> bool:
+        """Set an alias as the primary name for this identity."""
+        if self.service.promote_alias(self.artist.contributor_id, child_id):
+            self.on_data_changed()
+            return True
+        return False
     
     def get_parent_for_dialog(self) -> Any:
         return self.artist
