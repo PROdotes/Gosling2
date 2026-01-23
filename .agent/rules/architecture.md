@@ -9,7 +9,7 @@ trigger: always_on
     1.  **UI** (`src/presentation`): Can talk to Service. **NEVER** Repository. **NEVER** SQL.
     2.  **Service** (`src/business`): Logic & Orchestration. Can talk to Repo. **NEVER** UI Widgets.
     3.  **Data** (`src/data`): SQL & Models. Pure I/O.
-*   **Violation is Fatal**: If a task requires breaking this (e.g. SQL in View), **STOP** and Refactor First.
+*   **Violation is Noted**: If a task requires editing a file that breaks layering, **CONTINUE THE TASK**. Do not stop. Mention the violation in **Field Notes** at the end. Use the **GSD Protocol** in `operating_directives.md` for the work loop.
 
 ## 2. Code Structure
 *   **God Object Ban**: Any file > 600 lines is a critical risk. Logic must be split (e.g., Extract Helper, Split Service). *Note: This mandates proactive prevention for new code and surgical cleaning of legacy methods being modified, not an immediate halt for wholesale refactoring.*

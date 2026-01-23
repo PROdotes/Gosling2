@@ -1,34 +1,26 @@
----
-name: Core Protocol
-description: The fundamental operating directives for the Gosling Agent. Defines interaction style, scope management, and architectural philosophy.
----
-
 # The Gosling Core Protocol
-**NOTE: Primary Directives (Process, Scope, Philosophy) are now enforced via `rules/operating_directives.md`.**
+**NOTE: All operational logic is now governed by the GSD (Get Shit Done) Protocol in `rules/operating_directives.md`.**
 
-This skill defines extended context on how to interpret those directives.
+This skill defines the architectural guidelines for Gosling2.
 
-## 1. Extended Philosophy
-*   **The "Tomorrow Rule"**: We maintain this code tomorrow. If a fix is fast but messy, it violates the rule.
-*   **Blueprint First**: Writing the 'why' and 'how' prevents logic errors before they start.
-
-
-## 4. Architectural Boundaries
+## 1. Architectural Guidelines
 *   **Service Layer**: Business logic goes here (`src/business`).
 *   **Presentation Layer**: UI widgets go here (`src/presentation`).
 *   **Data Layer**: Repositories and Models go here (`src/data`).
-*   **Strict Separation**: Widgets should never talk directly to Repositories. They must go through a Service.
+*   **Encouraged Separation**: Try to keep UI and Data layers separate. If you notice a violation in a file you're editing, mention it in **Field Notes** but do not let it block the task.
 
-## 5. Refactor-First Mandate
-*   **Stop & Report**: If a requested user task involves editing a file that currently violates architectural boundaries (e.g., zip logic in `MainWindow`, SQL in `View`), you must **STOP**.
-*   **Propose Cleanup**: Do not build new features on top of broken foundations. Ask the user for permission to move the offending logic to its correct layer (Service/Repository) **FIRST**.
-*   **Fix Then Feature**: Only proceed with the user's original request once the structural integrity is restored.
+## 2. Structural Health
+*   **Avoid Bloat**: Keep methods focused. If a file is reaching 600 lines, log it in Field Notes as a refactoring candidate.
+*   **Progressive Cleanup**: Clean as you go, but never at the expense of functionality.
 
-## 6. The Immutable Laws (Regression Guard)
-The following features have been fixed repeatedly and are now LOCKED by Regression Tests in `tests/laws/`.
-**YOU MUST NOT BREAK THESE INVARIANTS**:
+## 3. The Laws (Regression Guard)
+The following features are sensitive. If you touch code related to these, double-check your logic:
 
-1.  **Alias Redirection**: Clicking an Alias/Member chip MUST redirect to the Primary Identity. (Check: `tests/laws/test_law_001_alias_integrity.py`)
-2.  **Unlink = Split**: Removing an alias MUST split it into a NEW Identity. NEVER DELETE the Name record.
+1.  **Alias Redirection**: Clicking an Alias/Member chip MUST redirect to the Primary Identity.
+2.  **Unlink = Split**: Removing an alias MUST split it into a NEW Identity.
 3.  **Merge = Combine**: Adding a Person to a Person MUST merge their Identities.
+
+## 4. Interaction Style
+*   **Direct & Technical**: Use technical language when discussing code, but keep the UI simple for the Night Shift DJ.
+*   **No Fluff**: No apologies, no filler. Just the status of the GSD loop.
 
