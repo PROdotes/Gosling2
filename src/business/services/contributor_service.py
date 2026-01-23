@@ -362,7 +362,6 @@ class ContributorService:
         if success and name_rec.owner_identity_id:
             identity = self._identity_service.get_identity(name_rec.owner_identity_id)
             if identity and identity.identity_type != contributor.type:
-                print(f"DEBUG: Types differ, will update identity")
                 old_type = identity.identity_type
                 new_type = contributor.type.lower()
                 identity_id = name_rec.owner_identity_id
@@ -625,8 +624,18 @@ class ContributorService:
         """Add a member to a group."""
         group_ident = self._get_identity_id(group_id)
         member_ident = self._get_identity_id(member_id)
-        
-        if not group_ident or not member_ident: return False
+
+        # Auto-create identity for orphan artists (legacy data or import edge case)
+        if not member_ident:
+            member_name = self._name_service.get_name(member_id)
+            if member_name:
+                identity = self._identity_service.create_identity("person", legal_name=member_name.display_name)
+                member_name.owner_identity_id = identity.identity_id
+                self._name_service.update_name(member_name)
+                member_ident = identity.identity_id
+
+        if not group_ident or not member_ident:
+            return False
         
         # Check if already exists (via SQL or try/except)
         try:

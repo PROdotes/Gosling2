@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QListWidget, QListWidgetItem, QFrame, QMessageBox, QWidget, QMenu, 
-    QComboBox, QRadioButton, QButtonGroup, QSizePolicy, QCompleter
+    QListWidget, QListWidgetItem, QFrame, QMessageBox, QWidget, QMenu,
+    QComboBox, QSizePolicy, QCompleter
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -130,44 +130,27 @@ class ArtistDetailsDialog(QDialog):
         
         layout.addWidget(lbl_name)
         layout.addWidget(self.txt_name)
-        
-        lbl_sort = QLabel("SORT NAME")
-        lbl_sort.setObjectName("DialogFieldLabel")
-        self.txt_sort = GlowLineEdit()
-        self.txt_sort.edit.returnPressed.connect(self._save) # Snappy: Enter to Update
-        layout.addWidget(lbl_sort)
-        layout.addWidget(self.txt_sort)
-        
-        # Type (Buttons)
-        t_row = QHBoxLayout()
-        t_row.setSpacing(20)  # Extra space for glow margins
-        t_row.setContentsMargins(0, 8, 10, 0)  # Removed bottom margin - let the glow breathe
-        self.btn_group = QButtonGroup(self)
-        self.btn_group.setExclusive(True)
-        
-        self.radio_person = GlowButton("PERSON")
-        self.radio_person.setObjectName("IdentityTypeButton")
-        self.radio_person.setCheckable(True)
-        self.radio_person.setMinimumHeight(48)  # Extra height for glow
-        self.btn_group.addButton(self.radio_person.btn, 0)
-        
-        self.radio_group = GlowButton("GROUP")
-        self.radio_group.setObjectName("IdentityTypeButton")
-        self.radio_group.setCheckable(True)
-        self.radio_group.setMinimumHeight(48)  # Extra height for glow
-        self.btn_group.addButton(self.radio_group.btn, 1)
-        
-        # UI Refresh logic (Safe-Toggle)
-        self.radio_person.btn.toggled.connect(lambda checked: self._on_type_toggled("person") if checked else None)
-        self.radio_group.btn.toggled.connect(lambda checked: self._on_type_toggled("group") if checked else None)
 
-        t_row.addWidget(self.radio_person)
-        t_row.addWidget(self.radio_group)
+        # Type Display + Convert Action
+        t_row = QHBoxLayout()
+        t_row.setContentsMargins(0, 8, 10, 0)
+
+        lbl_type = QLabel("TYPE")
+        lbl_type.setObjectName("DialogFieldLabel")
+        t_row.addWidget(lbl_type)
+
+        self.lbl_current_type = QLabel("PERSON")
+        self.lbl_current_type.setObjectName("TypeDisplayLabel")
+        t_row.addWidget(self.lbl_current_type)
+
         t_row.addStretch()
+
+        self.btn_convert_type = GlowButton("Convert to Group")
+        self.btn_convert_type.setObjectName("ConvertTypeButton")
+        self.btn_convert_type.clicked.connect(self._convert_type)
+        t_row.addWidget(self.btn_convert_type)
+
         layout.addLayout(t_row)
-        
-        # Spacer for glow to render without clipping
-        layout.addSpacing(8)
         
         line = QFrame()
         line.setObjectName("FieldGroupLine")
@@ -297,23 +280,17 @@ class ArtistDetailsDialog(QDialog):
             self.artist = primary
             self.setWindowTitle(f"Manager: {self.artist.name}")
 
-        # Block signals to prevent recursion during programmatic check
-        self.radio_person.blockSignals(True)
-        self.radio_group.blockSignals(True)
-
         self.txt_name.setText(self.artist.name)
-        self.txt_sort.setText(self.artist.sort_name)
+
+        # Update type display and convert button
         if self.artist.type == "group":
-            self.radio_group.setChecked(True)
-            self.radio_person.setChecked(False)
+            self.lbl_current_type.setText("GROUP")
+            self.btn_convert_type.setText("Convert to Person")
             self.lbl_member.setText("GROUP MEMBERS")
         else:
-            self.radio_person.setChecked(True)
-            self.radio_group.setChecked(False)
+            self.lbl_current_type.setText("PERSON")
+            self.btn_convert_type.setText("Convert to Group")
             self.lbl_member.setText("BELONGS TO GROUPS")
-            
-        self.radio_person.blockSignals(False)
-        self.radio_group.blockSignals(False)
             
         # Aliases - now uses EntityListWidget!
         # Update the adapter with current artist
@@ -335,12 +312,31 @@ class ArtistDetailsDialog(QDialog):
         self.list_members.context_adapter = self._member_adapter
         self.list_members.refresh_from_adapter()
 
-    def _on_type_toggled(self, new_type):
-        """Update local model and refresh context labels."""
-        if self.artist.type == new_type:
-            return
+    def _convert_type(self):
+        """Convert between person and group with confirmation."""
+        current = self.artist.type
+        new_type = "group" if current == "person" else "person"
+
+        # Check for data loss
+        if current == "group":
+            membership_count = len(self.service.get_members(self.artist.contributor_id))
+        else:
+            membership_count = len(self.service.get_groups(self.artist.contributor_id))
+
+        if membership_count > 0:
+            msg = f"Converting this {current.capitalize()} to a {new_type.capitalize()} will remove {membership_count} group membership(s). Continue?"
+            if QMessageBox.warning(self, "Confirm Type Change", msg,
+                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+                return
+
+        # Perform conversion via service
         self.artist.type = new_type
-        self._refresh_data()
+        if self.service.update(self.artist):
+            self.original_type = new_type
+            self._refresh_data()
+        else:
+            self.artist.type = current  # Revert on failure
+            QMessageBox.warning(self, "Error", "Failed to convert artist type.")
 
     def _add_alias(self):
         # UNIFY: Use the modern EntityPickerDialog (matching "add person" flow)
@@ -442,32 +438,32 @@ class ArtistDetailsDialog(QDialog):
         """Handle adding a member/group, with Person->Person merge bypass."""
         from .entity_picker_dialog import EntityPickerDialog
         from src.core.picker_config import get_artist_picker_config
-        
+
         # Determine allowed types based on current artist
         # Person: Can join 'Group' OR merge with 'Person'
         # Group: Can have 'Person' members
         allowed = ["Group", "Person"] if self.artist.type == "person" else ["Person"]
-        
+
         diag = EntityPickerDialog(
             service_provider=self._service_adapter,
             config=get_artist_picker_config(allowed_types=allowed),
             parent=self
         )
-        
+
         if diag.exec():
             target = diag.get_selected()
             if not target: return
-            
+
             # 1. Check types for Person->Person merge (The Gabriel/Gustavo Rule)
             # Fetch fresh model to be sure of type
             real_target = self.service.get_by_id(target.contributor_id)
             if not real_target: return
-            
+
             if self.artist.type == "person" and real_target.type == "person":
                 # They are the same artist? Merge identities.
                 # Apply Baggage Rule
                 aliases = self.service.get_aliases(target.contributor_id)
-                
+
                 if not aliases:
                     # SILENT
                     if self.service.merge(target.contributor_id, self.artist.contributor_id):
@@ -486,7 +482,6 @@ class ArtistDetailsDialog(QDialog):
                 return
 
             # 2. Normal Membership link (Group involved)
-            # Use the adapter to handle the link correctly (handles alias names too)
             self._member_adapter.link(target.contributor_id, matched_alias=getattr(target, 'matched_alias', None))
             self._refresh_data()
 
@@ -553,40 +548,16 @@ class ArtistDetailsDialog(QDialog):
     def _save(self):
         new_name = self.txt_name.text().strip()
         if not new_name: return
-        
-        new_type = "group" if self.radio_group.isChecked() else "person"
 
-        # 1. COLLISION DETECTION & MERGE PROMPT
-        # Check if name CHANGED (Case-sensitive check effectively, but we handle casing logic below)
+        # COLLISION DETECTION & MERGE PROMPT
         if new_name != self.artist.name:
-            # Check if target exists (excluding self)
             target_collision = self.service.get_collision(new_name, self.artist.contributor_id)
             if target_collision:
                 if self._resolve_collision(target_collision):
                      return # Done (Merged)
 
-        # Safety check for type change (Data integrity)
-        if self.original_type != new_type:
-            alias_count = len(self.service.get_aliases(self.artist.contributor_id))
-            if self.original_type == "group":
-                # Losing 'Children'
-                membership_count = len(self.service.get_members(self.artist.contributor_id))
-                relation = "member"
-            else:
-                # Losing 'Parents'
-                membership_count = len(self.service.get_groups(self.artist.contributor_id))
-                relation = "group membership"
-
-            if alias_count > 0 or membership_count > 0:
-                msg = f"Changing this {self.original_type.capitalize()} to a {new_type.capitalize()} will remove existing aliases and group memberships. Are you sure?"
-                if QMessageBox.warning(self, "Confirm Type Change", msg,
-                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
-                    return
-        
         self.artist.name = new_name
-        self.artist.sort_name = self.txt_sort.text().strip()
-        self.artist.type = new_type
-        
+
         try:
             update_result = self.service.update(self.artist)
             if update_result:
