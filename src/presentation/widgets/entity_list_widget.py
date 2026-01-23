@@ -502,7 +502,11 @@ class EntityListWidget(QWidget):
         menu = QMenu(self)
         
         # Priority Actions (Restore "Set Primary" functionality)
-        if hasattr(self.context_adapter, 'set_primary'):
+        # T-Restriction: Only show for Genres and Albums (User Request)
+        is_genre = self.entity_type == EntityType.TAG and label.startswith("Genre:")
+        is_album = self.entity_type == EntityType.ALBUM
+        
+        if (is_genre or is_album) and hasattr(self.context_adapter, 'set_primary'):
             menu.addAction("Set as Primary ★").triggered.connect(lambda: self._set_primary_internal(entity_id))
             menu.addSeparator()
         

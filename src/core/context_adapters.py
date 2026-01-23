@@ -290,32 +290,41 @@ class SongFieldAdapter(ContextAdapter):
         return True
     
     def set_primary(self, child_id: int) -> bool:
-        """Atomic reorder to make a tag primary and save immediately."""
-        if self.field_name != 'tags' or not self.songs:
+        """Promote entity to primary status (Atomic Save)."""
+        if not self.songs:
             return False
-        
-        # Immediate Save Mode (Atomic)
-        # We target the specific category of the requested tag
-        entity = self.service.get_by_id(child_id)
-        if not entity or not hasattr(entity, 'category'):
-            return False
-            
-        category = entity.category
-        success_any = False
 
-        for song in self.songs:
-            # 1. Fetch current tags for this specific category from DB (fresh)
-            current_tags = self.service.get_tags_for_source(song.source_id, category)
-            # 2. Reorder
-            ordered_ids = [t.tag_id for t in current_tags]
-            if child_id in ordered_ids:
-                ordered_ids.remove(child_id)
-            ordered_ids.insert(0, child_id)
-            
-            # 3. Save Atomic (Bypassing staging)
-            if self.service.set_tags(song.source_id, ordered_ids, category):
-                success_any = True
+        success_any = False
         
+        # 1. TAGS: Reorder within category
+        if self.field_name == 'tags':
+            # Immediate Save Mode (Atomic)
+            # We target the specific category of the requested tag
+            entity = self.service.get_by_id(child_id)
+            if not entity or not hasattr(entity, 'category'):
+                return False
+                
+            category = entity.category
+            for song in self.songs:
+                # 1. Fetch current tags for this specific category from DB (fresh)
+                current_tags = self.service.get_tags_for_source(song.source_id, category)
+                # 2. Reorder
+                ordered_ids = [t.tag_id for t in current_tags]
+                if child_id in ordered_ids:
+                    ordered_ids.remove(child_id)
+                ordered_ids.insert(0, child_id)
+                
+                # 3. Save Atomic (Bypassing staging)
+                if self.service.set_tags(song.source_id, ordered_ids, category):
+                    success_any = True
+        
+        # 2. ALBUM: Switch Primary Album
+        elif self.field_name == 'album':
+            if hasattr(self.service, 'set_primary_album'):
+                for song in self.songs:
+                    if self.service.set_primary_album(song.source_id, child_id):
+                        success_any = True
+
         if success_any:
             self.on_data_changed()
             
