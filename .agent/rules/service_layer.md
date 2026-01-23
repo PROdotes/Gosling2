@@ -336,3 +336,7 @@ class ImportService(QObject):
         worker.completed.connect(self.completed)
         # ... setup thread
 ```
+## 11. Facade Integrity (The Orchestrator Rule)
+*   **Completeness**: Facade services (e.g., `ContributorService`) MUST expose all necessary operations from their underlying domain services (`IdentityService`, `ArtistNameService`) if the UI requires them.
+*   **Delegation**: Always prefer delegating to an existing domain service method over re-implementing logic in the facade.
+*   **Consistency**: Ensure method signatures in the facade align with the domain service to maintain predictable behavior.

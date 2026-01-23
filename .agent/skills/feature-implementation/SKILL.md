@@ -4,6 +4,7 @@ description: Structured workflow for implementing new features with planning, ve
 ---
 
 # Feature Implementation Workflow
+**NOTE: All operational logic is now governed by the GSD (Get Shit Done) Protocol in `rules/operating_directives.md`.**
 
 This skill provides a systematic approach to implementing new features in Gosling2, ensuring architectural compliance and quality.
 

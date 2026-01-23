@@ -27,7 +27,18 @@ trigger: always_on
 - **Destructive Warnings**: Only interrupt the user if they are about to permanently lose data or make a significant, hard-to-reverse change.
 - **Clear Consequences**: If you do warn, explain *exactly* what will happen in plain English (e.g., "This will delete 'Abb'.").
 
-## 4. Specific Scenarios
+## 5. Code Change Discipline (The Approval Blockade)
+- **PLAN FIRST, CODE NEVER (PRESUMPTIVELY)**: For EVERY task, no matter how small, you MUST:
+  1. Research the target area.
+  2. Present a technical blueprint (files, methods, testing strategy).
+  3. **STOP AND WAIT**. You are FORBIDDEN from calling `write_to_file`, `replace_file_content`, `multi_replace_file_content`, or any other code-editing tools in the SAME TURN as your blueprint.
+  4. Only proceed once the USER has provided explicit approval (e.g., "Go", "Approved", "Do it").
+- **Research First**: Never assume you know a file's content. View it.
+- **No Drafts**: Do not provide "draft" code that isn't intended to be applied.
+- **Atomic Edits**: Prefer `replace_file_content` for specific fixes over overwriting entire files.
+- **Strict Scope**: NEVER perform unrelated refactoring, cleanup, or "linting" while working on a specific feature or bug. If you spot code smells, note them but stay on the path to the current goal.
+
+## 6. Specific Scenarios
 - **Renaming to Existing Item**:
   - Implied Intent: The user likely made a typo or wants to consolidate.
   - Preferred Action: "Combine" or "Fix".
