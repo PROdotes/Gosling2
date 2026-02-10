@@ -1,7 +1,7 @@
 from typing import List, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox,
-    QScrollArea, QFrame, QSizePolicy, QMessageBox, QMenu
+    QScrollArea, QFrame, QSizePolicy, QMessageBox, QMenu, QDialog
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl, QSize
 from PyQt6.QtGui import QFont, QDesktopServices, QAction, QIcon
@@ -13,6 +13,7 @@ from ...core.entity_registry import EntityType
 from ...core.entity_click_router import ClickResult, ClickAction
 from ...core.context_adapters import SongFieldAdapter
 from ..dialogs.entity_picker_dialog import EntityPickerDialog
+from ..dialogs.spotify_import_dialog import SpotifyImportDialog
 from ...core.picker_config import get_tag_picker_config, get_artist_picker_config
 
 import copy
@@ -57,6 +58,7 @@ class SidePanelWidget(QFrame):
         self.publisher_service = library_service.publisher_service
         self.tag_service = library_service.tag_service
         self.contributor_service = library_service.contributor_service
+        self.services = self # Satisfy service provider requirements for nested dialogs
         
         self.isrc_collision = False
         
@@ -506,6 +508,18 @@ class SidePanelWidget(QFrame):
                         header_layout.addWidget(btn_search)
 
                     header_layout.addWidget(label, 1)
+                    
+                    # SPOTIFY IMPORT: Import Button for Performers
+                    if field.name == 'performers':
+                        btn_spotify = GlowButton("Spotify")
+                        btn_spotify.setFixedSize(50, 20)
+                        btn_spotify.setCursor(Qt.CursorShape.PointingHandCursor)
+                        btn_spotify.set_radius_style("border-radius: 4px;")
+                        btn_spotify.set_font_size(8)
+                        btn_spotify.set_font_weight("bold")
+                        btn_spotify.setToolTip("Import Artists from Spotify Credits")
+                        btn_spotify.clicked.connect(self._open_spotify_import)
+                        header_layout.addWidget(btn_spotify)
                     
                     # TITLE TOOLS: Casing Buttons (Right Side)
                     if field.name == 'title':
@@ -2590,12 +2604,12 @@ class SidePanelWidget(QFrame):
                 self._update_save_state()
                 QMessageBox.information(self, "ISRCs Staged", f"Staged {len(conflicts)} ISRC updates. Click Save to apply.")
             elif skip.isChecked():
-                # Do nothing, conflicts are already skipped
+                    # Do nothing, conflicts are already skipped
                 QMessageBox.information(self, "Skipped", f"Skipped {len(conflicts)} songs with ISRC conflicts.")
             # else keep_existing: already handled (nothing done during initial processing)
 
     def _open_scrubber(self):
-        """Open the ScrubberDialog for the current song."""
+        # Open the ScrubberDialog for the current song.
         if not self.current_songs:
             return
             
@@ -2610,6 +2624,37 @@ class SidePanelWidget(QFrame):
         
         dlg.exec()
         
+        self.refresh_content()
+
+    def _open_spotify_import(self):
+        """Open the Spotify credit import dialog."""
+        dialog = SpotifyImportDialog(self.services, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            results = dialog.get_result()
+            if results:
+                self._apply_spotify_import(results)
+
+    def _apply_spotify_import(self, results):
+        """Link imported artists and roles to current songs."""
+        if not self.current_songs:
+            return
+
+        # Process each artist
+        for artist in results:
+            name = artist["name"]
+            roles = artist["roles"]
+            
+            # 1. Get/Create Identity
+            artist_obj, _ = self.contributor_service.get_or_create(name)
+            identity_id = artist_obj.contributor_id
+            
+            # 2. Link each role to all selected songs
+            for song in self.current_songs:
+                for role in roles:
+                    # add_song_role handles immediate DB write
+                    self.contributor_service.add_song_role(song.source_id, identity_id, role)
+        
+        # 3. UI Refresh & Synchronization
         self.refresh_content()
         self.filter_refresh_requested.emit()
 

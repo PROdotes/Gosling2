@@ -5,3 +5,4 @@ from .combo_box import GlowComboBox
 from .tooltip import ReviewTooltip
 from .led import GlowLED
 from .toggle import GlowToggle
+from .plain_text_edit import GlowPlainTextEdit

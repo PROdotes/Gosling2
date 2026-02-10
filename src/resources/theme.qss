@@ -264,6 +264,16 @@ QScrollBar::handle:vertical:hover {
     font-size: 10pt;
 }
 
+/* === SPOTIFY IMPORT PREVIEW === */
+#SpotifyArtistItem {
+    background-color: transparent;
+    border-bottom: 1px solid #1A1A1A;
+}
+
+#SpotifyArtistItem[has_unknown_roles="true"] {
+    background-color: rgba(255, 198, 109, 0.1); /* Subtle amber glow when mapping is needed */
+}
+
 #ChipRemoveButton {
     color: #666666;
     font-size: 12pt;

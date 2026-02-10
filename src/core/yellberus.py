@@ -453,7 +453,7 @@ FIELDS: List[FieldDef] = [
         required=True,
         searchable=False,
         strategy='decade_grouper',
-        visible=False,
+        visible=True,
     ),
     FieldDef(
         name='file_id',
