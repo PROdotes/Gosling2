@@ -19,6 +19,8 @@ from ...core.picker_config import get_tag_picker_config, get_artist_picker_confi
 import copy
 import os
 import logging
+import re
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 # from ..dialogs.album_manager_dialog import AlbumManagerDialog  # Moved to _open_album_manager to break cycle
@@ -1214,6 +1216,24 @@ class SidePanelWidget(QFrame):
         # Gather initial data from current selection to auto-populate "Create New"
         initial_data = {}
         
+        # T-Feature: Always gather Song Context as a baseline for the "Import Data" feature
+        song_context = {}
+        if self.current_songs:
+            song = self.current_songs[0]
+            sid = song.source_id
+            eff_performers = self._get_effective_value(sid, 'performers', song.performers)
+            eff_title = self._get_effective_value(sid, 'title', song.name)
+            
+            d_artist = eff_performers if isinstance(eff_performers, list) else [str(eff_performers)] if eff_performers else []
+            disp_artist = ", ".join(d_artist) if d_artist else "Unknown"
+            
+            song_context = {
+                'artist': self._get_effective_value(sid, 'album_artist', song.album_artist) or d_artist,
+                'year': self._get_effective_value(sid, 'recording_year', song.recording_year) or "",
+                'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
+                'display': f"{disp_artist} - {eff_title}"
+            }
+        
         if initial_album:
              initial_data = {
                  'title': initial_album.title,
@@ -1222,14 +1242,14 @@ class SidePanelWidget(QFrame):
                  'publisher': self.album_service.get_publisher(initial_album.album_id),
                  'album_id': initial_album.album_id,
                  'song_display': "Deep Link Selection",
-                 'focus_publisher': focus_publisher
+                 'focus_publisher': focus_publisher,
+                 'song_context': song_context
              }
         elif self.current_songs:
             song = self.current_songs[0]
             sid = song.source_id
             
             # T-70: Use Effective Values (Staged or Persisted) to ensure we capture "Just Typed" edits
-            # This ensures "Create New Album" sees the corrected Artist/Title
             eff_performers = self._get_effective_value(sid, 'performers', song.performers)
             eff_title = self._get_effective_value(sid, 'title', song.name)
             
@@ -1245,11 +1265,9 @@ class SidePanelWidget(QFrame):
             init_title = "" if clean_slate else (self._get_effective_value(sid, 'album', song.album) or "")
             init_id = None if clean_slate else self._get_effective_value(sid, 'album_id', getattr(song, 'album_id', None))
             
-            # T-Fix: If Creating New ('add'), do NOT pre-select the existing album ID. 
-            # We want the context strings (Artist/Title) but not the ID link.
             if mode == 'add':
                 init_id = None
-                init_title = "" # Also clear title so we don't search for 'Unknown Album' or current context
+                init_title = "" 
             
             initial_data = {
                 'title': init_title,
@@ -1258,7 +1276,8 @@ class SidePanelWidget(QFrame):
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
                 'album_id': init_id,
                 'song_display': f"{disp_artist} - {eff_title}",
-                'focus_publisher': focus_publisher
+                'focus_publisher': focus_publisher,
+                'song_context': song_context
             }
             
         initial_data['mode'] = mode
@@ -1852,45 +1871,69 @@ class SidePanelWidget(QFrame):
         if not self.current_songs:
             return []
 
-        missing_reasons = set()
-        
-        # Use Official Yellberus Validation (Single Source of Truth)
+        all_errors = set()
         for song in self.current_songs:
-            # 1. Construct Row Data matching FIELDS order
-            validation_row = []
-            for field in yellberus.FIELDS:
-                attr = field.model_attr or field.name
-                val = self._get_effective_value(song.source_id, field.name, getattr(song, attr, ""))
-                validation_row.append(val)
+            errors = self._get_song_validation_errors(song)
+            if errors:
+                logger.debug(f"Song '{song.name}' [ID:{song.source_id}] validation failed: {errors}")
+            all_errors.update(errors)
+        
+        return sorted(list(all_errors))
 
-            # 2. Check Completeness
-            incomplete_fields = yellberus.check_completeness(validation_row)
-            for f_name in incomplete_fields:
-                field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
-                if field_def and field_def.ui_header:
-                    missing_reasons.add(f"Missing: {field_def.ui_header}")
-                else:
-                    missing_reasons.add(f"Missing: {f_name}")
+    def _get_song_validation_errors(self, song, projected_changes: dict = None) -> List[str]:
+        """
+        Check if a specific song satisfies all completeness and validation rules.
+        projected_changes: Optional snapshot of changes being emitted (priority over staging).
+        """
+        missing_reasons = set()
+        validation_row = []
+        
+        def get_val(s_id, f_name, db_v):
+            if projected_changes and s_id in projected_changes and f_name in projected_changes[s_id]:
+                return projected_changes[s_id][f_name]
+            return self._get_effective_value(s_id, f_name, db_v)
 
-            # 3. Call Format Validation
-            failed_fields = yellberus.validate_row(validation_row)
-
-            # 4. Format Errors
-            for f_name in failed_fields:
-                field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
-                if not field_def: continue
-
-                # Special phrasing for Groups
-                if f_name in ['performers', 'groups']:
-                    missing_reasons.add("Required: Performers / Groups")
-                elif field_def.ui_header:
-                    missing_reasons.add(f"Invalid: {field_def.ui_header}")
-                else:
-                    missing_reasons.add(f"Invalid: {field_def.name}")
+        for field in yellberus.FIELDS:
+            attr = field.model_attr or field.name
+            val = get_val(song.source_id, field.name, getattr(song, attr, ""))
             
-        # 4. ISRC Collision Check (Global state)
+            # T-Fix: Field Aliasing for validation
+            # If 'performers' is empty but 'album_artist' is present, consider it valid enough for air
+            if field.name == 'performers' and not val:
+                 val = get_val(song.source_id, 'album_artist', getattr(song, 'album_artist', ""))
+            
+            # If 'publisher' is empty but 'publisher_id' is present...
+            if field.name == 'publisher' and not val:
+                 val = get_val(song.source_id, 'publisher_id', getattr(song, 'publisher_id', ""))
+
+            validation_row.append(val)
+
+        # 1. Completeness (T-104)
+        incomplete_fields = yellberus.check_completeness(validation_row)
+        for f_name in incomplete_fields:
+            field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
+            missing_reasons.add(f"Missing: {field_def.ui_header if field_def else f_name}")
+
+        # 2. Format Validation
+        failed_fields = yellberus.validate_row(validation_row)
+        for f_name in failed_fields:
+            field_def = next((f for f in yellberus.FIELDS if f.name == f_name), None)
+            if not field_def: continue
+
+            # Special phrasing for Groups
+            if f_name in ['performers', 'groups']:
+                missing_reasons.add("Required: Performers / Groups")
+            elif field_def.ui_header:
+                missing_reasons.add(f"Invalid: {field_def.ui_header}")
+            else:
+                missing_reasons.add(f"Invalid: {field_def.name}")
+
+        # 3. ISRC Collision Check (Global state)
         if getattr(self, 'isrc_collision', False):
-            missing_reasons.add("Duplicate ISRC Detected")
+             # Check if this song has an ISRC staged or in DB
+             isrc_val = self._get_effective_value(song.source_id, 'isrc', getattr(song, 'isrc', None))
+             if isrc_val:
+                missing_reasons.add("Duplicate ISRC Detected")
             
         return sorted(list(missing_reasons))
 
@@ -1938,7 +1981,6 @@ class SidePanelWidget(QFrame):
                           errors.append(str(e))
         
         if errors:
-             from PyQt6.QtWidgets import QMessageBox
              QMessageBox.warning(self, "Invalid Data", "\n".join(set(errors)))
              self.btn_save.setChecked(False) # Unlatch if checkable
              return
@@ -1949,9 +1991,6 @@ class SidePanelWidget(QFrame):
                 changes_to_emit[song.source_id] = {} # Empty dict implies "Save Current State"
         
         # Auto-fill Year logic (User Request)
-        from datetime import datetime
-        import re
-        from datetime import datetime
         
         # Determine Default Year (Configurable via Settings)
         default_year_setting = 0
@@ -2005,13 +2044,49 @@ class SidePanelWidget(QFrame):
                     formatted = re.sub(r'([a-z])([A-Z])', r'\1, \2', clean_val)
                     changes['composers'] = formatted
         
+        # T-Feature: Finalize Prompt (User Request)
+        # Identify songs that are Complete but still Pending (is_done=0)
+        finalize_candidates = []
+        for song in self.current_songs:
+            # 1. Is it currently Pending (locally or in DB)?
+            # Note: We don't check changes_to_emit for 'is_done' here because we want to know 
+            # if it was ALREADY pending before this prompt.
+            st_eff = self._get_effective_value(song.source_id, 'is_done', song.processing_status)
+            if not bool(st_eff):
+                # 2. Is it now complete and valid?
+                # Crucial: pass changes_to_emit so validator sees auto-filled Year etc.
+                errs = self._get_song_validation_errors(song, projected_changes=changes_to_emit)
+                if not errs:
+                    finalize_candidates.append(song)
+                else:
+                    logger.debug(f"Finalize check for '{song.name}': rejected due to {errs}")
+
+        if finalize_candidates:
+            noun = "song" if len(finalize_candidates) == 1 else "songs"
+            verb = "is" if len(finalize_candidates) == 1 else "are"
+            msg = f"{len(finalize_candidates)} {noun} {verb} complete!"
+            if len(finalize_candidates) == 1:
+                msg = f"'{finalize_candidates[0].name}' is complete!"
+            
+            res = QMessageBox.question(
+                self, 
+                "Finalize?", 
+                f"{msg}\n\nDo you want to mark {noun} as 'Ready to Finalize'?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if res == QMessageBox.StandardButton.Yes:
+                for s in finalize_candidates:
+                    if s.source_id not in changes_to_emit:
+                        changes_to_emit[s.source_id] = {}
+                    changes_to_emit[s.source_id]['is_done'] = 1
+
         self.save_requested.emit(changes_to_emit, self._hidden_album_ids)
         
         # Optimistic UI update or wait for refresh?
         # Usually Main Window refreshes us.
         self._staged_changes.clear()
         self._hidden_album_ids.clear()
-            
+        
         self._update_save_state()
         
         # Broadcast dirty state (Magenta Alert)

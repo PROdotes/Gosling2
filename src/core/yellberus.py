@@ -608,7 +608,9 @@ def check_completeness(row_data: list) -> set:
             for prefix in REQUIRED_TAG_PREFIXES:
                 has_tag = any(t.startswith(prefix) for t in tags_list)
                 if not has_tag:
-                    incomplete_fields.add(prefix.rstrip(':'))
+                    p_clean = prefix.rstrip(':')
+                    incomplete_fields.add(p_clean)
+                    incomplete_fields.add('tags')  # Mark the column itself as failing
 
     return incomplete_fields
     

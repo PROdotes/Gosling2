@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QStyledItemDelegate, QStyleOptionViewItem, QStyle, Q
 from PyQt6.QtCore import Qt, QRect, QSize, QPoint
 from PyQt6.QtGui import QPainter, QColor, QFont, QBrush, QPen, QLinearGradient
 from ...resources import constants
-from ...resources.constants import ROLE_HEALTH_STATUS
+from ...resources.constants import ROLE_HEALTH_STATUS, ROLE_IS_INCOMPLETE
 from ...core.yellberus import HealthStatus
 from .glow.led import GlowLED
 
@@ -116,17 +116,12 @@ class WorkstationDelegate(QStyledItemDelegate):
             # T-Feature: Highlight missing required fields during Incomplete/Validation workflows
             highlight_mode = getattr(self.parent(), '_show_incomplete', False)
             if highlight_mode:
-                 text = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
-                 if not text.strip(): # Empty Check
-                      col_name = self._get_column_name_by_index(index.column())
-                      if col_name and col_name not in ('is_active'): # Skip technical cols
-                           from ...core import yellberus
-                           field = yellberus.get_field(col_name)
-                           if field and field.required:
-                                # Subtle Red Warning Tint
-                                warn = QColor("#FF0000")
-                                warn.setAlpha(25)
-                                painter.fillRect(rect, warn)
+                 # T-89: Check per-cell incompleteness signal set by the model
+                 if index.data(ROLE_IS_INCOMPLETE):
+                      # Subtle Red Warning Tint
+                      warn = QColor("#FF0000")
+                      warn.setAlpha(25)
+                      painter.fillRect(rect, warn)
 
             # 2. Row-Level Hover Handling
             # T-90: Use the delegate's parent (LibraryWidget) for state tracking

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 import json
 import subprocess
 from ...resources import constants
-from ...resources.constants import ROLE_HEALTH_STATUS
+from ...resources.constants import ROLE_HEALTH_STATUS, ROLE_IS_INCOMPLETE
 from .filter_widget import FilterWidget
 from ...core import yellberus
 from ...core.yellberus import HealthStatus
@@ -541,6 +541,19 @@ class LibraryTable(QTableView):
                     return
                 parent = parent.parent()
         
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            indexes = self.selectionModel().selectedRows()
+            if len(indexes) == 1:
+                # Find the LibraryWidget parent
+                parent = self.parent()
+                while parent:
+                    if isinstance(parent, LibraryWidget):
+                        song = parent._get_song_from_index(indexes[0])
+                        if song:
+                            parent._open_scrubber_for_song(song)
+                        return
+                    parent = parent.parent()
+
         super().keyPressEvent(event)
 
 
@@ -1230,11 +1243,27 @@ class LibraryWidget(QWidget):
 
     def load_library(self, refresh_filters=True):
         """Load library from database, preserving selection if possible."""
-        # 1. Capture current selection (IDs)
+        # 1. Capture current selection & focus (IDs)
         selected_ids = set()
+        focused_id = None
         id_col = self.field_indices.get('file_id', -1)
-        if id_col != -1:
+        
+        if id_col != -1 and self.table_view.selectionModel():
             selection_model = self.table_view.selectionModel()
+            
+            # --- Capture Focused Song ---
+            curr_idx = self.table_view.currentIndex()
+            if curr_idx.isValid():
+                source_idx = self.proxy_model.mapToSource(curr_idx)
+                item = self.library_model.item(source_idx.row(), id_col)
+                if item:
+                    raw_val = item.data(Qt.ItemDataRole.UserRole)
+                    try:
+                        focused_id = str(int(float(raw_val))) if raw_val is not None else None
+                    except (ValueError, TypeError):
+                        pass
+
+            # --- Capture Selected Songs ---
             for index in selection_model.selectedRows():
                 source_index = self.proxy_model.mapToSource(index)
                 item = self.library_model.item(source_index.row(), id_col)
@@ -1266,34 +1295,40 @@ class LibraryWidget(QWidget):
         if self._dirty_ids:
             self.update_dirty_rows(list(self._dirty_ids))
 
-        # 4. Restore Selection
-        if selected_ids and id_col != -1:
+        # 4. Restore Selection & Focus
+        if (selected_ids or focused_id) and id_col != -1:
             from PyQt6.QtCore import QItemSelectionModel
             selection_model = self.table_view.selectionModel()
             selection_model.clearSelection() # Clean start
             
             # Iterate rows to find matches
-            # Optimization: could build a map, but for <10k rows linear scan is usually acceptable for UI refresh
             for row in range(self.library_model.rowCount()):
                 item = self.library_model.item(row, id_col)
                 if not item: continue
                 
                 raw_val = item.data(Qt.ItemDataRole.UserRole)
                 try:
-                    # Same safe extraction
                     current_id = str(int(float(raw_val))) if raw_val is not None else ""
                 except ValueError:
                     current_id = ""
                 
-                if current_id in selected_ids:
-                    # Map to Proxy
+                if current_id:
                     source_idx = self.library_model.index(row, 0)
                     proxy_idx = self.proxy_model.mapFromSource(source_idx)
-                    if proxy_idx.isValid():
+                    
+                    if not proxy_idx.isValid():
+                        continue
+
+                    # Restore Selection
+                    if current_id in selected_ids:
                         selection_model.select(
                             proxy_idx,
                             QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
                         )
+                    
+                    # Restore Focus (Keyboard Cursor)
+                    if focused_id and current_id == focused_id:
+                        self.table_view.setCurrentIndex(proxy_idx)
         
         # 5. Notify Listeners (e.g. SidePanelWidget)
         self.library_reloaded.emit()
@@ -1313,8 +1348,9 @@ class LibraryWidget(QWidget):
             if col_idx < len(yellberus.FIELDS):
                 field_def = yellberus.FIELDS[col_idx]
                 
-                # T-106: Show ONLY if required AND normally visible (don't show hidden IDs)
-                should_show = field_def.required and field_def.visible
+                # T-106: Show ONLY if required AND normally visible
+                # BUT always show Status Deck (is_active) and Tags for triage context
+                should_show = (field_def.required or field_def.name in ('is_active', 'tags')) and field_def.visible
                 
                 self.table_view.setColumnHidden(col_idx, not should_show)
             else:
@@ -1471,10 +1507,11 @@ class LibraryWidget(QWidget):
                         item.setText("")
                     
                     # Visual Indicator for Incomplete Fields
-                    if show_incomplete:
-                        if col_idx < len(yellberus.FIELDS):
-                            field_name = yellberus.FIELDS[col_idx].name
-                            if field_name and field_name in failing_fields:
+                    if col_idx < len(yellberus.FIELDS):
+                        field_name = yellberus.FIELDS[col_idx].name
+                        if field_name and field_name in failing_fields:
+                            item.setData(True, ROLE_IS_INCOMPLETE)
+                            if show_incomplete:
                                 item.setToolTip(f"{field_name} is incomplete")
 
                     items.append(item)
@@ -1527,7 +1564,7 @@ class LibraryWidget(QWidget):
         # we shift to Incomplete/Triage mode to show the required columns.
         status_filters = active_filters.get('is_done', set())
         needs_triage_view = False
-        if False in status_filters or "READY" in status_filters or "INCOMPLETE" in status_filters:
+        if "INCOMPLETE" in status_filters:
             needs_triage_view = True
             
         if needs_triage_view != self._show_incomplete:

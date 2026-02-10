@@ -332,6 +332,13 @@ class AlbumManagerDialog(QDialog):
         layout.setSpacing(0)  # Zero spacing - manual control like side panel
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         
+        # T-Feature: Quick Import from Context Song
+        self.btn_import_context = GlowButton("Import Data from Song")
+        self.btn_import_context.setToolTip("Fill Artist, Publisher, and Year from the current song context")
+        self.btn_import_context.clicked.connect(self._import_song_data)
+        layout.addWidget(self.btn_import_context)
+        layout.addSpacing(15)
+        
         # Form Fields (use FieldLabel for tight label-to-input proximity)
         # Form Fields (use FieldLabel for tight label-to-input proximity)
         # Form Fields
@@ -518,46 +525,9 @@ class AlbumManagerDialog(QDialog):
              AlbumPublisherAdapter(self.current_album, self.publisher_service, stage_change_fn=self._stage_inspector_change)
         )
         
-        # Populate Trays from Initial Data
-        if self.initial_data.get('artist'):
-            art_val = self.initial_data.get('artist')
-            # If string, resolve or wrap. If list, resolve each.
-            names = art_val if isinstance(art_val, list) else [art_val]
-            resolved = []
-            for name in names:
-                if not isinstance(name, str):
-                     resolved.append(name)
-                     continue
-                
-                art_obj = self.contributor_service.get_by_name(name)
-                if art_obj:
-                    resolved.append(art_obj)
-                else:
-                    # Ghost Chip
-                    resolved.append((0, name, "👤", False, False, "New Artist", "amber", False))
-            self.tray_artist.set_items(resolved)
-            
-        if self.initial_data.get('publisher'):
-            pub_val = self.initial_data.get('publisher')
-            names = pub_val if isinstance(pub_val, list) else [pub_val]
-            resolved = []
-            for name in names:
-                if not isinstance(name, str):
-                    resolved.append(name)
-                    continue
-                
-                pub_obj = self.publisher_service.find_by_name(name)
-                if pub_obj:
-                    resolved.append(pub_obj)
-                else:
-                    # Ghost Chip
-                    resolved.append((0, name, "🏢", False, False, "New Publisher", "amber", False))
-            self.tray_publisher.set_items(resolved)
+        # Shared logic for populating UI from Song Context
+        self._fill_fields_from_context()
         
-        # Populate UI
-        self.inp_title.setText(self.current_album.title)
-        self.inp_year.setText(str(self.current_album.release_year) if self.current_album.release_year else "")
-            
         if self.settings_manager:
             self.cmb_type.setCurrentText(self.settings_manager.get_default_album_type())
         else:
@@ -600,6 +570,84 @@ class AlbumManagerDialog(QDialog):
         sender = self.sender()
         if sender:
             sender.setProperty("ghost", False)
+
+    def _import_song_data(self):
+        """Fill current inspector fields with data from the song context."""
+        if not self.initial_data or not self.current_album:
+            return
+
+        self._fill_fields_from_context()
+
+        # Update Dirty State and Header for feedback
+        self.btn_save_inspector.setProperty("dirty", True)
+        self.btn_save_inspector.style().unpolish(self.btn_save_inspector)
+        self.btn_save_inspector.style().polish(self.btn_save_inspector)
+        self.btn_save_inspector.setEnabled(True)
+        
+        self.lbl_title.setText("EDITING ALBUM (Imported)")
+
+    def _fill_fields_from_context(self):
+        """Shared logic to populate Year, Artists, and Publishers from song context."""
+        # T-Feature: Prioritize song_context specifically if available (ensures we pull from song, not existing album)
+        # Fallback to initial_data for backward compatibility or when context is top-level.
+        ctx = self.initial_data.get('song_context', self.initial_data)
+
+        # 1. Title (Only if creating new or if specifically requested - keeping current behavior)
+        if hasattr(self, 'is_creating_new') and self.is_creating_new:
+            self.inp_title.setText(self.current_album.title or "")
+            self.inp_title.edit.setProperty("ghost", False)
+            self.inp_title.edit.style().unpolish(self.inp_title.edit)
+            self.inp_title.edit.style().polish(self.inp_title.edit)
+
+        # 2. Release Year
+        year_ctx = ctx.get('year')
+        if year_ctx:
+            self.inp_year.setText(str(year_ctx))
+            self.inp_year.edit.setProperty("ghost", False)
+            self.inp_year.edit.style().unpolish(self.inp_year.edit)
+            self.inp_year.edit.style().polish(self.inp_year.edit)
+
+        # 3. Artist (M2M Resolution)
+        art_val = ctx.get('artist')
+        if art_val:
+            names = art_val if isinstance(art_val, list) else [art_val]
+            resolved = []
+            for name in names:
+                if not isinstance(name, str):
+                    resolved.append(name)
+                    continue
+                
+                art_obj = self.contributor_service.get_by_name(name)
+                if art_obj:
+                    resolved.append(art_obj)
+                else:
+                    resolved.append((0, name, "👤", False, False, "New Artist", "amber", False))
+            
+            self.tray_artist.set_items(resolved)
+            # Stage change if we are in Edit mode
+            if not getattr(self, 'is_creating_new', False):
+                self._stage_inspector_change('album_artist', self.tray_artist.get_names())
+
+        # 4. Publisher (M2M Resolution)
+        pub_val = ctx.get('publisher')
+        if pub_val:
+            names = pub_val if isinstance(pub_val, list) else [pub_val]
+            resolved = []
+            for name in names:
+                if not isinstance(name, str):
+                    resolved.append(name)
+                    continue
+                
+                pub_obj = self.publisher_service.find_by_name(name)
+                if pub_obj:
+                    resolved.append(pub_obj)
+                else:
+                    resolved.append((0, name, "🏢", False, False, "New Publisher", "amber", False))
+            
+            self.tray_publisher.set_items(resolved)
+            # Stage change if we are in Edit mode
+            if not getattr(self, 'is_creating_new', False):
+                self._stage_inspector_change('publisher_id', self.tray_publisher.get_names())
 
     def _stage_inspector_change(self, field, value):
         """Callback for context adapters to stage changes."""

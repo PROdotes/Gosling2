@@ -28,3 +28,4 @@ SUPPORTED_AUDIO_FORMATS = ['.mp3']
 
 # Custom Data Roles
 ROLE_HEALTH_STATUS = Qt.ItemDataRole.UserRole + 1
+ROLE_IS_INCOMPLETE = Qt.ItemDataRole.UserRole + 2
