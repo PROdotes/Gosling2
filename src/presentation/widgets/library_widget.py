@@ -43,25 +43,25 @@ class DropIndicatorHeaderView(QHeaderView):
         self._dragging = False
     
     def mousePressEvent(self, event):
+        super().mousePressEvent(event)
         # Prevent dragging the Status Deck (Logical Index 0)
         idx = self.logicalIndexAt(event.pos())
         if idx != 0:
             self._dragging = True
-        super().mousePressEvent(event)
     
     def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
         self._dragging = False
         self._drop_indicator_pos = -1
         self.viewport().update()
-        super().mouseReleaseEvent(event)
     
     def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
         if self._dragging:
             # Calculate drop position
             pos = event.position().toPoint()
             self._drop_indicator_pos = self._calculate_drop_position(pos.x())
             self.viewport().update()
-        super().mouseMoveEvent(event)
     
     def _calculate_drop_position(self, x: int) -> int:
         """Calculate drop pos, ensuring we can't drop BEFORE the Status Deck."""
@@ -75,8 +75,11 @@ class DropIndicatorHeaderView(QHeaderView):
         deck_pos = self.sectionPosition(deck_idx) 
         barrier = deck_pos + deck_width
 
+        # T-Fix: Adjust X by scroll offset to compare against logical positions (sectionPosition)
+        logical_x = x + self.offset()
+
         # If cursor is within the deck,snap to barrier
-        if x < barrier:
+        if logical_x < barrier:
              return barrier
 
         for visual_idx in range(self.count()):
@@ -90,7 +93,7 @@ class DropIndicatorHeaderView(QHeaderView):
             section_size = self.sectionSize(logical_idx)
             section_mid = section_pos + section_size // 2
             
-            if x < section_mid:
+            if logical_x < section_mid:
                 # Ensure we don't return a position before the barrier
                 return max(section_pos, barrier)
         
@@ -287,12 +290,17 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
                      return not is_done_val
                  
                  # Check Row Completeness (only required fields)
+                 # Build completeness row by reading all columns from the source model in order
+                 # This ensures we check the actual data, not what's visible in the current view
                  completeness_row = []
-                 for f in yellberus.FIELDS:
-                     f_idx = self._field_indices.get(f.name, -1)
-                     val = model.data(model.index(row, f_idx, parent), Qt.ItemDataRole.UserRole) if f_idx >= 0 else None
+                 for col_idx in range(min(model.columnCount(), len(yellberus.FIELDS))):
+                     val = model.data(model.index(row, col_idx, parent), Qt.ItemDataRole.UserRole)
                      completeness_row.append(val)
-                 
+
+                 # Pad with None if model has fewer columns than expected (shouldn't happen)
+                 while len(completeness_row) < len(yellberus.FIELDS):
+                     completeness_row.append(None)
+
                  incomplete_fields = yellberus.check_completeness(completeness_row)
                  incomplete_count = len(incomplete_fields)
                  
