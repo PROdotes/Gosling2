@@ -22,6 +22,10 @@ class AlbumService:
         """Fetch a specific album by its ID."""
         return self._repo.get_by_id(album_id)
 
+    def find_by_title(self, title: str) -> Optional[Album]:
+        """Resolve an album by its exact title."""
+        return self._repo.find_by_title(title)
+
     def create(self, title: str, artist: Optional[str] = None, year: Optional[int] = None, album_type: Optional[str] = None) -> Album:
         """Create a new album record."""
         return self._repo.create(title, album_artist=artist, release_year=year, album_type=album_type)

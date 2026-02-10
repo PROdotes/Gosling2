@@ -1733,16 +1733,6 @@ class SidePanelWidget(QFrame):
                 chips.append((-1, f"{mixed_count} Mixed", "🔀", True, False, "", "gray", False))
             return chips
 
-        # T-Clean: Fetch LIVE from DB for Album (Atomic Attribute)
-        if field_name == 'album':
-            if not self.current_songs: return []
-            # Atomic Fetch from DB
-            live_albums = self.album_service.get_albums_for_song(self.current_songs[0].source_id)
-            chips = []
-            for i, alb in enumerate(live_albums):
-                chips.append((alb.album_id, alb.title, "💿", False, False, alb.title, field_def.zone or "amber", i==0))
-            return chips
-            
         # Convert to identities for the Chip Tray
         chips = []
         # T-Fix: Delimiters removed. Strict List adherence.
@@ -1788,6 +1778,15 @@ class SidePanelWidget(QFrame):
                             display_name = f"{pub.publisher_name} [{parent.publisher_name}]"
                     
                     chips.append((pid, display_name, "🏢", False, False, "Master Owner (Direct)", field_def.zone or "amber", False))
+            elif field_name == 'album':
+                # Album-based Lookup (Restoring 💿 icon and service resolution)
+                # T-Fix: This restores the disc icon and correct resolution from DB/staging.
+                alb = self.album_service.find_by_title(str(n).strip())
+                if alb:
+                    # T-Fix: Primary status (i==0) is guaranteed by Repository ORDER BY.
+                    chips.append((alb.album_id, alb.title, "💿", False, False, alb.title, field_def.zone or "amber", i==0))
+                else:
+                    chips.append((0, str(n), "⚠️", False, False, "Unresolved Album", "gray", False))
             else:
                 # Standard Contributor (Artist) via Service
                 # FIX: Use get_by_name to prevent 'Ghost Creation' when rendering stale 'performers' strings 

@@ -381,6 +381,7 @@ class AlbumRepository(GenericRepository[Album]):
             FROM Albums a
             JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
             WHERE sa.SourceID = ?
+            ORDER BY sa.IsPrimary DESC, a.AlbumTitle ASC
         """
         albums = []
         with self.get_connection() as conn:

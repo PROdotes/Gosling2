@@ -752,10 +752,17 @@ def row_to_tagged_tuples(row: tuple) -> list:
         
         # Handle list types (aggregated strings from DB)
         if field.field_type == FieldType.LIST and value:
-            # T-70: Support both standard comma and the '|||' separator used for tags
-            if '|||' in str(value):
-                value = [v.strip() for v in str(value).split('|||') if v.strip()]
+            # T-70: Strict delimiter policy. 
+            # Multi-entity fields (album, publisher, tags) ONLY use '|||' (matches DB GROUP_CONCAT).
+            # Note: Tags ALWAYS have '|||' in the query expression, but for albums/publishers
+            # with only one item, '|||' will be absent. Comma splitting here would be a bug.
+            if field.name in ('album', 'publisher', 'tags'):
+                if '|||' in str(value):
+                    value = [v.strip() for v in str(value).split('|||') if v.strip()]
+                else:
+                    value = [str(value).strip()] if value else []
             else:
+                # Performers, Composers, etc. use comma (standard ID3 / text aggregation)
                 value = [v.strip() for v in str(value).split(',') if v.strip()]
         
         # Look up ID3 frame from JSON
@@ -847,7 +854,14 @@ def cast_from_string(field_def: FieldDef, value: Any) -> Any:
 
     # 3. Type Casting
     if field_def.field_type == FieldType.LIST:
-        return [v.strip() for v in s_val.split(',') if v.strip()]
+        # Album, Publisher, and Tags use ||| delimiter (safe for internal data)
+        # Other LIST fields use comma (standard for performers/composers)
+        if field_def.name in ('album', 'publisher', 'tags'):
+            import re
+            delimiter = r'\|\|\|'
+            return [v.strip() for v in re.split(delimiter, s_val) if v.strip()]
+        else:
+            return [v.strip() for v in s_val.split(',') if v.strip()]
         
     elif field_def.field_type == FieldType.INTEGER:
         return int(s_val)
