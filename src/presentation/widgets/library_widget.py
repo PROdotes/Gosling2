@@ -274,7 +274,11 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
             # A. Special Case: Status Workflow (Done, Not Done, Pending, Incomplete)
             if field_name == 'is_done':
                  # T-89: "Done" is now determined by the ProcessingStatus column (0=Unprocessed, 1=Done)
-                 is_done_val = bool(row_val) if row_val is not None else True
+                 # T-Fix: Be more resilient to string versions of status flags (which Python bool() treats as True)
+                 val_for_bool = row_val
+                 if isinstance(row_val, str) and row_val.isdigit():
+                     val_for_bool = int(row_val)
+                 is_done_val = bool(val_for_bool) if val_for_bool is not None else True
                  
                  # 2. Match based on required_val
                  if required_val is True: # "Done"
@@ -1454,6 +1458,7 @@ class LibraryWidget(QWidget):
                         
                         # Set State
                         is_done_bool = bool(cell) if cell is not None else False
+                        item.setData(is_done_bool, Qt.ItemDataRole.UserRole)
                         item.setCheckState(Qt.CheckState.Checked if is_done_bool else Qt.CheckState.Unchecked)
                         item.setText("")
                     

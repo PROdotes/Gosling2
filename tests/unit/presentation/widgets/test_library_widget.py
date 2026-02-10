@@ -41,6 +41,7 @@ def library_widget(qtbot, mock_widget_deps):
         row[get_idx("duration")] = 180.0
         row[get_idx("is_done")] = 1 if prefix == 'a' else 0 # 'a' is Done, 'b' is Not Done
         row[get_idx("is_active")] = 1
+        row[get_idx("tags")] = ["Genre:Pop"]
         return row
 
     data = [create_row('a'), create_row('b')]
@@ -51,7 +52,8 @@ def library_widget(qtbot, mock_widget_deps):
         deps['metadata_service'], 
         deps['settings_manager'],
         deps['renaming_service'],
-        deps['duplicate_scanner']
+        deps['duplicate_scanner'],
+        import_service=deps['import_service']
     )
     qtbot.addWidget(widget)
     return widget
@@ -100,7 +102,7 @@ class TestLibraryWidgetLogic:
         expected_id = int(library_widget.proxy_model.data(idx_id))
         
         with patch("src.presentation.widgets.library_widget.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes):
-            library_widget._delete_selected()
+            library_widget._delete_resources(delete_files=False)
             
         deps['library_service'].delete_song.assert_called_with(expected_id)
 
@@ -166,8 +168,8 @@ class TestLibraryWidgetDragDrop:
         library_widget.dragEnterEvent(event)
         event.acceptProposedAction.assert_called_once()
 
-    def test_drop_zip_extracts_and_deletes(self, library_widget):
-        """Test zip file drop logic."""
+    def test_drop_zip_delegates_to_import_service(self, library_widget):
+        """Test zip file drop delegates to ImportService."""
         event = MagicMock(spec=QDropEvent)
         mime_data = MagicMock(spec=QMimeData)
         mime_data.hasUrls.return_value = True
@@ -175,20 +177,21 @@ class TestLibraryWidgetDragDrop:
         url = QUrl.fromLocalFile("C:/Downloads/archive.zip")
         mime_data.urls.return_value = [url]
         event.mimeData.return_value = mime_data
-
-        mock_zip = MagicMock()
-        mock_zip.__enter__.return_value = mock_zip
-        mock_zip.namelist.return_value = ["song1.mp3"]
         
-        with patch('zipfile.ZipFile', return_value=mock_zip), \
-             patch('os.path.exists', return_value=False), \
-             patch('os.remove') as mock_remove, \
-             patch.object(library_widget, 'import_files_list', return_value=1), \
-             patch('PyQt6.QtWidgets.QMessageBox.information'):
-            
+        # Ensure import_service is mocked
+        if library_widget.import_service is None:
+             library_widget.import_service = MagicMock()
+
+        # Setup mock behavior
+        library_widget.import_service.collect_import_list.return_value = ["/path/virtual/song.mp3"]
+        
+        with patch.object(library_widget, 'import_files_list') as mock_import_files:
             library_widget.dropEvent(event)
-            assert mock_zip.extract.call_count == 1
-            mock_remove.assert_called_once()
+            
+            # Assertions
+            library_widget.import_service.collect_import_list.assert_called()
+            mock_import_files.assert_called_with(["/path/virtual/song.mp3"])
+
 
 class TestLibraryWidgetContextMenu:
     """Level 1: Logic for Context Menu behavior (Consolidated)"""
@@ -231,13 +234,13 @@ class TestLibraryWidgetContextMenu:
             # Mock validation to pass
             with patch.object(library_widget, '_get_incomplete_fields', return_value=set()):
                 if status_action.isEnabled():
-                    deps['library_service'].update_song_status.return_value = True
+                    deps['library_service'].update_songs_status.return_value = 1
                     
                     # Direct Call to bypass QAction flakiness
                     library_widget._toggle_status(True)
                     
                     # ID for 'b' is 98
-                    deps['library_service'].update_song_status.assert_called_with(98, True)
+                    deps['library_service'].update_songs_status.assert_called_with([98], True)
                 else:
                     pytest.fail(f"Status action is disabled. Text: {status_action.text()}")
 

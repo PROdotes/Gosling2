@@ -45,6 +45,13 @@ This skill provides a systematic approach to implementing new features in Goslin
     *   Use GlowFactory components, not raw PyQt6 widgets
 *   **Present Plan to User**: Wait for approval if changes are significant
 
+### Step 1.4: Blast Radius Analysis (Mandatory for Data Changes)
+If modifying a data contract (Schema, Field Definition, Return Type):
+1.  **Search Usage**: `grep` the codebase for the field/method name.
+2.  **Audit Consumers**: Identify ALL disparate components (UI, Services, Reports) that consume this data.
+3.  **Verify Consumers**: Plan specific checks/tests for EACH consumer to ensure they handle the new data format.
+
+
 ## Phase 2: Implementation
 
 ### Step 2.1: Data Layer First

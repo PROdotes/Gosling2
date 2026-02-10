@@ -31,9 +31,10 @@ This skill activates when the user mentions "Junie-mode", "Debug this", "Test th
 *   **Requirement**: The script **MUST FAIL** initially.
 
 ### Phase 2: Investigate (Print Phase)
-*   **Goal**: Find the root cause.
+*   **Goal**: Find the root cause AND its reach.
 *   **Action**: Use `grep_search` and temporary `print()`/`logging` to trace. 
 *   **Constraint**: Do not "lint" or clean code. Just find the bug.
+*   **Blast Radius**: Identify all consumers of the faulty data/logic. If `A` is broken, check `B` and `C` that depend on `A`.
 
 ### Phase 3: Surgical Fix (Green Phase)
 *   **Goal**: Fix the bug with minimal changes.

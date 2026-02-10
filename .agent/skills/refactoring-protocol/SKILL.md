@@ -41,6 +41,13 @@ Common triggers:
 *   **Plan Small Steps**: Break into incremental changes
 *   **Present Plan to User**: Get approval before starting
 
+### Step 1.4: Blast Radius Analysis (Mandatory for Data Changes)
+If modifying a data contract (Schema, Field Definition, Return Type):
+1.  **Search Usage**: `grep` the codebase for the field/method name.
+2.  **Audit Consumers**: Identify ALL disparate components (UI, Services, Reports) that consume this data.
+3.  **Verify Consumers**: Plan specific checks/tests for EACH consumer to ensure they handle the new data format.
+
+
 ## Phase 2: Execution (The Refactoring Steps)
 
 ### General Principles
