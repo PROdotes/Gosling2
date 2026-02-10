@@ -592,10 +592,15 @@ def check_completeness(row_data: list) -> set:
             tags_value = row_data[tags_idx]
             
             # Normalize tags to list
+            # Note: raw DB values use '|||' separator, but model UserRole
+            # stores display text with ', ' separator after _populate_table
             tags_list = []
             if tags_value:
                 if isinstance(tags_value, str):
-                    tags_list = [t.strip() for t in tags_value.split('|||') if t.strip()]
+                    if '|||' in tags_value:
+                        tags_list = [t.strip() for t in tags_value.split('|||') if t.strip()]
+                    else:
+                        tags_list = [t.strip() for t in tags_value.split(', ') if t.strip()]
                 elif isinstance(tags_value, list):
                     tags_list = tags_value
 

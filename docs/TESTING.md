@@ -73,6 +73,14 @@ Mutation testing (including any use of `scripts/mutation_test.py`) must stay in 
 
 **The Boundary Rule:** Test at the point of responsibility. If `Repository.get()` sanitizes data, `Service.move()` does not re-test sanitization. If `get()` breaks, the failure shows in `test_repository.py`, not `test_service.py`.
 
+### 5.1 The Law of The Blast Radius (The Ripple Effect)
+When modifying a **Shared Data Contract** (e.g., changing a DB column from `bool` to `int`):
+1.  **Search**: You MUST `grep` the entire codebase for usage of that field.
+2.  **Audit**: Identify every consumer (UI, Report, Export).
+3.  **Verify**: You MUST run/write tests for **each** consumer to ensure they handle the new data type.
+*   *Example*: Changing `is_done` (bool) -> `processing_status` (int). You must verify `LibraryFilterProxyModel` (UI) still filters correctly.
+
+
 ---
 
 ### 6. The Law of Derivation (Where Tests Come From)

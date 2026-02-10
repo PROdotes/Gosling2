@@ -303,7 +303,7 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
                  incomplete_fields = yellberus.check_completeness(completeness_row)
                  incomplete_count = len(incomplete_fields)
-                 
+
                  # "Missing Data" - Shows songs missing REQUIRED data
                  if required_val == "INCOMPLETE":
                      return incomplete_count > 0
