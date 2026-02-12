@@ -324,6 +324,17 @@ class ChipTrayWidget(QWidget):
                 names.append(widget.label_text)
         return names
 
+    def get_ids(self) -> list[int]:
+        """Return a list of entity IDs for all current chips."""
+        ids = []
+        for i in range(self.flow_layout.count()):
+            item = self.flow_layout.itemAt(i)
+            if item:
+                widget = item.widget()
+                if isinstance(widget, Chip) and widget.entity_id:
+                    ids.append(widget.entity_id)
+        return ids
+
     def get_entity_id_by_name(self, name: str) -> int | None:
         """Find entity ID for a given label/name."""
         for i in range(self.flow_layout.count()):

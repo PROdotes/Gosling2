@@ -372,6 +372,42 @@ class PublisherRepository(GenericRepository[Publisher]):
             with self.get_connection() as conn:
                 _execute(conn)
 
+    def sync_publishers_by_id(self, album_id: int, publisher_ids: List[int], batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> None:
+        """
+        Synchronize album publishers by ID (no name roundtrip).
+        IDs come from UI chips which know their identity.
+        """
+        from src.core.audit_logger import AuditLogger
+
+        def _execute(target_conn):
+            auditor = AuditLogger(target_conn, batch_id=batch_id)
+            cursor = target_conn.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+            current_ids = {row[0] for row in cursor.fetchall()}
+
+            target_ids = set(pid for pid in publisher_ids if pid)
+
+            # 1. Remove items not in target
+            for p_id in current_ids:
+                if p_id not in target_ids:
+                    auditor.log_delete("AlbumPublishers", f"{album_id}-{p_id}", {"AlbumID": album_id, "PublisherID": p_id})
+                    target_conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, p_id))
+
+            # 2. Add new items
+            for p_id in publisher_ids:
+                if p_id and p_id not in current_ids:
+                    cursor = target_conn.execute(
+                        "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
+                        (album_id, p_id)
+                    )
+                    if cursor.rowcount > 0:
+                        auditor.log_insert("AlbumPublishers", f"{album_id}-{p_id}", {"AlbumID": album_id, "PublisherID": p_id})
+
+        if conn:
+            _execute(conn)
+        else:
+            with self.get_connection() as conn:
+                _execute(conn)
+
     def search(self, query: str = "") -> List[Publisher]:
         """Search for publishers by name."""
         sql = "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers"

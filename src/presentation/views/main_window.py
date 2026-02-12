@@ -1027,6 +1027,7 @@ class MainWindow(QMainWindow):
                             if idx.isValid():
                                 sm.select(idx, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
                 
+                self._last_selected_paths = []  # Force refresh of song objects after save
                 self._on_library_selection_changed(None, None)
                 # T-Fix: Do NOT use self.statusBar() as it recreates the hidden bar and breaks layout.
                 self.toast.show_message(f"Successfully saved {len(successful_ids)} songs", "success")

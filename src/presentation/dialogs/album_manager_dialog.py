@@ -667,7 +667,7 @@ class AlbumManagerDialog(QDialog):
         
         album_id = item.data(Qt.ItemDataRole.UserRole)
         self.current_album = self.album_service.get_by_id(album_id)
-        
+
         if not self.current_album:
             return
             
@@ -927,10 +927,12 @@ class AlbumManagerDialog(QDialog):
             QMessageBox.warning(self, "Error", "Title cannot be empty")
             return False
             
-        # Get Artist from Tray (M2M aware)
+        # Get Artist & Publisher from Trays (M2M aware)
         artist_names = self.tray_artist.get_names()
         artist = ", ".join(artist_names) if artist_names else ""
-        
+        publisher_names = self.tray_publisher.get_names()
+        publisher = ", ".join(publisher_names) if publisher_names else ""
+
         year_str = self.inp_year.text().strip()
         
         # Default to configured year if empty
@@ -947,31 +949,11 @@ class AlbumManagerDialog(QDialog):
         success = False
         try:
             if self.is_creating_new:
-                # Create
+                # Create album, then update to sync M2M via standard flow
                 album, created = self.album_service.get_or_create(title, artist, year, album_type=alb_type)
-                # album.album_type = alb_type # No longer needed if passed to get_or_create
-                # self.album_service.update(album)
-                
-                # Save Publishers (M2M)
-                pub_names = self.tray_publisher.get_names()
-                from src.data.repositories.album_repository import AlbumRepository
-                repo = AlbumRepository()
-                repo.sync_publishers(album.album_id, pub_names)
-                
-                # Save Artists (M2M) from Staged Adapter or Tray
-                # For Create Mode, we likely relied on staging or reading from tray names if adapter failed to stage
-                if hasattr(self.current_album, '_staged_contributors'):
-                     repo.sync_contributors(album.album_id, self.current_album._staged_contributors)
-                else:
-                    # Fallback if no staging happened (e.g. manual text entry)
-                    artists = []
-                    for art_name in artist_names:
-                        artist_obj, _ = self.contributor_service.get_or_create(art_name)
-                        if artist_obj:
-                            artists.append(artist_obj)
-                    repo.sync_contributors(album.album_id, artists)
-                
-                # ... 
+                album.album_publisher = publisher
+                self.album_service.update(album)
+
                 self.current_album = album
                 self.is_creating_new = False
                 
@@ -991,18 +973,12 @@ class AlbumManagerDialog(QDialog):
                 if not self.current_album: return False
                 
                 self.current_album.title = title
-                # self.current_album.album_artist = artist # Don't overwrite display string if M2M handles it, but maybe keep for legacy?
-                # Actually, if we use M2M, 'album_artist' legacy field might be derived.
-                # But for now, let's keep it sync.
-                self.current_album.album_artist = artist 
+                self.current_album.album_artist = artist
+                self.current_album.album_publisher = publisher
                 self.current_album.release_year = year
                 self.current_album.album_type = alb_type
-                
+
                 self.album_service.update(self.current_album)
-                
-                # IMMEDIATE SAVE PROTOCOL: 
-                # Chips (Publishers/Contributors) are already saved by the adapters.
-                # We DO NOT sync them here.
                 
                 # Clear Dirty State
                 self.btn_save_inspector.setProperty("dirty", False)

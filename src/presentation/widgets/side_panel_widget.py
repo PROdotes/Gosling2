@@ -1307,20 +1307,10 @@ class SidePanelWidget(QFrame):
         
         # Sync: Re-fetch current selection to ensure memory matches DB (e.g. if album was deleted)
         if self.current_songs:
-             from ...data.models.song import Song
              refreshed = []
-             dirty_found = False
              for s in self.current_songs:
-                  old_album_id = getattr(s, 'album_id', None)
                   song_data = self.library_service.get_song_by_id(s.source_id)
                   if song_data:
-                       # If DB album is now different (e.g. deleted), STAGE the change to trip the Amber Alert
-                       new_album_id = getattr(song_data, 'album_id', None)
-                       if new_album_id != old_album_id:
-                            # Use _on_field_changed to ensure it hits the staging buffer and emits the signal
-                            self._on_field_changed("album", song_data.album)
-                            self._on_field_changed("album_id", new_album_id)
-                            dirty_found = True
                        refreshed.append(song_data)
              
              self.current_songs = refreshed
@@ -1460,16 +1450,18 @@ class SidePanelWidget(QFrame):
                         if oid not in new_ids:
                             self.album_service.remove_song_from_album(sid, oid)
         
-        # 4. Metadata Update (Artist/Year) - Keep this STAGED (Side Effect behavior)
+        # 4. Metadata Update: Only fill empty year from album (don't overwrite existing)
         if data:
             primary_id = data[0]['id']
             full_album = self.album_service.get_by_id(primary_id)
-            if full_album:
-                 if full_album.album_artist:
-                     self._on_field_changed("album_artist", full_album.album_artist)
-                 if full_album.release_year:
-                     self._on_field_changed("recording_year", full_album.release_year)
-        
+            if full_album and full_album.release_year:
+                # Only stage year if song's year is currently empty
+                for song in self.current_songs:
+                    sid = song.source_id
+                    current_year = self._get_effective_value(sid, 'recording_year', song.recording_year)
+                    if not current_year:  # Only fill if empty
+                        self._on_field_changed("recording_year", full_album.release_year, song_id=sid)
+
         # 5. Refresh UI (Reload from DB to show new links)
         self.set_songs(self.current_songs, force=True)
 

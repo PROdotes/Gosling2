@@ -3,7 +3,8 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(python:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(find:*)"
     ]
   }
 }

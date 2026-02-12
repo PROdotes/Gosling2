@@ -740,7 +740,19 @@ class EntityListWidget(QWidget):
             return self._inner_widget.get_names()
         elif self.layout_mode == LayoutMode.STACK:
             return [
-                self._inner_widget.item(i).text() 
+                self._inner_widget.item(i).text()
                 for i in range(self._inner_widget.count())
+            ]
+        return []
+
+    def get_ids(self) -> list:
+        """Get list of entity IDs from chips."""
+        if self.layout_mode == LayoutMode.CLOUD and hasattr(self._inner_widget, 'get_ids'):
+            return self._inner_widget.get_ids()
+        elif self.layout_mode == LayoutMode.STACK:
+            return [
+                self._inner_widget.item(i).data(Qt.ItemDataRole.UserRole)
+                for i in range(self._inner_widget.count())
+                if self._inner_widget.item(i).data(Qt.ItemDataRole.UserRole)
             ]
         return []

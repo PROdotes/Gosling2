@@ -9,6 +9,7 @@ class Album:
     album_id: Optional[int] = None
     title: str = ""
     album_artist: Optional[str] = None  # COMPUTED via repository (M2M), not persisted in Albums table
+    album_publisher: Optional[str] = None  # COMPUTED via repository (M2M), not persisted in Albums table
     album_type: Optional[str] = None  # Single, Album, EP, Compilation
     release_year: Optional[int] = None
     song_count: int = 0  # Runtime statistic
@@ -39,6 +40,7 @@ class Album:
             "album_id": self.album_id,
             "title": self.title,
             "album_artist": self.album_artist,
+            "album_publisher": self.album_publisher,
             "album_type": self.album_type,
             "release_year": self.release_year
         }

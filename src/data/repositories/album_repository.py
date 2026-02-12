@@ -30,6 +30,7 @@ class AlbumRepository(GenericRepository[Album]):
         if row:
             album = Album.from_row(row)
             album.album_artist = self._get_joined_album_artist(conn, album_id) or album.album_artist
+            album.album_publisher = self._get_joined_album_publisher(conn, album_id)
             return album
         return None
 
@@ -40,6 +41,18 @@ class AlbumRepository(GenericRepository[Album]):
             FROM ArtistNames an
             JOIN AlbumCredits ac ON an.NameID = ac.CreditedNameID
             WHERE ac.AlbumID = ?
+        """
+        cursor = conn.execute(query, (album_id,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] else None
+
+    def _get_joined_album_publisher(self, conn: sqlite3.Connection, album_id: int) -> Optional[str]:
+        """Get album publishers from M2M table (separated by |||)."""
+        query = """
+            SELECT GROUP_CONCAT(p.PublisherName, '|||')
+            FROM Publishers p
+            JOIN AlbumPublishers ap ON p.PublisherID = ap.PublisherID
+            WHERE ap.AlbumID = ?
         """
         cursor = conn.execute(query, (album_id,))
         row = cursor.fetchone()
@@ -68,58 +81,131 @@ class AlbumRepository(GenericRepository[Album]):
         # T-91: Automatic M2M linking
         auditor = kwargs.get('auditor')
         self._resolve_and_link_artists(cursor, new_id, album.album_artist, auditor)
-        
+        self._resolve_and_link_publishers(cursor, new_id, album.album_publisher, auditor)
+
         return new_id
 
     def _update_db(self, cursor: sqlite3.Cursor, album: Album, **kwargs) -> None:
-        """Execute SQL UPDATE for GenericRepository"""
+        """Execute SQL UPDATE for GenericRepository.
+        Handles scalar fields + M2M sync for artists and publishers."""
         cursor.execute(
-            "UPDATE Albums SET AlbumTitle = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?", 
+            "UPDATE Albums SET AlbumTitle = ?, AlbumType = ?, ReleaseYear = ? WHERE AlbumID = ?",
             (album.title, album.album_type, album.release_year, album.album_id)
         )
-        
-        # T-91: Re-sync M2M links on update
+
         auditor = kwargs.get('auditor')
-        self._resolve_and_link_artists(cursor, album.album_id, album.album_artist, auditor, sync=True)
+        self._sync_artists(cursor, album.album_id, album.album_artist, auditor)
+        self._sync_publishers(cursor, album.album_id, album.album_publisher, auditor)
 
-    def _resolve_and_link_artists(self, cursor: sqlite3.Cursor, album_id: int, artist_string: Optional[str], auditor=None, sync: bool = False) -> None:
-        """
-        Helper to resolve a comma-separated artist string into individual artist M2M links.
-        If sync=True, clears existing links first (Snapshot strategy).
-        """
-        if sync:
-            # Audit removal of old links if auditor present
+    def _sync_artists(self, cursor: sqlite3.Cursor, album_id: int, artist_string: Optional[str], auditor=None) -> None:
+        """Set-diff sync for album artists. Only writes actual changes."""
+        # 1. Get current state
+        cursor.execute("SELECT CreditedNameID FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+        current_ids = {row[0] for row in cursor.fetchall()}
+
+        # 2. Resolve target names to IDs
+        target_ids = set()
+        if artist_string and artist_string.strip():
+            for a_name in artist_string.split(','):
+                a_name = a_name.strip()
+                if not a_name:
+                    continue
+                cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE", (a_name,))
+                row = cursor.fetchone()
+                if row:
+                    target_ids.add(row[0])
+                else:
+                    cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (a_name, a_name))
+                    new_id = cursor.lastrowid
+                    target_ids.add(new_id)
+                    if auditor:
+                        auditor.log_insert("ArtistNames", new_id, {"DisplayName": a_name, "SortName": a_name, "IsPrimaryName": 0})
+
+        # 3. Diff
+        to_remove = current_ids - target_ids
+        to_add = target_ids - current_ids
+
+        if not to_remove and not to_add:
+            return
+
+        # Resolve role once
+        cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = 'Performer'")
+        r_row = cursor.fetchone()
+        role_id = r_row[0] if r_row else 1
+
+        for c_id in to_remove:
+            cursor.execute("DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?", (album_id, c_id))
             if auditor:
-                cursor.execute("SELECT CreditedNameID, RoleID FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
-                for c_id, r_id in cursor.fetchall():
-                    auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": r_id})
-            cursor.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+                auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
 
+        for c_id in to_add:
+            cursor.execute("INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)", (album_id, c_id, role_id))
+            if cursor.rowcount > 0 and auditor:
+                auditor.log_insert("AlbumCredits", f"{album_id}-{c_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
+
+    def _sync_publishers(self, cursor: sqlite3.Cursor, album_id: int, publisher_string: Optional[str], auditor=None) -> None:
+        """Set-diff sync for album publishers. Only writes actual changes."""
+        # 1. Get current state
+        cursor.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+        current_ids = {row[0] for row in cursor.fetchall()}
+
+        # 2. Resolve target names to IDs
+        target_ids = set()
+        if publisher_string and publisher_string.strip():
+            for p_name in publisher_string.split(','):
+                p_name = p_name.strip()
+                if not p_name:
+                    continue
+                cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE NOCASE", (p_name,))
+                row = cursor.fetchone()
+                if row:
+                    target_ids.add(row[0])
+                else:
+                    cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (p_name,))
+                    new_id = cursor.lastrowid
+                    target_ids.add(new_id)
+                    if auditor:
+                        auditor.log_insert("Publishers", new_id, {"PublisherName": p_name})
+
+        # 3. Diff
+        to_remove = current_ids - target_ids
+        to_add = target_ids - current_ids
+
+        if not to_remove and not to_add:
+            return
+
+        for p_id in to_remove:
+            cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?", (album_id, p_id))
+            if auditor:
+                auditor.log_delete("AlbumPublishers", f"{album_id}-{p_id}", {"AlbumID": album_id, "PublisherID": p_id})
+
+        for p_id in to_add:
+            cursor.execute("INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, p_id))
+            if cursor.rowcount > 0 and auditor:
+                auditor.log_insert("AlbumPublishers", f"{album_id}-{p_id}", {"AlbumID": album_id, "PublisherID": p_id})
+
+    def _resolve_and_link_artists(self, cursor: sqlite3.Cursor, album_id: int, artist_string: Optional[str], auditor=None) -> None:
+        """Helper for INSERT path: resolve artist names and create M2M links."""
         if not artist_string or not artist_string.strip():
             return
 
         artist_names = [a.strip() for a in artist_string.split(',')]
         for a_name in artist_names:
             if not a_name: continue
-            
-            # 1. Resolve NameID from ArtistNames
+
             cursor.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE", (a_name,))
             row = cursor.fetchone()
             if row:
                 name_id = row[0]
             else:
-                # Orphan Create (Implicit Identity Creation?)
-                # Actually, standard behavior in assign_album was to just insert into ArtistNames.
                 cursor.execute("INSERT INTO ArtistNames (DisplayName, SortName, IsPrimaryName) VALUES (?, ?, 0)", (a_name, a_name))
                 name_id = cursor.lastrowid
                 if auditor:
                     auditor.log_insert("ArtistNames", name_id, {"DisplayName": a_name, "SortName": a_name, "IsPrimaryName": 0})
 
-            # 2. Link via AlbumCredits
-            # Use 'Performer' role (Lookup RoleID)
             cursor.execute("SELECT RoleID FROM Roles WHERE RoleName = 'Performer'")
             r_row = cursor.fetchone()
-            role_id = r_row[0] if r_row else 1 # Default fallback if schema missing Roles
+            role_id = r_row[0] if r_row else 1
 
             cursor.execute(
                 "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
@@ -127,6 +213,33 @@ class AlbumRepository(GenericRepository[Album]):
             )
             if cursor.rowcount > 0 and auditor:
                 auditor.log_insert("AlbumCredits", f"{album_id}-{name_id}", {"AlbumID": album_id, "CreditedNameID": name_id, "RoleID": role_id})
+
+    def _resolve_and_link_publishers(self, cursor: sqlite3.Cursor, album_id: int, publisher_string: Optional[str], auditor=None) -> None:
+        """Helper for INSERT path: resolve publisher names and create M2M links."""
+        if not publisher_string or not publisher_string.strip():
+            return
+
+        for p_name in publisher_string.split(','):
+            p_name = p_name.strip()
+            if not p_name:
+                continue
+
+            cursor.execute("SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE NOCASE", (p_name,))
+            row = cursor.fetchone()
+            if row:
+                pub_id = row[0]
+            else:
+                cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (p_name,))
+                pub_id = cursor.lastrowid
+                if auditor:
+                    auditor.log_insert("Publishers", pub_id, {"PublisherName": p_name})
+
+            cursor.execute(
+                "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
+                (album_id, pub_id)
+            )
+            if cursor.rowcount > 0 and auditor:
+                auditor.log_insert("AlbumPublishers", f"{album_id}-{pub_id}", {"AlbumID": album_id, "PublisherID": pub_id})
 
     def _delete_db(self, cursor: sqlite3.Cursor, record_id: int, **kwargs) -> None:
         """Execute SQL DELETE for GenericRepository"""
@@ -708,15 +821,70 @@ class AlbumRepository(GenericRepository[Album]):
         with self.get_connection() as conn:
             PublisherRepository(self.db_path).sync_publishers(album_id, publisher_names, batch_id=batch_id, conn=conn)
 
+    def sync_publishers_by_id(self, album_id: int, publisher_ids: List[int], batch_id: Optional[str] = None) -> None:
+        """
+        Synchronize album publishers by ID (no name roundtrip).
+        (Delegated to PublisherRepository)
+        """
+        from .publisher_repository import PublisherRepository
+        with self.get_connection() as conn:
+            PublisherRepository(self.db_path).sync_publishers_by_id(album_id, publisher_ids, batch_id=batch_id, conn=conn)
+
     def sync_contributors(self, album_id: int, contributors: List[Contributor], role_name: str = "Performer", batch_id: Optional[str] = None) -> None:
         """
         Synchronize album contributors to match the provided list exactly.
+        Compares by name (case-insensitive) to avoid phantom diffs when the
+        same person is resolved to a different NameID (alias vs primary).
         """
         from src.core.audit_logger import AuditLogger
-        
+
         with self.get_connection() as conn:
             auditor = AuditLogger(conn, batch_id=batch_id)
-            
+
+            # 1. Resolve role ID
+            cursor = conn.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
+            row = cursor.fetchone()
+            if not row:
+                conn.execute("INSERT INTO Roles (RoleName) VALUES (?)", (role_name,))
+                role_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            else:
+                role_id = row[0]
+
+            # 2. Get current links by name (mirrors sync_publishers pattern)
+            cursor = conn.execute(
+                "SELECT ac.CreditedNameID, an.DisplayName FROM AlbumCredits ac "
+                "JOIN ArtistNames an ON ac.CreditedNameID = an.NameID "
+                "WHERE ac.AlbumID = ? AND ac.RoleID = ?", (album_id, role_id))
+            current_map = {row[1].lower(): row[0] for row in cursor.fetchall()}
+
+            target_names = {c.name.lower() for c in contributors if c.name}
+
+            # 3. Remove items not in target
+            for name_lower, c_id in current_map.items():
+                if name_lower not in target_names:
+                    auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
+                    conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ? AND RoleID = ?", (album_id, c_id, role_id))
+
+            # 4. Add new items
+            for c in contributors:
+                if c.name and c.name.lower() not in current_map:
+                    cursor = conn.execute(
+                        "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+                        (album_id, c.contributor_id, role_id)
+                    )
+                    if cursor.rowcount > 0:
+                        auditor.log_insert("AlbumCredits", f"{album_id}-{c.contributor_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c.contributor_id, "RoleID": role_id})
+
+    def sync_contributors_by_id(self, album_id: int, contributor_ids: List[int], role_name: str = "Performer", batch_id: Optional[str] = None) -> None:
+        """
+        Synchronize album contributors by ID (no name roundtrip).
+        Compares by ID directly since IDs come from the UI chips which know their identity.
+        """
+        from src.core.audit_logger import AuditLogger
+
+        with self.get_connection() as conn:
+            auditor = AuditLogger(conn, batch_id=batch_id)
+
             # 1. Resolve role ID
             cursor = conn.execute("SELECT RoleID FROM Roles WHERE RoleName = ?", (role_name,))
             row = cursor.fetchone()
@@ -729,23 +897,23 @@ class AlbumRepository(GenericRepository[Album]):
             # 2. Get current links for this role
             cursor = conn.execute("SELECT CreditedNameID FROM AlbumCredits WHERE AlbumID = ? AND RoleID = ?", (album_id, role_id))
             current_ids = {row[0] for row in cursor.fetchall()}
-            
-            target_ids = {c.contributor_id for c in contributors if c.contributor_id}
-            
+
+            target_ids = set(cid for cid in contributor_ids if cid)
+
             # 3. Remove items not in target
             for c_id in current_ids:
                 if c_id not in target_ids:
                     auditor.log_delete("AlbumCredits", f"{album_id}-{c_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
                     conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ? AND RoleID = ?", (album_id, c_id, role_id))
-            
+
             # 4. Add new items
-            for c in contributors:
-                if c.contributor_id not in current_ids:
+            for c_id in contributor_ids:
+                if c_id and c_id not in current_ids:
                     cursor = conn.execute(
                         "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
-                        (album_id, c.contributor_id, role_id)
+                        (album_id, c_id, role_id)
                     )
                     if cursor.rowcount > 0:
-                        auditor.log_insert("AlbumCredits", f"{album_id}-{c.contributor_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c.contributor_id, "RoleID": role_id})
+                        auditor.log_insert("AlbumCredits", f"{album_id}-{c_id}-{role_id}", {"AlbumID": album_id, "CreditedNameID": c_id, "RoleID": role_id})
 
 
