@@ -237,8 +237,6 @@ class PlaybackService(QObject):
     def get_duration(self) -> int:
         return self.active_player.duration()
 
-    def get_state(self) -> QMediaPlayer.PlaybackState:
-        return self.active_player.playbackState()
 
     def is_playing(self) -> bool:
         return self.active_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState
@@ -389,10 +387,6 @@ class PlaybackService(QObject):
         if was_fading:
             self.crossfade_finished.emit()
 
-    def play_previous(self) -> None:
-        # Hard switch for previous
-        if self._current_index > 0:
-            self.play_at_index(self._current_index - 1)
 
     def get_current_index(self) -> int:
         return self._current_index

@@ -80,27 +80,3 @@ class DuplicateScannerService:
         # Query library for existing song with this audio hash
         return self.library_service.find_by_audio_hash(audio_hash)
     
-    def evaluate_import(self, audio_hash: str, isrc: Optional[str]) -> tuple[str, Optional[Song]]:
-        """
-        Evaluate whether to import a file based on duplicate checks.
-        
-        Args:
-            audio_hash: The calculated audio hash
-            isrc: The ISRC (if available)
-            
-        Returns:
-            Tuple (Action, ExistingSong)
-            Action can be: 'IMPORT', 'SKIP_HASH', 'SKIP_ISRC'
-            ExistingSong is the song that caused the collision (or None)
-        """
-        # 1. Check Audio Hash (Strongest duplicate signal)
-        existing_by_hash = self.check_audio_duplicate(audio_hash)
-        if existing_by_hash:
-            return 'SKIP_HASH', existing_by_hash
-            
-        # 2. Check ISRC (Metadata equivalent)
-        existing_by_isrc = self.check_isrc_duplicate(isrc)
-        if existing_by_isrc:
-            return 'SKIP_ISRC', existing_by_isrc
-            
-        return 'IMPORT', None

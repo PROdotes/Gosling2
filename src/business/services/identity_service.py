@@ -137,19 +137,6 @@ class IdentityService:
                                "MemberIdentityID": member_id, "CreditedAsNameID": credited_as}
                 auditor.log_update("GroupMemberships", membership_id, old_snapshot, new_snapshot)
 
-    def link_name_to_identity(self, name_id: int, identity_id: int, batch_id: Optional[str] = None) -> bool:
-        """Link an artist name to an identity."""
-        name = self._name_repo.get_by_id(name_id)
-        if not name:
-            return False
-        
-        # Audit high-level link
-        from src.core.audit_logger import AuditLogger
-        with self._repo.get_connection() as conn:
-            AuditLogger(conn, batch_id=batch_id).log_action("LINK_NAME", "Identities", identity_id, f"Link Name: {name_id}")
-
-        name.owner_identity_id = identity_id
-        return self._name_repo.update(name, batch_id=batch_id)
 
     def promote_alias(self, contributor_id: int, alias_id: int, batch_id: Optional[str] = None, **kwargs) -> bool:
         """

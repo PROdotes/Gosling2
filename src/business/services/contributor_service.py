@@ -127,12 +127,6 @@ class ContributorService:
             )
         return None
 
-    def validate_identity(self, name: str, exclude_id: Optional[int] = None) -> Tuple[Optional[int], Optional[str]]:
-        """Check if a name already exists and return conflict info (ID, Message)."""
-        existing = self.get_collision(name, exclude_id)
-        if existing:
-            return existing.contributor_id, f"Artist '{name}' already exists as a {existing.type}."
-        return None, None
 
     def create(self, name: str, type: Optional[str] = 'person', batch_id: Optional[str] = None) -> Contributor:
         """Create new contributor (Identity + Primary ArtistName)."""
@@ -425,13 +419,6 @@ class ContributorService:
         # Different identities: Perform deep identity merge
         return self._identity_service.merge(s_name.owner_identity_id, t_name.owner_identity_id, batch_id=batch_id)
 
-    def merge_contributors(self, source_id: int, target_id: int, create_alias: bool = True, batch_id: Optional[str] = None) -> bool:
-        """Alias for merge (Legacy Wrapper)."""
-        return self.merge(source_id, target_id, create_alias, batch_id)
-        
-    # ==========================
-    # Consume (Absorb without Alias)
-    # ==========================
 
     def consume(self, source_id: int, target_id: int, batch_id: Optional[str] = None) -> bool:
         """
@@ -539,32 +526,6 @@ class ContributorService:
                 ) for row in cursor.fetchall()
             ]
 
-    def get_all_by_type(self, type_name: str) -> List[Contributor]:
-        """Fetch all contributors of a primary identity type (person, group), including aliases."""
-        if not type_name:
-            return self.get_all()
-            
-        type_lower = type_name.lower()
-        with self._credit_repo.get_connection() as conn:
-            cursor = conn.cursor()
-            # T-Fix: Include both Primary and Alias names (IsPrimaryName 1 or 0) 
-            # as long as they belong to the correct Identity type.
-            cursor.execute("""
-                SELECT an.NameID, an.DisplayName, an.SortName, i.IdentityType, an.IsPrimaryName
-                FROM ArtistNames an
-                JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
-                WHERE i.IdentityType = ? COLLATE UTF8_NOCASE
-                ORDER BY an.SortName
-            """, (type_lower,))
-            return [
-                Contributor(
-                    contributor_id=row[0],
-                    name=row[1],
-                    sort_name=row[2],
-                    type=row[3] or 'person',
-                    matched_alias=row[1] if row[4] == 0 else None  # Mark as alias if not primary
-                ) for row in cursor.fetchall()
-            ]
 
     def search(self, query: str) -> List[Contributor]:
         """
@@ -687,18 +648,6 @@ class ContributorService:
                 AuditLogger(conn, batch_id=batch_id).log_delete("GroupMemberships", f"{group_ident}-{member_ident}", snapshot)
             return cursor.rowcount > 0
 
-    def get_member_count(self, contributor_id: int) -> int:
-        """Count how many group memberships this entity is involved in (as group or member)."""
-        identity_id = self._get_identity_id(contributor_id)
-        if not identity_id: return 0
-        
-        with self._credit_repo.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) FROM GroupMemberships 
-                WHERE GroupIdentityID = ? OR MemberIdentityID = ?
-            """, (identity_id, identity_id))
-            return cursor.fetchone()[0]
 
     def get_aliases(self, contributor_id: int) -> List[Any]:
         """Get all aliases (non-primary names) for this contributor."""
@@ -792,35 +741,6 @@ class ContributorService:
             return False
         return self._identity_service.move_alias(alias_name, old_ident, new_ident, batch_id=batch_id)
 
-    def abdicate_identity(self, old_id: int, heir_id: int, adopter_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        Abdicate an identity: move the primary name to another identity,
-        and promote an heir to become the new primary.
-        
-        Args:
-            old_id: NameID of the identity being abdicated from (resolved to IdentityID)
-            heir_id: NameID that will become the new primary
-            adopter_id: NameID of the identity receiving the old primary (resolved to IdentityID)
-        """
-        old_ident = self._get_identity_id(old_id)
-        adopter_ident = self._get_identity_id(adopter_id)
-        
-        if not old_ident or not adopter_ident:
-            return False
-        
-        # heir_id is already a NameID, not a ContributorID that needs resolution
-        return self._identity_service.abdicate(old_ident, heir_id, adopter_ident, batch_id=batch_id)
-
-    # Legcy alias removed as it is now defined in the unified section above.
-
-    def swap_song_contributor(self, song_id: int, old_contributor_id: int, new_contributor_id: int, batch_id: Optional[str] = None) -> bool:
-        """
-        Swap one contributor for another on a specific song (Fix This Song Only).
-        Operates on SongCredits.
-        """
-        return self._credit_repo.swap_song_contributor_credits(song_id, old_contributor_id, new_contributor_id, batch_id)
-
-    # --- Inventory Management (T-Tools) ---
 
     def get_all_with_usage(self, type_filter: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Contributor, int]]:
         """

@@ -62,14 +62,6 @@ class AlbumService:
         """Delete an album record."""
         return self._repo.delete(album_id)
 
-    def assign_to_song(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None, album_type: Optional[str] = None) -> Album:
-        """Link a song to an album by title, artist, and year."""
-        return self._repo.assign_album(source_id, album_title, artist, year, album_type=album_type)
-
-    def get_publisher_name(self, album_id: int) -> Optional[str]:
-        """Get the publisher name(s) associated with an album."""
-        return self._repo.get_publisher(album_id)
-
     def set_publisher(self, album_id: int, publisher_name: str) -> None:
         """Set or update the publisher for an album."""
         self._repo.set_publisher(album_id, publisher_name)

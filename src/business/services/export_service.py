@@ -86,38 +86,3 @@ class ExportService:
             logger.error(f"Export failed for {song.path}: {e}")
             return ExportResult(success=False, error=f"Error exporting {song.name or 'file'}:\n{e}")
     
-    def export_songs(self, 
-                     songs: List[Song], 
-                     dry_run: bool = False,
-                     write_tags: bool = True,
-                     progress_callback: Callable[[int, int, str, bool], None] = None,
-                     batch_id: Optional[str] = None,
-                     **kwargs
-                     ) -> BatchExportResult:
-        """
-        Export multiple songs with optional progress reporting.
-        
-        Args:
-            songs: List of Song objects to export.
-            dry_run: If True, validate but don't actually write.
-            progress_callback: Called after each song with (current, total, path, success).
-        
-        Returns:
-            BatchExportResult with counts and error details.
-        """
-        result = BatchExportResult()
-        total = len(songs)
-        
-        for i, song in enumerate(songs, start=1):
-            export_result = self.export_song(song, dry_run=dry_run, write_tags=write_tags, batch_id=batch_id, **kwargs)
-            
-            if export_result.success:
-                result.success_count += 1
-            else:
-                result.error_count += 1
-                result.errors.append(export_result.error or f"Unknown error for {song.path}")
-            
-            if progress_callback:
-                progress_callback(i, total, song.path or "unknown", export_result.success)
-        
-        return result

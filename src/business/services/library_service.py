@@ -68,9 +68,6 @@ class LibraryService:
         """Get all contributors for a specific role"""
         return self.contributor_service.get_by_role(role_name)
 
-    def get_songs_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific performer"""
-        return self.song_service._repo.get_by_performer(performer_name)
 
     def get_songs_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific artist (T-17: Identity Graph aware)"""
@@ -103,9 +100,6 @@ class LibraryService:
         return stats
 
 
-    def get_songs_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific composer"""
-        return self.song_service._repo.get_by_composer(composer_name)
 
     def get_song_by_path(self, path: str) -> Optional[Song]:
         """Get full song object by path"""
@@ -137,35 +131,6 @@ class LibraryService:
         """Get all distinct alias names"""
         return self.contributor_service.get_all_aliases()
 
-    def get_songs_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific year"""
-        return self.song_service.repo.get_by_year(year)
-
-    def get_songs_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by status"""
-        return self.song_service.repo.get_by_status(is_done)
-
-    # ==================== ALBUMS (T-06) ====================
-
-    def get_item_albums(self, source_id: int) -> List[Album]:
-        """Get albums linked to a source item."""
-        return self.album_service.get_albums_for_song(source_id)
-
-    def assign_album(self, source_id: int, album_title: str, artist: Optional[str] = None, year: Optional[int] = None) -> Album:
-        """
-        Link a song to an album by title, artist, and year (Find or Create).
-        """
-        if not album_title or not album_title.strip():
-            return None
-            
-        album, created = self.album_service.get_or_create(
-            title=album_title.strip(),
-            artist=artist,
-            year=year
-        )
-
-        self.album_service.link_song_to_album(source_id, album.album_id)
-        return album
 
     def get_distinct_filter_values(self, field_name: str) -> List[Any]:
         """Get distinct values for a field to populate filters."""
@@ -173,14 +138,6 @@ class LibraryService:
 
     # ==================== WORKFLOW (T-89) ====================
 
-    def is_song_unprocessed(self, song_id: int) -> bool:
-        """Check if a song is unprocessed (Status=0)."""
-        song = self.get_song_by_id(song_id)
-        return not song.is_done if song else True
-
-    def set_song_unprocessed(self, song_id: int, unprocessed: bool) -> bool:
-        """Set the processing status (Status column) for a song."""
-        return self.update_song_status(song_id, not unprocessed)
 
     def get_virtual_member_count(self, zip_path: str) -> int:
         """Count how many library items belong to this ZIP container."""

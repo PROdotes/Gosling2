@@ -12,9 +12,6 @@ class SearchService:
     
     PROVIDERS = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs", "ZAMP"]
 
-    def get_providers(self) -> List[str]:
-        """Return list of supported search providers."""
-        return self.PROVIDERS
 
     def get_search_url(self, provider: str, title: str = "", artist: str = "", field_name: str = "", field_header: str = "") -> str:
         """

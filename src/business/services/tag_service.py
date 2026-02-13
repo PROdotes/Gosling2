@@ -33,9 +33,6 @@ class TagService:
         """Get all tags in a specific category."""
         return self._repo.get_all_by_category(category)
 
-    def get_tags_for_song(self, song_id: int) -> List[Any]:
-        """Get all tags linked to a song."""
-        return self._repo.get_tags_for_source(song_id)
 
     def set_tags(self, song_id: int, tags: List[str], category: str) -> bool:
         """Update tags for a song by category (Replaces existing)."""

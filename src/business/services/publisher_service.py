@@ -88,12 +88,6 @@ class PublisherService:
         """Unlink a publisher from a recording (song)."""
         return self._repo.remove_publisher_from_song(song_id, publisher_id, batch_id=batch_id)
 
-    def get_usage_stats(self, publisher_id: int) -> dict:
-        """Retrieve usage statistics (referenced albums, dependencies) for safety checks."""
-        return {
-            'album_count': self._repo.get_album_count(publisher_id),
-            'child_count': self._repo.get_child_count(publisher_id)
-        }
 
     def would_create_cycle(self, child_id: int, proposed_parent_id: Optional[int]) -> bool:
         """
