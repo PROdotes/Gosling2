@@ -67,8 +67,3 @@ class SpotifyParsingService:
             preview += "..."
         return preview
 
-    def is_canonical(self, role: str) -> bool:
-        """Check if a role is a recognized canonical role."""
-        from src.utils.spotify_credits_parser import ROLE_SYNONYMS
-        canonical_roles = set(ROLE_SYNONYMS.values())
-        return role in canonical_roles
