@@ -111,7 +111,7 @@ class ToolsWindow(QMainWindow):
             self.tab_content.addWidget(self.artists_tab)
             self._create_tab_pill("Artists", "🎭 Artists", 1, color="#00E5FF")  # Cyan
         else:
-            placeholder = self._create_placeholder_tab("Artists")
+            placeholder = self._create_placeholder_tab("Artists", "Artists service not available")
             self.tab_content.addWidget(placeholder)
             self._create_tab_pill("Artists", "🎭 Artists", 1, enabled=False)
 
@@ -121,7 +121,7 @@ class ToolsWindow(QMainWindow):
             self.tab_content.addWidget(self.albums_tab)
             self._create_tab_pill("Albums", "💿 Albums", 2, color="#FFC66D")  # Amber
         else:
-            placeholder = self._create_placeholder_tab("Albums")
+            placeholder = self._create_placeholder_tab("Albums", "Albums service not available")
             self.tab_content.addWidget(placeholder)
             self._create_tab_pill("Albums", "💿 Albums", 2, enabled=False)
 
@@ -131,7 +131,7 @@ class ToolsWindow(QMainWindow):
             self.tab_content.addWidget(self.publishers_tab)
             self._create_tab_pill("Publishers", "🏢 Publishers", 3, color="#4DFFB8")  # Green
         else:
-            placeholder = self._create_placeholder_tab("Publishers")
+            placeholder = self._create_placeholder_tab("Publishers", "Publishers service not available")
             self.tab_content.addWidget(placeholder)
             self._create_tab_pill("Publishers", "🏢 Publishers", 3, enabled=False)
 
@@ -152,7 +152,7 @@ class ToolsWindow(QMainWindow):
         # Tab content (stacked)
         layout.addWidget(self.tab_content)
 
-    def _add_placeholder_tab(self, category: str, message: str) -> QWidget:
+    def _create_placeholder_tab(self, category: str, message: str) -> QWidget:
         """Add a placeholder tab for features not yet implemented."""
         widget = QWidget()
         widget.setObjectName(f"{category}Tab")
