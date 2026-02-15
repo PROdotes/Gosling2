@@ -2196,55 +2196,6 @@ class LibraryWidget(QWidget):
         """
         self._toggle_status(True)
 
-    def save_selected_songs(self) -> None:
-        """Save selected songs: DB + ID3.
-
-        For each selected row in the library table:
-        - Resolve the song via LibraryService (by path).
-        - Persist metadata to the database.
-        - Persist metadata to ID3 via MetadataService.write_tags.
-
-        Renaming/moves for Done items will be hooked in later via a
-        dedicated RenamingService.
-        """
-        indexes = self.table_view.selectionModel().selectedRows()
-        if not indexes:
-            return
-
-        saved = 0
-        errors = []
-
-        for index in indexes:
-            source_index = self.proxy_model.mapToSource(index)
-            row = source_index.row()
-
-            path_item = self.library_model.item(row, self.field_indices['path'])
-            if not path_item:
-                continue
-
-            path = path_item.text()
-            try:
-                song = self.library_service.get_song_by_path(path)
-                if not song:
-                    continue
-
-                # 1) Persist to DB
-                self.library_service.update_song(song)
-
-                # 2) Persist to ID3
-                self.metadata_service.write_tags(song)
-
-                # 3) TODO: When RenamingService exists, rename if song is NOT unprocessed (tag absent)
-                saved += 1
-            except Exception as e:
-                errors.append((path, str(e)))
-
-        # Basic feedback via console for now; UI can be wired to status bar later.
-        if saved == 0 and errors:
-            print(f"[Save] Failed to save {len(errors)} song(s)")
-        elif saved > 0:
-            print(f"[Save] Saved {saved} song(s); {len(errors)} failures")
-
     def toggle_jingle_curtain(self):
         """Triggers the bottom-up expansion of the Jingle Tray."""
         is_opening = self.jingle_handle.isChecked()
@@ -2277,50 +2228,6 @@ class LibraryWidget(QWidget):
     def totalSidebarWidth(self, width):
         # Update the splitter to track the handle during flight
         self.splitter.setSizes([width, self.width() - width])
-
-    def toggle_history_drawer(self):
-        """Synchronized Mechanical Swap: Handle pulls Log left, pushing Filter away."""
-        if not hasattr(self, "_swap_group"):
-            self._swap_group = QParallelAnimationGroup(self)
-            
-            # Anim A: History Log growth (drawerWidth is a property of HistoryDrawer)
-            self._history_anim = QPropertyAnimation(self.history_drawer, b"drawerWidth")
-            self._history_anim.setDuration(500)
-            self._history_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-            
-            # Anim B: Filter Tree shrink (filterWidth is a property of self)
-            self._filter_anim = QPropertyAnimation(self, b"filterWidth")
-            self._filter_anim.setDuration(500)
-            self._filter_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-            
-            # Anim C: Total Sidebar Width Adjustment (totalSidebarWidth is a property of self)
-            self._splitter_anim = QPropertyAnimation(self, b"totalSidebarWidth")
-            self._splitter_anim.setDuration(500)
-            self._splitter_anim.setEasingCurve(QEasingCurve.Type.OutQuint)
-            
-            self._swap_group.addAnimation(self._history_anim)
-            self._swap_group.addAnimation(self._filter_anim)
-            self._swap_group.addAnimation(self._splitter_anim)
-
-        if self._history_open:
-            # Back to Filters (Move handle RIGHT)
-            self._history_anim.setStartValue(self._history_target_width)
-            self._history_anim.setEndValue(0)
-            self._filter_anim.setStartValue(0)
-            self._filter_anim.setEndValue(self._filter_base_width)
-            self._splitter_anim.setStartValue(self._history_target_width + self._rail_width)
-            self._splitter_anim.setEndValue(self._filter_base_width + self._rail_width)
-        else:
-            # Pull Log Out (Move handle LEFT)
-            self._history_anim.setStartValue(0)
-            self._history_anim.setEndValue(self._history_target_width)
-            self._filter_anim.setStartValue(self._filter_base_width)
-            self._filter_anim.setEndValue(0)
-            self._splitter_anim.setStartValue(self._filter_base_width + self._rail_width)
-            self._splitter_anim.setEndValue(self._history_target_width + self._rail_width)
-            
-        self._swap_group.start()
-        self._history_open = not self._history_open
 
     def _on_item_entered(self, index) -> None:
         """Track the hovered row for row-wide highlighting."""
