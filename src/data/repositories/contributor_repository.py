@@ -64,27 +64,6 @@ class ContributorRepository(GenericRepository[Contributor]):
             )
         return None
 
-    def get_by_role(self, role_name: str) -> List[Contributor]:
-        """Fetch all contributors who have a specific role assigned at least once"""
-        from ..models.contributor import Contributor
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT DISTINCT c.ContributorID, c.ContributorName, c.SortName, c.ContributorType
-                    FROM Contributors c
-                    JOIN MediaSourceContributorRoles mscr ON c.ContributorID = mscr.ContributorID
-                    JOIN Roles r ON mscr.RoleID = r.RoleID
-                    WHERE r.RoleName = ?
-                    ORDER BY c.SortName ASC
-                """, (role_name,))
-
-                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error fetching contributors by role: {e}")
-            return []
-
     def get_usage_count(self, contributor_id: int) -> int:
         """Return the number of songs this contributor is linked to."""
         try:
@@ -210,47 +189,6 @@ class ContributorRepository(GenericRepository[Contributor]):
 
         return deleted
 
-    def swap_song_contributor(self, song_id: int, old_id: int, new_id: int, batch_id: Optional[str] = None) -> bool:
-        """Replace one contributor link with another for a single song. (Deduplication aware)"""
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                
-                # 1. Fetch current roles for old_id to audit
-                cursor.execute("SELECT RoleID, CreditedAliasID FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ?", (song_id, old_id))
-                old_links = cursor.fetchall()
-
-                # 2. Deduplicate: Find roles that BOTH already have for this song
-                # If both have the same role, we must delete the OLD one to avoiding breaking the PK (Source, Contributor, Role)
-                cursor.execute("""
-                    DELETE FROM MediaSourceContributorRoles 
-                    WHERE SourceID = ? AND ContributorID = ? AND RoleID IN (
-                        SELECT RoleID FROM MediaSourceContributorRoles WHERE SourceID = ? AND ContributorID = ?
-                    )
-                """, (song_id, old_id, song_id, new_id))
-                
-                # 3. Update remaining roles from OLD to NEW
-                cursor.execute("""
-                    UPDATE MediaSourceContributorRoles 
-                    SET ContributorID = ?, CreditedAliasID = NULL
-                    WHERE SourceID = ? AND ContributorID = ?
-                """, (new_id, song_id, old_id))
-
-                # 4. Audit
-                for r_id, a_id in old_links:
-                    auditor.log_update("MediaSourceContributorRoles", f"{song_id}-{old_id}-{r_id}", 
-                        {"ContributorID": old_id}, {"ContributorID": new_id})
-
-                return True 
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error swapping contributor {old_id} -> {new_id} on song {song_id}: {e}")
-            return False
-
-
-
     def get_all_aliases(self) -> List[str]:
         """Get all alias names"""
         try:
@@ -261,18 +199,6 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             from src.core import logger
             logger.error(f"Error fetching aliases: {e}")
-            return []
-
-    def get_all_names(self) -> List[str]:
-        """Fetch all unique contributor primary names (Ordered by SortName)."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT DISTINCT ContributorName FROM Contributors ORDER BY SortName")
-                return [row[0] for row in cursor.fetchall()]
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error fetching contributor names: {e}")
             return []
 
     def _insert_db(self, cursor: sqlite3.Cursor, contributor: Contributor, **kwargs) -> int:
@@ -409,48 +335,6 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error fetching contributors by type: {e}")
             return []
 
-    def search_identities(self, query: str) -> List[Tuple[int, str, str, str]]:
-        """
-        Search for ANY matching name (Primary or Alias) and return flat results.
-        Returns list of (ContributorID, DisplayName, Type, MatchSource)
-        MatchSource is 'Primary' or 'Alias'.
-        """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                q = f"%{query}%" if query else "%"
-                
-                # We want a UNION of Primary matches and Alias matches
-                # If query is empty (%), it returns EVERYTHING.
-                cursor.execute("""
-                    SELECT 
-                        ContributorID, 
-                        ContributorName as Name, 
-                        ContributorType, 
-                        'Primary' as MatchSource
-                    FROM Contributors 
-                    WHERE ContributorName LIKE ?
-                    
-                    UNION
-                    
-                    SELECT 
-                        C.ContributorID, 
-                        CA.AliasName as Name, 
-                        C.ContributorType, 
-                        'Alias' as MatchSource
-                    FROM ContributorAliases CA 
-                    JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                    WHERE CA.AliasName LIKE ?
-                    
-                    ORDER BY Name ASC
-                """, (q, q))
-                
-                return cursor.fetchall()
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error searching identities: {e}")
-            return []
-
     def get_types_for_names(self, names: List[str]) -> dict:
         """
         Get type ('person' or 'group') for a list of names.
@@ -527,48 +411,6 @@ class ContributorRepository(GenericRepository[Contributor]):
         
         # 3. Create if not found
         return self.create(name, type, conn=conn, batch_id=batch_id), True
-
-    def validate_identity(self, name: str, exclude_id: int = None) -> Tuple[Optional[int], str]:
-        """
-        Check if name exists as Primary or Alias. 
-        Returns (conflict_id_or_none, message).
-        """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                # Check Name Conflict
-                query = "SELECT ContributorID, ContributorName FROM Contributors WHERE ContributorName = ? COLLATE UTF8_NOCASE"
-                params = [name]
-                if exclude_id:
-                    query += " AND ContributorID != ?"
-                    params.append(exclude_id)
-                
-                cursor.execute(query, params)
-                row = cursor.fetchone()
-                if row:
-                    return row[0], f"Name '{name}' already exists as a primary artist (ID: {row[0]})."
-                
-                # Check Alias Conflict
-                query = """
-                    SELECT C.ContributorID, C.ContributorName 
-                    FROM ContributorAliases CA
-                    JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                    WHERE CA.AliasName = ? COLLATE UTF8_NOCASE
-                """
-                params = [name]
-                if exclude_id:
-                    query += " AND C.ContributorID != ?"
-                    params.append(exclude_id)
-                
-                cursor.execute(query, params)
-                row = cursor.fetchone()
-                if row:
-                    return row[0], f"Name '{name}' exists as an alias for artist '{row[1]}' (ID: {row[0]})."
-                
-                return None, ""
-        except Exception as e:
-            return None, str(e)
 
     # Complex identity methods removed (Moved to IdentityService)
 
