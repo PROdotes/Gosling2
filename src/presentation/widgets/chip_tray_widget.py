@@ -200,39 +200,6 @@ class ChipTrayWidget(QWidget):
         if move_add_button and self.is_add_visible:
             self._move_add_to_end()
 
-    def get_insertion_index(self, new_label: str) -> int:
-        """Calculate the alphabetical insertion index for a new chip."""
-        new_label = new_label.lower()
-        cnt = self.flow_layout.count()
-        
-        for i in range(cnt):
-            item = self.flow_layout.itemAt(i)
-            widget = item.widget()
-            
-            # If we hit the add button, we MUST insert here (pushing button to end)
-            if widget == self.btn_add:
-                return i
-                
-            # If we hit a chip that is "larger", insert here
-            if isinstance(widget, Chip):
-                if new_label < widget.label_text.lower():
-                    return i
-                    
-        return cnt # Fallback (append)
-            
-        chip.show()
-        # Refresh style for property change
-        chip.style().unpolish(chip)
-        chip.style().polish(chip)
-        
-        # Initial constraint (in case we are already visible)
-        current_max = self.width() - 20
-        if current_max > 50:
-            chip.setMaximumWidth(current_max)
-        
-        self.container.updateGeometry()
-        self.flow_layout.activate()
-
     def _move_add_to_end(self):
         # Safely move btn_add to the end using the layout API
         for i in range(self.flow_layout.count()):

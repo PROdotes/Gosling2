@@ -899,61 +899,6 @@ class SidePanelWidget(QFrame):
         
         self._refresh_field_values()
 
-    def _on_add_button_clicked(self, field_name, origin=None):
-        """Generic 'Add' button handler."""
-        
-        # Legacy / Special Handling (e.g. Album Manager direct invocation)
-        # MUST come before delegation because Album field IS an EntityListWidget 
-        # but the generic picker doesn't support AlbumManagerDialog's complexity yet.
-        if field_name == 'album':
-            # Clean Slate for Add, Merge logic handled in callback
-            self._open_album_manager(clean_slate=True, mode='add')
-            return
-
-        # T-Refactor: Delegate to EntityListWidget if applicable
-        if field_name in self._field_widgets:
-             widget = self._field_widgets[field_name]
-             if isinstance(widget, EntityListWidget):
-                 widget.add_item_interactive()
-                 return
-        elif field_name == 'tags':
-            # Unified tag picker - use universal EntityPickerDialog
-            from ..dialogs.entity_picker_dialog import EntityPickerDialog
-            from src.core.picker_config import get_tag_picker_config
-            diag = EntityPickerDialog(
-                service_provider=self,
-                config=get_tag_picker_config(),
-                parent=self
-            )
-            if diag.exec() == 1:
-                selected = diag.get_selected()
-                if selected:
-                    # Add tag to all selected songs via TagService
-                    for song in self.current_songs:
-                        self.tag_service.add_tag_to_source(song.source_id, selected.tag_id)
-                    # Refresh to show new tag
-                    self._refresh_field_values()
-                    self.filter_refresh_requested.emit()
-        else:
-            # Artists / Contributors - use universal EntityPickerDialog
-            from ..dialogs.entity_picker_dialog import EntityPickerDialog
-            from src.core.picker_config import get_artist_picker_config
-            diag = EntityPickerDialog(
-                service_provider=self,
-                config=get_artist_picker_config(),
-                parent=self
-            )
-            
-            if diag.exec() == 1:
-                selected = diag.get_selected()
-                if selected:
-                    # Support both List (Smart Split) and Single Item (Legacy)
-                    if isinstance(selected, list):
-                        for item in selected:
-                            self._add_name_to_selection(field_name, item.name if hasattr(item, 'name') else str(item))
-                    else:
-                        self._add_name_to_selection(field_name, selected.name if hasattr(selected, 'name') else str(selected))
-
     def _add_name_to_selection(self, field_name, name):
         """T-70: Add a name to the specified field for all selected songs."""
         for song in self.current_songs:

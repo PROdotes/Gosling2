@@ -340,13 +340,6 @@ class SongFieldAdapter(ContextAdapter):
         if self._refresh:
             self._refresh()
     
-    def _get_entity_id(self, entity: Any) -> int:
-        """Get ID from entity (handles different attribute names)."""
-        for attr in ['contributor_id', 'publisher_id', 'album_id', 'tag_id', 'id']:
-            if hasattr(entity, attr):
-                return getattr(entity, attr)
-        return 0
-    
     def _get_entity_name(self, entity: Any) -> str:
         """Get display name from entity."""
         if self.field_name == 'tags' and hasattr(entity, 'tag_name'):
@@ -387,13 +380,6 @@ class ArtistAliasAdapter(ContextAdapter):
     def link(self, child_id: int, **kwargs) -> bool:
         # For aliases, "link" means adding a new alias by name
         # This is handled differently - see ArtistDetailsDialog._add_alias
-        return False
-    
-    def link_by_name(self, name: str) -> bool:
-        """Add a new alias by name."""
-        if self.service.add_alias(self.artist.contributor_id, name):
-            self.on_data_changed()
-            return True
         return False
     
     def unlink(self, child_id: int) -> bool:

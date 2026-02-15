@@ -642,17 +642,6 @@ class ContributorService:
                 aliases.append(SimpleNamespace(alias_id=n.name_id, alias_name=n.display_name))
         return aliases
 
-    def add_alias(self, contributor_id: int, alias_name: str) -> bool:
-        """Create a new alias for this contributor."""
-        identity_id = self._get_identity_id(contributor_id)
-        if not identity_id: return False
-        
-        try:
-            self._name_service.create_name(alias_name, owner_identity_id=identity_id, is_primary=False)
-            return True
-        except Exception:
-            return False
-
     def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """Delete an alias."""
         return self._name_service.delete_name(alias_id, batch_id=batch_id)

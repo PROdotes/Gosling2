@@ -485,25 +485,6 @@ class ArtistDetailsDialog(QDialog):
             self._member_adapter.link(target.contributor_id, matched_alias=getattr(target, 'matched_alias', None))
             self._refresh_data()
 
-    def _show_alias_chip_menu(self, alias_id, alias_name, global_pos):
-        """Show context menu for alias chips."""
-        menu = QMenu(self)
-        
-        promote_act = QAction("Set as Main", self)
-        promote_act.triggered.connect(lambda: self._promote_alias(alias_id, alias_name))
-        menu.addAction(promote_act)
-        
-        menu.addSeparator()
-
-        edit_act = QAction("Rename", self)
-        edit_act.triggered.connect(lambda: self._edit_alias(alias_id, alias_name))
-        menu.addAction(edit_act)
-        
-        del_act = QAction("Unlink Name", self)
-        del_act.triggered.connect(lambda: self._confirm_delete_alias(alias_id, alias_name))
-        menu.addAction(del_act)
-        menu.exec(global_pos)
-
     def _confirm_delete_alias(self, alias_id, name):
         # Simplified: Just do it. Audit log handles the safety.
         if self.service.delete_alias(alias_id):
@@ -537,13 +518,6 @@ class ArtistDetailsDialog(QDialog):
                 if new_name and new_name != old_name:
                     if self.service.update_alias(alias_id, new_name):
                         self._refresh_data()
-
-    def _delete_alias(self, alias_id):
-        # Unused now, replaced by confirm version
-        pass
-
-    # NOTE: _add_member, _show_member_menu, _remove_member are now handled by EntityListWidget
-    # The old manual implementations have been removed.
 
     def _save(self):
         new_name = self.txt_name.text().strip()

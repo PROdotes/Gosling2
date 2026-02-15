@@ -1097,18 +1097,6 @@ class AlbumManagerDialog(QDialog):
             # For now, matching Artist: requires a target.
             pass
 
-    def _toggle_view_mode(self, checked):
-        """Toggle between Full (Expert) and Focused (Editor) modes."""
-        # ... (rest of method) ...
-        if checked:
-            self.btn_view_toggle.setText("View: Full")
-            self.pane_context.show()
-            self.pane_vault.show()
-        else:
-            self.btn_view_toggle.setText("View: Edit")
-            self.pane_context.hide()
-            self.pane_vault.hide()
-
     def get_selected(self):
         """Adapter method for EntityClickRouter compatibility."""
         return self._gather_selection()

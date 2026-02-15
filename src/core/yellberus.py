@@ -527,10 +527,6 @@ BASE_QUERY = f"{QUERY_SELECT} {QUERY_FROM} {QUERY_BASE_WHERE} {QUERY_GROUP_BY}"
 
 # ==================== HELPERS ====================
 
-def get_visible_fields() -> List[FieldDef]:
-    """Get fields that should appear in the table."""
-    return [f for f in FIELDS if f.visible]
-
 def get_filterable_fields() -> List[FieldDef]:
     """Get fields that should appear in the filter sidebar."""
     return [f for f in FIELDS if f.filterable]
@@ -603,34 +599,6 @@ def check_completeness(row_data: list) -> set:
                     incomplete_fields.add('tags')  # Mark the column itself as failing
 
     return incomplete_fields
-    
-
-def get_health_status(row_data: list) -> HealthStatus:
-    """
-    Determine the Health Status of a row (T-104).
-    Calculates priority: INVALID > UNPROCESSED > READY.
-    """
-    # 1. Check Completeness (INVALID)
-    missing_fields = check_completeness(row_data)
-    if missing_fields:
-        return HealthStatus.INVALID
-        
-    # 2. Check Processing Status (UNPROCESSED)
-    # If valid but specifically marked Unprocessed (Status=0)
-    is_done_idx = -1
-    for i, field in enumerate(FIELDS):
-        if field.name == 'is_done':
-            is_done_idx = i
-            break
-            
-    if is_done_idx != -1 and is_done_idx < len(row_data):
-        is_done_val = row_data[is_done_idx]
-        is_done = bool(is_done_val) if is_done_val is not None else True
-        if not is_done:
-            return HealthStatus.UNPROCESSED
-            
-    # 3. Default (READY)
-    return HealthStatus.READY
 
 
 # ==================== SCHEMA VALIDATION ====================
@@ -646,78 +614,6 @@ def yell(message: str) -> None:
     """
     from . import logger
     logger.dev_warning(f"YELLBERUS: {message}")
-
-def validate_schema() -> None:
-    """
-    Cross-check FIELDS against id3_frames.json and Song model.
-    Raises SchemaError if mismatches are found.
-    
-    Checks:
-    1. Portable fields have id3_frame defined
-    2. id3_frame exists in id3_frames.json with 'field' mapping
-    3. JSON 'field' value has matching Song attribute (or alias)
-    4. Local fields don't have id3_frame
-    
-    Call this at app startup or in tests to catch schema drift early.
-    """
-    from src.data.models.song import Song
-    from .registries.id3_registry import ID3Registry
-    
-    errors = []
-    
-    # Load ID3 frames from registry
-    id3_frames = ID3Registry.get_frame_map()
-    
-    # Build reverse lookup: field_name -> frame_code
-    field_to_frame = {}
-    for frame_code, frame_info in id3_frames.items():
-        if isinstance(frame_info, dict) and 'field' in frame_info:
-            field_to_frame[frame_info['field']] = frame_code
-    
-    # Known aliases (JSON field name -> Song attribute)
-    attr_map = {
-        'file_id': 'source_id',
-        'path': 'source',
-        'title': 'name',
-    }
-    
-    for field in FIELDS:
-        # Look up frame code from JSON using field name
-        frame_code = field_to_frame.get(field.name)
-        
-        # Check 1: Portable fields must have a frame in JSON
-        if field.portable and not frame_code:
-            errors.append(f"❌ Portable field '{field.name}' has no ID3 frame mapping in id3_frames.json")
-            continue
-        
-        # For portable fields, verify the full chain
-        if field.portable and frame_code:
-            frame_info = id3_frames.get(frame_code, {})
-            if isinstance(frame_info, dict):
-                json_field = frame_info.get('field')
-                
-                # Check 2: JSON field maps to Song attribute
-                attr = attr_map.get(json_field, json_field)
-                
-
-                    
-                if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
-                    errors.append(f"❌ JSON field '{json_field}' → Song missing attribute '{attr}'")
-        
-        # For local fields, check Song has the attribute (unless virtual/unified)
-        if not field.portable:
-            attr = field.model_attr or field.name
-            attr = attr_map.get(attr, attr)
-            
-            # Unified fields live in the 'tags' list, not as direct attributes
-            if field.name == 'is_done':
-                continue
-                
-            if attr not in Song.__dataclass_fields__ and not hasattr(Song, attr):
-                errors.append(f"❌ Local field '{field.name}' → Song missing attribute '{attr}'")
-    
-    if errors:
-        raise SchemaError("YELLBERUS SCHEMA MISMATCH:\n" + "\n".join(errors))
 
 def row_to_tagged_tuples(row: tuple) -> list:
     """

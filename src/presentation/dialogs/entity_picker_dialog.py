@@ -738,11 +738,4 @@ class EntityPickerDialog(QDialog):
     def get_rename_info(self):
         """Get rename details: (new_name, new_type)."""
         return self._rename_info
-    
-    def get_new_name(self) -> str:
-        """Return the text in the search box."""
-        return self.txt_search.text().strip()
-    
-    def get_target_type(self) -> str:
-        """Return the currently selected type filter."""
-        return self._current_type_filter or self.config.default_type
+

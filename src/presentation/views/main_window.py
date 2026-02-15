@@ -482,10 +482,6 @@ class MainWindow(QMainWindow):
         self.action_open_tools.triggered.connect(self._open_tools)
         self.addAction(self.action_open_tools)
 
-    def _on_playlist_changed(self, parent, start, end):
-        # Update widget with new count
-        self.playback_widget.set_playlist_count(self.playlist_widget.count())
-
     def _sync_playlist_to_service(self):
         """Sync the playback service playlist with the UI playlist"""
         paths = []
@@ -732,11 +728,6 @@ class MainWindow(QMainWindow):
                 playlist_data.append(data["path"])
         self.settings_manager.set_last_playlist(playlist_data)
 
-
-    def _on_right_tab_changed(self, index: int) -> None:
-        """Legacy handler - keep for now to avoid breaking other connections if any"""
-        pass
-
     def _on_library_selection_changed(self, selected, deselected) -> None:
         """Handle library row selection."""
         # Get selected rows from the view
@@ -825,40 +816,6 @@ class MainWindow(QMainWindow):
             # Force Fade Duration logic
             self.playback_service.crossfade_duration = duration_ms
             self._play_next() # Call UI Helper
-
-    def _get_selected_song_object(self, proxy_index):
-        """Helper to get a real Song object from a table selection."""
-        # Get path from column (standard Yellberus index)
-        path_idx = self.library_widget.field_indices.get('path', -1)
-        if path_idx == -1: return None
-        
-        # Get the row from the proxy index
-        source_index = self.library_widget.proxy_model.mapToSource(proxy_index)
-        
-        # We need the path to fetch the real model from the repo/service
-        path_item = self.library_widget.library_model.item(source_index.row(), path_idx)
-        
-        if not path_item: return None
-        
-        path = path_item.text()
-        return self.library_service.get_song_by_path(path)
-
-    def _toggle_surgical_mode(self, enabled: bool) -> None:
-        """Reveal the Metadata Editor."""
-        self._surgical_mode_enabled = enabled
-        sizes = self.right_splitter.sizes()
-        sizes[1] = 700 if enabled else 0
-        # If opening surgery, maybe hide jingles/history to save space
-        if enabled:
-            sizes[0] = 0
-            sizes[2] = 0
-        self.right_splitter.setSizes(sizes)
-
-    def _toggle_jingle_bay(self, enabled: bool) -> None:
-        """Reveal the Jingle/Chip Bay."""
-        sizes = self.right_splitter.sizes()
-        sizes[0] = 250 if enabled else 0
-        self.right_splitter.setSizes(sizes)
 
     def _on_editor_mode_changed(self, enabled: bool) -> None:
         """
@@ -1037,24 +994,6 @@ class MainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             logger.error(f"Save process crashed: {e}")
-
-    def _auto_advance_selection(self):
-        """Move selection to the next row in the library table."""
-        view = self.library_widget.table_view
-        selection_model = view.selectionModel()
-        current_indexes = selection_model.selectedRows()
-        
-        if not current_indexes:
-            return
-            
-        last_index = current_indexes[-1]
-        next_row = last_index.row() + 1
-        
-        if next_row < self.library_widget.proxy_model.rowCount():
-            next_index = self.library_widget.proxy_model.index(next_row, 0)
-            selection_model.clearSelection()
-            selection_model.select(next_index, selection_model.SelectionFlag.Select | selection_model.SelectionFlag.Rows)
-            view.scrollTo(next_index)
 
     def _get_yellberus_field(self, name: str):
         """Helper to find a field definition by name."""

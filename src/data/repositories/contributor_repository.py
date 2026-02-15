@@ -435,25 +435,6 @@ class ContributorRepository(GenericRepository[Contributor]):
         except Exception as e:
             return []
 
-    def add_alias(self, contributor_id: int, alias_name: str, batch_id: Optional[str] = None) -> int:
-        """Add an alias."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO ContributorAliases (ContributorID, AliasName) VALUES (?, ?)", (contributor_id, alias_name))
-                new_id = cursor.lastrowid
-                
-                # Audit Aliases
-                from src.core.audit_logger import AuditLogger
-                AuditLogger(conn, batch_id=batch_id).log_insert("ContributorAliases", new_id, {
-                    "ContributorID": contributor_id,
-                    "AliasName": alias_name
-                })
-                
-                return new_id
-        except Exception as e:
-            return -1
-
     def update_alias(self, alias_id: int, new_name: str, batch_id: Optional[str] = None) -> bool:
         """Rename an alias."""
         try:
