@@ -36,10 +36,6 @@ class GlowLED(QWidget):
         self._color = QColor(color)
         self.update()
 
-    def setShape(self, shape):
-        self._shape = shape
-        self.update()
-
     @pyqtProperty(bool)
     def active(self): return self._active
     

@@ -88,26 +88,9 @@ class GlowButton(GlowWidget):
         self.setGlowShape(css_string)
         self._update_text_styles()
 
-    def set_text_align(self, alignment):
-        self._text_align = alignment
-        self.lbl_main.setAlignment(alignment)
-        self.lbl_glow.setAlignment(alignment)
-        # Add padding if left aligned to match inputs
-        if alignment & Qt.AlignmentFlag.AlignLeft:
-            self.lbl_main.setIndent(8)
-            self.lbl_glow.setIndent(8)
-        else:
-            self.lbl_main.setIndent(0)
-            self.lbl_glow.setIndent(0)
-
     def set_font_weight(self, weight):
         """e.g. 'bold', 'normal', '100'"""
         self._font_weight = weight
-        self._update_text_styles()
-        
-    def set_font_family(self, family):
-        """e.g. 'Consolas'"""
-        self._font_family = family
         self._update_text_styles()
 
     def set_font_size(self, size_pt):
@@ -206,7 +189,6 @@ class GlowButton(GlowWidget):
     def isEnabled(self): return self.btn.isEnabled()
     def isVisible(self): return self.btn.isVisible()
     def text(self): return self.lbl_main.text()
-    def click(self): self.btn.click()
     def toggle(self): self.btn.toggle()
     def setCheckable(self, c): self.btn.setCheckable(c)
     def setChecked(self, c): self.btn.setChecked(c)

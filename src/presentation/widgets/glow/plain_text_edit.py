@@ -14,7 +14,6 @@ class GlowPlainTextEdit(GlowWidget):
 
     # Proxy methods
     def toPlainText(self): return self.edit.toPlainText()
-    def setPlainText(self, t): self.edit.setPlainText(t)
     def setPlaceholderText(self, t): self.edit.setPlaceholderText(t)
     def setReadOnly(self, r): self.edit.setReadOnly(r)
     def setEnabled(self, e): self.edit.setEnabled(e)

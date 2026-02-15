@@ -73,14 +73,11 @@ class GlowComboBox(GlowWidget):
     def setCurrentText(self, t): self.combo.setCurrentText(t)
     def findData(self, data): return self.combo.findData(data)
     def findText(self, text): return self.combo.findText(text)
-    def itemData(self, i, role=Qt.ItemDataRole.UserRole): return self.combo.itemData(i, role)
     def setItemData(self, i, data, role=Qt.ItemDataRole.UserRole): self.combo.setItemData(i, data, role)
     def blockSignals(self, b): return self.combo.blockSignals(b)
     def setFocus(self): self.combo.setFocus()
     def setEnabled(self, e): self.combo.setEnabled(e)
     def setEditable(self, e): self.combo.setEditable(e)
-    def itemText(self, i): return self.combo.itemText(i)
-    def clearEditText(self): self.combo.clearEditText()
     def lineEdit(self): return self.combo.lineEdit()
     def setAlignment(self, a): 
         if self.combo.lineEdit():
