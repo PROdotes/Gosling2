@@ -62,10 +62,6 @@ class AlbumService:
         """Delete an album record."""
         return self._repo.delete(album_id)
 
-    def set_publisher(self, album_id: int, publisher_name: str) -> None:
-        """Set or update the publisher for an album."""
-        self._repo.set_publisher(album_id, publisher_name)
-
     def get_songs_in_album(self, album_id: int) -> List[dict]:
         """Retrieve a list of songs contained in an album."""
         return self._repo.get_songs_in_album(album_id)

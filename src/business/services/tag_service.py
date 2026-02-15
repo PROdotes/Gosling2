@@ -77,10 +77,6 @@ class TagService:
         """Find a tag by name."""
         return self._repo.find_by_name(name, category)
 
-    def count_sources_for_tag(self, tag_id: int) -> int:
-        """Count songs using this tag."""
-        return self._repo.count_sources_for_tag(tag_id)
-
     def add_tag_to_source(self, source_id: int, tag_id: Any, category: Optional[str] = None) -> bool:
         """Link tag to song."""
         return self._repo.add_tag_to_source(source_id, tag_id, category)

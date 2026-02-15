@@ -60,10 +60,6 @@ class LibraryService:
         """Batch update song status"""
         return self.song_service.update_status_batch(file_ids, is_done)
 
-    def get_contributors_by_role(self, role_name: str) -> List[Any]:
-        """Get all contributors for a specific role"""
-        return self.contributor_service.get_by_role(role_name)
-
     def get_artist_genre_stats(self, artist_name: str) -> dict:
         """
         Calculate genre distribution for an artist (T-108).

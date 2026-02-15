@@ -164,29 +164,6 @@ class ContributorService:
 
     # Merge logic moved to unified section below to avoid duplication.
 
-    def get_by_role(self, role_name: str) -> List[Contributor]:
-        """Fetch all contributors who have a specific role assigned at least once."""
-        with self._credit_repo.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT DISTINCT an.NameID, an.DisplayName, an.SortName, i.IdentityType
-                FROM ArtistNames an
-                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
-                JOIN Roles r ON sc.RoleID = r.RoleID
-                LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
-                WHERE r.RoleName = ?
-                ORDER BY an.SortName ASC
-            """, (role_name,))
-            
-            return [
-                Contributor(
-                    contributor_id=row[0],
-                    name=row[1],
-                    sort_name=row[2],
-                    type=row[3] or 'person'
-                ) for row in cursor.fetchall()
-            ]
-
     def add_song_role(self, source_id: int, contributor_id: int, role_name: str, batch_id: Optional[str] = None) -> bool:
         """Link a contributor (NameID) to a song with a specific role."""
         # Get RoleID

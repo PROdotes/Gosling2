@@ -107,30 +107,6 @@ class SettingsManager:
         """Save main splitter state"""
         self._settings.setValue(self.KEY_MAIN_SPLITTER_STATE, state)
     
-    def get_v_splitter_state(self) -> Optional[QByteArray]:
-        """Get saved vertical splitter state"""
-        return self._settings.value(self.KEY_V_SPLITTER_STATE)
-    
-    def set_v_splitter_state(self, state: QByteArray) -> None:
-        """Save vertical splitter state"""
-        self._settings.setValue(self.KEY_V_SPLITTER_STATE, state)
-    
-    def get_right_panel_tab(self) -> int:
-        """Get last selected right panel tab (0 = Playlist, 1 = Editor)"""
-        return int(self._settings.value(self.KEY_RIGHT_PANEL_TAB, 0))
-    
-    def set_right_panel_tab(self, index: int) -> None:
-        """Save selected right panel tab"""
-        self._settings.setValue(self.KEY_RIGHT_PANEL_TAB, index)
-    
-    def get_splitter_state_by_mode(self, mode: str) -> Optional[QByteArray]:
-        """Get splitter state for a specific mode ('log' or 'edit')."""
-        return self._settings.value(f"window/splitter/{mode}")
-
-    def set_splitter_state_by_mode(self, mode: str, state: QByteArray) -> None:
-        """Save splitter state for a specific mode."""
-        self._settings.setValue(f"window/splitter/{mode}", state)
-
     def get_right_panel_splitter_state(self) -> Optional[QByteArray]:
         """Get saved right panel splitter state"""
         return self._settings.value(self.KEY_RIGHT_PANEL_SPLITTER_STATE)
@@ -235,9 +211,6 @@ class SettingsManager:
     
     def get_rename_pattern(self) -> str:
         return self._settings.value(self.KEY_RENAME_PATTERN, self.DEFAULT_RENAME_PATTERN, type=str)
-        
-    def set_rename_pattern(self, pattern: str) -> None:
-        self._settings.setValue(self.KEY_RENAME_PATTERN, pattern)
 
     def get_rename_enabled(self) -> bool:
         return self._settings.value(self.KEY_RENAME_ENABLED, self.DEFAULT_RENAME_ENABLED, type=bool)
@@ -334,22 +307,6 @@ class SettingsManager:
         """Save last playlist"""
         self._settings.setValue(self.KEY_LAST_PLAYLIST, playlist)
     
-    def get_last_song_path(self) -> Optional[str]:
-        """Get path of last played song"""
-        return self._settings.value(self.KEY_LAST_SONG_PATH)
-    
-    def set_last_song_path(self, path: str) -> None:
-        """Save path of last played song"""
-        self._settings.setValue(self.KEY_LAST_SONG_PATH, path)
-    
-    def get_last_position(self) -> int:
-        """Get last playback position in milliseconds"""
-        return self._settings.value(self.KEY_LAST_POSITION, 0, type=int)
-    
-    def set_last_position(self, position: int) -> None:
-        """Save last playback position in milliseconds"""
-        self._settings.setValue(self.KEY_LAST_POSITION, position)
-        
     def get_crossfade_enabled(self) -> bool:
         """Get whether crossfade is enabled"""
         return self._settings.value(self.KEY_CROSSFADE_ENABLED, self.DEFAULT_CROSSFADE_ENABLED, type=bool)
@@ -453,10 +410,6 @@ class SettingsManager:
     def get_all_keys(self) -> list[str]:
         """Get all setting keys (useful for debugging)"""
         return self._settings.allKeys()
-    
-    def has_setting(self, key: str) -> bool:
-        """Check if a setting exists"""
-        return self._settings.contains(key)
     
     def remove_setting(self, key: str) -> None:
         """Remove a specific setting"""
