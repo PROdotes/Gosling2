@@ -910,7 +910,7 @@ class MainWindow(QMainWindow):
         # Only rebuild the expensive filter tree if a "Filter-Critical" field changed.
         needs_filter_refresh = False
         filter_triggers = {
-            'performers', 'groups', 'unified_artist', 
+            'performers', 'groups', 
             'album', 'composers', 'publisher', 
             'recording_year', 'year', 
             'genre', 'genre_list', 'mood', 'mood_list', 

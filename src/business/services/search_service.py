@@ -29,7 +29,7 @@ class SearchService:
         
         # Add Field Context (e.g. "Year", "Composer") if searching a specific field
         # WE DONT DO THIS FOR CORE IDENTITY (Artist/Title buttons)
-        is_core = field_name in ['title', 'performers', 'unified_artist', 'artist']
+        is_core = field_name in ['title', 'performers', 'artist']
         
         if field_header and not is_core:
              raw_query_parts.append(field_header.strip())
@@ -79,7 +79,7 @@ class SearchService:
             
             # Logic: If searching specific metadata (Composer, Lyrics, Year), Force Google.
             # But if searching Core Identity (Artist/Title), treat as Main Search (Respect Provider).
-            if field_name not in ['title', 'performers', 'unified_artist', 'artist']:
+            if field_name not in ['title', 'performers', 'artist']:
                 effective_provider = "Google"
 
         # 2. Resolve Context (Draft Priority > Model Fallback)
@@ -89,14 +89,14 @@ class SearchService:
         title = str(resolve('title'))
         
         # Artist Resolution Logic
-        artist = str(draft_values.get('performers') or "")
-        if not artist:
-            p = getattr(song, 'performers', [])
-            if p and isinstance(p, list): 
-                artist = p[0] 
-            else: 
-                artist = getattr(song, 'unified_artist', "") or getattr(song, 'artist', "")
-        artist = str(artist)
+        # Artist Resolution: draft performers > song performers
+        draft_performers = draft_values.get('performers')
+        if draft_performers:
+            artist = str(draft_performers[0])
+        elif song.performers:
+            artist = str(song.performers[0])
+        else:
+            artist = ""
 
         # 3. Delegate to centralized URL builder
         return self.get_search_url(

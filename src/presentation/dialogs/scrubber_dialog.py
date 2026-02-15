@@ -157,7 +157,7 @@ class ScrubberDialog(QDialog):
         layout.setSpacing(15)
         
         # === Header: Artist - Title ===
-        artist = getattr(self.song, 'unified_artist', '') or (self.song.performers[0] if self.song.performers else '') or 'Unknown artist'
+        artist = self.song.performers[0] if self.song.performers else 'Unknown artist'
         title = getattr(self.song, 'title', '') or 'Unknown Title'
         
         self.header_label = QLabel(f"{artist} — {title}")
@@ -283,7 +283,7 @@ class ScrubberDialog(QDialog):
         try:
             fresh_song = self.library_service.get_song_by_id(source_id)
             if fresh_song:
-                artist = getattr(fresh_song, 'unified_artist', '') or (fresh_song.performers[0] if fresh_song.performers else '') or 'Unknown artist'
+                artist = fresh_song.performers[0] if fresh_song.performers else 'Unknown artist'
                 title = getattr(fresh_song, 'title', '') or 'Unknown Title'
                 self.header_label.setText(f"{artist} — {title}")
         except Exception as e:

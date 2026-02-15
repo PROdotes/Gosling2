@@ -288,8 +288,6 @@ class SidePanelWidget(QFrame):
             artist = p_val[0]
         elif isinstance(p_val, str) and p_val:
             artist = p_val
-        else:
-            artist = self._get_effective_value(song.source_id, "unified_artist", song.unified_artist)
         
         artist = artist or "Unknown Artist"
         self.header_label.setText(f"{artist} - {song.title}")
@@ -2342,11 +2340,9 @@ class SidePanelWidget(QFrame):
             return ""
 
         # Dump all relevant fields to draft dict
-        # We only really need performers, unified_artist, title, and the target field
         draft_values = {
             'title': get_widget_text('title'),
             'performers': get_widget_text('performers'),
-            'unified_artist': get_widget_text('unified_artist'),
         }
         
         if field_def:

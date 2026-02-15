@@ -56,10 +56,6 @@ class LibraryService:
         """Log a high-level systemic or user action."""
         self.song_service.log_action(action_type, target_table, target_id, details)
 
-    def update_song_status(self, file_id: int, is_done: bool) -> bool:
-        """Update song status"""
-        return self.song_service.update_status(file_id, is_done)
-
     def update_songs_status(self, file_ids: List[int], is_done: bool) -> int:
         """Batch update song status"""
         return self.song_service.update_status_batch(file_ids, is_done)
@@ -68,38 +64,36 @@ class LibraryService:
         """Get all contributors for a specific role"""
         return self.contributor_service.get_by_role(role_name)
 
-
-    def get_songs_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific artist (T-17: Identity Graph aware)"""
-        related_names = self.contributor_service.resolve_identity_graph(artist_name)
-        return self.song_service._repo.get_by_unified_artists(related_names)
-
     def get_artist_genre_stats(self, artist_name: str) -> dict:
         """
         Calculate genre distribution for an artist (T-108).
         Leverages the unified identity graph to find all related songs, 
         then parses their tags to find Genre distributions.
         """
-        headers, rows = self.get_songs_by_unified_artist(artist_name)
+        related_names = self.contributor_service.resolve_identity_graph(artist_name)
         stats = {}
         
-        for row in rows:
-            try:
-                song = Song.from_row(row)
-                
-                for tag in song.tags:
-                    if tag.startswith("Genre:"):
-                        parts = tag.split(':', 1)
-                        if len(parts) == 2:
-                            genre = parts[1].strip()
-                            if genre:
-                                stats[genre] = stats.get(genre, 0) + 1
-            except Exception as e:
-                pass
+        seen_songs = set()
+        for name in related_names:
+            headers, rows = self.song_service._repo.get_by_performer(name)
+            for row in rows:
+                try:
+                    song = Song.from_row(row)
+                    if song.source_id in seen_songs:
+                        continue
+                    seen_songs.add(song.source_id)
+                    
+                    for tag in song.tags:
+                        if tag.startswith("Genre:"):
+                            parts = tag.split(':', 1)
+                            if len(parts) == 2:
+                                genre = parts[1].strip()
+                                if genre:
+                                    stats[genre] = stats.get(genre, 0) + 1
+                except Exception:
+                    pass
                 
         return stats
-
-
 
     def get_song_by_path(self, path: str) -> Optional[Song]:
         """Get full song object by path"""

@@ -209,16 +209,6 @@ FIELDS: List[FieldDef] = [
         portable=False,
     ),
     FieldDef(
-        name='unified_artist',
-        ui_header='Artist',
-        db_column='UnifiedArtist',
-        editable=False,
-        filterable=True,
-        portable=False,
-        visible=False,
-        query_expression="(SELECT GROUP_CONCAT(AN_SUB.DisplayName, ', ') FROM SongCredits SC_SUB JOIN ArtistNames AN_SUB ON SC_SUB.CreditedNameID = AN_SUB.NameID JOIN Roles R_SUB ON SC_SUB.RoleID = R_SUB.RoleID WHERE SC_SUB.SourceID = MS.SourceID AND R_SUB.RoleName = 'Performer') AS UnifiedArtist",
-    ),
-    FieldDef(
         name='title',
         ui_header='Title',
         db_column='MS.MediaName',

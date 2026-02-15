@@ -12,11 +12,10 @@ class Song(MediaSource):
     bpm: Optional[int] = None
 
     recording_year: Optional[int] = None
-    unified_artist: Optional[str] = None
     album: Union[str, List[str], None] = None
     album_id: Union[int, List[int], None] = None # Added for precise linking (T-46)
     album_artist: Optional[str] = None  # From TPE2 (Album Artist)
-    publisher: Optional[object] = None # Union[str, List[str]]
+    publisher: Optional[object] = None # Union[str, List[str]]so
     publisher_id: Union[int, List[int], None] = None # Added for precise linking
     notes: Optional[str] = None
     is_active: bool = True
@@ -44,9 +43,7 @@ class Song(MediaSource):
         3. Song sets attributes directly via setattr
         """
         from src.core import yellberus
-        import json
-        import os
-        
+
         from src.business.services.metadata_service import MetadataService
         id3_frames = MetadataService._get_id3_map()
         
@@ -191,7 +188,6 @@ class Song(MediaSource):
             'bpm': self.bpm,
             'recording_year': self.recording_year,
             'isrc': self.isrc,
-            'unified_artist': self.unified_artist,
             # Flatten lists? AuditLogger._normalize_dict handles lists, 
             # so we just pass them raw.
             'album': self.album,  # Might be string or list

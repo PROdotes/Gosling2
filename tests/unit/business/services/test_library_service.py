@@ -155,3 +155,16 @@ class TestLibraryService:
         # Assert
         assert stats == {"Rock": 2, "Pop": 1}
         assert "Opera" not in stats
+
+    def test_get_artist_genre_stats_deduplication(self, service):
+        """
+        Verify that songs returned by multiple identity names are only counted once.
+        """
+        s1 = Song(source="path/1.mp3", name="Bohemian Rhapsody")
+        s1.performers = ["Queen", "Freddie Mercury"]
+        s1.tags = ["Genre: Rock"]
+        service.add_song(s1)
+        
+        stats = service.get_artist_genre_stats("Queen")
+        
+        assert stats == {"Rock": 1}

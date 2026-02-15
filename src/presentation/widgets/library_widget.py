@@ -257,7 +257,7 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
         match_candidates = {req_str}
         
         # T-70: Apply Identity Graph Expansion to Artist fields
-        if field_name in ('all_contributors', 'unified_artist', 'performers'):
+        if field_name in ('all_contributors', 'performers'):
             if not hasattr(self, '_group_membership_cache'): self._group_membership_cache = {}
             if req_str not in self._group_membership_cache:
                 source_widget = self.parent()
@@ -3140,11 +3140,6 @@ class LibraryWidget(QWidget):
                     # Add only if not already present
                     if val not in song.performers:
                         song.performers.append(val)
-                        # T-Fix: If we are adding a performer via Parse, and Unified Artist is empty or generic/unknown,
-                        # we should likely update it to reflect this new (likely primary) artist.
-                        # For now, let's stick to simple logic: If Unified Artist is empty, set it.
-                        if not song.unified_artist:
-                            song.unified_artist = val
                         changed = True
 
             # Album - APPEND if not exists

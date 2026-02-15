@@ -407,47 +407,6 @@ class SongRepository(GenericRepository[Song]):
             logger.error(f"Error fetching songs by composer: {e}")
             return [], []
 
-    def get_by_unified_artist(self, artist_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Legacy wrapper - resolves to get_by_unified_artists with single name"""
-        return self.get_by_unified_artists([artist_name])
-
-    def get_by_unified_artists(self, names: List[str]) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a list of related artists (T-17: Identity Graph)"""
-        if not names:
-            return [], []
-            
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                # Create dynamic placeholders for IN clause
-                placeholders = ",".join(["?"] * len(names))
-                # We need to provide names twice: once for Groups, once for Performers
-                params = names + names
-                
-                query = f"""
-                    {yellberus.QUERY_SELECT}
-                    {yellberus.QUERY_FROM}
-                    WHERE (
-                        S.SongGroups IN ({placeholders}) 
-                        OR MS.SourceID IN (
-                            SELECT SC.SourceID 
-                            FROM SongCredits SC
-                            JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
-                            JOIN Roles R ON SC.RoleID = R.RoleID
-                            WHERE AN.DisplayName IN ({placeholders}) COLLATE NOCASE AND R.RoleName = 'Performer'
-                        )
-                    )
-                    {yellberus.QUERY_GROUP_BY}
-                    ORDER BY MS.SourceID DESC
-                """
-                cursor.execute(query, params)
-                headers = [description[0] for description in cursor.description]
-                data = cursor.fetchall()
-                return headers, data
-        except Exception as e:
-            logger.error(f"Error fetching songs by unified artists: {e}")
-            return [], []
-
     def get_by_path(self, path: str) -> Optional[Song]:
         """Get full song object by path (Legacy wrapper)"""
         songs = self.get_songs_by_paths([path])
@@ -821,7 +780,7 @@ class SongRepository(GenericRepository[Song]):
         query = None
         if field_name == "recording_year":
              return self.get_all_years()
-        elif field_name in ("performers", "unified_artist"):
+        elif field_name == "performers":
             query = """
                 SELECT DISTINCT AN.DisplayName 
                 FROM SongCredits SC

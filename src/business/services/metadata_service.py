@@ -370,7 +370,7 @@ class MetadataService:
             # --- DYNAMIC WRITE LOOP ---
             # Fields to exclude from loop because they have special complex handling
             COMPLEX_FIELDS = {
-                'recording_year', 'is_done', 'producers', 'composers', 'lyricists', 'unified_artist'
+                'recording_year', 'is_done', 'producers', 'composers', 'lyricists'
             }
 
             for field in FIELDS:

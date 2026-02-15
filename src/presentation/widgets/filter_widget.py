@@ -642,15 +642,6 @@ class FilterWidget(QFrame):
         pass
 
     def _get_field_values(self, field: yellberus.FieldDef):
-        if field.name == "unified_artist":
-            # Merge logic for Unified Artist
-            artists = set()
-            for c in self.library_service.get_contributors_by_role("Performer"):
-                if c.name: artists.add(c.name)
-            for alias in self.library_service.get_all_aliases():
-                if alias: artists.add(alias)
-            return sorted(list(artists))
-        
         expression = field.query_expression or field.db_column
         if not expression: return []
         try:
