@@ -66,59 +66,6 @@ class AuditRepository(BaseRepository):
             logger.error(f"AuditRepository CRITICAL: Failed to write ActionLog: {e}")
             raise  # Fail-Secure
 
-    def get_change_log(self, limit: int = 1000) -> List[dict]:
-        """Retrieve recent field-level changes."""
-        try:
-            # Handle both raw connection and BaseRepository lifecycle
-            if hasattr(self, 'conn') and self.conn:
-                cursor = self.conn.cursor()
-                cursor.execute("""
-                    SELECT LogID, LogTableName, RecordID, LogFieldName, OldValue, NewValue, LogTimestamp, BatchID
-                    FROM ChangeLog
-                    ORDER BY LogTimestamp DESC
-                    LIMIT ?
-                """, (limit,))
-                return [dict(row) for row in cursor.fetchall()]
-            else:
-                with self.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT LogID, LogTableName, RecordID, LogFieldName, OldValue, NewValue, LogTimestamp, BatchID
-                        FROM ChangeLog
-                        ORDER BY LogTimestamp DESC
-                        LIMIT ?
-                    """, (limit,))
-                    return [dict(row) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"Failed to fetch ChangeLog: {e}")
-            return []
-
-    def get_action_log(self, limit: int = 1000) -> List[dict]:
-        """Retrieve recent high-level actions."""
-        try:
-            if hasattr(self, 'conn') and self.conn:
-                cursor = self.conn.cursor()
-                cursor.execute("""
-                    SELECT ActionID, ActionLogType, TargetTable, ActionTargetID, ActionDetails, ActionTimestamp, UserID
-                    FROM ActionLog
-                    ORDER BY ActionTimestamp DESC
-                    LIMIT ?
-                """, (limit,))
-                return [dict(row) for row in cursor.fetchall()]
-            else:
-                with self.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("""
-                        SELECT ActionID, ActionLogType, TargetTable, ActionTargetID, ActionDetails, ActionTimestamp, UserID
-                        FROM ActionLog
-                        ORDER BY ActionTimestamp DESC
-                        LIMIT ?
-                    """, (limit,))
-                    return [dict(row) for row in cursor.fetchall()]
-        except Exception as e:
-            logger.error(f"Failed to fetch ActionLog: {e}")
-            return []
-
     def get_unified_log(self, limit: int = 1000) -> List[dict]:
         """Retrieve a merged view of ChangeLog and ActionLog."""
         query = """
