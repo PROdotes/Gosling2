@@ -259,17 +259,6 @@ class RightPanelWidget(QWidget):
         """Passes selection to SidePanel (Editor)"""
         if self.editor_widget:
             self.editor_widget.set_songs(songs)
-            
-    def update_history(self, entries: List[Any]):
-        """Updates History Drawer"""
-        # TODO: Implement history update logic once HistoryDrawer supports it
-        pass
-    def set_mode(self, mode: str):
-        """Programmatic mode switch"""
-        if mode == 'edit':
-            self.header.btn_edit.setChecked(True)
-        elif mode == 'log':
-            self.header.btn_hist.setChecked(True)
 
     # --- INTERNAL SLOTS ---
 

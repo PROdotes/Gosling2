@@ -59,11 +59,6 @@ class HistoryDrawer(QFrame):
             items = [QStandardItem(time_str), QStandardItem(title), QStandardItem(artist)]
             self.model.appendRow(items)
 
-    def add_entry(self, time_str: str, title: str, artist: str):
-        """Add a new entry to the top of the log."""
-        items = [QStandardItem(time_str), QStandardItem(title), QStandardItem(artist)]
-        self.model.insertRow(0, items)
-
     # Property for Animation
     @pyqtProperty(int)
     def drawerWidth(self):

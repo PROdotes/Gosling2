@@ -642,10 +642,6 @@ class ContributorService:
                 aliases.append(SimpleNamespace(alias_id=n.name_id, alias_name=n.display_name))
         return aliases
 
-    def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
-        """Delete an alias."""
-        return self._name_service.delete_name(alias_id, batch_id=batch_id)
-
     def unlink_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
         """
         Unlink an alias from its current identity by splitting it into a NEW independent identity.

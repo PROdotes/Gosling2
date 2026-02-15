@@ -458,36 +458,7 @@ class ContributorRepository(GenericRepository[Contributor]):
             return False
 
 
-
-
-    def delete_alias(self, alias_id: int, batch_id: Optional[str] = None) -> bool:
-        """Delete an alias. Nullifies any specific credit references first."""
-        try:
-            from src.core.audit_logger import AuditLogger
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                auditor = AuditLogger(conn, batch_id=batch_id)
-                # Snapshot
-                cursor.execute("SELECT ContributorID, AliasName FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
-                row = cursor.fetchone()
-                if not row: return False
-                snapshot = {"ContributorID": row[0], "AliasName": row[1]}
-
-                # Audit Credit Nullification
-                cursor.execute("SELECT SourceID, RoleID FROM MediaSourceContributorRoles WHERE CreditedAliasID = ?", (alias_id,))
-                affected = cursor.fetchall()
-                for s_id, r_id in affected:
-                    auditor.log_update("MediaSourceContributorRoles", f"{s_id}-{row[0]}-{r_id}", 
-                        {"CreditedAliasID": alias_id}, {"CreditedAliasID": None}
-                    )
-
-                cursor.execute("UPDATE MediaSourceContributorRoles SET CreditedAliasID = NULL WHERE CreditedAliasID = ?", (alias_id,))
-                cursor.execute("DELETE FROM ContributorAliases WHERE AliasID = ?", (alias_id,))
-                
-                auditor.log_delete("ContributorAliases", alias_id, snapshot)
-                return True
-        except Exception as e:
-            return False
+    
 
     def _generate_sort_name(self, name: str) -> str:
         """Generate sort-friendly name (e.g., 'The Beatles' -> 'Beatles, The')."""

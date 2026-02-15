@@ -485,16 +485,6 @@ class ArtistDetailsDialog(QDialog):
             self._member_adapter.link(target.contributor_id, matched_alias=getattr(target, 'matched_alias', None))
             self._refresh_data()
 
-    def _confirm_delete_alias(self, alias_id, name):
-        # Simplified: Just do it. Audit log handles the safety.
-        if self.service.delete_alias(alias_id):
-            self._refresh_data()
-
-    def _promote_alias(self, alias_id, name):
-        # Silent execution per "Baggage Rule"
-        if self.service.promote_alias(self.artist.contributor_id, alias_id):
-            self._refresh_data()
-
     def _edit_alias(self, alias_id, old_name):
         from .entity_picker_dialog import EntityPickerDialog
         from src.core.picker_config import get_alias_picker_config
