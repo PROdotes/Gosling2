@@ -290,14 +290,6 @@ class TagRepository(GenericRepository[Tag]):
             logger.error(f"Merge error: {e}")
             return False
 
-    def count_sources_for_tag(self, tag_id: int) -> int:
-        """Count how many songs use this tag."""
-        query = "SELECT COUNT(*) FROM MediaSourceTags WHERE TagID = ?"
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (tag_id,))
-            result = cursor.fetchone()
-            return result[0] if result else 0
-
     def get_all_with_usage(self, category: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Tag, int]]:
         """
         Get all tags with their usage counts in a single query.

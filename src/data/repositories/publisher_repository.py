@@ -458,18 +458,6 @@ class PublisherRepository(GenericRepository[Publisher]):
                 publishers.append(Publisher.from_row(row))
         return publishers
 
-    def get_album_count(self, publisher_id: int) -> int:
-        """Count how many albums use this publisher."""
-        query = "SELECT COUNT(*) FROM AlbumPublishers WHERE PublisherID = ?"
-        with self.get_connection() as conn:
-            return conn.execute(query, (publisher_id,)).fetchone()[0]
-
-    def get_child_count(self, publisher_id: int) -> int:
-        """Count direct subsidiaries."""
-        query = "SELECT COUNT(*) FROM Publishers WHERE ParentPublisherID = ?"
-        with self.get_connection() as conn:
-            return conn.execute(query, (publisher_id,)).fetchone()[0]
-
     def get_usage_count(self, publisher_id: int) -> int:
         """Count how many albums AND recordings use this publisher."""
         query = """

@@ -155,34 +155,6 @@ class SongRepository(GenericRepository[Song]):
         album_type = kwargs.get('album_type')
         self.sync_service.sync_all(song, cursor, auditor=auditor, album_type=album_type)
 
-    def update_status(self, file_id: int, is_done: bool, batch_id: Optional[str] = None) -> bool:
-        """Update the status of a song (Direct Column Update)"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                from src.core.audit_logger import AuditLogger
-                auditor = AuditLogger(conn, batch_id=batch_id)
-
-                # Get old status for audit logging
-                cursor.execute("SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (file_id,))
-                old_row = cursor.fetchone()
-                if old_row:
-                    old_data = {'ProcessingStatus': old_row[0], 'SourceID': file_id}
-
-                new_status = 1 if is_done else 0
-                cursor.execute("UPDATE MediaSources SET ProcessingStatus = ? WHERE SourceID = ?", (new_status, file_id))
-
-                # Log the update
-                if old_row:
-                    new_data = old_data.copy()
-                    new_data['ProcessingStatus'] = new_status
-                    auditor.log_update("MediaSources", file_id, old_data, new_data)
-
-                return True
-        except Exception as e:
-            logger.error(f"Error updating song status: {e}")
-            return False
-
     def update_status_batch(self, file_ids: List[int], is_done: bool, batch_id: Optional[str] = None) -> int:
         """Batch update processing status (High Performance)."""
         if not file_ids: return 0
@@ -331,28 +303,6 @@ class SongRepository(GenericRepository[Song]):
 
         # ... rest of method ...
 
-    def get_by_status(self, is_done: bool) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by their Done status (ProcessingStatus flag)"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                query = f"""
-                    {yellberus.QUERY_SELECT}
-                    {yellberus.QUERY_FROM}
-                    WHERE MS.IsActive = 1 AND MS.ProcessingStatus = ?
-                    {yellberus.QUERY_GROUP_BY}
-                    ORDER BY MS.SourceID DESC
-                """
-                # 1 = Done, 0 = Unprocessed
-                status_val = 1 if is_done else 0
-                cursor.execute(query, (status_val,))
-                headers = [description[0] for description in cursor.description]
-                data = cursor.fetchall()
-                return headers, data
-        except Exception as e:
-            logger.error(f"Error fetching songs by status: {e}")
-            return [], []
-
     # Sync methods removed (Moved to SongSyncService)
 
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
@@ -379,32 +329,6 @@ class SongRepository(GenericRepository[Song]):
                 return headers, data
         except Exception as e:
             logger.error(f"Error fetching songs by performer: {e}")
-            return [], []
-
-    def get_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific composer"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                query = f"""
-                    {yellberus.QUERY_SELECT}
-                    {yellberus.QUERY_FROM}
-                    WHERE MS.SourceID IN (
-                        SELECT SC.SourceID 
-                        FROM SongCredits SC
-                        JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
-                        JOIN Roles R ON SC.RoleID = R.RoleID
-                        WHERE AN.DisplayName = ? AND R.RoleName = 'Composer'
-                    ) AND MS.IsActive = 1
-                    {yellberus.QUERY_GROUP_BY}
-                    ORDER BY MS.SourceID DESC
-                """
-                cursor.execute(query, (composer_name,))
-                headers = [description[0] for description in cursor.description]
-                data = cursor.fetchall()
-                return headers, data
-        except Exception as e:
-            logger.error(f"Error fetching songs by composer: {e}")
             return [], []
 
     def get_by_path(self, path: str) -> Optional[Song]:
@@ -697,26 +621,6 @@ class SongRepository(GenericRepository[Song]):
             return []
 
     # get_all_groups removed (Legacy zombie logic)
-
-    def get_by_year(self, year: int) -> Tuple[List[str], List[Tuple]]:
-        """Get all songs by a specific recording year"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                query = f"""
-                    {yellberus.QUERY_SELECT}
-                    {yellberus.QUERY_FROM}
-                    WHERE S.RecordingYear = ? AND MS.IsActive = 1
-                    {yellberus.QUERY_GROUP_BY}
-                    ORDER BY MS.SourceID DESC
-                """
-                cursor.execute(query, (year,))
-                headers = [description[0] for description in cursor.description]
-                data = cursor.fetchall()
-                return headers, data
-        except Exception as e:
-            logger.error(f"Error fetching songs by year: {e}")
-            return [], []
 
     def get_virtual_member_count(self, zip_path: str) -> int:
         """Count how many library items belong to this ZIP container."""
