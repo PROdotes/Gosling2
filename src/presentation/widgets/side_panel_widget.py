@@ -309,13 +309,6 @@ class SidePanelWidget(QFrame):
         # 9px radius is mathematically perfect for 18px height (Pill Shape)
         btn.set_radius_style("border-radius: 9px; padding: 0px;")
 
-    def _update_playback_state(self, is_playing):
-        if hasattr(self.parent(), 'playback_deck'):
-             self.parent().playback_deck.set_playing(is_playing)
-                
-
-
-
     def _build_fields(self):
         """Dynamic UI Factory driven by Yellberus with Grouping."""
         self._clear_fields()
@@ -899,30 +892,6 @@ class SidePanelWidget(QFrame):
         
         self._refresh_field_values()
 
-    def _add_name_to_selection(self, field_name, name):
-        """T-70: Add a name to the specified field for all selected songs."""
-        for song in self.current_songs:
-            current = self._get_effective_value(song.source_id, field_name, getattr(song, field_name, []))
-            if not isinstance(current, list):
-                if field_name in ['album', 'publisher']:
-                    current = [str(current)] if current else []
-                else:
-                    delims = r',|;| & '
-                    if field_name == 'composers': delims += r'|/'
-                    import re
-                if field_name in ['album', 'publisher']:
-                    current = [str(current)] if current else []
-                else:
-                    # T-Fix: Do NOT split on punctuation. Respect DB/Staging.
-                    current = [current] if current and isinstance(current, str) else (current or [])
-            
-            if name not in current:
-                new_list = list(current)
-                new_list.append(name)
-                self._on_field_changed(field_name, new_list)
-        
-        self._refresh_field_values()
-
     def _on_chip_context_menu(self, field_name, entity_id, name, global_pos):
         """T-82: Direct Right-Click action (Skip Menu) - ONLY for Genre category."""
         if field_name == 'album':
@@ -1317,51 +1286,6 @@ class SidePanelWidget(QFrame):
         self._update_save_state()
         self._refresh_field_values()
 
-    def _on_album_picked(self, album_data):
-        """Called when user selects albums from the manager.
-        Expecting list of dicts: [{'id': int, 'title': str, 'primary': bool}]
-        """
-        # Safety / Legacy Fallback
-        if not album_data: return
-        if isinstance(album_data, int): return # Should not occur with new signal signature
-
-        # 1. Parse Data
-        # Ensure we treat it as a list
-        if not isinstance(album_data, list): album_data = [album_data]
-        
-        primary = album_data[0] # First is Primary by convention
-        names = [x['title'] for x in album_data]
-        ids = [x['id'] for x in album_data]
-        
-        # 2. Update Hidden Set (If we picked them, they shouldn't be hidden)
-        for x in album_data:
-            self._hidden_album_ids.discard(x['id'])
-            
-        # 3. Update UI Chips
-        if 'album' in self._field_widgets:
-            w = self._field_widgets['album']
-            if hasattr(w, 'set_chips'):
-                 # Chip Tuple: (id, label, icon, is_user, is_inherit, tooltip, color)
-                 chips = []
-                 for x in album_data:
-                     is_p = x.get('primary', False)
-                     color = "amber" if is_p else ""
-                     label = x['title']
-                     # Visual indicator for primary if multiple
-                     if len(album_data) > 1 and is_p:
-                         label = f"★ {label}"
-                         
-                     chips.append((x['id'], label, "💿", False, False, "", color, is_p))
-                 w.set_chips(chips)
-            elif hasattr(w, 'setText'):
-                 w.setText(", ".join(names))
-
-        # 4. Stage Changes
-        print(f"DEBUG: Staging Multi-Album Pick: {names} (IDs: {ids})")
-        self._on_field_changed("album", names)
-        # Store complex objects? No, just names for display. IDs for link.
-        self._on_field_changed("album_id", ids)
-        
     def _on_album_picked_context(self, data, mode, target_id=None):
         if not data: return
         
@@ -1407,12 +1331,6 @@ class SidePanelWidget(QFrame):
 
         # 5. Refresh UI (Reload from DB to show new links)
         self.set_songs(self.current_songs, force=True)
-
-    def _on_save_select_picked(self, album_data):
-        """Callback from Dialog requesting an immediate atomic save."""
-        self._on_album_picked(album_data)
-        # Surgical Shortcut: Just commit metadata
-        self.trigger_save() # ensure save logic reads staged album_id
 
     def _validate_isrc_field(self, widget, text):
         """
@@ -2307,44 +2225,6 @@ class SidePanelWidget(QFrame):
 
 
 
-    def _get_magnifier_icons(self):
-        """Lazy create Start/Hover magnifier icons."""
-        if not hasattr(self, '_icons_magnifier'):
-            def draw_icon(color_str, glow=False):
-                # 20x20 to allow glow spill (icon is centered ~16x16)
-                pix = QPixmap(20, 20)
-                pix.fill(Qt.GlobalColor.transparent)
-                painter = QPainter(pix)
-                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-                
-                # Center offset
-                ox, oy = 2, 2
-                
-                if glow:
-                    # Glow Pass (Thick, Low Opacity)
-                    glow_color = QColor(color_str)
-                    glow_color.setAlpha(100)
-                    painter.setPen(QPen(glow_color, 4)) # Fat pen
-                    painter.setBrush(Qt.BrushStyle.NoBrush)
-                    painter.drawEllipse(ox+3, oy+3, 8, 8)
-                    painter.drawLine(ox+10, oy+10, ox+14, oy+14)
-                
-                # Sharp Pass
-                painter.setPen(QColor(color_str))
-                painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.drawEllipse(ox+3, oy+3, 8, 8)
-                painter.drawLine(ox+10, oy+10, ox+14, oy+14)
-                
-                painter.end()
-                return QIcon(pix)
-
-            # Return Tuple: (Normal, Hover)
-            # Normal: #CCCCCC (Light Grey)
-            # Hover: #FFC66D (Amber) with Glow
-            self._icons_magnifier = (draw_icon("#CCCCCC", glow=False), draw_icon("#FFC66D", glow=True))
-            
-        return self._icons_magnifier
-
     def _open_filename_parser(self):
         """
         Open the Filename -> Metadata parser for CURRENTLY STAGED songs.
@@ -2709,22 +2589,6 @@ class SidePanelWidget(QFrame):
         menu.addAction(action_stats)
         
         menu.exec(self.header_label.mapToGlobal(pos))
-
-    def _show_title_context_menu(self, global_pos):
-        """Show tools menu for the Title field."""
-        if not self.current_songs: return
-        
-        menu = QMenu(self)
-        
-        act_sentence = QAction("To Sentence Case", self)
-        act_sentence.triggered.connect(self._sentence_case_title)
-        menu.addAction(act_sentence)
-        
-        act_title = QAction("To Title Case", self)
-        act_title.triggered.connect(self._title_case_title)
-        menu.addAction(act_title)
-        
-        menu.exec(global_pos)
 
     def _sentence_case_title(self):
         """Convert title to Sentence case (First letter upper, rest lower) with protections."""

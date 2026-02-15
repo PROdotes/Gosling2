@@ -1215,9 +1215,6 @@ class LibraryWidget(QWidget):
         if final_list:
             self.import_files_list(final_list)
 
-    def _setup_top_controls(self, parent_layout) -> None:
-        pass
-
     def _setup_connections(self) -> None:
         """Setup internal signal/slot connections"""
         # (Internal model signals, etc.)
@@ -1746,38 +1743,6 @@ class LibraryWidget(QWidget):
         """Handle pill button click"""
         self._on_type_tab_changed(index)
 
-    def _on_incomplete_toggled(self, checked: bool) -> None:
-        """Handle incomplete filter toggle"""
-        self._show_incomplete = checked
-        self.load_library(refresh_filters=False)
-
-    def _get_colored_icon(self, standard_pixmap) -> QIcon:
-        """Helper to invert icon colors for visibility on dark backgrounds"""
-        icon = self.style().standardIcon(standard_pixmap)
-        pixmap = icon.pixmap(16, 16)
-        
-        if pixmap.isNull():
-            return icon
-
-        img = pixmap.toImage()
-        img = img.convertToFormat(QImage.Format.Format_ARGB32)
-        
-        for x in range(img.width()):
-            for y in range(img.height()):
-                color = img.pixelColor(x, y)
-                # Only invert sufficiently opaque pixels
-                if color.alpha() > 0:
-                    # Invert RGB channels
-                    new_color = QColor(
-                        255 - color.red(),
-                        255 - color.green(),
-                        255 - color.blue(),
-                        color.alpha()
-                    )
-                    img.setPixelColor(x, y, new_color)
-        
-        return QIcon(QPixmap.fromImage(img))
-
     def _reveal_in_explorer(self, path: str) -> None:
         """Reveal the file in Windows Explorer. If path is virtual (in a ZIP), reveal the ZIP itself."""
         if not path:
@@ -2220,10 +2185,6 @@ class LibraryWidget(QWidget):
         layout = self.settings_manager.get_column_layout("default")
         if layout:
             self._load_column_layout()
-
-    def _save_column_visibility_states(self) -> None:
-        """Save column layout (wraps new method for compatibility)."""
-        self._save_column_layout()
 
     # === Public helpers for shortcuts ===
 
