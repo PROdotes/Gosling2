@@ -38,9 +38,6 @@ class GlowLED(QWidget):
 
     @pyqtProperty(bool)
     def active(self): return self._active
-    
-    @active.setter
-    def active(self, val): self.setActive(val)
 
     RING_COLOR = "#444444"
 

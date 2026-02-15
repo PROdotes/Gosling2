@@ -19,8 +19,7 @@ class FlowLayout(QLayout):
         self._items = []
         self.setContentsMargins(margin, margin, margin, margin)
 
-    def __del__(self):
-        del self._items
+    # no explicit destructor; rely on Python GC to clean up items
 
     def addItem(self, item):
         self._items.append(item)

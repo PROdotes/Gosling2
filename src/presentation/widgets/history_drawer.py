@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableView, 
                              QAbstractItemView, QHeaderView, QFrame)
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect, pyqtProperty
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 
@@ -59,11 +59,5 @@ class HistoryDrawer(QFrame):
             items = [QStandardItem(time_str), QStandardItem(title), QStandardItem(artist)]
             self.model.appendRow(items)
 
-    # Property for Animation
-    @pyqtProperty(int)
-    def drawerWidth(self):
-        return self.width()
 
-    @drawerWidth.setter
-    def drawerWidth(self, width):
-        self.setFixedWidth(width)
+

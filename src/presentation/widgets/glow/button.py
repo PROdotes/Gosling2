@@ -13,8 +13,6 @@ class GlowButton(GlowWidget):
     
     @pyqtProperty(QIcon)
     def icon(self): return self.btn.icon()
-    @icon.setter
-    def icon(self, arg): self.btn.setIcon(arg)
     
     def __init__(self, text="", parent=None):
         self.btn = QPushButton()
@@ -163,9 +161,6 @@ class GlowButton(GlowWidget):
     # Proxy methods for Dialog behavior
     def setAutoDefault(self, auto):
         self.btn.setAutoDefault(auto)
-
-    def setDefault(self, default):
-        self.btn.setDefault(default)
 
     def setText(self, text):
         self.lbl_glow.setText(text)

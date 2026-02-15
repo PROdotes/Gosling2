@@ -977,7 +977,6 @@ class LibraryWidget(QWidget):
         self.splitter.addWidget(center_widget)
         
         # State Tracking & Constants
-        self._history_open = False
         self._sidebar_base_width = 250
         self._sidebar_expanded_width = 450
         
@@ -2212,22 +2211,6 @@ class LibraryWidget(QWidget):
         self.jingle_anim.start()
 
     # Mechanical Sidebar Swap Properties
-    @pyqtProperty(int)
-    def filterWidth(self):
-        return self.filter_widget.width()
-
-    @filterWidth.setter
-    def filterWidth(self, width):
-        self.filter_widget.setFixedWidth(width)
-
-    @pyqtProperty(int)
-    def totalSidebarWidth(self):
-        return self.splitter.sizes()[0]
-
-    @totalSidebarWidth.setter
-    def totalSidebarWidth(self, width):
-        # Update the splitter to track the handle during flight
-        self.splitter.setSizes([width, self.width() - width])
 
     def _on_item_entered(self, index) -> None:
         """Track the hovered row for row-wide highlighting."""
