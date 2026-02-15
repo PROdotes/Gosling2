@@ -1,6 +1,6 @@
 import re
 import os
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 
 class PatternEngine:
     """
@@ -35,40 +35,6 @@ class PatternEngine:
     }
 
     # ==================== EXPANSION (Rename) ====================
-    
-    @staticmethod
-    def resolve_pattern(pattern: str, data_context: Dict[str, Any]) -> str:
-        """
-        Replace tokens in pattern with data from context.
-        context is a flat dict of pre-processed strings (Artist, Title, etc.)
-        """
-        result = pattern
-        for token in PatternEngine.TOKENS:
-            key = token.strip("{}") # e.g. "Artist"
-            # Try exact key Match (Artist)
-            val = data_context.get(key)
-            if val is None:
-                # Try lowercase (artist)
-                val = data_context.get(key.lower())
-                
-            # Default to placeholder if missing? Or empty?
-            # RenamingService usually handles sanitized extraction first.
-            if val is None:
-                val = "Unknown"
-            
-            result = result.replace(token, str(val))
-            
-        return result
-
-    @staticmethod
-    def sanitize_filename(text: str) -> str:
-        """Sanitize text for use in filenames (Windows/Linux safe)."""
-        if not text: return ""
-        # Remove chars invalid in Windows
-        bad_chars = '<>:"/\\|?*'
-        clean = "".join(c for c in text if c not in bad_chars)
-        # Strip trailing/leading spaces/dots (Windows hates 'Folder. ')
-        return clean.strip().strip('.')
 
     # ==================== EXTRACTION (Parse) ====================
 

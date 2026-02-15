@@ -29,10 +29,6 @@ class TagService:
         """Alias for get_all_tags to support universal picker."""
         return self.get_all_tags()
 
-    def get_all_by_category(self, category: str) -> List[Any]:
-        """Get all tags in a specific category."""
-        return self._repo.get_all_by_category(category)
-
 
     def set_tags(self, song_id: int, tags: List[str], category: str) -> bool:
         """Update tags for a song by category (Replaces existing)."""

@@ -197,16 +197,6 @@ class TagRepository(GenericRepository[Tag]):
                 tags.append(Tag.from_row(row))
         return tags
     
-    def get_all_by_category(self, category: str) -> List[Tag]:
-        """Get all distinct tags of a certain category."""
-        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagCategory = ? ORDER BY TagName"
-        tags = []
-        with self.get_connection() as conn:
-            cursor = conn.execute(query, (category,))
-            for row in cursor.fetchall():
-                tags.append(Tag.from_row(row))
-        return tags
-
     def get_all_tags(self) -> List[Tag]:
         """Retrieve all tags from the database."""
         query = "SELECT TagID, TagName, TagCategory FROM Tags ORDER BY TagName"

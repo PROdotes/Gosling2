@@ -399,17 +399,9 @@ class SettingsManager:
     
     # ===== Utility Methods =====
     
-    def clear_all(self) -> None:
-        """Clear all settings (use with caution!)"""
-        self._settings.clear()
-    
     def sync(self) -> None:
         """Force synchronization of settings to disk"""
         self._settings.sync()
-    
-    def get_all_keys(self) -> list[str]:
-        """Get all setting keys (useful for debugging)"""
-        return self._settings.allKeys()
     
     def remove_setting(self, key: str) -> None:
         """Remove a specific setting"""

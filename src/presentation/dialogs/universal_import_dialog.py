@@ -260,9 +260,3 @@ class UniversalImportDialog(QDialog):
         """Return the list of paths selected by the user."""
         return self.selected_paths
 
-    @staticmethod
-    def get_import_paths(start_dir=None, parent=None):
-        dlg = UniversalImportDialog(start_dir, parent)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            return dlg.get_selected()
-        return []

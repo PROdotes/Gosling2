@@ -56,7 +56,7 @@ class FieldDef:
     
     # Filter behavior
     filterable: bool = False
-    strategy: str = "list"  # "list", "range", "boolean", "decade_grouper", "first_letter_grouper"
+    strategy: str = "list"  # "list", "range", "boolean", "decade_grouper"
     
     # Mapping
     model_attr: Optional[str] = None  # Song model property (defaults to name)
@@ -158,20 +158,9 @@ def decade_grouper(year: Any) -> str:
     except (ValueError, TypeError):
         return "Unknown"
 
-# Helper to group by first letter
-def first_letter_grouper(value: Any) -> str:
-    if not value:
-        return "#"
-    s = str(value).strip().upper()
-    if not s:
-        return "#"
-    first = s[0]
-    return first if first.isalpha() else "#"
-
 # Lookup for grouping functions by strategy name
 GROUPERS = {
     "decade_grouper": decade_grouper,
-    "first_letter_grouper": first_letter_grouper,
 }
 
 # NOTE: The order of this list MUST match the columns in BASE_QUERY!

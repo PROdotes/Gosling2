@@ -304,37 +304,6 @@ class ContributorRepository(GenericRepository[Contributor]):
             logger.error(f"Error fetching all contributors: {e}")
             return []
 
-    def get_all_by_type(self, type_name: str) -> List[Contributor]:
-        """Fetch all contributors of a specific type (supports 'person', 'group', 'alias')."""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                type_lower = type_name.lower()
-                
-                if type_lower == "alias":
-                    cursor.execute("""
-                        SELECT 
-                            C.ContributorID, 
-                            CA.AliasName as Name, 
-                            C.ContributorType
-                        FROM ContributorAliases CA 
-                        JOIN Contributors C ON CA.ContributorID = C.ContributorID
-                        ORDER BY Name ASC
-                    """)
-                    return [Contributor(contributor_id=r[0], name=r[1], type=r[2], matched_alias=r[1]) for r in cursor.fetchall()]
-                
-                cursor.execute("""
-                    SELECT ContributorID, ContributorName, SortName, ContributorType 
-                    FROM Contributors 
-                    WHERE ContributorType = ? COLLATE UTF8_NOCASE 
-                    ORDER BY SortName ASC
-                """, (type_lower,))
-                return [Contributor(contributor_id=r[0], name=r[1], sort_name=r[2], type=r[3]) for r in cursor.fetchall()]
-        except Exception as e:
-            from src.core import logger
-            logger.error(f"Error fetching contributors by type: {e}")
-            return []
-
     def get_types_for_names(self, names: List[str]) -> dict:
         """
         Get type ('person' or 'group') for a list of names.

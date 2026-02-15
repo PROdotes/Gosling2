@@ -41,8 +41,3 @@ class AuditContext:
         finally:
             self.conn.close()
 
-    @property
-    def auditor(self) -> AuditLogger:
-        if not self._auditor:
-            raise RuntimeError("AuditContext not initialized. Use 'with' statement.")
-        return self._auditor

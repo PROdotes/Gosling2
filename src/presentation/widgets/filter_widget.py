@@ -331,7 +331,7 @@ class FilterWidget(QFrame):
         for field in sorted_fields:
 
                 
-            if field.strategy in ("list", "decade_grouper", "first_letter_grouper"):
+            if field.strategy in ("list", "decade_grouper"):
                 self._add_list_filter(field)
             elif field.strategy == "boolean":
                 self._add_boolean_filter(field)

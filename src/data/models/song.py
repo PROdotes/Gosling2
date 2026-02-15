@@ -145,11 +145,6 @@ class Song(MediaSource):
     def year(self, value: Optional[int]):
         self.recording_year = value
 
-    @property
-    def formatted_duration(self) -> str:
-        """Get duration formatted as mm:ss"""
-        return self.get_formatted_duration()
-
     def get_formatted_duration(self) -> str:
         """Get duration formatted as mm:ss"""
         if self.duration is None:
