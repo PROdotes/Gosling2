@@ -87,16 +87,7 @@ class SearchService:
             return draft_values.get(field) or getattr(song, field, "")
             
         title = str(resolve('title'))
-        
-        # Artist Resolution Logic
-        # Artist Resolution: draft performers > song performers
-        draft_performers = draft_values.get('performers')
-        if draft_performers:
-            artist = str(draft_performers[0])
-        elif song.performers:
-            artist = str(song.performers[0])
-        else:
-            artist = ""
+        artist = str(resolve('performers'))
 
         # 3. Delegate to centralized URL builder
         return self.get_search_url(

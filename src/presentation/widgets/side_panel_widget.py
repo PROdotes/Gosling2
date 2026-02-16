@@ -2192,16 +2192,10 @@ class SidePanelWidget(QFrame):
         if s_mgr:
              provider = s_mgr.get_search_provider() or provider
         
-        def get_title():
-            return self._field_widgets['title'].text()
-
-        def get_performers():
-            return self._field_widgets['performers'].get_names()
-
         # Dump all relevant fields to draft dict
         draft_values = {
-            'title': get_title(),
-            'performers': get_performers(),
+            'title': self._field_widgets['title'].text(),
+            'performers': ", ".join(self.current_songs[0].performers),
         }
 
         # 4. Delegate to Service (URL Generation + Logic)
