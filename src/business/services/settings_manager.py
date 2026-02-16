@@ -35,6 +35,7 @@ class SettingsManager:
     KEY_RENAME_ENABLED = "rules/renameEnabled"
 
     KEY_WRITE_TAGS = "rules/writeTags"
+    KEY_WRITE_VFS_TAGS = "rules/writeVfsTags"
     
     # Playback settings
     KEY_VOLUME = "playback/volume"
@@ -71,6 +72,7 @@ class SettingsManager:
     DEFAULT_RENAME_ENABLED = True
 
     DEFAULT_WRITE_TAGS = True
+    DEFAULT_WRITE_VFS_TAGS = True
     
     DEFAULT_CONVERSION_ENABLED = False
     DEFAULT_CONVERSION_BITRATE = "320k"
@@ -225,6 +227,13 @@ class SettingsManager:
 
     def set_write_tags(self, enabled: bool) -> None:
         self._settings.setValue(self.KEY_WRITE_TAGS, enabled)
+        self._settings.sync()
+
+    def get_write_vfs_tags(self) -> bool:
+        return self._settings.value(self.KEY_WRITE_VFS_TAGS, self.DEFAULT_WRITE_VFS_TAGS, type=bool)
+
+    def set_write_vfs_tags(self, enabled: bool) -> None:
+        self._settings.setValue(self.KEY_WRITE_VFS_TAGS, enabled)
         self._settings.sync()
     
     def get_column_layout(self, layout_name: str = "default") -> Dict[str, Any]:

@@ -943,8 +943,9 @@ class MainWindow(QMainWindow):
                 
                 # Orchestration Layer: Delegate save to ExportService, but tell it our preference.
                 write_tags = self.settings_manager.get_write_tags()
+                write_vfs_tags = self.settings_manager.get_write_vfs_tags()
                 album_type = self.settings_manager.get_default_album_type()
-                result = self.export_service.export_song(song, write_tags=write_tags, batch_id=batch_id, album_type=album_type)
+                result = self.export_service.export_song(song, write_tags=write_tags, write_vfs_tags=write_vfs_tags, batch_id=batch_id, album_type=album_type)
                 
                 if result.success:
                     successful_ids.append(song_id)

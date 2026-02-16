@@ -168,6 +168,10 @@ class SettingsDialog(QDialog):
         self.chk_write_tags.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("WRITE TO TAGS", self.chk_write_tags, "If disabled, metadata changes will only be saved to the database."))
 
+        self.chk_write_vfs_tags = GlowToggle()
+        self.chk_write_vfs_tags.set_labels("ON", "OFF")
+        layout.addLayout(self._add_toggle_row("WRITE TO VFS (ZIP)", self.chk_write_vfs_tags, "If disabled, metadata changes will not be saved to files inside ZIP archives."))
+
         self.chk_delete_zip = GlowToggle()
         self.chk_delete_zip.set_labels("ON", "OFF")
         layout.addLayout(self._add_toggle_row("DELETE ZIP AFTER IMPORT", self.chk_delete_zip, "Delete ZIP files after successful import."))
@@ -307,6 +311,7 @@ class SettingsDialog(QDialog):
         self.chk_rename_enabled.setChecked(self.settings_manager.get_rename_enabled())
         self.chk_delete_zip.setChecked(self.settings_manager.get_delete_zip_after_import())
         self.chk_write_tags.setChecked(self.settings_manager.get_write_tags())
+        self.chk_write_vfs_tags.setChecked(self.settings_manager.get_write_vfs_tags())
         
         self.chk_conversion_enabled.setChecked(self.settings_manager.get_conversion_enabled())
         self.chk_delete_wav.setChecked(self.settings_manager.get_delete_wav_after_conversion())
@@ -384,6 +389,7 @@ class SettingsDialog(QDialog):
         self.settings_manager.set_rename_enabled(self.chk_rename_enabled.isChecked())
         self.settings_manager.set_delete_zip_after_import(self.chk_delete_zip.isChecked())
         self.settings_manager.set_write_tags(self.chk_write_tags.isChecked())
+        self.settings_manager.set_write_vfs_tags(self.chk_write_vfs_tags.isChecked())
 
         self.settings_manager.set_conversion_enabled(self.chk_conversion_enabled.isChecked())
         self.settings_manager.set_delete_wav_after_conversion(self.chk_delete_wav.isChecked())

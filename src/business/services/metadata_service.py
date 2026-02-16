@@ -296,15 +296,24 @@ class MetadataService:
     get_id3 = get_raw_tags
 
     @classmethod
-    def write_tags(cls, song: Song) -> bool:
+    def write_tags(cls, song: Song, write_vfs_tags: bool = True) -> bool:
         """
         Write metadata from Song object to MP3 file.
         Dynamically uses yellberus.FIELDS and id3_frames.json for mapping.
         Handles Dual-Mode fields (Year, Done, Producers) and Legacy Union (TCOM) specifically.
         Returns True on success, False on failure.
+        
+        Args:
+            song: The Song object with metadata to write.
+            write_vfs_tags: If False and file is inside a ZIP (VFS), skip writing to the archive.
         """
         if not song.path:
             return False
+        
+        is_virtual = VFS.is_virtual(song.path)
+        
+        if is_virtual and not write_vfs_tags:
+            return True
             
         # --- VALIDATION (Fail-Safe) ---
         # Centralized Yellberus Validation: Improves data before writing to ID3.

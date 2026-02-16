@@ -52,7 +52,7 @@ class ExportService:
         self.metadata_service = metadata_service
         self.library_service = library_service
     
-    def export_song(self, song: Song, dry_run: bool = False, write_tags: bool = True, batch_id: Optional[str] = None, **kwargs) -> ExportResult:
+    def export_song(self, song: Song, dry_run: bool = False, write_tags: bool = True, write_vfs_tags: bool = True, batch_id: Optional[str] = None, **kwargs) -> ExportResult:
         """
         Export a single song to database and optionally ID3.
         
@@ -60,6 +60,7 @@ class ExportService:
             song: The Song object with metadata to write.
             dry_run: If True, validate but don't actually write.
             write_tags: If True, also write metadata to the physical file.
+            write_vfs_tags: If False and file is in ZIP, skip writing to archive (DB save still happens).
         """
         if not song.path:
             return ExportResult(success=False, error="Song has no file path")
@@ -74,7 +75,7 @@ class ExportService:
             
             # Step 2: Write ID3 tags (The reflection)
             if write_tags:
-                if not self.metadata_service.write_tags(song):
+                if not self.metadata_service.write_tags(song, write_vfs_tags=write_vfs_tags):
                     return ExportResult(
                         success=False, 
                         error=f"Database saved, but failed to write ID3 tags to {song.path} (File may be missing or locked)"

@@ -43,34 +43,6 @@ def _load_rules() -> dict:
     return {}
 
 
-def save_rules(rules_data: dict) -> bool:
-    """Public API: Save rules configuration to JSON."""
-    import json
-
-    # Canonical save path: src/json/rules.json
-
-    target_path = _resolve_rules_path()
-    if not target_path:
-        # Fallback for new create
-        base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        target_path = os.path.join(base_dir, "src", "json", "rules.json")
-
-    try:
-        os.makedirs(os.path.dirname(target_path), exist_ok=True)
-        with open(target_path, 'w', encoding='utf-8') as f:
-            json.dump(rules_data, f, indent=4)
-        return True
-    except Exception as e:
-        from ...core import logger
-        logger.error(f"Failed to save rules.json: {e}")
-        return False
-
-
-def get_rules() -> dict:
-    """Public API: Get current rules configuration."""
-    return _load_rules()
-
-
 def _resolve_pattern(pattern: str, song, overrides: dict = None) -> str:
     """Replace tokens {Artist}, {Genre}, {Year}, etc."""
     # Data Preparation
@@ -300,3 +272,31 @@ class RenamingService:
             from src.core import logger
             logger.error(f"Rename Error during file move: {e}")
             return False, f"System Error: {str(e)}"
+
+    def get_rules(self) -> dict:
+        """Public API: Get current rules configuration."""
+        return _load_rules()
+    
+    def save_rules(self, rules_data: dict) -> bool:
+        """Public API: Save rules configuration to JSON."""
+        import json
+
+        # Canonical save path: src/json/rules.json
+
+        target_path = _resolve_rules_path()
+        if not target_path:
+            # Fallback for new create
+            base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+            target_path = os.path.join(base_dir, "src", "json", "rules.json")
+
+        try:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, 'w', encoding='utf-8') as f:
+                json.dump(rules_data, f, indent=4)
+            return True
+        except Exception as e:
+            from ...core import logger
+            logger.error(f"Failed to save rules.json: {e}")
+            return False
+
+
