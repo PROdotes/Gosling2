@@ -283,6 +283,7 @@ class SidePanelWidget(QFrame):
         # Single Song
         song = self.current_songs[0]
         # Priority: Staged Performers > Staged Unified Artist > DB Unified Artist
+        artist = None
         p_val = self._get_effective_value(song.source_id, "performers", song.performers)
         if isinstance(p_val, list) and p_val:
             artist = p_val[0]
