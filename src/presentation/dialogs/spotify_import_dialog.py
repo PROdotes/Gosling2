@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox, QLabel, QSplitter, QFrame
 )
 from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QShortcut, QKeySequence
 
 from src.presentation.widgets.glow_factory import GlowPlainTextEdit, GlowButton
 from src.presentation.widgets.spotify_artist_item_widget import SpotifyArtistItemWidget
@@ -111,6 +112,10 @@ class SpotifyImportDialog(QDialog):
         self.txt_input.textChanged.connect(self._on_input_changed)
         self.btn_box.accepted.connect(self.accept)
         self.btn_box.rejected.connect(self.reject)
+        
+        # Ctrl+S to trigger Import
+        self.save_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        self.save_shortcut.activated.connect(self.accept)
 
     def _on_input_changed(self):
         """Trigger debounced parse."""
@@ -167,7 +172,7 @@ class SpotifyImportDialog(QDialog):
         for row in self._row_widgets:
             name = row.get_name()
             roles = row.get_roles()
-            if name and roles:
+            if name and roles: 
                 results.append({
                     "name": name,
                     "roles": roles,

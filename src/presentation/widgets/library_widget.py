@@ -1239,11 +1239,14 @@ class LibraryWidget(QWidget):
 
     def load_library(self, refresh_filters=True):
         """Load library from database, preserving selection if possible."""
-        # 1. Capture current selection & focus (IDs)
+        # 1. Capture current selection, focus & scroll positions
         selected_ids = set()
         focused_id = None
         id_col = self.field_indices.get('file_id', -1)
         
+        v_scroll = self.table_view.verticalScrollBar().value()
+        h_scroll = self.table_view.horizontalScrollBar().value()
+
         if id_col != -1 and self.table_view.selectionModel():
             selection_model = self.table_view.selectionModel()
             
@@ -1272,61 +1275,80 @@ class LibraryWidget(QWidget):
                     except ValueError:
                         pass
 
-        # 2. Load Data (Pure Loading, filtering happens in Proxy)
+        # 2. Load Data (Pure Loading)
         headers, data = self.library_service.get_all_songs()
         
         # T-89: Clear Proxy Cache to ensure tag filters are fresh
         if hasattr(self.proxy_model, '_tag_cache'):
             self.proxy_model._tag_cache.clear()
-        # Also clear the filter cache which holds tag data for multiselect
         if hasattr(self.proxy_model, '_filter_cache'):
             self.proxy_model._filter_cache = {}
             
-        self._populate_table(headers, data)
+        # We block selection signals during re-population to prevent intermediate "Empty" 
+        # signals from clearing the SidePanel or other listeners (T-Fix: Deselection issue).
+        selection_model = self.table_view.selectionModel()
+        if selection_model:
+            selection_model.blockSignals(True)
 
-        if refresh_filters:
-            self.filter_widget.populate()
-        
-        # 3. Apply Dirty Highlights
-        if self._dirty_ids:
-            self.update_dirty_rows(list(self._dirty_ids))
+        try:
+            self._populate_table(headers, data)
 
-        # 4. Restore Selection & Focus
-        if (selected_ids or focused_id) and id_col != -1:
-            from PyQt6.QtCore import QItemSelectionModel
-            selection_model = self.table_view.selectionModel()
-            selection_model.clearSelection() # Clean start
+            if refresh_filters:
+                self.filter_widget.populate()
             
-            # Iterate rows to find matches
-            for row in range(self.library_model.rowCount()):
-                item = self.library_model.item(row, id_col)
-                if not item: continue
-                
-                raw_val = item.data(Qt.ItemDataRole.UserRole)
-                try:
-                    current_id = str(int(float(raw_val))) if raw_val is not None else ""
-                except ValueError:
-                    current_id = ""
-                
-                if current_id:
-                    source_idx = self.library_model.index(row, 0)
-                    proxy_idx = self.proxy_model.mapFromSource(source_idx)
-                    
-                    if not proxy_idx.isValid():
-                        continue
+            # 3. Apply Dirty Highlights
+            if self._dirty_ids:
+                self.update_dirty_rows(list(self._dirty_ids))
 
-                    # Restore Selection
-                    if current_id in selected_ids:
-                        selection_model.select(
-                            proxy_idx,
-                            QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
-                        )
+            # 4. Restore Selection & Focus
+            if (selected_ids or focused_id) and id_col != -1 and selection_model:
+                from PyQt6.QtCore import QItemSelectionModel, QItemSelection
+                
+                # Use QItemSelection to batch the selection update
+                # This is more efficient and triggers only one signal at the end
+                new_selection = QItemSelection()
+                
+                # Iterate rows to find matches
+                for row in range(self.library_model.rowCount()):
+                    item = self.library_model.item(row, id_col)
+                    if not item: continue
                     
-                    # Restore Focus (Keyboard Cursor)
-                    if focused_id and current_id == focused_id:
-                        self.table_view.setCurrentIndex(proxy_idx)
+                    raw_val = item.data(Qt.ItemDataRole.UserRole)
+                    try:
+                        current_id = str(int(float(raw_val))) if raw_val is not None else ""
+                    except (ValueError, TypeError):
+                        current_id = ""
+                    
+                    if current_id:
+                        source_idx = self.library_model.index(row, 0)
+                        proxy_idx = self.proxy_model.mapFromSource(source_idx)
+                        
+                        if not proxy_idx.isValid():
+                            continue
+
+                        # Restore Selection
+                        if current_id in selected_ids:
+                            new_selection.select(proxy_idx, proxy_idx)
+                        
+                        # Restore Focus (Keyboard Cursor)
+                        if focused_id and current_id == focused_id:
+                            self.table_view.setCurrentIndex(proxy_idx)
+                
+                # Apply batched selection
+                selection_model.select(new_selection, QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+            
+            # 5. Restore Scroll Position
+            # We do this after populating the table so the scroll bars have range
+            self.table_view.verticalScrollBar().setValue(v_scroll)
+            self.table_view.horizontalScrollBar().setValue(h_scroll)
         
-        # 5. Notify Listeners (e.g. SidePanelWidget)
+        finally:
+            if selection_model:
+                selection_model.blockSignals(False)
+                # Manually trigger a signal if the selection changed (or just to be safe)
+                # selection_model.selectionChanged.emit(selection_model.selection(), QItemSelection())
+        
+        # 6. Notify Listeners (e.g. SidePanelWidget)
         self.library_reloaded.emit()
 
     def update_dirty_rows(self, dirty_ids: list):
