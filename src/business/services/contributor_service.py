@@ -704,7 +704,7 @@ class ContributorService:
         return self._identity_service.move_alias(alias_name, old_ident, new_ident, batch_id=batch_id)
 
 
-    def get_all_with_usage(self, type_filter: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Contributor, int]]:
+    def get_all_with_usage(self, type_filter: Optional[str] = None, orphans_only: bool = False) -> List[Tuple[Contributor, int, int]]:
         """
         Get all contributors (ArtistNames) with their usage counts.
 
@@ -713,7 +713,7 @@ class ContributorService:
             orphans_only: If True, only return contributors with 0 usage.
 
         Returns:
-            List of (Contributor, usage_count) tuples.
+            List of (Contributor, song_count, album_count) tuples.
         """
         with self._credit_repo.get_connection() as conn:
             cursor = conn.cursor()
@@ -723,8 +723,8 @@ class ContributorService:
                     an.NameID, an.DisplayName, an.SortName,
                     COALESCE(i.IdentityType, 'person') as type,
                     an.IsPrimaryName,
-                    (SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = an.NameID) +
-                    (SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = an.NameID) as usage_count
+                    (SELECT COUNT(*) FROM SongCredits WHERE CreditedNameID = an.NameID) as song_count,
+                    (SELECT COUNT(*) FROM AlbumCredits WHERE CreditedNameID = an.NameID) as album_count
                 FROM ArtistNames an
                 LEFT JOIN Identities i ON an.OwnerIdentityID = i.IdentityID
             """
@@ -758,10 +758,11 @@ class ContributorService:
                     name=row[1],
                     sort_name=row[2],
                     type=row[3],
-                    matched_alias=row[1] if row[4] == 0 else None  # Mark non-primary as alias
+                    matched_alias=row[1] if row[4] == 0 else None
                 )
-                usage = row[5]
-                results.append((contrib, usage))
+                song_count = row[5]
+                album_count = row[6]
+                results.append((contrib, song_count, album_count))
             return results
 
     def get_orphan_count(self, type_filter: Optional[str] = None) -> int:
@@ -800,7 +801,7 @@ class ContributorService:
             return 0
 
         deleted = 0
-        for contrib, _ in orphans:
+        for contrib, _, _ in orphans:
             if self._name_service.delete_name(contrib.contributor_id, batch_id=batch_id):
                 deleted += 1
 

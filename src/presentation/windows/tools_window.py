@@ -661,8 +661,8 @@ class ToolsWindow(QMainWindow):
         # Left: Table
         self.artists_table = QTableWidget()
         self.artists_table.setObjectName("ArtistsTable")
-        self.artists_table.setColumnCount(3)
-        self.artists_table.setHorizontalHeaderLabels(["Name", "Type", "Usage"])
+        self.artists_table.setColumnCount(4)
+        self.artists_table.setHorizontalHeaderLabels(["Name", "Type", "Songs", "Albums"])
         self.artists_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.artists_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.artists_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -741,14 +741,14 @@ class ToolsWindow(QMainWindow):
         # Apply text filter
         if search_text:
             artists_with_usage = [
-                (a, u) for a, u in artists_with_usage
+                (a, s, al) for a, s, al in artists_with_usage
                 if search_text in a.name.lower()
             ]
 
         # Populate table
         self.artists_table.setRowCount(len(artists_with_usage))
 
-        for row, (artist, usage) in enumerate(artists_with_usage):
+        for row, (artist, song_count, album_count) in enumerate(artists_with_usage):
             # Name
             name_item = QTableWidgetItem(artist.name)
             name_item.setData(Qt.ItemDataRole.UserRole, artist.contributor_id)
@@ -758,12 +758,19 @@ class ToolsWindow(QMainWindow):
             type_item = QTableWidgetItem(artist.type or "person")
             self.artists_table.setItem(row, 1, type_item)
 
-            # Usage
-            usage_item = QTableWidgetItem(str(usage))
-            usage_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if usage == 0:
-                usage_item.setForeground(Qt.GlobalColor.red)
-            self.artists_table.setItem(row, 2, usage_item)
+            # Songs
+            song_item = QTableWidgetItem(str(song_count))
+            song_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if song_count == 0 and album_count == 0:
+                song_item.setForeground(Qt.GlobalColor.red)
+            self.artists_table.setItem(row, 2, song_item)
+
+            # Albums
+            album_item = QTableWidgetItem(str(album_count))
+            album_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if album_count == 0 and song_count == 0:
+                album_item.setForeground(Qt.GlobalColor.red)
+            self.artists_table.setItem(row, 3, album_item)
 
         # Update orphan count in nuke button
         orphan_count = self.contributor_service.get_orphan_count()
