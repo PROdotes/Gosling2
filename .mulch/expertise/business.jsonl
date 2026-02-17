@@ -1,0 +1,1 @@
+{"type":"convention","content":"contributor_service.get_all_with_usage returns (artist, song_count, album_count). UI components must expect 3-tuples.","classification":"tactical","recorded_at":"2026-02-17T14:34:18.328Z","evidence":{"file":"src/business/services/contributor_service.py"},"id":"mx-7e19c8"}

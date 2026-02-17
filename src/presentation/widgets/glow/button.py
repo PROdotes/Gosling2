@@ -13,6 +13,8 @@ class GlowButton(GlowWidget):
     
     @pyqtProperty(QIcon)
     def icon(self): return self.btn.icon()
+    @icon.setter
+    def icon(self, i): self.setIcon(i)
     
     def __init__(self, text="", parent=None):
         self.btn = QPushButton()
