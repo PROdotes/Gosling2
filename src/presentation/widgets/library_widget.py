@@ -136,12 +136,9 @@ class LibraryFilterProxyModel(QSortFilterProxyModel):
 
     def setCheckFilters(self, filters: dict, field_indices: dict):
         """Update multicheck filter state {field_name: set(values)}"""
-        # Clear high-frequency caches
+        # Clear filter-specific cache but NOT tag cache (tags don't change when filters change)
         if hasattr(self, '_filter_cache'):
             self._filter_cache = {}
-        # T-83: Clear tag cache when filters change
-        if hasattr(self, '_tag_cache'):
-            self._tag_cache = {}
 
         # T-70 Identity Awareness: Expand performers to include aliases/related names
         processed_filters = filters.copy()
@@ -553,6 +550,18 @@ class LibraryTable(QTableView):
                             parent._open_scrubber_for_song(song)
                         return
                     parent = parent.parent()
+
+        if event.key() == Qt.Key.Key_Home:
+            self.scrollToTop()
+            self.setCurrentIndex(self.model().index(0, self.currentIndex().column() if self.currentIndex().isValid() else 0))
+            return
+
+        if event.key() == Qt.Key.Key_End:
+            self.scrollToBottom()
+            last_row = self.model().rowCount() - 1
+            if last_row >= 0:
+                self.setCurrentIndex(self.model().index(last_row, self.currentIndex().column() if self.currentIndex().isValid() else 0))
+            return
 
         super().keyPressEvent(event)
 

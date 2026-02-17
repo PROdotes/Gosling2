@@ -308,16 +308,28 @@ class ScrubberDialog(QDialog):
             self._on_add_genre()
             event.accept()
         elif event.key() == Qt.Key.Key_Left:
-            # Seek back 10 seconds
+            # Seek back: 1s if shift, else 10s
+            step = 1000 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 10000
             current = self._playback.get_position()
-            self._playback.seek(max(0, current - 10000))
+            self._playback.seek(max(0, current - step))
             event.accept()
         elif event.key() == Qt.Key.Key_Right:
-            # Seek forward 10 seconds
+            # Seek forward: 1s if shift, else 10s
+            step = 1000 if event.modifiers() & Qt.KeyboardModifier.ShiftModifier else 10000
             current = self._playback.get_position()
             duration = self._playback.get_duration()
             if duration > 0:
-                self._playback.seek(min(duration, current + 10000))
+                self._playback.seek(min(duration, current + step))
+            event.accept()
+        elif event.key() == Qt.Key.Key_Home:
+            # Seek to start
+            self._playback.seek(0)
+            event.accept()
+        elif event.key() == Qt.Key.Key_End:
+            # Seek to end
+            duration = self._playback.get_duration()
+            if duration > 0:
+                self._playback.seek(duration)
             event.accept()
         else:
             super().keyPressEvent(event)
