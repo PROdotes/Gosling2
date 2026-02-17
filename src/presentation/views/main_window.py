@@ -14,7 +14,7 @@ from ..widgets import (
     SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland, ToastOverlay
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
-from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService, WaveformService
+from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
 from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
@@ -192,9 +192,6 @@ class MainWindow(QMainWindow):
         self.renaming_service = RenamingService(self.settings_manager)
         self.duplicate_scanner = DuplicateScannerService(self.library_service)
         self.conversion_service = ConversionService(self.settings_manager)
-        self.waveform_service = WaveformService(
-            settings_manager=self.settings_manager
-        )
 
         from ...business.services.import_service import ImportService
         self.import_service = ImportService(
@@ -311,8 +308,7 @@ class MainWindow(QMainWindow):
             self.renaming_service,
             self.duplicate_scanner,
             self.conversion_service,
-            self.import_service,
-            self.waveform_service
+            self.import_service
         )
         self.lc_splitter.addWidget(self.library_widget)
         
@@ -603,9 +599,9 @@ class MainWindow(QMainWindow):
         try:
             song = self.metadata_service.extract_from_mp3(path)
             text = f"{song.get_display_performers()} - {song.get_display_title()} ({song.get_formatted_duration()})"
-            self.playback_widget.update_song_label(text)
+            self.playback_widget.update_song_label(text, path=path)
         except Exception:
-            self.playback_widget.update_song_label(os.path.basename(path))
+            self.playback_widget.update_song_label(os.path.basename(path), path=path)
 
     def _on_playlist_double_click(self, item) -> None:
         """Handle double-click on playlist item"""

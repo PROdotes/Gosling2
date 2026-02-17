@@ -3,7 +3,9 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
 from .seek_slider import SeekSlider
+from .waveform_monitor import WaveformMonitor
 from .glow_factory import GlowButton
+from ...business.services import WaveformService
 
 # Note: All styling moved to theme.qss - see "PLAYBACK CONTROL WIDGET STYLES" section
 
@@ -28,10 +30,16 @@ class PlaybackControlWidget(QWidget):
     def __init__(self, playback_service, settings_manager, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("PlaybackDeck")
+        self.setMinimumHeight(100)
         self.playback_service = playback_service
         self.settings_manager = settings_manager
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._playlist_count = 0
+        
+        # Own waveform service — isolated from other consumers
+        self.waveform_service = WaveformService(
+            settings_manager=settings_manager
+        )
         
         self._init_ui()
         self._setup_connections()
@@ -41,33 +49,27 @@ class PlaybackControlWidget(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(15)
         
-        # --- LEFT: THE IDENT BAY (Album Art & Song Info) ---
-        # Fixed-width container prevents 'shimmering' layouts when song titles change
+        # --- LEFT: THE IDENT BAY (Volume Control) ---
         self.ident_container = QFrame()
-        self.ident_container.setFixedWidth(200)
-        ident_layout = QVBoxLayout(self.ident_container)
+        self.ident_container.setObjectName("PlaybackIdentBay")
+        ident_layout = QHBoxLayout(self.ident_container)
         ident_layout.setContentsMargins(0, 0, 0, 0)
-        ident_layout.setSpacing(2)
         
-        # Cover Placeholder
-        self.cover_bay = QFrame()
-        self.cover_bay.setObjectName("CoverBay")
-        self.cover_bay.setFixedSize(50, 50) 
-        ident_layout.addWidget(self.cover_bay)
+        self.vol_icon = QLabel("🔈")
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setObjectName("VolumeSlider")
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setFixedWidth(80)
+        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         
-        # Song Name (Compact)
-        self.lbl_song = QLabel("NO MEDIA ARMED")
-        self.lbl_song.setObjectName("LargeSongLabel")
-        self.lbl_song.setWordWrap(False) # Force single line
-        ident_layout.addWidget(self.lbl_song)
+        ident_layout.addWidget(self.vol_icon)
+        ident_layout.addWidget(self.volume_slider)
         
         layout.addWidget(self.ident_container)
 
         # --- CENTER: THE ENGINE (Transport Controls) ---
         engine_layout = QVBoxLayout()
         engine_layout.setSpacing(5)
-        
-        # Row 1: The readout (moved to ident_layout)
         
         # Row 2: Transport & Transition Controls
         controls_row = QHBoxLayout()
@@ -115,7 +117,7 @@ class PlaybackControlWidget(QWidget):
         controls_row.addSpacing(2) 
         controls_row.addWidget(self.combo_fade)
         
-        lbl_xfade = QLabel("X-FADE:")
+        lbl_xfade = QLabel("FADE")
         lbl_xfade.setObjectName("PlaybackXFadeLabel") # For potential QSS styling
         controls_row.addWidget(lbl_xfade)
             
@@ -126,30 +128,12 @@ class PlaybackControlWidget(QWidget):
         monitor_layout = QVBoxLayout()
         monitor_layout.setSpacing(2)
         
-        # Seek Strip
-        self.playback_slider = SeekSlider()
-        monitor_layout.addWidget(self.playback_slider)
+        # Monitor
+        self.playback_monitor = WaveformMonitor()
+        monitor_layout.addWidget(self.playback_monitor)
         
-        # Timers and Volume
+        # Footer
         footer_row = QHBoxLayout()
-        self.lbl_time_passed = QLabel("00:00")
-        self.lbl_time_remaining = QLabel("- 00:00")
-        self.lbl_time_passed.setObjectName("PlaybackTimer")
-        self.lbl_time_remaining.setObjectName("PlaybackTimer")
-        
-        self.vol_icon = QLabel("🔈")
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setObjectName("VolumeSlider")  # For QSS styling
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.setFixedWidth(80)
-        self.volume_slider.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
-        
-        footer_row.addWidget(self.lbl_time_passed)
-        footer_row.addStretch()
-        footer_row.addWidget(self.lbl_time_remaining)
-        footer_row.addWidget(self.vol_icon)
-        footer_row.addWidget(self.volume_slider)
-        
         monitor_layout.addLayout(footer_row)
         layout.addLayout(monitor_layout, 3)
 
@@ -215,11 +199,21 @@ class PlaybackControlWidget(QWidget):
 
     def _setup_connections(self) -> None:
         self.volume_slider.valueChanged.connect(self.volume_changed.emit)
-        self.playback_slider.seekRequested.connect(self.playback_service.seek)
+        self.playback_monitor.seek_requested.connect(self._handle_monitor_seek)
+        
+        # Waveform HUD & Peaks
+        self.waveform_service.finished.connect(self.playback_monitor.set_peaks)
+        self.waveform_service.error.connect(lambda msg: print(f"Waveform Error: {msg}"))
         
         self.playback_service.position_changed.connect(self.update_position)
         self.playback_service.duration_changed.connect(self.update_duration)
         self.playback_service.state_changed.connect(self._on_state_changed)
+
+    def _handle_monitor_seek(self, ratio: float):
+        duration = self.playback_service.get_duration()
+        if duration > 0:
+            pos_ms = int(ratio * duration)
+            self.playback_service.seek(pos_ms)
 
     def _on_state_changed(self, state):
         """Sync visuals with Tape Recorder states."""
@@ -234,21 +228,29 @@ class PlaybackControlWidget(QWidget):
             self.btn_pause.setChecked(False)
 
     def update_duration(self, duration):
-        self.playback_slider.updateDuration(duration)
-        self.lbl_time_remaining.setText(f"- {self._format_time(duration)}")
+        self.playback_monitor.set_duration(duration)
 
     def update_position(self, position):
-        self.playback_slider.blockSignals(True)
-        self.playback_slider.setValue(position)
-        self.playback_slider.blockSignals(False)
-        self.lbl_time_passed.setText(self._format_time(position))
-        
         duration = self.playback_service.get_duration()
-        remaining = max(0, duration - position)
-        self.lbl_time_remaining.setText(f"- {self._format_time(remaining)}")
+        if duration > 0:
+            ratio = position / duration
+            self.playback_monitor.set_position(ratio, position)
+        else:
+            self.playback_monitor.set_position(0, position)
 
-    def update_song_label(self, text):
-        self.lbl_song.setText(text)
+    def update_song_label(self, text, path=None):
+        """HUD Update: Pass metadata and trigger waveform load."""
+        if " - " in text:
+            parts = text.split(" - ", 1)
+            artist = parts[0]
+            # Strip duration from title if present: "Title (04:20)" -> "Title"
+            title = parts[1].split(" (")[0]
+            self.playback_monitor.set_song_info(artist, title)
+        else:
+            self.playback_monitor.set_song_info("", text)
+            
+        if path:
+            self.waveform_service.load_waveform(path)
 
     def _format_time(self, ms: int) -> str:
         seconds = int(ms / 1000)

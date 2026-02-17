@@ -679,7 +679,7 @@ class LibraryWidget(QWidget):
     library_reloaded = pyqtSignal() # When the entire library model is rebuilt
     status_message_requested = pyqtSignal(str, str) # Emitted for user feedback (message, type)
 
-    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, import_service=None, waveform_service=None, parent=None) -> None:
+    def __init__(self, library_service, metadata_service, settings_manager, renaming_service, duplicate_scanner, conversion_service=None, import_service=None, parent=None) -> None:
         super().__init__(parent)
         self.library_service = library_service
         self.metadata_service = metadata_service
@@ -688,7 +688,6 @@ class LibraryWidget(QWidget):
         self.duplicate_scanner = duplicate_scanner
         self.conversion_service = conversion_service
         self.import_service = import_service
-        self.waveform_service = waveform_service
         
         # Cache Yellberus Indices
         self.field_indices = {f.name: i for i, f in enumerate(yellberus.FIELDS)}
@@ -2615,7 +2614,6 @@ class LibraryWidget(QWidget):
             song=song,
             settings_manager=self.settings_manager,
             library_service=self.library_service,
-            waveform_service=self.waveform_service,
             parent=self
         )
         # T-Feature: Emit signal when genre/metadata changes in scrubber

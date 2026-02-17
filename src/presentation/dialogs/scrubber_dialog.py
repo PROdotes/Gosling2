@@ -13,6 +13,7 @@ from ..widgets.glow_factory import GlowButton
 from ..widgets.chip_tray_widget import ChipTrayWidget
 from ..widgets.waveform_monitor import WaveformMonitor
 from ...business.services.playback_service import PlaybackService
+from ...business.services.waveform_service import WaveformService
 
 
 class ScrubberDialog(QDialog):
@@ -23,20 +24,24 @@ class ScrubberDialog(QDialog):
     
     genre_changed = pyqtSignal(list)  # Emits list of genre names when changed
     
-    def __init__(self, song, settings_manager, library_service=None, waveform_service=None, parent=None):
+    def __init__(self, song, settings_manager,
+                 library_service=None, parent=None):
         """
         Args:
             song: Song object with path, artist, title, source_id
             settings_manager: SettingsManager for PlaybackService
             library_service: LibraryService for genre tag management
-            waveform_service: WaveformService for peak extraction
             parent: Parent widget
         """
         super().__init__(parent)
         self.song = song
         self.settings_manager = settings_manager
         self.library_service = library_service
-        self.waveform_service = waveform_service
+        
+        # Own waveform service — isolated from other consumers
+        self.waveform_service = WaveformService(
+            settings_manager=settings_manager
+        )
         
         self.setWindowTitle("Song Scrubber")
         self.setModal(True)
@@ -63,7 +68,7 @@ class ScrubberDialog(QDialog):
         layout.setSpacing(15)
         
         # === Waveform Area (with HUD Readout) ===
-        self.waveform = WaveformMonitor()
+        self.waveform = WaveformMonitor(compact=True)
         layout.addWidget(self.waveform)
 
         # Initialize with current data
@@ -129,9 +134,12 @@ class ScrubberDialog(QDialog):
         self.genre_tray.chip_remove_requested.connect(self._on_remove_genre)
         
         if self.waveform_service:
-            # We must use a unique identifier or a named slot to allow safe disconnection
-            self.waveform_service.finished.connect(self._on_waveform_finished)
-            self.waveform_service.error.connect(self._on_waveform_error)
+            self.waveform_service.finished.connect(
+                self._on_waveform_finished
+            )
+            self.waveform_service.error.connect(
+                self._on_waveform_error
+            )
 
     def _on_waveform_finished(self, peaks: List[float]):
         print(f"ScrubberDialog: Got {len(peaks)} peaks, sum={sum(peaks):.2f}, max={max(peaks):.2f}")
@@ -150,8 +158,7 @@ class ScrubberDialog(QDialog):
             self.btn_play.setChecked(True)
             
             # --- REAL WAVEFORM DATA ---
-            if self.waveform_service:
-                self.waveform_service.load_waveform(path)
+            self.waveform_service.load_waveform(path)
             
     def _load_genres(self) -> None:
         """Load existing genres into the chip tray"""
@@ -316,15 +323,9 @@ class ScrubberDialog(QDialog):
             super().keyPressEvent(event)
             
     def closeEvent(self, event) -> None:
-        """Clean up playback on close"""
+        """Clean up playback and waveform service on close"""
         self._position_timer.stop()
         self._playback.stop()
         self._playback.cleanup()
-        if self.waveform_service:
-            try:
-                self.waveform_service.finished.disconnect(self._on_waveform_finished)
-                self.waveform_service.error.disconnect(self._on_waveform_error)
-            except (TypeError, RuntimeError):
-                pass
-            self.waveform_service.stop()
+        self.waveform_service.stop()
         super().closeEvent(event)

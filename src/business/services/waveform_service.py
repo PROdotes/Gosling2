@@ -1,5 +1,6 @@
 """Waveform generation service using FFmpeg subprocess"""
 import os
+import re
 import json
 import hashlib
 import struct
@@ -8,6 +9,10 @@ import tempfile
 from typing import List, Optional
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from ...core.vfs import VFS
+
+# Bump this when changing the peak extraction algorithm
+# to auto-invalidate caches
+_CACHE_VERSION = 2
 
 
 class _WaveformWorker(QObject):
@@ -38,6 +43,7 @@ class _WaveformWorker(QObject):
     def _extract_peaks(self) -> List[float]:
         """Decode entire file to raw PCM via FFmpeg, compute peaks."""
         path = self._source_path
+        sample_rate = 8000
 
         # FFmpeg: decode to mono 16-bit 8kHz raw PCM on stdout
         # 8kHz is enough for waveform visuals and keeps data small
@@ -46,7 +52,7 @@ class _WaveformWorker(QObject):
             "-i", path,
             "-vn",
             "-ac", "1",
-            "-ar", "8000",
+            "-ar", str(sample_rate),
             "-f", "s16le",
             "-acodec", "pcm_s16le",
             "pipe:1"
@@ -69,6 +75,19 @@ class _WaveformWorker(QObject):
             err = stderr.decode(errors='replace') if stderr else "Unknown"
             raise RuntimeError(f"FFmpeg decode failed: {err[:200]}")
 
+        # Validate: compare decoded duration against FFmpeg's reported duration
+        # FFmpeg prints "Duration: HH:MM:SS.xx" on stderr
+        decoded_seconds = len(raw_data) / 2 / sample_rate
+        expected_seconds = self._parse_duration_from_stderr(stderr)
+        if expected_seconds and expected_seconds > 0:
+            ratio = decoded_seconds / expected_seconds
+            if ratio < 0.9:
+                raise RuntimeError(
+                    f"FFmpeg decoded only {decoded_seconds:.1f}s of "
+                    f"{expected_seconds:.1f}s ({ratio:.0%}) — possible "
+                    f"truncation or corrupt file"
+                )
+
         # Parse raw 16-bit signed samples
         num_samples = len(raw_data) // 2
         if num_samples == 0:
@@ -76,20 +95,32 @@ class _WaveformWorker(QObject):
 
         samples = struct.unpack(f"<{num_samples}h", raw_data)
 
-        # Resample into target_peaks bins
-        samples_per_peak = max(1, num_samples // self._target_peaks)
+        # Resample into target_peaks bins using float-precise boundaries
+        # to ensure ALL samples are covered (no tail truncation)
+        bin_count = min(self._target_peaks, num_samples)
         peaks = []
-        for i in range(self._target_peaks):
-            start = i * samples_per_peak
-            end = min(start + samples_per_peak, num_samples)
-            if start >= num_samples:
-                peaks.append(0.0)
-                continue
+        for i in range(bin_count):
+            start = int(i * num_samples / bin_count)
+            end = int((i + 1) * num_samples / bin_count)
             chunk = samples[start:end]
             peak = max(max(chunk), -min(chunk)) / 32768.0
             peaks.append(min(1.0, peak))
 
+        print(f"WaveformWorker: decoded {decoded_seconds:.1f}s "
+              f"({num_samples} samples) -> {len(peaks)} peaks")
         return peaks
+
+    @staticmethod
+    def _parse_duration_from_stderr(stderr: bytes) -> Optional[float]:
+        """Extract 'Duration: HH:MM:SS.xx' from FFmpeg stderr output."""
+        if not stderr:
+            return None
+        text = stderr.decode(errors='replace')
+        m = re.search(r'Duration:\s*(\d+):(\d+):(\d+)\.(\d+)', text)
+        if not m:
+            return None
+        h, mn, s, frac = m.groups()
+        return int(h) * 3600 + int(mn) * 60 + int(s) + int(frac) / 100.0
 
     def _cleanup(self):
         if self._temp_file and os.path.exists(self._temp_file):
@@ -210,5 +241,16 @@ class WaveformService(QObject):
         self.error.emit(msg)
 
     def _get_cache_path(self, file_path: str) -> str:
-        h = hashlib.md5(file_path.encode()).hexdigest()
+        """Cache key includes path, size, mtime, code version.
+        Any file or algorithm change invalidates the cache."""
+        try:
+            if not VFS.is_virtual(file_path):
+                stat = os.stat(file_path)
+                key = (f"v{_CACHE_VERSION}|{file_path}"
+                       f"|{stat.st_size}|{stat.st_mtime}")
+            else:
+                key = f"v{_CACHE_VERSION}|{file_path}"
+        except (OSError, Exception):
+            key = f"v{_CACHE_VERSION}|{file_path}"
+        h = hashlib.md5(key.encode()).hexdigest()
         return os.path.join(self._cache_dir, f"{h}.json")
