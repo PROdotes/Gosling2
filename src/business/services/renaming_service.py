@@ -49,7 +49,7 @@ def _resolve_pattern(pattern: str, song, overrides: dict = None) -> str:
 
     # 1. Resolve Artist (Priority: performers list > artist field)
     if song.performers:
-        artist = " & ".join(song.performers)
+        artist = ", ".join(song.performers)
     else:
         artist = getattr(song, 'artist', "Unknown Artist")
 

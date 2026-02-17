@@ -1525,7 +1525,8 @@ class ToolsWindow(QMainWindow):
 
     def _on_health_show_tags(self):
         """Switch to Tags tab with orphans filter."""
-        self.tabs.setCurrentWidget(self.tags_tab)
+        self._on_tab_pill_clicked(0)
+        self._tab_buttons[0].setChecked(True)
         self.tags_orphans_only.setChecked(True)
 
     def _on_health_nuke_tags(self):
@@ -1536,7 +1537,8 @@ class ToolsWindow(QMainWindow):
     def _on_health_show_artists(self):
         """Switch to Artists tab with orphans filter."""
         if hasattr(self, 'artists_tab'):
-            self.tabs.setCurrentWidget(self.artists_tab)
+            self._on_tab_pill_clicked(1)
+            self._tab_buttons[1].setChecked(True)
             self.artists_orphans_only.setChecked(True)
 
     def _on_health_nuke_artists(self):
@@ -1547,7 +1549,8 @@ class ToolsWindow(QMainWindow):
     def _on_health_show_albums(self):
         """Switch to Albums tab with orphans filter."""
         if hasattr(self, 'albums_tab'):
-            self.tabs.setCurrentWidget(self.albums_tab)
+            self._on_tab_pill_clicked(2)
+            self._tab_buttons[2].setChecked(True)
             self.albums_orphans_only.setChecked(True)
 
     def _on_health_nuke_albums(self):
@@ -1558,7 +1561,8 @@ class ToolsWindow(QMainWindow):
     def _on_health_show_publishers(self):
         """Switch to Publishers tab with orphans filter."""
         if hasattr(self, 'publishers_tab'):
-            self.tabs.setCurrentWidget(self.publishers_tab)
+            self._on_tab_pill_clicked(3)
+            self._tab_buttons[3].setChecked(True)
             self.publishers_orphans_only.setChecked(True)
 
     def _on_health_nuke_publishers(self):
