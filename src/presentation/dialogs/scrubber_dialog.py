@@ -2,6 +2,7 @@
 ScrubberDialog - Modal song preview with seek and genre tagging.
 Opens on double-click when edit mode is enabled.
 """
+from typing import List
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QWidget, QSizePolicy
 )
@@ -10,105 +11,8 @@ from PyQt6.QtGui import QPainter, QColor, QPen, QLinearGradient, QMouseEvent
 
 from ..widgets.glow_factory import GlowButton
 from ..widgets.chip_tray_widget import ChipTrayWidget
+from ..widgets.waveform_monitor import WaveformMonitor
 from ...business.services.playback_service import PlaybackService
-
-
-class WaveformSeekWidget(QFrame):
-    """
-    Clickable waveform/seek area. 
-    For MVP: Shows playback position indicator on a placeholder background.
-    Future: Will render actual waveform visualization.
-    """
-    seek_requested = pyqtSignal(float)  # Ratio 0.0-1.0
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("WaveformSeekWidget")
-        self.setFixedHeight(120)
-        self.setMinimumWidth(400)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setMouseTracking(True)
-        
-        self._position_ratio = 0.0  # 0.0 to 1.0
-        self._hover_ratio = None  # For hover indicator
-        self._duration_ms = 0
-        
-    def set_position(self, ratio: float) -> None:
-        """Update playback position (0.0 to 1.0)"""
-        self._position_ratio = max(0.0, min(1.0, ratio))
-        self.update()
-        
-    def set_duration(self, duration_ms: int) -> None:
-        """Set total duration for tooltip calculations"""
-        self._duration_ms = duration_ms
-        
-    def mousePressEvent(self, event: QMouseEvent) -> None:
-        if event.button() == Qt.MouseButton.LeftButton and self.width() > 0:
-            ratio = event.position().x() / self.width()
-            ratio = max(0.0, min(1.0, ratio))
-            self.seek_requested.emit(ratio)
-        super().mousePressEvent(event)
-        
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:
-        if self.width() > 0:
-            self._hover_ratio = event.position().x() / self.width()
-            self._hover_ratio = max(0.0, min(1.0, self._hover_ratio))
-            self.update()
-        super().mouseMoveEvent(event)
-        
-    def leaveEvent(self, event) -> None:
-        self._hover_ratio = None
-        self.update()
-        super().leaveEvent(event)
-        
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        w, h = self.width(), self.height()
-        
-        # Background gradient (placeholder for waveform)
-        gradient = QLinearGradient(0, 0, 0, h)
-        gradient.setColorAt(0, QColor(30, 35, 45))
-        gradient.setColorAt(0.5, QColor(40, 50, 65))
-        gradient.setColorAt(1, QColor(30, 35, 45))
-        painter.fillRect(0, 0, w, h, gradient)
-        
-        # Played region (tinted)
-        if self._position_ratio > 0:
-            played_w = int(w * self._position_ratio)
-            played_gradient = QLinearGradient(0, 0, 0, h)
-            played_gradient.setColorAt(0, QColor(50, 80, 120, 100))
-            played_gradient.setColorAt(0.5, QColor(70, 110, 160, 120))
-            played_gradient.setColorAt(1, QColor(50, 80, 120, 100))
-            painter.fillRect(0, 0, played_w, h, played_gradient)
-        
-        # Position indicator line (bright)
-        if self._position_ratio > 0:
-            pos_x = int(w * self._position_ratio)
-            pen = QPen(QColor(255, 180, 50))  # Amber
-            pen.setWidth(2)
-            painter.setPen(pen)
-            painter.drawLine(pos_x, 0, pos_x, h)
-        
-        # Hover indicator (subtle)
-        if self._hover_ratio is not None:
-            hover_x = int(w * self._hover_ratio)
-            pen = QPen(QColor(255, 255, 255, 80))
-            pen.setWidth(1)
-            painter.setPen(pen)
-            painter.drawLine(hover_x, 0, hover_x, h)
-            
-            # Time tooltip at hover position
-            if self._duration_ms > 0:
-                hover_ms = int(self._hover_ratio * self._duration_ms)
-                hover_secs = hover_ms // 1000
-                mins, secs = divmod(hover_secs, 60)
-                time_text = f"{mins:02d}:{secs:02d}"
-                
-                painter.setPen(QColor(255, 255, 255, 200))
-                painter.drawText(hover_x + 5, 20, time_text)
 
 
 class ScrubberDialog(QDialog):
@@ -119,18 +23,20 @@ class ScrubberDialog(QDialog):
     
     genre_changed = pyqtSignal(list)  # Emits list of genre names when changed
     
-    def __init__(self, song, settings_manager, library_service=None, parent=None):
+    def __init__(self, song, settings_manager, library_service=None, waveform_service=None, parent=None):
         """
         Args:
             song: Song object with path, artist, title, source_id
             settings_manager: SettingsManager for PlaybackService
             library_service: LibraryService for genre tag management
+            waveform_service: WaveformService for peak extraction
             parent: Parent widget
         """
         super().__init__(parent)
         self.song = song
         self.settings_manager = settings_manager
         self.library_service = library_service
+        self.waveform_service = waveform_service
         
         self.setWindowTitle("Song Scrubber")
         self.setModal(True)
@@ -156,38 +62,18 @@ class ScrubberDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
         
-        # === Header: Artist - Title ===
+        # === Waveform Area (with HUD Readout) ===
+        self.waveform = WaveformMonitor()
+        layout.addWidget(self.waveform)
+
+        # Initialize with current data
         artist = self.song.performers[0] if self.song.performers else 'Unknown artist'
         title = getattr(self.song, 'title', '') or 'Unknown Title'
-        
-        self.header_label = QLabel(f"{artist} — {title}")
-        self.header_label.setObjectName("ScrubberHeader")
-        self.header_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.header_label.setWordWrap(True)
-        layout.addWidget(self.header_label)
+        self.waveform.set_song_info(artist, title)
 
-        # Update header from DB if available
-        self._update_header_from_db()
+        # Update HUD from DB if available
+        self._update_hud_from_db()
         
-        # === Waveform/Seek Area ===
-        self.waveform = WaveformSeekWidget()
-        layout.addWidget(self.waveform)
-        
-        # === Time Display Row ===
-        time_row = QHBoxLayout()
-        time_row.setSpacing(10)
-        
-        self.time_current = QLabel("00:00")
-        self.time_current.setObjectName("ScrubberTimeLabel")
-        
-        self.time_remaining = QLabel("-00:00")
-        self.time_remaining.setObjectName("ScrubberTimeLabel")
-        self.time_remaining.setAlignment(Qt.AlignmentFlag.AlignRight)
-        
-        time_row.addWidget(self.time_current)
-        time_row.addStretch()
-        time_row.addWidget(self.time_remaining)
-        layout.addLayout(time_row)
         
         # === Transport Controls ===
         transport_row = QHBoxLayout()
@@ -242,6 +128,19 @@ class ScrubberDialog(QDialog):
         self.genre_tray.add_requested.connect(self._on_add_genre)
         self.genre_tray.chip_remove_requested.connect(self._on_remove_genre)
         
+        if self.waveform_service:
+            # We must use a unique identifier or a named slot to allow safe disconnection
+            self.waveform_service.finished.connect(self._on_waveform_finished)
+            self.waveform_service.error.connect(self._on_waveform_error)
+
+    def _on_waveform_finished(self, peaks: List[float]):
+        print(f"ScrubberDialog: Got {len(peaks)} peaks, sum={sum(peaks):.2f}, max={max(peaks):.2f}")
+        self.waveform.set_peaks(peaks)
+        self.waveform.update() # Force repaint
+
+    def _on_waveform_error(self, msg: str):
+        print(f"ScrubberDialog: Waveform Error: {msg}")
+
     def _load_song(self) -> None:
         """Load and auto-play the song"""
         path = getattr(self.song, 'path', None)
@@ -249,6 +148,10 @@ class ScrubberDialog(QDialog):
             self._playback.load(path)
             self._playback.play()
             self.btn_play.setChecked(True)
+            
+            # --- REAL WAVEFORM DATA ---
+            if self.waveform_service:
+                self.waveform_service.load_waveform(path)
             
     def _load_genres(self) -> None:
         """Load existing genres into the chip tray"""
@@ -271,8 +174,8 @@ class ScrubberDialog(QDialog):
         except Exception as e:
             print(f"ScrubberDialog: Error loading genres: {e}")
 
-    def _update_header_from_db(self) -> None:
-        """Update header label with fresh data from database"""
+    def _update_hud_from_db(self) -> None:
+        """Update waveform HUD with fresh data from database"""
         if not self.library_service:
             return
 
@@ -285,9 +188,9 @@ class ScrubberDialog(QDialog):
             if fresh_song:
                 artist = fresh_song.performers[0] if fresh_song.performers else 'Unknown artist'
                 title = getattr(fresh_song, 'title', '') or 'Unknown Title'
-                self.header_label.setText(f"{artist} — {title}")
+                self.waveform.set_song_info(artist, title)
         except Exception as e:
-            print(f"ScrubberDialog: Error updating header from DB: {e}")
+            print(f"ScrubberDialog: Error updating HUD from DB: {e}")
 
     def _on_play_toggled(self, checked: bool) -> None:
         if checked:
@@ -305,7 +208,7 @@ class ScrubberDialog(QDialog):
             
     def _on_duration_changed(self, duration_ms: int) -> None:
         self.waveform.set_duration(duration_ms)
-        self._update_time_labels(self._playback.get_position(), duration_ms)
+        self.waveform.set_position(self._playback.get_position() / duration_ms if duration_ms > 0 else 0, self._playback.get_position())
         
     def _on_state_changed(self, state) -> None:
         from PyQt6.QtMultimedia import QMediaPlayer
@@ -324,19 +227,8 @@ class ScrubberDialog(QDialog):
         
         if duration > 0:
             ratio = position / duration
-            self.waveform.set_position(ratio)
-            self._update_time_labels(position, duration)
+            self.waveform.set_position(ratio, position)
             
-    def _update_time_labels(self, position_ms: int, duration_ms: int) -> None:
-        pos_secs = position_ms // 1000
-        dur_secs = duration_ms // 1000
-        remaining = dur_secs - pos_secs
-        
-        pos_m, pos_s = divmod(pos_secs, 60)
-        rem_m, rem_s = divmod(remaining, 60)
-        
-        self.time_current.setText(f"{pos_m:02d}:{pos_s:02d}")
-        self.time_remaining.setText(f"-{rem_m:02d}:{rem_s:02d}")
         
     def _on_add_genre(self) -> None:
         """Handle add genre button click"""
@@ -428,4 +320,11 @@ class ScrubberDialog(QDialog):
         self._position_timer.stop()
         self._playback.stop()
         self._playback.cleanup()
+        if self.waveform_service:
+            try:
+                self.waveform_service.finished.disconnect(self._on_waveform_finished)
+                self.waveform_service.error.disconnect(self._on_waveform_error)
+            except (TypeError, RuntimeError):
+                pass
+            self.waveform_service.stop()
         super().closeEvent(event)

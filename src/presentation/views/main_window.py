@@ -14,7 +14,7 @@ from ..widgets import (
     SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland, ToastOverlay
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
-from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
+from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService, WaveformService
 from ...resources import constants
 from PyQt6.QtWidgets import (
     QPushButton, QFrame
@@ -192,6 +192,9 @@ class MainWindow(QMainWindow):
         self.renaming_service = RenamingService(self.settings_manager)
         self.duplicate_scanner = DuplicateScannerService(self.library_service)
         self.conversion_service = ConversionService(self.settings_manager)
+        self.waveform_service = WaveformService(
+            settings_manager=self.settings_manager
+        )
 
         from ...business.services.import_service import ImportService
         self.import_service = ImportService(
@@ -308,7 +311,8 @@ class MainWindow(QMainWindow):
             self.renaming_service,
             self.duplicate_scanner,
             self.conversion_service,
-            self.import_service
+            self.import_service,
+            self.waveform_service
         )
         self.lc_splitter.addWidget(self.library_widget)
         
