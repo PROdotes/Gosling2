@@ -11,7 +11,7 @@ from PyQt6.QtGui import QAction
 
 from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
-    SidePanelWidget, CustomTitleBar, JingleCurtain, SystemIsland, ToastOverlay
+    SidePanelWidget, CustomTitleBar, JingleCurtain, ToastOverlay
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
@@ -269,15 +269,9 @@ class MainWindow(QMainWindow):
         
         self.title_bar = CustomTitleBar(self)
         self.title_bar.maximize_requested.connect(self._toggle_maximize)
+        self.title_bar.minimize_requested.connect(self.showMinimized)
+        self.title_bar.close_requested.connect(self.close)
         title_area_layout.addWidget(self.title_bar, 1)
-        
-        # Floating System controls (The Island)
-        self.system_island = SystemIsland(self)
-        self.system_island.minimize_requested.connect(self.showMinimized)
-        self.system_island.maximize_requested.connect(self._toggle_maximize)
-        self.system_island.close_requested.connect(self.close)
-        
-        title_area_layout.addWidget(self.system_island, 0, Qt.AlignmentFlag.AlignTop)
         
         main_layout.addWidget(title_area_container)
         
@@ -1065,8 +1059,8 @@ class MainWindow(QMainWindow):
     def changeEvent(self, event):
         """Handle window state changes (Maximize/Restore) from OS or Buttons."""
         if event.type() == QEvent.Type.WindowStateChange:
-            if hasattr(self, 'system_island'):
-                self.system_island.update_maximize_icon(self.isMaximized())
+            if hasattr(self, 'title_bar'):
+                self.title_bar.update_maximize_icon(self.isMaximized())
         super().changeEvent(event)
 
     def resizeEvent(self, event):

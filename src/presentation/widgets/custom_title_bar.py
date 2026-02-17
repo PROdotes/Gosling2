@@ -13,6 +13,8 @@ class CustomTitleBar(QWidget):
     search_text_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
     maximize_requested = pyqtSignal()
+    minimize_requested = pyqtSignal()
+    close_requested = pyqtSignal()
     import_requested = pyqtSignal()
     logs_requested = pyqtSignal()
     history_requested = pyqtSignal()
@@ -108,6 +110,16 @@ class CustomTitleBar(QWidget):
         self.btn_import.setContentsMargins(0, 3, 0, 4)
         self.btn_import.clicked.connect(self.import_requested.emit)
         
+        # 5. System Controls (Inlined)
+        self.btn_min = self._create_system_btn("－", "MinimizeButton")
+        self.btn_min.clicked.connect(self.minimize_requested.emit)
+        
+        self.btn_max = self._create_system_btn("▢", "MaximizeButton")
+        self.btn_max.clicked.connect(self.maximize_requested.emit)
+        
+        self.btn_close = self._create_system_btn("✕", "CloseButton")
+        self.btn_close.clicked.connect(self.close_requested.emit)
+        
         # Assemble Left-to-Right
         layout.addWidget(self.btn_logo_icon)
         layout.addSpacing(10)
@@ -116,7 +128,10 @@ class CustomTitleBar(QWidget):
         layout.addWidget(self.search_box)
         layout.addWidget(self.draggable_area, 1) # Force it to swallow the rest with stretch factor 1
         layout.addWidget(self.btn_import)
-        layout.addSpacing(40) # Safety buffer against SystemIsland (X button)
+        layout.addSpacing(50)
+        layout.addWidget(self.btn_min)
+        layout.addWidget(self.btn_max)
+        layout.addWidget(self.btn_close)
 
     # Draggable logic
     def mousePressEvent(self, event):
@@ -154,3 +169,19 @@ class CustomTitleBar(QWidget):
         # Calculate position to show the menu aligned with the button
         pos = self.btn_logo_icon.mapToGlobal(self.btn_logo_icon.rect().bottomLeft())
         self.system_menu.exec(pos)
+
+    def _create_system_btn(self, text, obj_name):
+        btn = GlowButton(text)
+        btn.setObjectName(obj_name)
+        btn.setProperty("class", "SystemButton")
+        btn.setGlowRadius(2)
+        return btn
+
+    def update_maximize_icon(self, is_maximized: bool):
+        """Update the maximize button icon based on window state."""
+        if is_maximized:
+            self.btn_max.setText("❐") # Restore (Overlapping Squares)
+            self.btn_max.setToolTip("Restore Down")
+        else:
+            self.btn_max.setText("▢") # Maximize (Single Square)
+            self.btn_max.setToolTip("Maximize")
