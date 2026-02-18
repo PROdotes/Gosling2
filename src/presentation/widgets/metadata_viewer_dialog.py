@@ -127,8 +127,17 @@ class MetadataViewerDialog(QDialog):
             self.mapped_fields.append((field.ui_header, attr, frames))
             used_id3_keys.update(frames)
 
-        # Ensure legacy/dual keys are tracked as used (if they have multiple frame codes)
-        used_id3_keys.update(["TYER", "TIPL", "TEXT"])
+        # -- TAG CATEGORIES (Dynamics) --
+        tag_cats = ID3Registry.get_tag_categories()
+        tag_mapped = []
+        for cat_name, info in tag_cats.items():
+            frame = info.get('id3_frame')
+            if frame:
+                tag_mapped.append((cat_name, frame))
+                used_id3_keys.add(frame)
+
+        # Ensure legacy/dual keys are tracked as used
+        used_id3_keys.update(["TYER", "TIPL", "TEXT", "TDRC"])
 
         self.table.setRowCount(0)
         
@@ -140,6 +149,22 @@ class MetadataViewerDialog(QDialog):
             db_val = getattr(self.db_song, attr, None) if self.db_song else None
             
             self._add_row(label, file_val, db_val)
+
+        # -- Section: Tags --
+        if tag_mapped:
+            self._add_section_header("Tags")
+            for cat_name, frame_code in tag_mapped:
+                # File value comes from the frame
+                file_val = self.raw_tags.get(frame_code)
+                
+                # DB value comes from the tags list with prefix
+                db_val = None
+                if self.db_song and self.db_song.tags:
+                    prefix = f"{cat_name}:"
+                    matching = [t.split(':', 1)[1] for t in self.db_song.tags if t.startswith(prefix)]
+                    db_val = matching if matching else None
+                
+                self._add_row(cat_name, file_val, db_val)
 
         # -- Section: Raw / Extended Metadata --
         self._add_section_header("Extended / Raw ID3 Tags")

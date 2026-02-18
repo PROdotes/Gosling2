@@ -1,15 +1,14 @@
 """Metadata extraction service"""
 import os
+import mutagen.id3
 from typing import Optional, List
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, ID3NoHeaderError
+from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TOLY, TCOM, TDRC, TYER, TLEN
 from ...data.models.song import Song
 from ...core.yellberus import FIELDS
 from ...core import logger
 from ...core.vfs import VFS
 from ...core.registries.id3_registry import ID3Registry
-import mutagen.id3
-from mutagen.id3 import ID3, ID3NoHeaderError, TXXX, TIPL, TEXT, COMM, APIC, TKEY, TOLY, TCOM, TDRC, TYER, TLEN
 
 
 class MetadataService:
@@ -310,13 +309,12 @@ class MetadataService:
         if not song.path:
             return False
         
+        # --- VFS Safety Check ---
         is_virtual = VFS.is_virtual(song.path)
-        
         if is_virtual and not write_vfs_tags:
             return True
             
         # --- VALIDATION (Fail-Safe) ---
-        # Centralized Yellberus Validation: Improves data before writing to ID3.
         from ...core import yellberus
         for field in yellberus.FIELDS:
              if not field.portable: continue
@@ -324,27 +322,19 @@ class MetadataService:
              val = getattr(song, attr, None)
              if val is None: continue
              
-             # 1. Clean Lists (Remove None/'')
              if field.field_type == yellberus.FieldType.LIST and isinstance(val, list):
                  val = [str(v).strip() for v in val if v and str(v).strip()]
                  setattr(song, attr, val)
                  
-             # 2. Truncate Fields (Fail-Safe Overflow)
              if field.max_length and isinstance(val, str) and len(val) > field.max_length:
                  val = val[:field.max_length]
                  setattr(song, attr, val)
 
-             # 3. Final Policy Check
              if not field.is_valid(val):
-                 from src.core import logger
                  logger.dev_warning(f"MetadataService: Dropping invalid value '{val}' for field '{field.name}'")
                  setattr(song, attr, None)
 
-
-
-
         try:
-            # Use Cached ID3 Mapping from JSON (Spec T-38)
             id3_map = cls._get_id3_map()
             LIST_SEP = " / " # Radio-safe separator (No nulls)
             
@@ -353,104 +343,80 @@ class MetadataService:
                 if isinstance(info, dict) and 'field' in info:
                     field_to_frame[info['field']] = frame
             
-            # Open File (Physical or Virtual handling)
             temp_path = None
             target_path = song.path
             
             if VFS.is_virtual(song.path):
-                # VFS Write Strategy: Extract -> Edit -> Inject
                 import tempfile
                 ext = os.path.splitext(song.path)[1]
-                if VFS.SEPARATOR in ext: ext = "." + ext.split(".")[-1] # Safety
+                if VFS.SEPARATOR in ext: ext = "." + ext.split(".")[-1]
                 
                 fd, temp_path = tempfile.mkstemp(suffix=ext)
                 os.close(fd)
                 
-                # Write current VFS content to temp
                 with open(temp_path, 'wb') as f:
                     f.write(VFS.read_bytes(song.path))
                 
                 target_path = temp_path
             
-            # Load Mutagen on physical file (real or temp)
             audio = MP3(target_path, ID3=ID3)
             if audio.tags is None: audio.add_tags()
 
             # --- DYNAMIC WRITE LOOP ---
-            # Fields to exclude from loop because they have special complex handling
             COMPLEX_FIELDS = {
                 'recording_year', 'is_done', 'producers', 'composers', 'lyricists'
             }
 
             for field in FIELDS:
-                if not field.portable:
+                if not field.portable or field.name in COMPLEX_FIELDS:
                     continue
                 
-                if field.name in COMPLEX_FIELDS:
-                    continue
-                
-                # Get Value
                 val = getattr(song, field.name, None)
-                
-                # SPARSE UPDATE: If None, preserve existing tag (do not delete)
-                if val is None:
-                    continue
+                if val is None: continue
 
-                # Determine Frame ID
-                frame_id = field.id3_tag
-                if not frame_id:
-                     frame_id = field_to_frame.get(field.name)
+                frame_id = field.id3_tag or field_to_frame.get(field.name)
+                if not frame_id: continue
                 
-                if not frame_id:
-                     continue
+                try: audio.tags.delall(frame_id)
+                except KeyError: pass
                 
-                # Delete existing tags for this frame
-                try:
-                    audio.tags.delall(frame_id)
-                except KeyError:
-                    pass
+                if not val: continue
                 
-                # If empty (empty string/list), we leave it deleted
-                if not val:
-                    continue
-                
-                # Get Helper Class (Reflection)
                 FrameClass = getattr(mutagen.id3, frame_id, None)
                 
-                # Handle TXXX generic
                 if not FrameClass and frame_id.startswith("TXXX:"):
                     desc = frame_id.split(":", 1)[1]
-                    # Join lists for TXXX too
                     txt_val = LIST_SEP.join(val) if isinstance(val, list) else str(val)
                     audio.tags.add(TXXX(encoding=1, desc=desc, text=[txt_val]))
                     continue
                 
-                if not FrameClass:
-                    logger.warning(f"Unknown Mutagen class for {frame_id}")
-                    continue
+                if not FrameClass: continue
                 
-                # Write: Use native lists for ID3v2.4 (Mutagen handles null separation)
                 if isinstance(val, list):
                     audio.tags.add(FrameClass(encoding=1, text=val))
                 else:
                     audio.tags.add(FrameClass(encoding=1, text=[str(val)]))
 
             # --- DYNAMIC TAG CATEGORY WRITE ---
-            # Look for frames mapped to tag categories in the JSON map
-            for frame_id, frame_def in id3_map.items():
-                if not isinstance(frame_def, dict): continue
+            for entry_id, entry_def in id3_map.items():
+                if not isinstance(entry_def, dict): continue
                 
-                cat = frame_def.get('tag_category')
+                cat = entry_def.get('tag_category')
+                frame_id = entry_id
+                
+                # Identity-aware Category resolution
+                if not cat and 'icon' in entry_def and 'field' not in entry_def:
+                    cat = entry_id
+                    frame_id = entry_def.get('id3_frame') or entry_id
+                
                 if not cat: continue
                 
-                # Resolve from unified tags
                 prefix = f"{cat}:"
                 val = [t.split(':', 1)[1] for t in (song.tags or []) if t.startswith(prefix)]
-                
-                if not val:
-                    continue
+                if not val: continue
                     
-                # Direct write to frame
+                if not frame_id or len(frame_id) < 3: continue
+                
                 FrameClass = getattr(mutagen.id3, frame_id, None)
                 if not FrameClass and frame_id.startswith("TXXX:"):
                     desc = frame_id.split(":", 1)[1]
@@ -459,10 +425,13 @@ class MetadataService:
                 elif FrameClass:
                     audio.tags.delall(frame_id)
                     audio.tags.add(FrameClass(encoding=1, text=val))
+                elif not FrameClass and len(frame_id) == 4 and frame_id.isupper():
+                    audio.tags.delall(frame_id)
+                    audio.tags.add(TXXX(encoding=1, desc=frame_id, text=val))
 
-            # --- COMPLEX FIELDS (Dual Mode / Legacy) ---
+            # --- COMPLEX FIELDS ---
 
-            # 1. Year (Dual: TDRC + TYER)
+            # 1. Year (TDRC + TYER)
             if song.recording_year is not None:
                 audio.tags.delall('TDRC')
                 audio.tags.delall('TYER')
@@ -470,94 +439,58 @@ class MetadataService:
                 audio.tags.add(TDRC(encoding=1, text=[s_year]))
                 audio.tags.add(TYER(encoding=1, text=[s_year]))
 
-            # 2. Producers (Dual: TIPL + TXXX:PRODUCER)
+            # 2. Producers (TIPL + TXXX:PRODUCER)
             if song.producers:
                 audio.tags.delall('TIPL')
                 audio.tags.delall('TXXX:PRODUCER')
-                
-                # TIPL (Mutagen handles this specifically via 'people' list)
-                people_list = [(role, name) for name in song.producers for role in ['producer']]
+                people_list = [('producer', name) for name in song.producers]
                 audio.tags.add(TIPL(encoding=1, people=people_list))
-                
-                # TXXX Fallback (Joined string for Radio software)
                 audio.tags.add(TXXX(encoding=1, desc='PRODUCER', text=[LIST_SEP.join(song.producers)]))
             else:
                  audio.tags.delall('TIPL')
                  audio.tags.delall('TXXX:PRODUCER')
 
-            # 3. Status Tag (Truth) + Legacy Compatibility
-            # NOTE: Status is now managed by TagRepository. The caller must pass
-            # is_unprocessed if they want to bake the status into ID3.
-            # If song has 'is_unprocessed' attr (set by caller), use it.
+            # 3. Status Tag
             is_done = song.is_done
             audio.tags.delall('TXXX:STATUS')
-            audio.tags.delall('TKEY')
-            audio.tags.delall('TXXX:GOSLING_DONE') # Cleanup legacy
+            audio.tags.delall('TXXX:GOSLING_DONE')
+            
+            status_text = 'Ready' if is_done else 'Pending'
+            audio.tags.add(TXXX(encoding=1, desc='STATUS', text=[status_text]))
 
-            if not is_done:
-                # MARK AS PENDING (0)
-                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Pending']))
-            else:
-                # MARK AS READY (1)
-                audio.tags.add(TXXX(encoding=1, desc='STATUS', text=['Ready']))
-                audio.tags.add(TKEY(encoding=1, text=['true'])) # Legacy compatibility for external players
-            # If is_unprocessed is None, we don't touch the status tags (sparse update)
-
-            # 4. Author Union (Legacy: TCOM = Composers + Lyricists)
+            # 4. Author Union (TCOM = Composers + Lyricists)
             audio.tags.delall('TCOM')
             audio.tags.delall('TEXT')
             audio.tags.delall('TOLY')
             
-            # Write Modern Lyricists (Joined for Radio)
             if song.lyricists:
                 lyr_str = LIST_SEP.join(song.lyricists)
                 audio.tags.add(TEXT(encoding=1, text=[lyr_str]))
                 audio.tags.add(TOLY(encoding=1, text=[lyr_str]))
 
-            # Write TCOM Union (Jazler Hack - Joined for Radio)
-            union_list = []
-            seen = set()
-            for c in (song.composers or []):
-                if c not in seen:
-                    union_list.append(c)
-                    seen.add(c)
-            for l in (song.lyricists or []):
-                if l not in seen:
-                    union_list.append(l)
-                    seen.add(l)
-            
+            union_list = list(dict.fromkeys((song.composers or []) + (song.lyricists or [])))
             if union_list:
                 audio.tags.add(TCOM(encoding=1, text=[LIST_SEP.join(union_list)]))
 
-            # 5. Duration (TLEN) - Backup for VBR glitches
+            # 5. Duration (TLEN)
             if song.duration and song.duration > 0:
                 audio.tags.delall('TLEN')
                 tlen_ms = str(int(song.duration * 1000))
                 audio.tags.add(TLEN(encoding=1, text=[tlen_ms]))
 
-            # Save
-            # Save
-            # User Directive: Output MUST be ID3v2.4
             audio.save(v1=1, v2_version=4)
             
-            # VFS Commit Strategy
             if temp_path and VFS.is_virtual(song.path):
-                # Read modified bytes
                 with open(temp_path, 'rb') as f:
                     new_data = f.read()
-                
-                # Inject back into ZIP
                 if not VFS.update_file_in_zip(song.path, new_data):
                      raise IOError(f"Failed to update VFS archive: {song.path}")
-                     
-                # Cleanup handled in finally/teardown usually, but here explicit:
                 try: os.remove(temp_path)
                 except: pass
                 
             return True
 
         except Exception as e:
-            from src.core import logger
             logger.error(f"Error writing tags to {song.path}: {e}")
             if temp_path and os.path.exists(temp_path):
                 try: os.remove(temp_path)
