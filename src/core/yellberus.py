@@ -95,6 +95,8 @@ class FieldDef:
             return True
         if isinstance(value, str) and not value.strip():
             return True
+        if isinstance(value, (list, tuple)) and not value:
+            return True
             
         # String-based Checks (Length / Regex)
         if self.field_type in (FieldType.TEXT, FieldType.LIST):

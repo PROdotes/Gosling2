@@ -138,6 +138,17 @@ class GlowWidget(QWidget):
                         self._hide_glow()
         return super().eventFilter(obj, event)
 
+    def setObjectName(self, name):
+        """
+        Proper Decorator Pattern: 
+        1. The wrapper (GlowWidget) gets 'name_Glow' ID for themeing the halo.
+        2. The child (wrapped widget) gets 'name' ID for core styling.
+        This prevents QSS properties (like icons/sizes) from crushing the wrapper.
+        """
+        super().setObjectName(name + "_Glow")
+        if hasattr(self, "child") and self.child:
+            self.child.setObjectName(name)
+
     def _show_glow(self):
         self.glow_frame.show()
         self.outline_frame.show()

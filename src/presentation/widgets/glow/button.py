@@ -11,11 +11,6 @@ class GlowButton(GlowWidget):
     clicked = pyqtSignal()
     toggled = pyqtSignal(bool)
     
-    @pyqtProperty(QIcon)
-    def icon(self): return self.btn.icon()
-    @icon.setter
-    def icon(self, i): self.setIcon(i)
-    
     def __init__(self, text="", parent=None):
         self.btn = QPushButton()
         self.btn.setText("") # Ensure native text is never shown
@@ -145,6 +140,7 @@ class GlowButton(GlowWidget):
 
     def _show_glow(self):
         super()._show_glow()
+        # Keep internal labels on top of the button's own visuals
         self.lbl_glow.raise_()
         self.lbl_main.raise_()
         self._update_text_styles()
@@ -193,10 +189,6 @@ class GlowButton(GlowWidget):
     def setIconSize(self, s): self.btn.setIconSize(s)
     def setToolTip(self, t): self.btn.setToolTip(t)
     def setDefault(self, d): self.btn.setDefault(d)
-    def setObjectName(self, n):
-
-        super().setObjectName(n)
-        self.btn.setObjectName(n)
         
     def setProperty(self, n, v):
         super().setProperty(n, v)

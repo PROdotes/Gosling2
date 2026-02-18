@@ -11,7 +11,7 @@ from PyQt6.QtGui import QAction
 
 from ..widgets import (
     PlaylistWidget, PlaybackControlWidget, LibraryWidget, 
-    SidePanelWidget, CustomTitleBar, JingleCurtain, ToastOverlay
+    SidePanelWidget, RightPanelWidget, CustomTitleBar, JingleCurtain, ToastOverlay
 )
 from ..dialogs import SettingsDialog, LogViewerDialog
 from ...business.services import LibraryService, MetadataService, PlaybackService, SettingsManager, RenamingService, DuplicateScannerService, ConversionService, SpotifyParsingService
@@ -170,7 +170,7 @@ class MainWindow(QMainWindow):
         self.tag_service = TagService(self.tag_repository)
         
         from ...business.services.search_service import SearchService
-        self.search_service = SearchService()
+        self.search_service = SearchService(self.settings_manager)
         
         # Initialize Audit Repository and Service
         from ...data.repositories.audit_repository import AuditRepository
@@ -323,7 +323,6 @@ class MainWindow(QMainWindow):
         self.main_splitter.addWidget(lc_container)
 
         # --- RIGHT PANEL (Command Deck) ---
-        from ..widgets.right_panel_widget import RightPanelWidget
         self.right_panel = RightPanelWidget(
             self.library_service,
             self.metadata_service,

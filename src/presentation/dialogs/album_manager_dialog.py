@@ -101,20 +101,27 @@ class AlbumManagerDialog(QDialog):
 
     def keyPressEvent(self, event):
         modifiers = event.modifiers()
-        # T-Shortcut: Support both Ctrl++ and Ctrl+= (The "DJ Speed" shortcut)
         is_ctrl = bool(modifiers & Qt.KeyboardModifier.ControlModifier)
+        key = event.key()
         
-        if is_ctrl and event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+        # 1. Create New (Ctrl++ or Ctrl+=)
+        if is_ctrl and key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
             self._toggle_create_mode()
             event.accept()
-        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            return
+
+        # 2. Save/Assign (Enter or Ctrl+S)
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter) or (is_ctrl and key == Qt.Key.Key_S):
             if self.btn_save_inspector.isEnabled():
                 self._save_inspector(close_on_success=True)
                 event.accept()
             else:
-                super().keyPressEvent(event)
-        else:
-            super().keyPressEvent(event)
+                # If save is disabled, prevent Enter from closing the dialog (standard QDialog behavior)
+                # This keeps the user in the workstation if they haven't finished the record.
+                event.ignore()
+            return
+
+        super().keyPressEvent(event)
         
     def _init_ui(self):
         # ROOT LAYOUT: HBox [MainContainer] [SidecarContainer]

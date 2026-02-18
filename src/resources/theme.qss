@@ -661,7 +661,7 @@ QPushButton#TagPickerPill {
 }
 
 /* Inline Add/Search Buttons (Wrapper Size) */
-GlowButton#AddInlineButton, GlowButton#SearchInlineButton {
+GlowButton#AddInlineButton_Glow, GlowButton#SearchInlineButton_Glow {
     min-width: 36px;
     max-width: 36px;
     min-height: 34px;

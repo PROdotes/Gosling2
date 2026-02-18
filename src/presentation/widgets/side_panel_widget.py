@@ -162,7 +162,7 @@ class SidePanelWidget(QFrame):
         )
         self.btn_search_action.setToolTip("Search Metadata")
         self.btn_search_action.setGlowMargins(5, 5, 0, 5) # No right margin for split effect
-        self.btn_search_action.clicked.connect(self._on_web_search)
+        self.btn_search_action.clicked.connect(self._on_web_search_footer)
         self.btn_search_action.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.btn_search_action.customContextMenuRequested.connect(self._show_search_menu)
 
@@ -174,17 +174,16 @@ class SidePanelWidget(QFrame):
             "border-top-left-radius: 2px; border-bottom-left-radius: 2px; border-top-right-radius: 8px; border-bottom-right-radius: 8px;"
         )
         self.btn_search_menu.setToolTip("Select Search Provider")
-        self.btn_search_menu.setGlowMargins(0, 5, 5, 5) # No left margin for split effect
         self.btn_search_menu.clicked.connect(self._show_search_menu_btn)
 
         search_layout.addWidget(self.btn_search_action)
         search_layout.addWidget(self.btn_search_menu)
 
-        # Load saved search provider
-        self._search_provider = "Google"
+        # T-Feature: Search Provider Tracking (Sync with library_service)
+        # No local copy needed anymore, handled by service
         if hasattr(self.library_service, 'settings_manager'):
-            self._search_provider = self.library_service.settings_manager.get_search_provider()
-            self.btn_search_action.setToolTip(f"Search Metadata via {self._search_provider}")
+            current_provider = self.library_service.settings_manager.get_search_provider()
+            self.btn_search_action.setToolTip(f"Search Metadata via {current_provider}")
 
         # Discard button (compact)
         self.btn_discard = GlowButton("Discard")
@@ -398,9 +397,8 @@ class SidePanelWidget(QFrame):
                         if field.ui_search:
                             btn_search = GlowButton("")
                             btn_search.setObjectName("SearchInlineButton")
-                            self._configure_micro_button(btn_search)
                             # Left Click: Instant Search
-                            btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                            btn_search.clicked.connect(lambda f=field: self.do_web_search(self.current_songs[0], field_def=f))
                             # Right Click: Provider Menu
                             btn_search.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
                             btn_search.customContextMenuRequested.connect(lambda pos, f=field, b=btn_search: self._show_search_menu_internal(b.mapToGlobal(pos), f))
@@ -498,7 +496,7 @@ class SidePanelWidget(QFrame):
                         btn_search = GlowButton("")
                         btn_search.setObjectName("SearchInlineButton")
                         self._configure_micro_button(btn_search)
-                        btn_search.clicked.connect(lambda f=field: self._on_web_search(f))
+                        btn_search.clicked.connect(lambda f=field: self.do_web_search(self.current_songs[0], field_def=f))
                         header_layout.addWidget(btn_search)
 
                     header_layout.addWidget(label, 1)
@@ -2127,7 +2125,7 @@ class SidePanelWidget(QFrame):
     def trigger_search(self):
         """Public slot to trigger the search menu (e.g. from shortcuts)."""
         # T-96 Shortcut calls the ACTION, not the MENU
-        self._on_web_search()
+        self._on_web_search_footer()
 
     def _show_search_menu_btn(self):
         """Handle Left-Click on the Menu Button."""
@@ -2144,27 +2142,25 @@ class SidePanelWidget(QFrame):
     def _show_search_menu_internal(self, global_pos, field_def=None):
         """Shared Menu Builder. field_def: if provided, adds 'Search [Field] on...' action."""
         menu = QMenu(self)
-        providers = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs", "ZAMP"]
         
-        # Get current provider dynamically
-        # Get current provider dynamically
-        s_mgr = self.settings_manager
+        # Get central service
+        search_svc = self.library_service.search_service
         current = "Google"
-        if s_mgr:
-             current = s_mgr.get_search_provider()
+        if self.settings_manager:
+             current = self.settings_manager.get_search_provider()
         
-        for p in providers:
+        for p in search_svc.PROVIDERS:
             action = QAction(p, self)
             action.setCheckable(True)
             action.setChecked(p == current)
             
             def set_provider(checked, name=p):
-                if s_mgr:
-                    s_mgr.set_search_provider(name)
-                    s_mgr.sync()
-                self._search_provider = name
-                self.btn_search_action.setToolTip(f"Search Metadata via {name}")
-                # Update any open menus if needed? No, just close.
+                if self.settings_manager:
+                    self.settings_manager.set_search_provider(name)
+                    self.settings_manager.sync()
+                # Update tooltip if we have the reference, otherwise just close
+                if hasattr(self, 'btn_search_action'):
+                    self.btn_search_action.setToolTip(f"Search Metadata via {name}")
                 
             action.triggered.connect(set_provider)
             menu.addAction(action)
@@ -2172,41 +2168,28 @@ class SidePanelWidget(QFrame):
         if field_def:
             menu.addSeparator()
             act_search = QAction(f"Search {field_def.ui_header} on {current}", self)
-            act_search.triggered.connect(lambda: self._on_web_search(field_def))
+            def triggered_fn(f=field_def):
+                if self.current_songs:
+                    self.do_web_search(self.current_songs[0], field_def=f)
+            act_search.triggered.connect(triggered_fn)
             menu.addAction(act_search)
             
         menu.exec(global_pos)
 
-    def _on_web_searchh(self, field_def=None):
-        """Launch web search using SearchService."""
-        if not self.current_songs: return
-        song = self.current_songs[0]
-        
-        # 1. Resolve Search Service
-        search_svc = getattr(self.library_service, 'search_service', None)
-        if not search_svc: return
+    def _on_web_search_footer(self):
+        """Safe entry point for footer search - handles 'no song selected' cases."""
+        if not self.current_songs:
+             return
+        self.do_web_search(self.current_songs[0])
 
-        # 2. Determine Provider
-        s_mgr = getattr(self, 'settings_manager', None) or getattr(self.library_service, 'settings_manager', None)
-        provider = self._search_provider
-        if s_mgr:
-             provider = s_mgr.get_search_provider() or provider
-        
-        # Dump all relevant fields to draft dict
-        draft_values = {
-            'title': self._field_widgets['title'].text(),
-            'performers': ", ".join(self.current_songs[0].performers),
-        }
+    def do_web_search(self, song, provider=None, field_def=None):
+        """
+        Unified web search entry point.
+        Pure passthrough to SearchService.
+        """
+        search_svc = self.library_service.search_service
+        url = search_svc.prepare_search(song, provider, field_def=field_def)
 
-        # 4. Delegate to Service (URL Generation + Logic)
-        url = search_svc.prepare_search(
-            song=song,
-            draft_values=draft_values,
-            preferred_provider=provider,
-            field_def=field_def
-        )
-
-        # 5. Launch
         if url:
             QDesktopServices.openUrl(QUrl(url))
 
@@ -2217,7 +2200,6 @@ class SidePanelWidget(QFrame):
         Open the Filename -> Metadata parser for CURRENTLY STAGED songs.
         Applies results to STAGING, not DB.
         """
-        if not self.current_songs: return
         
         # We pass the original song objects, but we want the parser to 
         # potentially see staged Path changes? 
@@ -2485,8 +2467,6 @@ class SidePanelWidget(QFrame):
 
     def _open_scrubber(self):
         # Open the ScrubberDialog for the current song.
-        if not self.current_songs:
-            return
             
         song = self.current_songs[0]
         from ..dialogs.scrubber_dialog import ScrubberDialog
@@ -2503,19 +2483,20 @@ class SidePanelWidget(QFrame):
 
     def _open_spotify_import(self):
         """Open the Spotify credit import dialog."""
-        _web_search(self.current_songs[0], "Spotify")
+        song = self.current_songs[0]
+        self.do_web_search(song, "Spotify")
         
         # 2. Open Dialog
-        dialog = SpotifyImportDialog(self.services, current_title=current_title, parent=self)
+        from ..dialogs.spotify_import_dialog import SpotifyImportDialog
+        dialog = SpotifyImportDialog(self.services, current_title=song.name, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             artists, publishers = dialog.get_result()
             if artists or publishers:
                 self._apply_spotify_import(artists, publishers)
 
+
     def _apply_spotify_import(self, artists, publishers):
         """Link imported artists, roles, and publishers to current songs."""
-        if not self.current_songs:
-            return
 
         # 1. Process Publishers (Get or Create Entities)
         if publishers:

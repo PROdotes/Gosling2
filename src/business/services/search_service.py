@@ -12,6 +12,8 @@ class SearchService:
     
     PROVIDERS = ["Google", "Spotify", "YouTube", "MusicBrainz", "Discogs", "ZAMP"]
 
+    def __init__(self, settings_manager=None):
+        self.settings_manager = settings_manager
 
     def get_search_url(self, provider: str, title: str = "", artist: str = "", field_name: str = "", field_header: str = "") -> str:
         """
@@ -63,13 +65,25 @@ class SearchService:
         
         return ""
 
-    def prepare_search(self, song, preferred_provider: str, field_def=None) -> str:
+    def prepare_search(self, song, preferred_provider: str = None, field_def=None) -> str:
         """
         High-level entry point. 
         Gathers raw data and delegates URL construction.
         """
+        if not song:
+            return ""
+
         # 1. Resolve Effective Provider
         effective_provider = preferred_provider
+        
+        # If no provider specified by UI, fall back to global setting
+        if not effective_provider and self.settings_manager:
+            effective_provider = self.settings_manager.get_search_provider()
+            
+        # Final fallback
+        if not effective_provider:
+            effective_provider = "Google"
+
         field_name = ""
         field_header = ""
         
@@ -82,12 +96,15 @@ class SearchService:
             if field_name not in ['title', 'performers', 'artist']:
                 effective_provider = "Google"
 
-        # 2. Resolve Context (Draft Priority > Model Fallback)
-        def resolve(field):
-            return draft_values.get(field) or getattr(song, field, "")
-            
-        title = str(resolve('title'))
-        artist = str(resolve('performers'))
+        # 2. Resolve Context from Song object
+        title = song.name if hasattr(song, 'name') else ""
+        
+        # Get performers as a comma-separated string
+        performers = getattr(song, 'performers', [])
+        if isinstance(performers, list):
+            artist = ", ".join(performers)
+        else:
+            artist = str(performers)
 
         # 3. Delegate to centralized URL builder
         return self.get_search_url(

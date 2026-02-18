@@ -2,7 +2,6 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLab
 from PyQt6.QtGui import QAction
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtMultimedia import QMediaPlayer
-from .seek_slider import SeekSlider
 from .waveform_monitor import WaveformMonitor
 from .glow_factory import GlowButton
 from ...business.services import WaveformService

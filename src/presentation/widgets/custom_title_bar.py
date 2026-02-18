@@ -8,7 +8,7 @@ from .glow_factory import GlowLineEdit, GlowButton
 class CustomTitleBar(QWidget):
     """
     Workstation Title Bar Branding & Search Hub.
-    Does NOT contain system controls (see SystemIsland).
+    Contains integrated system controls (Min/Max/Close).
     """
     search_text_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
@@ -174,7 +174,7 @@ class CustomTitleBar(QWidget):
         btn = GlowButton(text)
         btn.setObjectName(obj_name)
         btn.setProperty("class", "SystemButton")
-        btn.setGlowRadius(2)
+        btn.setGlowRadius(8) # Matches QPushButton.SystemButton border-radius
         return btn
 
     def update_maximize_icon(self, is_maximized: bool):
