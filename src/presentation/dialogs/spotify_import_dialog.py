@@ -13,6 +13,7 @@ from PyQt6.QtGui import QShortcut, QKeySequence
 from src.presentation.widgets.glow_factory import GlowPlainTextEdit, GlowButton
 from src.presentation.widgets.spotify_artist_item_widget import SpotifyArtistItemWidget
 from src.utils.spotify_credits_parser import parse_spotify_credits
+import src.resources.constants as constants
 
 class SpotifyImportDialog(QDialog):
     """
@@ -21,19 +22,21 @@ class SpotifyImportDialog(QDialog):
     Right: Preview list with editable rows
     """
     
-    def __init__(self, service_provider, parent=None):
+    def __init__(self, service_provider, current_title: str = None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Import Spotify Credits")
+        self.setWindowTitle("Import Spotify Credits for: " + current_title)
         self.resize(1000, 600)
         
         self.services = service_provider
+        self.current_title = current_title
         self._parsed_artists: List[Dict] = []
+        self._parsed_publishers: List[str] = []
         self._row_widgets: List[SpotifyArtistItemWidget] = []
         
         # Debounce timer for parsing
         self._parse_timer = QTimer(self)
         self._parse_timer.setSingleShot(True)
-        self._parse_timer.setInterval(500)
+        self._parse_timer.setInterval(200)
         self._parse_timer.timeout.connect(self._do_parse)
         
         self._init_ui()
@@ -66,7 +69,9 @@ class SpotifyImportDialog(QDialog):
         input_layout.addWidget(input_label)
         
         self.txt_input = GlowPlainTextEdit()
-        self.txt_input.setPlaceholderText("Paste credits block here...")
+        self.txt_input.setPlaceholderText("Paste credits block (e.g. from Spotify)...")
+        if self.current_title:
+            self.txt_input.setToolTip(f"Copying credits for: {self.current_title}")
         input_layout.addWidget(self.txt_input)
         
         splitter.addWidget(input_container)
@@ -122,17 +127,56 @@ class SpotifyImportDialog(QDialog):
         self._parse_timer.start()
 
     def _do_parse(self):
-        """Perform parsing and update preview."""
+        """Perform parsing and update preview from flat tuple stream."""
         text = self.txt_input.toPlainText().strip()
         if not text:
             self._clear_preview()
             return
             
-        # 1. Parse using utility
-        parsed = parse_spotify_credits(text)
+        # 1. Get flat stream of tuples [(value, label), ...]
+        stream = parse_spotify_credits(text)
         
-        # 2. Update rows
-        self._update_preview(parsed)
+        # 2. Process Stream
+        detected_title = ""
+        publishers = []
+        artist_map = {} # {name: [roles]}
+        
+        for val, label in stream:
+            if label == "Title":
+                detected_title = val
+            elif label == "Publisher":
+                publishers.append(val)
+            elif label == "Composer" or label == "Lyricist" or label == "Arranger" or label == "Producer":
+                if val not in artist_map:
+                    artist_map[val] = []
+                if label not in artist_map[val]:
+                    artist_map[val].append(label)
+
+        # 3. Validation: Reactive Title Check (Moved from loop)
+        if detected_title:
+            colour = constants.COLOR_AMBER
+            if detected_title != self.current_title:
+                colour = constants.COLOR_RED
+            self.txt_input.setGlowColor(colour)
+
+        # 4. Save results for fetch
+        self._parsed_publishers = publishers
+
+        # 5. Prepare Preview Data
+        preview_data = []
+        for name, roles in artist_map.items():
+            preview_data.append({
+                "name": name,
+                "roles": roles
+            })
+        for pub in publishers:
+            preview_data.append({
+                "name": pub,
+                "roles": ["Publisher"]
+            })
+            
+        # 6. Update rows
+        self._update_preview(preview_data)
 
     def _clear_preview(self):
         while self.scroll_layout.count():
@@ -166,16 +210,16 @@ class SpotifyImportDialog(QDialog):
             self._row_widgets.remove(row)
             row.deleteLater()
 
-    def get_result(self) -> List[Dict]:
-        """Return the finalized artist/role mappings."""
-        results = []
+    def get_result(self) -> (List[Dict], List[str]):
+        """Return the finalized artist/role mappings and publishers."""
+        artists = []
         for row in self._row_widgets:
             name = row.get_name()
             roles = row.get_roles()
             if name and roles: 
-                results.append({
+                artists.append({
                     "name": name,
                     "roles": roles,
                     "source": "spotify_import"
                 })
-        return results
+        return artists, self._parsed_publishers

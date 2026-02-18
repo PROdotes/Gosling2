@@ -2177,7 +2177,7 @@ class SidePanelWidget(QFrame):
             
         menu.exec(global_pos)
 
-    def _on_web_search(self, field_def=None):
+    def _on_web_searchh(self, field_def=None):
         """Launch web search using SearchService."""
         if not self.current_songs: return
         song = self.current_songs[0]
@@ -2503,19 +2503,33 @@ class SidePanelWidget(QFrame):
 
     def _open_spotify_import(self):
         """Open the Spotify credit import dialog."""
-        dialog = SpotifyImportDialog(self.services, self)
+        _web_search(self.current_songs[0], "Spotify")
+        
+        # 2. Open Dialog
+        dialog = SpotifyImportDialog(self.services, current_title=current_title, parent=self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            results = dialog.get_result()
-            if results:
-                self._apply_spotify_import(results)
+            artists, publishers = dialog.get_result()
+            if artists or publishers:
+                self._apply_spotify_import(artists, publishers)
 
-    def _apply_spotify_import(self, results):
-        """Link imported artists and roles to current songs."""
+    def _apply_spotify_import(self, artists, publishers):
+        """Link imported artists, roles, and publishers to current songs."""
         if not self.current_songs:
             return
 
-        # Process each artist
-        for artist in results:
+        # 1. Process Publishers (Get or Create Entities)
+        if publishers:
+            # First, update the visual string on the songs
+            for song in self.current_songs:
+                # Now link the actual entities in the DB
+                for pub_name in publishers:
+                    # T-Feature: get_or_create publisher entity
+                    pub_obj, _ = self.publisher_service.get_or_create(pub_name)
+                    # add_publisher_to_song handles the DB junction
+                    self.publisher_service.add_publisher_to_song(song.source_id, pub_obj.publisher_id)
+
+        # 2. Process Artists
+        for artist in artists:
             name = artist["name"]
             roles = artist["roles"]
             

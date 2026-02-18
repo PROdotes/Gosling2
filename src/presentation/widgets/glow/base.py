@@ -22,7 +22,7 @@ class GlowWidget(QWidget):
         self.layout.setContentsMargins(l, t, r, b)
         self.layout.setSpacing(0)
         
-        # 1. THE GLOW FRAME
+        # 1. THE GLOW FRAME (Halo)
         self.glow_frame = QFrame(self)
         self.glow_frame.setObjectName("GlowFocusFrame")
         
@@ -30,20 +30,25 @@ class GlowWidget(QWidget):
         self.glow_blur.setBlurRadius(4) 
         self.glow_frame.setGraphicsEffect(self.glow_blur)
         self.glow_frame.hide()
+
+        # 1b. THE OUTLINE OVERLAY (The 'Chassis' edge)
+        self.outline_frame = QFrame(self)
+        self.outline_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.outline_frame.setObjectName("GlowOutlineFrame")
+        self.outline_frame.hide()
         
-        # Consistent radius for the glow
+        # Consistent radius
         self.glow_radius = 8
         self._update_glow_style()
         
         # 2. THE CHILD
-        self.layout.addWidget(self.child, 1)
+        self.layout.addWidget(child_widget, 1)
         self.child.installEventFilter(self)
         
-        # Default behavior for Workstation: Don't allow Tab to land on UI junk (buttons, frames)
-        # Mouse interaction still works (ClickFocus), but Tab skips them.
+        # Default behavior: Mouse clicks work, but Tab respects standard flow
         self.child.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         
-        # Ensure glow is behind
+        # Layering: Glow behind, Outline over
         self.glow_frame.lower()
 
     def _update_glow_style(self):
@@ -57,9 +62,18 @@ class GlowWidget(QWidget):
                 {radius_part}
             }}
         """)
+        
+        # Sync the outline chassis
+        self.outline_frame.setStyleSheet(f"""
+            #GlowOutlineFrame {{
+                border: 1px solid {self.glow_color};
+                background: transparent;
+                {radius_part}
+            }}
+        """)
 
     def setGlowShape(self, css):
-        """Allow passing complex border-radius strings (e.g. for split buttons)."""
+        """Allow passing complex border-radius strings."""
         self._custom_radius_css = css
         self._update_glow_style()
 
@@ -68,7 +82,7 @@ class GlowWidget(QWidget):
         self._update_glow_style()
 
     def setGlowColor(self, color):
-        """Dynamic color support (e.g. blue for Music, red for System)"""
+        """Dynamic color support. Both Halo and Outline follow this color."""
         self.glow_color = color
         self._update_glow_style()
 
@@ -78,8 +92,7 @@ class GlowWidget(QWidget):
     def setGlowMargins(self, left, top, right, bottom):
         self._glow_margins = (left, top, right, bottom)
         self.layout.setContentsMargins(left, top, right, bottom)
-        # Update geometry if we have fixed sizes (handled by resizeEvent mostly, but good to trigger)
-        if self.child:
+        if hasattr(self, "child") and self.child:
             self.updateGeometry()
 
     def setGlowMargin(self, m):
@@ -127,11 +140,15 @@ class GlowWidget(QWidget):
 
     def _show_glow(self):
         self.glow_frame.show()
-        self.glow_frame.raise_()
+        self.outline_frame.show()
+        
+        self.glow_frame.lower()
         self.child.raise_()
+        self.outline_frame.raise_()
         
     def _hide_glow(self):
         self.glow_frame.hide()
+        self.outline_frame.hide()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -144,10 +161,13 @@ class GlowWidget(QWidget):
         QTimer.singleShot(0, self._sync_glow_geometry)
 
     def _sync_glow_geometry(self):
-        """Sync glow frame to child widget geometry."""
-        if self.child:
-            self.glow_frame.setGeometry(self.child.geometry())
+        """Sync both glow and outline frames to child widget geometry."""
+        if hasattr(self, "child") and self.child:
+            geom = self.child.geometry()
+            self.glow_frame.setGeometry(geom)
+            self.outline_frame.setGeometry(geom)
 
     def blockSignals(self, b):
-        self.child.blockSignals(b)
+        if hasattr(self, "child"):
+            self.child.blockSignals(b)
         return super().blockSignals(b)

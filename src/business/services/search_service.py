@@ -63,7 +63,7 @@ class SearchService:
         
         return ""
 
-    def prepare_search(self, song, draft_values: dict, preferred_provider: str, field_def=None) -> str:
+    def prepare_search(self, song, preferred_provider: str, field_def=None) -> str:
         """
         High-level entry point. 
         Gathers raw data and delegates URL construction.
