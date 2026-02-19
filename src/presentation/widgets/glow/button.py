@@ -113,10 +113,10 @@ class GlowButton(GlowWidget):
             border_col = "#000000" # Black border for disabled state (recede)
         elif is_checked:
             color = self.glow_color
-            border_col = self.glow_color
+            border_col = "transparent" # Satin Rim handles the active edge now
         elif is_hovered:
             color = "#FFFFFF"
-            border_col = self.glow_color # Inherit button color on hover
+            border_col = "transparent" 
         else:
             color = "#DDDDDD"
             border_col = "#000000"
@@ -154,6 +154,9 @@ class GlowButton(GlowWidget):
 
     def setGlowColor(self, color):
         super().setGlowColor(color)
+        if hasattr(self, "btn_blur"):
+            self.btn_blur.setEnabled(False)
+            self.btn_blur.setEnabled(True)
         self._update_text_styles()
 
     # Proxy methods for Dialog behavior
@@ -179,6 +182,10 @@ class GlowButton(GlowWidget):
     # Proxy methods
     def isChecked(self): return self.btn.isChecked()
     def isCheckable(self): return self.btn.isCheckable()
+    # Proxy methods for QPushButton API
+    @property
+    def inner(self): return self.btn
+    
     def isEnabled(self): return self.btn.isEnabled()
     def isVisible(self): return self.btn.isVisible()
     def text(self): return self.lbl_main.text()
@@ -187,6 +194,16 @@ class GlowButton(GlowWidget):
     def setChecked(self, c): self.btn.setChecked(c)
     def setIcon(self, i): self.btn.setIcon(i)
     def setIconSize(self, s): self.btn.setIconSize(s)
+    
+    @pyqtProperty(QIcon)
+    def icon(self): return self.btn.icon()
+    @icon.setter
+    def icon(self, i): self.btn.setIcon(i)
+    
+    @pyqtProperty(QSize)
+    def iconSize(self): return self.btn.iconSize()
+    @iconSize.setter
+    def iconSize(self, s): self.btn.setIconSize(s)
     def setToolTip(self, t): self.btn.setToolTip(t)
     def setDefault(self, d): self.btn.setDefault(d)
         

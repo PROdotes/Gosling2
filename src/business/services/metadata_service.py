@@ -428,6 +428,11 @@ class MetadataService:
                 elif not FrameClass and len(frame_id) == 4 and frame_id.isupper():
                     audio.tags.delall(frame_id)
                     audio.tags.add(TXXX(encoding=1, desc=frame_id, text=val))
+                else:
+                    # Fallback for dynamic categories (e.g. Instrument)
+                    desc = frame_id
+                    audio.tags.delall(f"TXXX:{desc}")
+                    audio.tags.add(TXXX(encoding=1, desc=desc, text=val))
 
             # --- COMPLEX FIELDS ---
 

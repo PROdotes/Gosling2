@@ -1,5 +1,30 @@
 from PyQt6.QtWidgets import QWidget, QFrame, QGraphicsBlurEffect, QHBoxLayout
 from PyQt6.QtCore import Qt, QEvent, pyqtProperty
+from PyQt6.QtGui import QColor, QPainter, QPen
+
+class GlowOutline(QFrame):
+    """Custom painter to ensure smooth, anti-aliased chassis rims."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.color = QColor("#FFC66D")
+        self.radius = 8
+        self.radius_css = ""
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Draw the "Satin Rim" - darkened for depth
+        border_color = self.color.darker(180)
+        # T-93: Optimization - Use a slightly thicker pen for a more physical feel
+        painter.setPen(QPen(border_color, 1.2))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        
+        # Calculate rect from fixed radius or CSS parts
+        # Since we use setGeometry(match_child), we use our own rect
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, self.radius, self.radius)
 
 class GlowWidget(QWidget):
     """
@@ -31,10 +56,8 @@ class GlowWidget(QWidget):
         self.glow_frame.setGraphicsEffect(self.glow_blur)
         self.glow_frame.hide()
 
-        # 1b. THE OUTLINE OVERLAY (The 'Chassis' edge)
-        self.outline_frame = QFrame(self)
-        self.outline_frame.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        self.outline_frame.setObjectName("GlowOutlineFrame")
+        # 1b. THE OUTLINE OVERLAY (The 'Chassis' edge) - High Fidelity Painter
+        self.outline_frame = GlowOutline(self)
         self.outline_frame.hide()
         
         # Consistent radius
@@ -63,18 +86,32 @@ class GlowWidget(QWidget):
             }}
         """)
         
-        # Sync the outline chassis
-        self.outline_frame.setStyleSheet(f"""
-            #GlowOutlineFrame {{
-                border: 1px solid {self.glow_color};
-                background: transparent;
-                {radius_part}
-            }}
-        """)
+        # T-93: Pre-render Cache Invalidation
+        # Forces QGraphicsBlurEffect to discard its internal cache and redraw with the new color.
+        # This fixes the "old color persists" issue reported during selection changes.
+        if hasattr(self, "glow_blur"):
+            self.glow_blur.setEnabled(False)
+            self.glow_blur.setEnabled(True)
+        
+        # Sync the High-Fidelity Outline
+        if hasattr(self, "outline_frame"):
+            self.outline_frame.color = QColor(self.glow_color)
+            self.outline_frame.radius = self.glow_radius
+            self.outline_frame.update()
 
     def setGlowShape(self, css):
         """Allow passing complex border-radius strings."""
         self._custom_radius_css = css
+        
+        # T-93: Try to extract radius for the painter
+        if "border-radius:" in css:
+            try:
+                # Basic parser for "border-radius: 10px;"
+                val = css.split("border-radius:")[1].split("px")[0].strip()
+                self.glow_radius = int(val)
+            except:
+                pass
+
         self._update_glow_style()
 
     def setGlowRadius(self, r):

@@ -46,8 +46,11 @@ class GlowLineEdit(GlowWidget):
     def setPlaceholderText(self, t): self.edit.setPlaceholderText(t)
     def setReadOnly(self, r): self.edit.setReadOnly(r)
     def setEnabled(self, e): self.edit.setEnabled(e)
-    def setObjectName(self, n): self.edit.setObjectName(n)
+    def setObjectName(self, n): 
+        super().setObjectName(n)
+        self.edit.setObjectName(n)
     def setProperty(self, n, v): 
+        super().setProperty(n, v)
         self.edit.setProperty(n, v)
         self.edit.style().unpolish(self.edit)
         self.edit.style().polish(self.edit)    

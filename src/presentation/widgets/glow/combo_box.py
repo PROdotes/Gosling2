@@ -62,6 +62,12 @@ class GlowComboBox(GlowWidget):
     def setObjectName(self, n): 
         super().setObjectName(n)
         self.combo.setObjectName(n)
+
+    def setProperty(self, n, v):
+        super().setProperty(n, v)
+        self.combo.setProperty(n, v)
+        self.combo.style().unpolish(self.combo)
+        self.combo.style().polish(self.combo)
     def addItem(self, text, data=None): self.combo.addItem(text, data)
     def addItems(self, items): self.combo.addItems(items)
     def clear(self): self.combo.clear()

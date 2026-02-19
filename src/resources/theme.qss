@@ -87,7 +87,7 @@ QPushButton#CloseButton:hover {
 
 /* Amber Borders */
 
-QLineEdit:focus, QTextEdit:focus, #GlowInput:focus, QComboBox[glowing="true"] {
+QLineEdit:focus, QTextEdit:focus, QComboBox[glowing="true"] {
     border: 1px solid #FFC66D;
 }
 /* Exclude QComboBox generally OR just enforce specific style for PlaybackDeck? 
@@ -630,19 +630,19 @@ QPushButton {
     font-weight: bold;
 }
  
-GlowButton#CategoryPill[category="Music"] { qproperty-glowColor: #32A8FF; }
-GlowButton#CategoryPill[category="Jingles"] { qproperty-glowColor: #FF4DFF; }
-GlowButton#CategoryPill[category="Commercials"] { qproperty-glowColor: #4DFFB8; }
-GlowButton#CategoryPill[category="Speech"] { qproperty-glowColor: #AAAAAA; }
-GlowButton#CategoryPill[category="Streams"] { qproperty-glowColor: #00FFFF; }
+GlowButton#CategoryPill_Glow[category="Music"] { qproperty-glowColor: #32A8FF; }
+GlowButton#CategoryPill_Glow[category="Jingles"] { qproperty-glowColor: #FF4DFF; }
+GlowButton#CategoryPill_Glow[category="Commercials"] { qproperty-glowColor: #4DFFB8; }
+GlowButton#CategoryPill_Glow[category="Speech"] { qproperty-glowColor: #AAAAAA; }
+GlowButton#CategoryPill_Glow[category="Streams"] { qproperty-glowColor: #00FFFF; }
 
 /* Dialog Action Pills (Standardized Footer Buttons) */
-GlowButton#ActionPill[action_role="primary"] { qproperty-glowColor: #26E28C; }
-GlowButton#ActionPill[action_role="secondary"] { qproperty-glowColor: #FFC66D; }
-GlowButton#ActionPill[action_role="destructive"] { qproperty-glowColor: #E53935; }
-GlowButton#ActionPill[action_role="ghost"] { qproperty-glowColor: #444444; }
+GlowButton#ActionPill_Glow[action_role="primary"] { qproperty-glowColor: #26E28C; }
+GlowButton#ActionPill_Glow[action_role="secondary"] { qproperty-glowColor: #FFC66D; }
+GlowButton#ActionPill_Glow[action_role="destructive"] { qproperty-glowColor: #E53935; }
+GlowButton#ActionPill_Glow[action_role="ghost"] { qproperty-glowColor: #444444; }
 
-GlowButton#StatusPill { 
+GlowButton#StatusPill_Glow { 
     qproperty-glowColor: #26E28C; /* Station Green */
 }
 

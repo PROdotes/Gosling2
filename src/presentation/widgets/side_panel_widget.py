@@ -7,6 +7,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QTimer, QUrl, QSize
 from PyQt6.QtGui import QFont, QDesktopServices, QAction, QIcon
 from ...core import yellberus
 from ...core.registries.id3_registry import ID3Registry
+from ...resources import constants
 from ..widgets.glow_factory import GlowLineEdit, GlowButton, GlowLED, GlowToggle
 from ..widgets.entity_list_widget import EntityListWidget, LayoutMode
 from ...core.entity_registry import EntityType
@@ -997,6 +998,17 @@ class SidePanelWidget(QFrame):
         if is_bool:
             tg = GlowToggle()
             
+            # T-93: Multicolour support (Zone-based)
+            zone = field_def.zone if field_def.zone else "amber"
+            zone_map = {
+                "amber": constants.COLOR_AMBER,
+                "blue": constants.COLOR_CYAN,
+                "green": constants.COLOR_DROP_INDICATOR,
+                "magenta": constants.COLOR_MAGENTA,
+                "gray": constants.COLOR_GRAY
+            }
+            tg.color = zone_map.get(zone, constants.COLOR_AMBER)
+
             # T-93: Contextual Labels for Boolean Toggles
             if field_def.name == 'is_active':
                 tg.set_labels("ON", "OFF")

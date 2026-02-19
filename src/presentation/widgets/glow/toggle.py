@@ -24,6 +24,16 @@ class GlowToggle(QAbstractButton):
 
         self._on_txt = ""
         self._off_txt = ""
+        self._color = QColor("#FFC66D") # Default Amber
+
+    @pyqtProperty(QColor)
+    def color(self):
+        return self._color
+        
+    @color.setter
+    def color(self, c):
+        self._color = QColor(c)
+        self.update()
 
     def set_labels(self, on_txt, off_txt):
         self._on_txt = on_txt
@@ -81,9 +91,9 @@ class GlowToggle(QAbstractButton):
         
         # 1. Background (Pill)
         # Inactive: Dark Slate
-        # Active: Dark Amber/Brown
+        # Active: Darkened version of accent color
         if self.isChecked():
-            bg_color = QColor("#332200") # Deep Amber shadow
+            bg_color = self._color.darker(300)
         else:
             bg_color = QColor("#222222") # Industrial Dark
             
@@ -104,7 +114,7 @@ class GlowToggle(QAbstractButton):
             # ON Label (Left side) - Visible when toggle is ON
             if self._on_txt:
                 painter.setOpacity(self._handle_position)
-                painter.setPen(QColor("#FFC66D"))
+                painter.setPen(self._color)
                 painter.drawText(text_rect, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self._on_txt)
             
             # OFF Label (Right side) - Visible when toggle is OFF
@@ -119,7 +129,7 @@ class GlowToggle(QAbstractButton):
         if self._glow_opacity > 0:
             glow_rect = pill_rect.adjusted(2, 2, -2, -2)
             gradient = QLinearGradient(QPointF(glow_rect.topLeft()), QPointF(glow_rect.topRight()))
-            c = QColor("#FFC66D")
+            c = QColor(self._color)
             c.setAlpha(int(100 * self._glow_opacity))
             gradient.setColorAt(0, QColor(0,0,0,0))
             gradient.setColorAt(self._handle_position, c)
@@ -136,8 +146,8 @@ class GlowToggle(QAbstractButton):
         # Handle Gradient (Metallic/Soft Surface look)
         handle_grad = QLinearGradient(QPointF(handle_rect.topLeft()), QPointF(handle_rect.bottomRight()))
         if self.isChecked():
-            handle_grad.setColorAt(0, QColor("#FFD591")) # Bright Amber
-            handle_grad.setColorAt(1, QColor("#FFC66D")) # Amber
+            handle_grad.setColorAt(0, self._color.lighter(130))
+            handle_grad.setColorAt(1, self._color)
         else:
             handle_grad.setColorAt(0, QColor("#888888"))
             handle_grad.setColorAt(1, QColor("#555555"))
@@ -147,7 +157,7 @@ class GlowToggle(QAbstractButton):
         # Handle Halo (Outer glow for handle when active)
         if self.isChecked() and self._glow_opacity > 0:
             halo_grad = QRadialGradient(QPointF(handle_rect.center()), float(handle_size))
-            hc = QColor("#FFC66D")
+            hc = QColor(self._color)
             hc.setAlpha(int(150 * self._glow_opacity))
             halo_grad.setColorAt(0, hc)
             halo_grad.setColorAt(1, QColor(0,0,0,0))
