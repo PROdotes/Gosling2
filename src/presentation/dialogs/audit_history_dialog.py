@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QTableView, QHeaderView,
     QCheckBox, QComboBox, QMessageBox, QFrame, QAbstractItemView
 )
-from PyQt6.QtCore import Qt, QTimer, QAbstractTableModel, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, QAbstractTableModel, pyqtSlot, QItemSelectionModel
 from PyQt6.QtGui import QColor, QBrush, QStandardItemModel, QStandardItem, QFont
 
 from ..widgets.glow_factory import GlowLineEdit, GlowButton
@@ -221,8 +221,8 @@ class AuditHistoryDialog(QDialog):
         h.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)          # New
         h.setSectionResizeMode(7, QHeaderView.ResizeMode.Interactive)      # Batch ID
         
-        # Hide Batch ID by default (Power User feature revealed via Context Menu or future update)
-        self.table_view.setColumnHidden(7, True)
+        # Batch ID is now visible by default for 'Pro' diagnostics
+        self.table_view.setColumnHidden(7, False)
         
         # Context Menu
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)

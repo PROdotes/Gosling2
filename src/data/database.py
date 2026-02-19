@@ -1,9 +1,9 @@
-"""Base Repository with database operations"""
 import sqlite3
 from typing import Optional, Any
 from contextlib import contextmanager
 from .database_config import DatabaseConfig
-
+from contextvars import ContextVar
+_active_conn: ContextVar[Optional[sqlite3.Connection]] = ContextVar("_active_conn", default=None)
 
 class BaseRepository:
     """Base repository with database connection management"""
@@ -13,25 +13,53 @@ class BaseRepository:
         self._ensure_schema()
 
     @contextmanager
-    def get_connection(self):
-        """Context manager for database connections. Enables WAL mode for concurrent performance."""
+    def transaction(self):
+        """High-level transaction manager for pinning a connection across multiple service calls."""
+        existing = _active_conn.get()
+        if existing:
+            # Already in a transaction, just yield it
+            yield existing
+            return
+
         conn = sqlite3.connect(self.db_path)
-        conn.execute("PRAGMA journal_mode=WAL") # Enable write-ahead logging
+        self._configure_connection(conn)
+        token = _active_conn.set(conn)
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            _active_conn.reset(token)
+            conn.close()
+
+    def _configure_connection(self, conn: sqlite3.Connection):
+        """Setup WAL mode, collations, and functions."""
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys = ON")
-        
-        # T-Fix: Add Unicode-aware search/collation (SQLite's NOCASE and LOWER are ASCII-only)
-        # 1. Function for use in queries like py_lower(Name)
         conn.create_function("py_lower", 1, lambda x: x.lower() if x is not None else None)
         
-        # 2. Collation for use in Table Definitions (COLLATE UTF8_NOCASE)
         def unicode_compare(s1, s2):
             l1, l2 = s1.lower(), s2.lower()
             if l1 < l2: return -1
             if l1 > l2: return 1
             return 0
         conn.create_collation("UTF8_NOCASE", unicode_compare)
-        
         conn.row_factory = sqlite3.Row
+
+    @contextmanager
+    def get_connection(self):
+        """Context manager for database connections. Supports connection pinning."""
+        pinned = _active_conn.get()
+        if pinned:
+            # We are inside a transaction() block, do not commit/close here.
+            yield pinned
+            return
+
+        # Standard standalone connection (auto-commit behavior)
+        conn = sqlite3.connect(self.db_path)
+        self._configure_connection(conn)
         try:
             yield conn
             conn.commit()

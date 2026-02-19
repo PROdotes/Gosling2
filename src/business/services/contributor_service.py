@@ -144,22 +144,12 @@ class ContributorService:
         """Get existing contributor or create a new one. Enforces strict name uniqueness."""
         type_lower = (type or 'person').lower()
         
-        # 1. Search for name (Case Insensitive / LIKE)
-        matches = self.search(name)
-        
-        # 2. Try to find exact type match first (Best match)
-        for m in matches:
-            if m.name.lower() == name.lower() and m.type.lower() == type_lower:
-                return m, False
+        # 1. Search for exact name match (Fast path using UTF8_NOCASE index)
+        matches = self.get_collision(name)
+        if matches:
+            return matches, False
                 
-        # 3. T-Fix: Even if type differs, if the name matches exactly, reuse it.
-        # This prevents the "4 Queens" issue where Queen (Artist) and Queen (Composer) 
-        # end up as separate records due to minor type or role discrepancies.
-        for m in matches:
-            if m.name.lower() == name.lower():
-                return m, False
-                
-        # 4. Truly new name, create it
+        # 2. Truly new name, create it
         return self.create(name, type_lower), True
 
     # Merge logic moved to unified section below to avoid duplication.

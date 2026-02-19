@@ -300,10 +300,7 @@ class AlbumRepository(GenericRepository[Album]):
         if conn:
             return _execute(conn)
         with self.get_connection() as conn:
-            success = _execute(conn)
-            if success:
-                conn.commit()
-            return success
+            return _execute(conn)
 
     def find_by_key(
         self, 
@@ -652,7 +649,6 @@ class AlbumRepository(GenericRepository[Album]):
                 auditor.log_delete("Albums", album_id, snapshot)
                 deleted_count += 1
             
-            conn.commit()
             return deleted_count
 
     def add_contributor_to_album(self, album_id: int, contributor_id: int, role_name: str = "Performer", batch_id: Optional[str] = None) -> bool:

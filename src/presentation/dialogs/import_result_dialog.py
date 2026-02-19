@@ -14,7 +14,7 @@ import os
 
 # Error Category System
 ERROR_CATEGORIES = {
-    'DUPLICATE': {'color': constants.COLOR_GRAY, 'icon': '⊘', 'label': 'Duplicate', 'keywords': ['ALREADY_IMPORTED']},
+    'DUPLICATE': {'color': constants.COLOR_GRAY, 'icon': '⊘', 'label': 'Duplicate', 'keywords': ['ALREADY_IMPORTED', 'Duplicate audio found', 'Duplicate ISRC found']},
     'ACCESS': {'color': constants.COLOR_RED, 'icon': '🔒', 'label': 'Access', 'keywords': ['Permission denied', 'Access denied', 'permission']},
     'MISSING': {'color': constants.COLOR_CYAN, 'icon': '?', 'label': 'Missing', 'keywords': ['Not found', 'File not found', 'not exist']},
     'FORMAT': {'color': constants.COLOR_MAGENTA, 'icon': '⚠', 'label': 'Format', 'keywords': ['Invalid format', 'Unsupported', 'corrupt', 'invalid']},

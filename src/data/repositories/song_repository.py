@@ -135,12 +135,15 @@ class SongRepository(GenericRepository[Song]):
 
         # 1. Update MediaSources
         normalized_path = os.path.normcase(os.path.abspath(song.source))
+        # T-Fix: Fallback to filename if song.name is missing to satisfy NOT NULL constraint
+        display_name = song.name or os.path.basename(normalized_path)
+        
         cursor.execute("""
             UPDATE MediaSources
             SET MediaName = ?, SourcePath = ?, SourceDuration = ?, SourceNotes = ?, IsActive = ?, 
                 AudioHash = COALESCE(?, AudioHash), ProcessingStatus = ?
             WHERE SourceID = ?
-        """, (song.name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, 
+        """, (display_name, normalized_path, song.duration, song.notes, 1 if song.is_active else 0, 
               song.audio_hash, song.processing_status, song.source_id))
 
         # 2. Update Songs

@@ -2509,37 +2509,42 @@ class SidePanelWidget(QFrame):
 
     def _apply_spotify_import(self, artists, publishers):
         """Link imported artists, roles, and publishers to current songs."""
+        # T-Fix: Atomic Commit (T-Perf)
+        # Wrap the entire import in a SINGLE transaction to avoid UI thread blocking from disk sync.
+        # This uses the new transparent connection pinning, so no service signatures need to change!
+        try:
+            with self.library_service.song_service._repo.transaction():
+                # 1. Process Publishers
+                if publishers:
+                    for song in self.current_songs:
+                        for pub_name in publishers:
+                            pub_obj, _ = self.publisher_service.get_or_create(pub_name)
+                            self.publisher_service.add_publisher_to_song(song.source_id, pub_obj.publisher_id)
 
-        # 1. Process Publishers (Get or Create Entities)
-        if publishers:
-            # First, update the visual string on the songs
-            for song in self.current_songs:
-                # Now link the actual entities in the DB
-                for pub_name in publishers:
-                    # T-Feature: get_or_create publisher entity
-                    pub_obj, _ = self.publisher_service.get_or_create(pub_name)
-                    # add_publisher_to_song handles the DB junction
-                    self.publisher_service.add_publisher_to_song(song.source_id, pub_obj.publisher_id)
-
-        # 2. Process Artists
-        for artist in artists:
-            name = artist["name"]
-            roles = artist["roles"]
+                # 2. Process Artists
+                for artist in artists:
+                    name = artist["name"]
+                    roles = artist["roles"]
+                    
+                    # T-Fix: Identity Resolution (Uses optimized find_exact)
+                    artist_obj, _ = self.contributor_service.get_or_create(name)
+                    identity_id = artist_obj.contributor_id
+                    
+                    for song in self.current_songs:
+                        for role in roles:
+                            self.contributor_service.add_song_role(song.source_id, identity_id, role)
             
-            # 1. Get/Create Identity
-            artist_obj, _ = self.contributor_service.get_or_create(name)
-            identity_id = artist_obj.contributor_id
+            # 3. UI Refresh & Synchronization
+            self.refresh_content()
+            self.filter_refresh_requested.emit()
+            self.status_message_requested.emit(f"Imported {len(artists)} artists and {len(publishers)} publishers.", "success")
             
-            # 2. Link each role to all selected songs
-            for song in self.current_songs:
-                for role in roles:
-                    # add_song_role handles immediate DB write
-                    self.contributor_service.add_song_role(song.source_id, identity_id, role)
-        
-        # 3. UI Refresh & Synchronization
-        self.refresh_content()
-        self.filter_refresh_requested.emit()
-
+        except Exception as e:
+            from ...core import logger
+            logger.error(f"Spotify Import Transaction Failed: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Import Failed", f"Database error during import:\n{e}")
     def refresh_content(self):
         """Refetch current songs from DB and update UI to match latest state."""
         if not self.current_songs:

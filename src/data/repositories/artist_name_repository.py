@@ -99,10 +99,7 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
         if conn:
             return _execute(conn)
         with self.get_connection() as conn:
-            success = _execute(conn)
-            if success:
-                conn.commit()
-            return success
+            return _execute(conn)
 
     def get_by_owner(self, identity_id: int) -> List[ArtistName]:
         """Fetch all names owned by a specific identity."""
@@ -145,7 +142,7 @@ class ArtistNameRepository(GenericRepository[ArtistName]):
                 cursor.execute("""
                     SELECT NameID, OwnerIdentityID, DisplayName, SortName, IsPrimaryName, DisambiguationNote
                     FROM ArtistNames
-                    WHERE py_lower(DisplayName) = py_lower(?)
+                    WHERE DisplayName = ? COLLATE UTF8_NOCASE
                 """, (name,))
                 return [ArtistName.from_row(row) for row in cursor.fetchall()]
         except Exception as e:

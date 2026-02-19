@@ -144,10 +144,7 @@ class PublisherRepository(GenericRepository[Publisher]):
         if conn:
             return _execute(conn)
         with self.get_connection() as conn:
-            success = _execute(conn)
-            if success:
-                conn.commit()
-            return success
+            return _execute(conn)
 
     def add_publisher_to_album(self, album_id: int, publisher_id: int, batch_id: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> bool:
         """Link a publisher ID to an album."""

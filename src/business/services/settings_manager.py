@@ -6,6 +6,15 @@ from PyQt6.QtCore import QSettings, QByteArray
 class SettingsManager:
     """Centralized settings management for the application"""
     
+    _instance = None # Singleton anchor
+
+    @classmethod
+    def instance(cls):
+        """Access the global settings singleton."""
+        if cls._instance is None:
+            cls._instance = SettingsManager()
+        return cls._instance
+    
     # Settings keys as constants
     # Window settings
     KEY_WINDOW_GEOMETRY = "window/geometry"
@@ -90,6 +99,10 @@ class SettingsManager:
         # Fallback to local file if needed? UserScope puts it in AppData.
         # If user wants it next to exe, we might need absolute path.
         # For now, standard User location is safer than Program Files.
+        
+        # Singleton anchor
+        if SettingsManager._instance is None:
+            SettingsManager._instance = self
     
     # ===== Window Settings =====
     
@@ -150,8 +163,6 @@ class SettingsManager:
         return (self.DEFAULT_WINDOW_WIDTH, self.DEFAULT_WINDOW_HEIGHT)
     
     # ===== Library Settings =====
-    
-
     
     def get_last_import_directory(self) -> Optional[str]:
         """Get last directory used for importing files"""
