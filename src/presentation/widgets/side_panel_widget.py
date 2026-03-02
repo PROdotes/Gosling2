@@ -198,6 +198,11 @@ class SidePanelWidget(QFrame):
         self.btn_save.setFixedHeight(28)
         self.btn_save.clicked.connect(self._on_save_clicked)
         self.btn_save.setEnabled(False)
+        
+        # T-Fix: Disable Enter/Return trigger to prevent ghost-saves during name merges (User Req)
+        self.btn_save.setAutoDefault(False)
+        self.btn_save.setDefault(False)
+        self.btn_save.inner.installEventFilter(self)
 
         # Status button (REMOVED - now handled via Status chip in Tag tray for cleaner UI)
         self.btn_status = None
@@ -2028,6 +2033,12 @@ class SidePanelWidget(QFrame):
                 if event.button() == Qt.MouseButton.LeftButton:
                     self._open_filename_parser()
                     return True
+        # T-Fix: Block Enter/Return on the Save button to prevent ghost-saves (User Req)
+        elif hasattr(self, 'btn_save') and source == self.btn_save.inner:
+            if event.type() == QEvent.Type.KeyPress:
+                if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    return True # Consume and ignore
+                    
         return super().eventFilter(source, event)
 
     def _get_staged_song(self, original_song):
