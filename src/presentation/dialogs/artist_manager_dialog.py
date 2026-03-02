@@ -148,6 +148,7 @@ class ArtistDetailsDialog(QDialog):
         self.btn_convert_type = GlowButton("Convert to Group")
         self.btn_convert_type.setObjectName("ConvertTypeButton")
         self.btn_convert_type.clicked.connect(self._convert_type)
+        self.btn_convert_type.setAutoDefault(False)
         t_row.addWidget(self.btn_convert_type)
 
         layout.addLayout(t_row)
