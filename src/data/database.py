@@ -270,8 +270,11 @@ class BaseRepository:
                     ReleaseYear INTEGER
                 )
             """)
-            # T-Fix: Add unique constraint to Albums (Title + Year)
-            cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_title_year_v2 ON Albums(AlbumTitle COLLATE UTF8_NOCASE, ReleaseYear)")
+            # T-Fix: Albums can have the same Title+Year if they belong to different Artists ("Greatest Hits" paradox).
+            # We must drop the previous strict unique constraint. Uniqueness is enforced at application level by AlbumRepository.
+            cursor.execute("DROP INDEX IF EXISTS idx_albums_title_year")
+            cursor.execute("DROP INDEX IF EXISTS idx_albums_title_year_v2")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_albums_title_year_v3 ON Albums(AlbumTitle COLLATE UTF8_NOCASE, ReleaseYear)")
 
             # 31. AlbumContributors (Junction)
             cursor.execute("""

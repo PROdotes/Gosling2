@@ -942,15 +942,21 @@ class SidePanelWidget(QFrame):
     def _on_entity_data_changed(self):
         """Called when EntityListWidget reports a data change (e.g. rename/edit)."""
         
-        # T-Fix: Identify the field that changed and clear its staging
-        # We deduce the field name by finding which widget sent the signal
+        # T-Fix: Robustly identify the target field even if sender is a child widget
         sender = self.sender()
         target_field = None
         if sender:
+            # 1. Direct Widget Lookup
             for name, widget in self._field_widgets.items():
                 if widget == sender:
                     target_field = name
                     break
+            
+            # 2. Robust Adapter Lookup (Backup)
+            if not target_field and hasattr(sender, 'context_adapter'):
+                target_field = getattr(sender.context_adapter, 'field_name', None)
+        
+        print(f"DEBUG: SidePanelWidget._on_entity_data_changed triggered by {target_field or sender}")
         
         # Clear staging for this field to ensure we display/save fresh DB data
         if target_field and self.current_songs:
@@ -967,27 +973,31 @@ class SidePanelWidget(QFrame):
              self._update_save_state()
              self.staging_changed.emit(list(self._staged_changes.keys()))
 
-        # Reload current songs to reflect potential renames (e.g. cached 'performers' string)
-        if self.current_songs:
-             updated_songs = []
-             for s in self.current_songs:
-                 new_s = self.library_service.song_service.get_by_id(s.source_id)
-                 if new_s: updated_songs.append(new_s)
+        self._force_reload_from_db()
+
+    def _force_reload_from_db(self):
+        """Re-fetch song objects and trigger a full UI refresh across all panes."""
+        # CRITICAL: Re-fetch songs and Force REBUILD the UI
+        if not self.current_songs:
+             return
              
-             if updated_songs:
-                 self.current_songs = updated_songs
-                 
-                 # UPDATE ADAPTERS: Propagate new song list to all EntityListWidgets
-                 # This prevents them from using stale references during refresh_from_adapter()
-                 for f_name, widget in self._field_widgets.items():
-                    if isinstance(widget, EntityListWidget):
-                        # Duck-type check for SongFieldAdapter or compatible
-                        if hasattr(widget, 'context_adapter') and hasattr(widget.context_adapter, 'songs'):
-                            widget.context_adapter.songs = self.current_songs
+        updated_songs = []
+        for s in self.current_songs:
+            new_s = self.library_service.song_service.get_by_id(s.source_id)
+            if new_s: updated_songs.append(new_s)
         
-        self._refresh_field_values()
+        if updated_songs:
+            # Success: We have fresh DB data. Now hammer the UI into sync.
+            self.set_songs(updated_songs, force=True)
+            
+            # Ensure adapters for OTHER widgets are also updated
+            for f_name, widget in self._field_widgets.items():
+               if isinstance(widget, EntityListWidget):
+                   if hasattr(widget, 'context_adapter') and hasattr(widget.context_adapter, 'songs'):
+                       widget.context_adapter.songs = self.current_songs
         
-        # BROADCAST: Ensure Library Refresh to prevent re-seeding stale names from memory
+        # Sync with main library view
+        self.filter_refresh_requested.emit()
         try:
             win = self.window()
             if hasattr(win, 'library_widget'):
@@ -1228,9 +1238,12 @@ class SidePanelWidget(QFrame):
         dlg.album_deleted.connect(self._on_album_deleted_externally)
         
         if dlg.exec() == 2:
-             # T-Fix: Handle 'Remove Link' request (Matched to Artist workflow)
+             # T-Fix: Atomic removal for Album Manager context
              if initial_album:
-                 self._on_chip_removed('album', initial_album.album_id, initial_album.title)
+                 for song in self.current_songs:
+                     self.album_service.remove_song_from_album(song.source_id, initial_album.album_id)
+                 
+                 self._force_reload_from_db()
              return
         
         # Sync: Re-fetch current selection to ensure memory matches DB (e.g. if album was deleted)
@@ -1345,8 +1358,8 @@ class SidePanelWidget(QFrame):
                     if not current_year:  # Only fill if empty
                         self._on_field_changed("recording_year", full_album.release_year, song_id=sid)
 
-        # 5. Refresh UI (Reload from DB to show new links)
-        self.set_songs(self.current_songs, force=True)
+        # 5. Refresh UI (Re-fetch fresh objects so UI reflects new DB links)
+        self._force_reload_from_db()
 
     def _validate_isrc_field(self, widget, text):
         """

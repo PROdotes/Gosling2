@@ -121,6 +121,13 @@ class AlbumManagerDialog(QDialog):
                 event.ignore()
             return
 
+        # 3. Focus Search (Ctrl+F)
+        if is_ctrl and key == Qt.Key.Key_F:
+            if hasattr(self, 'txt_search'):
+                self.txt_search.setFocus()
+                event.accept()
+                return
+
         super().keyPressEvent(event)
         
     def _init_ui(self):

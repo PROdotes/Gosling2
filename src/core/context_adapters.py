@@ -234,8 +234,14 @@ class SongFieldAdapter(ContextAdapter):
         # 1. Album
         if self.field_name == 'album':
              for song in self.songs:
-                 if self.service.remove_song_from_album(song.source_id, child_id):
-                     success_any = True
+                 # Repository returns None, so we don't 'if' check it.
+                 self.service.remove_song_from_album(song.source_id, child_id)
+                 success_any = True
+                 
+                 # Clear local memory so if re-fetch is slow, the chip vanishes immediately.
+                 # Note: This is an optimistic wipe; re-fetch from SidePanel will restore other albums if present.
+                 if hasattr(song, 'album'): song.album = []
+                 if hasattr(song, 'album_id'): song.album_id = None
 
         # 2. Tags
         elif self.field_name == 'tags' and hasattr(self.service, 'remove_tag_from_source'):
@@ -246,8 +252,12 @@ class SongFieldAdapter(ContextAdapter):
         # 3. Publisher
         elif hasattr(self.service, 'remove_publisher_from_song') and self.field_name == 'publisher':
              for song in self.songs:
-                 if self.service.remove_publisher_from_song(song.source_id, child_id):
-                     success_any = True
+                 # Repository returns None.
+                 self.service.remove_publisher_from_song(song.source_id, child_id)
+                 success_any = True
+                 
+                 if hasattr(song, 'publisher'): song.publisher = []
+                 if hasattr(song, 'publisher_id'): song.publisher_id = None
 
         # 4. Roles
         elif hasattr(self.service, 'remove_song_role'):
