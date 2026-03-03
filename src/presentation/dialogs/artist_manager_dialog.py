@@ -256,6 +256,8 @@ class ArtistDetailsDialog(QDialog):
             self.btn_delete.setProperty("action_role", "destructive")
             self.btn_delete.setToolTip("Unlink this artist from the current song(s)")
             self.btn_delete.clicked.connect(lambda: self.done(2)) # Code 2 = Remove Request
+            self.btn_delete.setAutoDefault(False)
+            self.btn_delete.setDefault(False)
             btns.addWidget(self.btn_delete)
         
         # 2. Neutral (Middle)
@@ -263,6 +265,8 @@ class ArtistDetailsDialog(QDialog):
         btn_cancel.setObjectName("ActionPill")
         btn_cancel.setProperty("action_role", "secondary")
         btn_cancel.clicked.connect(self.reject)
+        btn_cancel.setAutoDefault(False)
+        btn_cancel.setDefault(False)
         btns.addWidget(btn_cancel)
         
         # 3. Primary (Right)

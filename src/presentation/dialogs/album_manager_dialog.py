@@ -228,6 +228,8 @@ class AlbumManagerDialog(QDialog):
         self.btn_remove.setToolTip("Unlink this album from the current song(s)")
         self.btn_remove.clicked.connect(self._on_remove_clicked)
         self.btn_remove.setEnabled(False) # Only if an actual link exists
+        self.btn_remove.setAutoDefault(False)
+        self.btn_remove.setDefault(False)
         btns.addWidget(self.btn_remove)
         
         # 2. Neutral (Middle)
@@ -235,6 +237,8 @@ class AlbumManagerDialog(QDialog):
         self.btn_cancel.setObjectName("ActionPill")
         self.btn_cancel.setProperty("action_role", "secondary")
         self.btn_cancel.clicked.connect(self.reject)
+        self.btn_cancel.setAutoDefault(False)
+        self.btn_cancel.setDefault(False)
         btns.addWidget(self.btn_cancel)
         
         # 3. Primary (Right)
