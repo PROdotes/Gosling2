@@ -195,119 +195,6 @@ class SongRepository(GenericRepository[Song]):
     # Sync methods removed (Moved to SongSyncService)
 
 
-
-    # ... skipping to bulk logic ...
-
-    def _get_songs_by_ids_logic(self, source_ids: List[int], conn: sqlite3.Connection) -> List[Song]:
-        """Internal logic for bulk fetching songs by their SourceID."""
-        cursor = conn.cursor()
-        
-        # 1. Fetch main song data using efficient IN clause
-        placeholders = ",".join(["?"] * len(source_ids))
-        query = f"""
-            SELECT 
-                MS.SourceID, MS.SourcePath, MS.MediaName, MS.SourceDuration, 
-                S.TempoBPM, S.RecordingYear, S.ISRC, S.SongGroups,
-                MS.SourceNotes, MS.IsActive, MS.AudioHash, MS.ProcessingStatus,
-                (
-                    SELECT GROUP_CONCAT(A.AlbumTitle, '|||')
-                    FROM Albums A 
-                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                    WHERE SA.SourceID = MS.SourceID
-                    ORDER BY SA.IsPrimary DESC
-                ) as AlbumTitle,
-                (
-                    SELECT A.AlbumID FROM Albums A 
-                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    LIMIT 1
-                ) as AlbumID,
-                COALESCE(
-                    (
-                        SELECT GROUP_CONCAT(P.PublisherName, '|||')
-                        FROM RecordingPublishers RP
-                        JOIN Publishers P ON RP.PublisherID = P.PublisherID
-                        WHERE RP.SourceID = MS.SourceID
-                    ),
-                    (
-                        SELECT P.PublisherName 
-                        FROM SongAlbums SA 
-                        JOIN Publishers P ON SA.TrackPublisherID = P.PublisherID 
-                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    )
-                ) as PublisherName,
-
-                (
-                    SELECT GROUP_CONCAT(AN.DisplayName, '|||')
-                    FROM Albums A 
-                    JOIN SongAlbums SA ON A.AlbumID = SA.AlbumID 
-                    JOIN AlbumCredits AC ON A.AlbumID = AC.AlbumID
-                    JOIN ArtistNames AN ON AC.CreditedNameID = AN.NameID
-                    WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                ) as AlbumArtist,
-                (
-                    SELECT GROUP_CONCAT(TG.TagCategory || ':' || TG.TagName, '|||')
-                    FROM MediaSourceTags MST
-                    JOIN Tags TG ON MST.TagID = TG.TagID
-                    WHERE MST.SourceID = MS.SourceID
-                ) as AllTags,
-                COALESCE(
-                    (
-                        SELECT GROUP_CONCAT(RP.PublisherID, '|||')
-                        FROM RecordingPublishers RP
-                        WHERE RP.SourceID = MS.SourceID
-                    ),
-                    (
-                        SELECT TrackPublisherID 
-                        FROM SongAlbums SA 
-                        WHERE SA.SourceID = MS.SourceID AND SA.IsPrimary = 1
-                    )
-                ) as PublisherID
-            FROM MediaSources MS
-            JOIN Songs S ON MS.SourceID = S.SourceID
-            WHERE MS.SourceID IN ({placeholders})
-        """
-        cursor.execute(query, source_ids)
-        rows = cursor.fetchall()
-        songs_map = {}
-        for row in rows:
-            try:
-                (source_id, path, name, duration, bpm, recording_year, isrc, groups_str, 
-                 notes, is_active_int, audio_hash, processing_status, album_title, album_id, publisher_name, 
-                 album_artist, all_tags_str, publisher_id) = row
-
-                groups = [g.strip() for g in groups_str.split(',')] if groups_str else []
-                tags = [t.strip() for t in all_tags_str.split('|||')] if all_tags_str else []
-                
-                song = Song(
-                    source_id=source_id,
-                    source=path,
-                    name=name,
-                    duration=duration,
-                    bpm=bpm,
-                    recording_year=recording_year,
-                    isrc=isrc,
-                    notes=notes,
-                    audio_hash=audio_hash,
-                    is_active=bool(is_active_int),
-                    processing_status=processing_status if processing_status is not None else 1,
-                    album=[a.strip() for a in album_title.split('|||')] if album_title else [],
-                    album_id=album_id,
-                    album_artist=album_artist,
-                    publisher=[p.strip() for p in publisher_name.split('|||')] if publisher_name else [],
-                    publisher_id=[int(p) for p in str(publisher_id).split('|||') if p] if publisher_id else [],
-                    groups=groups,
-                    tags=tags
-                )
-                songs_map[source_id] = song
-            except Exception:
-                import traceback
-                traceback.print_exc()
-
-        # ... rest of method ...
-
-    # Sync methods removed (Moved to SongSyncService)
-
     def get_by_performer(self, performer_name: str) -> Tuple[List[str], List[Tuple]]:
         """Get all songs by a specific performer"""
         try:
@@ -332,6 +219,52 @@ class SongRepository(GenericRepository[Song]):
                 return headers, data
         except Exception as e:
             logger.error(f"Error fetching songs by performer: {e}")
+            return [], []
+
+    def get_by_composer(self, composer_name: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by a specific composer"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
+                    WHERE MS.SourceID IN (
+                        SELECT SC.SourceID 
+                        FROM SongCredits SC
+                        JOIN ArtistNames AN ON SC.CreditedNameID = AN.NameID
+                        JOIN Roles R ON SC.RoleID = R.RoleID
+                        WHERE AN.DisplayName = ? AND R.RoleName = 'Composer'
+                    ) AND MS.IsActive = 1
+                    {yellberus.QUERY_GROUP_BY}
+                    ORDER BY MS.SourceID DESC
+                """
+                cursor.execute(query, (composer_name,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            logger.error(f"Error fetching songs by composer: {e}")
+            return [], []
+
+    def get_by_year(self, year: str) -> Tuple[List[str], List[Tuple]]:
+        """Get all songs by year"""
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = f"""
+                    {yellberus.QUERY_SELECT}
+                    {yellberus.QUERY_FROM}
+                    WHERE S.RecordingYear = ? AND MS.IsActive = 1
+                    {yellberus.QUERY_GROUP_BY}
+                    ORDER BY MS.SourceID DESC
+                """
+                cursor.execute(query, (year,))
+                headers = [description[0] for description in cursor.description]
+                data = cursor.fetchall()
+                return headers, data
+        except Exception as e:
+            logger.error(f"Error fetching songs by year: {e}")
             return [], []
 
     def get_by_path(self, path: str) -> Optional[Song]:

@@ -179,6 +179,7 @@ class EntityClickRouter:
             kwargs["album_service"] = service
             kwargs["publisher_service"] = getattr(self.services, "publisher_service", None)
             kwargs["contributor_service"] = getattr(self.services, "contributor_service", None)
+            kwargs["settings_manager"] = getattr(self.services, "settings_manager", None)
             kwargs["initial_data"] = {"albums": [entity]}
             
         elif entity_type == EntityType.TAG:
@@ -284,6 +285,7 @@ class EntityClickRouter:
             kwargs["album_service"] = service
             kwargs["publisher_service"] = getattr(self.services, "publisher_service", None)
             kwargs["contributor_service"] = getattr(self.services, "contributor_service", None)
+            kwargs["settings_manager"] = getattr(self.services, "settings_manager", None)
         
         dialog = dialog_class(**kwargs)
         if dialog.exec():

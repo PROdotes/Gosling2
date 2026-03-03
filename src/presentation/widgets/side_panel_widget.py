@@ -784,54 +784,12 @@ class SidePanelWidget(QFrame):
         
         return ClickResult(ClickAction.CANCELLED, entity_id)
 
-    def _handle_publisher_click(self, entity_id, name):
-        """
-        Intercept Publisher clicks to handle 'Jump to Album Manager'.
-        Returns True if handled (Jumped), False to let Router open standard Dialog.
-        """
-        if not self.publisher_service: return False
-        pub = self.publisher_service.get_by_id(entity_id)
-        if not pub: return False
-
-        # T-180: If the publisher is explicitly linked to the song, manage it here.
-        # Don't jump to the album if it is a direct recording-level owner.
-        # BUG FIX: Query DB directly instead of relying on stale song.publisher_id attribute
-        if self.current_songs:
-            song = self.current_songs[0]
-            # Query DB for actual direct links (RecordingPublishers junction table)
-            direct_publishers = self.publisher_service.get_for_song(song.source_id)
-            direct_pub_ids = [p.publisher_id for p in direct_publishers]
-            if entity_id in direct_pub_ids:
-                return False  # Direct link exists - open standard editor.
-
-        # Check Inherited Status for Deep Link
-        is_inherited = False
-        if self.current_songs and getattr(self.current_songs[0], 'album_id', None):
-            alb_id = self.current_songs[0].album_id
-            if isinstance(alb_id, list):
-                 alb_id = alb_id[0] if alb_id else None
-            
-            if alb_id:
-                alb_pub_str = self.album_service.get_publisher(alb_id) or ""
-                if pub.publisher_name in [p.strip() for p in alb_pub_str.split(',')]:
-                    is_inherited = True
-        
-        if is_inherited:
-            alb = self.album_service.get_by_id(alb_id)
-            if alb:
-                self._open_album_manager(initial_album=alb, focus_publisher=True)
-            return True # Handled custom action
-        
-        return False # Fallback to Standard Router (PublisherDetailsDialog)
 
     def _handle_album_click(self, entity_id, name):
         if self.album_service:
             alb = self.album_service.get_by_id(entity_id)
             if alb:
                 self._open_album_manager(initial_album=alb)
-
-
-
 
 
     def _on_chip_removed(self, field_name, entity_id, name):
@@ -1099,11 +1057,6 @@ class SidePanelWidget(QFrame):
                 # T-Fix: Override generic Add button to use SidePanel's context-aware launcher
                 ew.set_custom_add_handler(lambda: self._open_album_manager(mode='add', clean_slate=False))
 
-            if field_def.name == 'publisher':
-                ew.click_router.register_custom_handler(
-                    "handle_publisher_click",
-                    lambda eid, name: self._handle_publisher_click(eid, name)
-                )
             
             # Connect Context Menu
             ew.chip_context_menu_requested.connect(lambda eid, n, p, f=field_def.name: self._on_chip_context_menu(f, eid, n, p))
@@ -1149,7 +1102,7 @@ class SidePanelWidget(QFrame):
         edit.installEventFilter(self)
         return edit
 
-    def _open_album_manager(self, checked=False, focus_publisher=False, initial_album=None, clean_slate=False, mode='edit'):
+    def _open_album_manager(self, checked=False, initial_album=None, clean_slate=False, mode='edit'):
         """Open the T-46 Album Selector."""
         # Gather initial data from current selection to auto-populate "Create New"
         initial_data = {}
@@ -1177,10 +1130,8 @@ class SidePanelWidget(QFrame):
                  'title': initial_album.title,
                  'artist': initial_album.album_artist,
                  'year': initial_album.release_year,
-                 'publisher': self.album_service.get_publisher(initial_album.album_id),
                  'album_id': initial_album.album_id,
                  'song_display': "Deep Link Selection",
-                 'focus_publisher': focus_publisher,
                  'song_context': song_context
              }
         elif self.current_songs:
@@ -1214,7 +1165,6 @@ class SidePanelWidget(QFrame):
                 'publisher': self._get_effective_value(sid, 'publisher', song.publisher) or "",
                 'album_id': init_id,
                 'song_display': f"{disp_artist} - {eff_title}",
-                'focus_publisher': focus_publisher,
                 'song_context': song_context
             }
             
