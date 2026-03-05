@@ -24,14 +24,14 @@ This document describes the SQLite database structure used by the Gosling2 appli
 | Add partial unique index for single primary album | `SongAlbums` | 🔴 Pending |
 | Create `TagCategories` table | NEW | 🔴 Pending |
 
-### Future (Identity Model)
+### Identity Model (In Progress / Partially Implemented)
 
 | Change | Current Table | New Table | Status |
 |--------|---------------|-----------|--------|
-| Split Contributors into Identity + Name | `Contributors` | `Identities` + `ArtistNames` | 📋 Proposed |
-| Replace credits with immutable Name references | `MediaSourceContributorRoles` | `SongCredits` | 📋 Proposed |
-| Replace credits with immutable Name references | `AlbumContributors` | `AlbumCredits` | 📋 Proposed |
-| Add temporal membership data | `GroupMembers` | `GroupMemberships` | 📋 Proposed |
+| Split Contributors into Identity + Name | `Contributors` | `Identities` + `ArtistNames` | � Implemented (Schema) |
+| Replace credits with Name references | `MediaSourceContributorRoles` | `SongCredits` | � Implemented (Schema) |
+| Replace credits with Name references | `AlbumContributors` | `AlbumCredits` | � Implemented (Schema) |
+| Add temporal membership data | `GroupMembers` | `GroupMemberships` | � Implemented (Schema) |
 
 ### Publisher Clarification (Already Correct!)
 
@@ -87,7 +87,7 @@ Historically this was a calculated "Unprocessed" tag, but it is now a dedicated,
 | `RecordingYear` | Original recording year |
 
 > **Config location:** `src/core/yellberus.py`
-> **Enforcement:** Validation service checks against Registry before setting IsDone
+> **Enforcement:** Validation service checks against Registry before setting ProcessingStatus
 
 
 ## Schema Diagrams
@@ -400,7 +400,7 @@ erDiagram
 ```
 
 > **Implementation Status Overview:**
-> - ✅ **Implemented (14 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases, Albums, SongAlbums, Publishers, AlbumPublishers, RecordingPublishers, AlbumContributors
+> - ✅ **Implemented (19 Tables):** Types, MediaSources, Songs, Contributors, Roles, MediaSourceContributorRoles, GroupMembers, ContributorAliases, Albums, SongAlbums, Publishers, AlbumPublishers, RecordingPublishers, AlbumContributors, Identities, ArtistNames, GroupMemberships, SongCredits, AlbumCredits
 > - ❌ **Not Implemented (Missing):** Streams, Commercials, Tags, MediaSourceTags, TagRelations, AutoTagRules, Playlists, PlaylistItems, Agencies, Clients, Campaigns
 > - ⏸️ **Planned (Audit):** ChangeLog, DeletedRecords, PlayHistory, ActionLog
 > - 🔮 **Future (Broadcast):** Timeslots, ContentRules
@@ -440,7 +440,7 @@ The base table for all playable content. Every audio item starts here.
 | `SourceNotes` | TEXT | - | Searchable description |
 | `SourcePath` | TEXT | NOT NULL | File path (C:\...) or URL (https://...) |
 | `SourceDuration` | REAL | - | Duration in seconds (NULL for streams) |
-| `AudioHash` | TEXT | INDEXED | Hash of MP3 audio frames only (excludes ID3 tags) for duplicate detection |
+| `AudioHash` | TEXT | INDEXED | Hash of MP3 audio frames for duplicate detection |
 | `IsActive` | BOOLEAN | DEFAULT 1 | Show in library (0 = hidden/inactive) |
 | `ProcessingStatus` | INTEGER | DEFAULT 1 | 0 = Unprocessed, 1 = Done (Workflow State) |
 
@@ -463,13 +463,9 @@ Extends `MediaSources` for music tracks with additional metadata and timing.
 | `ISRC` | TEXT | - | International Standard Recording Code |
 | `SongGroups` | TEXT | - | Content group description (TIT1) |
 
-| `CueIn` | REAL | DEFAULT 0 | ❌ Playback start trim (seconds) |
-| `CueOut` | REAL | - | ❌ Playback end trim (seconds) |
-| `Intro` | REAL | - | ❌ End of talk-over zone at start |
-| `Outro` | REAL | - | ❌ Start of talk-over zone at end |
-| `HookIn` | REAL | - | ❌ Teaser segment start |
-| `HookOut` | REAL | - | ❌ Teaser segment end |
-| `MusicBrainzRecordingID` | TEXT | - | 🔮 (v0.3) Unique Recording ID |
+> [!IMPORTANT]
+> **Planned Playback Fields:** The following fields are defined in the architecture but are NOT yet in the database. Playout logic currenty relies on ID3 tags or defaults.
+> - `CueIn`, `CueOut`, `Intro`, `Outro`, `HookIn`, `HookOut`
 
 **Timing Fields:**
 ```
@@ -860,19 +856,63 @@ SELECT * FROM EntityTimeline WHERE SourceID = 123 ORDER BY Timestamp DESC;
 
 ## Contributors & Albums
 
-### 21. `Contributors` ✅ Implemented
+### 21. `Identities` ✅ Implemented (Schema)
 
-> **🔮 Future Change:** See [PROPOSAL_IDENTITY_MODEL.md](./PROPOSAL_IDENTITY_MODEL.md)  
-> This table will be split into `Identities` (the person/group) and `ArtistNames` (names they use).
+The "New World" identity model representing the real person, group, or placeholder.
 
-Artists, composers, and other credited individuals or groups.
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `IdentityID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `IdentityType` | TEXT | CHECK(...) | 'person', 'group', or 'placeholder' |
+| `LegalName` | TEXT | - | Real name (e.g., Farrokh Bulsara) |
+| `DateOfBirth` | DATE | - | DOB (person) |
+| `Nationality` | TEXT | - | Country of origin |
+| `Biography` | TEXT | - | Artist bio |
+
+### 22. `ArtistNames` ✅ Implemented (Schema)
+
+The names owned by identities (e.g. Freddie Mercury owned by Farrokh Bulsara).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `NameID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `OwnerIdentityID` | INTEGER | FK | Reference to `Identities` |
+| `DisplayName` | TEXT | NOT NULL | The name used (e.g. "Freddie Mercury") |
+| `SortName` | TEXT | - | Sorting name (e.g. "Mercury, Freddie") |
+| `IsPrimaryName` | BOOLEAN | DEFAULT 0 | Whether this is the main name for the identity |
+
+### 23. `GroupMemberships` ✅ Implemented (Schema)
+
+Links identities into groups (e.g. Freddie Mercury in Queen).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `MembershipID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `GroupIdentityID` | INTEGER | FK | Reference to group `Identities` |
+| `MemberIdentityID` | INTEGER | FK | Reference to person `Identities` |
+| `CreditedAsNameID` | INTEGER | FK | Reference to `ArtistNames` used during tenure |
+
+### 24. `SongCredits` ✅ Implemented (Schema)
+
+The "Immutable" link between a specific Song and a Name.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `CreditID` | INTEGER | PRIMARY KEY | Unique identifier |
+| `SourceID` | INTEGER | FK | Reference to `MediaSources` |
+| `CreditedNameID` | INTEGER | FK | Reference to `ArtistNames` |
+| `RoleID` | INTEGER | FK | Reference to `Roles` |
+
+### 25. `Contributors` (LEGACY)
+
+The "Old World" flat model. Still present in `database.py` for backward compatibility during migration.
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `ContributorID` | INTEGER | PRIMARY KEY | Unique identifier |
 | `ContributorName` | TEXT | NOT NULL UNIQUE | Display name |
-| `SortName` | TEXT | - | Sorting name (e.g., "Beatles, The") |
-| `ContributorType` | TEXT | CHECK(ContributorType IN ('person', 'group')) | Individual or band |
+| `SortName` | TEXT | - | Sorting name |
+| `ContributorType` | TEXT | CHECK(...) | 'person' or 'group' |
 
 **Type Definitions:**
 - `'person'`: An individual human being (e.g., "Dave Grohl").
@@ -1024,40 +1064,40 @@ Links albums to publishers. **This is the RELEASE LABEL** — who released this 
 
 ## Summary: All Tables
 
-| # | Table | Purpose |
-|---|-------|---------|
-| 1 | Types | Content type lookup |
-| 2 | MediaSources | Base for all playable items |
-| 3 | Songs | Music-specific (timing, BPM) |
-| 4 | RecordingPublishers | Song-publisher links (Master Ownership) |
-| 5 | Albums | Album release information |
-| 6 | Streams | Stream-specific (failover) |
-| 7 | Commercials | Ad-specific (campaign link) |
-| 8 | Agencies | Ad agencies |
-| 9 | Clients | Advertisers |
-| 10 | Campaigns | Ad campaigns |
-| 11 | Tags | All categorization |
-| 12 | MediaSourceTags | Tag assignments |
-| 13 | TagRelations | Tag hierarchy |
-| 14 | AutoTagRules | Smart auto-tagging |
-| 15 | Playlists | Saved playlists |
-| 16 | PlaylistItems | Playlist contents |
-| 17 | ChangeLog | Audit trail |
-| 18 | DeletedRecords | Deletion recovery |
-| 19 | PlayHistory | As-run broadcast log |
-| 20 | ActionLog | User action audit trail |
-| 21 | Contributors | Artists, composers |
-| 22 | ContributorAliases | Name variants |
-| 23 | Roles | Contribution types |
-| 24 | MediaSourceContributorRoles | Credits |
-| 25 | GroupMembers | Band membership |
-| 26 | Publishers | Labels hierarchy |
-| 27 | SongAlbums | Song-album links |
-| 28 | AlbumPublishers | Album-publisher links |
-| 29 | Timeslots | Broadcast automation slots |
-| 30 | ContentRules | Automation sequence rules |
+| # | Table | Purpose | Status |
+|---|-------|---------|--------|
+| 1 | `Types` | Content type lookup | ✅ Implemented |
+| 2 | `MediaSources` | Base for all playable items | ✅ Implemented |
+| 3 | `Songs` | Music-specific extensions | ✅ Implemented |
+| 4 | `Identities` | The real artist identity | ✅ Implemented |
+| 5 | `ArtistNames` | Names owned by identities | ✅ Implemented |
+| 6 | `GroupMemberships` | Identity → Group links | ✅ Implemented |
+| 7 | `SongCredits` | Immutable song credits | ✅ Implemented |
+| 8 | `AlbumCredits` | Immutable album credits | ✅ Implemented |
+| 9 | `Contributors` | LEGACY: Flat artist list | ✅ Implemented |
+| 10 | `Roles` | Contribution types | ✅ Implemented |
+| 11 | `MediaSourceContributorRoles` | LEGACY: Credit junction | ✅ Implemented |
+| 12 | `ContributorAliases` | LEGACY: Name variants | ✅ Implemented |
+| 13 | `Albums` | Album release information | ✅ Implemented |
+| 14 | `AlbumContributors` | Album-artist links | ✅ Implemented |
+| 15 | `SongAlbums` | Song-album links | ✅ Implemented |
+| 16 | `Publishers` | Label hierarchy | ✅ Implemented |
+| 17 | `AlbumPublishers` | Album release label | ✅ Implemented |
+| 18 | `RecordingPublishers` | Master ownership | ✅ Implemented |
+| 19 | `Tags` | All categorization | ✅ Implemented |
+| 20 | `MediaSourceTags` | Tag assignments | ✅ Implemented |
+| 21 | `ChangeLog` | Audit: Field-level edits | ✅ Implemented |
+| 22 | `DeletedRecords` | Audit: Deletion recovery | ✅ Implemented |
+| 23 | `ActionLog` | Audit: System/User actions | ✅ Implemented |
+| 24 | `Streams` | Live audio feeds | ❌ Planned |
+| 25 | `Commercials` | Advertisements | ❌ Planned |
+| 26 | `Playlists` | Saved playlists | ❌ Planned |
+| 27 | `PlaylistItems` | Playlist contents | ❌ Planned |
+| 28 | `PlayHistory` | As-run log | ⏸️ Planned |
+| 29 | `Timeslots` | Automation slots | 🔮 Future |
+| 30 | `ContentRules` | Automation rules | 🔮 Future |
 
-**Total: 30 tables** (including junctions and lookups) + 1 VIEW (EntityTimeline)
+**Total: 23 Implemented** | 7 Planned/Future | 1 VIEW (`EntityTimeline`)
 
 ---
 
