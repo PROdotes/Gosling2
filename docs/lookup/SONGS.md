@@ -1,26 +1,42 @@
-# Songs Contract Registry
+# Songs & Media Data Lookup
+*Location: `src/v3core/data/song_repository.py`*
 
-> **LAW**: This file is updated BEFORE the code changes. The signature here is the truth.
-> Format: `method_name(param: type, ...) -> ReturnType — plain English description`
+**Responsibility**: Low-level database access for the Songs and MediaSources tables.
 
 ---
 
 ## SongRepository
-*Location: `src/v3core/data/song_repository.py`*
-
-**Responsibility**: DB reads and writes for the Songs and SongCredits tables.
-
 ### get_by_id(song_id: int) -> Optional[Song]
-Fetches a single Song Domain Model by its primary key.
+Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
 
 ### get_by_ids(ids: List[int]) -> List[Song]
-Batch-fetches multiple Song Domain Models. Optimized for the ID-Skeleton virtual table.
+Batch-fetches core song records for multiple IDs.
+
+### _row_to_song(row: sqlite3.Row) -> Song
+**Internal**: Maps a physical database row to the strict Pydantic `Song` model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.
 
 ---
 
-## SongService
-*Location: `src/v3core/services/song_service.py`*
+## BaseRepository
+*Location: `src/v3core/data/base_repository.py`*
 
-**Responsibility**: Orchestrates multi-step song queries. The "Jazler-Debounce" and ID-Skeleton logic live here.
+**Responsibility**: The connection owner and audit spine for all repositories.
 
-*(No methods defined yet — add them here before implementation)*
+### _get_connection() -> sqlite3.Connection
+Single point of truth for all DB connections in `v3core`.
+
+### _log_change(cursor, table, record_id, field, old_val, new_val, batch_id)
+Writes one audit row to the existing `ChangeLog` table. Silently no-ops if no change.
+
+---
+
+## SongCreditRepository
+*Location: `src/v3core/data/song_credit_repository.py`*
+
+**Responsibility**: DB reads for the SongCredits table. Bridges Song IDs to Names and Roles.
+
+### get_credits_for_song(song_id: int) -> List[SongCredit]
+Fetches all credits for a given song, joining `ArtistNames` to include the human-readable `display_name`.
+
+### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
+**Internal**: Maps a physical database row to the strict Pydantic `SongCredit` model, enforcing strict validation that `RoleID` cannot be NULL.

@@ -10,6 +10,7 @@ Master list of all features, proposals, and tasks. Open in Obsidian "Graph View"
 
 ## Active Tasks
 
+- [[HANDOVER]] — Phase 0 → Phase 1 V3CORE Transfer (🔥 READ FIRST)
 - [[T-01_type_tabs]] — Type Tabs (✅ Done)
 - [[T-02_field_registry]] — Field Registry (✅ Done)
 - [[T-03_inline_edit]] — Inline Edit (🟡 Planned)
