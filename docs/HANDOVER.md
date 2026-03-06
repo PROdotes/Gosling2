@@ -9,3 +9,6 @@
 
 ## 2. Directory of Truth
 - **Contracts**: `docs/lookup/` (Updated *before* implementation).
+
+## 3. The "Done and Green" Workflow
+When starting Phase 1 (e.g., building the first Catalog Endpoint `GET /api/v1/songs/{song_id}`):
