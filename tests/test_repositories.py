@@ -57,4 +57,4 @@ def test_song_credit_repository_strict_validation(populated_db):
 
     # This should trigger our VIOLATION logic
     with pytest.raises(ValueError, match="VIOLATION: Database integrity error"):
-        repo.get_credits_for_song(99)
+        repo.get_credits_for_songs([99])

@@ -1,4 +1,5 @@
 import sqlite3
+from src.services.logger import logger
 
 
 class BaseRepository:
@@ -46,4 +47,7 @@ class BaseRepository:
                 str(new_val) if new_val is not None else None,
                 batch_id,
             ),
+        )
+        logger.debug(
+            f"[BaseRepository] Audit written: {table}.{field} (ID: {record_id})"
         )

@@ -1,15 +1,15 @@
-import sqlite3
-import pytest
 import sys
 from pathlib import Path
 
 # Ensure project root is in path for tests
 project_root = str(Path(__file__).parent.parent)
-if project_root not in sys.path:    
+if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from src.data.schema import SCHEMA_SQL
-from src.services.catalog_service import CatalogService
+import sqlite3  # noqa: E402
+import pytest  # noqa: E402
+from src.data.schema import SCHEMA_SQL  # noqa: E402
+from src.services.catalog_service import CatalogService  # noqa: E402
 
 
 @pytest.fixture
@@ -83,7 +83,8 @@ def populated_db(mock_db_path):
         "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (20, 2, 'Nirvana', 1)"
     )
     cursor.execute(
-        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (30, 3, 'Foo Fighters', 1)"
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) "
+        "VALUES (30, 3, 'Foo Fighters', 1)"
     )
 
     # Taylor's Primary
@@ -152,7 +153,8 @@ def populated_db(mock_db_path):
 
     # Song with ZERO credits
     cursor.execute(
-        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (7, 1, 'Hollow Song', '/path/7', 10, 1)"
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) "
+        "VALUES (7, 1, 'Hollow Song', '/path/7', 10, 1)"
     )
     cursor.execute("INSERT INTO Songs (SourceID) VALUES (7)")
 

@@ -9,7 +9,7 @@ class DomainModel(BaseModel):
 
 
 class MediaSource(DomainModel):
-    """The base record for any airable file in the Prodo library."""
+    """The base record for any airable file in the Gosling library."""
 
     id: int
     type_id: int
