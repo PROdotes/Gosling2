@@ -22,8 +22,14 @@ def check_conflict(target_path: str) -> bool:
 
 def _resolve_rules_path() -> str:
     """Determine where rules.json lives. Canonical location: src/json/rules.json"""
-    base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    path = os.path.join(base_dir, "src", "json", "rules.json")
+    import sys
+    if getattr(sys, 'frozen', False):
+        base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(base_dir, "src", "json", "rules.json")
+    else:
+        base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        path = os.path.join(base_dir, "src", "json", "rules.json")
+        
     if os.path.exists(path):
         return path
     return None

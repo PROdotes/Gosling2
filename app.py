@@ -24,7 +24,12 @@ def main() -> None:
     
     # Apply Theme
     try:
-        theme_path = os.path.join(os.path.dirname(__file__), "src", "resources", "theme.qss")
+        if getattr(sys, "frozen", False):
+            base_app_dir = sys._MEIPASS
+        else:
+            base_app_dir = os.path.dirname(__file__)
+
+        theme_path = os.path.join(base_app_dir, "src", "resources", "theme.qss")
         if os.path.exists(theme_path):
             with open(theme_path, "r") as f:
                 qss = f.read()

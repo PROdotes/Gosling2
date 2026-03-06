@@ -35,9 +35,20 @@ class ID3Registry:
             return
             
         try:
-            # Resolve path: src/core/registries/ -> src/json/
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            json_path = os.path.join(base_dir, '..', '..', 'json', 'id3_frames.json')
+            import sys
+            if getattr(sys, 'frozen', False):
+                # If running as a PyInstaller executable, use the MEIPASS temp folder.
+                # In PyInstaller, we added the src/resources folder using --add-data
+                # But ID3Frames might be in src/json, we need to check if we packaged it
+                # Looking at your PyInstaller command, you didn't include src/json. 
+                # BUT wait, the ID3 registry gets packaged anyway? No, it's a data file.
+                # Let's read from relative to the _MEIPASS root.
+                base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+                json_path = os.path.join(base_dir, 'src', 'json', 'id3_frames.json')
+            else:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                json_path = os.path.join(base_dir, '..', '..', 'json', 'id3_frames.json')
+            
             json_path = os.path.normpath(json_path)
             
             if not os.path.exists(json_path):
