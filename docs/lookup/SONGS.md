@@ -1,5 +1,5 @@
 # Songs & Media Data Lookup
-*Location: `src/v3core/data/song_repository.py`*
+*Location: `src/data/song_repository.py`*
 
 **Responsibility**: Low-level database access for the Songs and MediaSources tables.
 
@@ -18,7 +18,7 @@ Batch-fetches core song records for multiple IDs.
 ---
 
 ## BaseRepository
-*Location: `src/v3core/data/base_repository.py`*
+*Location: `src/data/base_repository.py`*
 
 **Responsibility**: The connection owner and audit spine for all repositories.
 
@@ -31,7 +31,7 @@ Writes one audit row to the existing `ChangeLog` table. Silently no-ops if no ch
 ---
 
 ## SongCreditRepository
-*Location: `src/v3core/data/song_credit_repository.py`*
+*Location: `src/data/song_credit_repository.py`*
 
 **Responsibility**: DB reads for the SongCredits table. Bridges Song IDs to Names and Roles.
 

@@ -1,5 +1,5 @@
 # Catalog Service Lookup
-*Location: `src/v3core/services/catalog_service.py`*
+*Location: `src/services/catalog_service.py`*
 
 **Responsibility**: Orchestrates data from multiple repositories into complete Domain Models.
 

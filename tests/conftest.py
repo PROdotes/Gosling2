@@ -1,240 +1,161 @@
-"""Test configuration"""
-import sys
-import shutil
-from pathlib import Path
+import sqlite3
 import pytest
-from unittest.mock import MagicMock, patch
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, TIT2, TPE1, APIC, COMM
+import sys
+from pathlib import Path
 
-# Add src to path
-src_path = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_path))
+# Ensure project root is in path for tests
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:    
+    sys.path.insert(0, project_root)
 
-# Path to the real test MP3 fixture
-FIXTURE_MP3 = Path(__file__).parent / "fixtures" / "test.mp3"
+from src.data.schema import SCHEMA_SQL
+from src.services.catalog_service import CatalogService
 
-@pytest.fixture(autouse=True)
-def silence_popups():
-    """Silence all QMessageBox popups globally for non-interactive testing."""
-    from PyQt6.QtWidgets import QMessageBox
-    with patch('PyQt6.QtWidgets.QMessageBox.information'), \
-         patch('PyQt6.QtWidgets.QMessageBox.warning'), \
-         patch('PyQt6.QtWidgets.QMessageBox.critical'), \
-         patch('PyQt6.QtWidgets.QMessageBox.question', return_value=QMessageBox.StandardButton.Yes):
-        yield
 
 @pytest.fixture
-def test_mp3(tmp_path):
-    """Create a test MP3 file by copying the fixture"""
-    if not FIXTURE_MP3.exists():
-        pytest.skip(f"Test fixture not found: {FIXTURE_MP3}")
-    
-    mp3_path = tmp_path / "test.mp3"
-    shutil.copy(FIXTURE_MP3, mp3_path)
-    
-    # Add basic ID3v2 tags
-    audio = MP3(mp3_path)
-    if audio.tags is None:
-        audio.add_tags()
-    audio.tags.add(TIT2(encoding=3, text='Test Title'))
-    audio.tags.add(TPE1(encoding=3, text='Test Artist'))
-    audio.save(v1=0)
-    
-    return str(mp3_path)
+def mock_db_path(tmp_path):
+    """
+    Creates a hermetic, in-memory SQLite database initialized with the v3core schema.
+    This ensures tests are always running against the current schema.
+    """
+    db_file = tmp_path / "test_v3core_hermetic.db"
+    conn = sqlite3.connect(db_file)
+    conn.executescript(SCHEMA_SQL)
+    conn.commit()
+    conn.close()
+    return str(db_file)
 
-# Path to the banana test MP3 fixture
-FIXTURE_BANANA = Path(__file__).parent / "fixtures" / "bananas.mp3"
 
 @pytest.fixture
-def test_mp3_banana(tmp_path):
-    """Create a banana test MP3 file by copying the fixture"""
-    if not FIXTURE_BANANA.exists():
-        pytest.skip(f"Test fixture not found: {FIXTURE_BANANA}")
-    
-    mp3_path = tmp_path / "bananas.mp3"
-    shutil.copy(FIXTURE_BANANA, mp3_path)
-    
-    # Add distinct ID3v2 tags
-    audio = MP3(mp3_path)
-    if audio.tags is None:
-        audio.add_tags()
-    audio.tags.add(TIT2(encoding=3, text='Banana Title'))
-    audio.tags.add(TPE1(encoding=3, text='Banana Artist'))
-    audio.save(v1=0)
-    
-    return str(mp3_path)
+def catalog_service(mock_db_path):
+    """Fixture to provide a clean CatalogService for every test."""
+    return CatalogService(mock_db_path)
+
 
 @pytest.fixture
-def test_mp3_with_album_art(tmp_path):
-    """MP3 with album art to test preservation"""
-    if not FIXTURE_MP3.exists():
-        pytest.skip(f"Test fixture not found: {FIXTURE_MP3}")
-    
-    mp3_path = tmp_path / "test_art.mp3"
-    shutil.copy(FIXTURE_MP3, mp3_path)
-    
-    audio = MP3(mp3_path)
-    if audio.tags is None:
-        audio.add_tags()
-    audio.tags.add(TIT2(encoding=3, text='Test'))
-    audio.tags.add(TPE1(encoding=3, text='Artist'))
-    
-    # Add minimal 1x1 PNG as album art
-    audio.tags.add(APIC(
-        encoding=3,
-        mime='image/png',
-        type=3,  # Cover (front)
-        desc='Cover',
-        data=b'\\x89PNG\\r\\n\\x1a\\n\\x00\\x00\\x00\\rIHDR\\x00\\x00\\x00\\x01\\x00\\x00\\x00\\x01\\x08\\x06\\x00\\x00\\x00\\x1f\\x15\\xc4\\x89\\x00\\x00\\x00\\nIDATx\\x9cc\\x00\\x01\\x00\\x00\\x05\\x00\\x01\\r\\n-\\xb4\\x00\\x00\\x00\\x00IEND\\xaeB`\\x82'
-    ))
-    audio.save()
-    
-    return str(mp3_path)
+def populated_db(mock_db_path):
+    """
+    A 'Dave Grohl' scenario pre-populated into the hermetic test DB.
+    Use this for logic/paradigm tests.
+    """
+    conn = sqlite3.connect(mock_db_path)
+    cursor = conn.cursor()
 
-@pytest.fixture
-def test_mp3_with_comments(tmp_path):
-    """MP3 with comments to test preservation"""
-    if not FIXTURE_MP3.exists():
-        pytest.skip(f"Test fixture not found: {FIXTURE_MP3}")
-    
-    mp3_path = tmp_path / "test_comments.mp3"
-    shutil.copy(FIXTURE_MP3, mp3_path)
-    
-    audio = MP3(mp3_path)
-    if audio.tags is None:
-        audio.add_tags()
-    audio.tags.add(TIT2(encoding=3, text='Test'))
-    audio.tags.add(COMM(encoding=3, lang='eng', desc='', text='Important comment'))
-    audio.save()
-    
-    return str(mp3_path)
-
-@pytest.fixture
-def test_mp3_empty(tmp_path):
-    """MP3 with no tags"""
-    if not FIXTURE_MP3.exists():
-        pytest.skip(f"Test fixture not found: {FIXTURE_MP3}")
-    
-    mp3_path = tmp_path / "test_empty.mp3"
-    shutil.copy(FIXTURE_MP3, mp3_path)
-    
-    # Remove all tags
-    audio = MP3(mp3_path)
-    if audio.tags is not None:
-        audio.delete()
-    
-    return str(mp3_path)
-
-@pytest.fixture
-def mock_mp3():
-    """Mock mutagen MP3"""
-    with patch("src.business.services.metadata_service.MP3") as mock:
-        yield mock
-
-@pytest.fixture
-def mock_id3():
-    """Mock mutagen ID3"""
-    with patch("src.business.services.metadata_service.ID3") as mock:
-        yield mock
-
-@pytest.fixture
-def mock_widget_deps():
-    """Unified mock dependencies for LibraryWidget and related UI components"""
-    deps = {
-        'library_service': MagicMock(),
-        'metadata_service': MagicMock(),
-        'settings_manager': MagicMock(),
-        'renaming_service': MagicMock(),
-        'duplicate_scanner': MagicMock(),
-        'import_service': MagicMock()
-    }
-    
-    # Default settings to prevent common initialization crashes
-    deps['settings_manager'].get_last_import_directory.return_value = ""
-    deps['settings_manager'].get_column_visibility.return_value = {}
-    deps['settings_manager'].get_column_layout.return_value = None
-    deps['settings_manager'].get_type_filter.return_value = 0
-    deps['settings_manager'].get_default_year.return_value = 0
-    deps['settings_manager'].get_library_splitter_state.return_value = None
-    
-    # Default library data (Empty but structured)
-    deps['library_service'].get_all_songs.return_value = ([], [])
-    
-    # Repository mocks (SidePanelWidget accesses these via library_service)
-    # Contributor repo
-    mock_contributor = MagicMock()
-    mock_contributor.contributor_id = 1
-    mock_contributor.contributor_name = "Test Artist"
-    deps['library_service'].contributor_repository = MagicMock()
-    deps['library_service'].contributor_repository.get_or_create.return_value = (mock_contributor, False)
-    # Service mock (SidePanel uses service, not repo directly)
-    deps['library_service'].contributor_service = MagicMock()
-    deps['library_service'].contributor_service.get_or_create.return_value = (mock_contributor, False)
-    
-    # Publisher repo
-    mock_publisher = MagicMock()
-    mock_publisher.publisher_id = 1
-    mock_publisher.publisher_name = "Test Publisher"
-    mock_publisher.parent_publisher_id = None
-    deps['library_service'].publisher_repo = MagicMock()
-    deps['library_service'].publisher_repo.get_or_create.return_value = (mock_publisher, False)
-    deps['library_service'].publisher_repo.get_by_id.return_value = None
-    # Service mock
-    deps['library_service'].publisher_service = MagicMock()
-    # PublisherService.get_or_create might act same as repo
-    deps['library_service'].publisher_service.get_or_create.return_value = (mock_publisher, False)
-    
-    # Album repo
-    mock_album = MagicMock()
-    mock_album.album_id = 1
-    mock_album.title = "Test Album"
-    deps['library_service'].album_repo = MagicMock()
-    deps['library_service'].album_repo.get_or_create.return_value = (mock_album, False)
-    
-    # Tag repo (for Genre/Mood)
-    mock_tag = MagicMock()
-    mock_tag.tag_id = 1
-    mock_tag.tag_name = "Test Genre"
-    deps['library_service'].tag_repo = MagicMock()
-    deps['library_service'].tag_repo.get_or_create.return_value = (mock_tag, False)
-    
-    return deps
-
-@pytest.fixture
-def library_widget(qtbot, mock_widget_deps):
-    """Unified LibraryWidget fixture for general UI testing"""
-    from src.presentation.widgets.library_widget import LibraryWidget
-    deps = mock_widget_deps
-    
-    # Minimal struct for load_library not to crash
-    deps['library_service'].get_all_songs.return_value = ([], [])
-    
-    widget = LibraryWidget(
-        deps['library_service'], 
-        deps['metadata_service'], 
-        deps['settings_manager'],
-        deps['renaming_service'],
-        deps['duplicate_scanner'],
-        conversion_service=None,
-        import_service=deps['import_service']
+    # 1. Identities
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (1, 'person', 'Dave Grohl')"
     )
-    qtbot.addWidget(widget)
-    return widget
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (2, 'group', 'Nirvana')"
+    )
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (3, 'group', 'Foo Fighters')"
+    )
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (4, 'person', 'Taylor Hawkins')"
+    )
 
-@pytest.fixture
-def mock_library_service():
-    """Mock library service for testing"""
-    service = MagicMock()
-    service.get_all_songs.return_value = ([], [])
-    return service
+    # 2. Memberships
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (2, 1)"
+    )  # Dave in Nirvana
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 1)"
+    )  # Dave in Foo Fighters
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 4)"
+    )  # Taylor in Foo Fighters
 
-@pytest.fixture
-def mock_metadata_service():
-    """Mock metadata service for testing"""
-    return MagicMock()
+    # 3. Aliases
+    # Dave's Primary + Aliases
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (10, 1, 'Dave Grohl', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (11, 1, 'Grohlton', 0)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (12, 1, 'Late!', 0)"
+    )
 
-@pytest.fixture
-def mock_renaming_service():
-    """Mock renaming service for testing"""
-    return MagicMock()
+    # Groups
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (20, 2, 'Nirvana', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (30, 3, 'Foo Fighters', 1)"
+    )
+
+    # Taylor's Primary
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (40, 4, 'Taylor Hawkins', 1)"
+    )
+
+    # 4. Media & Songs
+    # Nirvana Track
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (1, 1, 'Smells Like Teen Spirit', '/path/1', 200, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (1)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (1, 20, 1)"
+    )
+
+    # Foo Fighters Track
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (2, 1, 'Everlong', '/path/2', 240, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (2)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (2, 30, 1)"
+    )
+
+    # Taylor Hawkins Solo Track (Co-worker's work: Dave should NOT get this)
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (3, 1, 'Range Rover Bitch', '/path/3', 180, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (3)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (3, 40, 1)"
+    )
+
+    # Dave Grohl Alias Track #1 (Grohlton)
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (4, 1, 'Grohlton Theme', '/path/4', 120, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (4)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (4, 11, 1)"
+    )
+
+    # Dave Grohl Alias Track #2 (Late!)
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (5, 1, 'Pocketwatch Demo', '/path/5', 180, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (5)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (5, 12, 1)"
+    )
+
+    # 5. Edge Cases
+    # Song with MULTIPLE credits (Multiple performers/composers)
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (6, 1, 'Dual Credit Track', '/path/6', 300, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (6)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (6, 10, 1)"
+    )  # Dave Grohl
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (6, 40, 2)"
+    )  # Taylor Hawkins (Composer)
+
+    # Song with ZERO credits
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (7, 1, 'Hollow Song', '/path/7', 10, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (7)")
+
+    conn.commit()
+    conn.close()
+    return mock_db_path
