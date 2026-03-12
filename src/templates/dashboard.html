@@ -55,6 +55,7 @@
             font-weight: 600;
             background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: -0.02em;
         }
@@ -142,6 +143,33 @@
             border-radius: 6px;
             color: var(--accent-primary);
             font-size: 0.85rem;
+            white-space: nowrap;
+        }
+
+        .genre-badge {
+            font-size: 0.7rem;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent-primary);
+            padding: 0.1rem 0.4rem;
+            border-radius: 4px;
+            margin-left: 0.5rem;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        .tag-pill {
+            display: inline-block;
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            margin: 0 0.4rem 0.4rem 0;
+            color: var(--text-main);
+        }
+
+        .tag-pill.category-genre {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         #detail-panel {
@@ -289,7 +317,7 @@
     <main>
         <section id="results-container">
             <div class="empty-state">
-                <p>Type at least 2 characters to discover music</p>
+                <p>Type to discover music</p>
             </div>
         </section>
 
@@ -309,11 +337,6 @@
             clearTimeout(debounceTimer);
             const query = e.target.value.trim();
 
-            if (query.length < 2) {
-                resultsContainer.innerHTML = '<div class="empty-state"><p>Type at least 2 characters to discover music</p></div>';
-                return;
-            }
-
             debounceTimer = setTimeout(() => {
                 searchSongs(query);
             }, 300);
@@ -321,8 +344,12 @@
 
         async function searchSongs(query) {
             try {
-                const response = await fetch(`/api/v1/songs/search?q=${encodeURIComponent(query)}`);
-                if (!response.ok) throw new Error('Search failed');
+                const response = await fetch(`/api/v1/songs/search?query=${encodeURIComponent(query)}`);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `Search failed: ${response.statusText}`);
+                }
 
                 const songs = await response.json();
                 renderResults(songs);
@@ -340,8 +367,8 @@
             resultsContainer.innerHTML = songs.map(song => `
                 <div class="song-card" onclick="showDetail(${JSON.stringify(song).replace(/"/g, '&quot;')}, this)">
                     <div class="song-info">
-                        <h3>${song.title}</h3>
-                        <p>${song.credits.length > 0 ? song.credits[0].display_name : 'Unknown Artist'}</p>
+                        <h3>${song.title}${song.primary_genre ? `<span class="genre-badge">${song.primary_genre}</span>` : ''}</h3>
+                        <p>${song.display_artist || 'Unknown Artist'}</p>
                     </div>
                     <div class="song-year">${song.year || 'N/A'}</div>
                 </div>
@@ -358,7 +385,37 @@
             const creditsHtml = song.credits.map(c => `
                 <div class="credit-item">
                     <span class="credit-name">${c.display_name}</span>
-                    <span class="credit-role">${c.role_id === 1 ? 'Performer' : 'Contributor'}</span>
+                    <span class="credit-role">${c.role_name}</span>
+                </div>
+            `).join('');
+
+            const albumsHtml = (song.albums || []).map(a => {
+                const pubNames = (a.publishers || []).map(p => p.name).join(', ') || 'Unknown Publisher';
+                const trackInfo = a.track_number ? `Track ${a.track_number}` : '';
+                return `
+                <div class="credit-item" style="border-left: ${a.is_primary ? '2px solid var(--accent-primary)' : 'none'}; padding-left: ${a.is_primary ? '8px' : '0'};">
+                    <div>
+                        <span class="credit-name" style="color: ${a.is_primary ? '#fff' : 'var(--text-dim)'}">${a.album_title}</span>
+                        <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+                            ${a.release_year || 'Unknown Year'} ${a.album_type ? `• ${a.album_type}` : ''} ${trackInfo ? `• ${trackInfo}` : ''}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span class="credit-role">${a.is_primary ? 'Primary Album' : 'Appearance'}</span>
+                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; opacity: 0.7;">${pubNames}</div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            const tagsHtml = (song.tags || []).map(t => `
+                <span class="tag-pill ${t.category === 'Genre' ? 'category-genre' : ''}">${t.name}</span>
+            `).join('');
+
+            const masterPubsHtml = (song.publishers || []).map(p => `
+                <div class="credit-item">
+                    <span class="credit-name">${p.name}</span>
+                    <span class="credit-role">Copyright Owner</span>
                 </div>
             `).join('');
 
@@ -368,7 +425,25 @@
                     <div class="detail-meta">
                         <span class="meta-tag">${song.year || 'No Date'}</span>
                         <span class="meta-tag">${song.isrc || 'No ISRC'}</span>
+                        ${song.primary_genre ? `<span class="meta-tag" style="border-color: var(--accent-primary); color: var(--accent-primary)">${song.primary_genre}</span>` : ''}
                     </div>
+                </div>
+
+                <div style="margin-bottom: 2.5rem;">
+                    <span class="section-label">Genres & Tags</span>
+                    <div style="margin-top: 0.5rem;">
+                        ${tagsHtml || '<p style="color: var(--text-dim); font-size: 0.8rem;">No tags available</p>'}
+                    </div>
+                </div>
+
+                <span class="section-label">Master Copyright</span>
+                <div class="credit-list">
+                    ${masterPubsHtml || '<p style="color: var(--text-dim); font-size: 0.8rem;">No master publisher data found</p>'}
+                </div>
+
+                <span class="section-label">Albums & Appearances</span>
+                <div class="credit-list">
+                    ${albumsHtml || '<p style="color: var(--text-dim)">No album data found</p>'}
                 </div>
 
                 <span class="section-label">Personnel</span>
@@ -384,7 +459,7 @@
                     </div>
                     <div class="tech-box">
                         <label>Duration</label>
-                        <span>${(song.duration_ms / 1000).toFixed(2)}s</span>
+                        <span>${song.formatted_duration || '0:00'}</span>
                     </div>
                     <div class="tech-box" style="grid-column: span 2">
                         <label>Hash</label>

@@ -47,3 +47,48 @@ Batch-fetches credits for multiple songs in a single query.
 
 ### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
 **Internal**: Maps a physical database row to the strict Pydantic `SongCredit` model, enforcing strict validation that `RoleID` cannot be NULL.
+
+---
+
+## SongAlbumRepository
+*Location: `src/data/song_album_repository.py`*
+**Responsibility**: Batch fetching of album associations for songs (M2M).
+
+### get_albums_for_songs(song_ids: List[int]) -> List[SongAlbum]
+Fetches album context (Title, Track, Disc, Primary, Publishers) for a set of Song IDs.
+Returns `SongAlbum` bridge models ready for publisher hydration by the Service.
+
+### _row_to_song_album(row: sqlite3.Row) -> SongAlbum
+**Internal**: Maps a physical database row to the strict Pydantic `SongAlbum` model.
+
+---
+
+## PublisherRepository
+*Location: `src/data/publisher_repository.py`*
+**Responsibility**: Loading Publisher metadata for Albums and Tracks.
+
+### get_publishers_for_albums(album_ids: List[int]) -> List[Tuple[int, Publisher]]
+Batch-fetch publisher objects for a list of Albums (M2M resolution).
+
+### get_publishers_for_songs(song_ids: List[int]) -> List[Tuple[int, Publisher]]
+Batch-fetch master record publisher objects for a list of Songs (M2M resolution).
+
+### get_publishers(publisher_ids: List[int]) -> Dict[int, Publisher]
+Resolve a flat list of ID -> Publisher objects.
+
+### _row_to_publisher(row: sqlite3.Row) -> Publisher
+**Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
+
+---
+
+## TagRepository
+*Location: `src/data/tag_repository.py`*
+**Responsibility**: DB reads for the Tags table.
+
+### get_tags_for_songs(song_ids: List[int]) -> List[Tuple[int, Tag]]
+Batch-fetches tags for multiple songs (M2M).
+- Returns a flat list of `(SongID, Tag)` tuples.
+- Used to build the `tags` list on the `Song` domain model.
+
+### _row_to_tag(row: sqlite3.Row) -> Tag
+**Internal**: Maps a physical database row to the strict Pydantic `Tag` model.

@@ -14,7 +14,7 @@ class SongRepository(BaseRepository):
         m.ProcessingStatus, m.IsActive, m.SourceNotes, m.MediaName,
         s.TempoBPM, s.RecordingYear, s.ISRC
     """
-    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID"
+    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')"
 
     def get_by_id(self, song_id: int) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
@@ -69,9 +69,8 @@ class SongRepository(BaseRepository):
             ),
             is_active=bool(row["IsActive"]) if row["IsActive"] is not None else True,
             notes=row["SourceNotes"],
-            title=row["MediaName"],
+            media_name=row["MediaName"],
             bpm=row["TempoBPM"],
             year=row["RecordingYear"],
             isrc=row["ISRC"],
-            album_id=None,
         )

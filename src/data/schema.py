@@ -1,14 +1,20 @@
 SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS Types (
+    TypeID INTEGER PRIMARY KEY,
+    TypeName TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS MediaSources (
     SourceID INTEGER PRIMARY KEY,
     TypeID INTEGER NOT NULL,
-    SourcePath TEXT NOT NULL,
-    SourceDuration REAL NOT NULL,
-    AudioHash TEXT,
-    ProcessingStatus INTEGER DEFAULT 0,
-    IsActive BOOLEAN DEFAULT 1,
+    MediaName TEXT NOT NULL,
     SourceNotes TEXT,
-    MediaName TEXT
+    SourcePath TEXT NOT NULL UNIQUE,
+    SourceDuration REAL,
+    AudioHash TEXT,
+    IsActive BOOLEAN DEFAULT 1,
+    ProcessingStatus INTEGER DEFAULT 1,
+    FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );
 
 CREATE TABLE IF NOT EXISTS Songs (
@@ -17,7 +23,7 @@ CREATE TABLE IF NOT EXISTS Songs (
     RecordingYear INTEGER,
     ISRC TEXT,
     SongGroups TEXT,
-    FOREIGN KEY(SourceID) REFERENCES MediaSources(SourceID)
+    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS Identities (
@@ -32,33 +38,100 @@ CREATE TABLE IF NOT EXISTS ArtistNames (
     OwnerIdentityID INTEGER,
     DisplayName TEXT NOT NULL,
     IsPrimaryName BOOLEAN DEFAULT 0,
-    FOREIGN KEY(OwnerIdentityID) REFERENCES Identities(IdentityID)
+    FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID)
 );
 
 CREATE TABLE IF NOT EXISTS GroupMemberships (
     MembershipID INTEGER PRIMARY KEY,
     GroupIdentityID INTEGER NOT NULL,
     MemberIdentityID INTEGER NOT NULL,
-    FOREIGN KEY(GroupIdentityID) REFERENCES Identities(IdentityID),
-    FOREIGN KEY(MemberIdentityID) REFERENCES Identities(IdentityID)
+    FOREIGN KEY (GroupIdentityID) REFERENCES Identities(IdentityID),
+    FOREIGN KEY (MemberIdentityID) REFERENCES Identities(IdentityID)
+);
+
+CREATE TABLE IF NOT EXISTS Roles (
+    RoleID INTEGER PRIMARY KEY,
+    RoleName TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS SongCredits (
     CreditID INTEGER PRIMARY KEY,
     SourceID INTEGER NOT NULL,
     CreditedNameID INTEGER NOT NULL,
-    RoleID INTEGER,
-    FOREIGN KEY(SourceID) REFERENCES Songs(SourceID),
-    FOREIGN KEY(CreditedNameID) REFERENCES ArtistNames(NameID)
+    RoleID INTEGER NOT NULL,
+    CreditPosition INTEGER DEFAULT 0,
+    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
+    FOREIGN KEY (CreditedNameID) REFERENCES ArtistNames(NameID),
+    FOREIGN KEY (RoleID) REFERENCES Roles(RoleID),
+    UNIQUE(SourceID, CreditedNameID, RoleID)
+);
+
+CREATE TABLE IF NOT EXISTS Albums (
+    AlbumID INTEGER PRIMARY KEY,
+    AlbumTitle TEXT NOT NULL,
+    AlbumType TEXT,
+    ReleaseYear INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS SongAlbums (
+    SourceID INTEGER NOT NULL,
+    AlbumID INTEGER NOT NULL,
+    TrackNumber INTEGER,
+    DiscNumber INTEGER DEFAULT 1,
+    IsPrimary BOOLEAN DEFAULT 1,
+    TrackPublisherID INTEGER,
+    PRIMARY KEY (SourceID, AlbumID),
+    FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
+    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Publishers (
+    PublisherID INTEGER PRIMARY KEY,
+    PublisherName TEXT NOT NULL,
+    ParentPublisherID INTEGER,
+    FOREIGN KEY (ParentPublisherID) REFERENCES Publishers(PublisherID),
+    UNIQUE(PublisherName COLLATE UTF8_NOCASE)
+);
+
+CREATE TABLE IF NOT EXISTS AlbumPublishers (
+    AlbumID INTEGER NOT NULL,
+    PublisherID INTEGER NOT NULL,
+    PRIMARY KEY (AlbumID, PublisherID),
+    FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE,
+    FOREIGN KEY (PublisherID) REFERENCES Publishers(PublisherID) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS RecordingPublishers (
+    SourceID INTEGER NOT NULL,
+    PublisherID INTEGER NOT NULL,
+    PRIMARY KEY (SourceID, PublisherID),
+    FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
+    FOREIGN KEY (PublisherID) REFERENCES Publishers(PublisherID) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS Tags (
+    TagID INTEGER PRIMARY KEY,
+    TagName TEXT NOT NULL,
+    TagCategory TEXT,
+    UNIQUE(TagName COLLATE UTF8_NOCASE)
+);
+
+CREATE TABLE IF NOT EXISTS MediaSourceTags (
+    SourceID INTEGER NOT NULL,
+    TagID INTEGER NOT NULL,
+    PRIMARY KEY (SourceID, TagID),
+    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
+    FOREIGN KEY (TagID) REFERENCES Tags(TagID) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS ChangeLog (
-    LogID INTEGER PRIMARY KEY,
+    LogID INTEGER PRIMARY KEY AUTOINCREMENT,
     LogTableName TEXT NOT NULL,
     RecordID INTEGER NOT NULL,
     LogFieldName TEXT NOT NULL,
     OldValue TEXT,
     NewValue TEXT,
-    BatchID TEXT NOT NULL
+    LogTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    BatchID TEXT
 );
 """

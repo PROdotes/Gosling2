@@ -1,4 +1,5 @@
 from src.services.catalog_service import CatalogService
+from src.models.view_models import SongView
 
 
 def test_get_song_exists(populated_db):
@@ -48,3 +49,109 @@ def test_get_song_not_found(populated_db):
     service = CatalogService(populated_db)
     song = service.get_song(999)
     assert song is None
+
+
+def test_get_song_album_hydration(populated_db):
+    """LAW: Songs must be hydrated with their primary album and track/disc metadata."""
+    service = CatalogService(populated_db)
+
+    # Song 1: Nevermind
+    song1 = service.get_song(1)
+    assert len(song1.albums) == 1
+    assoc1 = song1.albums[0]
+    assert assoc1.album_id == 100
+    assert assoc1.album_title == "Nevermind"
+    assert assoc1.is_primary is True
+    # M2M: Nevermind has two publishers in conftest
+    assert len(assoc1.publishers) == 2
+    pub_names = {p.name for p in assoc1.publishers}
+    assert "DGC Records" in pub_names
+    assert "Sub Pop" in pub_names
+
+    # Master Publisher check
+    assert len(song1.publishers) == 1
+    assert song1.publishers[0].name == "DGC Records"
+
+    # Song 2: Everlong
+    song2 = service.get_song(2)
+    assert len(song2.albums) == 1
+    assoc2 = song2.albums[0]
+    assert assoc2.album_title == "The Colour and the Shape"
+    assert assoc2.track_number == 11
+    pub_names = {p.name for p in assoc2.publishers}
+    assert "Roswell Records" in pub_names
+
+    # Song with no album
+    song3 = service.get_song(4)  # Grohlton Theme
+    assert song3.albums == []
+
+
+def test_get_song_tag_hydration(populated_db):
+    """LAW: Songs must be hydrated with their tags and primary_genre derivation."""
+    service = CatalogService(populated_db)
+
+    # Song 1: Grunge + Energetic + English (Jezik)
+    song1 = service.get_song(1)
+    assert len(song1.tags) == 3
+    tag_names = {t.name for t in song1.tags}
+    assert "Grunge" in tag_names
+    assert "Energetic" in tag_names
+    assert "English" in tag_names
+    assert SongView.from_domain(song1).primary_genre == "Grunge"
+
+    # Song 2: 90s (Era) -> No Genre category so fallback to first
+    song2 = service.get_song(2)
+    assert len(song2.tags) == 1
+    assert SongView.from_domain(song2).primary_genre == "90s"
+
+    # Song 4: Electronic Style Fallback
+    song_4 = service.get_song(4)
+    view_4 = SongView.from_domain(song_4)
+    assert view_4.primary_genre == "Electronic"
+    assert any(t.name == "Electronic" for t in song_4.tags)
+
+    # Song with no tags
+    song7 = service.get_song(7)
+    assert song7.tags == []
+    assert SongView.from_domain(song7).primary_genre is None
+
+
+def test_song_domain_integrity(catalog_service, populated_db):
+    """Deep verification of song metadata: roles, languages, and publishers."""
+    # Song 1: Smells Like Teen Spirit
+    song = catalog_service.get_song(1)
+
+    # 1. Verification of Role-based formatting
+    view = SongView.from_domain(song)
+    assert view.display_artist == "Nirvana"
+    assert "Nirvana" in [c.display_name for c in song.credits]
+    assert song.credits[0].role_name == "Performer"
+
+    # 2. Verification of Duration formatting (200s -> 3:20)
+    assert view.formatted_duration == "3:20"
+
+    # 3. Verification of Multi-source Publishers
+    publisher_names = [p.name for p in song.publishers]
+    assert "DGC Records" in publisher_names
+
+    # 4. Verification of Language/Jezik tags
+    assert any(t.category == "Jezik" and t.name == "English" for t in song.tags)
+
+    # Song 6: Dual Credit Track (Dave=Performer, Taylor=Composer)
+    song_6 = catalog_service.get_song(6)
+    assert any(
+        c.display_name == "Dave Grohl" and c.role_name == "Performer"
+        for c in song_6.credits
+    )
+    assert any(
+        c.display_name == "Taylor Hawkins" and c.role_name == "Composer"
+        for c in song_6.credits
+    )
+
+
+def test_display_artist_multiple_performers(catalog_service, populated_db):
+    """LAW: display_artist must join multiple performers with a comma."""
+    song = catalog_service.get_song(8)  # Joint Venture
+    assert song is not None
+    view = SongView.from_domain(song)
+    assert view.display_artist == "Dave Grohl, Taylor Hawkins"

@@ -20,6 +20,11 @@ def mock_db_path(tmp_path):
     """
     db_file = tmp_path / "test_v3core_hermetic.db"
     conn = sqlite3.connect(db_file)
+    # Register the custom collation from the physical DB
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
     conn.executescript(SCHEMA_SQL)
     conn.commit()
     conn.close()
@@ -39,7 +44,14 @@ def populated_db(mock_db_path):
     Use this for logic/paradigm tests.
     """
     conn = sqlite3.connect(mock_db_path)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
     cursor = conn.cursor()
+
+    # 0. Types
+    cursor.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
 
     # 1. Identities
     cursor.execute(
@@ -111,7 +123,7 @@ def populated_db(mock_db_path):
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (2, 30, 1)"
     )
 
-    # Taylor Hawkins Solo Track (Co-worker's work: Dave should NOT get this)
+    # Taylor Hawkins Solo Track
     cursor.execute(
         "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (3, 1, 'Range Rover Bitch', '/path/3', 180, 1)"
     )
@@ -138,18 +150,17 @@ def populated_db(mock_db_path):
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (5, 12, 1)"
     )
 
-    # 5. Edge Cases
-    # Song with MULTIPLE credits (Multiple performers/composers)
+    # Song with MULTIPLE credits
     cursor.execute(
         "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (6, 1, 'Dual Credit Track', '/path/6', 300, 1)"
     )
     cursor.execute("INSERT INTO Songs (SourceID) VALUES (6)")
     cursor.execute(
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (6, 10, 1)"
-    )  # Dave Grohl
+    )
     cursor.execute(
         "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (6, 40, 2)"
-    )  # Taylor Hawkins (Composer)
+    )
 
     # Song with ZERO credits
     cursor.execute(
@@ -157,6 +168,81 @@ def populated_db(mock_db_path):
         "VALUES (7, 1, 'Hollow Song', '/path/7', 10, 1)"
     )
     cursor.execute("INSERT INTO Songs (SourceID) VALUES (7)")
+
+    # Song with MULTIPLE PERFORMERS (Joint Venture)
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (8, 1, 'Joint Venture', '/path/8', 180, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (8)")
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (8, 10, 1)"
+    )  # Dave
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (8, 40, 1)"
+    )  # Taylor
+
+    # 6. Albums & Roles & Publishers
+    cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (1, 'Performer')")
+    cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (2, 'Composer')")
+    cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (3, 'Lyricist')")
+    cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (4, 'Producer')")
+
+    # Publishers
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName) VALUES (1, 'DGC Records')"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName) VALUES (2, 'Roswell Records')"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName) VALUES (3, 'Sub Pop')"
+    )
+
+    # Album Data
+    cursor.execute(
+        "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (100, 'Nevermind', 1991)"
+    )
+    cursor.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary, TrackPublisherID) VALUES (1, 100, 1, 1, 1)"
+    )
+    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 1)")
+    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 3)")
+
+    cursor.execute(
+        "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (200, 'The Colour and the Shape', 1997)"
+    )
+    cursor.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary, TrackPublisherID) VALUES (2, 200, 11, 1, 2)"
+    )
+    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (200, 2)")
+
+    # Recording Publisher
+    cursor.execute(
+        "INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (1, 1)"
+    )
+
+    # 8. Tags
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (1, 'Grunge', 'Genre')"
+    )
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (2, 'Energetic', 'Mood')"
+    )
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (3, '90s', 'Era')"
+    )
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (4, 'Electronic', 'Style')"
+    )
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (5, 'English', 'Jezik')"
+    )
+
+    cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 1)")
+    cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 2)")
+    cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 5)")
+    cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (2, 3)")
+    cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (4, 4)")
 
     conn.commit()
     conn.close()

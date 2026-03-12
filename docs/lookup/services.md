@@ -9,18 +9,50 @@
 *Location: `src/services/catalog_service.py`*
 **Responsibility**: Entry point for song access. Stateless orchestrator that combines data from multiple repositories into complete Domain Models.
 
-### get_song(self, song_id: int) -> Optional[Song]
+### get_song(song_id: int) -> Optional[Song]
 Fetch a single song and all its credits by ID.
 - Accesses `SongRepository` to get the core record.
-- Uses `_hydrate_songs` to attach all credits.
+- Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
-### search_songs(self, query: str) -> List[Song]
+### search_songs(query: str) -> List[Song]
 Search for songs by title and hydrate with full metadata.
 - Calls `SongRepository.get_by_title`.
-- Uses `_hydrate_songs` to attach all credits.
+- Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
-### _hydrate_songs(self, songs: List[Song]) -> List[Song]
-**Internal**: Centralized batch hydration for song credits.
-- Fetches a flat list of credits using `SongCreditRepository.get_credits_for_songs`.
-- Locally orchestrates/groups the credits by SourceID for O(1) attribute access.
-- Stitches them back to the Songs and returns the hydrated list.
+### _hydrate_songs(songs: List[Song]) -> List[Song]
+**Internal**: Centralized batch hydration for all song metadata.
+- Fetches credits from `SongCreditRepository`.
+- Fetches album context from `SongAlbumRepository`.
+- Resolves publisher objects via `PublisherRepository`.
+- Locally orchestrates/groups the records by SourceID.
+- Stitches them back to the Songs creating `SongAlbum` bridge objects with resolved metadata and returns the hydrated list.
+
+### _get_credits_by_song(song_ids: List[int]) -> Dict[int, List[SongCredit]]
+**Internal**: Fetches and groups credits by song ID.
+
+### _get_publishers_by_song(song_ids: List[int]) -> Dict[int, List[Publisher]]
+**Internal**: Fetches and groups master recording publishers by song ID.
+
+### _get_tags_by_song(song_ids: List[int]) -> Dict[int, List[Tag]]
+**Internal**: Fetches and groups tags by song ID.
+
+### _get_albums_by_song(song_ids: List[int]) -> Dict[int, List[SongAlbum]]
+**Internal**: Fetches album associations, resolves publishers, and groups by song ID.
+
+---
+
+## Logger
+*Location: `src/services/logger.py`*
+**Responsibility**: Simple console logging for the application.
+
+### debug(msg: str)
+Logs a debug-level message.
+
+### info(msg: str)
+Logs an info-level message.
+
+### warning(msg: str)
+Logs a warning-level message.
+
+### error(msg: str)
+Logs an error-level message.

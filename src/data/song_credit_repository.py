@@ -18,9 +18,10 @@ class SongCreditRepository(BaseRepository):
         )
         placeholders = ",".join(["?" for _ in song_ids])
         query = f"""
-            SELECT sc.SourceID, sc.CreditedNameID, sc.RoleID, an.DisplayName
+            SELECT sc.SourceID, sc.CreditedNameID, sc.RoleID, an.DisplayName, an.IsPrimaryName, r.RoleName
             FROM SongCredits sc
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+            JOIN Roles r ON sc.RoleID = r.RoleID
             WHERE sc.SourceID IN ({placeholders})
         """
 
@@ -46,5 +47,7 @@ class SongCreditRepository(BaseRepository):
             source_id=row["SourceID"],
             name_id=row["CreditedNameID"],
             role_id=role_id,
+            role_name=row["RoleName"],
             display_name=row["DisplayName"],
+            is_primary=bool(row["IsPrimaryName"]),
         )

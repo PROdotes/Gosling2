@@ -65,7 +65,7 @@ class Song(BaseModel):
     
     # Nested Data (Resolved by Repository)
     credits: List[SongCredit]
-    primary_album: Optional[Album] = None
+    albums: List[SongAlbum]  # M2M: Each bridge contains context (Track#, Disc#, IsPrimary)
     tags: Set[str] = Field(default_factory=set)
     primary_genre: Optional[str] = None
     
@@ -77,6 +77,23 @@ class Song(BaseModel):
     # State
     processing_status: int = 1
     is_active: bool = True
+```
+
+### `SongAlbum`
+The temporal/contextual link between a song and an album.
+```python
+class SongAlbum(BaseModel):
+    source_id: int
+    album_id: int
+    is_primary: bool = True
+    track_number: Optional[int] = None
+    disc_number: Optional[int] = 1
+    
+    # Resolved Metadata
+    album_title: str
+    album_type: Optional[str] = None
+    publishers: List[str] = []
+```
 ```
 
 ## 4. Why this prevents Spaghetti?

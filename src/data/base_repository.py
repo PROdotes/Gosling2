@@ -13,7 +13,13 @@ class BaseRepository:
 
     def _get_connection(self) -> sqlite3.Connection:
         """Single point of truth for all DB connections in v3core."""
-        return sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path)
+        # Register the custom collation from the physical DB
+        conn.create_collation(
+            "UTF8_NOCASE",
+            lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+        )
+        return conn
 
     def _log_change(
         self,
