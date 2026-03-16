@@ -1,11 +1,10 @@
 import hashlib
-from typing import Optional
 
 
 def calculate_audio_hash(filepath: str) -> str:
     """
     Calculate SHA256 hash of MP3 audio frames only (excludes ID3 tags).
-    
+
     Ported from Legacy [GOSLING2] math to maintain cross-version consistency.
     """
     try:

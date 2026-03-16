@@ -56,3 +56,16 @@ Logs a warning-level message.
 
 ### error(msg: str)
 Logs an error-level message.
+---
+
+## MetadataService
+*Location: `src/services/metadata_service.py`*
+**Responsibility**: Extracts high-fidelity metadata (tags) from physical audio files using a dynamic JSON-driven mapping.
+
+### extract_metadata(file_path: str) -> Dict[str, List[str]]
+Reads a file and returns a raw dictionary of all found tags, preserving Frame IDs (e.g., `TPE1`, `TXXX:STATUS`).
+- **Entry**: Logs `file_path`.
+- **Exit**: Logs the count of tags found.
+
+### _read_tags(tags: Any) -> Dict[str, List[str]]
+**Internal**: Extracts and cleans tags from mutagen objects. Handles multi-value delimiters (`\u0000`, `|||`, ` / `) and complex roles (TIPL).

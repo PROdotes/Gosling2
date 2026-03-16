@@ -69,7 +69,7 @@ def test_song_display_artist_fallback(populated_db):
 
 def test_domain_edge_cases(populated_db):
     """Domain coverage: duration_ms=0 and no credits."""
-    
+
     # 1. duration_ms = 0
     song1 = Song(id=1, type_id=1, media_name="S1", source_path="P1", duration_ms=0)
     view1 = SongView.from_domain(song1)

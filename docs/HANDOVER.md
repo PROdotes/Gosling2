@@ -1,27 +1,27 @@
-# GOSLING2 Phase 1.9 Handoff: Frontend Polish & 100% Core Integrity
+# GOSLING2 Phase 2.1 Handoff: Metadata Reading (The "Dumb Reader" Milestone)
 
-## 1. Accomplishments (UI & Model Precision)
-We completed the "Frontend Polish" phase and implemented architectural separation for presentation logic.
-- **ViewModel Separation**: Created `src/models/view_models.py`. The `Song` domain model is now lean, with all UI formatting (`formatted_duration`, `display_artist`, `primary_genre`) moved to `SongView`.
-- **Improved display_artist**: The logic now correctly joins multiple performers (e.g., "Artist A, Taylor B").
-- **Enhanced Dashboard UI**: Added Genre Badges, Tag Visualization (pills), and Master Copyright visibility.
-- **Router Guardrails**: Search query validation (2+ chars) and improved error parsing in JS to show backend messages.
-- **Developer DX**: Enabled `reload=True` in `main.py`.
-- **Lookup Integrity Guard**: Created `tests/test_lookup_integrity.py`. The build now **fails** if any code drift occurs between `src/` and `docs/lookup/`.
+## 1. Accomplishments (Core Integrity & Extraction)
+We have successfully decoupled **Reading** from **Mapping**.
+- **MetadataService (Dumb Reader)**: Refactored `src/services/metadata_service.py` into a pure, stateless conduit.
+- **Fidelity First**: It now extracts ALL frames from a file with 100% fidelity. Keys are raw ID3 IDs (e.g., `TPE1`, `TIPL`).
+- **Delimiter Safety**: Uses a specific set of safe delimiters (`\u0000`, `|||`, and ` / `) to prevent breaking band names like "Earth, Wind & Fire".
+- **Real-World Proved**: Successfully extracted high-fidelity metadata from `Skrillex, ISOxo - Fuze.mp3`, resolving complex `TIPL` involved-people lists into clean string lists.
+- **Stateless Read**: The service has NO knowledge of the database schema or JSON mapping. It is 100% localized and future-proof.
 
 ## 2. Testing & Quality (Done and Green)
-- **100% Test Coverage**: Achieved and verified across all core files.
-- **Documentation Enforcement**: 29/29 tests pass, including the new integrity check.
+- **Dumb Reader Tests**: `tests/test_metadata_service.py` is updated to verify raw extraction, list fidelity, and delimiter splitting. All 6 tests pass.
+- **Coverage**: Logic for complex mutagen objects (like the `TIPL` roles) is now fully tested and verified against real-world tagging "scars".
 
-## 3. Immediate Next Step (Phase 2.1: Library Ingestion)
-We are pivoting from a "Read-Only" UI to building the library's metadata scanner.
-1. **Step 2.1.0 (Hash Logic)**: [RESOLVED] Ported legacy SHA256 audio-only hashing for ID-consistency.
-2. **Step 2.1.1 (Metadata Scanner)**: Implement a file scanner (likely using `mutagen`) to extract BPM, ISRC, and Tags from physical files.
-3. **Step 2.1.2 (Ingestion API)**: Create the `POST /api/v1/catalog/ingest` flow.
+## 3. Important Lessons (The "Scars")
+- **Mapping is a Second Step**: Trying to map fields *during* extraction causes data loss and prevents localization. The Reader must stay dumb.
+- **Delimiter Trap**: Common characters like `/` or `;` are dangerous as delimiters. Only the ` / ` (with spaces) and `\u0000` (null) are safe enough for initial reading.
+- **Data Doubling**: Frame duplication (e.g., producers in both `TXXX` and `TIPL`) is a reality. The Reader returns both; the Parser must deduplicate.
 
-## 4. Technical Debt & Missing Logic (Priority)
-- **Deep Search**: Currently, search only scans `MediaName`. We need to join `Credits` (Artists), `Albums`, and `Tags` into the search index.
-- **Library Lifecycle**: No ability to "Add" or "Delete" songs yet.
-- **Write Integrity**: No path to update the DB or the physical file tags.
-- **`TrackPublisherID` (SongAlbums)**: Investigate M2M vs 1:1 for track-level publishers.
-- **Frontend Framework**: Evaluate move to Vite/React if UI state (selection/batching) becomes unmanageable in Vanilla JS.
+## 4. Immediate Next Steps (Fresh Session)
+1.  **Metadata Parser**: Create a new service (e.g., `MetadataParser`) to take the "Dumb Read" and map it to the database schema using `json/id3_frames.json`.
+2.  **Deduplication Logic**: Implement the merge/dedupe logic in the Parser to handle frame doubling.
+3.  **Ingestion API**: Orchestrate the Hash -> Read -> Parse -> Insert flow.
+
+## 5. Metadata Map
+- **Location**: `json/id3_frames.json` is now the "Map of the Territory" but is NO LONGER loaded by the Service. It is strictly for the upcoming Parser.
+- **Structure**: All logic for "Genre" vs "Žanr" lives here and will guide the Parser.

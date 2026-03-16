@@ -4,8 +4,8 @@ The current Phase 1.9 established a high-fidelity **Read-Only** view of existing
 
 ## 1. Step 2.1: The Identity Core (Fingerprinting)
 We must ensure that GOSLING2 identifies duplicates correctly by hashing only audio frames, ignoring metadata changes.
-- **Task**: Implement `src/utils/audio_hash.py` using the Legacy SHA256 logic (skipping ID3v2 header/ID3v1 footers).
-- **Task**: Implement `src/services/metadata_service.py` to extract high-fidelity tags (ISRC, BPM, Multi-Performers) from physical files.
+- [x] **Task**: Implement `src/utils/audio_hash.py` using the Legacy SHA256 logic (skipping ID3v2 header/ID3v1 footers). [DONE]
+- [x] **Task**: Implement `src/services/metadata_service.py` to extract high-fidelity tags (ISRC, BPM, Multi-Performers) from physical files. [DONE]
 
 ## 2. Step 2.2: Library Lifecycle (Ingestion & Pruning)
 Establish the ability to actually *add* music to the database.

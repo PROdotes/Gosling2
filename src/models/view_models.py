@@ -2,9 +2,10 @@ from typing import List, Optional
 from pydantic import BaseModel, computed_field
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher
 
+
 class SongView(BaseModel):
     """View-model for Song data, including computed presentation fields."""
-    
+
     # Core Data from Song
     id: int
     media_name: str
@@ -18,7 +19,7 @@ class SongView(BaseModel):
     bpm: Optional[int] = None
     year: Optional[int] = None
     isrc: Optional[str] = None
-    
+
     # Hydrated Metadata
     credits: List[SongCredit] = []
     albums: List[SongAlbum] = []
@@ -38,7 +39,7 @@ class SongView(BaseModel):
         """MM:SS formatting for UI displays."""
         if not self.duration_ms:
             return "0:00"
-        
+
         total_seconds = int(self.duration_ms / 1000)
         minutes = total_seconds // 60
         seconds = total_seconds % 60
@@ -50,16 +51,18 @@ class SongView(BaseModel):
         """Provides the joined primary performer names."""
         if not self.credits:
             return None
-            
-        performers = [c.display_name for c in self.credits if c.role_name == "Performer"]
+
+        performers = [
+            c.display_name for c in self.credits if c.role_name == "Performer"
+        ]
         if performers:
             unique_names = []
             [unique_names.append(n) for n in performers if n not in unique_names]
-            
+
             if len(unique_names) > 1:
                 return ", ".join(unique_names)
             return unique_names[0]
-            
+
         return self.credits[0].display_name if self.credits else None
 
     @computed_field
