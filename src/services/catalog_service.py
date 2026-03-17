@@ -105,7 +105,7 @@ class CatalogService:
         """Fetch album associations, resolve publishers, and group by song ID."""
         all_assocs = self._album_repo.get_albums_for_songs(song_ids)
 
-        # Gather album IDs for M2M publisher resolution
+        # Gather IDs for batch resolution
         album_ids = list({a.album_id for a in all_assocs})
 
         # Resolve M2M publishers for albums
@@ -122,13 +122,15 @@ class CatalogService:
 
         assocs_by_song = {}
         for a in all_assocs:
-            # DomainModel is frozen, so set() deduplicates based on contents safely
-            resolved_pubs = list(set(pubs_by_album.get(a.album_id, [])))
+            album_pubs = pubs_by_album.get(a.album_id, [])
             resolved_credits = credits_by_album.get(a.album_id, [])
 
-            # Since 'a' is a frozen DomainModel, we copy it to apply publishers and credits
+            # Apply separate buckets to the model copy
             hydrated_assoc = a.model_copy(
-                update={"publishers": resolved_pubs, "credits": resolved_credits}
+                update={
+                    "album_publishers": album_pubs,
+                    "credits": resolved_credits,
+                }
             )
             assocs_by_song.setdefault(hydrated_assoc.source_id, []).append(
                 hydrated_assoc

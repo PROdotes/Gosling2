@@ -1,4 +1,4 @@
-# GOSLING2 CONSTITUTION
+# GOSLING 3 CONSTITUTION
 
 This document consolidates all project-level protocols and rules to ensure architectural integrity and prevent "vibe-coding" slop.
 
@@ -36,7 +36,7 @@ This document consolidates all project-level protocols and rules to ensure archi
 ## 4. Open Brain & Persistent Memory
 - **OPEN BRAIN**: Stores permanent lessons, "scars," and workflow preferences via MCP.
 - **LOCAL DOCS**: Project state (schemas, stack, structure) belongs in `docs/`, not the Brain.
-- **PREFIXES**: Use `[GOSLING2]` or `[GLOBAL]` for all brain operations.
+- **PREFIXES**: Use `[GOSLING 3]` or `[GLOBAL]` for all brain operations.
 - **SEARCH BEFORE ACTING**: Search brain when starting sessions, drafting specs, or hitting familiar bugs.
 
 ---

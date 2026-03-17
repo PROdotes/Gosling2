@@ -6,13 +6,23 @@ from src.models.domain import Song, SongCredit, Tag, Publisher, AlbumCredit
 class SongAlbumView(BaseModel):
     """View-model for Album associations."""
 
+    source_id: Optional[int] = None
+    album_id: Optional[int] = None
     album_title: str
     track_number: Optional[int] = None
     disc_number: Optional[int] = 1
     album_type: Optional[str] = None
     release_year: Optional[int] = None
-    publishers: List[Publisher] = []
+    album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
+
+    @computed_field
+    @property
+    def display_publisher(self) -> str:
+        """Name(s) of the album-level publishers."""
+        if self.album_publishers:
+            return ", ".join(p.name for p in self.album_publishers)
+        return ""
 
     @computed_field
     @property
@@ -59,6 +69,7 @@ class SongView(BaseModel):
         """Factory to create a view-model from a domain model."""
         data = song.model_dump()
         data["title"] = song.title
+
         # Map domain albums to album views
         data["albums"] = [SongAlbumView(**a.model_dump()) for a in song.albums]
         return cls(**data)
@@ -94,6 +105,14 @@ class SongView(BaseModel):
             return unique_names[0]
 
         return self.credits[0].display_name if self.credits else None
+
+    @computed_field
+    @property
+    def display_master_publisher(self) -> str:
+        """Joined names of the master rights holders."""
+        if not self.publishers:
+            return ""
+        return ", ".join(p.name for p in self.publishers)
 
     @computed_field
     @property

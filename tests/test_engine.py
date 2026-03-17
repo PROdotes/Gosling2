@@ -38,7 +38,9 @@ async def test_inspect_file_integration(populated_db, monkeypatch):
     # 1. Update Song ID 1 to point to a REAL fixture on disk
     fixture_path = os.path.abspath("tests/fixtures/silence.mp3")
     conn = sqlite3.connect(populated_db)
-    conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (fixture_path,))
+    conn.execute(
+        "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (fixture_path,)
+    )
     # Also set a real title in the ID3 tag metadata for this file if we want it to match
     conn.commit()
     conn.close()
@@ -50,7 +52,7 @@ async def test_inspect_file_integration(populated_db, monkeypatch):
     res = await inspect_file(1, service)
 
     assert isinstance(res, SongView)
-    # The silence.mp3 fixture has NO tags by default, or maybe some. 
+    # The silence.mp3 fixture has NO tags by default, or maybe some.
     # But it should return a SongView without crashing.
     assert res.source_path == fixture_path
 

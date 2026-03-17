@@ -63,8 +63,8 @@ def test_get_song_album_hydration(populated_db):
     assert assoc1.album_title == "Nevermind"
     assert assoc1.is_primary is True
     # M2M: Nevermind has two publishers in conftest
-    assert len(assoc1.publishers) == 2
-    pub_names = {p.name for p in assoc1.publishers}
+    assert len(assoc1.album_publishers) == 2
+    pub_names = {p.name for p in assoc1.album_publishers}
     assert "DGC Records" in pub_names
     assert "Sub Pop" in pub_names
 
@@ -78,7 +78,7 @@ def test_get_song_album_hydration(populated_db):
     assoc2 = song2.albums[0]
     assert assoc2.album_title == "The Colour and the Shape"
     assert assoc2.track_number == 11
-    pub_names = {p.name for p in assoc2.publishers}
+    pub_names = {p.name for p in assoc2.album_publishers}
     assert "Roswell Records" in pub_names
 
     # Song with no album

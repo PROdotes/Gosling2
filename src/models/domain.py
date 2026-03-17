@@ -69,13 +69,12 @@ class SongAlbum(DomainModel):
     is_primary: bool = True
     track_number: Optional[int] = None
     disc_number: Optional[int] = 1
-    track_publisher_id: Optional[int] = None
 
     # Resolved Metadata
     album_title: str
     album_type: Optional[str] = None
     release_year: Optional[int] = None
-    publishers: List[Publisher] = []
+    album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
 
 

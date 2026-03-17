@@ -166,6 +166,7 @@ class MetadataParser:
                     album_title=album,
                     track_number=track_num,
                     disc_number=disc_num,
+                    album_publishers=[],
                     credits=album_credit_models,
                 )
             )

@@ -79,7 +79,6 @@ CREATE TABLE IF NOT EXISTS SongAlbums (
     TrackNumber INTEGER,
     DiscNumber INTEGER DEFAULT 1,
     IsPrimary BOOLEAN DEFAULT 1,
-    TrackPublisherID INTEGER,
     PRIMARY KEY (SourceID, AlbumID),
     FOREIGN KEY (SourceID) REFERENCES Songs(SourceID) ON DELETE CASCADE,
     FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE

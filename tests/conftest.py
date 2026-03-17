@@ -203,7 +203,7 @@ def populated_db(mock_db_path):
         "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (100, 'Nevermind', 1991)"
     )
     cursor.execute(
-        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary, TrackPublisherID) VALUES (1, 100, 1, 1, 1)"
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (1, 100, 1, 1)"
     )
     cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 1)")
     cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 3)")
@@ -212,7 +212,7 @@ def populated_db(mock_db_path):
         "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (200, 'The Colour and the Shape', 1997)"
     )
     cursor.execute(
-        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary, TrackPublisherID) VALUES (2, 200, 11, 1, 2)"
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (2, 200, 11, 1)"
     )
     cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (200, 2)")
 

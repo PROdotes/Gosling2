@@ -9,7 +9,7 @@ class SongAlbumRepository(BaseRepository):
     """Repository for loading Album associations for Songs."""
 
     _QUERY = """
-        SELECT sa.SourceID, sa.AlbumID, sa.TrackNumber, sa.DiscNumber, sa.IsPrimary, sa.TrackPublisherID,
+        SELECT sa.SourceID, sa.AlbumID, sa.TrackNumber, sa.DiscNumber, sa.IsPrimary,
                a.AlbumTitle, a.AlbumType, a.ReleaseYear
         FROM SongAlbums sa
         JOIN Albums a ON sa.AlbumID = a.AlbumID
@@ -41,9 +41,8 @@ class SongAlbumRepository(BaseRepository):
             track_number=row["TrackNumber"],
             disc_number=row["DiscNumber"],
             is_primary=bool(row["IsPrimary"]),
-            track_publisher_id=row["TrackPublisherID"],
             album_title=row["AlbumTitle"],
             album_type=row["AlbumType"],
             release_year=row["ReleaseYear"],
-            publishers=[],  # Hydrated later by CatalogService
+            album_publishers=[],  # Hydrated later by CatalogService
         )
