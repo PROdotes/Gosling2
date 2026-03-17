@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from src.models.domain import Song, SongCredit, Tag, SongAlbum, Publisher
+from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
 from src.services.logger import logger
 
 
@@ -60,6 +60,7 @@ class MetadataParser:
         tags_dict = {}  # category -> list of names
         album_titles = []
         publisher_names = []
+        album_artists = []
 
         for tag_id, values in raw_metadata.items():
             # Sub-tag check (e.g. TXXX:STATUS)
@@ -107,6 +108,8 @@ class MetadataParser:
                         publisher_names.extend([str(v) for v in values])
                     elif field_name == "album_title":
                         album_titles.extend([str(v) for v in values])
+                    elif field_name == "album_artist":
+                        album_artists.extend([str(v) for v in values])
                     else:
                         role_name = self._get_role_name(field_name)
                         credits_dict.setdefault(role_name, []).extend(
@@ -150,12 +153,20 @@ class MetadataParser:
         track_num = song_data.pop("track_number", None)
         disc_num = song_data.pop("disc_number", None)
 
+        # Build album credits from parsed album artists
+        album_credit_models = []
+        for name in dict.fromkeys(album_artists):
+            album_credit_models.append(
+                AlbumCredit(role_name="Album Artist", display_name=name)
+            )
+
         for album in dict.fromkeys(album_titles):
             song_data["albums"].append(
                 SongAlbum(
                     album_title=album,
                     track_number=track_num,
                     disc_number=disc_num,
+                    credits=album_credit_models,
                 )
             )
 

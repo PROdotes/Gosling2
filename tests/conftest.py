@@ -216,6 +216,14 @@ def populated_db(mock_db_path):
     )
     cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (200, 2)")
 
+    # Album Credits
+    cursor.execute(
+        "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (100, 20, 1)"
+    )  # Nirvana - Performer on Nevermind
+    cursor.execute(
+        "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (200, 30, 1)"
+    )  # Foo Fighters - Performer on The Colour and the Shape
+
     # Recording Publisher
     cursor.execute(
         "INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (1, 1)"

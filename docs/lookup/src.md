@@ -1,15 +1,16 @@
 # Engine Server
-*Location: `src/engine_server.py`*
-
-**Responsibility**: Entry point, FastAPI app setup, and static UI routes.
+*Location: `src/`
 
 ---
 
-## UI Engine
+## engine_server
 *Location: `src/engine_server.py`*
-**Responsibility**: Serves the single-page dashboard.
+**Responsibility**: FastAPI application setup, CORS middleware, and routing for the entire API.
 
-### async def get_dashboard()
+### app: FastAPI
+The main FastAPI application instance.
+
+### get_dashboard() -> HTMLResponse
 **HTTP**: `GET /`
-- Serves the `src/templates/dashboard.html` interface.
-- Includes embedded Vanilla JS for the search/view logic.
+- Serves the single-page dashboard from `src/templates/dashboard.html`.
+- Includes embedded Vanilla JS for search/view logic.

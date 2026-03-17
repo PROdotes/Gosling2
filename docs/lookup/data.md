@@ -92,3 +92,17 @@ Batch-fetches tags for multiple songs (M2M).
 
 ### _row_to_tag(row: sqlite3.Row) -> Tag
 **Internal**: Maps a physical database row to the strict Pydantic `Tag` model, including the `IsPrimary` marker.
+
+---
+
+## AlbumCreditRepository
+*Location: `src/data/album_credit_repository.py`*
+**Responsibility**: DB reads for the AlbumCredits table. Bridges Album IDs to Names and Roles.
+
+### get_credits_for_albums(album_ids: List[int]) -> List[AlbumCredit]
+Batch-fetches credits for multiple albums in a single query.
+- Returns a flat list of `AlbumCredit` entities.
+- Joins with `ArtistNames` and `Roles` tables to resolve human-readable names.
+
+### _row_to_album_credit(row: sqlite3.Row) -> AlbumCredit
+**Internal**: Maps a physical database row to the `AlbumCredit` domain model.

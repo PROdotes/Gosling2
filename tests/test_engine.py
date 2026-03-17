@@ -59,7 +59,6 @@ async def test_inspect_file_integration(populated_db, monkeypatch):
 async def test_inspect_file_not_found(populated_db, monkeypatch):
     """Cover metabolic.py: 26 (404 Path)."""
     from src.engine.routers.metabolic import inspect_file, _get_catalog_service
-    import os
 
     monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
     service = _get_catalog_service()

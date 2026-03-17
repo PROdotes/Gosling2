@@ -33,6 +33,17 @@ class SongCredit(DomainModel):
     is_primary: bool = False  # Is this the Identity's primary stage name?
 
 
+class AlbumCredit(DomainModel):
+    """The bridge between an Album and an Actor (Alias)."""
+
+    album_id: Optional[int] = None
+    name_id: Optional[int] = None
+    role_id: Optional[int] = None
+    role_name: str
+    display_name: str
+    is_primary: bool = False
+
+
 class Publisher(DomainModel):
     """The copyright owner or distributor."""
 
@@ -65,6 +76,7 @@ class SongAlbum(DomainModel):
     album_type: Optional[str] = None
     release_year: Optional[int] = None
     publishers: List[Publisher] = []
+    credits: List[AlbumCredit] = []
 
 
 class Song(MediaSource):

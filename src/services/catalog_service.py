@@ -3,6 +3,7 @@ from src.data.song_repository import SongRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.data.song_album_repository import SongAlbumRepository
 from src.data.publisher_repository import PublisherRepository
+from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
 from src.models.domain import Song, SongAlbum
 from src.services.logger import logger
@@ -15,6 +16,7 @@ class CatalogService:
         self._song_repo = SongRepository(db_path)
         self._credit_repo = SongCreditRepository(db_path)
         self._album_repo = SongAlbumRepository(db_path)
+        self._album_credit_repo = AlbumCreditRepository(db_path)
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
 
@@ -112,13 +114,22 @@ class CatalogService:
         for album_id, pub in all_album_pubs:
             pubs_by_album.setdefault(album_id, []).append(pub)
 
+        # Resolve Album Credits
+        all_album_credits = self._album_credit_repo.get_credits_for_albums(album_ids)
+        credits_by_album = {}
+        for ac in all_album_credits:
+            credits_by_album.setdefault(ac.album_id, []).append(ac)
+
         assocs_by_song = {}
         for a in all_assocs:
             # DomainModel is frozen, so set() deduplicates based on contents safely
             resolved_pubs = list(set(pubs_by_album.get(a.album_id, [])))
+            resolved_credits = credits_by_album.get(a.album_id, [])
 
-            # Since 'a' is a frozen DomainModel, we copy it to apply publishers
-            hydrated_assoc = a.model_copy(update={"publishers": resolved_pubs})
+            # Since 'a' is a frozen DomainModel, we copy it to apply publishers and credits
+            hydrated_assoc = a.model_copy(
+                update={"publishers": resolved_pubs, "credits": resolved_credits}
+            )
             assocs_by_song.setdefault(hydrated_assoc.source_id, []).append(
                 hydrated_assoc
             )

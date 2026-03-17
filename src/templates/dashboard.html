@@ -743,7 +743,16 @@
                     if (a.album_type) parts.push(`<span>${escapeHtml(a.album_type)}</span>`);
                     if (a.release_year) parts.push(`<span>${escapeHtml(a.release_year)}</span>`);
                     if (a.publishers?.length) parts.push(`<span class="album-publishers">${escapeHtml(a.publishers.map(p => p.name).join(', '))}</span>`);
-                    return `<div class="album-card"><div class="album-title">${escapeHtml(title)}</div><div class="album-meta">${parts.join('')}</div></div>`;
+
+                    let albumArtistsStr = '';
+                    if (a.credits && a.credits.length) {
+                        const aa = a.credits.map(c => c.display_name || c.name);
+                        if (aa.length) {
+                            albumArtistsStr = `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${escapeHtml(aa.join(', '))}</div>`;
+                        }
+                    }
+
+                    return `<div class="album-card"><div class="album-title">${escapeHtml(title)}</div><div class="album-meta">${parts.join('')}</div>${albumArtistsStr}</div>`;
                 }).join('');
             };
 
@@ -764,9 +773,6 @@
             const fileGenres = fileTags.filter(t => t.category?.toLowerCase() === 'genre').map(t => t.name);
             const dbOther = rawTags.filter(t => t.category?.toLowerCase() !== 'genre').map(t => t.name);
             const fileOther = fileTags.filter(t => t.category?.toLowerCase() !== 'genre').map(t => t.name);
-
-            const dbAlbumArtists = rawCredits.filter(c => c.role_name?.toLowerCase().includes('album')).map(c => c.display_name || c.name);
-            const fileAlbumArtists = fileCredits.filter(c => c.role_name?.toLowerCase().includes('album')).map(c => c.display_name || c.name);
 
             detailPanel.innerHTML = `
                 <div class="detail-header">
@@ -810,11 +816,11 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
                             <div>
                                 <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${rawAlbums.length})</div>
-                                <div class="albums-list">${renderAlbums(rawAlbums)}${dbAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${escapeHtml(dbAlbumArtists.join(', '))}</div>` : ''}</div>
+                                <div class="albums-list">${renderAlbums(rawAlbums)}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileAlbums.length})</div>
-                                <div class="albums-list">${renderAlbums(fileAlbums)}${fileAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${escapeHtml(fileAlbumArtists.join(', '))}</div>` : ''}</div>
+                                <div class="albums-list">${renderAlbums(fileAlbums)}</div>
                             </div>
                         </div>
                     </div>

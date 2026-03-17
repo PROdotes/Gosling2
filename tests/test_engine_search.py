@@ -22,7 +22,7 @@ def test_engine_search_songs_logic(populated_db):
 def test_dashboard_serving_logic():
     """Verify the dashboard serving logic directly."""
     response = asyncio.run(get_dashboard())
-    assert "GOSLING V3CORE" in response
+    assert "GOSLING" in response
     assert "<!DOCTYPE html>" in response
 
 

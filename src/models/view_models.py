@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict
 from pydantic import BaseModel, computed_field
-from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher
+from src.models.domain import Song, SongCredit, Tag, Publisher, AlbumCredit
 
 
 class SongAlbumView(BaseModel):
@@ -12,6 +12,7 @@ class SongAlbumView(BaseModel):
     album_type: Optional[str] = None
     release_year: Optional[int] = None
     publishers: List[Publisher] = []
+    credits: List[AlbumCredit] = []
 
     @computed_field
     @property
@@ -59,9 +60,7 @@ class SongView(BaseModel):
         data = song.model_dump()
         data["title"] = song.title
         # Map domain albums to album views
-        data["albums"] = [
-            SongAlbumView(**a.model_dump()) for a in song.albums
-        ]
+        data["albums"] = [SongAlbumView(**a.model_dump()) for a in song.albums]
         return cls(**data)
 
     @computed_field
