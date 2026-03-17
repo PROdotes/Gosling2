@@ -535,6 +535,47 @@
 
         let debounceTimer;
         let currentQuery = '';
+        let cachedSongs = [];
+        let selectedIndex = -1;
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function updateSelection() {
+            const cards = document.querySelectorAll('.song-card');
+            cards.forEach((c, i) => c.classList.toggle('active', i === selectedIndex));
+            if (selectedIndex >= 0 && selectedIndex < cards.length) {
+                cards[selectedIndex].scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && detailPanel.style.display === 'flex') {
+                detailPanel.style.display = 'none';
+                document.querySelectorAll('.song-card').forEach(c => c.classList.remove('active'));
+                selectedIndex = -1;
+            }
+            if (document.activeElement === searchInput && cachedSongs.length > 0) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(selectedIndex + 1, cachedSongs.length - 1);
+                    updateSelection();
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(selectedIndex - 1, -1);
+                    updateSelection();
+                } else if (e.key === 'Enter' && selectedIndex >= 0) {
+                    e.preventDefault();
+                    showDetail(cachedSongs[selectedIndex], document.querySelectorAll('.song-card')[selectedIndex]);
+                }
+            }
+        });
 
         searchInput.addEventListener('input', (e) => {
             clearTimeout(debounceTimer);
@@ -559,6 +600,8 @@
         }
 
         function renderResults(songs) {
+            cachedSongs = songs;
+            selectedIndex = -1;
             resultsCount.textContent = `${songs.length} song${songs.length !== 1 ? 's' : ''}`;
             matchCount.textContent = songs.length;
 
@@ -575,11 +618,11 @@
                         </svg>
                     </div>
                     <div class="song-details">
-                        <div class="song-title">${song.title || song.media_name || 'Untitled'}</div>
+                        <div class="song-title">${escapeHtml(song.title || song.media_name || 'Untitled')}</div>
                         <div class="song-meta">
-                            <span>${song.display_artist || 'Unknown Artist'}</span>
-                            ${song.primary_genre ? `<span class="song-genre">${song.primary_genre}</span>` : ''}
-                            <span class="song-year">${song.year || '—'}</span>
+                            <span>${escapeHtml(song.display_artist || 'Unknown Artist')}</span>
+                            ${song.primary_genre ? `<span class="song-genre">${escapeHtml(song.primary_genre)}</span>` : ''}
+                            <span class="song-year">${escapeHtml(song.year || '—')}</span>
                         </div>
                     </div>
                 </div>
@@ -588,7 +631,9 @@
             document.querySelectorAll('.song-card').forEach(card => {
                 card.addEventListener('click', function() {
                     const idx = parseInt(this.dataset.idx);
-                    showDetail(songs[idx], this);
+                    selectedIndex = idx;
+                    updateSelection();
+                    showDetail(cachedSongs[idx], this);
                 });
             });
         }
@@ -613,8 +658,8 @@
         function renderDetailSkeleton(song) {
             detailPanel.innerHTML = `
                 <div class="detail-header">
-                    <div class="detail-title">${song.title}</div>
-                    <div class="detail-path">${song.source_path || 'No source path'}</div>
+                    <div class="detail-title">${escapeHtml(song.title)}</div>
+                    <div class="detail-path">${escapeHtml(song.source_path || 'No source path')}</div>
                 </div>
                 <div class="detail-content">
                     <div class="file-status loading">
@@ -622,12 +667,12 @@
                         Loading file info...
                     </div>
                     <div class="meta-grid">
-                        <div class="meta-item"><div class="meta-label">Title</div><div class="meta-value">${song.media_name || song.title}</div></div>
-                        <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${song.display_artist || '—'}</div></div>
-                        <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${song.year || '—'}</div></div>
-                        <div class="meta-item"><div class="meta-label">BPM</div><div class="meta-value">${song.bpm || '—'}</div></div>
-                        <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${song.formatted_duration || '—'}</div></div>
-                        <div class="meta-item"><div class="meta-label">ISRC</div><div class="meta-value mono">${song.isrc || '—'}</div></div>
+                        <div class="meta-item"><div class="meta-label">Title</div><div class="meta-value">${escapeHtml(song.media_name || song.title)}</div></div>
+                        <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${escapeHtml(song.display_artist || '—')}</div></div>
+                        <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${escapeHtml(song.year || '—')}</div></div>
+                        <div class="meta-item"><div class="meta-label">BPM</div><div class="meta-value">${escapeHtml(song.bpm || '—')}</div></div>
+                        <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${escapeHtml(song.formatted_duration || '—')}</div></div>
+                        <div class="meta-item"><div class="meta-label">ISRC</div><div class="meta-value mono">${escapeHtml(song.isrc || '—')}</div></div>
                     </div>
                 </div>
             `;
@@ -652,12 +697,42 @@
 
             const renderCredits = (credits, source) => {
                 if (!credits.length) return '';
-                return `<div class="credits-list">${credits.map(c => `
-                    <div class="credit-item">
-                        <span class="credit-name">${c.display_name || c.name || '-'}</span>
-                        <span class="credit-role">${c.role_name || '-'}</span>
+                
+                const roleGroups = {
+                    'Producers': ['producer', 'executive producer', 'co-producer', 'associate producer'],
+                    'Writers': ['writer', 'composer', 'lyricist', 'author'],
+                    'Performers': ['artist', 'performer', 'vocals', 'featuring', 'featured', 'featured artist'],
+                    'Engineers': ['engineer', 'mixing', 'mixing engineer', 'mastering', 'mastering engineer', 'recording'],
+                    'Other': []
+                };
+                
+                const groups = {};
+                Object.keys(roleGroups).forEach(k => groups[k] = []);
+                
+                credits.forEach(c => {
+                    const role = (c.role_name || '').toLowerCase();
+                    let placed = false;
+                    for (const [groupName, keywords] of Object.entries(roleGroups)) {
+                        if (keywords.some(k => role.includes(k))) {
+                            groups[groupName].push(c);
+                            placed = true;
+                            break;
+                        }
+                    }
+                    if (!placed) groups['Other'].push(c);
+                });
+                
+                return Object.entries(groups).filter(([_, items]) => items.length).map(([groupName, items]) => `
+                    <div style="margin-bottom:0.75rem">
+                        <div style="font-size:0.65rem;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.35rem">${groupName}</div>
+                        <div class="credits-list">${items.map(c => `
+                            <div class="credit-item">
+                                <span class="credit-name">${escapeHtml(c.display_name || c.name || '-')}</span>
+                                <span class="credit-role">${escapeHtml(c.role_name || '-')}</span>
+                            </div>
+                        `).join('')}</div>
                     </div>
-                `).join('')}</div>`;
+                `).join('');
             };
 
             const renderAlbums = (albums) => {
@@ -665,24 +740,24 @@
                 return albums.map(a => {
                     const title = a.album_title || a.display_title || 'Unknown Album';
                     const parts = [];
-                    if (a.album_type) parts.push(`<span>${a.album_type}</span>`);
-                    if (a.release_year) parts.push(`<span>${a.release_year}</span>`);
-                    if (a.publishers?.length) parts.push(`<span class="album-publishers">${a.publishers.map(p => p.name).join(', ')}</span>`);
-                    return `<div class="album-card"><div class="album-title">${title}</div><div class="album-meta">${parts.join('')}</div></div>`;
+                    if (a.album_type) parts.push(`<span>${escapeHtml(a.album_type)}</span>`);
+                    if (a.release_year) parts.push(`<span>${escapeHtml(a.release_year)}</span>`);
+                    if (a.publishers?.length) parts.push(`<span class="album-publishers">${escapeHtml(a.publishers.map(p => p.name).join(', '))}</span>`);
+                    return `<div class="album-card"><div class="album-title">${escapeHtml(title)}</div><div class="album-meta">${parts.join('')}</div></div>`;
                 }).join('');
             };
 
             const renderTags = (tags, isGenre = false) => {
                 if (!tags.length) return '';
-                return `<div class="tags-list">${tags.map(t => `<span class="tag ${isGenre ? 'genre' : ''}">${t.name || t.display_name || '-'}</span>`).join('')}</div>`;
+                return `<div class="tags-list">${tags.map(t => `<span class="tag ${isGenre ? 'genre' : ''}">${escapeHtml(t.name || t.display_name || '-')}</span>`).join('')}</div>`;
             };
 
-            const formatList = (arr, key) => arr?.length ? arr.map(i => i[key] || i.name || '-').join(', ') : '—';
+            const formatList = (arr, key) => arr?.length ? arr.map(i => escapeHtml(i[key] || i.name || '-')).join(', ') : '—';
 
             const mkRow = (label, dbVal, fileVal, isMono = false) => {
                 const match = String(dbVal).toLowerCase() === String(fileVal).toLowerCase();
                 const color = match ? 'var(--text-primary)' : 'var(--danger)';
-                return `<tr><td style="padding:6px;font-size:0.75rem;color:var(--text-muted)">${label}</td><td style="padding:6px;font-size:0.85rem">${dbVal || '-'}</td><td style="padding:6px;font-size:0.85rem;color:${color}">${fileVal || '-'}</td></tr>`;
+                return `<tr><td style="padding:6px;font-size:0.75rem;color:var(--text-muted)">${escapeHtml(label)}</td><td style="padding:6px;font-size:0.85rem">${escapeHtml(dbVal || '-')}</td><td style="padding:6px;font-size:0.85rem;color:${color}">${escapeHtml(fileVal || '-')}</td></tr>`;
             };
 
             const dbGenres = rawTags.filter(t => t.category?.toLowerCase() === 'genre').map(t => t.name);
@@ -695,8 +770,8 @@
 
             detailPanel.innerHTML = `
                 <div class="detail-header">
-                    <div class="detail-title">${song.title}</div>
-                    <div class="detail-path">${song.source_path || 'No source path'}</div>
+                    <div class="detail-title">${escapeHtml(song.title)}</div>
+                    <div class="detail-path">${escapeHtml(song.source_path || 'No source path')}</div>
                 </div>
                 <div class="detail-content">
                     ${statusHtml}
@@ -735,11 +810,11 @@
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
                             <div>
                                 <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${rawAlbums.length})</div>
-                                <div class="albums-list">${renderAlbums(rawAlbums)}${dbAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${dbAlbumArtists.join(', ')}</div>` : ''}</div>
+                                <div class="albums-list">${renderAlbums(rawAlbums)}${dbAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${escapeHtml(dbAlbumArtists.join(', '))}</div>` : ''}</div>
                             </div>
                             <div>
                                 <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileAlbums.length})</div>
-                                <div class="albums-list">${renderAlbums(fileAlbums)}${fileAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${fileAlbumArtists.join(', ')}</div>` : ''}</div>
+                                <div class="albums-list">${renderAlbums(fileAlbums)}${fileAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${escapeHtml(fileAlbumArtists.join(', '))}</div>` : ''}</div>
                             </div>
                         </div>
                     </div>
@@ -790,7 +865,7 @@
                     <div class="detail-section">
                         <div class="section-title">Raw Tags (${Object.keys(fileData.raw_tags).length})</div>
                         <div style="background:var(--bg-card);padding:0.75rem;border-radius:8px;border:1px solid var(--border-subtle);font-family:'JetBrains Mono',monospace;font-size:0.75rem;max-height:200px;overflow-y:auto">
-                            ${Object.entries(fileData.raw_tags).map(([k, v]) => `<div style="margin-bottom:0.25rem"><span style="color:var(--accent)">${k}</span>: ${v.join(', ')}</div>`).join('')}
+                            ${Object.entries(fileData.raw_tags).map(([k, v]) => `<div style="margin-bottom:0.25rem"><span style="color:var(--accent)">${escapeHtml(k)}</span>: ${escapeHtml(v.join(', '))}</div>`).join('')}
                         </div>
                     </div>
                     ` : ''}
@@ -798,7 +873,7 @@
                     <div class="detail-section">
                         <div class="section-title">Audio Hash</div>
                         <div class="meta-item" style="padding:0.75rem">
-                            <div class="meta-value mono" style="font-size:0.7rem;word-break:break-all">${song.audio_hash || '—'}</div>
+                            <div class="meta-value mono" style="font-size:0.7rem;word-break:break-all">${escapeHtml(song.audio_hash || '—')}</div>
                         </div>
                     </div>
                 </div>
