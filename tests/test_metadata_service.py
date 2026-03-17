@@ -161,3 +161,25 @@ def test_extract_metadata_tagless_file(silence_mp3):
     assert isinstance(metadata, dict)
     # Even if EasyID3 finds nothing, it should return an empty dict, not crash
     assert metadata == {}
+
+
+def test_extract_metadata_skips_binary(silence_mp3):
+    """LAW: APIC and other binary frames must be ignored to prevent table pollution."""
+    from mutagen.id3 import ID3, APIC
+
+    tags = ID3()
+    tags.add(
+        APIC(
+            encoding=3, mime="image/jpeg", type=3, desc="Cover", data=b"fake_image_data"
+        )
+    )
+    tags.add(TIT2(encoding=3, text=["Clean Title"]))
+    tags.save(str(silence_mp3))
+
+    service = MetadataService()
+    metadata = service.extract_metadata(str(silence_mp3))
+
+    # APIC should be missing, TIT2 should be there
+    assert "APIC" not in metadata
+    assert "TIT2" in metadata
+    assert metadata["TIT2"] == ["Clean Title"]

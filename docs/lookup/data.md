@@ -32,7 +32,7 @@ Finds songs by case-insensitive title match (LIKE '%query%').
 Returns full Song models parsed via `_row_to_song`.
 
 ### _row_to_song(row: sqlite3.Row) -> Song
-**Internal**: Maps a physical database row to the strict Pydantic `Song` model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.
+**Internal**: Maps a physical database row to the `Song` domain model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.
 
 ---
 
@@ -46,7 +46,7 @@ Batch-fetches credits for multiple songs in a single query.
 - Performance optimized for list-views (Search/Folders).
 
 ### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
-**Internal**: Maps a physical database row to the strict Pydantic `SongCredit` model, enforcing strict validation that `RoleID` cannot be NULL.
+**Internal**: Maps a physical database row to the `SongCredit` domain model, ensuring that `RoleID` is correctly handled.
 
 ---
 
@@ -88,7 +88,7 @@ Resolve a flat list of ID -> Publisher objects.
 ### get_tags_for_songs(song_ids: List[int]) -> List[Tuple[int, Tag]]
 Batch-fetches tags for multiple songs (M2M).
 - Returns a flat list of `(SongID, Tag)` tuples.
-- Used to build the `tags` list on the `Song` domain model.
+- Hydrates the `is_primary` flag from the `MediaSourceTags` table.
 
 ### _row_to_tag(row: sqlite3.Row) -> Tag
-**Internal**: Maps a physical database row to the strict Pydantic `Tag` model.
+**Internal**: Maps a physical database row to the strict Pydantic `Tag` model, including the `IsPrimary` marker.

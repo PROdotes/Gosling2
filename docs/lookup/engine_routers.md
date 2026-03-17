@@ -20,6 +20,22 @@ Fetches a single Song domain model by its unique ID.
 
 ### async def search_songs(q: str) -> List[Song]
 **HTTP**: `GET /api/v1/songs/search?q={query}`
-- Validates query (at least 2 chars).
+- Validates query (at least 1 char now per user request).
 - Calls `CatalogService.search_songs(q)`.
 - Returns a JSON list of `Song` models.
+- **Instrumentation**: Traces query and result count.
+
+---
+
+## Metabolic Router
+*Location: `src/engine/routers/metabolic.py`*
+**Responsibility**: File-system inspection and comparison logic.
+
+### def _get_catalog_service() -> CatalogService
+**Internal**: Factory for the router.
+
+### async def inspect_file(song_id: int) -> SongView
+**HTTP**: `GET /api/v1/metabolic/inspect-file/{song_id}`
+- Reads physical file metadata via `MetadataService`.
+- Parses into domain model via `MetadataParser`.
+- Returns a `SongView` for UI comparison.

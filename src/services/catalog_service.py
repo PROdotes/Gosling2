@@ -89,10 +89,14 @@ class CatalogService:
 
     def _get_tags_by_song(self, song_ids: List[int]) -> Dict[int, List]:
         """Fetch and group tags by song ID."""
+        logger.debug(f"[CatalogService] Entry: _get_tags_by_song(ids={song_ids})")
         all_tags = self._tag_repo.get_tags_for_songs(song_ids)
         tags_by_song = {}
         for song_id, tag in all_tags:
             tags_by_song.setdefault(song_id, []).append(tag)
+        logger.debug(
+            f"[CatalogService] Exit: _get_tags_by_song - Grouped for {len(tags_by_song)} songs"
+        )
         return tags_by_song
 
     def _get_albums_by_song(self, song_ids: List[int]) -> Dict[int, List[SongAlbum]]:

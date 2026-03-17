@@ -20,20 +20,11 @@ async def search_songs(
     q: Optional[str] = None, query: Optional[str] = None
 ) -> List[Song]:
     """Search for songs by title match. Supports both 'q' and 'query'."""
-    MIN_CHAR = 2
     search_term = q or query
     logger.info(f"[CatalogRouter] GET /songs/search search_term='{search_term}'")
 
-    if not search_term or len(search_term) < MIN_CHAR:
-        logger.warning(
-            f"[CatalogRouter] VIOLATION: Invalid search query '{search_term}'"
-        )
-        raise HTTPException(
-            status_code=400,
-            detail=f"Search query must be at least {MIN_CHAR} characters",
-        )
-
-    results = _get_service().search_songs(search_term)
+    # We allow empty/short queries to explore the DB
+    results = _get_service().search_songs(search_term or "")
     logger.debug(f"[CatalogRouter] Found {len(results)} search results.")
     return [SongView.from_domain(s) for s in results]
 

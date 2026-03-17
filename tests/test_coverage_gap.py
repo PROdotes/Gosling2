@@ -22,14 +22,13 @@ async def test_router_get_song_not_found(populated_db):
 
 
 @pytest.mark.asyncio
-async def test_router_search_short_query(populated_db):
-    """Router coverage: 400 for short query."""
+async def test_router_search_short_query_success(populated_db):
+    """Router coverage: Single character query now allowed."""
     import os
 
     os.environ["GOSLING_DB_PATH"] = populated_db
-    with pytest.raises(HTTPException) as excinfo:
-        await search_songs(q="A")
-    assert excinfo.value.status_code == 400
+    res = await search_songs(q="A")
+    assert isinstance(res, list)
 
 
 def test_repositories_empty_inputs(populated_db):

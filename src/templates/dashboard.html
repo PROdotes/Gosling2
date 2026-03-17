@@ -4,22 +4,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gosling Discovery Dashboard</title>
+    <title>Gosling Discovery</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #0f111a;
-            --accent-primary: #6366f1;
-            --accent-secondary: #a855f7;
-            --text-main: #e2e8f0;
-            --text-dim: #94a3b8;
-            --surface: rgba(30, 41, 59, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
-            --glass-blur: blur(12px);
+            --bg-deep: #0a0b0f;
+            --bg-surface: #12131a;
+            --bg-card: #1a1b24;
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --border-accent: rgba(255, 255, 255, 0.12);
+            --accent: #f97316;
+            --accent-dim: #f9731655;
+            --accent-glow: rgba(249, 115, 22, 0.15);
+            --text-primary: #f4f4f5;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --success: #22c55e;
+            --warning: #eab308;
+            --danger: #ef4444;
         }
 
         * {
@@ -29,268 +33,414 @@
         }
 
         body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            font-family: 'Outfit', sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-primary);
+            font-family: 'DM Sans', sans-serif;
             height: 100vh;
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background: radial-gradient(circle at 50% -20%, #1e1b4b 0%, #0f111a 100%);
         }
 
         header {
-            padding: 2rem 4rem;
+            padding: 1.25rem 2rem;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border);
-            backdrop-filter: var(--glass-blur);
-            background: rgba(15, 17, 26, 0.5);
-            z-index: 100;
+            gap: 2rem;
+            border-bottom: 1px solid var(--border-subtle);
+            background: var(--bg-surface);
         }
 
         .logo {
-            font-size: 1.5rem;
-            font-weight: 600;
-            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: -0.02em;
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            color: var(--text-primary);
+            white-space: nowrap;
         }
 
-        .search-container {
+        .logo span {
+            color: var(--accent);
+        }
+
+        .search-wrapper {
             flex: 1;
-            max-width: 600px;
-            margin: 0 4rem;
+            max-width: 480px;
             position: relative;
         }
 
-        input[type="text"] {
-            width: 100%;
-            padding: 1rem 1.5rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            color: white;
-            font-size: 1rem;
-            outline: none;
-            transition: all 0.3s ease;
-            backdrop-filter: var(--glass-blur);
+        .search-wrapper svg {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 18px;
+            color: var(--text-muted);
         }
 
-        input[type="text"]:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        #searchInput {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        #searchInput::placeholder {
+            color: var(--text-muted);
+        }
+
+        #searchInput:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 1.5rem;
+            margin-left: auto;
+        }
+
+        .stat-item {
+            text-align: right;
+        }
+
+        .stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         main {
             flex: 1;
             display: flex;
             overflow: hidden;
-            padding: 2rem 4rem;
-            gap: 2rem;
         }
 
-        #results-container {
+        .results-panel {
             flex: 1;
-            overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-            padding-right: 1rem;
+            border-right: 1px solid var(--border-subtle);
+            min-width: 400px;
         }
 
-        .song-card {
-            padding: 1.5rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        .results-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
+        .results-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .results-count {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        #results-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .song-card {
+            padding: 1rem 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
         .song-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 0.2);
-            background: rgba(51, 65, 85, 0.7);
+            background: #1f2029;
+            border-color: var(--border-accent);
         }
 
         .song-card.active {
-            border-color: var(--accent-primary);
-            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--accent);
+            background: var(--accent-glow);
         }
 
-        .song-info h3 {
-            font-size: 1.25rem;
-            margin-bottom: 0.25rem;
-            color: #fff;
+        .song-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-dim), transparent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
-        .song-info p {
-            color: var(--text-dim);
-            font-size: 0.9rem;
+        .song-icon svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent);
+        }
+
+        .song-details {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .song-title {
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-bottom: 0.2rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .song-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .song-genre {
+            color: var(--accent);
+            font-size: 0.7rem;
+            padding: 0.15rem 0.5rem;
+            background: var(--accent-glow);
+            border-radius: 4px;
         }
 
         .song-year {
             font-family: 'JetBrains Mono', monospace;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
-            color: var(--accent-primary);
-            font-size: 0.85rem;
-            white-space: nowrap;
-        }
-
-        .genre-badge {
-            font-size: 0.7rem;
-            background: rgba(99, 102, 241, 0.15);
-            color: var(--accent-primary);
-            padding: 0.1rem 0.4rem;
-            border-radius: 4px;
-            margin-left: 0.5rem;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-        }
-
-        .tag-pill {
-            display: inline-block;
             font-size: 0.75rem;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            padding: 0.2rem 0.6rem;
-            border-radius: 20px;
-            margin: 0 0.4rem 0.4rem 0;
-            color: var(--text-main);
         }
 
-        .tag-pill.category-genre {
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
-
-        #detail-panel {
-            width: 450px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2.5rem;
-            backdrop-filter: var(--glass-blur);
-            overflow-y: auto;
+        .detail-panel {
+            width: 480px;
+            background: var(--bg-surface);
             display: none;
-            animation: slideIn 0.4s ease-out;
+            flex-direction: column;
+            animation: slideIn 0.25s ease-out;
         }
 
         @keyframes slideIn {
-            from {
-                transform: translateX(20px);
-                opacity: 0;
-            }
-
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
         }
 
         .detail-header {
-            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
-        .detail-header h2 {
-            font-size: 2rem;
+        .detail-title {
+            font-size: 1.25rem;
+            font-weight: 600;
             margin-bottom: 0.5rem;
         }
 
-        .detail-meta {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
+        .detail-path {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            word-break: break-all;
+            font-family: 'JetBrains Mono', monospace;
         }
 
-        .meta-tag {
-            font-size: 0.75rem;
+        .detail-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .detail-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border-subtle);
+        }
+
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+        }
+
+        .meta-item {
+            background: var(--bg-card);
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .meta-label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: var(--text-dim);
-            border: 1px solid var(--border);
-            padding: 0.25rem 0.75rem;
-            border-radius: 4px;
+            margin-bottom: 0.25rem;
         }
 
-        .section-label {
+        .meta-value {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .meta-value.mono {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        .tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+
+        .tag {
             font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--accent-primary);
-            text-transform: uppercase;
-            margin-bottom: 1rem;
-            display: block;
-            letter-spacing: 0.1em;
+            padding: 0.3rem 0.6rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-secondary);
         }
 
-        .credit-list {
-            margin-bottom: 2.5rem;
+        .tag.genre {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .credits-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
         .credit-item {
             display: flex;
             justify-content: space-between;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid var(--border);
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-card);
+            border-radius: 6px;
+            border: 1px solid var(--border-subtle);
         }
 
         .credit-name {
             font-weight: 500;
-        }
-
-        .credit-role {
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            font-style: italic;
-        }
-
-        .tech-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-
-        .tech-box {
-            padding: 1rem;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-        }
-
-        .tech-box label {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            display: block;
-            margin-bottom: 0.25rem;
-        }
-
-        .tech-box span {
-            font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
         }
 
-        ::-webkit-scrollbar {
-            width: 8px;
+        .credit-role {
+            font-size: 0.8rem;
+            color: var(--text-muted);
         }
 
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        .albums-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
 
-        ::-webkit-scrollbar-thumb {
-            background: var(--border);
+        .album-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 1rem;
+        }
+
+        .album-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .album-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .album-meta span {
+            padding: 0.15rem 0.5rem;
+            background: rgba(255, 255, 255, 0.03);
             border-radius: 4px;
         }
 
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.2);
+        .album-meta .album-artist {
+            color: var(--accent);
+        }
+
+        .file-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        .file-status.found {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: var(--success);
+        }
+
+        .file-status.missing {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--danger);
+        }
+
+        .file-status.loading {
+            background: rgba(234, 179, 8, 0.1);
+            border: 1px solid rgba(234, 179, 8, 0.3);
+            color: var(--warning);
         }
 
         .empty-state {
@@ -299,7 +449,37 @@
             align-items: center;
             justify-content: center;
             height: 100%;
-            color: var(--text-dim);
+            color: var(--text-muted);
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .empty-state svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-accent);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
         }
     </style>
 </head>
@@ -307,169 +487,320 @@
 <body>
 
     <header>
-        <div class="logo">GOSLING V3CORE</div>
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search by song title..." autocomplete="off">
+        <div class="logo">GOSLING<span>.</span></div>
+        <div class="search-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input type="text" id="searchInput" placeholder="Search songs, artists, albums..." autocomplete="off">
         </div>
-        <div class="status-dot" title="Engine Connected"></div>
+        <div class="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="total-count">—</div>
+                <div class="stat-label">Total Songs</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="match-count">—</div>
+                <div class="stat-label">Matches</div>
+            </div>
+        </div>
     </header>
 
     <main>
-        <section id="results-container">
-            <div class="empty-state">
-                <p>Type to discover music</p>
+        <section class="results-panel">
+            <div class="results-header">
+                <span class="results-title">Results</span>
+                <span class="results-count" id="results-count">0 songs</span>
+            </div>
+            <div id="results-container">
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                    <p>Start typing to discover music</p>
+                </div>
             </div>
         </section>
 
-        <section id="detail-panel">
-            <!-- Populated by JS -->
-        </section>
+        <section class="detail-panel" id="detail-panel"></section>
     </main>
 
     <script>
         const searchInput = document.getElementById('searchInput');
         const resultsContainer = document.getElementById('results-container');
         const detailPanel = document.getElementById('detail-panel');
+        const resultsCount = document.getElementById('results-count');
+        const totalCount = document.getElementById('total-count');
+        const matchCount = document.getElementById('match-count');
 
         let debounceTimer;
+        let currentQuery = '';
 
         searchInput.addEventListener('input', (e) => {
             clearTimeout(debounceTimer);
-            const query = e.target.value.trim();
-
+            currentQuery = e.target.value.trim();
             debounceTimer = setTimeout(() => {
-                searchSongs(query);
-            }, 300);
+                searchSongs(currentQuery);
+            }, 250);
         });
+
+        searchSongs('');
 
         async function searchSongs(query) {
             try {
-                const response = await fetch(`/api/v1/songs/search?query=${encodeURIComponent(query)}`);
-                
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.detail || `Search failed: ${response.statusText}`);
-                }
-
+                const url = query ? `/api/v1/songs/search?q=${encodeURIComponent(query)}` : '/api/v1/songs/search';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Search failed: ' + response.status);
                 const songs = await response.json();
                 renderResults(songs);
             } catch (error) {
-                resultsContainer.innerHTML = `<div class="empty-state"><p style="color: #ef4444">Error: ${error.message}</p></div>`;
+                resultsContainer.innerHTML = `<div class="empty-state"><p style="color: var(--danger)">Error: ${error.message}</p></div>`;
             }
         }
 
         function renderResults(songs) {
+            resultsCount.textContent = `${songs.length} song${songs.length !== 1 ? 's' : ''}`;
+            matchCount.textContent = songs.length;
+
             if (songs.length === 0) {
-                resultsContainer.innerHTML = '<div class="empty-state"><p>No results found matching your query</p></div>';
+                resultsContainer.innerHTML = `<div class="empty-state"><p>No songs found</p></div>`;
                 return;
             }
 
-            resultsContainer.innerHTML = songs.map(song => `
-                <div class="song-card" onclick="showDetail(${JSON.stringify(song).replace(/"/g, '&quot;')}, this)">
-                    <div class="song-info">
-                        <h3>${song.title}${song.primary_genre ? `<span class="genre-badge">${song.primary_genre}</span>` : ''}</h3>
-                        <p>${song.display_artist || 'Unknown Artist'}</p>
+            resultsContainer.innerHTML = songs.map((song, idx) => `
+                <div class="song-card" data-idx="${idx}">
+                    <div class="song-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                        </svg>
                     </div>
-                    <div class="song-year">${song.year || 'N/A'}</div>
-                </div>
-            `).join('');
-        }
-
-        function showDetail(song, element) {
-            // Highlight selected
-            document.querySelectorAll('.song-card').forEach(c => c.classList.remove('active'));
-            element.classList.add('active');
-
-            detailPanel.style.display = 'block';
-
-            const creditsHtml = song.credits.map(c => `
-                <div class="credit-item">
-                    <span class="credit-name">${c.display_name}</span>
-                    <span class="credit-role">${c.role_name}</span>
-                </div>
-            `).join('');
-
-            const albumsHtml = (song.albums || []).map(a => {
-                const pubNames = (a.publishers || []).map(p => p.name).join(', ') || 'Unknown Publisher';
-                const trackInfo = a.track_number ? `Track ${a.track_number}` : '';
-                return `
-                <div class="credit-item" style="border-left: ${a.is_primary ? '2px solid var(--accent-primary)' : 'none'}; padding-left: ${a.is_primary ? '8px' : '0'};">
-                    <div>
-                        <span class="credit-name" style="color: ${a.is_primary ? '#fff' : 'var(--text-dim)'}">${a.album_title}</span>
-                        <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
-                            ${a.release_year || 'Unknown Year'} ${a.album_type ? `• ${a.album_type}` : ''} ${trackInfo ? `• ${trackInfo}` : ''}
+                    <div class="song-details">
+                        <div class="song-title">${song.title || song.media_name || 'Untitled'}</div>
+                        <div class="song-meta">
+                            <span>${song.display_artist || 'Unknown Artist'}</span>
+                            ${song.primary_genre ? `<span class="song-genre">${song.primary_genre}</span>` : ''}
+                            <span class="song-year">${song.year || '—'}</span>
                         </div>
                     </div>
-                    <div style="text-align: right;">
-                        <span class="credit-role">${a.is_primary ? 'Primary Album' : 'Appearance'}</span>
-                        <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; opacity: 0.7;">${pubNames}</div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.song-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    showDetail(songs[idx], this);
+                });
+            });
+        }
+
+        async function showDetail(song, element) {
+            document.querySelectorAll('.song-card').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            detailPanel.style.display = 'flex';
+
+            renderDetailSkeleton(song);
+
+            try {
+                const response = await fetch(`/api/v1/metabolic/inspect-file/${song.id}`);
+                const fileData = response.ok ? await response.json() : null;
+                renderDetailComplete(song, fileData, !response.ok);
+            } catch (err) {
+                console.error('Error:', err);
+                renderDetailComplete(song, null, true);
+            }
+        }
+
+        function renderDetailSkeleton(song) {
+            detailPanel.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${song.title}</div>
+                    <div class="detail-path">${song.source_path || 'No source path'}</div>
+                </div>
+                <div class="detail-content">
+                    <div class="file-status loading">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Loading file info...
+                    </div>
+                    <div class="meta-grid">
+                        <div class="meta-item"><div class="meta-label">Title</div><div class="meta-value">${song.media_name || song.title}</div></div>
+                        <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${song.display_artist || '—'}</div></div>
+                        <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${song.year || '—'}</div></div>
+                        <div class="meta-item"><div class="meta-label">BPM</div><div class="meta-value">${song.bpm || '—'}</div></div>
+                        <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${song.formatted_duration || '—'}</div></div>
+                        <div class="meta-item"><div class="meta-label">ISRC</div><div class="meta-value mono">${song.isrc || '—'}</div></div>
                     </div>
                 </div>
-                `;
-            }).join('');
+            `;
+        }
 
-            const tagsHtml = (song.tags || []).map(t => `
-                <span class="tag-pill ${t.category === 'Genre' ? 'category-genre' : ''}">${t.name}</span>
-            `).join('');
+        function renderDetailComplete(song, fileData, fileMissing) {
+            const rawCredits = Array.isArray(song.credits) ? song.credits : [];
+            const fileCredits = fileData && Array.isArray(fileData.credits) ? fileData.credits : [];
+            
+            const rawAlbums = Array.isArray(song.albums) ? song.albums : [];
+            const fileAlbums = fileData && Array.isArray(fileData.albums) ? fileData.albums : [];
+            
+            const rawTags = Array.isArray(song.tags) ? song.tags : [];
+            const fileTags = fileData && Array.isArray(fileData.tags) ? fileData.tags : [];
+            
+            const rawPublishers = Array.isArray(song.publishers) ? song.publishers : [];
+            const filePublishers = fileData && Array.isArray(fileData.publishers) ? fileData.publishers : [];
 
-            const masterPubsHtml = (song.publishers || []).map(p => `
-                <div class="credit-item">
-                    <span class="credit-name">${p.name}</span>
-                    <span class="credit-role">Copyright Owner</span>
-                </div>
-            `).join('');
+            const statusHtml = fileMissing 
+                ? `<div class="file-status missing"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>File not found</div>`
+                : `<div class="file-status found"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>File verified</div>`;
+
+            const renderCredits = (credits, source) => {
+                if (!credits.length) return '';
+                return `<div class="credits-list">${credits.map(c => `
+                    <div class="credit-item">
+                        <span class="credit-name">${c.display_name || c.name || '-'}</span>
+                        <span class="credit-role">${c.role_name || '-'}</span>
+                    </div>
+                `).join('')}</div>`;
+            };
+
+            const renderAlbums = (albums) => {
+                if (!albums.length) return '';
+                return albums.map(a => {
+                    const title = a.album_title || a.display_title || 'Unknown Album';
+                    const parts = [];
+                    if (a.album_type) parts.push(`<span>${a.album_type}</span>`);
+                    if (a.release_year) parts.push(`<span>${a.release_year}</span>`);
+                    if (a.publishers?.length) parts.push(`<span class="album-publishers">${a.publishers.map(p => p.name).join(', ')}</span>`);
+                    return `<div class="album-card"><div class="album-title">${title}</div><div class="album-meta">${parts.join('')}</div></div>`;
+                }).join('');
+            };
+
+            const renderTags = (tags, isGenre = false) => {
+                if (!tags.length) return '';
+                return `<div class="tags-list">${tags.map(t => `<span class="tag ${isGenre ? 'genre' : ''}">${t.name || t.display_name || '-'}</span>`).join('')}</div>`;
+            };
+
+            const formatList = (arr, key) => arr?.length ? arr.map(i => i[key] || i.name || '-').join(', ') : '—';
+
+            const mkRow = (label, dbVal, fileVal, isMono = false) => {
+                const match = String(dbVal).toLowerCase() === String(fileVal).toLowerCase();
+                const color = match ? 'var(--text-primary)' : 'var(--danger)';
+                return `<tr><td style="padding:6px;font-size:0.75rem;color:var(--text-muted)">${label}</td><td style="padding:6px;font-size:0.85rem">${dbVal || '-'}</td><td style="padding:6px;font-size:0.85rem;color:${color}">${fileVal || '-'}</td></tr>`;
+            };
+
+            const dbGenres = rawTags.filter(t => t.category?.toLowerCase() === 'genre').map(t => t.name);
+            const fileGenres = fileTags.filter(t => t.category?.toLowerCase() === 'genre').map(t => t.name);
+            const dbOther = rawTags.filter(t => t.category?.toLowerCase() !== 'genre').map(t => t.name);
+            const fileOther = fileTags.filter(t => t.category?.toLowerCase() !== 'genre').map(t => t.name);
+
+            const dbAlbumArtists = rawCredits.filter(c => c.role_name?.toLowerCase().includes('album')).map(c => c.display_name || c.name);
+            const fileAlbumArtists = fileCredits.filter(c => c.role_name?.toLowerCase().includes('album')).map(c => c.display_name || c.name);
 
             detailPanel.innerHTML = `
                 <div class="detail-header">
-                    <h2>${song.title}</h2>
-                    <div class="detail-meta">
-                        <span class="meta-tag">${song.year || 'No Date'}</span>
-                        <span class="meta-tag">${song.isrc || 'No ISRC'}</span>
-                        ${song.primary_genre ? `<span class="meta-tag" style="border-color: var(--accent-primary); color: var(--accent-primary)">${song.primary_genre}</span>` : ''}
+                    <div class="detail-title">${song.title}</div>
+                    <div class="detail-path">${song.source_path || 'No source path'}</div>
+                </div>
+                <div class="detail-content">
+                    ${statusHtml}
+                    
+                    <div class="detail-section">
+                        <div class="section-title">Core Metadata</div>
+                        <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+                            <thead><tr><th style="text-align:left;padding:8px;font-size:0.7rem;color:var(--text-muted);border-bottom:1px solid var(--border-subtle)">Field</th><th style="text-align:left;padding:8px;font-size:0.7rem;color:var(--text-muted);border-bottom:1px solid var(--border-subtle)">Library</th><th style="text-align:left;padding:8px;font-size:0.7rem;color:var(--text-muted);border-bottom:1px solid var(--border-subtle)">File</th></tr></thead>
+                            <tbody>
+                                ${mkRow('Title', song.media_name, fileData?.media_name)}
+                                ${mkRow('Artist', song.display_artist, fileData?.display_artist)}
+                                ${mkRow('Year', song.year, fileData?.year)}
+                                ${mkRow('BPM', song.bpm, fileData?.bpm)}
+                                ${mkRow('Duration', song.formatted_duration, fileData?.formatted_duration)}
+                                ${mkRow('ISRC', song.isrc, fileData?.isrc, true)}
+                            </tbody>
+                        </table>
                     </div>
-                </div>
 
-                <div style="margin-bottom: 2.5rem;">
-                    <span class="section-label">Genres & Tags</span>
-                    <div style="margin-top: 0.5rem;">
-                        ${tagsHtml || '<p style="color: var(--text-dim); font-size: 0.8rem;">No tags available</p>'}
+                    <div class="detail-section">
+                        <div class="section-title">Credits</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${rawCredits.length})</div>
+                                ${renderCredits(rawCredits, 'db')}
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileCredits.length})</div>
+                                ${renderCredits(fileCredits, 'file')}
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <span class="section-label">Master Copyright</span>
-                <div class="credit-list">
-                    ${masterPubsHtml || '<p style="color: var(--text-dim); font-size: 0.8rem;">No master publisher data found</p>'}
-                </div>
-
-                <span class="section-label">Albums & Appearances</span>
-                <div class="credit-list">
-                    ${albumsHtml || '<p style="color: var(--text-dim)">No album data found</p>'}
-                </div>
-
-                <span class="section-label">Personnel</span>
-                <div class="credit-list">
-                    ${creditsHtml || '<p style="color: var(--text-dim)">No contributor data found</p>'}
-                </div>
-
-                <span class="section-label">Technical Metadata</span>
-                <div class="tech-grid">
-                    <div class="tech-box">
-                        <label>BPM</label>
-                        <span>${song.bpm || 'N/A'}</span>
+                    <div class="detail-section">
+                        <div class="section-title">Albums</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${rawAlbums.length})</div>
+                                <div class="albums-list">${renderAlbums(rawAlbums)}${dbAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${dbAlbumArtists.join(', ')}</div>` : ''}</div>
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileAlbums.length})</div>
+                                <div class="albums-list">${renderAlbums(fileAlbums)}${fileAlbumArtists.length ? `<div style="font-size:0.75rem;color:var(--accent);margin-top:0.5rem">Album Artist: ${fileAlbumArtists.join(', ')}</div>` : ''}</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="tech-box">
-                        <label>Duration</label>
-                        <span>${song.formatted_duration || '0:00'}</span>
-                    </div>
-                    <div class="tech-box" style="grid-column: span 2">
-                        <label>Hash</label>
-                        <span style="font-size: 0.75rem">${song.audio_hash}</span>
-                    </div>
-                </div>
 
-                <div style="margin-top: 3rem; font-size: 0.7rem; color: var(--text-dim)">
-                    <span class="section-label">Source Path</span>
-                    <p style="word-break: break-all; opacity: 0.6">${song.source_path}</p>
+                    <div class="detail-section">
+                        <div class="section-title">Genres</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${dbGenres.length})</div>
+                                ${renderTags(rawTags.filter(t => t.category?.toLowerCase() === 'genre'), true)}
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileGenres.length})</div>
+                                ${renderTags(fileTags.filter(t => t.category?.toLowerCase() === 'genre'), true)}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Other Tags</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${dbOther.length})</div>
+                                ${renderTags(rawTags.filter(t => t.category?.toLowerCase() !== 'genre'))}
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${fileOther.length})</div>
+                                ${renderTags(fileTags.filter(t => t.category?.toLowerCase() !== 'genre'))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Publishers</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">Library (${rawPublishers.length})</div>
+                                ${renderTags(rawPublishers)}
+                            </div>
+                            <div>
+                                <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.5rem">File (${filePublishers.length})</div>
+                                ${renderTags(filePublishers)}
+                            </div>
+                        </div>
+                    </div>
+
+                    ${fileData?.raw_tags && Object.keys(fileData.raw_tags).length ? `
+                    <div class="detail-section">
+                        <div class="section-title">Raw Tags (${Object.keys(fileData.raw_tags).length})</div>
+                        <div style="background:var(--bg-card);padding:0.75rem;border-radius:8px;border:1px solid var(--border-subtle);font-family:'JetBrains Mono',monospace;font-size:0.75rem;max-height:200px;overflow-y:auto">
+                            ${Object.entries(fileData.raw_tags).map(([k, v]) => `<div style="margin-bottom:0.25rem"><span style="color:var(--accent)">${k}</span>: ${v.join(', ')}</div>`).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <div class="detail-section">
+                        <div class="section-title">Audio Hash</div>
+                        <div class="meta-item" style="padding:0.75rem">
+                            <div class="meta-value mono" style="font-size:0.7rem;word-break:break-all">${song.audio_hash || '—'}</div>
+                        </div>
+                    </div>
                 </div>
             `;
         }

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourceDuration REAL,
     AudioHash TEXT,
     IsActive BOOLEAN DEFAULT 1,
-    ProcessingStatus INTEGER DEFAULT 1,
+    ProcessingStatus INTEGER DEFAULT 0,
     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );
 
@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS Tags (
 CREATE TABLE IF NOT EXISTS MediaSourceTags (
     SourceID INTEGER NOT NULL,
     TagID INTEGER NOT NULL,
+    IsPrimary BOOLEAN DEFAULT 0,
     PRIMARY KEY (SourceID, TagID),
     FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE,
     FOREIGN KEY (TagID) REFERENCES Tags(TagID) ON DELETE CASCADE

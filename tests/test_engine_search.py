@@ -26,12 +26,11 @@ def test_dashboard_serving_logic():
     assert "<!DOCTYPE html>" in response
 
 
-def test_engine_search_guard_violates_short_query():
-    """Verify that the engine as gatekeeper raises 400 for short queries."""
-    with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(search_songs(q="E"))
-    assert excinfo.value.status_code == 400
-    assert "at least 2 characters" in str(excinfo.value.detail)
+def test_engine_search_allows_short_query(populated_db):
+    """Verify that the engine now allows single character queries for exploration."""
+    os.environ["GOSLING_DB_PATH"] = populated_db
+    results = asyncio.run(search_songs(q="E"))
+    assert isinstance(results, list)
 
 
 def test_dashboard_serving_missing_file():

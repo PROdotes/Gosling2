@@ -18,8 +18,8 @@
     },
     "TALB": {
         "description": "Album",
-        "field": "album",
-        "type": "text"
+        "field": "album_title",
+        "type": "list"
     },
     "TBPM": {
         "description": "BPM (Beats Per Minute)",
@@ -56,7 +56,7 @@
     },
     "TIT2": {
         "description": "Title/songname/content description",
-        "field": "title",
+        "field": "media_name",
         "type": "text"
     },
     "TIT3": "Subtitle/Description refinement",
@@ -70,7 +70,7 @@
     },
     "TLEN": {
         "description": "Length",
-        "field": "duration",
+        "field": "duration_ms",
         "type": "integer"
     },
     "TMED": "Media type",
@@ -96,7 +96,11 @@
     },
     "TPE3": "Conductor/performer refinement",
     "TPE4": "Interpreted, remixed, or otherwise modified by",
-    "TPOS": "Part of a set",
+    "TPOS": {
+        "description": "Part of a set (Disc Number)",
+        "field": "disc_number",
+        "type": "integer"
+    },
     "TMOO": {
         "description": "Mood",
         "tag_category": "Mood",
@@ -109,7 +113,11 @@
         "field": "publisher",
         "type": "list"
     },
-    "TRCK": "Track number/Position in set",
+    "TRCK": {
+        "description": "Track number/Position in set",
+        "field": "track_number",
+        "type": "integer"
+    },
     "TRDA": "Recording dates",
     "TRSN": "Internet radio station name",
     "TRSO": "Internet radio station owner",
@@ -196,7 +204,7 @@
     "TAL": {
         "description": "Album",
         "field": "album",
-        "type": "text"
+        "type": "list"
     },
     "TBP": {
         "description": "BPM",
@@ -260,9 +268,9 @@
     },
     "TSOC": "Composer sort order",
     "TKWD": "Podcast keywords",
-    "TXXX:pikachu": {
-        "description": "Custom field: pikachu",
-        "field": "pikachu",
-        "type": "text"
+    "TXXX:STATUS": {
+        "description": "Internal workflow status",
+        "field": "processing_status",
+        "type": "integer"
     }
 }

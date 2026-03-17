@@ -237,12 +237,27 @@ def populated_db(mock_db_path):
     cursor.execute(
         "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (5, 'English', 'Jezik')"
     )
+    cursor.execute(
+        "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (6, 'Alt Rock', 'Genre')"
+    )
 
     cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 1)")
     cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 2)")
     cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (1, 5)")
     cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (2, 3)")
     cursor.execute("INSERT INTO MediaSourceTags (SourceID, TagID) VALUES (4, 4)")
+
+    # Song 9: Multi-genre with explicit primary
+    cursor.execute(
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (9, 1, 'Priority Test', '/path/9', 100, 1)"
+    )
+    cursor.execute("INSERT INTO Songs (SourceID) VALUES (9)")
+    cursor.execute(
+        "INSERT INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (9, 1, 0)"
+    )  # Grunge
+    cursor.execute(
+        "INSERT INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (9, 6, 1)"
+    )  # Alt Rock (Primary)
 
     conn.commit()
     conn.close()

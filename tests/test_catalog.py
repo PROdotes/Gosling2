@@ -102,13 +102,17 @@ def test_get_song_tag_hydration(populated_db):
     # Song 2: 90s (Era) -> No Genre category so fallback to first
     song2 = service.get_song(2)
     assert len(song2.tags) == 1
-    assert SongView.from_domain(song2).primary_genre == "90s"
+    assert SongView.from_domain(song2).primary_genre is None
 
-    # Song 4: Electronic Style Fallback
+    # Song 4: Electronic Style (Not a Genre) -> No badge
     song_4 = service.get_song(4)
     view_4 = SongView.from_domain(song_4)
-    assert view_4.primary_genre == "Electronic"
+    assert view_4.primary_genre is None
     assert any(t.name == "Electronic" for t in song_4.tags)
+
+    # Song 9: Multi-genre with explicit primary (Alt Rock vs Grunge)
+    song_9 = service.get_song(9)
+    assert SongView.from_domain(song_9).primary_genre == "Alt Rock"
 
     # Song with no tags
     song7 = service.get_song(7)

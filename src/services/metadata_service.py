@@ -61,11 +61,16 @@ class MetadataService:
 
     def _read_tags(self, tags: Any) -> Dict[str, List[str]]:
         """Extracts and cleans all tags from mutagen into a clean list-based dictionary."""
+        logger.debug("[MetadataService] Entry: _read_tags")
         metadata = {}
 
         tag_items = tags.items() if hasattr(tags, "items") else []
 
         for tag_id, value in tag_items:
+            # Data Fidelity: Skip binary/non-textual frames (APIC=Picture, GEOB=Object, PRIV=Private)
+            if tag_id.startswith(("APIC", "GEOB", "PRIV")):
+                continue
+
             # Data Fidelity: Extract values from lists and complex mutagen objects
             extracted = []
             if hasattr(value, "people"):
@@ -76,7 +81,8 @@ class MetadataService:
                 for item in raw_list:
                     # Clean the value and split by common delimiters
                     val_str = str(item).strip()
-                    # Split by common delimiters: \u0000, |||,  /
+                    # Data Fidelity: Split by 'hard' nulls and established safe delimiters.
+                    # We avoid splitting by single ';' to protect song titles.
                     parts = re.split(r"\u0000|\|\|\|| / ", val_str)
                     extracted.extend([p.strip() for p in parts if p.strip()])
 
@@ -84,4 +90,7 @@ class MetadataService:
                 # Store by the raw tag ID (e.g. TPE1, TXXX:STATUS), deduplicated
                 metadata[tag_id] = list(dict.fromkeys(extracted))
 
+        logger.debug(
+            f"[MetadataService] Exit: _read_tags - Extracted {len(metadata)} frames"
+        )
         return metadata

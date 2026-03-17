@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 from pydantic import BaseModel, ConfigDict
 
 
@@ -11,13 +11,13 @@ class DomainModel(BaseModel):
 class MediaSource(DomainModel):
     """The base record for any airable file in the Gosling library."""
 
-    id: int
-    type_id: int
+    id: Optional[int] = None
+    type_id: Optional[int] = None
     media_name: str  # The "Title" in the database
     source_path: str
     duration_ms: int
     audio_hash: Optional[str] = None
-    processing_status: int = 1
+    processing_status: Optional[int] = None
     is_active: bool = False
     notes: Optional[str] = None
 
@@ -25,9 +25,9 @@ class MediaSource(DomainModel):
 class SongCredit(DomainModel):
     """The bridge between a Track and an Actor (Alias)."""
 
-    source_id: int
-    name_id: int
-    role_id: int  # 1=Performer, 2=Composer, 3=Producer, etc.
+    source_id: Optional[int] = None
+    name_id: Optional[int] = None
+    role_id: Optional[int] = None  # 1=Performer, 2=Composer, 3=Producer, etc.
     role_name: str  # Hydrated from Roles table
     display_name: str  # Hydrated from ArtistNames table
     is_primary: bool = False  # Is this the Identity's primary stage name?
@@ -36,7 +36,7 @@ class SongCredit(DomainModel):
 class Publisher(DomainModel):
     """The copyright owner or distributor."""
 
-    id: int
+    id: Optional[int] = None
     name: str
     parent_id: Optional[int] = None
 
@@ -44,16 +44,17 @@ class Publisher(DomainModel):
 class Tag(DomainModel):
     """A descriptive metadata marker (Genre, Mood, Era, etc.)."""
 
-    id: int
+    id: Optional[int] = None
     name: str
     category: Optional[str] = None
+    is_primary: bool = False
 
 
 class SongAlbum(DomainModel):
     """The link between a song and an album."""
 
-    source_id: int
-    album_id: int
+    source_id: Optional[int] = None
+    album_id: Optional[int] = None
     is_primary: bool = True
     track_number: Optional[int] = None
     disc_number: Optional[int] = 1
@@ -77,6 +78,10 @@ class Song(MediaSource):
     albums: List[SongAlbum] = []
     publishers: List[Publisher] = []
     tags: List[Tag] = []
+
+    # Storage for every raw ID3 frame found that wasn't explicitly mapped.
+    # Format: { "TIT2": ["Title"], "TXXX:STATUS": ["Ready"] }
+    raw_tags: Dict[str, List[str]] = {}
 
     @property
     def title(self) -> str:

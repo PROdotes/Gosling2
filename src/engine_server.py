@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from src.engine.routers.catalog import router as catalog_router
+from src.engine.routers.metabolic import router as metabolic_router
 from src.services.logger import logger
 
 app = FastAPI(title="Gosling2 Background Engine (V3CORE)", version="3.1.0")
@@ -34,3 +35,4 @@ async def get_dashboard():
 
 
 app.include_router(catalog_router)
+app.include_router(metabolic_router)
