@@ -7,25 +7,33 @@ We must ensure that GOSLING2 identifies duplicates correctly by hashing only aud
 - [x] **Task**: Implement `src/utils/audio_hash.py` using the Legacy SHA256 logic (skipping ID3v2 header/ID3v1 footers). [DONE]
 - [x] **Task**: Implement `src/services/metadata_service.py` to extract high-fidelity tags (ISRC, BPM, Multi-Performers) from physical files. [DONE]
 
-## 2. Step 2.2: Library Lifecycle (Ingestion & Pruning)
+## 2. Step 2.2: Library Lifecycle (Ingestion & Pruning) [IN PROGRESS]
 Establish the ability to actually *add* music to the database.
-- **Task**: `POST /api/v1/catalog/ingest`
+- [ ] **Task**: `POST /api/v1/catalog/ingest`
     - Logic: Path -> Hash -> Duplicate Check -> Metadata Extract -> ACID Insert.
-- **Task**: `DELETE /api/v1/catalog/songs/{song_id}`
+- [ ] **Task**: `DELETE /api/v1/catalog/songs/{song_id}`
     - Logic: Support "Soft Delete" (IsActive=0) vs "Purge" (Remove from DB).
 
-## 3. Step 2.3: Deep Search & Filtering
-Search is currently limited to `Songs.MediaName LIKE %q%`.
-- **Task**: Expand Search logic to join `Credits` and `Albums`.
-    - Searching for "Nirvana" should return all songs where Nirvana is a Performer.
-    - Searching for "Nevermind" should return all songs on that album.
-- **Task**: Implement UI Filter Pills (Genre, Year Range).
+## 2.5. Step 2.5: Identity Resolution [DONE]
+- [x] **Task**: Implement `IdentityRepository` with bidirectional Tree expansion (Aliases, Members, Groups).
+- [x] **Task**: Implement `GET /api/v1/identities/{id}` for full context.
+- [x] **Task**: Update Search to use Identity Resolution for deep discovery (Artist Names, Identities, Albums).
 
-## 4. Step 2.4: The Editor (Write Proof-of-Concept)
-Prove that we can modify data safely.
-- **Task**: `PATCH /api/v1/songs/{song_id}` - Single song updates.
-- **Task**: Finalize `BaseRepository._log_change` integration for auditing.
-- **Task**: Implement "Single Song Save" in the Dashboard Detail Panel.
+## 3. Step 2.3: Deep Search & Filtering [DONE]
+Search is currently limited to `Songs.MediaName LIKE %q%`.
+- [x] **Task**: Expand Search logic to join `Credits` and `Albums`.
+- [x] **Task**: Implement full "Identity Resolution" in search (Searching for "Dave Grohl" returns Nirvana).
+- [ ] **Task**: Implement UI Filter Pills (Genre, Year Range).
+
+
+## 4. Step 2.6: The Artist Browser (Next Chat) [DONE]
+Current Status: Backend is 90% ready. Navigation bridges are in place.
+- [x] **Task**: Implement **Artist Directory** API for browsing the entire library.
+- [x] **Task**: Build the **`/artists/{id}` UI** (The Universal Tree View).
+- [x] **Task**: Complete the **Reverse Credit** endpoint to populate the browse catalog.
+- [x] **Task**: Audit `schema.py` for remaining "Dark Data" (Publishers, Audit Logs). [DONE]
+
+
 
 ## 5. Metadata Scars & Constraints
 - **Hashing**: Use SHA256 (Skips ID3v2/v1). Do NOT hash the whole file.

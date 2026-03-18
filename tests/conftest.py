@@ -54,18 +54,10 @@ def populated_db(mock_db_path):
     cursor.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
 
     # 1. Identities
-    cursor.execute(
-        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (1, 'person', 'Dave Grohl')"
-    )
-    cursor.execute(
-        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (2, 'group', 'Nirvana')"
-    )
-    cursor.execute(
-        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (3, 'group', 'Foo Fighters')"
-    )
-    cursor.execute(
-        "INSERT INTO Identities (IdentityID, IdentityType, DisplayName) VALUES (4, 'person', 'Taylor Hawkins')"
-    )
+    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (1, 'person')")
+    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (2, 'group')")
+    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (3, 'group')")
+    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (4, 'person')")
 
     # 2. Memberships
     cursor.execute(

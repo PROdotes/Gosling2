@@ -29,7 +29,6 @@ CREATE TABLE IF NOT EXISTS Songs (
 CREATE TABLE IF NOT EXISTS Identities (
     IdentityID INTEGER PRIMARY KEY,
     IdentityType TEXT NOT NULL,
-    DisplayName TEXT NOT NULL,
     LegalName TEXT
 );
 
@@ -109,10 +108,10 @@ CREATE TABLE IF NOT EXISTS RecordingPublishers (
 );
 
 CREATE TABLE IF NOT EXISTS AlbumCredits (
+    CreditID INTEGER PRIMARY KEY,
     AlbumID INTEGER NOT NULL,
     CreditedNameID INTEGER NOT NULL,
     RoleID INTEGER NOT NULL,
-    PRIMARY KEY (AlbumID, CreditedNameID, RoleID),
     FOREIGN KEY (AlbumID) REFERENCES Albums(AlbumID) ON DELETE CASCADE,
     FOREIGN KEY (CreditedNameID) REFERENCES ArtistNames(NameID),
     FOREIGN KEY (RoleID) REFERENCES Roles(RoleID)

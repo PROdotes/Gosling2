@@ -18,6 +18,8 @@ def test_get_song_exists(populated_db):
     assert len(song.credits) == 1
     assert song.credits[0].display_name == "Foo Fighters"
     assert song.credits[0].role_id == 1
+    assert song.credits[0].identity_id == 3  # Foo Fighters Identity
+
 
 
 def test_get_song_multiple_credits(populated_db):
@@ -159,3 +161,38 @@ def test_display_artist_multiple_performers(catalog_service, populated_db):
     assert song is not None
     view = SongView.from_domain(song)
     assert view.display_artist == "Dave Grohl, Taylor Hawkins"
+
+
+def test_get_all_identities(catalog_service, populated_db):
+    """LAW: get_all_identities returns a list ordered by DisplayName."""
+    identities = catalog_service.get_all_identities()
+    assert len(identities) == 4
+    names = [i.display_name for i in identities]
+    # ASCII ascending: Dave Grohl, Foo Fighters, Nirvana, Taylor Hawkins
+    assert names[0] == "Dave Grohl"
+    assert names[1] == "Foo Fighters"
+    assert names[2] == "Nirvana"
+    assert names[3] == "Taylor Hawkins"
+
+
+def test_get_songs_by_identity(catalog_service, populated_db):
+    """LAW: get_songs_by_identity resolves the full tree and finds all credited songs."""
+    # Dave Grohl (id=1) belongs to Nirvana (id=2) and Foo Fighters (id=3). 
+    # Plus his solo/aliases (Grohlton, Late!).
+    dave_songs = catalog_service.get_songs_by_identity(1)
+    
+    # Nirvana = 1, Foo Fighters = 2, Grohlton = 4, Late! = 5, Joint Venture = 8, Dual Credit = 6
+    song_ids = {s.id for s in dave_songs}
+    assert 1 in song_ids  # Smells Like Teen Spirit (Nirvana)
+    assert 2 in song_ids  # Everlong (Foo Fighters)
+    assert 4 in song_ids  # Grohlton Theme (Alias)
+    assert 5 in song_ids  # Pocketwatch Demo (Alias)
+    assert 6 in song_ids  # Dual Credit
+    assert 8 in song_ids  # Joint Venture
+    
+    assert 3 not in song_ids  # Range Rover Bitch (Taylor Solo)
+
+def test_get_songs_by_identity_not_found(catalog_service, populated_db):
+    """LAW: get_songs_by_identity returns empty list for non-existent identity."""
+    res = catalog_service.get_songs_by_identity(999)
+    assert res == []

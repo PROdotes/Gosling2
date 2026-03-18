@@ -15,9 +15,37 @@ Fetch a single song and all its credits by ID.
 - Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
 ### search_songs(query: str) -> List[Song]
-Search for songs by title and hydrate with full metadata.
-- Calls `SongRepository.get_by_title`.
-- Uses `_hydrate_songs` to attach all credits, albums, and publishers.
+Search for songs by title, album, and identity expansion (groups/aliases).
+- Calls `SongRepository.search_surface` for titles/albums.
+- Calls `IdentityRepository.search_identities` and `get_group_ids_for_members` for deep expansion.
+- Uses `_hydrate_songs` to attach all metadata.
+
+### get_identity(identity_id: int) -> Optional[Identity]
+Fetch a single Identity and all its aliases/members/groups by ID.
+- Accesses `IdentityRepository.get_by_id`.
+- Uses `_hydrate_identities` for tree expansion.
+
+### get_all_identities() -> List[Identity]
+Fetch a list of all active identities.
+
+### search_identities(query: str) -> List[Identity]
+Search for identities by name or alias.
+
+### get_songs_by_identity(identity_id: int) -> List[Song]
+Reverse Credit lookup: Given a seed identity_id, find all related IDs (its aliases + members/groups) and return all songs where any of those IDs are credited.
+
+### get_all_publishers() -> List[Publisher]
+Fetch the full directory of publishers with resolved hierarchy chains.
+
+### search_publishers(query: str) -> List[Publisher]
+Search for publishers by name match with resolved hierarchy chains.
+
+### get_publisher(publisher_id: int) -> Optional[Publisher]
+Fetch a single publisher by ID and resolve its full hierarchy and sub-publishers.
+
+### get_publisher_songs(publisher_id: int) -> List[Song]
+Fetch the full song repertoire (Master rights) for a given publisher.
+
 
 ### _hydrate_songs(songs: List[Song]) -> List[Song]
 **Internal**: Centralized batch hydration for all song metadata.
@@ -26,6 +54,17 @@ Search for songs by title and hydrate with full metadata.
 - Resolves publisher objects via `PublisherRepository`.
 - Locally orchestrates/groups the records by SourceID.
 - Stitches them back to the Songs creating `SongAlbum` bridge objects with resolved metadata and returns the hydrated list.
+
+### _hydrate_publishers(pubs: List[Publisher]) -> List[Publisher]
+**Internal**: Batch-resolves the full parent hierarchy chains for any list of publishers.
+1. Performs a single batch fetch for all ancestors using a recursive CTE via `PublisherRepository.get_hierarchy_batch`.
+2. Attaches parent names to each entry locally.
+
+### _hydrate_identities(identities: List[Identity]) -> List[Identity]
+**Internal**: Batch-resolves the "Universal Tree" for a list of identities (Aliases, Members, Groups).
+1. Collects all unique owner IDs.
+2. Batch fetches aliases and memberships.
+3. Hydrates the view model trees.
 
 ### _get_credits_by_song(song_ids: List[int]) -> Dict[int, List[SongCredit]]
 **Internal**: Fetches and groups credits by song ID.
@@ -38,6 +77,12 @@ Search for songs by title and hydrate with full metadata.
 
 ### _get_albums_by_song(song_ids: List[int]) -> Dict[int, List[SongAlbum]]
 **Internal**: Fetches album associations, resolves publishers, and groups by song ID.
+
+### _get_publishers_by_album(album_ids: List[int]) -> Dict[int, List[Publisher]]
+**Internal**: Batch-fetch and hydrate publishers for albums.
+
+### _get_album_credits_by_album(album_ids: List[int]) -> Dict[int, List[AlbumCredit]]
+**Internal**: Batch-fetch album credits grouped by album ID.
 
 ---
 

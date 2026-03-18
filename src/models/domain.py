@@ -27,6 +27,7 @@ class SongCredit(DomainModel):
 
     source_id: Optional[int] = None
     name_id: Optional[int] = None
+    identity_id: Optional[int] = None  # The parent Identity ID
     role_id: Optional[int] = None  # 1=Performer, 2=Composer, 3=Producer, etc.
     role_name: str  # Hydrated from Roles table
     display_name: str  # Hydrated from ArtistNames table
@@ -38,6 +39,7 @@ class AlbumCredit(DomainModel):
 
     album_id: Optional[int] = None
     name_id: Optional[int] = None
+    identity_id: Optional[int] = None
     role_id: Optional[int] = None
     role_name: str
     display_name: str
@@ -50,6 +52,8 @@ class Publisher(DomainModel):
     id: Optional[int] = None
     name: str
     parent_id: Optional[int] = None
+    parent_name: Optional[str] = None
+    sub_publishers: List["Publisher"] = []
 
 
 class Tag(DomainModel):
@@ -76,6 +80,28 @@ class SongAlbum(DomainModel):
     release_year: Optional[int] = None
     album_publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
+
+
+class ArtistName(DomainModel):
+    """A specific stage name or alias for an Identity."""
+
+    id: int
+    display_name: str
+    is_primary: bool = False
+
+
+class Identity(DomainModel):
+    """A resolved artist entity (Person or Group)."""
+
+    id: int
+    type: str  # person, group, placeholder
+    display_name: Optional[str] = None
+    legal_name: Optional[str] = None
+
+    # The Tree Connections
+    aliases: List[ArtistName] = []  # Formerly List[str]
+    members: List["Identity"] = []  # If type='group', the constituent persons
+    groups: List["Identity"] = []  # If type='person', the parent groups
 
 
 class Song(MediaSource):

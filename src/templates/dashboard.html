@@ -488,13 +488,91 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--text-muted);
         }
+
+        .mode-tabs {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.25rem;
+            border-radius: 8px;
+            gap: 0.25rem;
+        }
+
+        .mode-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 0.4rem 1rem;
+            font-size: 0.85rem;
+            font-family: 'DM Sans', sans-serif;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .mode-tab.active {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 2px 10px var(--accent-glow);
+        }
+
+        .artist-card {
+            padding: 1.25rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .artist-card:hover {
+            background: #1f2029;
+            border-color: var(--accent-dim);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .artist-card.active {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .artist-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+        
+        .artist-badge {
+            align-self: flex-start;
+            font-size: 0.65rem;
+            padding: 0.2rem 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
     </style>
+
 </head>
 
 <body>
 
     <header>
         <div class="logo">GOSLING<span>.</span></div>
+        <div class="mode-tabs">
+            <button id="mode-songs" class="mode-tab active" onclick="switchMode('songs')">Songs</button>
+            <button id="mode-artists" class="mode-tab" onclick="switchMode('artists')">Artists</button>
+            <button id="mode-publishers" class="mode-tab" onclick="switchMode('publishers')">Publishers</button>
+        </div>
         <div class="search-wrapper">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -540,6 +618,8 @@
         const totalCount = document.getElementById('total-count');
         const matchCount = document.getElementById('match-count');
 
+        let currentMode = 'songs'; // 'songs' or 'artists'
+        let cachedIdentities = [];
         let debounceTimer;
         let currentQuery = '';
         let cachedSongs = [];
@@ -553,9 +633,33 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
         }
+        
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`mode-${mode}`).classList.add('active');
+            
+            searchInput.placeholder = 
+                mode === 'songs' ? "Search songs, artists, albums..." : 
+                mode === 'artists' ? "Search artists and aliases..." : 
+                "Search music publishers...";
+            
+            detailPanel.style.display = 'none';
+            searchInput.value = '';
+            currentQuery = '';
+            
+            if (mode === 'songs') {
+                searchSongs('');
+            } else if (mode === 'artists') {
+                searchArtists();
+            } else {
+                searchPublishers();
+            }
+        }
 
         function updateSelection() {
-            const cards = document.querySelectorAll('.song-card');
+            const className = currentMode === 'songs' ? '.song-card' : '.artist-card';
+            const cards = document.querySelectorAll(className);
             cards.forEach((c, i) => c.classList.toggle('active', i === selectedIndex));
             if (selectedIndex >= 0 && selectedIndex < cards.length) {
                 cards[selectedIndex].scrollIntoView({ block: 'nearest' });
@@ -565,13 +669,17 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && detailPanel.style.display === 'flex') {
                 detailPanel.style.display = 'none';
-                document.querySelectorAll('.song-card').forEach(c => c.classList.remove('active'));
+                document.querySelectorAll('.song-card, .artist-card').forEach(c => c.classList.remove('active'));
                 selectedIndex = -1;
             }
-            if (document.activeElement === searchInput && cachedSongs.length > 0) {
+            const activeList = 
+                currentMode === 'songs' ? cachedSongs : 
+                currentMode === 'artists' ? cachedIdentities : 
+                cachedPublishers;
+            if (document.activeElement === searchInput && activeList.length > 0) {
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    selectedIndex = Math.min(selectedIndex + 1, cachedSongs.length - 1);
+                    selectedIndex = Math.min(selectedIndex + 1, activeList.length - 1);
                     updateSelection();
                 } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
@@ -579,7 +687,12 @@
                     updateSelection();
                 } else if (e.key === 'Enter' && selectedIndex >= 0) {
                     e.preventDefault();
-                    showDetail(cachedSongs[selectedIndex], document.querySelectorAll('.song-card')[selectedIndex]);
+                    const cards = document.querySelectorAll(currentMode === 'songs' ? '.song-card' : '.artist-card');
+                    if (currentMode === 'songs') {
+                        showDetail(activeList[selectedIndex], cards[selectedIndex]);
+                    } else {
+                        showArtistDetail(activeList[selectedIndex], cards[selectedIndex]);
+                    }
                 }
             }
         });
@@ -588,10 +701,13 @@
             clearTimeout(debounceTimer);
             currentQuery = e.target.value.trim();
             debounceTimer = setTimeout(() => {
-                searchSongs(currentQuery);
+                if (currentMode === 'songs') searchSongs(currentQuery);
+                else if (currentMode === 'artists') searchArtists(currentQuery);
+                else searchPublishers(currentQuery);
             }, 250);
         });
 
+        // Init
         searchSongs('');
 
         async function searchSongs(query) {
@@ -627,6 +743,7 @@
                     <div class="song-details">
                         <div class="song-title">${escapeHtml(song.title || song.media_name || 'Untitled')}</div>
                         <div class="song-meta">
+                            <span style="color:var(--accent); font-family:monospace; font-weight:bold">#${song.song_id}</span>
                             <span>${escapeHtml(song.display_artist || 'Unknown Artist')}</span>
                             ${song.primary_genre ? `<span class="song-genre">${escapeHtml(song.primary_genre)}</span>` : ''}
                             <span class="song-year">${escapeHtml(song.year || '—')}</span>
@@ -643,6 +760,281 @@
                     showDetail(cachedSongs[idx], this);
                 });
             });
+        }
+
+        async function searchArtists(query = '') {
+            try {
+                const url = query ? `/api/v1/identities/search?q=${encodeURIComponent(query)}` : '/api/v1/identities?limit=100';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Search failed: ' + response.status);
+                const identities = await response.json();
+                renderArtists(identities);
+            } catch (error) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p style="color: var(--danger)">Error: ${error.message}</p></div>`;
+            }
+        }
+
+        function renderArtists(identities) {
+            cachedIdentities = identities;
+            selectedIndex = -1;
+            resultsCount.textContent = `${identities.length} artist${identities.length !== 1 ? 's' : ''}`;
+            matchCount.textContent = identities.length;
+
+            if (identities.length === 0) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p>No artists found</p></div>`;
+                return;
+            }
+
+            resultsContainer.innerHTML = identities.map((artist, idx) => `
+                <div class="artist-card" data-idx="${idx}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start">
+                        <div class="artist-name">${escapeHtml(artist.display_name)} <span style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">#${artist.id}</span></div>
+                        <span class="artist-badge">${escapeHtml(artist.type)}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.artist-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    selectedIndex = idx;
+                    updateSelection();
+                    showArtistDetail(cachedIdentities[idx], this);
+                });
+            });
+        }
+
+        async function searchPublishers(query = '') {
+            try {
+                const url = query ? `/api/v1/publishers/search?q=${encodeURIComponent(query)}` : '/api/v1/publishers';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Search failed: ' + response.status);
+                const publishers = await response.json();
+                renderPublishers(publishers);
+            } catch (error) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p style="color: var(--danger)">Error: ${error.message}</p></div>`;
+            }
+        }
+
+        let cachedPublishers = [];
+        function renderPublishers(publishers) {
+            cachedPublishers = publishers;
+            selectedIndex = -1;
+            resultsCount.textContent = `${publishers.length} publisher${publishers.length !== 1 ? 's' : ''}`;
+            matchCount.textContent = publishers.length;
+
+            if (publishers.length === 0) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p>No publishers found</p></div>`;
+                return;
+            }
+
+            resultsContainer.innerHTML = publishers.map((pub, idx) => `
+                <div class="artist-card" data-idx="${idx}" style="border-left: 4px solid #FFB84D">
+                    <div class="artist-details">
+                        <div class="artist-name">${escapeHtml(pub.name)} ${pub.parent_name ? `<span style="font-size:0.7rem; color:var(--text-muted)">(${escapeHtml(pub.parent_name)})</span>` : ''}</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem">ID: ${pub.id}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.artist-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    selectedIndex = idx;
+                    updateSelection();
+                    showPublisherDetail(cachedPublishers[idx], this);
+                });
+            });
+        }
+
+        async function showPublisherDetail(publisher_data, element) {
+            // Backend returns List[Publisher] to avoid Optional crashes
+            const pub = Array.isArray(publisher_data) ? publisher_data[0] : publisher_data;
+            if (!pub) return;
+
+            document.querySelectorAll('.artist-card').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            detailPanel.style.display = 'flex';
+
+            detailPanel.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${escapeHtml(pub.name)}</div>
+                    <div class="detail-path">PUBLISHER • ID ${pub.id}</div>
+                </div>
+                <div class="detail-content" id="publisher-detail-content">
+                    <div class="detail-section">
+                        <div class="section-title">Identity</div>
+                        <div class="meta-grid">
+                            <div class="meta-item"><div class="meta-label">Name</div><div class="meta-value">${escapeHtml(pub.name)}</div></div>
+                            <div class="meta-item"><div class="meta-label">Parent</div><div class="meta-value">${escapeHtml(pub.parent_name || 'None')}</div></div>
+                        </div>
+                    </div>
+                    
+                    <div class="file-status loading" style="background:rgba(255,184,77,0.1); border-color:rgba(255,184,77,0.2); color:#FFB84D">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Loading repertoire...
+                    </div>
+                </div>
+            `;
+
+            try {
+                const songRes = await fetch(`/api/v1/publishers/${pub.id}/songs`);
+                if (!songRes.ok) throw new Error('Repertoire missing');
+                const songsData = await songRes.json();
+                renderPublisherComplete(pub, songsData);
+            } catch (err) {
+                console.error('Error fetching publisher repertoire:', err);
+                document.getElementById('publisher-detail-content').innerHTML += `
+                    <div class="file-status missing" style="margin-top:1rem">Failed to load repertoire.</div>
+                `;
+            }
+        }
+
+        function renderPublisherComplete(pub, repertoire) {
+            const content = document.getElementById('publisher-detail-content');
+            
+            let childrenHtml = '';
+            if (pub.sub_publishers && pub.sub_publishers.length > 0) {
+                childrenHtml = `
+                    <div class="detail-section">
+                        <div class="section-title">Sub-Publishers</div>
+                        <div class="tags-list">
+                            ${pub.sub_publishers.map(s => `
+                                <span class="tag" style="cursor:pointer; border-color:#FFB84D; color:#FFB84D" onclick="switchMode('publishers'); searchPublishers('${escapeHtml(s.name).replace(/'/g, "\\'")}');">
+                                    ${escapeHtml(s.name)}
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let songsHtml = `
+                <div class="detail-section" style="margin-top:2rem">
+                    <div class="section-title">Repertoire (${repertoire.length})</div>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem">
+                        ${repertoire.length === 0 ? '<div class="text-muted" style="font-size:0.8rem">No songs explicitly linked as Master</div>' : ''}
+                        ${repertoire.map(song => `
+                            <div class="credit-item" style="cursor:pointer" onclick="switchMode('songs'); searchSongs('${escapeHtml(song.media_name).replace(/'/g, "\\'")}');">
+                                <div style="display:flex;flex-direction:column">
+                                    <span class="credit-name" style="color:var(--text-primary)">${escapeHtml(song.media_name || song.title)}</span>
+                                    <span class="credit-role" style="font-size:0.75rem">${escapeHtml(song.display_artist)}</span>
+                                </div>
+                                <span class="credit-role" style="margin-left:auto;align-self:center">${escapeHtml(song.formatted_duration)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            content.innerHTML = `
+                <div class="detail-section">
+                    <div class="section-title">Identity</div>
+                    <div class="meta-grid">
+                        <div class="meta-item"><div class="meta-label">Name</div><div class="meta-value">${escapeHtml(pub.name)}</div></div>
+                        <div class="meta-item"><div class="meta-label">Parent</div><div class="meta-value">${escapeHtml(pub.parent_name || 'None')}</div></div>
+                    </div>
+                </div>
+                ${childrenHtml}
+                ${songsHtml}
+            `;
+        }
+
+        async function showArtistDetail(artist, element) {
+            document.querySelectorAll('.artist-card').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            detailPanel.style.display = 'flex';
+
+            detailPanel.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${escapeHtml(artist.display_name)} <span style="color:var(--text-muted); font-size: 0.8rem; font-family: monospace;">#${artist.id}</span></div>
+                    <div class="detail-path">${escapeHtml(artist.type.toUpperCase())} ${artist.legal_name ? `• Legal: ${escapeHtml(artist.legal_name)}` : ''}</div>
+                </div>
+                <div class="detail-content" id="artist-detail-content">
+                    <div class="file-status loading">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Loading artist catalog...
+                    </div>
+                </div>
+            `;
+            
+            try {
+                // Fetch the detail tree to get members/aliases 
+                const treeRes = await fetch(`/api/v1/identities/${artist.id}`);
+                const treeData = treeRes.ok ? await treeRes.json() : null;
+                
+                // Fetch Reverse Credits
+                const songRes = await fetch(`/api/v1/identities/${artist.id}/songs`);
+                if (!songRes.ok) throw new Error('Catalog missing');
+                const songsData = await songRes.json();
+                
+                renderArtistComplete(treeData || artist, songsData);
+            } catch (err) {
+                console.error('Error fetching artist details:', err);
+                document.getElementById('artist-detail-content').innerHTML = `
+                    <div class="file-status missing">Failed to load artist details.</div>
+                `;
+            }
+        }
+        
+        function renderArtistComplete(tree, songs) {
+            const content = document.getElementById('artist-detail-content');
+            
+            let aliasesHtml = '';
+            if (tree.aliases && tree.aliases.length > 0) {
+                aliasesHtml = `
+                    <div class="detail-section">
+                        <div class="section-title">Aliases</div>
+                        <div class="tags-list">
+                            ${tree.aliases.map(a => `<span class="tag ${a.is_primary ? 'genre' : ''}">${escapeHtml(a.display_name)}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let membersHtml = '';
+            if (tree.members && tree.members.length > 0) {
+                membersHtml = `
+                    <div class="detail-section">
+                        <div class="section-title">Members</div>
+                        <div class="tags-list">
+                            ${tree.members.map(m => `<span class="tag">${escapeHtml(m.display_name)}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let groupsHtml = '';
+            if (tree.groups && tree.groups.length > 0) {
+                groupsHtml = `
+                    <div class="detail-section">
+                        <div class="section-title">Member Of</div>
+                        <div class="tags-list">
+                            ${tree.groups.map(g => `<span class="tag" style="border-color:var(--accent);color:var(--accent)">${escapeHtml(g.display_name)}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            let songsHtml = `
+                <div class="detail-section" style="margin-top:2rem">
+                    <div class="section-title">Full Catalog (${songs.length})</div>
+                    <div style="display:flex; flex-direction:column; gap:0.5rem">
+                        ${songs.length === 0 ? '<div class="text-muted" style="font-size:0.8rem">No songs mapped yet</div>' : ''}
+                        ${songs.map(song => `
+                            <div class="credit-item" style="cursor:pointer" onclick="switchMode('songs'); searchSongs('${escapeHtml(song.media_name).replace(/'/g, "\\'")}');">
+                                <div style="display:flex;flex-direction:column">
+                                    <span class="credit-name" style="color:var(--text-primary)">${escapeHtml(song.media_name || song.title)}</span>
+                                    <span class="credit-role" style="font-size:0.75rem">${escapeHtml(song.display_artist)}</span>
+                                </div>
+                                <span class="credit-role" style="margin-left:auto;align-self:center">${escapeHtml(song.formatted_duration)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            content.innerHTML = aliasesHtml + membersHtml + groupsHtml + songsHtml;
         }
 
         async function showDetail(song, element) {
@@ -665,7 +1057,7 @@
         function renderDetailSkeleton(song) {
             detailPanel.innerHTML = `
                 <div class="detail-header">
-                    <div class="detail-title">${escapeHtml(song.title)}</div>
+                    <div class="detail-title">${escapeHtml(song.title)} <span style="color:var(--text-muted); font-size: 0.8rem; font-family: monospace;">#${song.song_id}</span></div>
                     <div class="detail-path">${escapeHtml(song.source_path || 'No source path')}</div>
                 </div>
                 <div class="detail-content">

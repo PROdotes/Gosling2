@@ -9,6 +9,8 @@ from src.services.logger import logger
 class AlbumCreditRepository(BaseRepository):
     """Bridges Album IDs to their Credits and Human Names."""
 
+    _COLUMNS = "ac.AlbumID, ac.CreditedNameID, ac.RoleID, an.DisplayName, an.IsPrimaryName, an.OwnerIdentityID, r.RoleName"
+
     def get_credits_for_albums(self, album_ids: List[int]) -> List[AlbumCredit]:
         """Batch-fetches credits for multiple albums in a single query."""
         if not album_ids:
@@ -19,7 +21,7 @@ class AlbumCreditRepository(BaseRepository):
         )
         placeholders = ",".join(["?" for _ in album_ids])
         query = f"""
-            SELECT ac.AlbumID, ac.CreditedNameID, ac.RoleID, an.DisplayName, an.IsPrimaryName, r.RoleName
+            SELECT {self._COLUMNS}
             FROM AlbumCredits ac
             JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
             JOIN Roles r ON ac.RoleID = r.RoleID
@@ -39,6 +41,7 @@ class AlbumCreditRepository(BaseRepository):
         return AlbumCredit(
             album_id=row["AlbumID"],
             name_id=row["CreditedNameID"],
+            identity_id=row["OwnerIdentityID"],
             role_id=row["RoleID"],
             role_name=row["RoleName"],
             display_name=row["DisplayName"],

@@ -1,6 +1,14 @@
 from typing import List, Optional, Dict
-from pydantic import BaseModel, computed_field
-from src.models.domain import Song, SongCredit, Tag, Publisher, AlbumCredit
+from pydantic import BaseModel, computed_field, ConfigDict
+from src.models.domain import (
+    Song,
+    SongCredit,
+    Tag,
+    Publisher,
+    AlbumCredit,
+    Identity,
+    ArtistName,
+)
 
 
 class SongAlbumView(BaseModel):
@@ -19,10 +27,18 @@ class SongAlbumView(BaseModel):
     @computed_field
     @property
     def display_publisher(self) -> str:
-        """Name(s) of the album-level publishers."""
-        if self.album_publishers:
-            return ", ".join(p.name for p in self.album_publishers)
-        return ""
+        """Name(s) of the album-level publishers with parent hierarchy."""
+        if not self.album_publishers:
+            return ""
+
+        display_names = []
+        for p in self.album_publishers:
+            name = p.name
+            if p.parent_name:
+                name = f"{name} ({p.parent_name})"
+            display_names.append(name)
+
+        return ", ".join(display_names)
 
     @computed_field
     @property
@@ -109,10 +125,18 @@ class SongView(BaseModel):
     @computed_field
     @property
     def display_master_publisher(self) -> str:
-        """Joined names of the master rights holders."""
+        """Joined names of the master rights holders with parent hierarchy."""
         if not self.publishers:
             return ""
-        return ", ".join(p.name for p in self.publishers)
+
+        display_names = []
+        for p in self.publishers:
+            name = p.name
+            if p.parent_name:
+                name = f"{name} ({p.parent_name})"
+            display_names.append(name)
+
+        return ", ".join(display_names)
 
     @computed_field
     @property
@@ -137,3 +161,36 @@ class SongView(BaseModel):
                 return t.name
 
         return None
+
+
+class IdentityView(BaseModel):
+    """View-model for the bidirectional artist tree."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: str
+    display_name: Optional[str] = None
+    legal_name: Optional[str] = None
+    aliases: List[ArtistName] = []  # Can reuse domain model here as it's simple
+
+    # Recursive connections
+    members: List["IdentityView"] = []
+    groups: List["IdentityView"] = []
+
+    @classmethod
+    def from_domain(cls, identity: Identity) -> "IdentityView":
+        """Factory to convert a domain Identity tree into a view model."""
+        data = identity.model_dump()
+        data["members"] = []
+        data["groups"] = []
+
+        # Recursive mapping for members
+        if identity.members:
+            data["members"] = [cls.from_domain(m) for m in identity.members]
+
+        # Recursive mapping for groups
+        if identity.groups:
+            data["groups"] = [cls.from_domain(g) for g in identity.groups]
+
+        return cls(**data)

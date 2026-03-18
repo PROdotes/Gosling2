@@ -68,3 +68,29 @@ async def test_inspect_file_not_found(populated_db, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         await inspect_file(9999, service)
     assert exc.value.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_get_all_identities_logic(populated_db, monkeypatch):
+    from src.engine.routers.catalog import get_all_identities
+    monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
+
+    identities = await get_all_identities()
+    assert len(identities) == 4
+    names = [i.display_name for i in identities]
+    assert names[0] == "Dave Grohl"
+
+
+@pytest.mark.anyio
+async def test_get_songs_by_identity_logic(populated_db, monkeypatch):
+    from src.engine.routers.catalog import get_songs_by_identity
+    monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
+
+    songs = await get_songs_by_identity(2)  # Nirvana
+    assert len(songs) > 0
+    assert any(s.title == "Smells Like Teen Spirit" for s in songs)
+
+    with pytest.raises(HTTPException) as excinfo:
+        await get_songs_by_identity(999)
+    assert excinfo.value.status_code == 404
+

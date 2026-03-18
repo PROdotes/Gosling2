@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from src.models.domain import Song
-from src.models.view_models import SongView
+from src.models.domain import Song, Publisher
+from src.models.view_models import SongView, IdentityView
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 import os
@@ -38,3 +38,95 @@ async def get_song(song_id: int) -> Song:
         logger.warning(f"[CatalogRouter] VIOLATION: Song ID {song_id} not found")
         raise HTTPException(status_code=404, detail=f"Song ID {song_id} not found")
     return SongView.from_domain(song)
+
+
+@router.get("/identities/{identity_id:int}", response_model=IdentityView)
+async def get_identity(identity_id: int) -> IdentityView:
+    """Fetch a full identity tree by ID."""
+    logger.debug(f"[CatalogRouter] GET /identities/{identity_id}")
+    identity = _get_service().get_identity(identity_id)
+    if not identity:
+        logger.warning(
+            f"[CatalogRouter] VIOLATION: Identity ID {identity_id} not found"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Identity ID {identity_id} not found"
+        )
+    return IdentityView.from_domain(identity)
+
+
+@router.get("/identities", response_model=List[IdentityView])
+async def get_all_identities() -> List[IdentityView]:
+    """Fetch a list of active artists/identities."""
+    logger.debug("[CatalogRouter] GET /identities")
+    identities = _get_service().get_all_identities()
+    return [IdentityView.from_domain(i) for i in identities]
+
+
+@router.get("/identities/search", response_model=List[IdentityView])
+async def search_identities(q: str) -> List[IdentityView]:
+    """Search for identities by name or alias."""
+    logger.debug(f"[CatalogRouter] GET /identities/search q='{q}'")
+    identities = _get_service().search_identities(q)
+    return [IdentityView.from_domain(i) for i in identities]
+
+
+@router.get("/identities/{identity_id:int}/songs", response_model=List[SongView])
+async def get_songs_by_identity(identity_id: int) -> List[SongView]:
+    """Fetch all complete songs associated with a full universal identity tree."""
+    logger.debug(f"[CatalogRouter] GET /identities/{identity_id}/songs")
+
+    # We first ensure the identity exists
+    identity = _get_service().get_identity(identity_id)
+    if not identity:
+        logger.warning(
+            f"[CatalogRouter] VIOLATION: Identity ID {identity_id} not found"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Identity ID {identity_id} not found"
+        )
+
+    songs = _get_service().get_songs_by_identity(identity_id)
+    return [SongView.from_domain(s) for s in songs]
+
+
+@router.get("/publishers", response_model=List[Publisher])
+async def get_all_publishers() -> List[Publisher]:
+    """Fetch a list of all active music publishers."""
+    logger.debug("[CatalogRouter] GET /publishers")
+    return _get_service().get_all_publishers()
+
+
+@router.get("/publishers/search", response_model=List[Publisher])
+async def search_publishers(q: str) -> List[Publisher]:
+    """Search for publishers by name."""
+    logger.debug(f"[CatalogRouter] GET /publishers/search q='{q}'")
+    return _get_service().search_publishers(q)
+
+
+@router.get("/publishers/{publisher_id:int}", response_model=Publisher)
+async def get_publisher(publisher_id: int) -> Publisher:
+    """Fetch a single publisher by ID."""
+    logger.debug(f"[CatalogRouter] GET /publishers/{publisher_id}")
+    publisher = _get_service().get_publisher(publisher_id)
+    if not publisher:
+        logger.warning(
+            f"[CatalogRouter] VIOLATION: Publisher ID {publisher_id} not found"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Publisher ID {publisher_id} not found"
+        )
+    return publisher
+
+
+@router.get("/publishers/{publisher_id:int}/songs", response_model=List[SongView])
+async def get_publisher_songs(publisher_id: int) -> List[SongView]:
+    """Fetch the full repertoire associated with a given publisher."""
+    logger.debug(f"[CatalogRouter] GET /publishers/{publisher_id}/songs")
+    # Verify existence
+    pub = _get_service().get_publisher(publisher_id)
+    if not pub:
+        raise HTTPException(status_code=404, detail="Publisher not found")
+
+    songs = _get_service().get_publisher_songs(publisher_id)
+    return [SongView.from_domain(s) for s in songs]

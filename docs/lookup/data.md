@@ -27,23 +27,31 @@ Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
 ### get_by_ids(ids: List[int]) -> List[Song]
 Batch-fetches core song records for multiple IDs.
 
-### get_by_title(query: str, limit: int = 50) -> List[Song]
+### get_by_title(query: str) -> List[Song]
 Finds songs by case-insensitive title match (LIKE '%query%').
-Returns full Song models parsed via `_row_to_song`.
+
+### search_surface(query: str) -> List[Song]
+Discovery path on titles and albums. Fastest search.
+
+### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
+Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
 
 ### _row_to_song(row: sqlite3.Row) -> Song
+
 **Internal**: Maps a physical database row to the `Song` domain model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.
 
 ---
 
 ## SongCreditRepository
 *Location: `src/data/song_credit_repository.py`*
-**Responsibility**: DB reads for the SongCredits table. Bridges Song IDs to Names and Roles.
+**Responsibility**: DB reads for the SongCredits table. Bridges Song IDs to Names, Roles, and Identity IDs.
 
 ### get_credits_for_songs(song_ids: List[int]) -> List[SongCredit]
 Batch-fetches credits for multiple songs in a single query.
 - Returns a flat list of `SongCredit` entities.
+- Includes `identity_id` by joining `ArtistNames.OwnerIdentityID`.
 - Performance optimized for list-views (Search/Folders).
+
 
 ### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
 **Internal**: Maps a physical database row to the `SongCredit` domain model, ensuring that `RoleID` is correctly handled.
@@ -76,6 +84,27 @@ Batch-fetch master record publisher objects for a list of Songs (M2M resolution)
 ### get_publishers(publisher_ids: List[int]) -> Dict[int, Publisher]
 Resolve a flat list of ID -> Publisher objects.
 
+### get_all() -> List[Publisher]
+Fetch the full directory of active publishers.
+
+### search(query: str) -> List[Publisher]
+Search for publishers by name match.
+
+### get_by_id(publisher_id: int) -> Optional[Publisher]
+Fetch a single publisher by its ID.
+
+### get_by_ids(ids: List[int]) -> List[Publisher]
+Batch-fetch multiple publishers by ID. Used for parent chain resolution.
+
+### get_hierarchy_batch(publisher_ids: List[int]) -> Dict[int, Publisher]
+RESOLVER: Fetches the entire ancestry chain for a list of publishers in a SINGLE query using a recursive CTE.
+
+### get_children(parent_id: int) -> List[Publisher]
+Fetch all sub-publishers for a given parent.
+
+### get_song_ids_by_publisher(publisher_id: int) -> List[int]
+Find all song IDs explicitly linked to this publisher (Master rights).
+
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
 
@@ -106,3 +135,41 @@ Batch-fetches credits for multiple albums in a single query.
 
 ### _row_to_album_credit(row: sqlite3.Row) -> AlbumCredit
 **Internal**: Maps a physical database row to the `AlbumCredit` domain model.
+
+---
+
+## IdentityRepository
+*Location: `src/data/identity_repository.py`*
+**Responsibility**: Handles resolution of Artist Identities, Aliases, and Group Memberships.
+
+### get_by_id(identity_id: int) -> Optional[Identity]
+Hydrates a basic Identity record without tree expansion.
+
+### get_all_identities() -> List[Identity]
+Fetches the directory of all identities.
+
+### get_by_ids(identity_ids: List[int]) -> List[Identity]
+Batch-fetch multiple identities by ID.
+
+### search_identities(query: str) -> List[Identity]
+Finds identities whose DisplayName, LegalName, or Alias match the query.
+
+### get_group_ids_for_members(member_ids: List[int]) -> List[int]
+Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs.
+
+### get_aliases_batch(identity_ids: List[int]) -> Dict[int, List[ArtistName]]
+Batch-fetch aliases (ArtistNames) for multiple identities.
+
+### get_members_batch(identity_ids: List[int]) -> Dict[int, List[Identity]]
+Batch-fetch member identities for multiple group identities.
+
+### get_groups_batch(identity_ids: List[int]) -> Dict[int, List[Identity]]
+Batch-fetch group identities that multiple person identities belong to.
+
+### _row_to_identity(row: sqlite3.Row) -> Identity
+**Internal**: Maps a physical database row to the `Identity` domain model.
+
+### _row_to_artist_name(row: sqlite3.Row) -> ArtistName
+**Internal**: Maps a physical database row to the `ArtistName` domain model.
+
+

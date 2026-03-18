@@ -8,6 +8,8 @@ import sqlite3
 class SongCreditRepository(BaseRepository):
     """Bridges Song IDs to their Credits and Human Names."""
 
+    _COLUMNS = "sc.SourceID, sc.CreditedNameID, sc.RoleID, an.DisplayName, an.IsPrimaryName, an.OwnerIdentityID, r.RoleName"
+
     def get_credits_for_songs(self, song_ids: List[int]) -> List[SongCredit]:
         """Batch-fetches credits for multiple songs in a single query."""
         if not song_ids:
@@ -18,7 +20,7 @@ class SongCreditRepository(BaseRepository):
         )
         placeholders = ",".join(["?" for _ in song_ids])
         query = f"""
-            SELECT sc.SourceID, sc.CreditedNameID, sc.RoleID, an.DisplayName, an.IsPrimaryName, r.RoleName
+            SELECT {self._COLUMNS}
             FROM SongCredits sc
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
             JOIN Roles r ON sc.RoleID = r.RoleID
@@ -46,6 +48,7 @@ class SongCreditRepository(BaseRepository):
         return SongCredit(
             source_id=row["SourceID"],
             name_id=row["CreditedNameID"],
+            identity_id=row["OwnerIdentityID"],
             role_id=role_id,
             role_name=row["RoleName"],
             display_name=row["DisplayName"],

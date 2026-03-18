@@ -25,6 +25,51 @@ Fetches a single Song domain model by its unique ID.
 - Returns a JSON list of `Song` models.
 - **Instrumentation**: Traces query and result count.
 
+### async def get_identity(identity_id: int) -> IdentityView
+**HTTP**: `GET /api/v1/identities/{identity_id}`
+- Fetches a full identity tree by ID.
+- Raises `HTTPException(404)` if not found.
+- Wraps `CatalogService.get_identity`.
+- Maps to `IdentityView` for recursive tree serialization.
+
+### async def get_all_identities() -> List[IdentityView]
+**HTTP**: `GET /api/v1/identities`
+- Fetches the directory of active identities.
+- Wraps `CatalogService.get_all_identities`.
+
+### async def search_identities(q: str) -> List[IdentityView]
+**HTTP**: `GET /api/v1/identities/search?q={query}`
+- Searches identities by name or alias.
+- Wraps `CatalogService.search_identities`.
+
+### async def get_songs_by_identity(identity_id: int) -> List[SongView]
+**HTTP**: `GET /api/v1/identities/{identity_id}/songs`
+- Fetches all songs credited to this identity or its group/members.
+- Raises `HTTPException(404)` if the identity is not found.
+- Wraps `CatalogService.get_songs_by_identity`.
+
+### async def get_all_publishers() -> List[Publisher]
+**HTTP**: `GET /api/v1/publishers`
+- Fetches the directory of all active music publishers.
+- Wraps `CatalogService.get_all_publishers`.
+
+### async def search_publishers(q: str) -> List[Publisher]
+**HTTP**: `GET /api/v1/publishers/search?q={query}`
+- Searches publishers by name.
+- Wraps `CatalogService.search_publishers`.
+
+### async def get_publisher(publisher_id: int) -> Publisher
+**HTTP**: `GET /api/v1/publishers/{publisher_id}`
+- Fetches a single publisher by ID.
+- Raises `HTTPException(404)` if not found.
+- Wraps `CatalogService.get_publisher`.
+
+### async def get_publisher_songs(publisher_id: int) -> List[SongView]
+**HTTP**: `GET /api/v1/publishers/{publisher_id}/songs`
+- Fetches the full repertoire (Master rights) for a given publisher.
+- Wraps `CatalogService.get_publisher_songs`.
+
+
 ---
 
 ## Metabolic Router

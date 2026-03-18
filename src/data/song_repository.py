@@ -40,20 +40,55 @@ class SongRepository(BaseRepository):
             )
             return [self._row_to_song(row) for row in rows]
 
-    def get_by_title(self, query: str, limit: int = 50) -> List[Song]:
+    def get_by_title(self, query: str) -> List[Song]:
         """Find songs by title match."""
         logger.debug(f"[SongRepository] Searching for songs with title LIKE: {query}")
-        query_sql = (
-            f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.MediaName LIKE ? LIMIT ?"
-        )
+        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.MediaName LIKE ?"
 
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            # Basic SQLite LIKE is case-insensitive by default for ASCII
-            rows = conn.execute(query_sql, (f"%{query}%", limit)).fetchall()
+            rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
             logger.debug(
                 f"[SongRepository] Found {len(rows)} matches for query: '{query}'"
             )
+            return [self._row_to_song(row) for row in rows]
+
+    def search_surface(self, query: str) -> List[Song]:
+        """Discovery path on titles and albums. Fastest search."""
+        fmt_q = f"%{query}%"
+        query_sql = f"""
+            SELECT {self._COLUMNS} {self._JOIN}
+            WHERE m.MediaName LIKE ?
+               OR m.SourceID IN (
+                   SELECT sa.SourceID FROM SongAlbums sa
+                   JOIN Albums a ON sa.AlbumID = a.AlbumID
+                   WHERE a.AlbumTitle LIKE ?
+               )
+        """
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
+            return [self._row_to_song(row) for row in rows]
+
+    def get_by_identity_ids(self, identity_ids: List[int]) -> List[Song]:
+        """Retrieves songs where any given Identity ID is credited (The Grohlton Check base)."""
+        if not identity_ids:
+            return []
+
+        logger.debug(f"[SongRepository] get_by_identity_ids entry: ids={identity_ids}")
+        placeholders = ",".join(["?" for _ in identity_ids])
+        query_sql = f"""
+            SELECT {self._COLUMNS} {self._JOIN}
+            WHERE m.SourceID IN (
+                SELECT sc.SourceID FROM SongCredits sc
+                JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                WHERE an.OwnerIdentityID IN ({placeholders})
+            )
+        """
+
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query_sql, identity_ids).fetchall()
             return [self._row_to_song(row) for row in rows]
 
     def _row_to_song(self, row: sqlite3.Row) -> Song:
@@ -67,7 +102,7 @@ class SongRepository(BaseRepository):
             processing_status=(
                 row["ProcessingStatus"] if row["ProcessingStatus"] is not None else 0
             ),
-            is_active=bool(row["IsActive"]) if row["IsActive"] is not None else True,
+            is_active=bool(row["IsActive"]) if row["IsActive"] is not None else False,
             notes=row["SourceNotes"],
             media_name=row["MediaName"],
             bpm=row["TempoBPM"],
