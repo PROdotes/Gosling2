@@ -2,7 +2,6 @@ from typing import List, Optional, Dict
 from pydantic import BaseModel, computed_field, ConfigDict
 from src.models.domain import (
     Album,
-    SongAlbum,
     Song,
     SongCredit,
     Tag,
@@ -178,6 +177,7 @@ class AlbumView(BaseModel):
 
     @classmethod
     def from_domain(cls, album: Album) -> "AlbumView":
+        """Maps a domain Album to its view-model. Note: excludes 'songs' from base dump but re-attaches hydrated views."""
         data = album.model_dump(exclude={"songs"})
         data["songs"] = [SongView.from_domain(song) for song in album.songs]
         return cls(**data)
@@ -209,7 +209,11 @@ class AlbumView(BaseModel):
         ]
         if performers:
             unique_names = []
-            [unique_names.append(name) for name in performers if name not in unique_names]
+            [
+                unique_names.append(name)
+                for name in performers
+                if name not in unique_names
+            ]
             return ", ".join(unique_names)
 
         return self.credits[0].display_name

@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from src.data.base_repository import BaseRepository
 from src.models.domain import Album
@@ -14,7 +14,9 @@ class AlbumRepository(BaseRepository):
     def get_all(self) -> List[Album]:
         """Fetch the full album directory."""
         logger.info("[AlbumRepository] Entry: get_all()")
-        query = f"SELECT {self._COLUMNS} FROM Albums ORDER BY AlbumTitle COLLATE NOCASE ASC"
+        query = (
+            f"SELECT {self._COLUMNS} FROM Albums ORDER BY AlbumTitle COLLATE NOCASE ASC"
+        )
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
@@ -56,6 +58,28 @@ class AlbumRepository(BaseRepository):
             result = [row[0] for row in rows]
             logger.info(f"[AlbumRepository] Exit: Found {len(result)} song IDs.")
             return result
+
+    def get_song_ids_for_albums(self, album_ids: List[int]) -> Dict[int, List[int]]:
+        """Batch fetch song IDs for a set of albums in a single query."""
+        if not album_ids:
+            return {}
+
+        logger.info(
+            f"[AlbumRepository] Entry: get_song_ids_for_albums(count={len(album_ids)})"
+        )
+        placeholders = ",".join(["?"] * len(album_ids))
+        query = f"SELECT AlbumID, SourceID FROM SongAlbums WHERE AlbumID IN ({placeholders}) ORDER BY DiscNumber, TrackNumber, SourceID"
+
+        results: Dict[int, List[int]] = {}
+        with self._get_connection() as conn:
+            rows = conn.execute(query, album_ids).fetchall()
+            for album_id, song_id in rows:
+                results.setdefault(album_id, []).append(song_id)
+
+        logger.info(
+            f"[AlbumRepository] Exit: Grouped tracks for {len(results)} albums."
+        )
+        return results
 
     def _row_to_album(self, row: sqlite3.Row) -> Album:
         return Album(

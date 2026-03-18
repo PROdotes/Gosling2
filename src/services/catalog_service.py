@@ -487,20 +487,45 @@ class CatalogService:
         return credits_by_album
 
     def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:
-        """Fetch and hydrate songs grouped by album ID."""
+        """
+        RESOLVER: Fetches and hydrates all songs for multiple albums in a single BATCH flow.
+        Prevents the N+1 trap where each album individually triggers _hydrate_songs.
+        """
         logger.debug(
             f"[CatalogService] Entry: _get_songs_by_album(count={len(album_ids)})"
         )
         if not album_ids:
             return {}
 
-        songs_by_album: Dict[int, List[Song]] = {}
-        for album_id in album_ids:
-            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id)
-            songs = self._song_repo.get_by_ids(song_ids)
-            songs_by_album[album_id] = self._hydrate_songs(songs)
+        # 1. Fetch all Song IDs involved (Single Repository Query)
+        map_by_album = self._album_repo_dir.get_song_ids_for_albums(album_ids)
+
+        # 2. Collect unique IDs for hydration
+        all_song_ids = []
+        for sids in map_by_album.values():
+            all_song_ids.extend(sids)
+        unique_song_ids = list(dict.fromkeys(all_song_ids))
+
+        if not unique_song_ids:
+            return {}
+
+        # 3. Batch Fetch and Hydrate ALL songs in one orchestrator call
+        logger.debug(
+            f"[CatalogService] Hydrating {len(unique_song_ids)} unique songs for {len(album_ids)} albums."
+        )
+        all_songs = self._song_repo.get_by_ids(unique_song_ids)
+        hydrated_songs = self._hydrate_songs(all_songs)
+
+        # 4. Map back to albums
+        song_lookup = {s.id: s for s in hydrated_songs if s.id is not None}
+
+        results: Dict[int, List[Song]] = {}
+        for album_id, s_ids in map_by_album.items():
+            results[album_id] = [
+                song_lookup[sid] for sid in s_ids if sid in song_lookup
+            ]
 
         logger.debug(
-            f"[CatalogService] Exit: Hydrated songs for {len(songs_by_album)} albums."
+            f"[CatalogService] Exit: Hydrated tracklists for {len(results)} albums."
         )
-        return songs_by_album
+        return results

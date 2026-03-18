@@ -87,6 +87,9 @@ Fetch a single album by its ID.
 ### get_song_ids_by_album(album_id: int) -> List[int]
 Fetch all song IDs linked to a specific album, ordered by disc, track, and source ID.
 
+### get_song_ids_for_albums(album_ids: List[int]) -> Dict[int, List[int]]
+Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID].
+
 ### _row_to_album(row: sqlite3.Row) -> Album
 **Internal**: Maps a physical database row to the strict Pydantic `Album` model.
 

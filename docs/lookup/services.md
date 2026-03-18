@@ -101,7 +101,10 @@ Fetch the full song repertoire (Master rights) for a given publisher.
 **Internal**: Batch-fetch album credits grouped by album ID.
 
 ### _get_songs_by_album(album_ids: List[int]) -> Dict[int, List[Song]]
-**Internal**: Fetch and hydrate songs grouped by album ID for album detail views.
+**Internal**: RESOLVER: Fetches and hydrates all songs for multiple albums in a single BATCH flow to prevent the N+1 trap.
+- Fetches track mappings via `AlbumRepository.get_song_ids_for_albums`.
+- Batch hydration for ALL songs in the set.
+- Re-groups by AlbumID in memory.
 
 ---
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from src.models.domain import Song, Publisher
+from src.models.domain import Publisher
 from src.models.view_models import SongView, IdentityView, AlbumView
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -18,7 +18,7 @@ def _get_service() -> CatalogService:
 @router.get("/songs/search", response_model=List[SongView])
 async def search_songs(
     q: Optional[str] = None, query: Optional[str] = None
-) -> List[Song]:
+) -> List[SongView]:
     """Search for songs by title match. Supports both 'q' and 'query'."""
     search_term = q or query
     logger.info(f"[CatalogRouter] GET /songs/search search_term='{search_term}'")
@@ -30,7 +30,7 @@ async def search_songs(
 
 
 @router.get("/songs/{song_id:int}", response_model=SongView)
-async def get_song(song_id: int) -> Song:
+async def get_song(song_id: int) -> SongView:
     """Fetch a single song by ID."""
     logger.debug(f"[CatalogRouter] GET /songs/{song_id}")
     song = _get_service().get_song(song_id)
@@ -156,4 +156,6 @@ async def get_album(album_id: int) -> AlbumView:
     if not album:
         logger.warning(f"[CatalogRouter] VIOLATION: Album ID {album_id} not found")
         raise HTTPException(status_code=404, detail=f"Album ID {album_id} not found")
+
+    # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)

@@ -30,6 +30,7 @@ def test_publisher_hierarchy_resolution(mock_db_path):
     # 3. Test Service (Hydration)
     service = CatalogService(mock_db_path)
     hydrated = service.get_publisher(3)
+    assert hydrated is not None
     assert hydrated.name == "Island Def Jam"
     assert hydrated.parent_name == "Island Records"
 

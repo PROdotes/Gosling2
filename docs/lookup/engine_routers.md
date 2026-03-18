@@ -12,13 +12,13 @@
 ### def _get_service() -> CatalogService
 **Internal**: Centralized service factory for the router that injects `GOSLING_DB_PATH`.
 
-### async def get_song(song_id: int) -> Song
+### async def get_song(song_id: int) -> SongView
 **HTTP**: `GET /api/v1/songs/{song_id}`
 Fetches a single Song domain model by its unique ID.
 - Raises `HTTPException(404)` if the song does not exist.
 - Wraps `CatalogService.get_song`.
 
-### async def search_songs(q: str) -> List[Song]
+### async def search_songs(q: str) -> List[SongView]
 **HTTP**: `GET /api/v1/songs/search?q={query}`
 - Validates query (at least 1 char now per user request).
 - Calls `CatalogService.search_songs(q)`.
