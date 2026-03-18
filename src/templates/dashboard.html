@@ -570,6 +570,7 @@
         <div class="logo">GOSLING<span>.</span></div>
         <div class="mode-tabs">
             <button id="mode-songs" class="mode-tab active" onclick="switchMode('songs')">Songs</button>
+            <button id="mode-albums" class="mode-tab" onclick="switchMode('albums')">Albums</button>
             <button id="mode-artists" class="mode-tab" onclick="switchMode('artists')">Artists</button>
             <button id="mode-publishers" class="mode-tab" onclick="switchMode('publishers')">Publishers</button>
         </div>
@@ -618,8 +619,10 @@
         const totalCount = document.getElementById('total-count');
         const matchCount = document.getElementById('match-count');
 
-        let currentMode = 'songs'; // 'songs' or 'artists'
+        let currentMode = 'songs';
         let cachedIdentities = [];
+        let cachedAlbums = [];
+        let cachedPublishers = [];
         let debounceTimer;
         let currentQuery = '';
         let cachedSongs = [];
@@ -641,6 +644,7 @@
             
             searchInput.placeholder = 
                 mode === 'songs' ? "Search songs, artists, albums..." : 
+                mode === 'albums' ? "Search albums..." :
                 mode === 'artists' ? "Search artists and aliases..." : 
                 "Search music publishers...";
             
@@ -650,6 +654,8 @@
             
             if (mode === 'songs') {
                 searchSongs('');
+            } else if (mode === 'albums') {
+                searchAlbums();
             } else if (mode === 'artists') {
                 searchArtists();
             } else {
@@ -674,6 +680,7 @@
             }
             const activeList = 
                 currentMode === 'songs' ? cachedSongs : 
+                currentMode === 'albums' ? cachedAlbums :
                 currentMode === 'artists' ? cachedIdentities : 
                 cachedPublishers;
             if (document.activeElement === searchInput && activeList.length > 0) {
@@ -690,6 +697,8 @@
                     const cards = document.querySelectorAll(currentMode === 'songs' ? '.song-card' : '.artist-card');
                     if (currentMode === 'songs') {
                         showDetail(activeList[selectedIndex], cards[selectedIndex]);
+                    } else if (currentMode === 'albums') {
+                        showAlbumDetail(activeList[selectedIndex], cards[selectedIndex]);
                     } else {
                         showArtistDetail(activeList[selectedIndex], cards[selectedIndex]);
                     }
@@ -702,6 +711,7 @@
             currentQuery = e.target.value.trim();
             debounceTimer = setTimeout(() => {
                 if (currentMode === 'songs') searchSongs(currentQuery);
+                else if (currentMode === 'albums') searchAlbums(currentQuery);
                 else if (currentMode === 'artists') searchArtists(currentQuery);
                 else searchPublishers(currentQuery);
             }, 250);
@@ -717,6 +727,18 @@
                 if (!response.ok) throw new Error('Search failed: ' + response.status);
                 const songs = await response.json();
                 renderResults(songs);
+            } catch (error) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p style="color: var(--danger)">Error: ${error.message}</p></div>`;
+            }
+        }
+
+        async function searchAlbums(query = '') {
+            try {
+                const url = query ? `/api/v1/albums/search?q=${encodeURIComponent(query)}` : '/api/v1/albums';
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Search failed: ' + response.status);
+                const albums = await response.json();
+                renderAlbums(albums);
             } catch (error) {
                 resultsContainer.innerHTML = `<div class="empty-state"><p style="color: var(--danger)">Error: ${error.message}</p></div>`;
             }
@@ -758,6 +780,44 @@
                     selectedIndex = idx;
                     updateSelection();
                     showDetail(cachedSongs[idx], this);
+                });
+            });
+        }
+
+        function renderAlbums(albums) {
+            cachedAlbums = albums;
+            selectedIndex = -1;
+            resultsCount.textContent = `${albums.length} album${albums.length !== 1 ? 's' : ''}`;
+            matchCount.textContent = albums.length;
+
+            if (albums.length === 0) {
+                resultsContainer.innerHTML = `<div class="empty-state"><p>No albums found</p></div>`;
+                return;
+            }
+
+            resultsContainer.innerHTML = albums.map((album, idx) => `
+                <div class="artist-card" data-idx="${idx}" style="border-left: 4px solid var(--accent)">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem">
+                        <div style="min-width:0">
+                            <div class="artist-name">${escapeHtml(album.title)} <span style="font-size: 0.7rem; color: var(--text-muted); font-family: monospace;">#${album.id}</span></div>
+                            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.3rem">
+                                ${escapeHtml(album.display_artist || 'Unknown Artist')}
+                                ${album.release_year ? ` • ${escapeHtml(album.release_year)}` : ''}
+                                ${album.song_count ? ` • ${escapeHtml(album.song_count)} song${album.song_count !== 1 ? 's' : ''}` : ''}
+                            </div>
+                            ${album.display_publisher ? `<div style="font-size:0.72rem; color:#FFB84D; margin-top:0.3rem">${escapeHtml(album.display_publisher)}</div>` : ''}
+                        </div>
+                        ${album.album_type ? `<span class="artist-badge">${escapeHtml(album.album_type)}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            document.querySelectorAll('.artist-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.idx);
+                    selectedIndex = idx;
+                    updateSelection();
+                    showAlbumDetail(cachedAlbums[idx], this);
                 });
             });
         }
@@ -816,7 +876,6 @@
             }
         }
 
-        let cachedPublishers = [];
         function renderPublishers(publishers) {
             cachedPublishers = publishers;
             selectedIndex = -1;
@@ -845,6 +904,103 @@
                     showPublisherDetail(cachedPublishers[idx], this);
                 });
             });
+        }
+
+        function renderAlbumSongs(songs) {
+            return `
+                <div style="display:flex; flex-direction:column; gap:0.5rem">
+                    ${songs.length === 0 ? '<div class="text-muted" style="font-size:0.8rem">No songs linked yet</div>' : ''}
+                    ${songs.map(song => `
+                        <div class="credit-item" style="cursor:pointer" onclick="switchMode('songs'); searchSongs('${escapeHtml(song.media_name).replace(/'/g, "\\'")}');">
+                            <div style="display:flex;flex-direction:column">
+                                <span class="credit-name" style="color:var(--text-primary)">${escapeHtml(song.media_name || song.title)}</span>
+                                <span class="credit-role" style="font-size:0.75rem">${escapeHtml(song.display_artist || 'Unknown Artist')}</span>
+                            </div>
+                            <span class="credit-role" style="margin-left:auto;align-self:center">${escapeHtml(song.formatted_duration || '')}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        async function showAlbumDetail(album, element) {
+            document.querySelectorAll('.artist-card').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+            detailPanel.style.display = 'flex';
+
+            detailPanel.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${escapeHtml(album.title)} <span style="color:var(--text-muted); font-size: 0.8rem; font-family: monospace;">#${album.id}</span></div>
+                    <div class="detail-path">ALBUM${album.album_type ? ` • ${escapeHtml(album.album_type.toUpperCase())}` : ''}</div>
+                </div>
+                <div class="detail-content">
+                    <div class="file-status loading">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Loading album detail...
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/api/v1/albums/${album.id}`);
+                if (!response.ok) throw new Error('Album detail missing');
+                const fullAlbum = await response.json();
+                renderAlbumComplete(fullAlbum);
+            } catch (err) {
+                console.error('Error fetching album details:', err);
+                detailPanel.innerHTML = `
+                    <div class="detail-header">
+                        <div class="detail-title">${escapeHtml(album.title)}</div>
+                        <div class="detail-path">ALBUM • ID ${album.id}</div>
+                    </div>
+                    <div class="detail-content">
+                        <div class="file-status missing">Failed to load album details.</div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderAlbumComplete(album) {
+            const credits = Array.isArray(album.credits) ? album.credits : [];
+            const songs = Array.isArray(album.songs) ? album.songs : [];
+
+            detailPanel.innerHTML = `
+                <div class="detail-header">
+                    <div class="detail-title">${escapeHtml(album.title)} <span style="color:var(--text-muted); font-size: 0.8rem; font-family: monospace;">#${album.id}</span></div>
+                    <div class="detail-path">ALBUM${album.album_type ? ` • ${escapeHtml(album.album_type.toUpperCase())}` : ''}</div>
+                </div>
+                <div class="detail-content">
+                    <div class="detail-section">
+                        <div class="section-title">Overview</div>
+                        <div class="meta-grid">
+                            <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${escapeHtml(album.display_artist || 'Unknown Artist')}</div></div>
+                            <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${escapeHtml(album.release_year || '—')}</div></div>
+                            <div class="meta-item"><div class="meta-label">Type</div><div class="meta-value">${escapeHtml(album.album_type || 'Unknown')}</div></div>
+                            <div class="meta-item"><div class="meta-label">Songs</div><div class="meta-value">${escapeHtml(album.song_count || 0)}</div></div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Publishers</div>
+                        ${album.publishers && album.publishers.length ? `<div class="tags-list">${album.publishers.map(pub => `<span class="tag" style="border-color:#FFB84D;color:#FFB84D">${escapeHtml(pub.parent_name ? `${pub.name} (${pub.parent_name})` : pub.name)}</span>`).join('')}</div>` : '<div class="text-muted" style="font-size:0.8rem">No album publishers linked</div>'}
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Album Credits</div>
+                        ${credits.length ? `<div class="credits-list">${credits.map(credit => `
+                            <div class="credit-item">
+                                <span class="credit-name">${escapeHtml(credit.display_name)}</span>
+                                <span class="credit-role">${escapeHtml(credit.role_name)}</span>
+                            </div>
+                        `).join('')}</div>` : '<div class="text-muted" style="font-size:0.8rem">No album credits linked</div>'}
+                    </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Track List (${songs.length})</div>
+                        ${renderAlbumSongs(songs)}
+                    </div>
+                </div>
+            `;
         }
 
         async function showPublisherDetail(publisher_data, element) {

@@ -1,4 +1,5 @@
 from typing import Optional, List, Dict
+from src.data.album_repository import AlbumRepository
 from src.data.song_repository import SongRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.data.song_album_repository import SongAlbumRepository
@@ -8,6 +9,7 @@ from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
 from src.models.domain import (
     Song,
+    Album,
     SongAlbum,
     Identity,
     Publisher,
@@ -23,6 +25,7 @@ class CatalogService:
 
     def __init__(self, db_path: str):
         self._song_repo = SongRepository(db_path)
+        self._album_repo_dir = AlbumRepository(db_path)
         self._credit_repo = SongCreditRepository(db_path)
         self._album_repo = SongAlbumRepository(db_path)
         self._album_credit_repo = AlbumCreditRepository(db_path)
@@ -79,6 +82,38 @@ class CatalogService:
         pubs = self._pub_repo.get_all()
         result = self._hydrate_publishers(pubs)
         logger.info(f"[CatalogService] Exit: Returning {len(result)} publishers.")
+        return result
+
+    def get_all_albums(self) -> List[Album]:
+        """Fetch the full album directory with hydrated publishers, credits, and songs."""
+        logger.info("[CatalogService] Entry: get_all_albums()")
+        albums = self._album_repo_dir.get_all()
+        result = self._hydrate_albums(albums)
+        logger.info(f"[CatalogService] Exit: Returning {len(result)} albums.")
+        return result
+
+    def search_albums(self, query: str) -> List[Album]:
+        """Search for albums by title."""
+        logger.info(f"[CatalogService] Entry: search_albums(query='{query}')")
+        albums = self._album_repo_dir.search(query)
+        result = self._hydrate_albums(albums)
+        logger.info(f"[CatalogService] Exit: Found {len(result)} albums.")
+        return result
+
+    def get_album(self, album_id: int) -> Optional[Album]:
+        """Fetch a single album by ID with hydrated publishers, credits, and songs."""
+        logger.info(f"[CatalogService] Entry: get_album(id={album_id})")
+        album = self._album_repo_dir.get_by_id(album_id)
+        if not album:
+            logger.warning(f"[CatalogService] Exit: AlbumID {album_id} not found.")
+            return None
+
+        hydrated = self._hydrate_albums([album])
+        result = hydrated[0] if hydrated else None
+        if result:
+            logger.info(
+                f"[CatalogService] Exit: Returning hydrated album '{result.title}'"
+            )
         return result
 
     def search_publishers(self, query: str) -> List[Publisher]:
@@ -277,6 +312,35 @@ class CatalogService:
         logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated)} publishers.")
         return hydrated
 
+    def _hydrate_albums(self, albums: List[Album]) -> List[Album]:
+        """Centralized batch hydration for albums and their related songs."""
+        if not albums:
+            return []
+
+        album_ids = [album.id for album in albums if album.id is not None]
+        logger.debug(f"[CatalogService] Entry: _hydrate_albums(count={len(album_ids)})")
+
+        pubs_by_album = self._get_publishers_by_album(album_ids)
+        credits_by_album = self._get_album_credits_by_album(album_ids)
+        songs_by_album = self._get_songs_by_album(album_ids)
+
+        hydrated = []
+        for album in albums:
+            if album.id is None:
+                continue
+            hydrated.append(
+                album.model_copy(
+                    update={
+                        "publishers": pubs_by_album.get(album.id, []),
+                        "credits": credits_by_album.get(album.id, []),
+                        "songs": songs_by_album.get(album.id, []),
+                    }
+                )
+            )
+
+        logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated)} albums.")
+        return hydrated
+
     def _get_credits_by_song(self, song_ids: List[int]) -> Dict[int, List[SongCredit]]:
         """Fetch and group credits by song ID."""
         logger.debug(
@@ -421,3 +485,22 @@ class CatalogService:
             f"[CatalogService] Exit: Found credits for {len(credits_by_album)} albums."
         )
         return credits_by_album
+
+    def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:
+        """Fetch and hydrate songs grouped by album ID."""
+        logger.debug(
+            f"[CatalogService] Entry: _get_songs_by_album(count={len(album_ids)})"
+        )
+        if not album_ids:
+            return {}
+
+        songs_by_album: Dict[int, List[Song]] = {}
+        for album_id in album_ids:
+            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id)
+            songs = self._song_repo.get_by_ids(song_ids)
+            songs_by_album[album_id] = self._hydrate_songs(songs)
+
+        logger.debug(
+            f"[CatalogService] Exit: Hydrated songs for {len(songs_by_album)} albums."
+        )
+        return songs_by_album

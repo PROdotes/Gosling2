@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from src.models.domain import Song, Publisher
-from src.models.view_models import SongView, IdentityView
+from src.models.view_models import SongView, IdentityView, AlbumView
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 import os
@@ -130,3 +130,30 @@ async def get_publisher_songs(publisher_id: int) -> List[SongView]:
 
     songs = _get_service().get_publisher_songs(publisher_id)
     return [SongView.from_domain(s) for s in songs]
+
+
+@router.get("/albums", response_model=List[AlbumView])
+async def get_all_albums() -> List[AlbumView]:
+    """Fetch a list of all albums."""
+    logger.debug("[CatalogRouter] GET /albums")
+    albums = _get_service().get_all_albums()
+    return [AlbumView.from_domain(album) for album in albums]
+
+
+@router.get("/albums/search", response_model=List[AlbumView])
+async def search_albums(q: str) -> List[AlbumView]:
+    """Search albums by title."""
+    logger.debug(f"[CatalogRouter] GET /albums/search q='{q}'")
+    albums = _get_service().search_albums(q)
+    return [AlbumView.from_domain(album) for album in albums]
+
+
+@router.get("/albums/{album_id:int}", response_model=AlbumView)
+async def get_album(album_id: int) -> AlbumView:
+    """Fetch a single album by ID."""
+    logger.debug(f"[CatalogRouter] GET /albums/{album_id}")
+    album = _get_service().get_album(album_id)
+    if not album:
+        logger.warning(f"[CatalogRouter] VIOLATION: Album ID {album_id} not found")
+        raise HTTPException(status_code=404, detail=f"Album ID {album_id} not found")
+    return AlbumView.from_domain(album)

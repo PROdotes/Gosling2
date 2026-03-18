@@ -1,6 +1,8 @@
 from typing import List, Optional, Dict
 from pydantic import BaseModel, computed_field, ConfigDict
 from src.models.domain import (
+    Album,
+    SongAlbum,
     Song,
     SongCredit,
     Tag,
@@ -161,6 +163,61 @@ class SongView(BaseModel):
                 return t.name
 
         return None
+
+
+class AlbumView(BaseModel):
+    """View-model for album directory records."""
+
+    id: Optional[int] = None
+    title: str
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
+    publishers: List[Publisher] = []
+    credits: List[AlbumCredit] = []
+    songs: List[SongView] = []
+
+    @classmethod
+    def from_domain(cls, album: Album) -> "AlbumView":
+        data = album.model_dump(exclude={"songs"})
+        data["songs"] = [SongView.from_domain(song) for song in album.songs]
+        return cls(**data)
+
+    @computed_field
+    @property
+    def display_publisher(self) -> str:
+        if not self.publishers:
+            return ""
+
+        display_names = []
+        for publisher in self.publishers:
+            name = publisher.name
+            if publisher.parent_name:
+                name = f"{name} ({publisher.parent_name})"
+            display_names.append(name)
+        return ", ".join(display_names)
+
+    @computed_field
+    @property
+    def display_artist(self) -> Optional[str]:
+        if not self.credits:
+            return None
+
+        performers = [
+            credit.display_name
+            for credit in self.credits
+            if credit.role_name == "Performer"
+        ]
+        if performers:
+            unique_names = []
+            [unique_names.append(name) for name in performers if name not in unique_names]
+            return ", ".join(unique_names)
+
+        return self.credits[0].display_name
+
+    @computed_field
+    @property
+    def song_count(self) -> int:
+        return len(self.songs)
 
 
 class IdentityView(BaseModel):

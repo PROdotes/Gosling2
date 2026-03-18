@@ -53,16 +53,35 @@ Fetches a single Song domain model by its unique ID.
 - Fetches the directory of all active music publishers.
 - Wraps `CatalogService.get_all_publishers`.
 
+### async def get_all_albums() -> List[AlbumView]
+**HTTP**: `GET /api/v1/albums`
+- Fetches the directory of all albums.
+- Wraps `CatalogService.get_all_albums`.
+- Maps to `AlbumView` for dashboard rendering.
+
 ### async def search_publishers(q: str) -> List[Publisher]
 **HTTP**: `GET /api/v1/publishers/search?q={query}`
 - Searches publishers by name.
 - Wraps `CatalogService.search_publishers`.
+
+### async def search_albums(q: str) -> List[AlbumView]
+**HTTP**: `GET /api/v1/albums/search?q={query}`
+- Searches albums by title.
+- Wraps `CatalogService.search_albums`.
+- Maps to `AlbumView` for dashboard rendering.
 
 ### async def get_publisher(publisher_id: int) -> Publisher
 **HTTP**: `GET /api/v1/publishers/{publisher_id}`
 - Fetches a single publisher by ID.
 - Raises `HTTPException(404)` if not found.
 - Wraps `CatalogService.get_publisher`.
+
+### async def get_album(album_id: int) -> AlbumView
+**HTTP**: `GET /api/v1/albums/{album_id}`
+- Fetches a single album by ID.
+- Raises `HTTPException(404)` if not found.
+- Wraps `CatalogService.get_album`.
+- Maps to `AlbumView` for dashboard rendering.
 
 ### async def get_publisher_songs(publisher_id: int) -> List[SongView]
 **HTTP**: `GET /api/v1/publishers/{publisher_id}/songs`

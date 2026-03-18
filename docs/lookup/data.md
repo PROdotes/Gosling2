@@ -71,6 +71,27 @@ Returns `SongAlbum` bridge models ready for publisher hydration by the Service.
 
 ---
 
+## AlbumRepository
+*Location: `src/data/album_repository.py`*
+**Responsibility**: Loading first-class Album directory records and album-to-song links.
+
+### get_all() -> List[Album]
+Fetch the full album directory ordered by album title.
+
+### search(query: str) -> List[Album]
+Search albums by title match.
+
+### get_by_id(album_id: int) -> Optional[Album]
+Fetch a single album by its ID.
+
+### get_song_ids_by_album(album_id: int) -> List[int]
+Fetch all song IDs linked to a specific album, ordered by disc, track, and source ID.
+
+### _row_to_album(row: sqlite3.Row) -> Album
+**Internal**: Maps a physical database row to the strict Pydantic `Album` model.
+
+---
+
 ## PublisherRepository
 *Location: `src/data/publisher_repository.py`*
 **Responsibility**: Loading Publisher metadata for Albums and Tracks.

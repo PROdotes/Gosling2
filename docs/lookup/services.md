@@ -37,11 +37,20 @@ Reverse Credit lookup: Given a seed identity_id, find all related IDs (its alias
 ### get_all_publishers() -> List[Publisher]
 Fetch the full directory of publishers with resolved hierarchy chains.
 
+### get_all_albums() -> List[Album]
+Fetch the full directory of albums with hydrated publishers, credits, and songs.
+
 ### search_publishers(query: str) -> List[Publisher]
 Search for publishers by name match with resolved hierarchy chains.
 
+### search_albums(query: str) -> List[Album]
+Search albums by title with hydrated publishers, credits, and songs.
+
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 Fetch a single publisher by ID and resolve its full hierarchy and sub-publishers.
+
+### get_album(album_id: int) -> Optional[Album]
+Fetch a single album by ID and hydrate its publishers, credits, and songs.
 
 ### get_publisher_songs(publisher_id: int) -> List[Song]
 Fetch the full song repertoire (Master rights) for a given publisher.
@@ -59,6 +68,13 @@ Fetch the full song repertoire (Master rights) for a given publisher.
 **Internal**: Batch-resolves the full parent hierarchy chains for any list of publishers.
 1. Performs a single batch fetch for all ancestors using a recursive CTE via `PublisherRepository.get_hierarchy_batch`.
 2. Attaches parent names to each entry locally.
+
+### _hydrate_albums(albums: List[Album]) -> List[Album]
+**Internal**: Centralized batch hydration for album directory models.
+- Fetches album-level publishers from `PublisherRepository`.
+- Fetches album credits from `AlbumCreditRepository`.
+- Resolves linked songs via `AlbumRepository.get_song_ids_by_album` and `SongRepository.get_by_ids`.
+- Reuses `_hydrate_songs` so album track lists carry the same song metadata as the rest of the app.
 
 ### _hydrate_identities(identities: List[Identity]) -> List[Identity]
 **Internal**: Batch-resolves the "Universal Tree" for a list of identities (Aliases, Members, Groups).
@@ -83,6 +99,9 @@ Fetch the full song repertoire (Master rights) for a given publisher.
 
 ### _get_album_credits_by_album(album_ids: List[int]) -> Dict[int, List[AlbumCredit]]
 **Internal**: Batch-fetch album credits grouped by album ID.
+
+### _get_songs_by_album(album_ids: List[int]) -> Dict[int, List[Song]]
+**Internal**: Fetch and hydrate songs grouped by album ID for album detail views.
 
 ---
 

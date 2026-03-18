@@ -1,5 +1,5 @@
 from src.services.catalog_service import CatalogService
-from src.models.view_models import SongView
+from src.models.view_models import SongView, AlbumView
 
 
 def test_get_song_exists(populated_db):
@@ -196,3 +196,71 @@ def test_get_songs_by_identity_not_found(catalog_service, populated_db):
     """LAW: get_songs_by_identity returns empty list for non-existent identity."""
     res = catalog_service.get_songs_by_identity(999)
     assert res == []
+
+
+def test_get_all_albums(populated_db):
+    """LAW: get_all_albums returns hydrated album directory entries."""
+    service = CatalogService(populated_db)
+
+    albums = service.get_all_albums()
+
+    assert len(albums) == 2
+    titles = [album.title for album in albums]
+    assert "Nevermind" in titles
+    assert "The Colour and the Shape" in titles
+
+    nevermind = next(album for album in albums if album.title == "Nevermind")
+    assert len(nevermind.publishers) == 2
+    assert {publisher.name for publisher in nevermind.publishers} == {
+        "DGC Records",
+        "Sub Pop",
+    }
+    assert len(nevermind.credits) == 1
+    assert nevermind.credits[0].display_name == "Nirvana"
+    assert [song.title for song in nevermind.songs] == ["Smells Like Teen Spirit"]
+
+
+def test_get_album_exists(populated_db):
+    """LAW: get_album returns a fully hydrated album."""
+    service = CatalogService(populated_db)
+
+    album = service.get_album(200)
+
+    assert album is not None
+    assert album.title == "The Colour and the Shape"
+    assert album.release_year == 1997
+    assert album.album_type is None
+    assert len(album.publishers) == 1
+    assert album.publishers[0].name == "Roswell Records"
+    assert len(album.credits) == 1
+    assert album.credits[0].display_name == "Foo Fighters"
+    assert [song.title for song in album.songs] == ["Everlong"]
+
+
+def test_search_albums(populated_db):
+    """LAW: search_albums matches by album title."""
+    service = CatalogService(populated_db)
+
+    albums = service.search_albums("Never")
+
+    assert len(albums) == 1
+    assert albums[0].title == "Nevermind"
+
+
+def test_get_album_not_found(populated_db):
+    """LAW: get_album returns None for unknown album IDs."""
+    service = CatalogService(populated_db)
+
+    assert service.get_album(999) is None
+
+
+def test_album_view_display_fields(populated_db):
+    """LAW: AlbumView exposes display helpers for dashboard rendering."""
+    service = CatalogService(populated_db)
+
+    album = service.get_album(100)
+    view = AlbumView.from_domain(album)
+
+    assert view.display_artist == "Nirvana"
+    assert view.display_publisher == "DGC Records, Sub Pop"
+    assert view.song_count == 1

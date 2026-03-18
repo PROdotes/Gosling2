@@ -82,6 +82,18 @@ class SongAlbum(DomainModel):
     credits: List[AlbumCredit] = []
 
 
+class Album(DomainModel):
+    """A first-class album directory record."""
+
+    id: Optional[int] = None
+    title: str
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
+    publishers: List[Publisher] = []
+    credits: List[AlbumCredit] = []
+    songs: List["Song"] = []
+
+
 class ArtistName(DomainModel):
     """A specific stage name or alias for an Identity."""
 
