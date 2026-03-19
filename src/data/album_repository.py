@@ -13,7 +13,7 @@ class AlbumRepository(BaseRepository):
 
     def get_all(self) -> List[Album]:
         """Fetch the full album directory."""
-        logger.info("[AlbumRepository] Entry: get_all()")
+        logger.debug("[AlbumRepository] -> get_all()")
         query = (
             f"SELECT {self._COLUMNS} FROM Albums ORDER BY AlbumTitle COLLATE NOCASE ASC"
         )
@@ -21,42 +21,42 @@ class AlbumRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
             result = [self._row_to_album(row) for row in rows]
-            logger.info(f"[AlbumRepository] Exit: Found {len(result)} albums.")
+            logger.debug(f"[AlbumRepository] <- get_all() count={len(result)}")
             return result
 
     def search(self, query: str) -> List[Album]:
         """Search albums by title."""
-        logger.info(f"[AlbumRepository] Entry: search(query='{query}')")
+        logger.debug(f"[AlbumRepository] -> search(q='{query}')")
         sql = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumTitle LIKE ? ORDER BY AlbumTitle COLLATE NOCASE ASC"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_album(row) for row in rows]
-            logger.info(f"[AlbumRepository] Exit: Found {len(result)} albums.")
+            logger.debug(f"[AlbumRepository] <- search(q='{query}') count={len(result)}")
             return result
 
     def get_by_id(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID."""
-        logger.info(f"[AlbumRepository] Entry: get_by_id(id={album_id})")
+        logger.debug(f"[AlbumRepository] -> get_by_id(id={album_id})")
         query = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ?"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (album_id,)).fetchone()
             if row is None:
-                logger.warning(f"[AlbumRepository] Exit: ID {album_id} NOT_FOUND")
+                logger.warning(f"[AlbumRepository] <- get_by_id(id={album_id}) NOT_FOUND")
                 return None
             result = self._row_to_album(row)
-            logger.info(f"[AlbumRepository] Exit: Found '{result.title}'")
+            logger.debug(f"[AlbumRepository] <- get_by_id(id={album_id}) '{result.title}'")
             return result
 
     def get_song_ids_by_album(self, album_id: int) -> List[int]:
         """Fetch all song IDs linked to an album."""
-        logger.info(f"[AlbumRepository] Entry: get_song_ids_by_album(id={album_id})")
+        logger.debug(f"[AlbumRepository] -> get_song_ids_by_album(id={album_id})")
         query = "SELECT SourceID FROM SongAlbums WHERE AlbumID = ? ORDER BY DiscNumber, TrackNumber, SourceID"
         with self._get_connection() as conn:
             rows = conn.execute(query, (album_id,)).fetchall()
             result = [row[0] for row in rows]
-            logger.info(f"[AlbumRepository] Exit: Found {len(result)} song IDs.")
+            logger.debug(f"[AlbumRepository] <- get_song_ids_by_album() count={len(result)}")
             return result
 
     def get_song_ids_for_albums(self, album_ids: List[int]) -> Dict[int, List[int]]:
@@ -64,8 +64,8 @@ class AlbumRepository(BaseRepository):
         if not album_ids:
             return {}
 
-        logger.info(
-            f"[AlbumRepository] Entry: get_song_ids_for_albums(count={len(album_ids)})"
+        logger.debug(
+            f"[AlbumRepository] -> get_song_ids_for_albums(count={len(album_ids)})"
         )
         placeholders = ",".join(["?"] * len(album_ids))
         query = f"SELECT AlbumID, SourceID FROM SongAlbums WHERE AlbumID IN ({placeholders}) ORDER BY DiscNumber, TrackNumber, SourceID"
@@ -76,8 +76,8 @@ class AlbumRepository(BaseRepository):
             for album_id, song_id in rows:
                 results.setdefault(album_id, []).append(song_id)
 
-        logger.info(
-            f"[AlbumRepository] Exit: Grouped tracks for {len(results)} albums."
+        logger.debug(
+            f"[AlbumRepository] <- get_song_ids_for_albums() grouped={len(results)} albums"
         )
         return results
 

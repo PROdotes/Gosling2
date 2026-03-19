@@ -19,18 +19,14 @@ class IdentityRepository(BaseRepository):
 
     def get_by_id(self, identity_id: int) -> Optional[Identity]:
         """Fetch a basic Identity record."""
-        logger.debug(f"[IdentityRepository] get_by_id entry: id={identity_id}")
+        logger.debug(f"[IdentityRepository] -> get_by_id(id={identity_id})")
         identities = self.get_by_ids([identity_id])
         if not identities:
-            logger.debug(
-                f"[IdentityRepository] get_by_id exit: NOT_FOUND id={identity_id}"
-            )
+            logger.debug(f"[IdentityRepository] <- get_by_id(id={identity_id}) NOT_FOUND")
             return None
 
         identity = identities[0]
-        logger.debug(
-            f"[IdentityRepository] get_by_id exit: FOUND name={identity.display_name}"
-        )
+        logger.debug(f"[IdentityRepository] <- get_by_id(id={identity_id}) '{identity.display_name}'")
         return identity
 
     def get_by_ids(self, identity_ids: List[int]) -> List[Identity]:
@@ -53,7 +49,7 @@ class IdentityRepository(BaseRepository):
 
     def get_all_identities(self) -> List[Identity]:
         """Fetch the directory of all identities."""
-        logger.debug("[IdentityRepository] get_all_identities entry.")
+        logger.debug("[IdentityRepository] -> get_all_identities()")
         query = f"""
             SELECT {self._IDENTITY_COLUMNS}
             FROM Identities i
@@ -65,14 +61,12 @@ class IdentityRepository(BaseRepository):
             rows = conn.execute(query).fetchall()
 
         identities = [self._row_to_identity(row) for row in rows]
-        logger.debug(
-            f"[IdentityRepository] get_all_identities found {len(identities)} identities."
-        )
+        logger.debug(f"[IdentityRepository] <- get_all_identities() count={len(identities)}")
         return identities
 
     def search_identities(self, query: str) -> List[Identity]:
         """Find identities whose DisplayName, LegalName, or Alias match the query."""
-        logger.info(f"[IdentityRepository] Entry: search_identities(query='{query}')")
+        logger.debug(f"[IdentityRepository] -> search_identities(q='{query}')")
         fmt_q = f"%{query}%"
 
         # Search against all aliases, but return identities with their primary DisplayName
@@ -90,14 +84,12 @@ class IdentityRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
             result = [self._row_to_identity(row) for row in rows]
-            logger.info(f"[IdentityRepository] Exit: Found {len(result)} identities.")
+            logger.debug(f"[IdentityRepository] <- search_identities(q='{query}') count={len(result)}")
             return result
 
     def get_group_ids_for_members(self, member_ids: List[int]) -> List[int]:
         """Batch-fetch GroupIdentityIDs for a list of MemberIdentityIDs."""
-        logger.info(
-            f"[IdentityRepository] Entry: get_group_ids_for_members(count={len(member_ids)})"
-        )
+        logger.debug(f"[IdentityRepository] -> get_group_ids_for_members(count={len(member_ids)})")
         if not member_ids:
             return []
 
@@ -107,14 +99,12 @@ class IdentityRepository(BaseRepository):
         with self._get_connection() as conn:
             rows = conn.execute(query, member_ids).fetchall()
             result = [row[0] for row in rows]
-            logger.info(f"[IdentityRepository] Exit: Found {len(result)} group IDs.")
+            logger.debug(f"[IdentityRepository] <- get_group_ids_for_members() count={len(result)}")
             return result
 
     def get_aliases_batch(self, identity_ids: List[int]) -> Dict[int, List[ArtistName]]:
         """Batch-fetch aliases for a list of identities."""
-        logger.info(
-            f"[IdentityRepository] Entry: get_aliases_batch(count={len(identity_ids)})"
-        )
+        logger.debug(f"[IdentityRepository] -> get_aliases_batch(count={len(identity_ids)})")
         if not identity_ids:
             return {}
 
@@ -132,16 +122,12 @@ class IdentityRepository(BaseRepository):
                 )
                 result[row["OwnerIdentityID"]].append(alias)
 
-        logger.info(
-            f"[IdentityRepository] Exit: Batched aliases for {len(result)} IDs."
-        )
+        logger.debug(f"[IdentityRepository] <- get_aliases_batch() batched={len(result)} IDs")
         return result
 
     def get_members_batch(self, identity_ids: List[int]) -> Dict[int, List[Identity]]:
         """Batch-fetch members for a list of group identities."""
-        logger.info(
-            f"[IdentityRepository] Entry: get_members_batch(count={len(identity_ids)})"
-        )
+        logger.debug(f"[IdentityRepository] -> get_members_batch(count={len(identity_ids)})")
         if not identity_ids:
             return {}
 
@@ -162,16 +148,12 @@ class IdentityRepository(BaseRepository):
                 identity = self._row_to_identity(row)
                 result[row["GroupIdentityID"]].append(identity)
 
-        logger.info(
-            f"[IdentityRepository] Exit: Batched members for {len(result)} IDs."
-        )
+        logger.debug(f"[IdentityRepository] <- get_members_batch() batched={len(result)} IDs")
         return result
 
     def get_groups_batch(self, identity_ids: List[int]) -> Dict[int, List[Identity]]:
         """Batch-fetch groups for a list of person identities."""
-        logger.info(
-            f"[IdentityRepository] Entry: get_groups_batch(count={len(identity_ids)})"
-        )
+        logger.debug(f"[IdentityRepository] -> get_groups_batch(count={len(identity_ids)})")
         if not identity_ids:
             return {}
 
@@ -192,7 +174,7 @@ class IdentityRepository(BaseRepository):
                 identity = self._row_to_identity(row)
                 result[row["MemberIdentityID"]].append(identity)
 
-        logger.info(f"[IdentityRepository] Exit: Batched groups for {len(result)} IDs.")
+        logger.debug(f"[IdentityRepository] <- get_groups_batch() batched={len(result)} IDs")
         return result
 
     def _row_to_identity(self, row: sqlite3.Row) -> Identity:

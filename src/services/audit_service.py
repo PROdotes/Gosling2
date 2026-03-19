@@ -14,8 +14,8 @@ class AuditService:
         Retrieves a unified timeline of actions and changes for a record.
         Merges ActionLog and ChangeLog entries, sorted by timestamp.
         """
-        logger.info(
-            f"[AuditService] Entry: get_history(id={record_id}, table='{table}')"
+        logger.debug(
+            f"[AuditService] -> get_history(id={record_id}, table='{table}')"
         )
 
         actions = self._audit_repo.get_actions_for_target(record_id, table)
@@ -70,5 +70,5 @@ class AuditService:
         # Sort timeline descending (newest first)
         timeline.sort(key=lambda x: x["timestamp"] or "", reverse=True)
 
-        logger.info(f"[AuditService] Exit: Returning {len(timeline)} timeline events.")
+        logger.debug(f"[AuditService] <- get_history count={len(timeline)}")
         return timeline

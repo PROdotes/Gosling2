@@ -10,9 +10,8 @@ class TagRepository(BaseRepository):
 
     def get_tags_for_songs(self, song_ids: List[int]) -> List[Tuple[int, Tag]]:
         """Batch-fetch all tags for a list of songs (M2M)."""
-        logger.info(f"[TagRepository] Entry: get_tags_for_songs(ids={song_ids})")
+        logger.debug(f"[TagRepository] -> get_tags_for_songs(count={len(song_ids)})")
         if not song_ids:
-            logger.info("[TagRepository] Exit: get_tags_for_songs - Empty input")
             return []
 
         placeholders = ",".join(["?" for _ in song_ids])
@@ -28,12 +27,12 @@ class TagRepository(BaseRepository):
                 conn.row_factory = sqlite3.Row
                 rows = conn.execute(query, song_ids).fetchall()
                 results = [(row["SourceID"], self._row_to_tag(row)) for row in rows]
-                logger.info(
-                    f"[TagRepository] Exit: get_tags_for_songs - Found {len(results)} tags"
+                logger.debug(
+                    f"[TagRepository] <- get_tags_for_songs() count={len(results)}"
                 )
                 return results
         except Exception as e:
-            logger.error(f"[TagRepository] Violation: Failed to fetch tags: {e}")
+            logger.error(f"[TagRepository] ERROR: Failed to fetch tags: {e}")
             raise
 
     def _row_to_tag(self, row: sqlite3.Row) -> Tag:

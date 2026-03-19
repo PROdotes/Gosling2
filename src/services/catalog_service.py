@@ -35,10 +35,10 @@ class CatalogService:
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
-        logger.info(f"[CatalogService] Entry: get_song(id={song_id})")
+        logger.debug(f"[CatalogService] -> get_song(id={song_id})")
         song = self._song_repo.get_by_id(song_id)
         if not song:
-            logger.warning(f"[CatalogService] Exit: SongID {song_id} not found.")
+            logger.warning(f"[CatalogService] <- get_song(id={song_id}) NOT_FOUND")
             return None
 
         hydrated = self._hydrate_songs([song])
@@ -46,12 +46,12 @@ class CatalogService:
             return None
 
         result = hydrated[0]
-        logger.info(f"[CatalogService] Exit: Returning hydrated song '{result.title}'")
+        logger.debug(f"[CatalogService] <- get_song(id={song_id}) '{result.title}'")
         return result
 
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
-        logger.info(f"[CatalogService] Entry: get_identity(id={identity_id})")
+        logger.debug(f"[CatalogService] -> get_identity(id={identity_id})")
         identity = self._identity_repo.get_by_id(identity_id)
         if not identity:
             logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
@@ -62,57 +62,57 @@ class CatalogService:
             return None
 
         result = hydrated_list[0]
-        logger.info(
-            f"[CatalogService] Exit: Returning hydrated identity '{result.display_name}'"
+        logger.debug(
+            f"[CatalogService] <- get_identity(id={identity_id}) '{result.display_name}'"
         )
         return result
 
     def get_all_identities(self) -> List[Identity]:
         """Fetch a list of all active identities."""
-        logger.info("[CatalogService] Entry: get_all_identities()")
+        logger.debug("[CatalogService] -> get_all_identities()")
         identities = self._identity_repo.get_all_identities()
         result = self._hydrate_identities(identities)
-        logger.info(f"[CatalogService] Exit: Returning {len(result)} identities.")
+        logger.debug(f"[CatalogService] <- get_all_identities() count={len(result)}")
         return result
 
     def search_identities(self, query: str) -> List[Identity]:
         """Search for identities by name or alias."""
-        logger.info(f"[CatalogService] Entry: search_identities(query='{query}')")
+        logger.debug(f"[CatalogService] -> search_identities(q='{query}')")
         identities = self._identity_repo.search_identities(query)
         result = self._hydrate_identities(identities)
-        logger.info(f"[CatalogService] Exit: Found {len(result)} identities.")
+        logger.debug(f"[CatalogService] <- search_identities(q='{query}') count={len(result)}")
         return result
 
     def get_all_publishers(self) -> List[Publisher]:
         """Fetch the full directory of publishers with resolved hierarchies."""
-        logger.info("[CatalogService] Entry: get_all_publishers()")
+        logger.debug("[CatalogService] -> get_all_publishers()")
         pubs = self._pub_repo.get_all()
         result = self._hydrate_publishers(pubs)
-        logger.info(f"[CatalogService] Exit: Returning {len(result)} publishers.")
+        logger.debug(f"[CatalogService] <- get_all_publishers() count={len(result)}")
         return result
 
     def get_all_albums(self) -> List[Album]:
         """Fetch the full album directory with hydrated publishers, credits, and songs."""
-        logger.info("[CatalogService] Entry: get_all_albums()")
+        logger.debug("[CatalogService] -> get_all_albums()")
         albums = self._album_repo_dir.get_all()
         result = self._hydrate_albums(albums)
-        logger.info(f"[CatalogService] Exit: Returning {len(result)} albums.")
+        logger.debug(f"[CatalogService] <- get_all_albums() count={len(result)}")
         return result
 
     def search_albums(self, query: str) -> List[Album]:
         """Search for albums by title."""
-        logger.info(f"[CatalogService] Entry: search_albums(query='{query}')")
+        logger.debug(f"[CatalogService] -> search_albums(q='{query}')")
         albums = self._album_repo_dir.search(query)
         result = self._hydrate_albums(albums)
-        logger.info(f"[CatalogService] Exit: Found {len(result)} albums.")
+        logger.debug(f"[CatalogService] <- search_albums(q='{query}') count={len(result)}")
         return result
 
     def get_album(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID with hydrated publishers, credits, and songs."""
-        logger.info(f"[CatalogService] Entry: get_album(id={album_id})")
+        logger.debug(f"[CatalogService] -> get_album(id={album_id})")
         album = self._album_repo_dir.get_by_id(album_id)
         if not album:
-            logger.warning(f"[CatalogService] Exit: AlbumID {album_id} not found.")
+            logger.warning(f"[CatalogService] <- get_album(id={album_id}) NOT_FOUND")
             return None
 
         hydrated = self._hydrate_albums([album])
@@ -120,24 +120,24 @@ class CatalogService:
             return None
 
         result = hydrated[0]
-        logger.info(f"[CatalogService] Exit: Returning hydrated album '{result.title}'")
+        logger.debug(f"[CatalogService] <- get_album(id={album_id}) '{result.title}'")
         return result
 
     def search_publishers(self, query: str) -> List[Publisher]:
         """Search for publishers by name match with resolved hierarchies."""
-        logger.info(f"[CatalogService] Entry: search_publishers(query='{query}')")
+        logger.debug(f"[CatalogService] -> search_publishers(q='{query}')")
         pubs = self._pub_repo.search(query)
         result = self._hydrate_publishers(pubs)
-        logger.info(f"[CatalogService] Exit: Found {len(result)} publishers.")
+        logger.debug(f"[CatalogService] <- search_publishers(q='{query}') count={len(result)}")
         return result
 
     def get_publisher(self, publisher_id: int) -> Optional[Publisher]:
         """Fetch a single publisher by ID and resolve its full hierarchy."""
-        logger.info(f"[CatalogService] Entry: get_publisher(id={publisher_id})")
+        logger.debug(f"[CatalogService] -> get_publisher(id={publisher_id})")
         publisher = self._pub_repo.get_by_id(publisher_id)
         if not publisher:
             logger.warning(
-                f"[CatalogService] Exit: PublisherID {publisher_id} not found."
+                f"[CatalogService] <- get_publisher(id={publisher_id}) NOT_FOUND"
             )
             return None
 
@@ -148,24 +148,24 @@ class CatalogService:
 
         hydrated = hydrated_list[0]
         result = hydrated.model_copy(update={"sub_publishers": children})
-        logger.info(
-            f"[CatalogService] Exit: Returning hydrated publisher '{result.name}'"
+        logger.debug(
+            f"[CatalogService] <- get_publisher(id={publisher_id}) '{result.name}'"
         )
         return result
 
     def get_publisher_songs(self, publisher_id: int) -> List[Song]:
         """Fetch the full song repertoire for a given publisher."""
-        logger.info(f"[CatalogService] Entry: get_publisher_songs(id={publisher_id})")
+        logger.debug(f"[CatalogService] -> get_publisher_songs(id={publisher_id})")
         song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id)
         if not song_ids:
             logger.debug(
-                f"[CatalogService] Exit: No repertoire found for ID {publisher_id}"
+                f"[CatalogService] <- get_publisher_songs(id={publisher_id}) NO_REPERTOIRE"
             )
             return []
 
         songs = self._song_repo.get_by_ids(song_ids)
         result = self._hydrate_songs(songs)
-        logger.info(f"[CatalogService] Exit: Returning {len(result)} songs.")
+        logger.debug(f"[CatalogService] <- Return count={len(result)}")
         return result
 
     def get_songs_by_identity(self, identity_id: int) -> List[Song]:
@@ -173,7 +173,7 @@ class CatalogService:
         Reverse Credit lookup: Given a seed identity_id, find all related IDs (its aliases + members/groups)
         and return all songs where any of those IDs are credited.
         """
-        logger.info(f"[CatalogService] Entry: get_songs_by_identity(id={identity_id})")
+        logger.debug(f"[CatalogService] -> get_songs_by_identity(id={identity_id})")
         identity = self._identity_repo.get_by_id(identity_id)
         if not identity:
             logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
@@ -190,7 +190,7 @@ class CatalogService:
 
         songs = self._song_repo.get_by_identity_ids(list(related_ids))
         result = self._hydrate_songs(songs)
-        logger.info(f"[CatalogService] Exit: Returning {len(result)} songs.")
+        logger.debug(f"[CatalogService] <- Return count={len(result)}")
         return result
 
     def search_songs(self, query: str) -> List[Song]:
@@ -199,7 +199,7 @@ class CatalogService:
         1. Surface Discovery (Title/Album match).
         2. Deep Resolution (Identity/Group expansion) via Fast Batching (4 Query method).
         """
-        logger.info(f"[CatalogService] Entry: search_songs(query='{query}')")
+        logger.debug(f"[CatalogService] -> search_songs(q='{query}')")
 
         songs = self._song_repo.search_surface(query)
         seen_ids = {s.id for s in songs}
@@ -220,7 +220,7 @@ class CatalogService:
                     seen_ids.add(s.id)
 
         results = self._hydrate_songs(songs)
-        logger.info(f"[CatalogService] Exit: total={len(results)}")
+        logger.debug(f"[CatalogService] <- search_songs(q='{query}') count={len(results)}")
         return results
 
     def _hydrate_songs(self, songs: List[Song]) -> List[Song]:
@@ -229,7 +229,7 @@ class CatalogService:
             return []
 
         song_ids = [s.id for s in songs if s.id is not None]
-        logger.debug(f"[CatalogService] Entry: _hydrate_songs(count={len(song_ids)})")
+        logger.debug(f"[CatalogService] -> _hydrate_songs(count={len(song_ids)})")
 
         credits_by_song = self._get_credits_by_song(song_ids)
         assocs_by_song = self._get_albums_by_song(song_ids)
@@ -251,7 +251,7 @@ class CatalogService:
                 )
             )
 
-        logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated_songs)} songs.")
+        logger.debug(f"[CatalogService] <- hydrated {len(hydrated_songs)} songs.")
         return hydrated_songs
 
     def _hydrate_identities(self, identities: List[Identity]) -> List[Identity]:
@@ -261,9 +261,7 @@ class CatalogService:
             return []
 
         identity_ids = [i.id for i in identities]
-        logger.debug(
-            f"[CatalogService] Entry: _hydrate_identities(count={len(identity_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _hydrate_identities(count={len(identity_ids)})")
 
         aliases_by_id = self._identity_repo.get_aliases_batch(identity_ids)
         members_by_id = self._identity_repo.get_members_batch(identity_ids)
@@ -280,7 +278,7 @@ class CatalogService:
                     }
                 )
             )
-        logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated)} identities.")
+        logger.debug(f"[CatalogService] <- _hydrate_identities(count={len(hydrated)})")
         return hydrated
 
     def _hydrate_publishers(self, pubs: List[Publisher]) -> List[Publisher]:
@@ -290,9 +288,7 @@ class CatalogService:
 
         # Collect all unique seed publisher IDs
         seed_ids = [p.id for p in pubs if p.id is not None]
-        logger.debug(
-            f"[CatalogService] Entry: _hydrate_publishers(seed_count={len(seed_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _hydrate_publishers(count={len(seed_ids)})")
 
         # FETCH ENTIRE ANCESTRY IN ONE QUERY (CTE)
         full_parent_map = self._pub_repo.get_hierarchy_batch(seed_ids)
@@ -316,7 +312,7 @@ class CatalogService:
                 pub.model_copy(update={"parent_name": chain[0].name if chain else None})
             )
 
-        logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated)} publishers.")
+        logger.debug(f"[CatalogService] <- _hydrate_publishers(count={len(hydrated)})")
         return hydrated
 
     def _hydrate_albums(self, albums: List[Album]) -> List[Album]:
@@ -325,7 +321,7 @@ class CatalogService:
             return []
 
         album_ids = [album.id for album in albums if album.id is not None]
-        logger.debug(f"[CatalogService] Entry: _hydrate_albums(count={len(album_ids)})")
+        logger.debug(f"[CatalogService] -> _hydrate_albums(count={len(album_ids)})")
 
         pubs_by_album = self._get_publishers_by_album(album_ids)
         credits_by_album = self._get_album_credits_by_album(album_ids)
@@ -345,31 +341,25 @@ class CatalogService:
                 )
             )
 
-        logger.debug(f"[CatalogService] Exit: hydrated {len(hydrated)} albums.")
+        logger.debug(f"[CatalogService] <- _hydrate_albums(count={len(hydrated)})")
         return hydrated
 
     def _get_credits_by_song(self, song_ids: List[int]) -> Dict[int, List[SongCredit]]:
         """Fetch and group credits by song ID."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_credits_by_song(count={len(song_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_credits_by_song(count={len(song_ids)})")
         all_credits = self._credit_repo.get_credits_for_songs(song_ids)
         credits_by_song: Dict[int, List[SongCredit]] = {}
         for credit in all_credits:
             if credit.source_id is not None:
                 credits_by_song.setdefault(credit.source_id, []).append(credit)
-        logger.debug(
-            f"[CatalogService] Exit: Grouped credits for {len(credits_by_song)} songs."
-        )
+        logger.debug(f"[CatalogService] <- _get_credits_by_song(count={len(credits_by_song)})")
         return credits_by_song
 
     def _get_publishers_by_song(
         self, song_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Fetch and group master publishers by song ID, then resolve hierarchies."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_publishers_by_song(count={len(song_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})")
         raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids)
         if not raw_assocs:
             logger.debug("[CatalogService] Exit: No publishers found for songs.")
@@ -389,31 +379,23 @@ class CatalogService:
                 else:
                     pubs_by_song.setdefault(song_id, []).append(pub)
 
-        logger.debug(
-            f"[CatalogService] Exit: Grouped publishers for {len(pubs_by_song)} songs."
-        )
+        logger.debug(f"[CatalogService] <- _get_publishers_by_song(count={len(pubs_by_song)})")
         return pubs_by_song
 
     def _get_tags_by_song(self, song_ids: List[int]) -> Dict[int, List[Tag]]:
         """Fetch and group tags by song ID."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_tags_by_song(count={len(song_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_tags_by_song(count={len(song_ids)})")
         all_tags = self._tag_repo.get_tags_for_songs(song_ids)
         tags_by_song: Dict[int, List[Tag]] = {}
         for song_id, tag in all_tags:
             if song_id is not None:
                 tags_by_song.setdefault(song_id, []).append(tag)
-        logger.debug(
-            f"[CatalogService] Exit: Grouped tags for {len(tags_by_song)} songs."
-        )
+        logger.debug(f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})")
         return tags_by_song
 
     def _get_albums_by_song(self, song_ids: List[int]) -> Dict[int, List[SongAlbum]]:
         """Fetch album associations and hydrate with publishers and credits."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_albums_by_song(count={len(song_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_albums_by_song(count={len(song_ids)})")
         all_assocs = self._album_repo.get_albums_for_songs(song_ids)
 
         album_ids = [a.album_id for a in all_assocs if a.album_id is not None]
@@ -433,18 +415,14 @@ class CatalogService:
             )
             assocs_by_song.setdefault(a.source_id, []).append(hydrated_assoc)
 
-        logger.debug(
-            f"[CatalogService] Exit: Hydrated albums for {len(assocs_by_song)} songs."
-        )
+        logger.debug(f"[CatalogService] <- _get_albums_by_song(count={len(assocs_by_song)})")
         return assocs_by_song
 
     def _get_publishers_by_album(
         self, album_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Batch-fetch and hydrate publishers for albums."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_publishers_by_album(count={len(album_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_publishers_by_album(count={len(album_ids)})")
         if not album_ids:
             return {}
 
@@ -467,18 +445,14 @@ class CatalogService:
                 else:
                     pubs_by_album.setdefault(album_id, []).append(pub)
 
-        logger.debug(
-            f"[CatalogService] Exit: Hydrated publishers for {len(pubs_by_album)} albums."
-        )
+        logger.debug(f"[CatalogService] <- _get_publishers_by_album(count={len(pubs_by_album)})")
         return pubs_by_album
 
     def _get_album_credits_by_album(
         self, album_ids: List[int]
     ) -> Dict[int, List[AlbumCredit]]:
         """Batch-fetch album credits grouped by album ID."""
-        logger.debug(
-            f"[CatalogService] Entry: _get_album_credits_by_album(count={len(album_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})")
         if not album_ids:
             return {}
 
@@ -488,9 +462,7 @@ class CatalogService:
             if ac.album_id is not None:
                 credits_by_album.setdefault(ac.album_id, []).append(ac)
 
-        logger.debug(
-            f"[CatalogService] Exit: Found credits for {len(credits_by_album)} albums."
-        )
+        logger.debug(f"[CatalogService] <- _get_album_credits_by_album(count={len(credits_by_album)})")
         return credits_by_album
 
     def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:
@@ -498,9 +470,7 @@ class CatalogService:
         RESOLVER: Fetches and hydrates all songs for multiple albums in a single BATCH flow.
         Prevents the N+1 trap where each album individually triggers _hydrate_songs.
         """
-        logger.debug(
-            f"[CatalogService] Entry: _get_songs_by_album(count={len(album_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_songs_by_album(count={len(album_ids)})")
         if not album_ids:
             return {}
 
@@ -532,7 +502,5 @@ class CatalogService:
                 song_lookup[sid] for sid in s_ids if sid in song_lookup
             ]
 
-        logger.debug(
-            f"[CatalogService] Exit: Hydrated tracklists for {len(results)} albums."
-        )
+        logger.debug(f"[CatalogService] <- _get_songs_by_album(count={len(results)})")
         return results
