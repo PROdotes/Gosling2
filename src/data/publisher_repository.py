@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Mapping, Any
 from src.data.base_repository import BaseRepository
 from src.models.domain import Publisher
 from src.services.logger import logger
@@ -195,7 +195,7 @@ class PublisherRepository(BaseRepository):
             logger.info(f"[PublisherRepository] Exit: Found {len(result)} songs.")
             return result
 
-    def _row_to_publisher(self, row: sqlite3.Row) -> Publisher:
+    def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""
         return Publisher(
             id=row["PublisherID"],

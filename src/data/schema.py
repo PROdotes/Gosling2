@@ -143,4 +143,25 @@ CREATE TABLE IF NOT EXISTS ChangeLog (
     LogTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     BatchID TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ActionLog (
+    ActionID INTEGER PRIMARY KEY AUTOINCREMENT,
+    ActionLogType TEXT NOT NULL,
+    TargetTable TEXT,
+    ActionTargetID INTEGER,
+    ActionDetails TEXT,
+    ActionTimestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UserID TEXT,
+    BatchID TEXT
+);
+
+CREATE TABLE IF NOT EXISTS DeletedRecords (
+    DeleteID INTEGER PRIMARY KEY AUTOINCREMENT,
+    DeletedFromTable TEXT NOT NULL,
+    RecordID INTEGER NOT NULL,
+    FullSnapshot TEXT NOT NULL,
+    DeletedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    RestoredAt DATETIME,
+    BatchID TEXT
+);
 """

@@ -560,6 +560,90 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+
+        /* Audit Timeline Styles */
+        .timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 1rem;
+            position: relative;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 7px;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: var(--border-subtle);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-left: 2rem;
+            font-size: 0.85rem;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 0;
+            top: 6px;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 2px solid var(--border-accent);
+            z-index: 1;
+        }
+
+        .timeline-item.ACTION .timeline-dot { border-color: var(--accent); }
+        .timeline-item.CHANGE .timeline-dot { border-color: var(--success); }
+        .timeline-item.LIFECYCLE .timeline-dot { border-color: var(--warning); }
+
+        .timeline-content {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-subtle);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.4rem;
+        }
+
+        .timeline-time {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .timeline-label {
+            font-weight: 600;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+        }
+
+        .timeline-details {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .timeline-diff {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.4rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+        }
+
+        .timeline-old { color: var(--danger); text-decoration: line-through; }
+        .timeline-new { color: var(--success); }
+        .timeline-arrow { color: var(--text-muted); }
     </style>
 
 </head>
@@ -999,8 +1083,19 @@
                         <div class="section-title">Track List (${songs.length})</div>
                         ${renderAlbumSongs(songs)}
                     </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Lifecycle & History</div>
+                        <div id="album-audit-container">
+                            <div class="file-status loading" style="font-size:0.75rem; padding:0.5rem">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Loading history...
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
+            loadAuditHistory('Albums', album.id, 'album-audit-container');
         }
 
         async function showPublisherDetail(publisher_data, element) {
@@ -1189,8 +1284,21 @@
                     </div>
                 </div>
             `;
+
+            let auditHtml = `
+                <div class="detail-section" style="margin-top:2rem">
+                    <div class="section-title">Lifecycle & History</div>
+                    <div id="artist-audit-container">
+                        <div class="file-status loading" style="font-size:0.75rem; padding:0.5rem">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Loading history...
+                        </div>
+                    </div>
+                </div>
+            `;
             
-            content.innerHTML = aliasesHtml + membersHtml + groupsHtml + songsHtml;
+            content.innerHTML = aliasesHtml + membersHtml + groupsHtml + songsHtml + auditHtml;
+            loadAuditHistory('Identities', tree.id, 'artist-audit-container');
         }
 
         async function showDetail(song, element) {
@@ -1438,8 +1546,83 @@
                             <div class="meta-value mono" style="font-size:0.7rem;word-break:break-all">${escapeHtml(song.audio_hash || '—')}</div>
                         </div>
                     </div>
+
+                    <div class="detail-section">
+                        <div class="section-title">Lifecycle & History</div>
+                        <div id="song-audit-container">
+                            <div class="file-status loading" style="font-size:0.75rem; padding:0.5rem">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                Loading history...
+                            </div>
+                        </div>
+                    </div>
                 </div>
             `;
+            loadAuditHistory('Songs', song.id, 'song-audit-container');
+        }
+        async function loadAuditHistory(table, id, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            try {
+                const response = await fetch(`/api/v1/audit/history/${table}/${id}`);
+                if (!response.ok) throw new Error('History missing');
+                const history = await response.json();
+                
+                if (history.length === 0) {
+                    container.innerHTML = '<div class="text-muted" style="font-size:0.8rem">No history found for this record</div>';
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="timeline">
+                        ${history.map(item => {
+                            let typeClass = item.type.toUpperCase();
+                            let details = escapeHtml(item.details || '');
+                            let diffHtml = '';
+                            
+                            if (item.type === 'CHANGE' && item.new !== undefined) {
+                                let oldVal = item.old === null || item.old === "" ? "(empty)" : item.old;
+                                let newVal = item.new === null || item.new === "" ? "(empty)" : item.new;
+                                diffHtml = `
+                                    <div class="timeline-diff">
+                                        <span class="timeline-old">${escapeHtml(oldVal)}</span>
+                                        <span class="timeline-arrow">→</span>
+                                        <span class="timeline-new">${escapeHtml(newVal)}</span>
+                                    </div>
+                                `;
+                            }
+
+                            if (item.type === 'LIFECYCLE' && item.snapshot) {
+                                diffHtml = `
+                                    <div style="margin-top:0.4rem; padding:0.4rem; background:rgba(0,0,0,0.2); border-radius:4px; font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text-muted); overflow-x:auto; white-space:pre-wrap">
+                                        Snapshot: ${escapeHtml(item.snapshot)}
+                                    </div>
+                                `;
+                            }
+
+                            return `
+                                <div class="timeline-item ${typeClass}">
+                                    <div class="timeline-dot"></div>
+                                    <div class="timeline-content">
+                                        <div class="timeline-header">
+                                            <span class="timeline-label">${escapeHtml(item.label)}</span>
+                                            <span class="timeline-time">${escapeHtml(item.timestamp)}</span>
+                                        </div>
+                                        <div class="timeline-details">${details}</div>
+                                        ${diffHtml}
+                                        <div style="font-size:0.6rem; color:var(--text-muted); margin-top:0.4rem; text-transform:uppercase">
+                                            User: ${escapeHtml(item.user || 'SYSTEM')} • Batch: ${item.batch ? `#${item.batch}` : '—'}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = `<div class="file-status missing">Failed to load audit logs.</div>`;
+            }
         }
     </script>
 </body>

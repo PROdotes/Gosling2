@@ -165,11 +165,11 @@ def test_extract_metadata_tagless_file(silence_mp3):
 
 def test_extract_metadata_skips_binary(silence_mp3):
     """LAW: APIC and other binary frames must be ignored to prevent table pollution."""
-    from mutagen.id3 import ID3, APIC
+    import mutagen.id3
 
-    tags = ID3()
+    tags = mutagen.id3.ID3()
     tags.add(
-        APIC(
+        mutagen.id3.APIC(
             encoding=3, mime="image/jpeg", type=3, desc="Cover", data=b"fake_image_data"
         )
     )

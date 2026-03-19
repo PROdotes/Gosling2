@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Mapping, Any
 
 from src.data.base_repository import BaseRepository
 from src.models.domain import Album
@@ -81,7 +81,7 @@ class AlbumRepository(BaseRepository):
         )
         return results
 
-    def _row_to_album(self, row: sqlite3.Row) -> Album:
+    def _row_to_album(self, row: Mapping[str, Any]) -> Album:
         return Album(
             id=row["AlbumID"],
             title=row["AlbumTitle"],

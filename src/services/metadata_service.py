@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 import mutagen
 from mutagen.id3 import ID3
+import mutagen.easyid3
 
 try:
     from mutagen.id3 import (
@@ -73,9 +74,10 @@ class MetadataService:
 
             # Data Fidelity: Extract values from lists and complex mutagen objects
             extracted = []
-            if hasattr(value, "people"):
+            people = getattr(value, "people", None)
+            if people:
                 # Handle TIPL/TMCL (Involved People List)
-                extracted = [p[1] for p in value.people if len(p) > 1]
+                extracted = [p[1] for p in people if len(p) > 1]
             else:
                 raw_list = value if isinstance(value, (list, tuple)) else [value]
                 for item in raw_list:

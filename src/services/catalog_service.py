@@ -42,7 +42,10 @@ class CatalogService:
             return None
 
         hydrated = self._hydrate_songs([song])
-        result = hydrated[0] if hydrated else None
+        if not hydrated:
+            return None
+
+        result = hydrated[0]
         logger.info(f"[CatalogService] Exit: Returning hydrated song '{result.title}'")
         return result
 
@@ -54,7 +57,11 @@ class CatalogService:
             logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
             return None
 
-        result = self._hydrate_identities([identity])[0]
+        hydrated_list = self._hydrate_identities([identity])
+        if not hydrated_list:
+            return None
+
+        result = hydrated_list[0]
         logger.info(
             f"[CatalogService] Exit: Returning hydrated identity '{result.display_name}'"
         )
@@ -109,11 +116,11 @@ class CatalogService:
             return None
 
         hydrated = self._hydrate_albums([album])
-        result = hydrated[0] if hydrated else None
-        if result:
-            logger.info(
-                f"[CatalogService] Exit: Returning hydrated album '{result.title}'"
-            )
+        if not hydrated:
+            return None
+
+        result = hydrated[0]
+        logger.info(f"[CatalogService] Exit: Returning hydrated album '{result.title}'")
         return result
 
     def search_publishers(self, query: str) -> List[Publisher]:

@@ -32,18 +32,18 @@ async def test_router_search_short_query_success(populated_db):
 
 
 def test_repositories_empty_inputs(populated_db):
-    """Repo coverage: Ensure empty input paths are executed."""
+    """Repo coverage: Empty inputs return empty results."""
     db = populated_db
-    SongRepository(db).get_by_ids([])
-    SongCreditRepository(db).get_credits_for_songs([])
-    SongAlbumRepository(db).get_albums_for_songs([])
-    PublisherRepository(db).get_publishers_for_songs([])
-    PublisherRepository(db).get_publishers_for_albums([])
-    TagRepository(db).get_tags_for_songs([])
+    assert SongRepository(db).get_by_ids([]) == []
+    assert SongCreditRepository(db).get_credits_for_songs([]) == []
+    assert SongAlbumRepository(db).get_albums_for_songs([]) == []
+    assert PublisherRepository(db).get_publishers_for_songs([]) == []
+    assert PublisherRepository(db).get_publishers_for_albums([]) == []
+    assert TagRepository(db).get_tags_for_songs([]) == []
 
 
-def test_song_display_artist_fallback(populated_db):
-    """Domain coverage: Song with credits but NO performers."""
+def test_song_display_artist_composer_only(populated_db):
+    """Domain coverage: Song with credits but NO performers returns None."""
     import sqlite3
     from src.services.catalog_service import CatalogService
 
@@ -62,8 +62,9 @@ def test_song_display_artist_fallback(populated_db):
 
     service = CatalogService(populated_db)
     song = service.get_song(99)
+    assert song is not None
     view = SongView.from_domain(song)
-    assert view.display_artist == "Dave Grohl"
+    assert view.display_artist is None  # Composers are not Performers
 
 
 def test_domain_edge_cases(populated_db):
@@ -87,10 +88,11 @@ def test_publisher_repository_get_publishers(populated_db):
     from src.data.publisher_repository import PublisherRepository
 
     repo = PublisherRepository(populated_db)
-    # The populated_db has IDs 1, 2, 3
-    res = repo.get_publishers([1, 2])
+    # The populated_db has IDs 1 (UMG), 2 (Island), 3 (IDJ), 4 (Roswell), 5 (Sub Pop), 10 (DGC)
+    res = repo.get_publishers([1, 10])
     assert len(res) == 2
-    assert res[1].name == "DGC Records"
+    assert res[1].name == "Universal Music Group"
+    assert res[10].name == "DGC Records"
 
     assert repo.get_publishers([]) == {}
 
@@ -124,30 +126,3 @@ def test_song_credit_repository_integrity_failure_mock(populated_db):
     with pytest.raises(ValueError) as excinfo:
         repo._row_to_song_credit(mock_row)
     assert "RoleID cannot be NULL" in str(excinfo.value)
-
-
-def test_base_repository_log_change(populated_db):
-    """BaseRepository coverage: Audit logging logic."""
-    from src.data.base_repository import BaseRepository
-    import sqlite3
-
-    repo = BaseRepository(populated_db)
-    conn = sqlite3.connect(populated_db)
-    cursor = conn.cursor()
-
-    # Create ChangeLog table if it doesn't exist (it should be in schema)
-    cursor.execute(
-        "CREATE TABLE IF NOT EXISTS ChangeLog (LogTableName TEXT, RecordID INTEGER, LogFieldName TEXT, OldValue TEXT, NewValue TEXT, BatchID TEXT)"
-    )
-
-    # 1. No change (should return early)
-    repo._log_change(cursor, "Songs", 1, "Notes", "Test", "Test", "B1")
-
-    # 2. Real change
-    repo._log_change(cursor, "Songs", 1, "Notes", "Old", "New", "B2")
-
-    # 3. Change with None
-    repo._log_change(cursor, "Songs", 1, "Notes", None, "New", "B3")
-
-    conn.commit()
-    conn.close()

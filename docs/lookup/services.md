@@ -163,3 +163,15 @@ Translates raw frame IDs (TPE1, TIT2) into domain fields, credits, and tags.
 
 ### _get_role_name(field: str) -> str
 **Internal**: Maps internal JSON field names like `artist` or `producers` to clean UI role names like `Performer` or `Producer`.
+
+---
+
+## AuditService
+*Location: `src/services/audit_service.py`*
+**Responsibility**: Orchestrates audit history logs and snapshots.
+
+### get_history(record_id: int, table: str) -> List[Dict[str, Any]]
+Retrieves a unified timeline of actions and changes for a record.
+Merges `ActionLog` and `ChangeLog` entries, sorted by timestamp.
+Includes `DeletedRecords` lifecycles if available.
+Returns a list of dictionaries with `timestamp`, `type`, `label`, `details`, `user`, and `batch`.

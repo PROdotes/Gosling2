@@ -103,3 +103,18 @@ Fetches a single Song domain model by its unique ID.
 - Reads physical file metadata via `MetadataService`.
 - Parses into domain model via `MetadataParser`.
 - Returns a `SongView` for UI comparison.
+
+---
+
+## Audit Router
+*Location: `src/engine/routers/audit.py`*
+**Responsibility**: HTTP interface for unified history logs.
+
+### def _get_service() -> AuditService
+**Internal**: Centralized service factory for the router.
+
+### async def get_history(table: str, record_id: int) -> List[Dict[str, Any]]
+**HTTP**: `GET /api/v1/audit/history/{table}/{record_id}`
+- Fetches the complete unified audit timeline for a record.
+- Matches `ActionLog`, `ChangeLog`, and `DeletedRecords` snapshots.
+- Wraps `AuditService.get_history`.

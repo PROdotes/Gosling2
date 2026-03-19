@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional, List
+from typing import List, Optional, Mapping, Any
 from src.models.domain import Song
 from src.data.base_repository import BaseRepository
 from src.services.logger import logger
@@ -91,7 +91,7 @@ class SongRepository(BaseRepository):
             rows = conn.execute(query_sql, identity_ids).fetchall()
             return [self._row_to_song(row) for row in rows]
 
-    def _row_to_song(self, row: sqlite3.Row) -> Song:
+    def _row_to_song(self, row: Mapping[str, Any]) -> Song:
         """Map a database row to a Song Pydantic model."""
         return Song(
             id=row["SourceID"],

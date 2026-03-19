@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Mapping, Any
 from src.models.domain import SongCredit
 from src.data.base_repository import BaseRepository
 from src.services.logger import logger
@@ -34,7 +34,7 @@ class SongCreditRepository(BaseRepository):
             logger.debug(f"[SongCreditRepository] Found {len(rows)} raw credit rows.")
             return [self._row_to_song_credit(row) for row in rows]
 
-    def _row_to_song_credit(self, row: sqlite3.Row) -> SongCredit:
+    def _row_to_song_credit(self, row: Mapping[str, Any]) -> SongCredit:
         """Maps a physical database row to the strict Pydantic SongCredit model, enforcing RoleID exists."""
         role_id = row["RoleID"]
         if role_id is None:

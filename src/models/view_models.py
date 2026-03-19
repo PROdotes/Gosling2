@@ -106,22 +106,30 @@ class SongView(BaseModel):
     @computed_field
     @property
     def display_artist(self) -> Optional[str]:
-        """Provides the joined primary performer names."""
+        """
+        Joined primary performer names.
+        Returns None if no Performer exists.
+        STRICT: Never fallback to Composer/Producer/etc.
+        """
         if not self.credits:
             return None
 
+        # 1. Filter to Performers only
         performers = [
             c.display_name for c in self.credits if c.role_name == "Performer"
         ]
-        if performers:
-            unique_names = []
-            [unique_names.append(n) for n in performers if n not in unique_names]
+        if not performers:
+            return None
 
-            if len(unique_names) > 1:
-                return ", ".join(unique_names)
-            return unique_names[0]
+        # 2. Deduplicate while preserving order (avoid 'clever' comprehensions)
+        unique_names = []
+        for name in performers:
+            if name not in unique_names:
+                unique_names.append(name)
 
-        return self.credits[0].display_name if self.credits else None
+        if len(unique_names) > 1:
+            return ", ".join(unique_names)
+        return unique_names[0]
 
     @computed_field
     @property
@@ -144,22 +152,26 @@ class SongView(BaseModel):
     def primary_genre(self) -> Optional[str]:
         """
         Picks the headline genre for the UI badge.
+        Only considers tags with category='Genre'.
         Priority:
-        1. Any tag explicitly marked as is_primary=True.
+        1. Genre tag explicitly marked as is_primary=True.
         2. First tag with category 'Genre'.
         """
         if not self.tags:
             return None
 
-        # 1. Explicit primary marker wins everything
-        for t in self.tags:
+        genre_tags = [
+            t for t in self.tags if t.category and t.category.lower() == "genre"
+        ]
+
+        # 1. Explicit primary Genre tag wins
+        for t in genre_tags:
             if t.is_primary:
                 return t.name
 
-        # 2. First 'Genre' tag wins if no explicit primary
-        for t in self.tags:
-            if t.category and t.category.lower() == "genre":
-                return t.name
+        # 2. First Genre tag wins if no explicit primary
+        if genre_tags:
+            return genre_tags[0].name
 
         return None
 
@@ -199,24 +211,29 @@ class AlbumView(BaseModel):
     @computed_field
     @property
     def display_artist(self) -> Optional[str]:
+        """
+        Joined performer names for the album.
+        Returns None if no Performer exists.
+        STRICT: Never fallback to Composer/Producer/etc.
+        """
         if not self.credits:
             return None
 
+        # 1. Performer roles only
         performers = [
             credit.display_name
             for credit in self.credits
             if credit.role_name == "Performer"
         ]
-        if performers:
-            unique_names = []
-            [
-                unique_names.append(name)
-                for name in performers
-                if name not in unique_names
-            ]
-            return ", ".join(unique_names)
+        if not performers:
+            return None
 
-        return self.credits[0].display_name
+        # 2. Simple deduplication while preserving order
+        unique_names = []
+        for name in performers:
+            if name not in unique_names:
+                unique_names.append(name)
+        return ", ".join(unique_names)
 
     @computed_field
     @property
@@ -255,3 +272,9 @@ class IdentityView(BaseModel):
             data["groups"] = [cls.from_domain(g) for g in identity.groups]
 
         return cls(**data)
+
+
+IdentityView.model_rebuild()
+SongAlbumView.model_rebuild()
+SongView.model_rebuild()
+AlbumView.model_rebuild()

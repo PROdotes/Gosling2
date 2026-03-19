@@ -196,4 +196,24 @@ Batch-fetch group identities that multiple person identities belong to.
 ### _row_to_artist_name(row: sqlite3.Row) -> ArtistName
 **Internal**: Maps a physical database row to the `ArtistName` domain model.
 
+---
+
+## AuditRepository
+*Location: `src/data/audit_repository.py`*
+**Responsibility**: Low-level database access for Audit tables (`ActionLog`, `ChangeLog`, `DeletedRecords`).
+
+### get_actions_for_target(target_id: int, table: str) -> List[AuditAction]
+Fetch high-level events (IMPORT, DELETE) for a specific record.
+
+### get_changes_for_record(record_id: int, table: str) -> List[AuditChange]
+Fetch field-level modifications for a specific record.
+
+### get_deleted_snapshot(record_id: int, table: str) -> Optional[DeletedRecord]
+Fetch the last JSON snapshot of a deleted record.
+
+### _row_to_action(row: sqlite3.Row) -> AuditAction
+### _row_to_change(row: sqlite3.Row) -> AuditChange
+### _row_to_deleted(row: sqlite3.Row) -> DeletedRecord
+**Internal**: Maps physical database rows to the `Audit*` domain models.
+
 
