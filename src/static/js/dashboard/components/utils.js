@@ -44,7 +44,31 @@ export function renderStatus(kind, message) {
 }
 
 export function buildNavigateAttrs(mode, query) {
-    return `data-action="navigate-search" data-mode="${escapeHtml(mode)}" data-query="${escapeHtml(query || "")}"`;
+    return `data-action="navigate-search" data-mode="${escapeHtml(mode)}" data-query="${escapeHtml(String(query || "").trim())}"`;
+}
+
+export function renderSongList(songs, emptyMessage = "No songs linked yet") {
+    const items = asArray(songs);
+    if (!items.length) {
+        return `<div class="muted-note">${escapeHtml(emptyMessage)}</div>`;
+    }
+
+    return `
+        <div class="stack-list">
+            ${items.map((song) => `
+                <div class="list-row linkable" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
+                    <div>
+                        <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
+                        <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
+                    </div>
+                    <div style="text-align: right">
+                        <div class="credit-role mono">${escapeHtml(song.formatted_duration || "")}</div>
+                        ${song.bpm ? `<div class="meta-label" style="margin: 0">${escapeHtml(song.bpm)} BPM</div>` : ""}
+                    </div>
+                </div>
+            `).join("")}
+        </div>
+    `;
 }
 
 export function renderAuditTimeline(history) {

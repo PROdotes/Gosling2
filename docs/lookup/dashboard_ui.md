@@ -44,3 +44,18 @@ Renders artist profiles, aliases, and group memberships.
 
 ### publishers.js
 Renders publisher details and repertoire listings.
+
+---
+
+## components/utils.js
+*Location: `src/static/js/dashboard/components/utils.js`*
+**Responsibility**: Shared UI components and formatting helpers.
+
+### buildNavigateAttrs(mode, query)
+Helper that builds common `data-action`, `data-mode`, and `data-query` attributes for navigation buttons/rows.
+
+### renderSongList(songs, emptyMessage)
+Universal renderer for a stack-list of songs with duration and BPM. Used in all entity detail panels.
+
+### renderAuditTimeline(history)
+Renders a consistent vertical timeline of actions, changes, and lifecycles.

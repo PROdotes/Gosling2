@@ -202,13 +202,21 @@ main {
 
 .results-count,
 .muted-note,
-.detail-path,
 .meta-label,
 .credit-role,
 .card-subtitle,
 .timeline-time,
 .timeline-details {
     color: var(--text-muted);
+}
+
+.detail-path {
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    word-break: break-all;
+    line-height: 1.4;
 }
 
 #results-container {

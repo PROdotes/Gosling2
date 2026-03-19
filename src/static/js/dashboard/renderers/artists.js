@@ -4,6 +4,7 @@ import {
     escapeHtml,
     renderAuditTimeline,
     renderEmptyState,
+    renderSongList,
     renderStatus,
 } from "../components/utils.js";
 
@@ -32,27 +33,6 @@ function renderAliasTags(items) {
         <div class="tag-list">
             ${aliases.map((alias) => `
                 <button class="tag ${alias.is_primary ? "genre" : ""} link" ${buildNavigateAttrs("artists", alias.display_name || "")}>${escapeHtml(alias.display_name || "-")}</button>
-            `).join("")}
-        </div>
-    `;
-}
-
-function renderCatalogSongs(songs) {
-    const items = asArray(songs);
-    if (!items.length) {
-        return '<div class="muted-note">No songs mapped yet</div>';
-    }
-
-    return `
-        <div class="stack-list">
-            ${items.map((song) => `
-                <div class="list-row linkable" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(song.media_name || song.title || "")}">
-                    <div>
-                        <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
-                        <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
-                    </div>
-                    <span class="credit-role mono">${escapeHtml(song.formatted_duration || "")}</span>
-                </div>
             `).join("")}
         </div>
     `;
@@ -97,7 +77,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
     const aliases = renderAliasTags(tree.aliases);
     const members = renderIdentityTags(tree.members);
     const groups = renderIdentityTags(tree.groups);
-    const catalogSongs = renderCatalogSongs(songs);
+    const catalogHtml = renderSongList(songs, "No songs mapped yet");
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -111,7 +91,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
 
             <div class="detail-section">
                 <div class="section-title">Full Catalog (${asArray(songs).length})</div>
-                ${catalogSongs}
+                ${catalogHtml}
             </div>
 
             <div class="detail-section">

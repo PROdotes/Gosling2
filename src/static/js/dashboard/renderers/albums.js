@@ -4,30 +4,10 @@ import {
     escapeHtml,
     renderAuditTimeline,
     renderEmptyState,
+    renderSongList,
     renderStatus,
     textOrDash,
 } from "../components/utils.js";
-
-function renderAlbumSongs(songs) {
-    const items = asArray(songs);
-    if (!items.length) {
-        return '<div class="muted-note">No songs linked yet</div>';
-    }
-
-    return `
-        <div class="stack-list">
-            ${items.map((song) => `
-                <div class="list-row linkable" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(song.media_name || song.title || "")}">
-                    <div>
-                        <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
-                        <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
-                    </div>
-                    <span class="credit-role mono">${escapeHtml(song.formatted_duration || "")}</span>
-                </div>
-            `).join("")}
-        </div>
-    `;
-}
 
 function renderCredits(credits) {
     const items = asArray(credits);
@@ -137,7 +117,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
 
             <div class="detail-section">
                 <div class="section-title">Track List (${songs.length})</div>
-                ${renderAlbumSongs(songs)}
+                ${renderSongList(songs)}
             </div>
 
             <div class="detail-section">

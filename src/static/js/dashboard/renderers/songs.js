@@ -218,7 +218,11 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
                     <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${artistValue}</div></div>
                     <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${textOrDash(song.year)}</div></div>
                     <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${textOrDash(song.formatted_duration)}</div></div>
-                    <div class="meta-item"><div class="meta-label">Audio Hash</div><div class="meta-value mono">${textOrDash(song.audio_hash)}</div></div>
+                    <div class="meta-item"><div class="meta-label">BPM</div><div class="meta-value mono">${textOrDash(song.bpm)}</div></div>
+                    <div class="meta-item" style="grid-column: span 2">
+                        <div class="meta-label">Audio Hash</div>
+                        <div class="meta-value mono" style="font-size: 0.72rem; word-break: break-all">${textOrDash(song.audio_hash)}</div>
+                    </div>
                 </div>
             </div>
 
