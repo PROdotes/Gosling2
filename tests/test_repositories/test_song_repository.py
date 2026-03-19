@@ -2,6 +2,7 @@
 Contract tests for SongRepository.
 Every assertion verifies EXACT values from the populated_db fixture.
 """
+
 from src.data.song_repository import SongRepository
 
 
@@ -25,22 +26,22 @@ class TestGetById:
         """Contract: SourceDuration (seconds) * 1000 = duration_ms."""
         repo = SongRepository(populated_db)
         expected = {
-            1: 200000,   # 200s
-            2: 240000,   # 240s
-            3: 180000,   # 180s
-            4: 120000,   # 120s
-            5: 180000,   # 180s
-            6: 300000,   # 300s
-            7: 10000,    # 10s
-            8: 180000,   # 180s
-            9: 100000,   # 100s
+            1: 200000,  # 200s
+            2: 240000,  # 240s
+            3: 180000,  # 180s
+            4: 120000,  # 120s
+            5: 180000,  # 180s
+            6: 300000,  # 300s
+            7: 10000,  # 10s
+            8: 180000,  # 180s
+            9: 100000,  # 100s
         }
         for song_id, expected_ms in expected.items():
             song = repo.get_by_id(song_id)
             assert song is not None, f"Song {song_id} not found"
-            assert song.duration_ms == expected_ms, (
-                f"Song {song_id}: expected {expected_ms}ms, got {song.duration_ms}ms"
-            )
+            assert (
+                song.duration_ms == expected_ms
+            ), f"Song {song_id}: expected {expected_ms}ms, got {song.duration_ms}ms"
 
     def test_nonexistent_id_returns_none(self, populated_db):
         repo = SongRepository(populated_db)
@@ -83,9 +84,15 @@ class TestGetByIds:
         assert len(songs) == 9
         titles = {s.title for s in songs}
         assert titles == {
-            "Smells Like Teen Spirit", "Everlong", "Range Rover Bitch",
-            "Grohlton Theme", "Pocketwatch Demo", "Dual Credit Track",
-            "Hollow Song", "Joint Venture", "Priority Test",
+            "Smells Like Teen Spirit",
+            "Everlong",
+            "Range Rover Bitch",
+            "Grohlton Theme",
+            "Pocketwatch Demo",
+            "Dual Credit Track",
+            "Hollow Song",
+            "Joint Venture",
+            "Priority Test",
         }
 
     def test_duplicate_ids_behavior(self, populated_db):
@@ -124,7 +131,7 @@ class TestGetByTitle:
         assert songs == []
 
     def test_multi_match(self, populated_db):
-        """'o' appears in multiple titles: Everlong, Grohlton Theme, Pocketwatch Demo, Hollow Song, Priority Test, Joint Venture, Zero... """
+        """'o' appears in multiple titles: Everlong, Grohlton Theme, Pocketwatch Demo, Hollow Song, Priority Test, Joint Venture, Zero..."""
         repo = SongRepository(populated_db)
         songs = repo.get_by_title("oint")
         assert len(songs) == 1
@@ -189,7 +196,10 @@ class TestGetByIdentityIds:
         songs = repo.get_by_identity_ids([1])
         titles = {s.title for s in songs}
         assert titles == {
-            "Grohlton Theme", "Pocketwatch Demo", "Dual Credit Track", "Joint Venture",
+            "Grohlton Theme",
+            "Pocketwatch Demo",
+            "Dual Credit Track",
+            "Joint Venture",
         }
 
     def test_nirvana_identity(self, populated_db):

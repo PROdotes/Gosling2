@@ -2,6 +2,7 @@
 Contract tests for AuditRepository.
 Every assertion verifies EXACT values from the populated_db fixture.
 """
+
 from src.data.audit_repository import AuditRepository
 
 
@@ -61,7 +62,8 @@ class TestGetChangesForRecord:
 
     def test_table_expansion_songs(self, populated_db):
         """When table='Songs', the query should also search SongCredits, SongAlbums, etc.
-        With our data there are no changes for song records, so result should be empty."""
+        With our data there are no changes for song records, so result should be empty.
+        """
         repo = AuditRepository(populated_db)
         changes = repo.get_changes_for_record(1, "Songs")
         assert changes == []
@@ -69,7 +71,8 @@ class TestGetChangesForRecord:
     def test_table_expansion_identities(self, populated_db):
         """When table='Identities', query also searches ArtistNames and GroupMemberships.
         Record 33 is in ArtistNames ChangeLog - but record_id check is against the identity ID, not 33.
-        So searching for identity 1 with table Identities should look in ArtistNames too."""
+        So searching for identity 1 with table Identities should look in ArtistNames too.
+        """
         repo = AuditRepository(populated_db)
         # The ChangeLog record has RecordID=33 and LogTableName='ArtistNames'
         # When we query get_changes_for_record(33, 'Identities'), it searches

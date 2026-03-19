@@ -2,6 +2,7 @@
 Contract tests for AlbumRepository, SongCreditRepository, SongAlbumRepository,
 AlbumCreditRepository, TagRepository, and BaseRepository.
 """
+
 import sqlite3
 import pytest
 from src.data.album_repository import AlbumRepository

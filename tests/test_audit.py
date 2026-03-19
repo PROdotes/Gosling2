@@ -3,6 +3,7 @@ Contract tests for AuditService.
 Tests the unified timeline merge of ActionLog + ChangeLog + DeletedRecords.
 Every assertion verifies EXACT values from the populated_db fixture.
 """
+
 from src.services.audit_service import AuditService
 
 
@@ -87,6 +88,7 @@ class TestGetHistoryChangeLabeling:
         """When a change is from a related table, label should be '[RelatedTable] Updated {field}'.
         We need to add a cross-table change to verify this."""
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         conn.create_collation(
             "UTF8_NOCASE",
@@ -114,14 +116,34 @@ class TestGetHistoryTimelineStructure:
     def test_action_entry_keys(self, audit_service):
         history = audit_service.get_history(33, "ArtistNames")
         action = next(h for h in history if h["type"] == "ACTION")
-        assert set(action.keys()) == {"timestamp", "type", "label", "details", "user", "batch"}
+        assert set(action.keys()) == {
+            "timestamp",
+            "type",
+            "label",
+            "details",
+            "user",
+            "batch",
+        }
 
     def test_change_entry_keys(self, audit_service):
         history = audit_service.get_history(33, "ArtistNames")
         change = next(h for h in history if h["type"] == "CHANGE")
-        assert set(change.keys()) == {"timestamp", "type", "label", "old", "new", "batch"}
+        assert set(change.keys()) == {
+            "timestamp",
+            "type",
+            "label",
+            "old",
+            "new",
+            "batch",
+        }
 
     def test_lifecycle_entry_keys(self, audit_service):
         history = audit_service.get_history(99, "Songs")
         lifecycle = history[0]
-        assert set(lifecycle.keys()) == {"timestamp", "type", "label", "snapshot", "batch"}
+        assert set(lifecycle.keys()) == {
+            "timestamp",
+            "type",
+            "label",
+            "snapshot",
+            "batch",
+        }

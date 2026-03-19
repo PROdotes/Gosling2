@@ -45,6 +45,14 @@ class TestDashboard:
         if resp.status_code == 200:
             assert "<!DOCTYPE html>" in resp.text or "<html" in resp.text
 
+    def test_static_dashboard_assets_are_served(self, populated_db, monkeypatch):
+        """GET /static/... should serve extracted dashboard assets."""
+        monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
+        c = TestClient(app)
+        resp = c.get("/static/css/dashboard.css")
+        assert resp.status_code == 200
+        assert "--bg-deep" in resp.text
+
 
 # ===========================================================================
 # GET /api/v1/songs/{song_id}

@@ -2,6 +2,7 @@
 Contract tests for IdentityRepository.
 Every assertion verifies EXACT values from the populated_db fixture.
 """
+
 from src.data.identity_repository import IdentityRepository
 
 

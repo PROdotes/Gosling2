@@ -12,6 +12,7 @@ No mocking. No env leaking. Every test states what it expects EXACTLY.
 """
 
 import sys
+import shutil
 from pathlib import Path
 
 # Ensure project root is in path for tests
@@ -50,8 +51,6 @@ def _connect(db_path):
     )
     return conn
 
-
-import shutil
 
 # ---------------------------------------------------------------------------
 # Session-level master databases (Created once, reused for speed)
@@ -174,36 +173,76 @@ def _populate_db_data(db_path):
     cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (4, 'Producer')")
 
     # --- Identities ---
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (1, 'person')")  # Dave Grohl
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (2, 'group')")   # Nirvana
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (3, 'group')")   # Foo Fighters
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (4, 'person')")  # Taylor Hawkins
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (1, 'person')"
+    )  # Dave Grohl
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (2, 'group')"
+    )  # Nirvana
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (3, 'group')"
+    )  # Foo Fighters
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (4, 'person')"
+    )  # Taylor Hawkins
 
     # --- Group Memberships ---
-    cursor.execute("INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (2, 1)")  # Dave in Nirvana
-    cursor.execute("INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 1)")  # Dave in Foo Fighters
-    cursor.execute("INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 4)")  # Taylor in Foo Fighters
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (2, 1)"
+    )  # Dave in Nirvana
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 1)"
+    )  # Dave in Foo Fighters
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (3, 4)"
+    )  # Taylor in Foo Fighters
 
     # --- Artist Names (aliases) ---
     # Dave's Primary + Aliases
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (10, 1, 'Dave Grohl', 1)")
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (11, 1, 'Grohlton', 0)")
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (12, 1, 'Late!', 0)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (10, 1, 'Dave Grohl', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (11, 1, 'Grohlton', 0)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (12, 1, 'Late!', 0)"
+    )
     # Groups
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (20, 2, 'Nirvana', 1)")
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (30, 3, 'Foo Fighters', 1)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (20, 2, 'Nirvana', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (30, 3, 'Foo Fighters', 1)"
+    )
     # Taylor
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (40, 4, 'Taylor Hawkins', 1)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (40, 4, 'Taylor Hawkins', 1)"
+    )
     # Audit alias (Dave's extra alias for rename test)
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (33, 1, 'Ines Prajo', 0)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (33, 1, 'Ines Prajo', 0)"
+    )
 
     # --- Publishers ---
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (1, 'Universal Music Group', NULL)")
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (2, 'Island Records', 1)")
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (3, 'Island Def Jam', 2)")
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (4, 'Roswell Records', NULL)")
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (5, 'Sub Pop', NULL)")
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (10, 'DGC Records', 1)")
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (1, 'Universal Music Group', NULL)"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (2, 'Island Records', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (3, 'Island Def Jam', 2)"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (4, 'Roswell Records', NULL)"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (5, 'Sub Pop', NULL)"
+    )
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (10, 'DGC Records', 1)"
+    )
 
     # --- Media Sources + Songs ---
     songs = [
@@ -226,15 +265,15 @@ def _populate_db_data(db_path):
 
     # --- Song Credits ---
     credits = [
-        (1, 20, 1),   # SLTS -> Nirvana, Performer
-        (2, 30, 1),   # Everlong -> Foo Fighters, Performer
-        (3, 40, 1),   # Range Rover Bitch -> Taylor Hawkins, Performer
-        (4, 11, 1),   # Grohlton Theme -> Grohlton (alias), Performer
-        (5, 12, 1),   # Pocketwatch Demo -> Late! (alias), Performer
-        (6, 10, 1),   # Dual Credit Track -> Dave Grohl, Performer
-        (6, 40, 2),   # Dual Credit Track -> Taylor Hawkins, Composer
-        (8, 10, 1),   # Joint Venture -> Dave Grohl, Performer
-        (8, 40, 1),   # Joint Venture -> Taylor Hawkins, Performer
+        (1, 20, 1),  # SLTS -> Nirvana, Performer
+        (2, 30, 1),  # Everlong -> Foo Fighters, Performer
+        (3, 40, 1),  # Range Rover Bitch -> Taylor Hawkins, Performer
+        (4, 11, 1),  # Grohlton Theme -> Grohlton (alias), Performer
+        (5, 12, 1),  # Pocketwatch Demo -> Late! (alias), Performer
+        (6, 10, 1),  # Dual Credit Track -> Dave Grohl, Performer
+        (6, 40, 2),  # Dual Credit Track -> Taylor Hawkins, Composer
+        (8, 10, 1),  # Joint Venture -> Dave Grohl, Performer
+        (8, 40, 1),  # Joint Venture -> Taylor Hawkins, Performer
     ]
     for source_id, name_id, role_id in credits:
         cursor.execute(
@@ -243,24 +282,44 @@ def _populate_db_data(db_path):
         )
 
     # --- Albums ---
-    cursor.execute("INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (100, 'Nevermind', 1991)")
-    cursor.execute("INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (200, 'The Colour and the Shape', 1997)")
+    cursor.execute(
+        "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (100, 'Nevermind', 1991)"
+    )
+    cursor.execute(
+        "INSERT INTO Albums (AlbumID, AlbumTitle, ReleaseYear) VALUES (200, 'The Colour and the Shape', 1997)"
+    )
 
     # --- Song-Album links ---
-    cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (1, 100, 1, 1)")
-    cursor.execute("INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (2, 200, 11, 1)")
+    cursor.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (1, 100, 1, 1)"
+    )
+    cursor.execute(
+        "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, IsPrimary) VALUES (2, 200, 11, 1)"
+    )
 
     # --- Album Publishers ---
-    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 10)")  # Nevermind -> DGC Records
-    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 5)")   # Nevermind -> Sub Pop
-    cursor.execute("INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (200, 4)")   # TCATS -> Roswell Records
+    cursor.execute(
+        "INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 10)"
+    )  # Nevermind -> DGC Records
+    cursor.execute(
+        "INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (100, 5)"
+    )  # Nevermind -> Sub Pop
+    cursor.execute(
+        "INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (200, 4)"
+    )  # TCATS -> Roswell Records
 
     # --- Album Credits ---
-    cursor.execute("INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (100, 20, 1)")  # Nirvana Performer on Nevermind
-    cursor.execute("INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (200, 30, 1)")  # Foo Fighters Performer on TCATS
+    cursor.execute(
+        "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (100, 20, 1)"
+    )  # Nirvana Performer on Nevermind
+    cursor.execute(
+        "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (200, 30, 1)"
+    )  # Foo Fighters Performer on TCATS
 
     # --- Recording Publishers ---
-    cursor.execute("INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (1, 10)")  # SLTS -> DGC Records
+    cursor.execute(
+        "INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (1, 10)"
+    )  # SLTS -> DGC Records
 
     # --- Tags ---
     tags = [
@@ -336,32 +395,61 @@ def _populate_edge_case_data(db_path):
     cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (1, 'Performer')")
 
     # --- Identities ---
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (100, 'person')")  # No name at all
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType, LegalName) VALUES (101, 'person', 'John Legal')")  # LegalName only
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (102, 'group')")   # Circular A
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (103, 'group')")   # Circular B
-    cursor.execute("INSERT INTO Identities (IdentityID, IdentityType) VALUES (104, 'person')")  # Unicode
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (100, 'person')"
+    )  # No name at all
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType, LegalName) VALUES (101, 'person', 'John Legal')"
+    )  # LegalName only
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (102, 'group')"
+    )  # Circular A
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (103, 'group')"
+    )  # Circular B
+    cursor.execute(
+        "INSERT INTO Identities (IdentityID, IdentityType) VALUES (104, 'person')"
+    )  # Unicode
 
     # Artist Names
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (200, 102, 'Circular Group A', 1)")
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (201, 103, 'Circular Group B', 1)")
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (202, 104, 'Bjork', 1)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (200, 102, 'Circular Group A', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (201, 103, 'Circular Group B', 1)"
+    )
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (202, 104, 'Bjork', 1)"
+    )
 
     # Circular memberships
-    cursor.execute("INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (102, 103)")
-    cursor.execute("INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (103, 102)")
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (102, 103)"
+    )
+    cursor.execute(
+        "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (103, 102)"
+    )
 
     # --- Publishers ---
-    cursor.execute("INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (100, 'Orphan Publisher', 999)")
+    cursor.execute(
+        "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (100, 'Orphan Publisher', 999)"
+    )
 
     # --- Songs ---
     edge_songs = [
         (100, 1, "Orphaned Song", "/edge/1", 180, 1),
-        (101, 1, " ", "/edge/2", 60, 1),           # whitespace title
-        (102, 1, "A", "/edge/3", 30, 1),            # single char
+        (101, 1, " ", "/edge/2", 60, 1),  # whitespace title
+        (102, 1, "A", "/edge/3", 30, 1),  # single char
         (103, 1, "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0", "/edge/4", 200, 1),  # Japanese
-        (104, 1, "Zero Duration", "/edge/5", 0, 1), # zero duration
-        (105, 1, "No Identity Name Song", "/edge/6", 120, 1),  # credits identity with no ArtistName
+        (104, 1, "Zero Duration", "/edge/5", 0, 1),  # zero duration
+        (
+            105,
+            1,
+            "No Identity Name Song",
+            "/edge/6",
+            120,
+            1,
+        ),  # credits identity with no ArtistName
     ]
     for sid, tid, name, path, dur, active in edge_songs:
         cursor.execute(
@@ -372,8 +460,12 @@ def _populate_edge_case_data(db_path):
 
     # Credit pointing to identity 100 (no ArtistName record for this identity)
     # We create a standalone ArtistName for the credit but identity 100 has no primary name
-    cursor.execute("INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (300, 100, 'Ghost Artist', 0)")
-    cursor.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (105, 300, 1)")
+    cursor.execute(
+        "INSERT INTO ArtistNames (NameID, OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (300, 100, 'Ghost Artist', 0)"
+    )
+    cursor.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (105, 300, 1)"
+    )
 
     conn.commit()
     conn.close()

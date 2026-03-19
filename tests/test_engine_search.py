@@ -102,7 +102,7 @@ class TestSongSearchPhaseTwo:
         data = client.get("/api/v1/songs/search", params={"q": "Taylor Hawkins"}).json()
         titles = sorted([s["title"] for s in data])
         assert "Range Rover Bitch" in titles  # Taylor solo
-        assert "Everlong" in titles            # FF group song
+        assert "Everlong" in titles  # FF group song
 
     def test_nirvana_returns_slts(self, client):
         """'Nirvana' returns SLTS."""

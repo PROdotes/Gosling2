@@ -2,6 +2,7 @@ import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from src.engine.routers.catalog import router as catalog_router
 from src.engine.routers.metabolic import router as metabolic_router
 from src.engine.routers.audit import router as audit_router
@@ -38,3 +39,8 @@ async def get_dashboard():
 app.include_router(catalog_router)
 app.include_router(metabolic_router)
 app.include_router(audit_router)
+app.mount(
+    "/static",
+    StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
+    name="static",
+)

@@ -2,6 +2,7 @@
 Contract tests for PublisherRepository.
 Every assertion verifies EXACT values from the populated_db fixture.
 """
+
 from src.data.publisher_repository import PublisherRepository
 
 
@@ -30,9 +31,9 @@ class TestGetAll:
         parent_map = {p.name: p.parent_id for p in pubs}
 
         assert parent_map["Universal Music Group"] is None
-        assert parent_map["Island Records"] == 1   # parent = UMG
-        assert parent_map["Island Def Jam"] == 2    # parent = Island Records
-        assert parent_map["DGC Records"] == 1       # parent = UMG
+        assert parent_map["Island Records"] == 1  # parent = UMG
+        assert parent_map["Island Def Jam"] == 2  # parent = Island Records
+        assert parent_map["DGC Records"] == 1  # parent = UMG
         assert parent_map["Roswell Records"] is None
         assert parent_map["Sub Pop"] is None
 
