@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional, Mapping, Any
+from typing import List, Optional, Mapping, Any, Dict
 from src.models.domain import Song
 from src.data.base_repository import BaseRepository
 from src.services.logger import logger
@@ -90,6 +90,108 @@ class SongRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, identity_ids).fetchall()
             return [self._row_to_song(row) for row in rows]
+
+    def get_by_hash(self, audio_hash: str) -> Optional[Song]:
+        """Fetch a Song by its audio-only hash."""
+        logger.debug(f"[SongRepository] Fetching song by hash: {audio_hash}")
+        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.AudioHash = ?"
+
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query_sql, (audio_hash,)).fetchone()
+            if row:
+                logger.debug(f"[SongRepository] Found song by hash: {audio_hash}")
+                return self._row_to_song(row)
+
+            logger.debug(f"[SongRepository] No song found with hash: {audio_hash}")
+            return None
+
+    def get_by_path(self, path: str) -> Optional[Song]:
+        """Fetch a song by its absolute source path."""
+        if not path:
+            return None
+
+        logger.debug(f"[SongRepository] -> get_by_path(path='{path}')")
+        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.SourcePath = ?"
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query_sql, (path,)).fetchone()
+            song = self._row_to_song(row) if row else None
+            if not song:
+                logger.debug(
+                    f"[SongRepository] <- get_by_path(path='{path}') NOT_FOUND"
+                )
+            return song
+
+    def find_by_metadata(
+        self, title: str, artists: List[str], year: Optional[int]
+    ) -> List[Song]:
+        """
+        Find songs matching Title, exact Performer set, and Recording Year.
+        """
+        if not title or not artists:
+            return []
+
+        logger.debug(
+            f"[SongRepository] -> find_by_metadata(title='{title}', artists={artists}, year={year})"
+        )
+
+        # Step 1: Find all songs with this Title (and RecordingYear if provided)
+        # This is our candidate set.
+        params: List[Any] = [title]
+        year_filter = ""
+        if year:
+            year_filter = "AND s.RecordingYear = ?"
+            params.append(year)
+
+        query_sql = f"""
+            SELECT DISTINCT {self._COLUMNS}
+            {self._JOIN}
+            WHERE m.MediaName = ? COLLATE UTF8_NOCASE
+            {year_filter}
+        """
+
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query_sql, tuple(params)).fetchall()
+            candidates = [self._row_to_song(row) for row in rows]
+
+        if not candidates:
+            return []
+
+        # Step 2: For each candidate, check if the Performer set matches exactly
+        # We need to hydrate the candidates (or at least their credits)
+        # But for this simple check, we can just fetch the names from the DB for these candidates.
+        found_matches = []
+        candidate_ids = [c.id for c in candidates]
+        placeholders = ",".join(["?" for _ in candidate_ids])
+
+        performer_sql = f"""
+            SELECT sc.SourceID, an.DisplayName 
+            FROM SongCredits sc
+            JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+            WHERE sc.SourceID IN ({placeholders})
+              AND sc.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'Performer')
+        """
+
+        source_performers: Dict[int, List[str]] = {}
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            p_rows = conn.execute(performer_sql, candidate_ids).fetchall()
+            for r in p_rows:
+                source_performers.setdefault(r["SourceID"], []).append(r["DisplayName"])
+
+        # Compare sets
+        target_set = set(a.lower() for a in artists)
+        for song in candidates:
+            current_set = set(a.lower() for a in source_performers.get(song.id, []))
+            if current_set == target_set:
+                found_matches.append(song)
+
+        logger.debug(
+            f"[SongRepository] <- find_by_metadata(title='{title}') matches={len(found_matches)}"
+        )
+        return found_matches
 
     def _row_to_song(self, row: Mapping[str, Any]) -> Song:
         """Map a database row to a Song Pydantic model."""

@@ -1,7 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from src.models.domain import Publisher
-from src.models.view_models import SongView, IdentityView, AlbumView
+from src.models.view_models import (
+    SongView,
+    IdentityView,
+    AlbumView,
+    IngestionCheckRequest,
+    IngestionReportView,
+)
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 import os
@@ -110,9 +116,7 @@ async def get_publisher(publisher_id: int) -> Publisher:
     logger.debug(f"[CatalogRouter] get_publisher(id={publisher_id})")
     publisher = _get_service().get_publisher(publisher_id)
     if not publisher:
-        logger.warning(
-            f"[CatalogRouter] Publisher ID {publisher_id} not found"
-        )
+        logger.warning(f"[CatalogRouter] Publisher ID {publisher_id} not found")
         raise HTTPException(
             status_code=404, detail=f"Publisher ID {publisher_id} not found"
         )
@@ -159,3 +163,30 @@ async def get_album(album_id: int) -> AlbumView:
 
     # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)
+
+
+@router.post("/catalog/ingest/check", response_model=IngestionReportView)
+async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView:
+    """
+    Check if a file exists in the catalog (dry-run).
+    Returns existing metadata if found, or extracted metadata if new.
+    """
+    logger.info(f"[CatalogRouter] check_ingestion(path='{request.file_path}')")
+    result = _get_service().check_ingestion(request.file_path)
+
+    if result["status"] == "ERROR":
+        raise HTTPException(
+            status_code=400, detail=result.get("message", "Unknown error")
+        )
+
+    song_domain = result.get("song")
+    song_view = None
+    if song_domain:
+        song_view = SongView.from_domain(song_domain)
+
+    return IngestionReportView(
+        status=result["status"],
+        match_type=result.get("match_type"),
+        message=result.get("message"),
+        song=song_view,
+    )

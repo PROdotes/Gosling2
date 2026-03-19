@@ -106,7 +106,9 @@ class PublisherRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
-            logger.debug(f"[PublisherRepository] <- search(q='{query}') count={len(result)}")
+            logger.debug(
+                f"[PublisherRepository] <- search(q='{query}') count={len(result)}"
+            )
             return result
 
     def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
@@ -115,9 +117,13 @@ class PublisherRepository(BaseRepository):
         results = self.get_by_ids([publisher_id])
         if results:
             res = results[0]
-            logger.debug(f"[PublisherRepository] <- get_by_id(id={publisher_id}) '{res.name}'")
+            logger.debug(
+                f"[PublisherRepository] <- get_by_id(id={publisher_id}) '{res.name}'"
+            )
             return res
-        logger.warning(f"[PublisherRepository] <- get_by_id(id={publisher_id}) NOT_FOUND")
+        logger.warning(
+            f"[PublisherRepository] <- get_by_id(id={publisher_id}) NOT_FOUND"
+        )
         return None
 
     def get_by_ids(self, ids: List[int]) -> List[Publisher]:
@@ -192,7 +198,9 @@ class PublisherRepository(BaseRepository):
         with self._get_connection() as conn:
             rows = conn.execute(query, (publisher_id,)).fetchall()
             result = [row[0] for row in rows]
-            logger.debug(f"[PublisherRepository] <- get_song_ids_by_publisher() count={len(result)}")
+            logger.debug(
+                f"[PublisherRepository] <- get_song_ids_by_publisher() count={len(result)}"
+            )
             return result
 
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:

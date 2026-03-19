@@ -36,6 +36,15 @@ Discovery path on titles and albums. Fastest search.
 ### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
 Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
 
+### get_by_path(path: str) -> Optional[Song]
+Fetch a song by its exact physical source path.
+
+### get_by_hash(ahash: str) -> Optional[Song]
+Fetch a song by its unique audio hash.
+
+### find_by_metadata(title: str, artists: List[str], year: Optional[int]) -> List[Song]
+Find songs matching Title, exact Performer set, and Recording Year. Avoids "Single-Match" false duplicates by requiring the incoming performer set to be an exact match for the existing performer set.
+
 ### _row_to_song(row: sqlite3.Row) -> Song
 
 **Internal**: Maps a physical database row to the `Song` domain model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.

@@ -88,6 +88,12 @@ Fetches a single Song domain model by its unique ID.
 - Fetches the full repertoire (Master rights) for a given publisher.
 - Wraps `CatalogService.get_publisher_songs`.
 
+### async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
+**HTTP**: `POST /api/v1/catalog/ingest/check`
+- Performs a dry-run ingestion collision check.
+- Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
+- Wraps `CatalogService.check_ingestion`.
+
 
 ---
 

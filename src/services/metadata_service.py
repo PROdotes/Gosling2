@@ -54,6 +54,8 @@ class MetadataService:
             )
             return metadata
 
+        except FileNotFoundError:
+            raise
         except Exception as e:
             logger.error(
                 f"[MetadataService] Exit: Error reading tags from {file_path}: {e}"

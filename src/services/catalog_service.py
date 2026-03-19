@@ -1,4 +1,5 @@
-from typing import Optional, List, Dict
+import os
+from typing import Optional, List, Dict, Any
 from src.data.album_repository import AlbumRepository
 from src.data.song_repository import SongRepository
 from src.data.song_credit_repository import SongCreditRepository
@@ -18,12 +19,16 @@ from src.models.domain import (
     Tag,
 )
 from src.services.logger import logger
+from src.utils.audio_hash import calculate_audio_hash
+from src.services.metadata_service import MetadataService
+from src.services.metadata_parser import MetadataParser
 
 
 class CatalogService:
     """Entry point for song access. Stateless orchestrator."""
 
     def __init__(self, db_path: str):
+        self._db_path = db_path
         self._song_repo = SongRepository(db_path)
         self._album_repo_dir = AlbumRepository(db_path)
         self._credit_repo = SongCreditRepository(db_path)
@@ -32,6 +37,105 @@ class CatalogService:
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
+
+        # Ingestion Helpers
+        self._metadata_service = MetadataService()
+        self._metadata_parser = MetadataParser()
+
+    def check_ingestion(self, file_path: str) -> Dict[str, Any]:
+        """
+        Dry-run ingestion check.
+        1. Source Path collision.
+        2. Audio Hash collision.
+        3. Metadata (Artist, Title, Year) collision.
+        """
+        logger.debug(f"[CatalogService] -> check_ingestion(file_path='{file_path}')")
+
+        if not os.path.exists(file_path):
+            logger.warning(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') NOT_FOUND"
+            )
+            return {"status": "ERROR", "message": "File not found"}
+
+        # 1. Path Check (Fastest)
+        existing_by_path = self._song_repo.get_by_path(file_path)
+        if existing_by_path:
+            logger.info(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') PATH_COLLISION"
+            )
+            hydrated = self._hydrate_songs([existing_by_path])
+            return {
+                "status": "ALREADY_EXISTS",
+                "match_type": "PATH",
+                "message": f"Source path collision: {file_path}",
+                "song": hydrated[0] if hydrated else existing_by_path,
+            }
+
+        # 2. Hash Check (Requires reading file)
+        try:
+            audio_hash = calculate_audio_hash(file_path)
+        except Exception as e:
+            logger.error(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') HASH_FAILED: {e}"
+            )
+            return {"status": "ERROR", "message": f"Hash failed: {str(e)}"}
+
+        existing_by_hash = self._song_repo.get_by_hash(audio_hash)
+        if existing_by_hash:
+            logger.info(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') HASH_COLLISION"
+            )
+            hydrated = self._hydrate_songs([existing_by_hash])
+            return {
+                "status": "ALREADY_EXISTS",
+                "match_type": "HASH",
+                "message": f"Audio hash collision: {audio_hash}",
+                "song": hydrated[0] if hydrated else existing_by_hash,
+            }
+
+        # 3. Metadata Extraction & Metadata Collision Check
+        try:
+            raw_meta = self._metadata_service.extract_metadata(file_path)
+            parsed_song = self._metadata_parser.parse(raw_meta, file_path)
+            # Ensure the hash is attached for the "potential" record
+            parsed_song = parsed_song.model_copy(update={"audio_hash": audio_hash})
+
+            # Extract ALL performer names
+            title = parsed_song.title
+            performers = []
+            if parsed_song.credits:
+                performers = [
+                    c.display_name
+                    for c in parsed_song.credits
+                    if c.role_name == "Performer"
+                ]
+
+            year = parsed_song.year
+
+            if title and performers:
+                # find_by_metadata now handles multiple artists to avoid "Single-Match" false duplicates
+                matches = self._song_repo.find_by_metadata(title, performers, year)
+                if matches:
+                    logger.info(
+                        f"[CatalogService] <- check_ingestion(file_path='{file_path}') METADATA_COLLISION"
+                    )
+                    hydrated = self._hydrate_songs(matches)
+                    return {
+                        "status": "ALREADY_EXISTS",
+                        "match_type": "METADATA",
+                        "message": f"Metadata match found: {', '.join(performers)} - {title} ({year})",
+                        "song": hydrated[0] if hydrated else matches[0],
+                    }
+
+            logger.info(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') NEW"
+            )
+            return {"status": "NEW", "song": parsed_song}
+        except Exception as e:
+            logger.error(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') EXTRACTION_FAILED: {e}"
+            )
+            return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
@@ -80,7 +184,9 @@ class CatalogService:
         logger.debug(f"[CatalogService] -> search_identities(q='{query}')")
         identities = self._identity_repo.search_identities(query)
         result = self._hydrate_identities(identities)
-        logger.debug(f"[CatalogService] <- search_identities(q='{query}') count={len(result)}")
+        logger.debug(
+            f"[CatalogService] <- search_identities(q='{query}') count={len(result)}"
+        )
         return result
 
     def get_all_publishers(self) -> List[Publisher]:
@@ -104,7 +210,9 @@ class CatalogService:
         logger.debug(f"[CatalogService] -> search_albums(q='{query}')")
         albums = self._album_repo_dir.search(query)
         result = self._hydrate_albums(albums)
-        logger.debug(f"[CatalogService] <- search_albums(q='{query}') count={len(result)}")
+        logger.debug(
+            f"[CatalogService] <- search_albums(q='{query}') count={len(result)}"
+        )
         return result
 
     def get_album(self, album_id: int) -> Optional[Album]:
@@ -128,7 +236,9 @@ class CatalogService:
         logger.debug(f"[CatalogService] -> search_publishers(q='{query}')")
         pubs = self._pub_repo.search(query)
         result = self._hydrate_publishers(pubs)
-        logger.debug(f"[CatalogService] <- search_publishers(q='{query}') count={len(result)}")
+        logger.debug(
+            f"[CatalogService] <- search_publishers(q='{query}') count={len(result)}"
+        )
         return result
 
     def get_publisher(self, publisher_id: int) -> Optional[Publisher]:
@@ -220,7 +330,9 @@ class CatalogService:
                     seen_ids.add(s.id)
 
         results = self._hydrate_songs(songs)
-        logger.debug(f"[CatalogService] <- search_songs(q='{query}') count={len(results)}")
+        logger.debug(
+            f"[CatalogService] <- search_songs(q='{query}') count={len(results)}"
+        )
         return results
 
     def _hydrate_songs(self, songs: List[Song]) -> List[Song]:
@@ -261,7 +373,9 @@ class CatalogService:
             return []
 
         identity_ids = [i.id for i in identities]
-        logger.debug(f"[CatalogService] -> _hydrate_identities(count={len(identity_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _hydrate_identities(count={len(identity_ids)})"
+        )
 
         aliases_by_id = self._identity_repo.get_aliases_batch(identity_ids)
         members_by_id = self._identity_repo.get_members_batch(identity_ids)
@@ -352,14 +466,18 @@ class CatalogService:
         for credit in all_credits:
             if credit.source_id is not None:
                 credits_by_song.setdefault(credit.source_id, []).append(credit)
-        logger.debug(f"[CatalogService] <- _get_credits_by_song(count={len(credits_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_credits_by_song(count={len(credits_by_song)})"
+        )
         return credits_by_song
 
     def _get_publishers_by_song(
         self, song_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Fetch and group master publishers by song ID, then resolve hierarchies."""
-        logger.debug(f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})"
+        )
         raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids)
         if not raw_assocs:
             logger.debug("[CatalogService] Exit: No publishers found for songs.")
@@ -379,7 +497,9 @@ class CatalogService:
                 else:
                     pubs_by_song.setdefault(song_id, []).append(pub)
 
-        logger.debug(f"[CatalogService] <- _get_publishers_by_song(count={len(pubs_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_publishers_by_song(count={len(pubs_by_song)})"
+        )
         return pubs_by_song
 
     def _get_tags_by_song(self, song_ids: List[int]) -> Dict[int, List[Tag]]:
@@ -390,7 +510,9 @@ class CatalogService:
         for song_id, tag in all_tags:
             if song_id is not None:
                 tags_by_song.setdefault(song_id, []).append(tag)
-        logger.debug(f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})"
+        )
         return tags_by_song
 
     def _get_albums_by_song(self, song_ids: List[int]) -> Dict[int, List[SongAlbum]]:
@@ -415,14 +537,18 @@ class CatalogService:
             )
             assocs_by_song.setdefault(a.source_id, []).append(hydrated_assoc)
 
-        logger.debug(f"[CatalogService] <- _get_albums_by_song(count={len(assocs_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_albums_by_song(count={len(assocs_by_song)})"
+        )
         return assocs_by_song
 
     def _get_publishers_by_album(
         self, album_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Batch-fetch and hydrate publishers for albums."""
-        logger.debug(f"[CatalogService] -> _get_publishers_by_album(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_publishers_by_album(count={len(album_ids)})"
+        )
         if not album_ids:
             return {}
 
@@ -445,14 +571,18 @@ class CatalogService:
                 else:
                     pubs_by_album.setdefault(album_id, []).append(pub)
 
-        logger.debug(f"[CatalogService] <- _get_publishers_by_album(count={len(pubs_by_album)})")
+        logger.debug(
+            f"[CatalogService] <- _get_publishers_by_album(count={len(pubs_by_album)})"
+        )
         return pubs_by_album
 
     def _get_album_credits_by_album(
         self, album_ids: List[int]
     ) -> Dict[int, List[AlbumCredit]]:
         """Batch-fetch album credits grouped by album ID."""
-        logger.debug(f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})"
+        )
         if not album_ids:
             return {}
 
@@ -462,7 +592,9 @@ class CatalogService:
             if ac.album_id is not None:
                 credits_by_album.setdefault(ac.album_id, []).append(ac)
 
-        logger.debug(f"[CatalogService] <- _get_album_credits_by_album(count={len(credits_by_album)})")
+        logger.debug(
+            f"[CatalogService] <- _get_album_credits_by_album(count={len(credits_by_album)})"
+        )
         return credits_by_album
 
     def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:

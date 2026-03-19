@@ -274,7 +274,23 @@ class IdentityView(BaseModel):
         return cls(**data)
 
 
+class IngestionCheckRequest(BaseModel):
+    """Payload for the dry-run ingestion check."""
+
+    file_path: str
+
+
+class IngestionReportView(BaseModel):
+    """The result of a dry-run ingestion check."""
+
+    status: str  # NEW, ALREADY_EXISTS, ERROR
+    match_type: Optional[str] = None  # "HASH", "PATH", "METADATA"
+    message: Optional[str] = None
+    song: Optional[SongView] = None
+
+
 IdentityView.model_rebuild()
 SongAlbumView.model_rebuild()
 SongView.model_rebuild()
 AlbumView.model_rebuild()
+IngestionReportView.model_rebuild()

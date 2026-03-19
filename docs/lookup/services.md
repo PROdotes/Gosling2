@@ -55,6 +55,13 @@ Fetch a single album by ID and hydrate its publishers, credits, and songs.
 ### get_publisher_songs(publisher_id: int) -> List[Song]
 Fetch the full song repertoire (Master rights) for a given publisher.
 
+### check_ingestion(file_path: str) -> Dict[str, Any]
+Performs a multi-tiered collision check for a new file.
+1.  **Path check**: Checks `SongRepository.get_by_path`.
+2.  **Hash check**: Calculates and checks `SongRepository.get_by_hash`.
+3.  **Metadata check**: Extracts tags and checks `SongRepository.find_by_metadata` (Titles, Artist Set, Year).
+Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
+
 
 ### _hydrate_songs(songs: List[Song]) -> List[Song]
 **Internal**: Centralized batch hydration for all song metadata.

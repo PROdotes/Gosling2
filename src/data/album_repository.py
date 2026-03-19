@@ -32,7 +32,9 @@ class AlbumRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_album(row) for row in rows]
-            logger.debug(f"[AlbumRepository] <- search(q='{query}') count={len(result)}")
+            logger.debug(
+                f"[AlbumRepository] <- search(q='{query}') count={len(result)}"
+            )
             return result
 
     def get_by_id(self, album_id: int) -> Optional[Album]:
@@ -43,10 +45,14 @@ class AlbumRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (album_id,)).fetchone()
             if row is None:
-                logger.warning(f"[AlbumRepository] <- get_by_id(id={album_id}) NOT_FOUND")
+                logger.warning(
+                    f"[AlbumRepository] <- get_by_id(id={album_id}) NOT_FOUND"
+                )
                 return None
             result = self._row_to_album(row)
-            logger.debug(f"[AlbumRepository] <- get_by_id(id={album_id}) '{result.title}'")
+            logger.debug(
+                f"[AlbumRepository] <- get_by_id(id={album_id}) '{result.title}'"
+            )
             return result
 
     def get_song_ids_by_album(self, album_id: int) -> List[int]:
@@ -56,7 +62,9 @@ class AlbumRepository(BaseRepository):
         with self._get_connection() as conn:
             rows = conn.execute(query, (album_id,)).fetchall()
             result = [row[0] for row in rows]
-            logger.debug(f"[AlbumRepository] <- get_song_ids_by_album() count={len(result)}")
+            logger.debug(
+                f"[AlbumRepository] <- get_song_ids_by_album() count={len(result)}"
+            )
             return result
 
     def get_song_ids_for_albums(self, album_ids: List[int]) -> Dict[int, List[int]]:

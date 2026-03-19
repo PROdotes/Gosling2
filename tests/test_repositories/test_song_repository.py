@@ -230,3 +230,84 @@ class TestGetByIdentityIds:
     def test_nonexistent_identity(self, populated_db):
         repo = SongRepository(populated_db)
         assert repo.get_by_identity_ids([999]) == []
+
+
+class TestGetByHash:
+    """SongRepository.get_by_hash contracts."""
+
+    def test_valid_hash_returns_song(self, populated_db):
+        repo = SongRepository(populated_db)
+        song = repo.get_by_hash("hash_1")
+        assert song is not None
+        assert song.id == 1
+        assert song.title == "Smells Like Teen Spirit"
+
+    def test_nonexistent_hash_returns_none(self, populated_db):
+        repo = SongRepository(populated_db)
+        assert repo.get_by_hash("no_such_hash") is None
+
+    def test_empty_hash_returns_none(self, populated_db):
+        repo = SongRepository(populated_db)
+        assert repo.get_by_hash("") is None
+
+
+class TestGetByPath:
+    """SongRepository.get_by_path contracts."""
+
+    def test_valid_path_returns_song(self, populated_db):
+        repo = SongRepository(populated_db)
+        song = repo.get_by_path("/path/1")
+        assert song is not None
+        assert song.title == "Smells Like Teen Spirit"
+
+    def test_invalid_path_returns_none(self, populated_db):
+        repo = SongRepository(populated_db)
+        assert repo.get_by_path("/no/such/path") is None
+
+    def test_empty_path_returns_none(self, populated_db):
+        repo = SongRepository(populated_db)
+        assert repo.get_by_path("") is None
+
+
+class TestFindByMetadata:
+    """SongRepository.find_by_metadata contracts."""
+
+    def test_match_by_recording_year(self, populated_db):
+        repo = SongRepository(populated_db)
+        # Song 1 is Nirvana - Smells Like Teen Spirit (1991)
+        songs = repo.find_by_metadata("Smells Like Teen Spirit", ["Nirvana"], 1991)
+        assert len(songs) == 1
+        assert songs[0].id == 1
+
+    def test_no_match_wrong_year(self, populated_db):
+        repo = SongRepository(populated_db)
+        songs = repo.find_by_metadata("Smells Like Teen Spirit", ["Nirvana"], 2024)
+        assert len(songs) == 0
+
+    def test_match_without_year(self, populated_db):
+        repo = SongRepository(populated_db)
+        songs = repo.find_by_metadata("Everlong", ["Foo Fighters"], None)
+        assert len(songs) == 1
+        assert songs[0].id == 2
+
+    def test_exact_performer_set_match(self, populated_db):
+        repo = SongRepository(populated_db)
+        # If we search for just "Nirvana" it matches Song 1
+        assert (
+            len(repo.find_by_metadata("Smells Like Teen Spirit", ["Nirvana"], 1991))
+            == 1
+        )
+        # If we search for "Nirvana" AND "Dave Grohl" (but Song 1 only has Nirvana), it should NOT match
+        assert (
+            len(
+                repo.find_by_metadata(
+                    "Smells Like Teen Spirit", ["Nirvana", "Dave Grohl"], 1991
+                )
+            )
+            == 0
+        )
+
+    def test_find_by_metadata_empty_inputs(self, populated_db):
+        repo = SongRepository(populated_db)
+        assert repo.find_by_metadata("", "Artist", 2000) == []
+        assert repo.find_by_metadata("Title", "", 2000) == []

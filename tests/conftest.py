@@ -245,23 +245,26 @@ def _populate_db_data(db_path):
     )
 
     # --- Media Sources + Songs ---
+    # sid, tid, name, path, dur, active, ahash, recording_year
     songs = [
-        (1, 1, "Smells Like Teen Spirit", "/path/1", 200, 1),
-        (2, 1, "Everlong", "/path/2", 240, 1),
-        (3, 1, "Range Rover Bitch", "/path/3", 180, 1),
-        (4, 1, "Grohlton Theme", "/path/4", 120, 1),
-        (5, 1, "Pocketwatch Demo", "/path/5", 180, 1),
-        (6, 1, "Dual Credit Track", "/path/6", 300, 1),
-        (7, 1, "Hollow Song", "/path/7", 10, 1),
-        (8, 1, "Joint Venture", "/path/8", 180, 1),
-        (9, 1, "Priority Test", "/path/9", 100, 1),
+        (1, 1, "Smells Like Teen Spirit", "/path/1", 200, 1, "hash_1", 1991),
+        (2, 1, "Everlong", "/path/2", 240, 1, None, 1997),
+        (3, 1, "Range Rover Bitch", "/path/3", 180, 1, None, 2016),
+        (4, 1, "Grohlton Theme", "/path/4", 120, 1, None, None),
+        (5, 1, "Pocketwatch Demo", "/path/5", 180, 1, None, 1992),
+        (6, 1, "Dual Credit Track", "/path/6", 300, 1, None, None),
+        (7, 1, "Hollow Song", "/path/7", 10, 1, None, None),
+        (8, 1, "Joint Venture", "/path/8", 180, 1, None, None),
+        (9, 1, "Priority Test", "/path/9", 100, 1, None, None),
     ]
-    for sid, tid, name, path, dur, active in songs:
+    for sid, tid, name, path, dur, active, ahash, ryear in songs:
         cursor.execute(
-            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (?, ?, ?, ?, ?, ?)",
-            (sid, tid, name, path, dur, active),
+            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, AudioHash) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (sid, tid, name, path, dur, active, ahash),
         )
-        cursor.execute("INSERT INTO Songs (SourceID) VALUES (?)", (sid,))
+        cursor.execute(
+            "INSERT INTO Songs (SourceID, RecordingYear) VALUES (?, ?)", (sid, ryear)
+        )
 
     # --- Song Credits ---
     credits = [
