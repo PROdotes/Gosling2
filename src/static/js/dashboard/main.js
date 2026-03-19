@@ -67,6 +67,14 @@ const modeConfig = {
         fetcher: searchPublishers,
         renderer: renderPublisherResults,
     },
+    ingest: {
+        placeholder: "Enter absolute file path...",
+        noun: "ingestion task",
+        fetcher: async () => [],
+        renderer: (ctx) => {
+            import("./renderers/ingestion.js").then((m) => m.renderIngestionPanel(ctx));
+        },
+    },
 };
 
 let detailController = null;

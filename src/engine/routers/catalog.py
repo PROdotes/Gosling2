@@ -165,28 +165,47 @@ async def get_album(album_id: int) -> AlbumView:
     return AlbumView.from_domain(album)
 
 
+@router.get("/ingest/downloads-folder")
+async def get_downloads_folder():
+    """Helper for Phase 3.1: Provide the guestimate path for drag-and-drop."""
+    import os
+
+    user_profile = os.environ.get("USERPROFILE", "C:\\Users\\Default")
+    downloads = os.path.join(user_profile, "Downloads")
+    return {"path": downloads}
+
+
 @router.post("/catalog/ingest/check", response_model=IngestionReportView)
 async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView:
     """
     Check if a file exists in the catalog (dry-run).
     Returns existing metadata if found, or extracted metadata if new.
     """
-    logger.info(f"[CatalogRouter] check_ingestion(path='{request.file_path}')")
-    result = _get_service().check_ingestion(request.file_path)
+    try:
+        logger.info(f"[CatalogRouter] check_ingestion(path='{request.file_path}')")
+        result = _get_service().check_ingestion(request.file_path)
 
-    if result["status"] == "ERROR":
-        raise HTTPException(
-            status_code=400, detail=result.get("message", "Unknown error")
+        if result["status"] == "ERROR":
+            raise HTTPException(
+                status_code=400, detail=result.get("message", "Unknown error")
+            )
+
+        song_domain = result.get("song")
+        song_view = None
+        if song_domain:
+            logger.debug(
+                f"[CatalogRouter] Transforming domain to view model: {song_domain.media_name}"
+            )
+            song_view = SongView.from_domain(song_domain)
+
+        return IngestionReportView(
+            status=result["status"],
+            match_type=result.get("match_type"),
+            message=result.get("message"),
+            song=song_view,
         )
-
-    song_domain = result.get("song")
-    song_view = None
-    if song_domain:
-        song_view = SongView.from_domain(song_domain)
-
-    return IngestionReportView(
-        status=result["status"],
-        match_type=result.get("match_type"),
-        message=result.get("message"),
-        song=song_view,
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"[CatalogRouter] Unexpected error in check_ingestion: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

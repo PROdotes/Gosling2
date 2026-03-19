@@ -160,7 +160,9 @@ Reads a file and returns a raw dictionary of all found tags, preserving Frame ID
 Translates raw frame IDs (TPE1, TIT2) into domain fields, credits, and tags.
 - **Entry**: Logs `file_path`.
 - **Exit**: Logs counts of credits and tags created.
-- **Wisdom**: Handles "Frame Doubling" (e.g. merging TIPL and TPE1 into unique credits).
+- **Wisdom**: Implements a **Strict Data Contract**. Does not guess missing fields (no Composer->Artist or Mood->Genre fallbacks).
+- **Sub-tags**: Resolves frames by exact ID (e.g., TXXX:STATUS). Does not borrow configuration from base frames (TXXX) to prevent mis-mapping.
+- **Deduplication**: Handles "Frame Doubling" (e.g. merging TIPL and TPE1 into unique credits).
 
 ### _load_config(json_path: str) -> Dict[str, Any]
 **Internal**: Loads the frame mapping configuration from JSON. Uses `utf-8-sig` to ignore Windows BOMs.

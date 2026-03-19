@@ -45,6 +45,9 @@ Renders artist profiles, aliases, and group memberships.
 ### publishers.js
 Renders publisher details and repertoire listings.
 
+### ingestion.js
+Renders the file verification panel with drag-and-drop support, path input, and result cards showing status (NEW/ALREADY_EXISTS/ERROR) with match type.
+
 ---
 
 ## components/utils.js

@@ -11,7 +11,6 @@ is fully covered in tests/test_services/test_ingestion_service.py
 against the real repository with zero mocking.
 """
 
-import os
 import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app

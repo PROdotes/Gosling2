@@ -45,7 +45,7 @@ class MetadataParser:
 
         # Prepare the core song data
         song_data = {
-            "media_name": "Unknown Title",
+            "media_name": "",
             "source_path": str(file_path),
             "duration_ms": 0,
             "credits": [],
@@ -65,9 +65,6 @@ class MetadataParser:
         for tag_id, values in raw_metadata.items():
             # Sub-tag check (e.g. TXXX:STATUS)
             entry = self.config.get(tag_id)
-            if not entry and ":" in tag_id:
-                base_id = tag_id.split(":")[0]
-                entry = self.config.get(base_id)
 
             if not entry:
                 logger.debug(

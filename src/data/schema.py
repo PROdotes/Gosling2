@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourcePath TEXT NOT NULL UNIQUE,
     SourceDuration REAL,
     AudioHash TEXT,
-    IsActive BOOLEAN DEFAULT 1,
+    IsActive BOOLEAN DEFAULT 0,
     ProcessingStatus INTEGER DEFAULT 0,
     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );

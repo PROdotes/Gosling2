@@ -102,3 +102,31 @@ def test_parser_config_not_found():
     """Cover metadata_parser.py: 33-34 (Config not found)."""
     p = MetadataParser(json_path="non_existent_config_file.json")
     assert p.config == {}
+
+def test_parse_empty_fields_strict(parser):
+    """Verify that we do not guess fields when they are missing."""
+    raw = {}  # Empty metadata
+    song = parser.parse(raw, "fake/path.mp3")
+
+    # Strict Data Contract: No 'Unknown Title' marker
+    assert song.media_name == ""
+    # Strict Data Contract: No 'Disc 1' assumption
+    assert all(a.disc_number is None for a in song.albums)
+
+
+def test_no_txxx_config_borrowing(parser):
+    """
+    Verify that TXXX:DESCRIPTOR does not borrow configuration from the base TXXX frame
+    if it's not explicitly defined.
+    """
+    # Simulate a TXXX:Descriptor that is NOT in id3_frames.json.
+    # It should become a dynamic Tag, NOT a raw_tag with the base TXXX description.
+    raw = {"TXXX:Pure": ["Strict"]}
+    song = parser.parse(raw, "fake/path.mp3")
+
+    # It should be a dynamic Tag with Category 'Pure'
+    pures = [t.name for t in song.tags if t.category == "Pure"]
+    assert "Strict" in pures
+
+    # It should NOT be in raw_tags with 'User defined text information frame' label
+    assert "User defined text information frame" not in song.raw_tags

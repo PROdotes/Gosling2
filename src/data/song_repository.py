@@ -199,7 +199,9 @@ class SongRepository(BaseRepository):
             id=row["SourceID"],
             type_id=row["TypeID"],
             source_path=row["SourcePath"],
-            duration_ms=int(row["SourceDuration"] * 1000),  # Convert seconds to ms
+            duration_ms=int(
+                (row["SourceDuration"] or 0) * 1000
+            ),  # Convert seconds to ms
             audio_hash=row["AudioHash"],
             processing_status=(
                 row["ProcessingStatus"] if row["ProcessingStatus"] is not None else 0

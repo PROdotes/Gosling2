@@ -72,7 +72,7 @@ class SongAlbum(DomainModel):
     album_id: Optional[int] = None
     is_primary: bool = True
     track_number: Optional[int] = None
-    disc_number: Optional[int] = 1
+    disc_number: Optional[int] = None
 
     # Resolved Metadata
     album_title: str

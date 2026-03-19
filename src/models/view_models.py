@@ -19,7 +19,7 @@ class SongAlbumView(BaseModel):
     album_id: Optional[int] = None
     album_title: str
     track_number: Optional[int] = None
-    disc_number: Optional[int] = 1
+    disc_number: Optional[int] = None
     album_type: Optional[str] = None
     release_year: Optional[int] = None
     album_publishers: List[Publisher] = []

@@ -816,3 +816,167 @@ main {
         gap: 0.25rem;
     }
 }
+
+/* Ingestion Panel */
+.ingestion-view {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.ingestion-header {
+    text-align: center;
+}
+
+.ingest-drop-zone {
+    border: 2px dashed var(--border-accent);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.ingest-drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.drop-zone-icon {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+}
+
+.drop-zone-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.drop-zone-hint {
+    font-size: 0.72rem;
+}
+
+.ingest-input-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.ingest-input-row input {
+    flex: 1;
+    padding: 0.9rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ingest-input-row input::placeholder {
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+}
+
+.ingest-input-row input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.ingest-btn-primary {
+    padding: 0.9rem 1.5rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.16s ease;
+    min-width: 110px;
+}
+
+.ingest-btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.ingest-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ingest-btn-secondary {
+    padding: 0.6rem 1rem;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.ingest-btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.ingest-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ingest-hint {
+    margin-left: auto;
+    font-size: 0.72rem;
+}
+
+.ingest-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ingest-card {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.ingest-icon {
+    font-size: 1.2rem;
+}
+
+.ingest-card.new .ingest-icon {
+    color: var(--success);
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.ingest-card.already_exists .ingest-icon {
+    color: var(--warning);
+    background: rgba(234, 179, 8, 0.15);
+}
+
+.ingest-card.error .ingest-icon {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.ingest-meta {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}

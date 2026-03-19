@@ -9,7 +9,16 @@ function isAbortError(error) {
 async function fetchJson(url, options = {}) {
     const response = await fetch(url, options);
     if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData && errorData.detail) {
+                errorMsg = errorData.detail;
+            }
+        } catch (e) {
+            // No JSON body
+        }
+        throw new Error(errorMsg);
     }
     return response.json();
 }
@@ -107,4 +116,17 @@ export function getPublisherSongs(id, options = {}) {
 
 export function getAuditHistory(table, id, options = {}) {
     return fetchJson(`/api/v1/audit/history/${table}/${id}`, options);
+}
+
+export function checkIngestion(filePath) {
+    return fetchJson("/api/v1/catalog/ingest/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_path: filePath }),
+    });
+}
+
+export async function getDownloadsFolder() {
+    const result = await fetchJson("/api/v1/ingest/downloads-folder");
+    return result.path;
 }
