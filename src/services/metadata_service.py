@@ -45,7 +45,11 @@ class MetadataService:
                 tags = getattr(audio, "tags", None)
                 if tags is None or (isinstance(tags, ID3) and len(tags) == 0):
                     tags = mutagen.easyid3.EasyID3(file_path)
-            except Exception:
+            except (ID3NoHeaderError, HeaderNotFoundError, ID3HeaderError, ID3TagError) as me:
+                logger.warning(f"[MetadataService] Mutagen could not read tags from {file_path}: {me}")
+                tags = {}
+            except Exception as e:
+                logger.error(f"[MetadataService] Unexpected error reading file {file_path}: {e}")
                 tags = {}
 
             metadata = self._read_tags(tags)

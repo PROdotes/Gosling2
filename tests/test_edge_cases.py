@@ -249,3 +249,66 @@ class TestNonExistentIds:
     def test_publisher_not_found(self, populated_db):
         service = CatalogService(populated_db)
         assert service.get_publisher(999) is None
+
+# ===========================================================================
+# Repository/Domain Coverage: Misc (Migrated from test_coverage_gap.py)
+# ===========================================================================
+class TestGeneralEdgeCases:
+    def test_repositories_empty_inputs(self, populated_db):
+        """Repo coverage: Empty inputs return empty results."""
+        from src.data.song_repository import SongRepository
+        from src.data.song_credit_repository import SongCreditRepository
+        from src.data.song_album_repository import SongAlbumRepository
+        from src.data.publisher_repository import PublisherRepository
+        from src.data.tag_repository import TagRepository
+
+        db = populated_db
+        assert SongRepository(db).get_by_ids([]) == []
+        assert SongCreditRepository(db).get_credits_for_songs([]) == []
+        assert SongAlbumRepository(db).get_albums_for_songs([]) == []
+        assert PublisherRepository(db).get_publishers_for_songs([]) == []
+        assert PublisherRepository(db).get_publishers_for_albums([]) == []
+        assert TagRepository(db).get_tags_for_songs([]) == []
+
+    def test_song_display_artist_composer_only(self, populated_db):
+        """Domain coverage: Song with credits but NO performers returns None."""
+        import sqlite3
+        from src.services.catalog_service import CatalogService
+        from src.models.view_models import SongView
+
+        # Insert a song with only a Composer
+        conn = sqlite3.connect(populated_db)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration) VALUES (99, 1, 'Composer Only', '/path/99', 100)"
+        )
+        cursor.execute("INSERT INTO Songs (SourceID) VALUES (99)")
+        cursor.execute(
+            "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (99, 10, 2)"
+        )  # Dave as Composer
+        conn.commit()
+        conn.close()
+
+        service = CatalogService(populated_db)
+        song = service.get_song(99)
+        assert song is not None
+        view = SongView.from_domain(song)
+        assert view.display_artist is None
+
+    def test_song_credit_repository_integrity_failure_mock(self, populated_db):
+        """Repo coverage: Mocked DB integrity error for NULL RoleID."""
+        from src.data.song_credit_repository import SongCreditRepository
+        import pytest
+
+        repo = SongCreditRepository(populated_db)
+        mock_row = {
+            "SourceID": 1,
+            "CreditedNameID": 10,
+            "RoleID": None,
+            "RoleName": "P",
+            "DisplayName": "D",
+            "IsPrimaryName": 1,
+        }
+        with pytest.raises(ValueError) as excinfo:
+            repo._row_to_song_credit(mock_row)
+        assert "RoleID cannot be NULL" in str(excinfo.value)

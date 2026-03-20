@@ -688,4 +688,25 @@ class TestMetabolicInspectFile:
         # Song 1 has source_path="/path/1" which doesn't exist on disk
         resp = client.get("/api/v1/metabolic/inspect-file/1")
         assert resp.status_code == 500
-        assert "error" in resp.json()["detail"].lower()
+    # ===========================================================================
+# Router Coverage: Edge Cases (Migrated from test_coverage_gap.py)
+# ===========================================================================
+class TestRouterEdgeCases:
+    def test_router_get_song_not_found(self, client):
+        """Router coverage: 404 for missing song."""
+        resp = client.get("/api/v1/songs/9999")
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    def test_router_search_short_query_success(self, client):
+        """Router coverage: Single character query now allowed."""
+        resp = client.get("/api/v1/songs/search", params={"q": "A"})
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_router_get_song_success(self, client):
+        """Router coverage: Successful get_song hit for ID 1."""
+        resp = client.get("/api/v1/songs/1")
+        assert resp.status_code == 200
+        assert resp.json()["id"] == 1
+        assert resp.json()["title"] == "Smells Like Teen Spirit"

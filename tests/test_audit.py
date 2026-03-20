@@ -46,8 +46,8 @@ class TestGetHistoryWithData:
         """Timeline entries must be sorted by timestamp descending (newest first)."""
         history = audit_service.get_history(33, "ArtistNames")
         timestamps = [h["timestamp"] for h in history]
-        # Both have the same CURRENT_TIMESTAMP default, but ordering should not crash
-        assert len(timestamps) == 2
+        # Both may have same CURRENT_TIMESTAMP in fixture, but ordering logic must be stable
+        assert timestamps == sorted(timestamps, reverse=True)
 
 
 class TestGetHistoryEmpty:

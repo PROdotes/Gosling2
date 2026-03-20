@@ -29,34 +29,20 @@ function renderCreditsGroups(credits) {
         return '<div class="muted-note">No credits found</div>';
     }
 
-    const roleGroups = {
-        Producers: ["producer", "executive producer", "co-producer", "associate producer"],
-        Writers: ["writer", "composer", "lyricist", "author"],
-        Performers: ["artist", "performer", "vocals", "featuring", "featured artist"],
-        Engineers: ["engineer", "mixing", "mixing engineer", "mastering", "mastering engineer", "recording"],
-        Other: [],
-    };
-
-    const grouped = {
-        Producers: [],
-        Writers: [],
-        Performers: [],
-        Engineers: [],
-        Other: [],
-    };
-
+    // Group by exact role_name (preserve order of first occurrence)
+    const grouped = new Map();
     items.forEach((credit) => {
-        const role = String(credit.role_name || "").toLowerCase();
-        const target = Object.entries(roleGroups).find(([, keywords]) => keywords.some((keyword) => role.includes(keyword)));
-        const bucket = target ? target[0] : "Other";
-        grouped[bucket].push(credit);
+        const role = credit.role_name || "";
+        if (!grouped.has(role)) {
+            grouped.set(role, []);
+        }
+        grouped.get(role).push(credit);
     });
 
-    return Object.entries(grouped)
-        .filter(([, groupItems]) => groupItems.length)
-        .map(([label, groupItems]) => `
+    return Array.from(grouped.entries())
+        .map(([role, groupItems]) => `
             <div class="stack-list">
-                <div class="mini-label">${escapeHtml(label)}</div>
+                <div class="mini-label">${escapeHtml(role || "Unknown")}</div>
                 <div class="credits-list">
                     ${groupItems.map((credit) => `
                         <div class="credit-item">

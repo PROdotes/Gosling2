@@ -37,13 +37,16 @@ class TestIngestionApi:
         """Path that exists in DB returns ALREADY_EXISTS with PATH match.
         We write a real empty file and update the DB to point to it."""
         import sqlite3
+
         temp_file = tmp_path / "song1.mp3"
         temp_file.write_bytes(b"")
         target_path = str(temp_file)
 
         # Update DB to point to this real path
         conn = sqlite3.connect(populated_db)
-        conn.execute("UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (target_path,))
+        conn.execute(
+            "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (target_path,)
+        )
         conn.commit()
         conn.close()
 
@@ -63,8 +66,6 @@ class TestIngestionApi:
 
     def test_check_ingestion_empty_path(self, client):
         """Empty string path returns 400 (file not found)."""
-        resp = client.post(
-            "/api/v1/catalog/ingest/check", json={"file_path": ""}
-        )
+        resp = client.post("/api/v1/catalog/ingest/check", json={"file_path": ""})
         # Empty path won't exist on disk
         assert resp.status_code == 400

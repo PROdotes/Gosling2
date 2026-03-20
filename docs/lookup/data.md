@@ -75,6 +75,9 @@ Batch-fetches credits for multiple songs in a single query.
 Fetches album context (Title, Track, Disc, Primary, Publishers) for a set of Song IDs.
 Returns `SongAlbum` bridge models ready for publisher hydration by the Service.
 
+### get_albums_for_songs_reverse(album_ids: List[int]) -> List[SongAlbum]
+Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a set of Album IDs. Used for efficient tracklist hydration.
+
 ### _row_to_song_album(row: sqlite3.Row) -> SongAlbum
 **Internal**: Maps a physical database row to the strict Pydantic `SongAlbum` model.
 

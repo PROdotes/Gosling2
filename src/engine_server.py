@@ -1,4 +1,5 @@
 import os
+import anyio
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -9,11 +10,15 @@ from src.engine.routers.audit import router as audit_router
 from src.engine.routers.ingest import router as ingest_router
 from src.services.logger import logger
 
-app = FastAPI(title="Gosling2 Background Engine (V3CORE)", version="3.1.0")
+from src.engine.config import TRUSTED_ORIGINS
 
+app = FastAPI(title="GOSLING2 Engine")
+
+# CORS middleware (restricted to trusted origins - Audit #4)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=TRUSTED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -31,10 +36,13 @@ async def get_dashboard():
         logger.error(f"[EngineServer] Dashboard template missing at: {template_path}")
         raise HTTPException(status_code=404, detail="Dashboard UI template not found")
 
-    with open(template_path, "r", encoding="utf-8") as f:
-        html = f.read()
-        logger.debug(f"[EngineServer] Loaded dashboard template ({len(html)} bytes)")
-        return html
+    def _read_file():
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    html = await anyio.to_thread.run_sync(_read_file)
+    logger.debug(f"[EngineServer] Loaded dashboard template ({len(html)} bytes)")
+    return html
 
 
 app.include_router(catalog_router)

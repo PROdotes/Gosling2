@@ -179,10 +179,7 @@ class MetadataParser:
             return song
         except Exception as e:
             logger.error(f"[MetadataParser] Validation error creating Song: {e}")
-            # Return a minimal valid song if possible or re-raise if critical
-            return Song(
-                media_name="Parse Error", source_path=str(file_path), duration_ms=0
-            )
+            raise ValueError(f"Failed to parse metadata into Song model: {e}")
 
     def _to_int(self, val: Any) -> Optional[int]:
         """Safely converts a value to an integer, discarding junk."""
@@ -190,7 +187,7 @@ class MetadataParser:
             # Handle cases like "2023/2024" or "128 BPM"
             clean = "".join(filter(str.isdigit, str(val)))
             return int(clean) if clean else None
-        except Exception:
+        except (ValueError, TypeError):
             return None
 
     def _get_role_name(self, field: str) -> str:

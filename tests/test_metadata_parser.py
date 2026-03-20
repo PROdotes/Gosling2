@@ -103,6 +103,7 @@ def test_parser_config_not_found():
     p = MetadataParser(json_path="non_existent_config_file.json")
     assert p.config == {}
 
+
 def test_parse_empty_fields_strict(parser):
     """Verify that we do not guess fields when they are missing."""
     raw = {}  # Empty metadata
