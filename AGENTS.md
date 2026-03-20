@@ -51,3 +51,9 @@ A task is not done until:
 4. `black .` and `ruff check . --fix` pass with 0 errors
 5. `pytest` passes on the entire test suite
 6. `pytest --cov` shows 100% coverage for new code
+
+---
+
+## 7. No Emojis
+- Emojis are strictly forbidden in code, configuration files (JSON, etc.), and UI elements.
+- Prevents encoding issues and visual "noise" in terminal/IDE.
