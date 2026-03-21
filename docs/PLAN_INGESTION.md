@@ -26,11 +26,11 @@ Phase 2.2 transitions the system from Read-Only to **Active Ingestion**. We will
 ---
 
 ## 2. Step 2.2.2: Pruning (`DELETE /api/v1/catalog/songs/{id}`)
-**Goal**: Remove or de-activate records.
+**Goal**: Remove records (Hard Delete).
 
 ### A. Repository Layer (`SongRepository`)
-- **Soft Delete**: Set `IsActive = 0` (Prefer this for history preservation).
 - **Purge**: `DELETE FROM MediaSources` (Cascades to all tables).
+- **Note**: `IsActive = 0` is NOT a soft-delete flag. It represents airplay eligibility.
 
 ---
 

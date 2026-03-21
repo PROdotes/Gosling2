@@ -5,7 +5,7 @@ The verification pipeline (`POST /api/v1/catalog/ingest/check`) is complete — 
 
 ## Scope
 **In:** File upload to staging, auto-ingest (MediaSources + Songs rows only), hard delete, auditing for all writes, frontend wiring.
-**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. Soft delete. File routing.
+**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. File routing. Audit of physical file deletion (post-MVP).
 
 ### Future: File Routing
 After ingestion, files will be moved from staging to `LIBRARY_ROOT` (`Z:\Songs`) using genre-based routing rules defined in `docs/configs/rules.json`. For MVP, `source_path` in the DB points to the staging location. Routing is a separate task.

@@ -298,7 +298,7 @@ No tests for write operations:
 |-----------|--------------|
 | Create song | Does it assign correct ID? Rollback on error? |
 | Update song | Does it preserve unchanged fields? Audit log? |
-| Delete song | Cascade to credits? Soft delete? |
+| Delete song | Cascade to credits? Hard delete protocol? |
 | Batch operations | 100 inserts succeed or all rollback? |
 
 **ACTION NEEDED**: If you have write operations, test them:

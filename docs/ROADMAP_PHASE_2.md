@@ -12,7 +12,7 @@ Establish the ability to actually *add* music to the database.
 - [ ] **Task**: `POST /api/v1/catalog/ingest`
     - Logic: Path -> Hash -> Duplicate Check -> Metadata Extract -> ACID Insert.
 - [ ] **Task**: `DELETE /api/v1/catalog/songs/{song_id}`
-    - Logic: Support "Soft Delete" (IsActive=0) vs "Purge" (Remove from DB).
+    - Logic: Hard Delete (Remove from DB). Note: IsActive is NOT a soft-delete flag.
 
 ## 2.5. Step 2.5: Identity Resolution [DONE]
 - [x] **Task**: Implement `IdentityRepository` with bidirectional Tree expansion (Aliases, Members, Groups).
