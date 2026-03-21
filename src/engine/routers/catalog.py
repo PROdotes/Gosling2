@@ -5,8 +5,6 @@ from src.models.view_models import (
     SongView,
     IdentityView,
     AlbumView,
-    IngestionCheckRequest,
-    IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -163,4 +161,3 @@ async def get_album(album_id: int) -> AlbumView:
 
     # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)
-
