@@ -5,7 +5,7 @@ The verification pipeline (`POST /api/v1/catalog/ingest/check`) is complete — 
 
 ## Scope
 **In:** File upload to staging, auto-ingest (MediaSources + Songs rows only), hard delete, auditing for all writes, frontend wiring.
-**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. Soft delete. File routing.
+**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. File routing. Audit of physical file deletion (post-MVP).
 
 ### Future: File Routing
 After ingestion, files will be moved from staging to `LIBRARY_ROOT` (`Z:\Songs`) using genre-based routing rules defined in `docs/configs/rules.json`. For MVP, `source_path` in the DB points to the staging location. Routing is a separate task.
@@ -38,15 +38,15 @@ Audit entries use `_log_change(cursor, table, record_id, field, old_val, new_val
 
 ### `insert(song: Song, conn, batch_id) -> int`
 Single transaction inserting into two tables:
-1. **MediaSources** — TypeID=1, MediaName, SourcePath, SourceDuration (seconds), AudioHash, ProcessingStatus=1, IsActive=1.
+1. **MediaSources** — TypeID via `(SELECT TypeID FROM Types WHERE TypeName = 'Song')`, MediaName, SourcePath, SourceDuration (seconds), AudioHash, ProcessingStatus=1, IsActive=1.
 2. **Songs** — SourceID (from step 1), TempoBPM, RecordingYear, ISRC.
 3. **Audit** — `_log_change()` for each inserted field (`old_val=None`, `new_val=<value>`).
 
 Returns the new SourceID. Does NOT commit — the service layer owns the commit.
 
 ### `delete(song_id: int, conn, batch_id) -> bool`
-1. Fetch the existing row first (need field values for audit).
-2. **Audit** — `_log_change()` for each field being removed (`old_val=<value>`, `new_val=None`).
+1. Fetch the existing row first (need field values for audit — both MediaSources and Songs fields).
+2. **Audit** — `_log_change()` for each MediaSources field and Songs field being removed (`old_val=<value>`, `new_val=None`). Must happen before the delete — cascade removes the Songs row automatically.
 3. `DELETE FROM MediaSources WHERE SourceID = ?` — cascade handles the Songs row.
 
 Returns True if a row was deleted. Does NOT commit — the service layer owns the commit.
@@ -120,7 +120,7 @@ Drop zone upgrade — `drop` event grabs the `File` object from `e.dataTransfer.
 - `INGESTED` → green card with song metadata.
 - `ALREADY_EXISTS` → yellow card with match info. Card includes a clickable link to the existing song (navigates to Songs tab and opens the song detail) so the user can quickly inspect the duplicate.
 - `ERROR` → red card.
-- Path input + Check button remain for path-based verification (existing flow).
+- Path input + Check button remain for path-based verification (existing flow — returns `NEW` or `ALREADY_EXISTS`).
 
 ---
 

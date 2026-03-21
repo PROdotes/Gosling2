@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Optional
+from typing import Any, List, Mapping, Optional
 from src.data.base_repository import BaseRepository
 from src.models.domain import AuditAction, AuditChange, DeletedRecord
 from src.services.logger import logger
@@ -96,7 +96,7 @@ class AuditRepository(BaseRepository):
             )
             return result
 
-    def _row_to_action(self, row: sqlite3.Row) -> AuditAction:
+    def _row_to_action(self, row: Mapping[str, Any]) -> AuditAction:
         return AuditAction(
             id=row["ActionID"],
             action_type=row["ActionLogType"],
@@ -112,7 +112,7 @@ class AuditRepository(BaseRepository):
             batch_id=row["BatchID"],
         )
 
-    def _row_to_change(self, row: sqlite3.Row) -> AuditChange:
+    def _row_to_change(self, row: Mapping[str, Any]) -> AuditChange:
         return AuditChange(
             id=row["LogID"],
             table_name=row["LogTableName"],
@@ -124,7 +124,7 @@ class AuditRepository(BaseRepository):
             batch_id=row["BatchID"],
         )
 
-    def _row_to_deleted(self, row: sqlite3.Row) -> DeletedRecord:
+    def _row_to_deleted(self, row: Mapping[str, Any]) -> DeletedRecord:
         return DeletedRecord(
             id=row["DeleteID"],
             table_name=row["DeletedFromTable"],

@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from pydantic import ValidationError
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
 from src.services.logger import logger
 
@@ -177,7 +178,7 @@ class MetadataParser:
                 f"[MetadataParser] Exit: parse - Created Song with {len(song.credits)} credits and {len(song.tags)} tags"
             )
             return song
-        except Exception as e:
+        except ValidationError as e:
             logger.error(f"[MetadataParser] Validation error creating Song: {e}")
             raise ValueError(f"Failed to parse metadata into Song model: {e}")
 

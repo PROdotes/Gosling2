@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourceDuration REAL,
     AudioHash TEXT,
     IsActive BOOLEAN DEFAULT 0,
-    ProcessingStatus INTEGER DEFAULT 0,
+    ProcessingStatus INTEGER,  -- NULL = Pending/Unseen by engine
     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );
 
@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS MediaSourceTags (
 CREATE TABLE IF NOT EXISTS ChangeLog (
     LogID INTEGER PRIMARY KEY AUTOINCREMENT,
     LogTableName TEXT NOT NULL,
-    RecordID INTEGER NOT NULL,
+    RecordID TEXT NOT NULL,
     LogFieldName TEXT NOT NULL,
     OldValue TEXT,
     NewValue TEXT,
@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS ActionLog (
 CREATE TABLE IF NOT EXISTS DeletedRecords (
     DeleteID INTEGER PRIMARY KEY AUTOINCREMENT,
     DeletedFromTable TEXT NOT NULL,
-    RecordID INTEGER NOT NULL,
+    RecordID TEXT NOT NULL,
     FullSnapshot TEXT NOT NULL,
     DeletedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     RestoredAt DATETIME,

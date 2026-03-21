@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List
+from typing import Any, List, Mapping
 from src.data.base_repository import BaseRepository
 from src.models.domain import SongAlbum
 from src.services.logger import logger
@@ -43,7 +43,9 @@ class SongAlbumRepository(BaseRepository):
         )
         placeholders = ",".join(["?" for _ in album_ids])
         # We reuse the same base query but filter by AlbumID instead of SourceID
-        query = self._QUERY.replace("sa.SourceID IN ({placeholders})", f"sa.AlbumID IN ({placeholders})")
+        query = self._QUERY.replace(
+            "sa.SourceID IN ({placeholders})", f"sa.AlbumID IN ({placeholders})"
+        )
         query = query.format(placeholders=placeholders)
 
         with self._get_connection() as conn:
@@ -52,7 +54,7 @@ class SongAlbumRepository(BaseRepository):
             logger.debug(f"[SongAlbumRepository] Found {len(rows)} song associations.")
             return [self._row_to_song_album(row) for row in rows]
 
-    def _row_to_song_album(self, row: sqlite3.Row) -> SongAlbum:
+    def _row_to_song_album(self, row: Mapping[str, Any]) -> SongAlbum:
         """Map a database row to a SongAlbum Pydantic model."""
         return SongAlbum(
             source_id=row["SourceID"],

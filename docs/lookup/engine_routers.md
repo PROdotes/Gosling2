@@ -94,11 +94,8 @@ Fetches a single Song domain model by its unique ID.
 - Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 - Wraps `CatalogService.check_ingestion`.
 
-### async def get_downloads_folder()
-**HTTP**: `GET /api/v1/ingest/downloads-folder`
-- Returns the absolute path guestimate for the user's Downloads folder.
-
 ---
+
 
 ## Ingest Router
 *Location: `src/engine/routers/ingest.py`*

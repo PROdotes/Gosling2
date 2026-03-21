@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List, Tuple
+from typing import Any, List, Mapping, Tuple
 from src.data.base_repository import BaseRepository
 from src.models.domain import Tag
 from src.services.logger import logger
@@ -35,7 +35,7 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch tags: {e}")
             raise
 
-    def _row_to_tag(self, row: sqlite3.Row) -> Tag:
+    def _row_to_tag(self, row: Mapping[str, Any]) -> Tag:
         """Map a database row to a Tag Pydantic model."""
         return Tag(
             id=row["TagID"],

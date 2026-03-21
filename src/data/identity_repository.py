@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Optional, List, Dict
+from typing import Any, Dict, List, Mapping, Optional
 from src.data.base_repository import BaseRepository
 from src.models.domain import Identity, ArtistName
 from src.services.logger import logger
@@ -38,6 +38,7 @@ class IdentityRepository(BaseRepository):
         if not identity_ids:
             return []
 
+        logger.debug(f"[IdentityRepository] -> get_by_ids(count={len(identity_ids)})")
         placeholders = ",".join(["?" for _ in identity_ids])
         query = f"""
             SELECT {self._IDENTITY_COLUMNS}
@@ -49,7 +50,9 @@ class IdentityRepository(BaseRepository):
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, identity_ids).fetchall()
 
-        return [self._row_to_identity(row) for row in rows]
+        identities = [self._row_to_identity(row) for row in rows]
+        logger.debug(f"[IdentityRepository] <- get_by_ids() found {len(identities)}")
+        return identities
 
     def get_all_identities(self) -> List[Identity]:
         """Fetch the directory of all identities."""
@@ -201,10 +204,10 @@ class IdentityRepository(BaseRepository):
         )
         return result
 
-    def _row_to_identity(self, row: sqlite3.Row) -> Identity:
+    def _row_to_identity(self, row: Mapping[str, Any]) -> Identity:
         return Identity(
             id=row["IdentityID"],
             type=row["IdentityType"],
-            display_name=row["DisplayName"] or f"Unknown Artist #{row['IdentityID']}",
+            display_name=row["DisplayName"],
             legal_name=row["LegalName"],
         )

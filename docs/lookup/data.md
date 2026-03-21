@@ -205,10 +205,8 @@ Batch-fetch group identities that multiple person identities belong to.
 ### _row_to_identity(row: sqlite3.Row) -> Identity
 **Internal**: Maps a physical database row to the `Identity` domain model.
 
-### _row_to_artist_name(row: sqlite3.Row) -> ArtistName
-**Internal**: Maps a physical database row to the `ArtistName` domain model.
-
 ---
+
 
 ## AuditRepository
 *Location: `src/data/audit_repository.py`*

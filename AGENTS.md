@@ -48,7 +48,7 @@ A task is not done until:
 1. `docs/lookup/` is accurate to implementation
 2. Logger instrumentation is pervasive
 3. Zombie code and orphan files are purged
-4. `black .` and `ruff check . --fix` pass with 0 errors
+4. `black .`, `ruff check . --fix`, and `pyright` pass with 0 errors (errors mapping to external libraries like `mutagen` without type stubs are exempt)
 5. `pytest` passes on the entire test suite
 6. `pytest --cov` shows 100% coverage for new code
 
@@ -57,3 +57,18 @@ A task is not done until:
 ## 7. No Emojis
 - Emojis are strictly forbidden in code, configuration files (JSON, etc.), and UI elements.
 - Prevents encoding issues and visual "noise" in terminal/IDE.
+
+---
+
+## 8. Execution Protocol
+- Convert specs into a discrete checklist (e.g. <200 lines per step).
+- Execute exactly one step autonomously (code, format, local test).
+- Stop execution entirely and present the diff.
+- Wait for explicit user authorization before starting the next step. Do not ask permission inside an approved step.
+
+---
+
+## 9. No Chat Promises
+- Vows, rules, or promises made in the chat UI are meaningless because they are lost when a new chat starts.
+- Never write "From now on I'll do X" in a conversation.
+- If a workflow rule is broken, do not apologize. Immediately document the correction in `AGENTS.md` or Open Brain so it survives the reset.

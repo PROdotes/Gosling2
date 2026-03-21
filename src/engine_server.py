@@ -40,7 +40,7 @@ async def get_dashboard():
         with open(template_path, "r", encoding="utf-8") as f:
             return f.read()
 
-    html = await anyio.to_thread.run_sync(_read_file)
+    html = await anyio.to_thread.run_sync(_read_file)  # type: ignore[reportAttributeAccessIssue]
     logger.debug(f"[EngineServer] Loaded dashboard template ({len(html)} bytes)")
     return html
 
