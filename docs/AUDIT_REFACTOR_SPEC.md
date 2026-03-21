@@ -8,7 +8,9 @@
 
 ## Problem Statement
 
-The current `BaseRepository._log_change()` method (lines 29-64 of base_repository.py) was hastily added during the v3 refactor and has several issues:
+The current `BaseRepository._log_change()` method (lines 24-59 of base_repository.py) was hastily added during the v3 refactor and has several issues:
+
+**Note:** A rollback reverted earlier changes that added `_log_change` calls to `song_repository.py`. The method definition remains but is currently unused. Line references reflect the post-rollback state.
 
 1. **No diff computation** — Logs `None → value` for all fields on insert, even when values haven't changed
 2. **Repository responsibility violation** — Audit logic belongs in the service layer, not the repository
@@ -556,9 +558,15 @@ def insert_action_log(
 
 ---
 
-#### 5. `src/data/base_repository.py`
+#### 5. `docs/lookup/data.md`
 
-**Delete lines 29-64** (`_log_change` method entirely).
+**Update** to reflect new state:
+- Remove `_log_change` entry from BaseRepository section
+- Add write methods to AuditRepository section (`insert_change_logs`, `insert_deleted_record`, `insert_action_log`)
+
+#### 6. `src/data/base_repository.py`
+
+**Delete lines 24-59** (`_log_change` method entirely).
 
 ---
 
@@ -683,6 +691,18 @@ If issues are discovered after merge:
 
 ---
 
+## Done Protocol Checklist
+
+Before marking complete, run:
+
+1. `black .` — zero errors
+2. `ruff check . --fix` — zero errors
+3. `pytest` — full suite passes
+4. `pytest --cov` — 100% coverage on new code (`audit_mappings.py`, new `audit_service.py` methods, new `audit_repository.py` methods)
+5. `docs/lookup/data.md` — accurate to implementation
+
+---
+
 ## Success Criteria
 
 ✅ All tests pass (including new drift detection)
@@ -703,7 +723,8 @@ If issues are discovered after merge:
 | `tests/test_audit_mapping_drift.py` | **CREATE** | Automated drift detection for mappings vs schema |
 | `src/services/audit_service.py` | **MODIFY** | Add write methods, port normalization/diff logic |
 | `src/data/audit_repository.py` | **MODIFY** | Add write methods (insert_change_logs, insert_deleted_record, insert_action_log) |
-| `src/data/base_repository.py` | **MODIFY** | Delete `_log_change()` method (lines 29-64) |
+| `docs/lookup/data.md` | **MODIFY** | Remove `_log_change` entry, add AuditRepository write methods |
+| `src/data/base_repository.py` | **MODIFY** | Delete `_log_change()` method (lines 24-59) |
 | `src/data/song_repository.py` | **MODIFY** | Remove all `_log_change()` calls from insert/delete |
 | `tests/test_repositories/test_other_repositories.py` | **MODIFY** | Delete old `_log_change` tests, add new AuditRepository write tests |
 | `tests/test_audit.py` | **MODIFY** | Add tests for AuditService write methods |
