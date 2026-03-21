@@ -1,24 +1,23 @@
 import hashlib
+import os
 
 
-def calculate_audio_hash(filepath: str) -> str:
+def calculate_audio_hash(filepath: str, chunk_size: int = 65536) -> str:
     """
     Calculate SHA256 hash of MP3 audio frames only (excludes ID3 tags).
-
-    Ported from Legacy [GOSLING2] math to maintain cross-version consistency.
+    Streams file in chunks to avoid high memory usage (Audit #2).
+    Matches Step 631 logic for cross-version consistency.
     """
-    try:
-        with open(filepath, "rb") as f:
-            data = f.read()
-    except Exception as e:
-        raise FileNotFoundError(f"Could not read file {filepath}: {e}")
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"File not found: {filepath}")
 
-    # Determine ID3v2 header size (if present)
+    # 1. Determine boundaries (ID3v2 header and ID3v1 footer)
     id3v2_size = 0
-    if data[:3] == b"ID3":
-        if len(data) >= 10:
-            # Extract size from bytes 6-9 (synchsafe integer)
-            size_bytes = data[6:10]
+    with open(filepath, "rb") as f:
+        header = f.read(10)
+        if len(header) == 10 and header[:3] == b"ID3":
+            # Extract size from bytes 6-9 (synchsafe integer - 7 bits per byte)
+            size_bytes = header[6:10]
             id3v2_size = (
                 (size_bytes[0] << 21)
                 | (size_bytes[1] << 14)
@@ -28,21 +27,36 @@ def calculate_audio_hash(filepath: str) -> str:
             # Add 10 bytes for the header itself
             id3v2_size += 10
 
-    # Determine ID3v1 footer size (if present)
     id3v1_size = 0
-    if len(data) >= 128 and data[-128:-125] == b"TAG":
-        id3v1_size = 128
+    file_size = os.path.getsize(filepath)
+    if file_size >= 128:
+        with open(filepath, "rb") as f:
+            f.seek(-128, os.SEEK_END)
+            footer_header = f.read(3)
+            if footer_header == b"TAG":
+                id3v1_size = 128
 
-    # Extract audio frames only (skip ID3 tags)
     audio_start = id3v2_size
-    audio_end = len(data) - id3v1_size
+    audio_end = file_size - id3v1_size
 
     if audio_start >= audio_end:
-        # Fallback for small/weird files or non-MP3: hash everything
-        # This prevents breaking on edge cases while trying to be smart
-        hash_obj = hashlib.sha256(data)
-    else:
-        audio_data = data[audio_start:audio_end]
-        hash_obj = hashlib.sha256(audio_data)
+        # Fallback for weird files (same as Step 631 spirit but chunked)
+        hash_obj = hashlib.sha256()
+        with open(filepath, "rb") as f:
+            while chunk := f.read(chunk_size):
+                hash_obj.update(chunk)
+        return hash_obj.hexdigest()
+
+    # 2. Hash only the MPEG frames (the 'Slab') in chunks
+    hash_obj = hashlib.sha256()
+    bytes_to_read = audio_end - audio_start
+    with open(filepath, "rb") as f:
+        f.seek(audio_start)
+        while bytes_to_read > 0:
+            chunk = f.read(min(chunk_size, bytes_to_read))
+            if not chunk:
+                break
+            hash_obj.update(chunk)
+            bytes_to_read -= len(chunk)
 
     return hash_obj.hexdigest()

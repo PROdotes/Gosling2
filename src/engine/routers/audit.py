@@ -2,15 +2,14 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from src.services.audit_service import AuditService
 from src.services.logger import logger
-import os
+from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 
 
 def _get_service() -> AuditService:
     """Centralized service factory for the router."""
-    db_path = os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db")
-    return AuditService(db_path)
+    return AuditService(get_db_path())
 
 
 @router.get("/history/{table}/{record_id:int}")

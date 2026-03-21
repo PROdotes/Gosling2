@@ -63,10 +63,10 @@ Performs a multi-tiered collision check for a new file.
 Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 
 
-### _hydrate_songs(songs: List[Song]) -> List[Song]
+### _hydrate_songs(songs: List[Song], pre_albums: Optional[Dict[int, List[SongAlbum]]] = None) -> List[Song]
 **Internal**: Centralized batch hydration for all song metadata.
 - Fetches credits from `SongCreditRepository`.
-- Fetches album context from `SongAlbumRepository`.
+- Fetches album context from `SongAlbumRepository` (unless `pre_albums` is provided).
 - Resolves publisher objects via `PublisherRepository`.
 - Locally orchestrates/groups the records by SourceID.
 - Stitches them back to the Songs creating `SongAlbum` bridge objects with resolved metadata and returns the hydrated list.
@@ -109,9 +109,16 @@ Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 
 ### _get_songs_by_album(album_ids: List[int]) -> Dict[int, List[Song]]
 **Internal**: RESOLVER: Fetches and hydrates all songs for multiple albums in a single BATCH flow to prevent the N+1 trap.
-- Fetches track mappings via `AlbumRepository.get_song_ids_for_albums`.
+- Fetches track mappings via `SongAlbumRepository.get_albums_for_songs_reverse`.
+- Pre-seeds hydration with album links to avoid redundant SQL queries.
 - Batch hydration for ALL songs in the set.
 - Re-groups by AlbumID in memory.
+
+### _batch_group_by_id(items: List[Any], id_attr: str) -> Dict[int, List[Any]]
+**Internal**: Generic utility to group a list of objects by a specific attribute ID into a dictionary.
+
+### _resolve_publisher_associations(raw_assocs: List[tuple], entity_label: str) -> Dict[int, List[Publisher]]
+**Internal**: Shared logic to hydrate and group publisher entities for any source type (Songs or Albums).
 
 ---
 
@@ -131,8 +138,14 @@ Logs a warning-level message.
 ### error(msg: str)
 Logs an error-level message.
 
+### critical(msg: str)
+Logs a critical-level message.
+
 ### _log(level: str, msg: str)
 **Internal**: Helper to format and send messages to stdout.
+
+### _get_file(self) -> Optional[TextIO]
+**Internal**: Lazy file handle acquisition with stderr fallback on failure.
 ---
 
 ## MetadataService

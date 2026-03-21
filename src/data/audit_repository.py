@@ -19,16 +19,13 @@ class AuditRepository(BaseRepository):
             WHERE ActionTargetID = ? AND TargetTable = ?
             ORDER BY ActionTimestamp DESC
         """
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(query, (target_id, table))
             rows = cursor.fetchall()
             results = [self._row_to_action(row) for row in rows]
             logger.debug(f"[AuditRepository] Exit: Found {len(results)} actions.")
             return results
-        finally:
-            conn.close()
 
     def get_changes_for_record(self, record_id: int, table: str) -> List[AuditChange]:
         """Fetch field-level modifications for a specific record."""
@@ -62,8 +59,7 @@ class AuditRepository(BaseRepository):
             AND LogTableName IN ({placeholders})
             ORDER BY LogTimestamp DESC
         """
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             params = [str(record_id), f"{record_id}-%"] + valid_tables
             cursor = conn.execute(query, params)
@@ -71,8 +67,6 @@ class AuditRepository(BaseRepository):
             results = [self._row_to_change(row) for row in rows]
             logger.debug(f"[AuditRepository] Exit: Found {len(results)} changes.")
             return results
-        finally:
-            conn.close()
 
     def get_deleted_snapshot(
         self, record_id: int, table: str
@@ -87,8 +81,7 @@ class AuditRepository(BaseRepository):
             WHERE RecordID = ? AND DeletedFromTable = ?
             ORDER BY DeletedAt DESC LIMIT 1
         """
-        conn = self._get_connection()
-        try:
+        with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(query, (record_id, table))
             row = cursor.fetchone()
@@ -102,8 +95,6 @@ class AuditRepository(BaseRepository):
                 f"[AuditRepository] Exit: Returning snapshot from {result.deleted_at}"
             )
             return result
-        finally:
-            conn.close()
 
     def _row_to_action(self, row: sqlite3.Row) -> AuditAction:
         return AuditAction(

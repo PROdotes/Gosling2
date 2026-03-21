@@ -1,17 +1,18 @@
 import os
+from typing import Optional
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 
 
-def _get_downloads_folder() -> str:
+def _get_downloads_folder() -> Optional[str]:
     if os.name == "nt":
         return os.path.join(os.environ.get("USERPROFILE", ""), "Downloads")
     elif os.name == "posix":
         home = os.environ.get("HOME", "")
         return os.path.join(home, "Downloads")
-    return ""
+    return None
 
 
 @router.get("/downloads-folder")

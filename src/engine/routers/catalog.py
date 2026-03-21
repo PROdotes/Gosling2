@@ -8,15 +8,14 @@ from src.models.view_models import (
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
-import os
+from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
 
 def _get_service() -> CatalogService:
     """Centralized service factory for the router."""
-    db_path = os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db")
-    return CatalogService(db_path)
+    return CatalogService(get_db_path())
 
 
 @router.get("/songs/search", response_model=List[SongView])
@@ -161,3 +160,20 @@ async def get_album(album_id: int) -> AlbumView:
 
     # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)
+
+
+@router.post("/catalog/ingest/check", response_model=IngestionReportView)
+async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView:
+    """Performs a dry-run ingestion collision check."""
+    logger.debug(f"[CatalogRouter] check_ingestion(path='{request.file_path}')")
+    result = _get_service().check_ingestion(request.file_path)
+
+    if result["status"] == "ERROR":
+        logger.warning(f"[CatalogRouter] Ingestion check ERROR: {result['message']}")
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    # Cast domain Song to SongView for the frontend contract
+    if "song" in result and result["song"]:
+        result["song"] = SongView.from_domain(result["song"])
+
+    return IngestionReportView(**result)

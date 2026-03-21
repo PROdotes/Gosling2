@@ -3,14 +3,13 @@ from src.services.catalog_service import CatalogService
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
 from src.models.view_models import SongView
-import os
+from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/metabolic", tags=["Metabolic"])
 
 
 def _get_catalog_service():
-    db_path = os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db")
-    return CatalogService(db_path)
+    return CatalogService(get_db_path())
 
 
 @router.get("/inspect-file/{song_id}", response_model=SongView)

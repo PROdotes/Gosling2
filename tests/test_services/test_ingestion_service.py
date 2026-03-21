@@ -52,7 +52,9 @@ def disambiguation_db(tmp_path, _master_populated_db):
         "VALUES (50, 1, 'Shared Title', '/path/50', 200, 1)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (50, 1991)")
-    c.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (50, 20, 1)")  # Nirvana Performer
+    c.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (50, 20, 1)"
+    )  # Nirvana Performer
 
     # Song 51: "Shared Title" by Foo Fighters, 1991
     c.execute(
@@ -60,7 +62,9 @@ def disambiguation_db(tmp_path, _master_populated_db):
         "VALUES (51, 1, 'Shared Title', '/path/51', 200, 1)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (51, 1991)")
-    c.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (51, 30, 1)")  # Foo Fighters Performer
+    c.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (51, 30, 1)"
+    )  # Foo Fighters Performer
 
     # Song 52: "Shared Title" by Dave Grohl + Taylor Hawkins, 1991
     c.execute(
@@ -68,8 +72,12 @@ def disambiguation_db(tmp_path, _master_populated_db):
         "VALUES (52, 1, 'Shared Title', '/path/52', 200, 1)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (52, 1991)")
-    c.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (52, 10, 1)")  # Dave Grohl Performer
-    c.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (52, 40, 1)")  # Taylor Hawkins Performer
+    c.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (52, 10, 1)"
+    )  # Dave Grohl Performer
+    c.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (52, 40, 1)"
+    )  # Taylor Hawkins Performer
 
     # Song 53: "Shared Title" by Nirvana, 2020 (different year)
     c.execute(
@@ -77,7 +85,9 @@ def disambiguation_db(tmp_path, _master_populated_db):
         "VALUES (53, 1, 'Shared Title', '/path/53', 200, 1)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (53, 2020)")
-    c.execute("INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (53, 20, 1)")  # Nirvana Performer
+    c.execute(
+        "INSERT INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (53, 20, 1)"
+    )  # Nirvana Performer
 
     conn.commit()
     conn.close()
@@ -143,7 +153,8 @@ class TestExactPerformerSetMatch:
 
     def test_composer_not_treated_as_performer(self, populated_db):
         """Song 6 has Dave Grohl(Performer) + Taylor Hawkins(Composer).
-        Only Performer role should count. Searching for both as Performers must NOT match."""
+        Only Performer role should count. Searching for both as Performers must NOT match.
+        """
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata(
             "Dual Credit Track", ["Dave Grohl", "Taylor Hawkins"], None
@@ -225,7 +236,8 @@ class TestSameTitleDisambiguation:
 
     def test_same_title_subset_of_multi_no_match(self, disambiguation_db):
         """Song 52 has [Dave Grohl, Taylor Hawkins]. Searching just [Dave Grohl] → no match.
-        Even though Song 52 exists with that title+year, the artist set doesn't match."""
+        Even though Song 52 exists with that title+year, the artist set doesn't match.
+        """
         repo = SongRepository(disambiguation_db)
         results = repo.find_by_metadata("Shared Title", ["Dave Grohl"], 1991)
         assert len(results) == 0
@@ -233,9 +245,7 @@ class TestSameTitleDisambiguation:
     def test_same_title_superset_of_single_no_match(self, disambiguation_db):
         """Song 50 has [Nirvana]. Searching [Nirvana, Dave Grohl] → no match."""
         repo = SongRepository(disambiguation_db)
-        results = repo.find_by_metadata(
-            "Shared Title", ["Nirvana", "Dave Grohl"], 1991
-        )
+        results = repo.find_by_metadata("Shared Title", ["Nirvana", "Dave Grohl"], 1991)
         assert len(results) == 0
 
     def test_same_title_wrong_artist_entirely(self, disambiguation_db):
