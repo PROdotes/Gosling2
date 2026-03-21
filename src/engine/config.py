@@ -19,6 +19,9 @@ def get_library_root() -> str:
 # Staging Area (Uploaded but un-indexed files)
 STAGING_DIR = Path("temp/library/staging")
 
+# Accepted file extensions for ingestion
+ACCEPTED_EXTENSIONS = [".mp3"]
+
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.
 TRUSTED_ORIGINS = [
