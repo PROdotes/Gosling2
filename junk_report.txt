@@ -1,0 +1,104 @@
+============================= test session starts =============================
+platform win32 -- Python 3.10.5, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\glazb\AppData\Local\Programs\Python\Python310\python.exe
+cachedir: .pytest_cache
+PyQt6 6.10.1 -- Qt runtime 6.10.1 -- Qt compiled 6.10.0
+rootdir: C:\Users\glazb\PycharmProjects\gosling2
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0, mock-3.15.1, qt-4.5.0
+asyncio: mode=strict, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_lookup_junk_detector.py::test_lookup_junk_detection FAILED    [100%]
+
+================================== FAILURES ===================================
+_________________________ test_lookup_junk_detection __________________________
+
+    def test_lookup_junk_detection():
+        """
+        JUNK DETECTION: Every signature documented in docs/lookup/
+        must actually exist in the source code.
+        """
+        lookup_dir = os.path.abspath("docs/lookup")
+    
+        if not os.path.exists(lookup_dir):
+            pytest.fail(f"Lookup directory missing: {lookup_dir}")
+    
+        documented = get_all_documented_signatures(lookup_dir)
+        errors = []
+    
+        actual_cache = {}
+    
+        for md_file, line_num, name, py_file_path in documented:
+            abs_py_path = os.path.abspath(py_file_path)
+    
+            if abs_py_path not in actual_cache:
+                actual = get_actual_members(abs_py_path)
+                actual_cache[abs_py_path] = actual
+    
+            actual = actual_cache[abs_py_path]
+    
+            rel_md = os.path.relpath(md_file, os.path.abspath("."))
+    
+            if actual is None:
+                errors.append(
+                    f"[FILE MISSING] {rel_md}:{line_num} references non-existent path: `{py_file_path}`"
+                )
+                continue
+    
+            with open(md_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                header_line = lines[line_num - 1]
+                is_signature = header_line.startswith("###")
+    
+            if is_signature:
+                # Extract raw signature part for filtering
+                sig_part = header_line[4:].strip().split("(")[0].strip()
+    
+                # Skip common meta-headers or intentional documentation elements
+                if name in ("Location:", "Layer", "Protocol", "Responsibility", "Status:", "Contract:", "HTTP:"):
+                    continue
+                # Skip things that look like routes or filesystem paths (e.g., /static Mount)
+                if "/" in sig_part or "*" in sig_part:
+                    continue
+    
+                if name not in actual:
+                    errors.append(
+                        f"[GHOST SIGNATURE] '{name}' documented in {rel_md}:{line_num} not found in `{py_file_path}`"
+                    )
+    
+    
+    
+        if errors:
+            summary = "\n".join(errors)
+>           pytest.fail(f"Lookup Junk Protocol Violation:\n{summary}")
+E           Failed: Lookup Junk Protocol Violation:
+E           [GHOST SIGNATURE] 'init' documented in docs\lookup\dashboard_ui.md:12 not found in `src/static/js/dashboard/main.js`
+E           [GHOST SIGNATURE] 'switchMode' documented in docs\lookup\dashboard_ui.md:15 not found in `src/static/js/dashboard/main.js`
+E           [GHOST SIGNATURE] 'searchSongs' documented in docs\lookup\dashboard_ui.md:24 not found in `src/static/js/dashboard/api.js`
+E           [GHOST SIGNATURE] 'searchAlbums' documented in docs\lookup\dashboard_ui.md:27 not found in `src/static/js/dashboard/api.js`
+E           [GHOST SIGNATURE] 'songs.js' documented in docs\lookup\dashboard_ui.md:36 not found in `src/static/js/dashboard/renderers/`
+E           [GHOST SIGNATURE] 'albums.js' documented in docs\lookup\dashboard_ui.md:39 not found in `src/static/js/dashboard/renderers/`
+E           [GHOST SIGNATURE] 'artists.js' documented in docs\lookup\dashboard_ui.md:42 not found in `src/static/js/dashboard/renderers/`
+E           [GHOST SIGNATURE] 'publishers.js' documented in docs\lookup\dashboard_ui.md:45 not found in `src/static/js/dashboard/renderers/`
+E           [GHOST SIGNATURE] 'ingestion.js' documented in docs\lookup\dashboard_ui.md:48 not found in `src/static/js/dashboard/renderers/`
+E           [GHOST SIGNATURE] 'buildNavigateAttrs' documented in docs\lookup\dashboard_ui.md:57 not found in `src/static/js/dashboard/components/utils.js`
+E           [GHOST SIGNATURE] 'renderSongList' documented in docs\lookup\dashboard_ui.md:60 not found in `src/static/js/dashboard/components/utils.js`
+E           [GHOST SIGNATURE] 'renderAuditTimeline' documented in docs\lookup\dashboard_ui.md:63 not found in `src/static/js/dashboard/components/utils.js`
+E           [GHOST SIGNATURE] '_row_to_artist_name' documented in docs\lookup\data.md:208 not found in `src/data/identity_repository.py`
+
+tests\test_lookup_junk_detector.py:174: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_lookup_junk_detector.py::test_lookup_junk_detection - Failed: Lookup Junk Protocol Violation:
+[GHOST SIGNATURE] 'init' documented in docs\lookup\dashboard_ui.md:12 not found in `src/static/js/dashboard/main.js`
+[GHOST SIGNATURE] 'switchMode' documented in docs\lookup\dashboard_ui.md:15 not found in `src/static/js/dashboard/main.js`
+[GHOST SIGNATURE] 'searchSongs' documented in docs\lookup\dashboard_ui.md:24 not found in `src/static/js/dashboard/api.js`
+[GHOST SIGNATURE] 'searchAlbums' documented in docs\lookup\dashboard_ui.md:27 not found in `src/static/js/dashboard/api.js`
+[GHOST SIGNATURE] 'songs.js' documented in docs\lookup\dashboard_ui.md:36 not found in `src/static/js/dashboard/renderers/`
+[GHOST SIGNATURE] 'albums.js' documented in docs\lookup\dashboard_ui.md:39 not found in `src/static/js/dashboard/renderers/`
+[GHOST SIGNATURE] 'artists.js' documented in docs\lookup\dashboard_ui.md:42 not found in `src/static/js/dashboard/renderers/`
+[GHOST SIGNATURE] 'publishers.js' documented in docs\lookup\dashboard_ui.md:45 not found in `src/static/js/dashboard/renderers/`
+[GHOST SIGNATURE] 'ingestion.js' documented in docs\lookup\dashboard_ui.md:48 not found in `src/static/js/dashboard/renderers/`
+[GHOST SIGNATURE] 'buildNavigateAttrs' documented in docs\lookup\dashboard_ui.md:57 not found in `src/static/js/dashboard/components/utils.js`
+[GHOST SIGNATURE] 'renderSongList' documented in docs\lookup\dashboard_ui.md:60 not found in `src/static/js/dashboard/components/utils.js`
+[GHOST SIGNATURE] 'renderAuditTimeline' documented in docs\lookup\dashboard_ui.md:63 not found in `src/static/js/dashboard/components/utils.js`
+[GHOST SIGNATURE] '_row_to_artist_name' documented in docs\lookup\data.md:208 not found in `src/data/identity_repository.py`
+============================== 1 failed in 0.26s ==============================

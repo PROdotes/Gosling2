@@ -468,7 +468,9 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- _hydrate_albums(count={len(hydrated)})")
         return hydrated
 
-    def _batch_group_by_id(self, items: List[Any], id_attr: str) -> Dict[int, List[Any]]:
+    def _batch_group_by_id(
+        self, items: List[Any], id_attr: str
+    ) -> Dict[int, List[Any]]:
         """Generic helper to group a list of objects by a specific attribute ID."""
         results: Dict[int, List[Any]] = {}
         for item in items:
@@ -490,7 +492,9 @@ class CatalogService:
     ) -> Dict[int, List[Publisher]]:
         """Generic helper to hydrate and group publishers for any entity type."""
         if not raw_assocs:
-            logger.debug(f"[CatalogService] Exit: No publishers found for {entity_label}.")
+            logger.debug(
+                f"[CatalogService] Exit: No publishers found for {entity_label}."
+            )
             return {}
 
         all_found_pubs = [pub for _, pub in raw_assocs]
@@ -507,14 +511,18 @@ class CatalogService:
                 else:
                     results.setdefault(entity_id, []).append(pub)
 
-        logger.debug(f"[CatalogService] <- _resolve_pubs_for_{entity_label}(count={len(results)})")
+        logger.debug(
+            f"[CatalogService] <- _resolve_pubs_for_{entity_label}(count={len(results)})"
+        )
         return results
 
     def _get_publishers_by_song(
         self, song_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Fetch and group master publishers by song ID, then resolve hierarchies."""
-        logger.debug(f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})"
+        )
         raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids)
         return self._resolve_publisher_associations(raw_assocs, "songs")
 
@@ -526,7 +534,9 @@ class CatalogService:
         for song_id, tag in all_tags_tuples:
             if song_id is not None:
                 tags_by_song.setdefault(song_id, []).append(tag)
-        logger.debug(f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})"
+        )
         return tags_by_song
 
     def _get_albums_by_song(self, song_ids: List[int]) -> Dict[int, List[SongAlbum]]:
@@ -550,14 +560,18 @@ class CatalogService:
             )
             assocs_by_song.setdefault(a.source_id, []).append(hydrated_assoc)
 
-        logger.debug(f"[CatalogService] <- _get_albums_by_song(count={len(assocs_by_song)})")
+        logger.debug(
+            f"[CatalogService] <- _get_albums_by_song(count={len(assocs_by_song)})"
+        )
         return assocs_by_song
 
     def _get_publishers_by_album(
         self, album_ids: List[int]
     ) -> Dict[int, List[Publisher]]:
         """Batch-fetch and hydrate publishers for albums."""
-        logger.debug(f"[CatalogService] -> _get_publishers_by_album(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_publishers_by_album(count={len(album_ids)})"
+        )
         if not album_ids:
             return {}
         raw_assocs = self._pub_repo.get_publishers_for_albums(album_ids)
@@ -567,12 +581,16 @@ class CatalogService:
         self, album_ids: List[int]
     ) -> Dict[int, List[AlbumCredit]]:
         """Batch-fetch album credits grouped by album ID."""
-        logger.debug(f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})"
+        )
         if not album_ids:
             return {}
         all_credits = self._album_credit_repo.get_credits_for_albums(album_ids)
         results = self._batch_group_by_id(all_credits, "album_id")
-        logger.debug(f"[CatalogService] <- _get_album_credits_by_album(count={len(results)})")
+        logger.debug(
+            f"[CatalogService] <- _get_album_credits_by_album(count={len(results)})"
+        )
         return results
 
     def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:
@@ -591,7 +609,9 @@ class CatalogService:
             return {}
 
         # 2. Collect unique song IDs and pre-map assocs by song
-        unique_song_ids = list(dict.fromkeys(a.source_id for a in all_assocs if a.source_id))
+        unique_song_ids = list(
+            dict.fromkeys(a.source_id for a in all_assocs if a.source_id)
+        )
         pre_mapped_assocs: Dict[int, List[SongAlbum]] = {}
         for a in all_assocs:
             if a.source_id:

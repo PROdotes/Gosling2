@@ -43,7 +43,9 @@ class SongAlbumRepository(BaseRepository):
         )
         placeholders = ",".join(["?" for _ in album_ids])
         # We reuse the same base query but filter by AlbumID instead of SourceID
-        query = self._QUERY.replace("sa.SourceID IN ({placeholders})", f"sa.AlbumID IN ({placeholders})")
+        query = self._QUERY.replace(
+            "sa.SourceID IN ({placeholders})", f"sa.AlbumID IN ({placeholders})"
+        )
         query = query.format(placeholders=placeholders)
 
         with self._get_connection() as conn:

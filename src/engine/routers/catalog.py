@@ -5,6 +5,8 @@ from src.models.view_models import (
     SongView,
     IdentityView,
     AlbumView,
+    IngestionCheckRequest,
+    IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
