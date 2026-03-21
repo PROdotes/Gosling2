@@ -65,3 +65,10 @@ A task is not done until:
 - Execute exactly one step autonomously (code, format, local test).
 - Stop execution entirely and present the diff.
 - Wait for explicit user authorization before starting the next step. Do not ask permission inside an approved step.
+
+---
+
+## 9. No Chat Promises
+- Vows, rules, or promises made in the chat UI are meaningless because they are lost when a new chat starts.
+- Never write "From now on I'll do X" in a conversation.
+- If a workflow rule is broken, do not apologize. Immediately document the correction in `AGENTS.md` or Open Brain so it survives the reset.
