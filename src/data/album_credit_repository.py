@@ -1,5 +1,5 @@
 import sqlite3
-from typing import List
+from typing import Any, List, Mapping
 
 from src.data.base_repository import BaseRepository
 from src.models.domain import AlbumCredit
@@ -37,7 +37,7 @@ class AlbumCreditRepository(BaseRepository):
             )
             return [self._row_to_album_credit(row) for row in rows]
 
-    def _row_to_album_credit(self, row: sqlite3.Row) -> AlbumCredit:
+    def _row_to_album_credit(self, row: Mapping[str, Any]) -> AlbumCredit:
         return AlbumCredit(
             album_id=row["AlbumID"],
             name_id=row["CreditedNameID"],

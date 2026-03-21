@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourceDuration REAL,
     AudioHash TEXT,
     IsActive BOOLEAN DEFAULT 0,
-    ProcessingStatus INTEGER DEFAULT 0,
+    ProcessingStatus INTEGER,  -- NULL = Pending/Unseen by engine
     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );
 

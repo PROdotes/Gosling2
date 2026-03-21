@@ -18,8 +18,14 @@ class SongRepository(BaseRepository):
 
     def get_by_id(self, song_id: int) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
+        logger.debug(f"[SongRepository] -> get_by_id(id={song_id})")
         results = self.get_by_ids([song_id])
-        return results[0] if results else None
+        song = results[0] if results else None
+        if song:
+            logger.debug(f"[SongRepository] <- get_by_id(id={song_id}) '{song.title}'")
+        else:
+            logger.debug(f"[SongRepository] <- get_by_id(id={song_id}) NOT_FOUND")
+        return song
 
     def get_by_ids(self, ids: List[int]) -> List[Song]:
         """Batch-fetch multiple Songs by their IDs."""
@@ -55,6 +61,7 @@ class SongRepository(BaseRepository):
 
     def search_surface(self, query: str) -> List[Song]:
         """Discovery path on titles and albums. Fastest search."""
+        logger.debug(f"[SongRepository] -> search_surface(query='{query}')")
         fmt_q = f"%{query}%"
         query_sql = f"""
             SELECT {self._COLUMNS} {self._JOIN}
@@ -68,6 +75,9 @@ class SongRepository(BaseRepository):
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
+            logger.debug(
+                f"[SongRepository] <- search_surface(query='{query}') found {len(rows)}"
+            )
             return [self._row_to_song(row) for row in rows]
 
     def get_by_identity_ids(self, identity_ids: List[int]) -> List[Song]:
@@ -163,7 +173,9 @@ class SongRepository(BaseRepository):
         # We need to hydrate the candidates (or at least their credits)
         # But for this simple check, we can just fetch the names from the DB for these candidates.
         found_matches = []
-        candidate_ids = [c.id for c in candidates]
+        candidate_ids = [c.id for c in candidates if c.id is not None]
+        if not candidate_ids:
+            return []
         placeholders = ",".join(["?" for _ in candidate_ids])
 
         performer_sql = f"""
@@ -184,6 +196,8 @@ class SongRepository(BaseRepository):
         # Compare sets
         target_set = set(a.lower() for a in artists)
         for song in candidates:
+            if song.id is None:
+                continue
             current_set = set(a.lower() for a in source_performers.get(song.id, []))
             if current_set == target_set:
                 found_matches.append(song)
@@ -203,9 +217,7 @@ class SongRepository(BaseRepository):
                 (row["SourceDuration"] or 0) * 1000
             ),  # Convert seconds to ms
             audio_hash=row["AudioHash"],
-            processing_status=(
-                row["ProcessingStatus"] if row["ProcessingStatus"] is not None else 0
-            ),
+            processing_status=row["ProcessingStatus"],
             is_active=bool(row["IsActive"]) if row["IsActive"] is not None else False,
             notes=row["SourceNotes"],
             media_name=row["MediaName"],

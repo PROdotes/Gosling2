@@ -613,7 +613,7 @@ def test_get_by_id(self, populated_db):
 
 ---
 
-## TDD Refactor Protocol: The Slop Purge
+## TDD Refactor Protocol
 
 ### Red → Green → Refactor Cycle
 TDD follows: **Red** (write failing test) → **Green** (make it pass) → **Refactor** (clean up).
@@ -624,31 +624,31 @@ During the **Green** phase, LLMs often add "vibe-coding" to get tests passing:
 - Redundant NULL guards when the field is non-nullable
 - Copy-pasted error messages that don't match the actual condition
 
-### The Slop Purge Rule
+### Code Cleanup Requirements
 Once a test is **green**, audit the implementation and remove:
 1. **Unreachable error handlers**: If Pydantic validates the input, don't add try/except for type errors
 2. **Defensive guards that duplicate validation**: Don't check `if song_id is None` if the signature is `song_id: int` (not Optional)
 3. **Speculative logging**: Only log actual branch decisions, not "just in case" debug spam
 4. **Commented-out code**: Delete it (git history preserves it)
 
-**Example of Slop**:
+**Unnecessary Code Example**:
 ```python
 def get_by_id(self, song_id: int) -> Optional[Song]:
-    try:  # SLOP: Pydantic already validates song_id is int
-        if song_id is None:  # SLOP: Signature guarantees int, not Optional
+    try:  # REDUNDANT: Pydantic already validates song_id is int
+        if song_id is None:  # REDUNDANT: Signature guarantees int, not Optional
             return None
-        if not isinstance(song_id, int):  # SLOP: Redundant
+        if not isinstance(song_id, int):  # REDUNDANT
             raise ValueError("song_id must be int")
 
         # Actual logic
         row = cursor.execute("SELECT * FROM Songs WHERE SourceID = ?", (song_id,)).fetchone()
         return self._row_to_song(row) if row else None
-    except Exception as e:  # SLOP: Too broad, hides real errors
+    except Exception as e:  # REDUNDANT: Too broad, hides real errors
         logger.error(f"Something went wrong: {e}")
         return None
 ```
 
-**After Slop Purge**:
+**Cleaned Version**:
 ```python
 def get_by_id(self, song_id: int) -> Optional[Song]:
     logger.debug(f"[SongRepository] -> get_by_id(id={song_id})")
@@ -719,12 +719,12 @@ def get_by_id(self, song_id: int) -> Optional[Song]:
 
 ---
 
-## Signature Sync: The 1:1:1 Rule
+## Signature Synchronization
 
 ### Documentation Integrity is Part of the Test Contract
 **Critical**: Any change to a method name or signature during TDD must be **instantly synced** to `docs/lookup/`.
 
-**The 1:1:1 Rule**:
+**Synchronization Requirements**:
 1. **One method** in the source code
 2. **One entry** in `docs/lookup/{layer}.md`
 3. **One test class** in the test suite
