@@ -60,11 +60,14 @@ A task is not done until:
 
 ---
 
-## 8. Execution Protocol
-- Convert specs into a discrete checklist (e.g. <200 lines per step).
-- Execute exactly one step autonomously (code, format, local test).
-- Stop execution entirely and present the diff.
-- Wait for explicit user authorization before starting the next step. Do not ask permission inside an approved step.
+## 8. Execution Protocol (Strict TDD Per-Method)
+- Convert specs into a discrete method-by-method checklist.
+- EVERY step MUST be atomic: exactly ONE method or ONE discrete unit at a time.
+- 1. Write the TEST for that one method.
+- 2. Write the IMPLEMENTATION for that one method.
+- 3. Run formatters and local tests.
+- 4. STOP execution entirely and present the diff. Wait for explicit user authorization.
+- NEVER implement or test multiple methods in a single step.
 
 ---
 
