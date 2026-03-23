@@ -47,6 +47,11 @@ class TestMetadataServiceExtractMetadata:
         assert metadata["TDRC"] == [
             "2024-03-16"
         ], f"Expected TDRC=['2024-03-16'], got {metadata['TDRC']}"
+        assert (
+            "TLEN" in metadata
+        ), f"Expected 'TLEN' injection from stream info, got {list(metadata.keys())}"
+        # silence.mp3 is 2.27s
+        assert float(metadata["TLEN"][0]) > 2.0
 
     def test_extract_metadata_complex_delimiters(self, silence_mp3):
         """Supported delimiters (' / ' and '|||') must be split into separate list items."""
@@ -203,7 +208,9 @@ class TestMetadataServiceExtractMetadata:
         metadata = service.extract_metadata(str(silence_mp3))
 
         assert isinstance(metadata, dict), f"Expected dict, got {type(metadata)}"
-        assert metadata == {}, f"Expected empty dict for tagless file, got {metadata}"
+        # Even tagless files get virtual TLEN from stream info
+        assert "TLEN" in metadata
+        assert len(metadata) == 1
 
     def test_extract_metadata_skips_binary(self, silence_mp3):
         """APIC and other binary frames must be ignored to prevent table pollution."""

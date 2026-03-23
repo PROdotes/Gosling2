@@ -44,7 +44,7 @@ class TestPublisherLogic:
             type_id=1,
             media_name="Test Song",
             source_path="test/path.mp3",
-            duration_ms=180000,
+            duration_s=180.0,
             publishers=[pub_a, pub_b],
             albums=[
                 SongAlbum(album_title="Album None", album_publishers=[]),
@@ -121,7 +121,7 @@ class TestPublisherLogic:
             type_id=1,
             media_name="Test Song 2",
             source_path="test/path2.mp3",
-            duration_ms=180000,
+            duration_s=180.0,
             publishers=[],
             albums=[
                 SongAlbum(album_title="Album A", album_publishers=[pub_a]),

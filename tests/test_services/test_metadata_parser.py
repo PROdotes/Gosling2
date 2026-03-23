@@ -29,7 +29,7 @@ class TestParse:
 
     def test_basic_fields(self, parser):
         """parse() must populate media_name, year, bpm, duration_ms from raw ID3 frames."""
-        raw = {"TIT2": ["Fuze"], "TYER": ["2024"], "TBPM": ["128"], "TLEN": ["180000"]}
+        raw = {"TIT2": ["Fuze"], "TYER": ["2024"], "TBPM": ["128"], "TLEN": ["180"]}
         song = parser.parse(raw, "fake/path.mp3")
 
         assert (
@@ -38,8 +38,8 @@ class TestParse:
         assert song.year == 2024, f"Expected year=2024, got {song.year}"
         assert song.bpm == 128, f"Expected bpm=128, got {song.bpm}"
         assert (
-            song.duration_ms == 180000
-        ), f"Expected duration_ms=180000, got {song.duration_ms}"
+            song.duration_s == 180.0
+        ), f"Expected duration_s=180.0, got {song.duration_s}"
         assert (
             song.source_path == "fake/path.mp3"
         ), f"Expected source_path='fake/path.mp3', got '{song.source_path}'"
@@ -58,7 +58,7 @@ class TestParse:
         assert song.year == 2024, f"Expected year=2024, got {song.year}"
         assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
-        assert song.duration_ms == 0, f"Expected duration_ms=0, got {song.duration_ms}"
+        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_ms}"
 
     def test_credits_deduplication(self, parser):
         """parse() must deduplicate credits while preserving first-seen order across TPE1 and TIPL."""
@@ -148,7 +148,7 @@ class TestParse:
         assert song.year == 2023, f"Expected year=2023, got {song.year}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
         assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
-        assert song.duration_ms == 0, f"Expected duration_ms=0, got {song.duration_ms}"
+        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_ms}"
 
     def test_album_creation(self, parser):
         """parse() must create SongAlbum from TALB and Publisher objects from TPUB."""
@@ -237,7 +237,7 @@ class TestParse:
         assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
         assert song.year is None, f"Expected year=None, got {song.year}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
-        assert song.duration_ms == 0, f"Expected duration_ms=0, got {song.duration_ms}"
+        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_ms}"
         assert song.credits == [], f"Expected no credits, got {song.credits}"
         assert song.tags == [], f"Expected no tags, got {song.tags}"
         assert song.albums == [], f"Expected no albums, got {song.albums}"

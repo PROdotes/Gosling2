@@ -36,7 +36,7 @@ class TestSongViewFromDomain:
             type_id=1,
             media_name="Test Song",
             source_path="/test/path",
-            duration_ms=200000,
+            duration_s=200.0,
             is_active=True,
             credits=[],
             albums=[],
@@ -58,6 +58,9 @@ class TestSongViewFromDomain:
         assert (
             view.source_path == song.source_path
         ), f"Expected source_path={song.source_path}, got {view.source_path}"
+        assert (
+            view.duration_s == song.duration_s
+        ), f"Expected duration_s={song.duration_s}, got {view.duration_s}"
         assert (
             view.duration_ms == song.duration_ms
         ), f"Expected duration_ms={song.duration_ms}, got {view.duration_ms}"
@@ -82,7 +85,7 @@ class TestSongViewFromDomain:
 
     def test_basic_fields(self):
         """All core fields are mapped from domain Song to SongView."""
-        song = self._make_song(id=42, media_name="Hello World", duration_ms=185000)
+        song = self._make_song(id=42, media_name="Hello World", duration_s=185.0)
         view = SongView.from_domain(song)
         self._assert_song_view_defaults(view, song)
 
@@ -109,43 +112,43 @@ class TestSongViewFromDomain:
         ), f"Expected processing_status=None, got {view.processing_status}"
 
     def test_formatted_duration_standard(self):
-        """3 min 20 sec = 200000ms -> '3:20'."""
-        view = SongView.from_domain(self._make_song(duration_ms=200000))
+        """3 min 20 sec = 200.0s -> '3:20'."""
+        view = SongView.from_domain(self._make_song(duration_s=200.0))
         assert (
             view.formatted_duration == "3:20"
         ), f"Expected '3:20', got '{view.formatted_duration}'"
 
     def test_formatted_duration_exact_minute(self):
-        """Exactly 4 min = 240000ms -> '4:00'."""
-        view = SongView.from_domain(self._make_song(duration_ms=240000))
+        """Exactly 4 min = 240.0s -> '4:00'."""
+        view = SongView.from_domain(self._make_song(duration_s=240.0))
         assert (
             view.formatted_duration == "4:00"
         ), f"Expected '4:00', got '{view.formatted_duration}'"
 
     def test_formatted_duration_zero(self):
         """Zero duration -> '0:00'."""
-        view = SongView.from_domain(self._make_song(duration_ms=0))
+        view = SongView.from_domain(self._make_song(duration_s=0.0))
         assert (
             view.formatted_duration == "0:00"
         ), f"Expected '0:00', got '{view.formatted_duration}'"
 
     def test_formatted_duration_short(self):
-        """10 seconds = 10000ms -> '0:10'."""
-        view = SongView.from_domain(self._make_song(duration_ms=10000))
+        """10 seconds = 10.0s -> '0:10'."""
+        view = SongView.from_domain(self._make_song(duration_s=10.0))
         assert (
             view.formatted_duration == "0:10"
         ), f"Expected '0:10', got '{view.formatted_duration}'"
 
     def test_formatted_duration_one_second(self):
-        """1 second = 1000ms -> '0:01'."""
-        view = SongView.from_domain(self._make_song(duration_ms=1000))
+        """1 second = 1.0s -> '0:01'."""
+        view = SongView.from_domain(self._make_song(duration_s=1.0))
         assert (
             view.formatted_duration == "0:01"
         ), f"Expected '0:01', got '{view.formatted_duration}'"
 
     def test_formatted_duration_long(self):
-        """10 min 5 sec = 605000ms -> '10:05'."""
-        view = SongView.from_domain(self._make_song(duration_ms=605000))
+        """10 min 5 sec = 605.0s -> '10:05'."""
+        view = SongView.from_domain(self._make_song(duration_s=605.0))
         assert (
             view.formatted_duration == "10:05"
         ), f"Expected '10:05', got '{view.formatted_duration}'"
@@ -553,7 +556,7 @@ class TestAlbumViewFromDomain:
             type_id=1,
             media_name="Song",
             source_path="/p",
-            duration_ms=180000,
+            duration_s=180.0,
             is_active=True,
         )
         defaults.update(overrides)
@@ -618,8 +621,8 @@ class TestAlbumViewFromDomain:
             song_view.source_path == "/p"
         ), f"Expected source_path='/p', got {song_view.source_path}"
         assert (
-            song_view.duration_ms == 180000
-        ), f"Expected duration_ms=180000, got {song_view.duration_ms}"
+            song_view.duration_s == 180.0
+        ), f"Expected duration_s=180.0, got {song_view.duration_s}"
         assert (
             song_view.is_active is True
         ), f"Expected is_active=True, got {song_view.is_active}"

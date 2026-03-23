@@ -27,7 +27,7 @@ class TestGetSong:
             song.source_path == "/path/2"
         ), f"Expected source_path '/path/2', got {song.source_path}"
         assert (
-            song.duration_ms == 240000
+            song.duration_s == 240.0
         ), f"Expected duration_ms 240000, got {song.duration_ms}"
         assert song.is_active is True, f"Expected is_active True, got {song.is_active}"
         assert song.type_id == 1, f"Expected type_id 1, got {song.type_id}"

@@ -25,7 +25,7 @@ class TestGetById:
         assert (
             song.source_path == "/path/1"
         ), f"Expected '/path/1', got '{song.source_path}'"
-        assert song.duration_ms == 200000, f"Expected 200000, got {song.duration_ms}"
+        assert song.duration_s == 200.0, f"Expected 200000, got {song.duration_ms}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
         assert song.type_id == 1, f"Expected 1, got {song.type_id}"
         assert (
@@ -309,7 +309,7 @@ class TestGetByHash:
         assert (
             song.audio_hash == "hash_1"
         ), f"Expected 'hash_1', got '{song.audio_hash}'"
-        assert song.duration_ms == 200000, f"Expected 200000, got {song.duration_ms}"
+        assert song.duration_s == 200.0, f"Expected 200000, got {song.duration_ms}"
 
     def test_nonexistent_hash_returns_none(self, populated_db):
         """Test that get_by_hash returns None for non-existent hash."""
@@ -512,7 +512,7 @@ class TestRowToSong:
         ), f"Expected 'Test Song', got '{song.media_name}'"
         assert song.title == "Test Song", f"Expected 'Test Song', got '{song.title}'"
         assert (
-            song.duration_ms == 200000
+            song.duration_s == 200.0
         ), f"Expected 200000ms (converted), got {song.duration_ms}"
         assert (
             song.source_path == "/path/test"

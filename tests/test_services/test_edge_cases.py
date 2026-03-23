@@ -87,8 +87,8 @@ class TestSongEdgeCases:
             song.source_path == "/edge/2"
         ), f"Expected source_path='/edge/2', got {song.source_path}"
         assert (
-            song.duration_ms == 60000
-        ), f"Expected duration_ms=60000, got {song.duration_ms}"
+            song.duration_s == 60.0
+        ), f"Expected duration_s=60.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -118,8 +118,8 @@ class TestSongEdgeCases:
             song.source_path == "/edge/3"
         ), f"Expected source_path='/edge/3', got {song.source_path}"
         assert (
-            song.duration_ms == 30000
-        ), f"Expected duration_ms=30000, got {song.duration_ms}"
+            song.duration_s == 30.0
+        ), f"Expected duration_s=30.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -153,8 +153,8 @@ class TestSongEdgeCases:
             song.source_path == "/edge/4"
         ), f"Expected source_path='/edge/4', got {song.source_path}"
         assert (
-            song.duration_ms == 200000
-        ), f"Expected duration_ms=200000, got {song.duration_ms}"
+            song.duration_s == 200.0
+        ), f"Expected duration_s=200.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -173,7 +173,7 @@ class TestSongEdgeCases:
         assert song.raw_tags == {}, f"Expected no raw_tags, got {song.raw_tags}"
 
     def test_zero_duration(self, edge_case_db):
-        """Song 104 has SourceDuration=0 -> duration_ms=0."""
+        """Song 104 has SourceDuration=0 -> duration_s=0.0."""
         repo = SongRepository(edge_case_db)
         song = repo.get_by_id(104)
         assert song is not None, "Song 104 should exist in edge_case_db"
@@ -187,7 +187,7 @@ class TestSongEdgeCases:
         assert (
             song.source_path == "/edge/5"
         ), f"Expected source_path='/edge/5', got {song.source_path}"
-        assert song.duration_ms == 0, f"Expected duration_ms=0, got {song.duration_ms}"
+        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -226,7 +226,7 @@ class TestSongEdgeCases:
         assert (
             view.source_path == "/edge/5"
         ), f"Expected source_path='/edge/5', got {view.source_path}"
-        assert view.duration_ms == 0, f"Expected duration_ms=0, got {view.duration_ms}"
+        assert view.duration_s == 0.0, f"Expected duration_s=0.0, got {view.duration_ms}"
         assert (
             view.audio_hash is None
         ), f"Expected audio_hash=None, got {view.audio_hash}"
@@ -270,8 +270,8 @@ class TestSongEdgeCases:
             song.source_path == "/edge/4"
         ), f"Expected source_path='/edge/4', got {song.source_path}"
         assert (
-            song.duration_ms == 200000
-        ), f"Expected duration_ms=200000, got {song.duration_ms}"
+            song.duration_s == 200.0
+        ), f"Expected duration_s=200.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -441,8 +441,8 @@ class TestCreditWithNoIdentityName:
             song.source_path == "/edge/6"
         ), f"Expected source_path='/edge/6', got {song.source_path}"
         assert (
-            song.duration_ms == 120000
-        ), f"Expected duration_ms=120000, got {song.duration_ms}"
+            song.duration_s == 120.0
+        ), f"Expected duration_s=120.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -556,8 +556,8 @@ class TestSongsWithNoAlbum:
             song.source_path == "/path/3"
         ), f"Expected source_path='/path/3', got {song.source_path}"
         assert (
-            song.duration_ms == 180000
-        ), f"Expected duration_ms=180000, got {song.duration_ms}"
+            song.duration_s == 180.0
+        ), f"Expected duration_s=180.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -604,8 +604,8 @@ class TestSongsWithNoAlbum:
             song.source_path == "/path/2"
         ), f"Expected source_path='/path/2', got {song.source_path}"
         assert (
-            song.duration_ms == 240000
-        ), f"Expected duration_ms=240000, got {song.duration_ms}"
+            song.duration_s == 240.0
+        ), f"Expected duration_s=240.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -726,8 +726,8 @@ class TestGeneralEdgeCases:
             song.source_path == "/path/99"
         ), f"Expected source_path='/path/99', got {song.source_path}"
         assert (
-            song.duration_ms == 100000
-        ), f"Expected duration_ms=100000, got {song.duration_ms}"
+            song.duration_s == 100.0
+        ), f"Expected duration_s=100.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"

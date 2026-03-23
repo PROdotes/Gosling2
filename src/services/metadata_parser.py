@@ -48,7 +48,7 @@ class MetadataParser:
         song_data = {
             "media_name": "",
             "source_path": str(file_path),
-            "duration_ms": 0,
+            "duration_s": 0.0,
             "credits": [],
             "tags": [],
             "albums": [],
@@ -87,7 +87,7 @@ class MetadataParser:
                 pass
 
             if field_name and values:
-                # 1. Routing to core Song fields (Integer/Text)
+                # 1. Routing to core Song fields (Integer/Text/Float)
                 if type_info == "integer":
                     raw_val = values[0]
                     if field_name == "year" and "-" in str(raw_val):
@@ -96,6 +96,12 @@ class MetadataParser:
                     val_int = self._to_int(raw_val)
                     if val_int is not None:
                         song_data[field_name] = val_int
+
+                elif type_info == "float":
+                    try:
+                        song_data[field_name] = float(values[0])
+                    except (ValueError, TypeError):
+                        pass
 
                 elif type_info == "text":
                     song_data[field_name] = str(values[0])

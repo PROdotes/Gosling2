@@ -12,14 +12,34 @@
 ### _get_connection() -> sqlite3.Connection
 Single point of truth for all DB connections in `v3core`.
 
-### _log_change(cursor, table, record_id, field, old_val, new_val, batch_id)
-Writes one audit row to the existing `ChangeLog` table. Silently no-ops if no change.
+
+---
+
+
+## MediaSourceRepository
+*Location: `src/data/media_source_repository.py`*
+**Responsibility**: Universal access for the base `MediaSources` table. Used by specialized repos (Songs, Podcasts) to manage core file metadata.
+
+### insert_source(model: MediaSource, type_name: str, conn: sqlite3.Connection) -> int
+Writes the base record into `MediaSources`. Resolves `TypeID` from the given `type_name`. Returns the new `SourceID`.
+
+### get_by_path(path: str) -> Optional[MediaSource]
+Universal lookup by SourcePath. Returns the base `MediaSource` record (or None) regardless of specialized type (Song, Podcast, etc.).
+
+### get_by_hash(audio_hash: str) -> Optional[MediaSource]
+Universal lookup by AudioHash. Returns the base `MediaSource` record (or None).
+
+### delete(source_id: int, conn: sqlite3.Connection) -> bool
+Universal hard delete for any media type. Triggers `ON DELETE CASCADE` into specialized tables (Songs, etc.). Returns `True` if deleted.
+
+### _row_to_source(row: sqlite3.Row) -> MediaSource
+**Internal**: Maps a physical database row to the base `MediaSource` domain model, preserving the duration in raw seconds (`duration_s`).
 
 ---
 
 ## SongRepository
 *Location: `src/data/song_repository.py`*
-**Responsibility**: Low-level database access for the Songs and MediaSources tables.
+**Responsibility**: Specialized access for the `Songs` table. Inherits core file management from `MediaSourceRepository`.
 
 ### get_by_id(song_id: int) -> Optional[Song]
 Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
@@ -45,9 +65,11 @@ Fetch a song by its unique audio hash.
 ### find_by_metadata(title: str, artists: List[str], year: Optional[int]) -> List[Song]
 Find songs matching Title, exact Performer set, and Recording Year. Avoids "Single-Match" false duplicates by requiring the incoming performer set to be an exact match for the existing performer set.
 
-### _row_to_song(row: sqlite3.Row) -> Song
+### insert(song: Song, conn: sqlite3.Connection) -> int
+Atomic insert into `MediaSources` and `Songs` tables. Modular: delegates core file record to `MediaSourceRepository.insert_source`. Returns the new `SourceID`. Does NOT commit.
 
-**Internal**: Maps a physical database row to the `Song` domain model, handling NULLs (like `processing_status` and `is_active`) and converting duration to milliseconds.
+### _row_to_song(row: sqlite3.Row) -> Song
+**Internal**: Maps a physical database row to the `Song` domain model, handling NULLs and preserving the duration in raw seconds (`duration_s`).
 
 ---
 

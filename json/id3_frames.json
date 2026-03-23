@@ -70,8 +70,8 @@
     },
     "TLEN": {
         "description": "Length",
-        "field": "duration_ms",
-        "type": "integer"
+        "field": "duration_s",
+        "type": "float"
     },
     "TMED": "Media type",
     "TOAL": "Original album/movie/show title",

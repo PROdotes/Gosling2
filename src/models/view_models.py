@@ -65,7 +65,7 @@ class SongView(BaseModel):
     media_name: str
     title: str
     source_path: str
-    duration_ms: int
+    duration_s: float
     audio_hash: Optional[str] = None
     processing_status: Optional[int] = 0
     is_active: bool = False
@@ -93,12 +93,18 @@ class SongView(BaseModel):
 
     @computed_field
     @property
+    def duration_ms(self) -> int:
+        """Legacy compatibility field for API consumers."""
+        return int(self.duration_s * 1000)
+
+    @computed_field
+    @property
     def formatted_duration(self) -> str:
         """MM:SS formatting for UI displays."""
-        if not self.duration_ms:
+        if not self.duration_s:
             return "0:00"
 
-        total_seconds = int(self.duration_ms / 1000)
+        total_seconds = int(self.duration_s)
         minutes = total_seconds // 60
         seconds = total_seconds % 60
         return f"{minutes}:{seconds:02d}"

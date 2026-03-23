@@ -37,13 +37,7 @@ Project protocols for architectural integrity.
 
 ---
 
-## 5. Context Health
-- Include Step Id at the beginning of every response
-- Suggest a fresh chat if step count exceeds 500
-
----
-
-## 6. Done Protocol
+## 5. Done Protocol
 A task is not done until:
 1. `docs/lookup/` is accurate to implementation
 2. Logger instrumentation is pervasive
@@ -54,13 +48,13 @@ A task is not done until:
 
 ---
 
-## 7. No Emojis
+## 6. No Emojis
 - Emojis are strictly forbidden in code, configuration files (JSON, etc.), and UI elements.
 - Prevents encoding issues and visual "noise" in terminal/IDE.
 
 ---
 
-## 8. Execution Protocol (Strict TDD Per-Method)
+## 7. Execution Protocol (Strict TDD Per-Method)
 - Convert specs into a discrete method-by-method checklist.
 - EVERY step MUST be atomic: exactly ONE method or ONE discrete unit at a time.
 - 1. Write the TEST for that one method.
@@ -71,7 +65,7 @@ A task is not done until:
 
 ---
 
-## 9. No Chat Promises
+## 8. No Chat Promises
 - Vows, rules, or promises made in the chat UI are meaningless because they are lost when a new chat starts.
 - Never write "From now on I'll do X" in a conversation.
 - If a workflow rule is broken, do not apologize. Immediately document the correction in `AGENTS.md` or Open Brain so it survives the reset.

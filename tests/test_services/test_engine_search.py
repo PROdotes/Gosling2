@@ -58,7 +58,7 @@ def _assert_slts(song):
     ), f"Expected source_path='/path/1', got {song['source_path']}"
     assert (
         song["duration_ms"] == 200000
-    ), f"Expected duration_ms=200000, got {song['duration_ms']}"
+    ), f"Expected duration_s=200.0, got {song['duration_ms']}"
     assert (
         song["audio_hash"] == "hash_1"
     ), f"Expected audio_hash='hash_1', got {song['audio_hash']}"
@@ -159,7 +159,7 @@ def _assert_everlong(song):
     ), f"Expected source_path='/path/2', got {song['source_path']}"
     assert (
         song["duration_ms"] == 240000
-    ), f"Expected duration_ms=240000, got {song['duration_ms']}"
+    ), f"Expected duration_s=240.0, got {song['duration_ms']}"
     assert (
         song["audio_hash"] is None
     ), f"Expected audio_hash=None, got {song['audio_hash']}"
@@ -272,7 +272,7 @@ class TestSongSearchPhaseTwo:
         ), f"Expected source_path='/path/5', got {song['source_path']}"
         assert (
             song["duration_ms"] == 180000
-        ), f"Expected duration_ms=180000, got {song['duration_ms']}"
+        ), f"Expected duration_s=180.0, got {song['duration_ms']}"
         assert (
             song["is_active"] is True
         ), f"Expected is_active=True, got {song['is_active']}"
@@ -314,7 +314,7 @@ class TestSongSearchPhaseTwo:
         ), f"Expected media_name='Range Rover Bitch', got {rrb['media_name']}"
         assert (
             rrb["duration_ms"] == 180000
-        ), f"Expected duration_ms=180000, got {rrb['duration_ms']}"
+        ), f"Expected duration_s=180.0, got {rrb['duration_ms']}"
         assert (
             rrb["is_active"] is True
         ), f"Expected is_active=True, got {rrb['is_active']}"

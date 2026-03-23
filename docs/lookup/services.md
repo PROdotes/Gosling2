@@ -155,6 +155,7 @@ Logs a critical-level message.
 ### extract_metadata(file_path: str) -> Dict[str, List[str]]
 Reads a file and returns a raw dictionary of all found tags, preserving Frame IDs (e.g., `TPE1`, `TXXX:STATUS`).
 - **Entry**: Logs `file_path`.
+- **Stream Info**: Injects a virtual `TLEN` frame derived from the audio stream (`audio.info.length`) in **raw seconds** to ensure accurate duration across all file types.
 - **Instrumentation**: Skips binary frames (APIC, GEOB, PRIV).
 - **Exit**: Logs the count of tags found.
 

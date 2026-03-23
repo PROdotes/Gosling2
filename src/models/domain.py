@@ -1,5 +1,5 @@
-from typing import Optional, List, Dict
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class DomainModel(BaseModel):
@@ -15,11 +15,16 @@ class MediaSource(DomainModel):
     type_id: Optional[int] = None
     media_name: str  # The "Title" in the database
     source_path: str
-    duration_ms: int
+    duration_s: float
     audio_hash: Optional[str] = None
     processing_status: Optional[int] = None
     is_active: bool = False
     notes: Optional[str] = None
+
+    @property
+    def duration_ms(self) -> int:
+        """Legacy compatibility property."""
+        return int(self.duration_s * 1000)
 
 
 class SongCredit(DomainModel):

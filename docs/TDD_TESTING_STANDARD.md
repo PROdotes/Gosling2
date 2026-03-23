@@ -1,9 +1,6 @@
 # TDD & Testing Standard
-
 **Purpose**: Prevent code regression and eliminate LLM assumptions by establishing bulletproof testing contracts.
-
 **Philosophy**: Tests must be exhaustive and reflect physical reality. No room for defaults, guesses, or "reasonable assumptions" about missing data.
-
 ---
 
 ## Core Principles
@@ -718,7 +715,6 @@ def get_by_id(self, song_id: int) -> Optional[Song]:
 - Branch: `[ClassName] Branch: reason for decision`
 
 ---
-
 ## Signature Synchronization
 
 ### Documentation Integrity is Part of the Test Contract
@@ -776,7 +772,6 @@ class TestGetById:
 - Use grep to find outdated method references: `grep -r "old_method_name" docs/lookup/`
 
 ---
-
 ## Weekly Review Process
 
 1. **Check Open Brain RAG** for patterns where tests failed to catch bugs
@@ -786,11 +781,8 @@ class TestGetById:
 5. **Audit `docs/lookup/` integrity**: Verify all method signatures are current
 
 ---
-
 ## Summary Checklist
-
 When writing a new test, verify:
-
 - ✅ Uses real test database (empty_db, populated_db, edge_case_db)
 - ✅ One test per scenario with descriptive name
 - ✅ Exhaustive assertions on all fields

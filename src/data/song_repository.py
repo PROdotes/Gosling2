@@ -1,11 +1,11 @@
 import sqlite3
 from typing import List, Optional, Mapping, Any, Dict
 from src.models.domain import Song
-from src.data.base_repository import BaseRepository
+from src.data.media_source_repository import MediaSourceRepository
 from src.services.logger import logger
 
 
-class SongRepository(BaseRepository):
+class SongRepository(MediaSourceRepository):
     """Repository for loading Song domain models from the SQLite database."""
 
     # The Golden Truth: All song queries MUST fetch these columns.
@@ -15,6 +15,34 @@ class SongRepository(BaseRepository):
         s.TempoBPM, s.RecordingYear, s.ISRC
     """
     _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')"
+
+    def insert(self, song: Song, conn: sqlite3.Connection) -> int:
+        """
+        Atomic insert into MediaSources and Songs tables.
+        Modular: delegates core MediaSource record to parent.
+        Returns the new SourceID.
+        """
+        logger.debug(
+            f"[SongRepository] -> insert(name='{song.title}', path='{song.source_path}')"
+        )
+
+        # 1. Insert core record (delegated to MediaSourceRepository)
+        source_id = self.insert_source(song, "Song", conn)
+
+        # 2. Insert song-specific extension record
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO Songs (SourceID, TempoBPM, RecordingYear, ISRC)
+            VALUES (?, ?, ?, ?)
+            """,
+            (source_id, song.bpm, song.year, song.isrc),
+        )
+
+        logger.info(
+            f"[SongRepository] <- insert() INGESTED ID={source_id} '{song.title}'"
+        )
+        return source_id
 
     def get_by_id(self, song_id: int) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
@@ -102,36 +130,23 @@ class SongRepository(BaseRepository):
             return [self._row_to_song(row) for row in rows]
 
     def get_by_hash(self, audio_hash: str) -> Optional[Song]:
-        """Fetch a Song by its audio-only hash."""
-        logger.debug(f"[SongRepository] Fetching song by hash: {audio_hash}")
-        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.AudioHash = ?"
-
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(query_sql, (audio_hash,)).fetchone()
-            if row:
-                logger.debug(f"[SongRepository] Found song by hash: {audio_hash}")
-                return self._row_to_song(row)
-
-            logger.debug(f"[SongRepository] No song found with hash: {audio_hash}")
-            return None
+        """Fetch a Song by its audio-only hash, utilizing universal MediaSource lookup."""
+        logger.debug(f"[SongRepository] -> get_by_hash(hash='{audio_hash}')")
+        base = super().get_by_hash(audio_hash)
+        if base:
+            return self.get_by_id(base.id)
+        return None
 
     def get_by_path(self, path: str) -> Optional[Song]:
-        """Fetch a song by its absolute source path."""
+        """Fetch a song by its absolute source path, utilizing universal MediaSource lookup."""
         if not path:
             return None
 
         logger.debug(f"[SongRepository] -> get_by_path(path='{path}')")
-        query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.SourcePath = ?"
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(query_sql, (path,)).fetchone()
-            song = self._row_to_song(row) if row else None
-            if not song:
-                logger.debug(
-                    f"[SongRepository] <- get_by_path(path='{path}') NOT_FOUND"
-                )
-            return song
+        base = super().get_by_path(path)
+        if base:
+            return self.get_by_id(base.id)
+        return None
 
     def find_by_metadata(
         self, title: str, artists: List[str], year: Optional[int]
@@ -213,9 +228,7 @@ class SongRepository(BaseRepository):
             id=row["SourceID"],
             type_id=row["TypeID"],
             source_path=row["SourcePath"],
-            duration_ms=int(
-                (row["SourceDuration"] or 0) * 1000
-            ),  # Convert seconds to ms
+            duration_s=float(row["SourceDuration"] or 0),
             audio_hash=row["AudioHash"],
             processing_status=row["ProcessingStatus"],
             is_active=bool(row["IsActive"]) if row["IsActive"] is not None else False,

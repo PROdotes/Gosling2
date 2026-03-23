@@ -2,7 +2,6 @@ import re
 from pathlib import Path
 from typing import Dict, List, Any
 import mutagen
-from mutagen.id3 import ID3
 import mutagen.easyid3
 
 try:
@@ -38,42 +37,36 @@ class MetadataService:
             logger.error(f"[MetadataService] File not found: {file_path}")
             raise FileNotFoundError(f"File not found: {file_path}")
 
+        audio = None
+        duration_s: float = 0.0
+        tags = {}
+
         try:
-            # Source tags (ID3 or EasyID3)
-            try:
-                audio = mutagen.File(file_path)
-                tags = getattr(audio, "tags", None)
-                if tags is None or (isinstance(tags, ID3) and len(tags) == 0):
-                    tags = mutagen.easyid3.EasyID3(file_path)
-            except (
-                ID3NoHeaderError,
-                HeaderNotFoundError,
-                ID3HeaderError,
-                ID3TagError,
-            ) as me:
-                logger.warning(
-                    f"[MetadataService] Mutagen could not read tags from {file_path}: {me}"
-                )
-                tags = {}
-            except Exception as e:
-                logger.error(
-                    f"[MetadataService] Unexpected error reading file {file_path}: {e}"
-                )
-                tags = {}
+            # 1. Try to read the audio file structure (Stream Info)
+            audio = mutagen.File(file_path)
+            if audio is not None and hasattr(audio, "info") and audio.info:
+                duration_s = getattr(audio.info, "length", 0.0)
 
-            metadata = self._read_tags(tags)
-            logger.info(
-                f"[MetadataService] Exit: extract_metadata - Found {len(metadata)} tags"
-            )
-            return metadata
+            # 2. Try to extract tags (Pure ID3/Tags only)
+            tags = getattr(audio, "tags", {}) if audio is not None else {}
 
-        except FileNotFoundError:
-            raise
+        except (ID3NoHeaderError, HeaderNotFoundError, ID3HeaderError, ID3TagError):
+            # If tags are missing, it might raise, but we still have 'tags = {}'
+            pass
         except Exception as e:
-            logger.error(
-                f"[MetadataService] Exit: Error reading tags from {file_path}: {e}"
-            )
-            return {}
+            logger.error(f"[MetadataService] Mutagen error reading {file_path}: {e}")
+
+        # 3. Clean and map tags
+        metadata = self._read_tags(tags)
+
+        # 4. Data Fidelity: Always use stream info for duration (Virtual TLEN)
+        if duration_s > 0:
+            metadata["TLEN"] = [str(duration_s)]
+
+        logger.info(
+            f"[MetadataService] Exit: extract_metadata - Found {len(metadata)} tags (including virtual TLEN)"
+        )
+        return metadata
 
     def _read_tags(self, tags: Any) -> Dict[str, List[str]]:
         """Extracts and cleans all tags from mutagen into a clean list-based dictionary."""

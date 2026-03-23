@@ -7,8 +7,9 @@ from src.engine.config import get_db_path, get_library_root
 # Refactored for transaction safety, dynamic paths, and robust error handling.
 
 # --- CONFIGURATION ---
-TESTING = True # Always True by default for safety.
+TESTING = True  # Always True by default for safety.
 CHECK_FILE_EXISTENCE = True
+
 
 def fix_croatian_chars(text: str) -> str:
     """Normalize Croatian diacritics to ASCII equivalents."""
@@ -17,9 +18,10 @@ def fix_croatian_chars(text: str) -> str:
         text = text.replace(old, new).replace(old.upper(), new.upper())
     return text
 
+
 def run_fix():
     db_path = get_db_path()
-    library_root = Path(get_library_root()) # Dynamic from GOSLING_LIBRARY_ROOT
+    library_root = Path(get_library_root())  # Dynamic from GOSLING_LIBRARY_ROOT
 
     if not os.path.exists(db_path):
         print(f"ERROR: Database not found at {db_path}")
@@ -54,8 +56,8 @@ def run_fix():
 
         # 1. Generate new names
         new_name = fix_croatian_chars(name)
-        
-        # Determine the physical path. 
+
+        # Determine the physical path.
         # SourcePath is absolute in DB, but we verify it via library_root safely.
         old_p = Path(old_source_path)
         filename = old_p.name
@@ -76,15 +78,15 @@ def run_fix():
             if old_p.exists() and old_p != new_p:
                 os.rename(old_p, new_p)
                 print("      [OK] Renamed on disk.")
-            
+
             # Audit #7: Update DB record per-file for atomic safety.
             cur.execute(
-                "UPDATE MediaSources SET MediaName = ?, SourcePath = ? WHERE SourceID = ?", 
-                (new_name, str(new_p), sid)
+                "UPDATE MediaSources SET MediaName = ?, SourcePath = ? WHERE SourceID = ?",
+                (new_name, str(new_p), sid),
             )
             conn.commit()
             renamed_count += 1
-            
+
         except Exception as e:
             conn.rollback()
             print(f"      [ERROR] Failed to process SourceID {sid}: {e}")
@@ -97,6 +99,7 @@ def run_fix():
     else:
         print(f"Successfully processed: {renamed_count}")
         print(f"Encountered errors: {error_count}")
+
 
 if __name__ == "__main__":
     run_fix()

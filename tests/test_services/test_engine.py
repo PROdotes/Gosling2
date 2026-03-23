@@ -80,7 +80,7 @@ class TestGetSong:
         ), f"Expected source_path='/path/2', got {data['source_path']!r}"
         assert (
             data["duration_ms"] == 240000
-        ), f"Expected duration_ms=240000, got {data['duration_ms']}"
+        ), f"Expected duration_s=240.0, got {data['duration_ms']}"
         assert (
             data["formatted_duration"] == "4:00"
         ), f"Expected formatted_duration='4:00', got {data['formatted_duration']!r}"

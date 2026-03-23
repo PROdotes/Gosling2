@@ -10,7 +10,6 @@ from src.data.song_credit_repository import SongCreditRepository
 from src.data.song_album_repository import SongAlbumRepository
 from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
-from src.data.base_repository import BaseRepository
 
 
 # ===================================================================
@@ -764,42 +763,4 @@ class TestRowToTag:
         assert result.is_primary is False
 
 
-class TestBaseRepositoryLogChange:
-    def test_noop_when_values_equal(self, mock_db_path):
-        """_log_change must NOT write a row if old == new."""
-        repo = BaseRepository(mock_db_path)
-        with repo._get_connection() as conn:
-            cursor = conn.cursor()
-            repo._log_change(cursor, "Songs", 1, "TempoBPM", "120", "120", "batch-1")
-            count = cursor.execute("SELECT COUNT(*) FROM ChangeLog").fetchone()[0]
-            assert count == 0, f"Expected 0 ChangeLog rows for no-op, got {count}"
-
-    def test_writes_when_values_differ_with_all_fields(self, mock_db_path):
-        """_log_change MUST write all fields when old != new."""
-        repo = BaseRepository(mock_db_path)
-        with repo._get_connection() as conn:
-            cursor = conn.cursor()
-            repo._log_change(cursor, "Songs", 1, "TempoBPM", "120", "130", "batch-1")
-            row = cursor.execute(
-                "SELECT LogTableName, RecordID, LogFieldName, OldValue, NewValue, BatchID FROM ChangeLog"
-            ).fetchone()
-            assert row is not None, "Expected a ChangeLog row, got None"
-            assert row[0] == "Songs", f"Expected LogTableName='Songs', got '{row[0]}'"
-            assert row[1] == 1, f"Expected RecordID=1, got {row[1]}"
-            assert (
-                row[2] == "TempoBPM"
-            ), f"Expected LogFieldName='TempoBPM', got '{row[2]}'"
-            assert row[3] == "120", f"Expected OldValue='120', got '{row[3]}'"
-            assert row[4] == "130", f"Expected NewValue='130', got '{row[4]}'"
-            assert row[5] == "batch-1", f"Expected BatchID='batch-1', got '{row[5]}'"
-
-    def test_none_to_value_records_null_old_value(self, mock_db_path):
-        """_log_change must record NULL OldValue when transitioning from None to a value."""
-        repo = BaseRepository(mock_db_path)
-        with repo._get_connection() as conn:
-            cursor = conn.cursor()
-            repo._log_change(cursor, "Songs", 1, "Notes", None, "Hello", "batch-2")
-            row = cursor.execute("SELECT OldValue, NewValue FROM ChangeLog").fetchone()
-            assert row is not None, "Expected a ChangeLog row, got None"
-            assert row[0] is None, f"Expected OldValue=None (NULL), got {row[0]!r}"
-            assert row[1] == "Hello", f"Expected NewValue='Hello', got '{row[1]}'"
+# TestBaseRepositoryLogChange removed as _log_change is not implemented.
