@@ -12,6 +12,9 @@
 ### _get_connection() -> sqlite3.Connection
 Single point of truth for all DB connections in `v3core`.
 
+### get_connection() -> sqlite3.Connection
+Public connection accessor used by services for atomic transaction control.
+
 
 ---
 

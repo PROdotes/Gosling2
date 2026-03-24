@@ -70,6 +70,27 @@ Full write-path orchestration for a staged file.
 - Deletes `staged_path` on failure to prevent orphans.
 - Returns `IngestionReportView` data.
 
+### scan_folder(folder_path: str, recursive: bool = True) -> List[str]
+Pure file discovery utility that scans a folder for audio files.
+- Returns list of absolute paths to audio files.
+- If `recursive=True`, walks entire directory tree.
+- If `recursive=False`, only scans top-level directory.
+- No staging or ingestion - just file system scanning.
+
+### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
+Parallel batch ingestion of multiple already-staged files.
+- Each file gets its own transaction (one failure doesn't block others).
+- Uses `ThreadPoolExecutor` for concurrent processing (works in web and desktop apps).
+- Each thread gets its own DB connection (thread-safe).
+- Reuses existing `ingest_file()` method for each file.
+- Returns `BatchIngestReport` with aggregate stats (total_files, ingested, duplicates, errors) and per-file results.
+
+### _ingest_single(file_path: str) -> Dict[str, Any]
+**Internal**: Thread-safe wrapper for single file ingestion.
+- Called by `ingest_batch()` worker threads.
+- Ensures each thread gets its own database connection.
+- Catches exceptions and returns error report instead of crashing thread.
+
 ### delete_song(song_id: int) -> bool
 Atomic hard-delete of a song and its physical file.
 - Removes record from DB via `SongRepository`.

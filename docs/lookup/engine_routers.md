@@ -111,12 +111,21 @@ Fetches a single Song domain model by its unique ID.
 **HTTP**: `GET /api/v1/ingest/downloads-folder`
 - Returns the platform-specific default downloads folder.
 
-### async def upload_file(file: UploadFile = File(...)) -> IngestionReportView
+### async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 **HTTP**: `POST /api/v1/ingest/upload`
-- Physical file ingestion entry point.
-- Saves to `STAGING_DIR` with UUID filename.
-- Orchestrates ingestion via `CatalogService`.
-- Returns `IngestionReportView` with status and hydrated `SongView`.
+- Batch file ingestion entry point (supports single or multiple files).
+- Browser automatically flattens folder drag-and-drop into file list.
+- Validates extensions and stages all files to `STAGING_DIR` with UUID filenames.
+- Orchestrates batch ingestion via `CatalogService.ingest_batch()`.
+- Returns `BatchIngestReport` with aggregate stats and per-file results.
+
+### async def scan_folder(request: FolderScanRequest) -> BatchIngestReport
+**HTTP**: `POST /api/v1/ingest/scan-folder`
+- Server-side folder scanning and ingestion.
+- Scans local filesystem path for audio files (recursive or flat).
+- Copies files to staging and ingests via `CatalogService.ingest_batch()`.
+- Returns `BatchIngestReport` with aggregate stats and per-file results.
+- Example payload: `{"folder_path": "Z:\\Songs\\NewAlbum", "recursive": true}`
 
 ### async def delete_song(song_id: int) -> Dict[str, Any]
 **HTTP**: `DELETE /api/v1/ingest/songs/{song_id}`

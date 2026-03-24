@@ -6,7 +6,12 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 
-from src.models.view_models import IngestionReportView, SongView
+from src.models.view_models import (
+    IngestionReportView,
+    SongView,
+    FolderScanRequest,
+    BatchIngestReport,
+)
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 from src.engine.config import get_db_path, STAGING_DIR, ACCEPTED_EXTENSIONS
@@ -35,63 +40,152 @@ async def get_downloads_folder():
     return JSONResponse({"path": _get_downloads_folder()})
 
 
-@router.post("/upload", response_model=IngestionReportView)
-async def upload_file(file: UploadFile = File(...)) -> IngestionReportView:
-    """
-    Physical file ingestion entry point.
-    1. Validate extension
-    2. Save to STAGING_DIR with UUID filename
-    3. Orchestrate ingestion via CatalogService
-    4. Return IngestionReportView with status and hydrated SongView.
-    """
-    logger.info(f"[IngestRouter] -> upload_file(filename='{file.filename}')")
+@router.get("/formats")
+async def get_accepted_formats():
+    """Retrieve the list of supported file extensions for ingestion."""
+    return JSONResponse({"extensions": ACCEPTED_EXTENSIONS})
 
-    # 1. Extension validation
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="Filename is required")
 
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in ACCEPTED_EXTENSIONS:
-        logger.warning(f"[IngestRouter] Rejected file with extension '{file_ext}'")
+@router.post("/upload", response_model=BatchIngestReport)
+async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport:
+    """
+    Physical file ingestion entry point (supports batch uploads).
+    Browser automatically flattens folders into individual files.
+
+    1. Validate extensions
+    2. Save all files to STAGING_DIR with UUID filenames
+    3. Orchestrate batch ingestion via CatalogService
+    4. Return BatchIngestReport with aggregate stats and per-file results.
+    """
+    logger.info(f"[IngestRouter] -> upload_files(count={len(files)})")
+
+    # 1. Ensure staging exists
+    if not os.path.exists(STAGING_DIR):
+        os.makedirs(STAGING_DIR, exist_ok=True)
+
+    # 2. Stage all valid files
+    staged_paths = []
+    for file in files:
+        # Validate filename
+        if not file.filename:
+            logger.warning("[IngestRouter] Skipping file with no filename")
+            continue
+
+        # Validate extension
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in ACCEPTED_EXTENSIONS:
+            logger.warning(
+                f"[IngestRouter] Skipping file with invalid extension '{file_ext}': {file.filename}"
+            )
+            continue
+
+        # Save to staging with UUID filename to prevent collisions
+        uuid_filename = f"{uuid4()}_{file.filename}"
+        staged_path = os.path.join(STAGING_DIR, uuid_filename)
+
+        try:
+            with open(staged_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            staged_paths.append(staged_path)
+            logger.debug(f"[IngestRouter] Staged: {file.filename} -> {staged_path}")
+        except Exception as e:
+            logger.error(f"[IngestRouter] Failed to stage {file.filename}: {e}")
+            # Continue with other files instead of failing the entire batch
+
+    if not staged_paths:
         raise HTTPException(
             status_code=400,
-            detail=f"File extension '{file_ext}' not allowed. Accepted: {ACCEPTED_EXTENSIONS}",
+            detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
+        )
+
+    # 3. Batch ingest
+    try:
+        service = _get_service()
+        batch_report = service.ingest_batch(staged_paths)
+
+        # 4. Convert Domain Songs to SongViews for frontend compatibility
+        for result in batch_report["results"]:
+            if "song" in result and result["song"]:
+                result["song"] = SongView.from_domain(result["song"])
+
+        return BatchIngestReport(**batch_report)
+
+    except Exception as e:
+        logger.error(f"[IngestRouter] Batch ingestion error: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
+        )
+
+
+@router.post("/scan-folder", response_model=BatchIngestReport)
+async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
+    """
+    Server-side folder scanning and ingestion.
+    Scans a local filesystem path for audio files and ingests them.
+
+    Use this for desktop app or when files are already on the server.
+    For browser uploads, use /upload instead.
+
+    Example:
+        POST /api/v1/ingest/scan-folder
+        {
+            "folder_path": "Z:\\Songs\\New Album",
+            "recursive": true
+        }
+    """
+    logger.info(
+        f"[IngestRouter] -> scan_folder(path='{request.folder_path}', recursive={request.recursive})"
+    )
+
+    # 1. Scan for audio files
+    service = _get_service()
+    audio_files = service.scan_folder(request.folder_path, request.recursive)
+
+    if not audio_files:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No audio files found in {request.folder_path}. Accepted extensions: {ACCEPTED_EXTENSIONS}",
         )
 
     # 2. Ensure staging exists
     if not os.path.exists(STAGING_DIR):
         os.makedirs(STAGING_DIR, exist_ok=True)
 
-    # 3. Save to staging with UUID filename to prevent collisions
-    uuid_filename = f"{uuid4()}_{file.filename}"
-    staged_path = os.path.join(STAGING_DIR, uuid_filename)
+    # 3. Copy files to staging
+    staged_paths = []
+    for file_path in audio_files:
+        try:
+            uuid_filename = f"{uuid4()}_{Path(file_path).name}"
+            staged_path = os.path.join(STAGING_DIR, uuid_filename)
+            shutil.copy2(file_path, staged_path)
+            staged_paths.append(staged_path)
+            logger.debug(f"[IngestRouter] Staged: {file_path} -> {staged_path}")
+        except Exception as e:
+            logger.error(f"[IngestRouter] Failed to stage {file_path}: {e}")
+            # Continue with other files
+
+    if not staged_paths:
+        raise HTTPException(
+            status_code=500, detail="Failed to stage any files for ingestion"
+        )
+
+    # 4. Batch ingest
     try:
-        with open(staged_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        batch_report = service.ingest_batch(staged_paths)
+
+        # 5. Convert Domain Songs to SongViews
+        for result in batch_report["results"]:
+            if "song" in result and result["song"]:
+                result["song"] = SongView.from_domain(result["song"])
+
+        logger.info(
+            f"[IngestRouter] <- scan_folder() "
+            f"found={len(audio_files)} ingested={batch_report['ingested']}"
+        )
+        return BatchIngestReport(**batch_report)
+
     except Exception as e:
-        logger.error(f"[IngestRouter] Failed to save staged file: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to stage file: {str(e)}")
-
-    # 4. Ingest
-    try:
-        service = _get_service()
-        report = service.ingest_file(staged_path)
-
-        if report["status"] == "ERROR":
-            logger.warning(f"[IngestRouter] Ingestion FAILED: {report.get('message')}")
-            raise HTTPException(status_code=400, detail=report["message"])
-
-        # 5. Success / Collision
-        if "song" in report and report["song"]:
-            # Cast Domain Song to SongView for frontend compatibility
-            report["song"] = SongView.from_domain(report["song"])
-
-        return IngestionReportView(**report)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[IngestRouter] Unexpected ingestion error: {e}")
+        logger.error(f"[IngestRouter] Folder scan ingestion error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
         )

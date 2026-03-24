@@ -1,4 +1,4 @@
-import { checkIngestion, getDownloadsFolder, uploadFile } from "../api.js";
+import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats } from "../api.js";
 import {
     escapeHtml,
     renderStatus,
@@ -8,16 +8,68 @@ const PATH_INPUT_ID = "ingest-path-input";
 const CHECK_BTN_ID = "ingest-check-btn";
 const RESULTS_LIST_ID = "ingest-results";
 
+/**
+ * Recursively collect all File objects from DataTransferItemList.
+ * Handles both files and directories.
+ */
+async function collectFilesFromItems(items, allowedExtensions) {
+    const files = [];
+    const queue = [];
+    const exts = (allowedExtensions || []).map(e => e.toLowerCase());
+
+    // Convert items to entries
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === "file") {
+            const entry = item.webkitGetAsEntry();
+            if (entry) {
+                queue.push(entry);
+            }
+        }
+    }
+
+    // Process queue
+    while (queue.length > 0) {
+        const entry = queue.shift();
+
+        if (entry.isFile) {
+            const isAllowed = exts.some(ext => entry.name.toLowerCase().endsWith(ext));
+            if (isAllowed) {
+                // Get the actual File object
+                const file = await new Promise((resolve) => entry.file(resolve));
+                files.push(file);
+            }
+        } else if (entry.isDirectory) {
+            // Read ALL directory contents (readEntries returns batches)
+            const reader = entry.createReader();
+            let batch;
+            do {
+                batch = await new Promise((resolve) => reader.readEntries(resolve));
+                queue.push(...batch);
+            } while (batch.length > 0);
+        }
+    }
+
+    return files;
+}
+
 export async function renderIngestionPanel(ctx) {
     ctx.updateResultsSummary(0, "ingestion check");
 
     const DROP_ZONE_ID = "ingest-drop-zone";
     let downloadsFolder = "";
+    let allowedExtensions = [];
 
     try {
-        downloadsFolder = await getDownloadsFolder();
+        const [folder, exts] = await Promise.all([
+            getDownloadsFolder(),
+            getAcceptedFormats()
+        ]);
+        downloadsFolder = folder;
+        allowedExtensions = exts;
     } catch (e) {
-        downloadsFolder = "C:\\Users\\Downloads";
+        console.error("Failed to load ingestion configuration:", e);
+        // No fallbacks. UI will handle missing config.
     }
 
     ctx.elements.resultsContainer.innerHTML = `
@@ -54,6 +106,7 @@ export async function renderIngestionPanel(ctx) {
             </div>
 
             <div class="ingest-actions">
+                <button class="ingest-btn-secondary" id="ingest-scan-folder-btn">Scan Server Folder</button>
                 <button class="ingest-btn-secondary" id="ingest-clear-btn">Clear Results</button>
                 <span class="ingest-hint muted-note">Press Enter to check</span>
             </div>
@@ -63,13 +116,14 @@ export async function renderIngestionPanel(ctx) {
         </div>
     `;
 
-    setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID);
+    setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions);
     setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID);
     setupClearButton("ingest-clear-btn", RESULTS_LIST_ID);
+    setupScanFolderButton("ingest-scan-folder-btn", PATH_INPUT_ID, RESULTS_LIST_ID);
     setupManualIngestHandlers(RESULTS_LIST_ID);
 }
 
-function setupDropZone(zoneId, resultsId) {
+function setupDropZone(zoneId, resultsId, allowedExtensions) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
 
@@ -94,15 +148,41 @@ function setupDropZone(zoneId, resultsId) {
         e.preventDefault();
         zone.classList.remove("drag-over");
 
-        const file = e.dataTransfer?.files?.[0];
-        if (!file) return;
+        const items = e.dataTransfer?.items;
+
+        if (!items || items.length === 0) {
+            return;
+        }
 
         showLoading(true);
         try {
-            const result = await uploadFile(file);
-            appendResult(resultsId, result, file.name);
+            // Recursively collect all files from dropped items (supports folders)
+            const allFiles = await collectFilesFromItems(items, allowedExtensions);
+
+            if (allFiles.length === 0) {
+                appendResult(resultsId, {
+                    status: "ERROR",
+                    message: "No audio files found in dropped folder(s)"
+                }, "Drag and Drop");
+                showLoading(false);
+                return;
+            }
+
+            // Upload all collected files
+            const result = await uploadFiles(allFiles);
+
+            // Result is now BatchIngestReport
+            const summary = `Processed ${result.total_files} files: ${result.ingested} ingested, ${result.duplicates} duplicates, ${result.errors} errors`;
+            appendBatchSummary(resultsId, result, summary);
+
+            // Show individual file results
+            for (const fileResult of result.results) {
+                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
+                appendResult(resultsId, fileResult, fileName);
+            }
         } catch (error) {
-            appendResult(resultsId, { status: "ERROR", message: error.message }, file.name);
+            console.error("Drop error:", error);
+            appendResult(resultsId, { status: "ERROR", message: error.message }, "Batch Upload");
         } finally {
             showLoading(false);
         }
@@ -153,7 +233,7 @@ function setupManualIngestHandlers(resultsId) {
         // But for now, I'll alert that manual path ingestion requires server-side file access.
         btn.disabled = true;
         btn.textContent = "Uploading...";
-        
+
         try {
             // For now, remind them to drop the file for instant ingestion.
             throw new Error("Path-based ingestion restricted. Please drag and drop the physical file for instant ingestion.");
@@ -175,6 +255,42 @@ function setupClearButton(btnId, resultsId) {
     });
 }
 
+function setupScanFolderButton(btnId, inputId, resultsId) {
+    const btn = document.getElementById(btnId);
+    const input = document.getElementById(inputId);
+    if (!btn || !input) return;
+
+    btn.addEventListener("click", async () => {
+        const folderPath = input.value.trim();
+        if (!folderPath) {
+            alert("Please enter a folder path (e.g., Z:\\Songs\\NewAlbum)");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Scanning...";
+
+        try {
+            const result = await scanFolder(folderPath, true);
+
+            // Result is BatchIngestReport
+            const summary = `Scanned folder: ${result.total_files} files processed (${result.ingested} ingested, ${result.duplicates} duplicates, ${result.errors} errors)`;
+            appendBatchSummary(resultsId, result, summary);
+
+            // Show individual file results
+            for (const fileResult of result.results) {
+                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
+                appendResult(resultsId, fileResult, fileName);
+            }
+        } catch (error) {
+            appendResult(resultsId, { status: "ERROR", message: error.message }, folderPath);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Scan Server Folder";
+        }
+    });
+}
+
 function setLoading(btn, loading) {
     const label = btn.querySelector(".btn-label");
     const loadingEl = btn.querySelector(".btn-loading");
@@ -189,6 +305,49 @@ function appendResult(resultsId, result, path) {
 
     const item = createResultCard(result, path);
     list.insertBefore(item, list.firstChild);
+}
+
+function appendBatchSummary(resultsId, batchReport, summary) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+
+    const card = document.createElement("article");
+    card.className = "result-card batch-summary-card";
+
+    const successRate = batchReport.total_files > 0
+        ? Math.round((batchReport.ingested / batchReport.total_files) * 100)
+        : 0;
+
+    card.innerHTML = `
+        <div class="card-icon ingest-icon">📦</div>
+        <div class="card-body">
+            <div class="card-title-row">
+                <div class="card-title">Batch Processing Complete</div>
+                ${renderStatus("found", `${successRate}% Success`)}
+            </div>
+            <div class="card-subtitle">${escapeHtml(summary)}</div>
+            <div class="batch-stats" style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+                <div class="stat-pill">
+                    <div class="stat-value">${batchReport.total_files}</div>
+                    <div class="stat-label muted-note">Total</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="stat-value" style="color: var(--accent);">${batchReport.ingested}</div>
+                    <div class="stat-label muted-note">Ingested</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="stat-value" style="color: var(--warning);">${batchReport.duplicates}</div>
+                    <div class="stat-label muted-note">Duplicates</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="stat-value" style="color: var(--danger);">${batchReport.errors}</div>
+                    <div class="stat-label muted-note">Errors</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    list.insertBefore(card, list.firstChild);
 }
 
 function createResultCard(result, path) {

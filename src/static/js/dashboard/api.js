@@ -131,12 +131,29 @@ export async function getDownloadsFolder() {
     return result.path;
 }
 
-export function uploadFile(file) {
+export async function getAcceptedFormats() {
+    const result = await fetchJson("/api/v1/ingest/formats");
+    return result.extensions;
+}
+
+export function uploadFiles(files) {
     const formData = new FormData();
-    formData.append("file", file);
+    // Support both single file and array of files
+    const fileArray = Array.isArray(files) ? files : [files];
+    for (const file of fileArray) {
+        formData.append("files", file);
+    }
     return fetchJson("/api/v1/ingest/upload", {
         method: "POST",
         body: formData,
+    });
+}
+
+export function scanFolder(folderPath, recursive = true) {
+    return fetchJson("/api/v1/ingest/scan-folder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder_path: folderPath, recursive }),
     });
 }
 

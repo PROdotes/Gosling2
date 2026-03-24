@@ -295,8 +295,26 @@ class IngestionReportView(BaseModel):
     song: Optional[SongView] = None
 
 
+class FolderScanRequest(BaseModel):
+    """Payload for server-side folder scanning."""
+
+    folder_path: str
+    recursive: bool = True
+
+
+class BatchIngestReport(BaseModel):
+    """The result of a batch ingestion operation."""
+
+    total_files: int
+    ingested: int
+    duplicates: int
+    errors: int
+    results: List[IngestionReportView]
+
+
 IdentityView.model_rebuild()
 SongAlbumView.model_rebuild()
 SongView.model_rebuild()
 AlbumView.model_rebuild()
 IngestionReportView.model_rebuild()
+BatchIngestReport.model_rebuild()

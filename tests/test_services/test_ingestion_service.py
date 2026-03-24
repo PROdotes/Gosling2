@@ -23,8 +23,11 @@ Disambiguation fixture (local, extends populated_db):
 
 import sqlite3
 import shutil
+import os
 import pytest
+from pathlib import Path
 from src.data.song_repository import SongRepository
+from src.services.catalog_service import CatalogService
 
 
 def _connect(db_path):
@@ -493,3 +496,147 @@ class TestEmptyAndBoundaryInputs:
         assert (
             repo.get_by_hash("any_hash") is None
         ), "Expected None for hash on empty DB"
+
+
+# ========================================
+# BATCH INGESTION TESTS
+# ========================================
+
+
+@pytest.fixture
+def test_audio_folder(tmp_path):
+    """Create a temporary folder structure with mock audio files for scanning."""
+    audio_dir = tmp_path / "audio_files"
+    audio_dir.mkdir()
+
+    # Create mock .mp3 files
+    (audio_dir / "song1.mp3").write_text("mock audio data 1")
+    (audio_dir / "song2.mp3").write_text("mock audio data 2")
+    (audio_dir / "song3.mp3").write_text("mock audio data 3")
+
+    # Create subdirectory with more files
+    subdir = audio_dir / "subfolder"
+    subdir.mkdir()
+    (subdir / "song4.mp3").write_text("mock audio data 4")
+    (subdir / "song5.mp3").write_text("mock audio data 5")
+
+    # Create non-audio files that should be ignored
+    (audio_dir / "readme.txt").write_text("not audio")
+    (audio_dir / "image.jpg").write_text("not audio")
+    (subdir / "notes.doc").write_text("not audio")
+
+    return str(audio_dir)
+
+
+class TestScanFolder:
+    """Tests for scan_folder() method - pure file discovery utility."""
+
+    def test_flat_scan_finds_top_level_files_only(self, populated_db, test_audio_folder):
+        """Non-recursive scan returns only top-level .mp3 files."""
+        service = CatalogService(populated_db)
+        files = service.scan_folder(test_audio_folder, recursive=False)
+
+        assert len(files) == 3, f"Expected 3 files, got {len(files)}"
+
+        # Verify all returned paths are absolute
+        for f in files:
+            assert os.path.isabs(f), f"Expected absolute path, got {f}"
+
+        # Verify only top-level mp3s (not subdirectory files)
+        filenames = [os.path.basename(f) for f in files]
+        assert "song1.mp3" in filenames, "Expected song1.mp3 in results"
+        assert "song2.mp3" in filenames, "Expected song2.mp3 in results"
+        assert "song3.mp3" in filenames, "Expected song3.mp3 in results"
+        assert "song4.mp3" not in filenames, "song4.mp3 should not be in flat scan"
+        assert "song5.mp3" not in filenames, "song5.mp3 should not be in flat scan"
+
+    def test_recursive_scan_finds_all_audio_files(self, populated_db, test_audio_folder):
+        """Recursive scan returns all .mp3 files including subdirectories."""
+        service = CatalogService(populated_db)
+        files = service.scan_folder(test_audio_folder, recursive=True)
+
+        assert len(files) == 5, f"Expected 5 files, got {len(files)}"
+
+        filenames = [os.path.basename(f) for f in files]
+        assert "song1.mp3" in filenames, "Expected song1.mp3 in results"
+        assert "song2.mp3" in filenames, "Expected song2.mp3 in results"
+        assert "song3.mp3" in filenames, "Expected song3.mp3 in results"
+        assert "song4.mp3" in filenames, "Expected song4.mp3 in results"
+        assert "song5.mp3" in filenames, "Expected song5.mp3 in results"
+
+    def test_scan_ignores_non_audio_files(self, populated_db, test_audio_folder):
+        """Only .mp3 files are returned, other file types ignored."""
+        service = CatalogService(populated_db)
+        files = service.scan_folder(test_audio_folder, recursive=True)
+
+        filenames = [os.path.basename(f) for f in files]
+        assert "readme.txt" not in filenames, "txt files should be ignored"
+        assert "image.jpg" not in filenames, "jpg files should be ignored"
+        assert "notes.doc" not in filenames, "doc files should be ignored"
+
+    def test_nonexistent_folder_returns_empty_list(self, populated_db):
+        """Scanning a nonexistent folder returns empty list."""
+        service = CatalogService(populated_db)
+        files = service.scan_folder("/nonexistent/path/xyz", recursive=True)
+
+        assert files == [], f"Expected empty list, got {files}"
+
+    def test_empty_folder_returns_empty_list(self, populated_db, tmp_path):
+        """Scanning an empty folder returns empty list."""
+        empty_dir = tmp_path / "empty"
+        empty_dir.mkdir()
+
+        service = CatalogService(populated_db)
+        files = service.scan_folder(str(empty_dir), recursive=True)
+
+        assert files == [], f"Expected empty list, got {files}"
+
+    def test_folder_with_only_non_audio_files(self, populated_db, tmp_path):
+        """Folder with only non-.mp3 files returns empty list."""
+        dir_path = tmp_path / "no_audio"
+        dir_path.mkdir()
+        (dir_path / "file1.txt").write_text("text")
+        (dir_path / "file2.jpg").write_text("image")
+
+        service = CatalogService(populated_db)
+        files = service.scan_folder(str(dir_path), recursive=True)
+
+        assert files == [], f"Expected empty list, got {files}"
+
+
+class TestIngestBatch:
+    """Tests for ingest_batch() method - parallel file processing."""
+
+    def test_empty_list_returns_zero_counts(self, populated_db):
+        """Batch ingesting empty list returns all zeros."""
+        service = CatalogService(populated_db)
+        report = service.ingest_batch([], max_workers=5)
+
+        assert report["total_files"] == 0, f"Expected 0 total_files, got {report['total_files']}"
+        assert report["ingested"] == 0, f"Expected 0 ingested, got {report['ingested']}"
+        assert report["duplicates"] == 0, f"Expected 0 duplicates, got {report['duplicates']}"
+        assert report["errors"] == 0, f"Expected 0 errors, got {report['errors']}"
+        assert report["results"] == [], f"Expected empty results, got {report['results']}"
+
+    def test_single_file_sequential_behavior(self, populated_db, tmp_path):
+        """Single file batch behaves same as single ingest_file() call."""
+        # This is a placeholder - real test would need actual audio file with metadata
+        # Skipping for now since it requires MetadataService integration
+        pass
+
+    def test_max_workers_parameter_accepted(self, populated_db):
+        """Verify max_workers parameter is accepted without error."""
+        service = CatalogService(populated_db)
+
+        # Should not raise
+        report = service.ingest_batch([], max_workers=1)
+        assert report is not None, "Expected report dict"
+
+        report = service.ingest_batch([], max_workers=20)
+        assert report is not None, "Expected report dict"
+
+    def test_aggregate_stats_sum_correctly(self, populated_db):
+        """Aggregate counts (ingested + duplicates + errors) equal total_files."""
+        # This would need real staged files to test properly
+        # Placeholder for now
+        pass

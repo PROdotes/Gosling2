@@ -33,18 +33,26 @@ class TestCatalogWriteApi:
         with open(sample_mp3, "rb") as f:
             resp = api_client.post(
                 "/api/v1/ingest/upload",
-                files={"file": (sample_mp3.name, f, "audio/mpeg")}
+                files=[("files", (sample_mp3.name, f, "audio/mpeg"))]
             )
-        
+
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {resp.text}"
         data = resp.json()
-        
-        # 1. Report Metadata
-        assert data["status"] == "INGESTED", f"Expected 'INGESTED', got '{data['status']}'"
-        assert data["match_type"] is None, f"Expected None match_type for new ingest, got {data['match_type']}"
-        
-        # 2. EXHAUSTIVE SONGVIEW ASSERTIONS
-        song = data["song"]
+
+        # 1. Batch Report Structure (now returns BatchIngestReport)
+        assert data["total_files"] == 1, f"Expected 1 file, got {data['total_files']}"
+        assert data["ingested"] == 1, f"Expected 1 ingested, got {data['ingested']}"
+        assert data["duplicates"] == 0, f"Expected 0 duplicates, got {data['duplicates']}"
+        assert data["errors"] == 0, f"Expected 0 errors, got {data['errors']}"
+        assert len(data["results"]) == 1, f"Expected 1 result, got {len(data['results'])}"
+
+        # 2. Individual Result
+        result = data["results"][0]
+        assert result["status"] == "INGESTED", f"Expected 'INGESTED', got '{result['status']}'"
+        assert result["match_type"] is None, f"Expected None match_type for new ingest, got {result['match_type']}"
+
+        # 3. EXHAUSTIVE SONGVIEW ASSERTIONS
+        song = result["song"]
         assert song["id"] is not None, "Expected DB-assigned ID"
         assert song["title"] == "Mayor of Crazy Town (Radio Edit)", f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['title']}'"
         assert song["media_name"] == "Mayor of Crazy Town (Radio Edit)", f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['media_name']}'"
@@ -83,15 +91,15 @@ class TestCatalogWriteApi:
         """POST /upload: Reject non-MP3 files with 400."""
         bad_file = tmp_path / "report.pdf"
         bad_file.write_bytes(b"%PDF-1.4")
-        
+
         with open(bad_file, "rb") as f:
             resp = api_client.post(
                 "/api/v1/ingest/upload",
-                files={"file": (bad_file.name, f, "application/pdf")}
+                files=[("files", (bad_file.name, f, "application/pdf"))]
             )
-        
+
         assert resp.status_code == 400, f"Expected 400 for bad extension, got {resp.status_code}"
-        assert "not allowed" in resp.json()["detail"].lower()
+        assert "no valid audio files" in resp.json()["detail"].lower()
 
     def test_upload_missing_file_returns_422(self, api_client):
         """POST /upload: Missing 'file' field returns 422."""
@@ -104,10 +112,11 @@ class TestCatalogWriteApi:
         with open(sample_mp3, "rb") as f:
             up_resp = api_client.post(
                 "/api/v1/ingest/upload",
-                files={"file": (sample_mp3.name, f, "audio/mpeg")}
+                files=[("files", (sample_mp3.name, f, "audio/mpeg"))]
             )
-        song_id = up_resp.json()["song"]["id"]
-        source_path = up_resp.json()["song"]["source_path"]
+        batch_result = up_resp.json()
+        song_id = batch_result["results"][0]["song"]["id"]
+        source_path = batch_result["results"][0]["song"]["source_path"]
         
         assert os.path.exists(source_path), "File should exist in staging before delete"
         

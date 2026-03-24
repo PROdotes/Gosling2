@@ -25,6 +25,7 @@ import pytest  # noqa: E402
 from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
 from src.services.audit_service import AuditService  # noqa: E402
+from src.engine.config import STAGING_DIR  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -501,3 +502,17 @@ def audit_service(populated_db):
 def audit_service_empty(empty_db):
     """AuditService wired to an empty test DB."""
     return AuditService(empty_db)
+
+
+@pytest.fixture(autouse=True)
+def cleanup_staging_dir():
+    """
+    Auto-cleanup fixture that runs after every test.
+    Removes all files from STAGING_DIR to prevent test pollution.
+    """
+    yield  # Let the test run first
+
+    # Cleanup after test
+    if STAGING_DIR.exists():
+        shutil.rmtree(STAGING_DIR)
+    STAGING_DIR.mkdir(parents=True, exist_ok=True)

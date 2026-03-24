@@ -1,5 +1,6 @@
 import os
 from typing import Optional, List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.data.album_repository import AlbumRepository
 from src.data.song_repository import SongRepository
 from src.data.song_credit_repository import SongCreditRepository
@@ -188,6 +189,143 @@ class CatalogService:
             return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
         finally:
             conn.close()
+
+    def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
+        """
+        Scan a folder for audio files and return their paths.
+        Pure file discovery - no staging or ingestion.
+
+        Args:
+            folder_path: Directory to scan
+            recursive: Include subdirectories
+
+        Returns:
+            List of absolute paths to audio files
+        """
+        logger.debug(
+            f"[CatalogService] -> scan_folder(path='{folder_path}', recursive={recursive})"
+        )
+
+        if not os.path.exists(folder_path):
+            logger.warning(
+                f"[CatalogService] <- scan_folder() FOLDER_NOT_FOUND: {folder_path}"
+            )
+            return []
+
+        from pathlib import Path
+        from src.engine.config import ACCEPTED_EXTENSIONS
+
+        audio_files = []
+
+        if recursive:
+            # Walk entire directory tree
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    if Path(file).suffix.lower() in ACCEPTED_EXTENSIONS:
+                        audio_files.append(os.path.join(root, file))
+        else:
+            # Only scan top level
+            for entry in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, entry)
+                if os.path.isfile(file_path):
+                    if Path(entry).suffix.lower() in ACCEPTED_EXTENSIONS:
+                        audio_files.append(file_path)
+
+        logger.debug(
+            f"[CatalogService] <- scan_folder() found {len(audio_files)} audio files"
+        )
+        return audio_files
+
+    def ingest_batch(
+        self, file_paths: List[str], max_workers: int = 10
+    ) -> Dict[str, Any]:
+        """
+        Ingest multiple already-staged files in parallel.
+        Each file gets its own transaction (one failure doesn't block others).
+
+        Uses ThreadPoolExecutor for concurrent processing (works in web and desktop apps).
+
+        Args:
+            file_paths: List of absolute paths to staged files
+            max_workers: Maximum number of parallel threads (default: 10)
+
+        Returns:
+            BatchIngestReport with aggregate stats and per-file results
+        """
+        logger.info(
+            f"[CatalogService] -> ingest_batch(count={len(file_paths)}, workers={max_workers})"
+        )
+
+        results = []
+        ingested_count = 0
+        duplicate_count = 0
+        error_count = 0
+
+        # Use ThreadPoolExecutor for parallel processing
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all files for processing
+            future_to_path = {
+                executor.submit(self._ingest_single, file_path): file_path
+                for file_path in file_paths
+            }
+
+            # Collect results as they complete
+            for future in as_completed(future_to_path):
+                file_path = future_to_path[future]
+                try:
+                    report = future.result()
+
+                    # Track aggregate stats
+                    if report["status"] == "INGESTED":
+                        ingested_count += 1
+                    elif report["status"] == "ALREADY_EXISTS":
+                        duplicate_count += 1
+                    else:  # ERROR
+                        error_count += 1
+
+                    results.append(report)
+
+                except Exception as e:
+                    logger.error(
+                        f"[CatalogService] Batch item failed: {file_path} - {e}"
+                    )
+                    error_count += 1
+                    results.append(
+                        {
+                            "status": "ERROR",
+                            "message": f"Unexpected error: {str(e)}",
+                            "song": None,
+                        }
+                    )
+
+        logger.info(
+            f"[CatalogService] <- ingest_batch() "
+            f"total={len(file_paths)} ingested={ingested_count} "
+            f"duplicates={duplicate_count} errors={error_count}"
+        )
+
+        return {
+            "total_files": len(file_paths),
+            "ingested": ingested_count,
+            "duplicates": duplicate_count,
+            "errors": error_count,
+            "results": results,
+        }
+
+    def _ingest_single(self, file_path: str) -> Dict[str, Any]:
+        """
+        Internal wrapper for thread-safe single file ingestion.
+        Each thread gets its own database connection.
+        """
+        try:
+            return self.ingest_file(file_path)
+        except Exception as e:
+            logger.error(f"[CatalogService] Thread error processing {file_path}: {e}")
+            return {
+                "status": "ERROR",
+                "message": f"Thread error: {str(e)}",
+                "song": None,
+            }
 
     def delete_song(self, song_id: int) -> bool:
         """
