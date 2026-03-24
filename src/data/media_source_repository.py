@@ -51,60 +51,58 @@ class MediaSourceRepository(BaseRepository):
     def get_by_path(self, path: str) -> Optional[MediaSource]:
         """Universal lookup by SourcePath. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_path(path='{path}')")
-        conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
-            FROM MediaSources
-            WHERE SourcePath = ?
-        """,
-            (path,),
-        )
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            source = self._row_to_source(row)
-            logger.info(
-                f"[MediaSourceRepository] <- get_by_path(path='{path}') FOUND id={source.id}"
+            cursor.execute(
+                """
+                SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+                FROM MediaSources
+                WHERE SourcePath = ?
+            """,
+                (path,),
             )
-            return source
+            row = cursor.fetchone()
 
-        logger.info(f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND")
-        return None
+            if row:
+                source = self._row_to_source(row)
+                logger.info(
+                    f"[MediaSourceRepository] <- get_by_path(path='{path}') FOUND id={source.id}"
+                )
+                return source
+
+            logger.info(f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND")
+            return None
 
     def get_by_hash(self, audio_hash: str) -> Optional[MediaSource]:
         """Universal lookup by AudioHash. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_hash(hash='{audio_hash}')")
-        conn = self._get_connection()
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
 
-        cursor.execute(
-            """
-            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
-            FROM MediaSources
-            WHERE AudioHash = ?
-        """,
-            (audio_hash,),
-        )
-        row = cursor.fetchone()
-        conn.close()
-
-        if row:
-            source = self._row_to_source(row)
-            logger.info(
-                f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') FOUND id={source.id}"
+            cursor.execute(
+                """
+                SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+                FROM MediaSources
+                WHERE AudioHash = ?
+            """,
+                (audio_hash,),
             )
-            return source
+            row = cursor.fetchone()
 
-        logger.info(
-            f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') NOT_FOUND"
-        )
-        return None
+            if row:
+                source = self._row_to_source(row)
+                logger.info(
+                    f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') FOUND id={source.id}"
+                )
+                return source
+
+            logger.info(
+                f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') NOT_FOUND"
+            )
+            return None
 
     def _row_to_source(self, row: Mapping[str, Any]) -> MediaSource:
         """Hydrates a base MediaSource from a raw MediaSources row."""

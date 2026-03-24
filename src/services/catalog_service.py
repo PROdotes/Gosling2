@@ -162,7 +162,7 @@ class CatalogService:
 
         # 2. Atomic Write
         song = check["song"]
-        conn = self._song_repo._get_connection()
+        conn = self._song_repo.get_connection()
         try:
             new_id = self._song_repo.insert(song, conn)
             # Update the returned song object with the new db ID
@@ -207,7 +207,7 @@ class CatalogService:
         source_path = song.source_path
 
         # 2. Database Delete
-        conn = self._song_repo._get_connection()
+        conn = self._song_repo.get_connection()
         try:
             success = self._song_repo.delete(song_id, conn)
             if not success:

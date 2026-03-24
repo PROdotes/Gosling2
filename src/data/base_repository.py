@@ -10,8 +10,11 @@ class BaseRepository:
     def __init__(self, db_path: str):
         self.db_path = db_path
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Single point of truth for all DB connections in v3core."""
+    def get_connection(self) -> sqlite3.Connection:
+        """
+        Public connection factory for service layer.
+        Service layer uses this to create connections for write transactions.
+        """
         conn = sqlite3.connect(self.db_path)
 
         # 1. Enable foreign keys so ON DELETE CASCADE fires
@@ -28,3 +31,7 @@ class BaseRepository:
             lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
         )
         return conn
+
+    def _get_connection(self) -> sqlite3.Connection:
+        """Internal connection factory for repository read methods."""
+        return self.get_connection()
