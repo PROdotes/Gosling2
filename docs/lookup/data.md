@@ -69,7 +69,7 @@ Fetch a song by its unique audio hash.
 Find songs matching Title, exact Performer set, and Recording Year. Avoids "Single-Match" false duplicates by requiring the incoming performer set to be an exact match for the existing performer set.
 
 ### insert(song: Song, conn: sqlite3.Connection) -> int
-Atomic insert into `MediaSources` and `Songs` tables. Modular: delegates core file record to `MediaSourceRepository.insert_source`. Returns the new `SourceID`. Does NOT commit.
+Atomic insert into `MediaSources`, `Songs`, and all relationship tables (tags, albums, publishers, credits). Delegates core file record to `MediaSourceRepository.insert_source`, then calls `TagRepository.insert_tags`, `SongAlbumRepository.insert_albums`, `PublisherRepository.insert_song_publishers`, and `SongCreditRepository.insert_credits`. Returns the new `SourceID`. Does NOT commit.
 
 ### _row_to_song(row: sqlite3.Row) -> Song
 **Internal**: Maps a physical database row to the `Song` domain model, handling NULLs and preserving the duration in raw seconds (`duration_s`).
@@ -78,7 +78,10 @@ Atomic insert into `MediaSources` and `Songs` tables. Modular: delegates core fi
 
 ## SongCreditRepository
 *Location: `src/data/song_credit_repository.py`*
-**Responsibility**: DB reads for the SongCredits table. Bridges Song IDs to Names, Roles, and Identity IDs.
+**Responsibility**: DB reads and writes for the SongCredits table. Bridges Song IDs to Names, Roles, and Identity IDs.
+
+### insert_credits(source_id: int, credits: List[SongCredit], conn: sqlite3.Connection) -> None
+Get-or-create `Roles` rows (exact match on `RoleName`) and `ArtistNames` rows (exact match on `DisplayName`; new names get `NULL` OwnerIdentityID, `IsPrimaryName=0`), then insert `SongCredits` link rows. Uses `INSERT OR IGNORE` for idempotency against the `UNIQUE(SourceID, CreditedNameID, RoleID)` constraint.
 
 ### get_credits_for_songs(song_ids: List[int]) -> List[SongCredit]
 Batch-fetches credits for multiple songs in a single query.
@@ -94,7 +97,10 @@ Batch-fetches credits for multiple songs in a single query.
 
 ## SongAlbumRepository
 *Location: `src/data/song_album_repository.py`*
-**Responsibility**: Batch fetching of album associations for songs (M2M).
+**Responsibility**: Batch fetching and writing of album associations for songs (M2M).
+
+### insert_albums(source_id: int, albums: List[SongAlbum], conn: sqlite3.Connection) -> None
+Get-or-create `Albums` rows (matched on `AlbumTitle` + `ReleaseYear` + album artist via `AlbumCredits`), then insert `SongAlbums` link rows with track/disc numbers. Also writes `AlbumCredits` for newly created albums. Falls back to Title+Year only when no credits are provided.
 
 ### get_albums_for_songs(song_ids: List[int]) -> List[SongAlbum]
 Fetches album context (Title, Track, Disc, Primary, Publishers) for a set of Song IDs.
@@ -102,6 +108,12 @@ Returns `SongAlbum` bridge models ready for publisher hydration by the Service.
 
 ### get_albums_for_songs_reverse(album_ids: List[int]) -> List[SongAlbum]
 Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a set of Album IDs. Used for efficient tracklist hydration.
+
+### _find_matching_album(cursor, album: SongAlbum) -> int | None
+**Internal**: Finds an existing album matching Title+Year+Artist. Queries candidates by title+year, then compares sorted artist sets from `AlbumCredits`. Falls back to title+year if no incoming credits. Returns `AlbumID` or `None`.
+
+### _insert_album_credits(cursor, album_id: int, album: SongAlbum) -> None
+**Internal**: Writes `AlbumCredits` rows for a newly created album. Get-or-creates `Roles` and `ArtistNames` (NULL identity for new names), then inserts `AlbumCredits` links.
 
 ### _row_to_song_album(row: sqlite3.Row) -> SongAlbum
 **Internal**: Maps a physical database row to the strict Pydantic `SongAlbum` model.
@@ -134,7 +146,10 @@ Batch fetch song IDs for a set of albums in a single query. Returns a map of Alb
 
 ## PublisherRepository
 *Location: `src/data/publisher_repository.py`*
-**Responsibility**: Loading Publisher metadata for Albums and Tracks.
+**Responsibility**: Loading and writing Publisher metadata for Albums and Tracks.
+
+### insert_song_publishers(source_id: int, publishers: List[Publisher], conn: sqlite3.Connection) -> None
+Get-or-create `Publishers` rows (case-insensitive match on `PublisherName`), then insert `RecordingPublishers` link rows.
 
 ### get_publishers_for_albums(album_ids: List[int]) -> List[Tuple[int, Publisher]]
 Batch-fetch publisher objects for a list of Albums (M2M resolution).
@@ -173,7 +188,10 @@ Find all song IDs explicitly linked to this publisher (Master rights).
 
 ## TagRepository
 *Location: `src/data/tag_repository.py`*
-**Responsibility**: DB reads for the Tags table.
+**Responsibility**: DB reads and writes for the Tags table.
+
+### insert_tags(source_id: int, tags: List[Tag], conn: sqlite3.Connection) -> None
+Get-or-create `Tags` rows (case-insensitive match on `TagName`), then insert `MediaSourceTags` link rows with the `IsPrimary` flag.
 
 ### get_tags_for_songs(song_ids: List[int]) -> List[Tuple[int, Tag]]
 Batch-fetches tags for multiple songs (M2M).

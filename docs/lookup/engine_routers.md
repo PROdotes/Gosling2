@@ -111,6 +111,10 @@ Fetches a single Song domain model by its unique ID.
 **HTTP**: `GET /api/v1/ingest/downloads-folder`
 - Returns the platform-specific default downloads folder.
 
+### async def get_accepted_formats() -> JSONResponse
+**HTTP**: `GET /api/v1/ingest/formats`
+- Returns the list of supported file extensions for ingestion as defined in `ACCEPTED_EXTENSIONS`.
+
 ### async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 **HTTP**: `POST /api/v1/ingest/upload`
 - Batch file ingestion entry point (supports single or multiple files).

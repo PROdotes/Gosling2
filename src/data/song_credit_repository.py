@@ -34,6 +34,60 @@ class SongCreditRepository(BaseRepository):
             logger.debug(f"[SongCreditRepository] Found {len(rows)} raw credit rows.")
             return [self._row_to_song_credit(row) for row in rows]
 
+    def insert_credits(
+        self, source_id: int, credits: List[SongCredit], conn: sqlite3.Connection
+    ) -> None:
+        """Get-or-create Roles + ArtistNames rows, then insert SongCredits links."""
+        logger.debug(
+            f"[SongCreditRepository] -> insert_credits(source_id={source_id}, count={len(credits)})"
+        )
+        if not credits:
+            logger.debug("[SongCreditRepository] <- insert_credits() empty list, no-op")
+            return
+
+        cursor = conn.cursor()
+        for credit in credits:
+            # Get-or-create Role
+            row = cursor.execute(
+                "SELECT RoleID FROM Roles WHERE RoleName = ?",
+                (credit.role_name,),
+            ).fetchone()
+
+            if row:
+                role_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO Roles (RoleName) VALUES (?)",
+                    (credit.role_name,),
+                )
+                role_id = cursor.lastrowid
+
+            # Get-or-create ArtistName (match on DisplayName; new names get NULL identity)
+            # TODO: Validate NULL OwnerIdentityID pattern against work DB (~500 entries)
+            row = cursor.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = ?",
+                (credit.display_name,),
+            ).fetchone()
+
+            if row:
+                name_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",
+                    (credit.display_name,),
+                )
+                name_id = cursor.lastrowid
+
+            # Insert SongCredits link (OR IGNORE for idempotency on UNIQUE constraint)
+            cursor.execute(
+                "INSERT OR IGNORE INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+                (source_id, name_id, role_id),
+            )
+
+        logger.info(
+            f"[SongCreditRepository] <- insert_credits(source_id={source_id}) wrote {len(credits)} credits"
+        )
+
     def _row_to_song_credit(self, row: Mapping[str, Any]) -> SongCredit:
         """Maps a physical database row to the strict Pydantic SongCredit model, enforcing RoleID exists."""
         role_id = row["RoleID"]

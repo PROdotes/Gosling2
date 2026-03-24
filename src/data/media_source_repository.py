@@ -72,7 +72,9 @@ class MediaSourceRepository(BaseRepository):
                 )
                 return source
 
-            logger.info(f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND")
+            logger.info(
+                f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND"
+            )
             return None
 
     def get_by_hash(self, audio_hash: str) -> Optional[MediaSource]:

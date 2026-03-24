@@ -158,7 +158,9 @@ class CatalogService:
             # Cleanup staging file for rejected duplicates
             if os.path.exists(staged_path):
                 os.remove(staged_path)
-                logger.debug(f"[CatalogService] Deleted rejected staged file: {staged_path}")
+                logger.debug(
+                    f"[CatalogService] Deleted rejected staged file: {staged_path}"
+                )
             return check
 
         # 2. Atomic Write

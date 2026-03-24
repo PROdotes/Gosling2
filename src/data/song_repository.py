@@ -2,6 +2,10 @@ import sqlite3
 from typing import List, Optional, Mapping, Any, Dict
 from src.models.domain import Song
 from src.data.media_source_repository import MediaSourceRepository
+from src.data.tag_repository import TagRepository
+from src.data.song_album_repository import SongAlbumRepository
+from src.data.publisher_repository import PublisherRepository
+from src.data.song_credit_repository import SongCreditRepository
 from src.services.logger import logger
 
 
@@ -18,8 +22,8 @@ class SongRepository(MediaSourceRepository):
 
     def insert(self, song: Song, conn: sqlite3.Connection) -> int:
         """
-        Atomic insert into MediaSources and Songs tables.
-        Modular: delegates core MediaSource record to parent.
+        Atomic insert into MediaSources, Songs, and all relationship tables.
+        Modular: delegates core MediaSource record to parent, relationships to specialized repos.
         Returns the new SourceID.
         """
         logger.debug(
@@ -38,6 +42,17 @@ class SongRepository(MediaSourceRepository):
             """,
             (source_id, song.bpm, song.year, song.isrc),
         )
+
+        # 3. Insert relationship data
+        tag_repo = TagRepository(self.db_path)
+        album_repo = SongAlbumRepository(self.db_path)
+        pub_repo = PublisherRepository(self.db_path)
+        credit_repo = SongCreditRepository(self.db_path)
+
+        credit_repo.insert_credits(source_id, song.credits, conn)
+        tag_repo.insert_tags(source_id, song.tags, conn)
+        album_repo.insert_albums(source_id, song.albums, conn)
+        pub_repo.insert_song_publishers(source_id, song.publishers, conn)
 
         logger.info(
             f"[SongRepository] <- insert() INGESTED ID={source_id} '{song.title}'"

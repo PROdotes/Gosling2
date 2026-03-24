@@ -203,6 +203,46 @@ class PublisherRepository(BaseRepository):
             )
             return result
 
+    def insert_song_publishers(
+        self, source_id: int, publishers: List[Publisher], conn: sqlite3.Connection
+    ) -> None:
+        """Get-or-create Publishers rows (case-insensitive), then insert RecordingPublishers links."""
+        logger.debug(
+            f"[PublisherRepository] -> insert_song_publishers(source_id={source_id}, count={len(publishers)})"
+        )
+        if not publishers:
+            logger.debug(
+                "[PublisherRepository] <- insert_song_publishers() empty list, no-op"
+            )
+            return
+
+        cursor = conn.cursor()
+        for pub in publishers:
+            # Get-or-create: UNIQUE(PublisherName COLLATE UTF8_NOCASE) in schema
+            row = cursor.execute(
+                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE",
+                (pub.name,),
+            ).fetchone()
+
+            if row:
+                pub_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO Publishers (PublisherName, ParentPublisherID) VALUES (?, ?)",
+                    (pub.name, pub.parent_id),
+                )
+                pub_id = cursor.lastrowid
+
+            # Insert link
+            cursor.execute(
+                "INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)",
+                (source_id, pub_id),
+            )
+
+        logger.info(
+            f"[PublisherRepository] <- insert_song_publishers(source_id={source_id}) wrote {len(publishers)} publishers"
+        )
+
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""
         return Publisher(

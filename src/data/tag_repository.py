@@ -35,6 +35,44 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch tags: {e}")
             raise
 
+    def insert_tags(
+        self, source_id: int, tags: List[Tag], conn: sqlite3.Connection
+    ) -> None:
+        """Get-or-create Tags rows, then insert MediaSourceTags links."""
+        logger.debug(
+            f"[TagRepository] -> insert_tags(source_id={source_id}, count={len(tags)})"
+        )
+        if not tags:
+            logger.debug("[TagRepository] <- insert_tags() empty list, no-op")
+            return
+
+        cursor = conn.cursor()
+        for tag in tags:
+            # Get-or-create: match on name + category. Schema enforces UNIQUE(TagName, TagCategory).
+            row = cursor.execute(
+                "SELECT TagID FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory IS ?",
+                (tag.name, tag.category),
+            ).fetchone()
+
+            if row:
+                tag_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)",
+                    (tag.name, tag.category),
+                )
+                tag_id = cursor.lastrowid
+
+            # Insert link
+            cursor.execute(
+                "INSERT INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (?, ?, ?)",
+                (source_id, tag_id, 1 if tag.is_primary else 0),
+            )
+
+        logger.info(
+            f"[TagRepository] <- insert_tags(source_id={source_id}) wrote {len(tags)} tags"
+        )
+
     def _row_to_tag(self, row: Mapping[str, Any]) -> Tag:
         """Map a database row to a Tag Pydantic model."""
         return Tag(

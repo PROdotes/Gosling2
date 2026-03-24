@@ -25,7 +25,6 @@ import sqlite3
 import shutil
 import os
 import pytest
-from pathlib import Path
 from src.data.song_repository import SongRepository
 from src.services.catalog_service import CatalogService
 

@@ -54,6 +54,142 @@ class SongAlbumRepository(BaseRepository):
             logger.debug(f"[SongAlbumRepository] Found {len(rows)} song associations.")
             return [self._row_to_song_album(row) for row in rows]
 
+    def insert_albums(
+        self, source_id: int, albums: List[SongAlbum], conn: sqlite3.Connection
+    ) -> None:
+        """Get-or-create Albums rows (by Title+Year+Artist), then insert SongAlbums links."""
+        logger.debug(
+            f"[SongAlbumRepository] -> insert_albums(source_id={source_id}, count={len(albums)})"
+        )
+        if not albums:
+            logger.debug("[SongAlbumRepository] <- insert_albums() empty list, no-op")
+            return
+
+        cursor = conn.cursor()
+        for album in albums:
+            album_id = self._find_matching_album(cursor, album)
+
+            if album_id is None:
+                cursor.execute(
+                    "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
+                    (album.album_title, album.album_type, album.release_year),
+                )
+                album_id = cursor.lastrowid
+                self._insert_album_credits(cursor, album_id, album)
+
+            # Insert link
+            cursor.execute(
+                "INSERT INTO SongAlbums (SourceID, AlbumID, TrackNumber, DiscNumber, IsPrimary) VALUES (?, ?, ?, ?, ?)",
+                (
+                    source_id,
+                    album_id,
+                    album.track_number,
+                    album.disc_number,
+                    1 if album.is_primary else 0,
+                ),
+            )
+
+        logger.info(
+            f"[SongAlbumRepository] <- insert_albums(source_id={source_id}) wrote {len(albums)} albums"
+        )
+
+    def _find_matching_album(self, cursor, album: SongAlbum):
+        """Find an existing album matching Title+Year+Artist. Returns AlbumID or None."""
+        logger.debug(
+            f"[SongAlbumRepository] -> _find_matching_album(title='{album.album_title}', year={album.release_year})"
+        )
+        rows = cursor.execute(
+            "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE AND ReleaseYear IS ?",
+            (album.album_title, album.release_year),
+        ).fetchall()
+
+        if not rows:
+            logger.debug(
+                "[SongAlbumRepository] <- _find_matching_album() no title+year candidates"
+            )
+            return None
+
+        incoming_artists = sorted(c.display_name.lower() for c in album.credits)
+
+        # No credits on the incoming album — fall back to Title+Year only
+        if not incoming_artists:
+            logger.debug(
+                f"[SongAlbumRepository] <- _find_matching_album() no incoming credits, reusing AlbumID={rows[0][0]}"
+            )
+            return rows[0][0]
+
+        for row in rows:
+            candidate_id = row[0]
+            existing_artists = sorted(
+                r[0].lower()
+                for r in cursor.execute(
+                    "SELECT an.DisplayName FROM AlbumCredits ac "
+                    "JOIN ArtistNames an ON ac.CreditedNameID = an.NameID "
+                    "WHERE ac.AlbumID = ?",
+                    (candidate_id,),
+                ).fetchall()
+            )
+            if existing_artists == incoming_artists:
+                logger.debug(
+                    f"[SongAlbumRepository] <- _find_matching_album() artist match, reusing AlbumID={candidate_id}"
+                )
+                return candidate_id
+            # Also match if the existing album has no credits yet
+            if not existing_artists:
+                logger.debug(
+                    f"[SongAlbumRepository] <- _find_matching_album() existing has no credits, reusing AlbumID={candidate_id}"
+                )
+                return candidate_id
+
+        logger.debug(
+            "[SongAlbumRepository] <- _find_matching_album() no artist match, will create new"
+        )
+        return None
+
+    def _insert_album_credits(self, cursor, album_id: int, album: SongAlbum) -> None:
+        """Write AlbumCredits rows for a newly created album."""
+        if not album.credits:
+            return
+        logger.debug(
+            f"[SongAlbumRepository] -> _insert_album_credits(album_id={album_id}, count={len(album.credits)})"
+        )
+        for credit in album.credits:
+            # Get-or-create Role
+            row = cursor.execute(
+                "SELECT RoleID FROM Roles WHERE RoleName = ?",
+                (credit.role_name,),
+            ).fetchone()
+            if row:
+                role_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO Roles (RoleName) VALUES (?)",
+                    (credit.role_name,),
+                )
+                role_id = cursor.lastrowid
+
+            # Get-or-create ArtistName
+            row = cursor.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = ?",
+                (credit.display_name,),
+            ).fetchone()
+            if row:
+                name_id = row[0]
+            else:
+                cursor.execute(
+                    "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",
+                    (credit.display_name,),
+                )
+                name_id = cursor.lastrowid
+
+            cursor.execute(
+                "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+                (album_id, name_id, role_id),
+            )
+        logger.debug(
+            f"[SongAlbumRepository] <- _insert_album_credits(album_id={album_id}) wrote {len(album.credits)} credits"
+        )
+
     def _row_to_song_album(self, row: Mapping[str, Any]) -> SongAlbum:
         """Map a database row to a SongAlbum Pydantic model."""
         return SongAlbum(

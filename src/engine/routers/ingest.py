@@ -7,7 +7,6 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from src.models.view_models import (
-    IngestionReportView,
     SongView,
     FolderScanRequest,
     BatchIngestReport,

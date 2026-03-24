@@ -1,10 +1,8 @@
 import os
-import shutil
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from src.engine_server import app
-from src.engine.config import STAGING_DIR, ACCEPTED_EXTENSIONS
 
 @pytest.fixture
 def api_client(populated_db, monkeypatch, tmp_path):
