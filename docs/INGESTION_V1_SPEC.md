@@ -4,8 +4,8 @@
 The verification pipeline (`POST /api/v1/catalog/ingest/check`) is complete — path, hash, and metadata collision detection all work. What's missing is the **write path**: uploading a file to staging, inserting it into the DB, and deleting songs. This spec defines the minimal end-to-end ingestion loop for testing.
 
 ## Scope
-**In:** File upload to staging, auto-ingest (MediaSources + Songs rows only), hard delete, auditing for all writes, frontend wiring.
-**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. File routing. Audit of physical file deletion (post-MVP).
+**In:** File upload to staging, auto-ingest (MediaSources + Songs rows only), hard delete, frontend wiring.
+**Out:** Credits, albums, tags, publishers insertion. Multi-file/folder support. File routing. Auditing for writes (Deferred).
 
 ### Future: File Routing
 After ingestion, files will be moved from staging to `LIBRARY_ROOT` (`Z:\Songs`) using genre-based routing rules defined in `docs/configs/rules.json`. For MVP, `source_path` in the DB points to the staging location. Routing is a separate task.
@@ -25,29 +25,18 @@ Both live in `_get_connection()` for now. A proper migration system will be intr
 ### Pre-flight: Verify Existing Data
 Before applying the UNIQUE index, verify no duplicate `AudioHash` values exist in the current DB. If duplicates are found, deduplicate first — the index creation will fail otherwise.
 
----
+### Connection Pattern
+Both `insert()` and `delete()` receive a **connection** from the service layer (see Section 3). Both writes share the same connection — the service layer commits or rolls back as a single atomic unit.
 
-## 2. Repository: Write Methods
-
-**File:** `src/data/song_repository.py`
-
-### Connection & Auditing Pattern
-Both `insert()` and `delete()` receive a **connection** and **`batch_id`** from the service layer (see Section 3). All writes and audit logs share the same connection — the service layer commits or rolls back as a single atomic unit.
-
-Audit entries use `_log_change(cursor, table, record_id, field, old_val, new_val, batch_id)` from `BaseRepository`.
-
-### `insert(song: Song, conn, batch_id) -> int`
+### `insert(song: Song, conn) -> int`
 Single transaction inserting into two tables:
 1. **MediaSources** — TypeID via `(SELECT TypeID FROM Types WHERE TypeName = 'Song')`, MediaName, SourcePath, SourceDuration (seconds), AudioHash, ProcessingStatus=1, IsActive=1.
 2. **Songs** — SourceID (from step 1), TempoBPM, RecordingYear, ISRC.
-3. **Audit** — `_log_change()` for each inserted field (`old_val=None`, `new_val=<value>`).
 
 Returns the new SourceID. Does NOT commit — the service layer owns the commit.
 
-### `delete(song_id: int, conn, batch_id) -> bool`
-1. Fetch the existing row first (need field values for audit — both MediaSources and Songs fields).
-2. **Audit** — `_log_change()` for each MediaSources field and Songs field being removed (`old_val=<value>`, `new_val=None`). Must happen before the delete — cascade removes the Songs row automatically.
-3. `DELETE FROM MediaSources WHERE SourceID = ?` — cascade handles the Songs row.
+### `delete(song_id: int, conn) -> bool`
+1. `DELETE FROM MediaSources WHERE SourceID = ?` — cascade handles the Songs row.
 
 Returns True if a row was deleted. Does NOT commit — the service layer owns the commit.
 
@@ -57,17 +46,16 @@ Returns True if a row was deleted. Does NOT commit — the service layer owns th
 
 **File:** `src/services/catalog_service.py`
 
-The service layer owns the DB connection and `batch_id` for all write operations. Pattern:
+The service layer owns the DB connection for all write operations. Pattern:
 1. Create connection via `_song_repo._get_connection()`.
-2. Generate `batch_id` (UUID4).
-3. Pass both to repo methods.
-4. On success: `conn.commit()`.
-5. On failure: `conn.rollback()` + clean up staged file (if applicable).
+2. Pass to repo methods.
+3. On success: `conn.commit()`.
+4. On failure: `conn.rollback()` + clean up staged file (if applicable).
 
 ### `ingest_file(staged_path: str) -> Dict[str, Any]`
 1. Delegates to the existing `check_ingestion()` against the staged file. The `Song` object built during this step (with metadata, hash, etc.) flows through the pipeline — no double extraction.
 2. If `ALREADY_EXISTS` — returns the check result as-is.
-3. If `NEW` — creates connection + batch_id, calls `_song_repo.insert(song, conn, batch_id)`. On success, attaches the returned `SourceID` onto the Song object (`song.model_copy(update={"id": new_source_id})`), commits, returns `{"status": "INGESTED", "song": <Song with ID>}`.
+3. If `NEW` — creates connection, calls `_song_repo.insert(song, conn)`. On success, attaches the returned `SourceID` onto the Song object (`song.model_copy(update={"id": new_source_id})`), commits, returns `{"status": "INGESTED", "song": <Song with ID>}`.
 4. If `ERROR` — returns as-is.
 5. **On DB failure:** rollback the transaction AND delete the staged file to prevent orphans. Staged files that fail to ingest should not accumulate in staging.
 
@@ -75,7 +63,7 @@ The service layer owns the DB connection and `batch_id` for all write operations
 
 ### `delete_song(song_id: int) -> bool`
 1. Fetches the song via `_song_repo.get_by_id()` (need `source_path` for cleanup).
-2. Creates connection + batch_id, calls `_song_repo.delete(song_id, conn, batch_id)`, commits.
+2. Creates connection, calls `_song_repo.delete(song_id, conn)`, commits.
 3. **File cleanup for MVP:** If `source_path` is inside `STAGING_DIR`, deletes the physical file. **CRITICAL:** Cleanup must happen only *after* a successful `conn.commit()`. Silently ignores if file is already gone. Non-staged files are DB-only delete — a user-facing "delete from disk?" choice will be added post-MVP.
 
 ---

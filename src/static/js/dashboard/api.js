@@ -130,3 +130,18 @@ export async function getDownloadsFolder() {
     const result = await fetchJson("/api/v1/ingest/downloads-folder");
     return result.path;
 }
+
+export function uploadFile(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    return fetchJson("/api/v1/ingest/upload", {
+        method: "POST",
+        body: formData,
+    });
+}
+
+export function deleteSong(id) {
+    return fetchJson(`/api/v1/ingest/songs/${id}`, {
+        method: "DELETE",
+    });
+}

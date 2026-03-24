@@ -172,6 +172,8 @@ def _populate_db_data(db_path):
     cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (3, 'Lyricist')")
     cursor.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (4, 'Producer')")
 
+    conn.commit()
+
     # --- Identities ---
     cursor.execute(
         "INSERT INTO Identities (IdentityID, IdentityType) VALUES (1, 'person')"

@@ -359,6 +359,22 @@ document.addEventListener("click", (event) => {
 
     if (action === "navigate-search") {
         navigate(actionTarget.dataset.mode, actionTarget.dataset.query || "");
+        return;
+    }
+
+    if (action === "delete-song") {
+        const { id, title } = actionTarget.dataset;
+        if (confirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`)) {
+            import("./api.js").then(async (m) => {
+                try {
+                    await m.deleteSong(id);
+                    ctx.hideDetailPanel();
+                    performSearch(); // Refresh the current view
+                } catch (err) {
+                    alert(`Deletion failed: ${err.message}`);
+                }
+            });
+        }
     }
 });
 

@@ -27,6 +27,12 @@ Fetches songs matching query. Returns `List[SongView]`.
 ### searchAlbums(query)
 Fetches albums matching query. Returns `List[AlbumView]`.
 
+### uploadFile(file)
+POSTs a binary file to the ingestion endpoint. Returns `IngestionReportView`.
+
+### deleteSong(id)
+DELETEs a song by ID. Returns `{"status": "DELETED"}`.
+
 ---
 
 ## Renderers

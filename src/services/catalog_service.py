@@ -22,6 +22,7 @@ from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
+from src.engine.config import STAGING_DIR
 
 
 class CatalogService:
@@ -136,6 +137,105 @@ class CatalogService:
                 f"[CatalogService] <- check_ingestion(file_path='{file_path}') EXTRACTION_FAILED: {e}"
             )
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
+
+    def ingest_file(self, staged_path: str) -> Dict[str, Any]:
+        """
+        Write path for a staged file.
+        1. Check (Hash/Path/Meta collisions).
+        2. If NEW, insert into both tables.
+        3. Commit single transaction.
+        4. Rollback on failure + cleanup.
+        """
+        logger.debug(f"[CatalogService] -> ingest_file(path='{staged_path}')")
+
+        # 1. Validation check
+        check = self.check_ingestion(staged_path)
+        if check["status"] != "NEW":
+            logger.info(
+                f"[CatalogService] <- ingest_file(path='{staged_path}') REJECTED: {check['status']}"
+            )
+            # Cleanup staging file for rejected duplicates
+            if os.path.exists(staged_path):
+                os.remove(staged_path)
+                logger.debug(f"[CatalogService] Deleted rejected staged file: {staged_path}")
+            return check
+
+        # 2. Atomic Write
+        song = check["song"]
+        conn = self._song_repo._get_connection()
+        try:
+            new_id = self._song_repo.insert(song, conn)
+            # Update the returned song object with the new db ID
+            hydrated_song = song.model_copy(update={"id": new_id})
+
+            conn.commit()
+            logger.info(
+                f"[CatalogService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
+            )
+            return {"status": "INGESTED", "song": hydrated_song}
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- ingest_file() FAILED: {e}")
+
+            # Prevent orphans: delete staged file on failed ingestion
+            if os.path.exists(staged_path):
+                os.remove(staged_path)
+                logger.warning(
+                    f"[CatalogService] Deleted failed staged file: {staged_path}"
+                )
+
+            return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
+        finally:
+            conn.close()
+
+    def delete_song(self, song_id: int) -> bool:
+        """
+        Hard delete for a single song by SourceID.
+        1. Fetch metadata (need path).
+        2. Delete from DB (cascade).
+        3. Physical cleanup ONLY if in staging.
+        """
+        logger.debug(f"[CatalogService] -> delete_song(id={song_id})")
+
+        # 1. Fetch current info (need path for cleanup)
+        song = self._song_repo.get_by_id(song_id)
+        if not song:
+            logger.warning(f"[CatalogService] <- delete_song(id={song_id}) NOT_FOUND")
+            return False
+
+        source_path = song.source_path
+
+        # 2. Database Delete
+        conn = self._song_repo._get_connection()
+        try:
+            success = self._song_repo.delete(song_id, conn)
+            if not success:
+                logger.warning(
+                    f"[CatalogService] <- delete_song(id={song_id}) REPO_DELETE_FALSE"
+                )
+                return False
+
+            conn.commit()
+            logger.info(f"[CatalogService] <- delete_song(id={song_id}) DB_DELETED")
+
+            # 3. Physical File Cleanup (Only after successful DB commit)
+            # If path is in staging area, delete the physical file
+            if source_path.startswith(str(STAGING_DIR)):
+                if os.path.exists(source_path):
+                    os.remove(source_path)
+                    logger.info(
+                        f"[CatalogService] Physical file deleted from staging: {source_path}"
+                    )
+
+            return True
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- delete_song(id={song_id}) FAILED: {e}")
+            return False
+        finally:
+            conn.close()
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""

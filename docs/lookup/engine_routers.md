@@ -101,12 +101,28 @@ Fetches a single Song domain model by its unique ID.
 *Location: `src/engine/routers/ingest.py`*
 **Responsibility**: Dedicated endpoints for binary file handling and session state.
 
-### def _get_downloads_folder() -> str
-**Internal**: OS-aware logic to find the Downloads directory.
+### def _get_service() -> CatalogService
+**Internal**: Service factory for the ingestion router.
 
-### async def get_downloads_folder()
+### def _get_downloads_folder() -> Optional[str]
+**Internal**: NT/POSIX compatible downloads folder path.
+
+### async def get_downloads_folder() -> JSONResponse
 **HTTP**: `GET /api/v1/ingest/downloads-folder`
-- Returns the host machine's Downloads path to the frontend.
+- Returns the platform-specific default downloads folder.
+
+### async def upload_file(file: UploadFile = File(...)) -> IngestionReportView
+**HTTP**: `POST /api/v1/ingest/upload`
+- Physical file ingestion entry point.
+- Saves to `STAGING_DIR` with UUID filename.
+- Orchestrates ingestion via `CatalogService`.
+- Returns `IngestionReportView` with status and hydrated `SongView`.
+
+### async def delete_song(song_id: int) -> Dict[str, Any]
+**HTTP**: `DELETE /api/v1/ingest/songs/{song_id}`
+- Atomic hard-delete of a song by ID.
+- Triggers DB cascade and physical cleanup if in staging.
+- Returns `{"status": "DELETED", "id": song_id}`.
 
 ---
 

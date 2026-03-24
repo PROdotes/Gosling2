@@ -1013,21 +1013,16 @@ main {
 }
 
 .ingest-btn-link {
-    appearance: none;
-    background: none;
+    background: transparent;
     border: none;
-    outline: none;
     color: var(--accent);
     padding: 0;
-    margin: 0;
     font-size: 0.82rem;
     font-weight: 500;
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 4px;
     transition: color 0.16s ease;
-    display: inline-block;
-    line-height: inherit;
 }
 
 .ingest-btn-link:hover {

@@ -62,6 +62,21 @@ Performs a multi-tiered collision check for a new file.
 3.  **Metadata check**: Extracts tags and checks `SongRepository.find_by_metadata` (Titles, Artist Set, Year).
 Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 
+### ingest_file(staged_path: str) -> Dict[str, Any]
+Full write-path orchestration for a staged file.
+- Performs `check_ingestion`.
+- If NEW, inserts into `SongRepository` (atomic).
+- Handles transaction lifecycle (commit/rollback).
+- Deletes `staged_path` on failure to prevent orphans.
+- Returns `IngestionReportView` data.
+
+### delete_song(song_id: int) -> bool
+Atomic hard-delete of a song and its physical file.
+- Removes record from DB via `SongRepository`.
+- Commits transaction.
+- Deletes physical file only if it resides in `STAGING_DIR`.
+- Returns `True` if successfully deleted.
+
 
 ### _hydrate_songs(songs: List[Song], pre_albums: Optional[Dict[int, List[SongAlbum]]] = None) -> List[Song]
 **Internal**: Centralized batch hydration for all song metadata.

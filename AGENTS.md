@@ -55,8 +55,9 @@ A task is not done until:
 ---
 
 ## 7. Execution Protocol (Strict TDD Per-Method)
-- Convert specs into a discrete method-by-method checklist.
-- EVERY step MUST be atomic: exactly ONE method or ONE discrete unit at a time.
+- Every response that includes code MUST begin with the **Execution Checklist** progress status. 
+- If a response contains implementation code for more than one atomic item in that checklist, it is a **VIOLATION** and must be rejected.
+- **Rule 7.5 (Step Cap)**: You are strictly forbidden from executing more than **10 atomic tool calls** in any single turn without a "Stop-and-Report" event.
 - 1. Write the TEST for that one method.
 - 2. Write the IMPLEMENTATION for that one method.
 - 3. Run formatters and local tests.

@@ -168,7 +168,15 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
 
     ctx.showDetailPanel(`
         <div class="detail-header">
-            <div class="detail-title">${escapeHtml(song.title || song.media_name || "Untitled")} <span class="pill mono">#${escapeHtml(song.id || "-")}</span></div>
+            <div class="card-title-row" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; width: 100%;">
+                <div class="detail-title" style="flex: 1;">
+                    ${escapeHtml(song.title || song.media_name || "Untitled")} 
+                    <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
+                </div>
+                <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
+                    Delete
+                </button>
+            </div>
             <div class="detail-path">${escapeHtml(song.source_path || "No source path")}</div>
         </div>
         <div class="detail-content">
