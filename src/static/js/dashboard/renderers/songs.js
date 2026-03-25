@@ -99,16 +99,92 @@ function renderTagCollection(tags, variant = "") {
     `;
 }
 
-export function renderSongs(ctx, songs) {
-    ctx.setState({ selectedIndex: -1 });
-    ctx.updateResultsSummary(songs.length, "song");
+// TODO: Migrate to backend sorting during Phase 2 Advanced Filters
+// State for frontend sorting
+let currentSongs = [];
+let currentSort = { field: null, direction: null };
 
-    if (!songs.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No songs found");
-        return;
-    }
+function sortSongs(songs, field, direction) {
+    const sorted = [...songs];
+    sorted.sort((a, b) => {
+        const aVal = a[field];
+        const bVal = b[field];
 
-    ctx.elements.resultsContainer.innerHTML = songs.map((song, index) => `
+        // Null handling: ASC = nulls to bottom, DESC = nulls to top
+        if (aVal === null || aVal === undefined || aVal === "") {
+            return direction === "asc" ? 1 : -1;
+        }
+        if (bVal === null || bVal === undefined || bVal === "") {
+            return direction === "asc" ? -1 : 1;
+        }
+
+        // Numeric comparison for ID field
+        if (field === "id") {
+            const diff = aVal - bVal;
+            return direction === "asc" ? diff : -diff;
+        }
+
+        // String comparison (case-insensitive) for text fields
+        const aStr = String(aVal).toLowerCase();
+        const bStr = String(bVal).toLowerCase();
+
+        if (aStr < bStr) return direction === "asc" ? -1 : 1;
+        if (aStr > bStr) return direction === "asc" ? 1 : -1;
+        return 0;
+    });
+    return sorted;
+}
+
+function applySortAndRender(ctx, field, direction) {
+    currentSort = { field, direction };
+    const sorted = field ? sortSongs(currentSongs, field, direction) : currentSongs;
+    renderSongsCards(ctx, sorted);
+    updateSortButtonStates();
+}
+
+function clearSort(ctx) {
+    currentSort = { field: null, direction: null };
+    renderSongsCards(ctx, currentSongs);
+    updateSortButtonStates();
+}
+
+function updateSortButtonStates() {
+    document.querySelectorAll("[data-sort-field]").forEach((btn) => {
+        const field = btn.getAttribute("data-sort-field");
+        const direction = btn.getAttribute("data-sort-direction");
+        if (field === currentSort.field && direction === currentSort.direction) {
+            btn.classList.add("active");
+        } else {
+            btn.classList.remove("active");
+        }
+    });
+}
+
+function renderSortControls(ctx) {
+    return `
+        <div class="sort-controls">
+            <span class="sort-label">Sort:</span>
+            <button class="sort-clear-btn" data-action="clear-sort">Clear</button>
+            <div class="sort-buttons">
+                <div class="sort-row">
+                    <span class="sort-direction">↑</span>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="media_name" data-sort-direction="asc">Title</button>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="display_artist" data-sort-direction="asc">Artist</button>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="id" data-sort-direction="asc">ID</button>
+                </div>
+                <div class="sort-row">
+                    <span class="sort-direction">↓</span>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="media_name" data-sort-direction="desc">Title</button>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="display_artist" data-sort-direction="desc">Artist</button>
+                    <button class="sort-btn" data-action="apply-sort" data-sort-field="id" data-sort-direction="desc">ID</button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderSongsCards(ctx, songs) {
+    const cardsHtml = songs.map((song, index) => `
         <article class="result-card song-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">♪</div>
             <div class="card-body">
@@ -125,6 +201,41 @@ export function renderSongs(ctx, songs) {
             </div>
         </article>
     `).join("");
+
+    ctx.elements.resultsContainer.innerHTML = renderSortControls(ctx) + cardsHtml;
+
+    // Attach event handlers
+    ctx.elements.resultsContainer.querySelectorAll("[data-action='apply-sort']").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const field = btn.getAttribute("data-sort-field");
+            const direction = btn.getAttribute("data-sort-direction");
+            applySortAndRender(ctx, field, direction);
+        });
+    });
+
+    ctx.elements.resultsContainer.querySelector("[data-action='clear-sort']")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        clearSort(ctx);
+    });
+
+    updateSortButtonStates();
+}
+
+export function renderSongs(ctx, songs) {
+    ctx.setState({ selectedIndex: -1 });
+    ctx.updateResultsSummary(songs.length, "song");
+
+    currentSongs = songs;
+
+    if (!songs.length) {
+        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No songs found");
+        return;
+    }
+
+    // Apply current sort if active, otherwise show in API order
+    const displaySongs = currentSort.field ? sortSongs(songs, currentSort.field, currentSort.direction) : songs;
+    renderSongsCards(ctx, displaySongs);
 }
 
 export function renderSongDetailLoading(ctx, song) {
