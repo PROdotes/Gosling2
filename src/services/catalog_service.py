@@ -331,10 +331,11 @@ class CatalogService:
 
     def delete_song(self, song_id: int) -> bool:
         """
-        Hard delete for a single song by SourceID.
+        Soft-delete a single song by SourceID.
         1. Fetch metadata (need path).
-        2. Delete from DB (cascade).
-        3. Physical cleanup ONLY if in staging.
+        2. Hard-delete junction/link rows (CASCADE won't fire on UPDATE).
+        3. Soft-delete the MediaSources row (IsDeleted = 1).
+        4. Physical cleanup ONLY if in staging.
         """
         logger.debug(f"[CatalogService] -> delete_song(id={song_id})")
 
@@ -346,18 +347,25 @@ class CatalogService:
 
         source_path = song.source_path
 
-        # 2. Database Delete
+        # 2. Database Soft-Delete
         conn = self._song_repo.get_connection()
         try:
-            success = self._song_repo.delete(song_id, conn)
+            # Hard-delete junction rows first (links die, entities stay)
+            self._song_repo.delete_song_links(song_id, conn)
+
+            # Soft-delete the song itself
+            success = self._song_repo.soft_delete(song_id, conn)
             if not success:
                 logger.warning(
-                    f"[CatalogService] <- delete_song(id={song_id}) REPO_DELETE_FALSE"
+                    f"[CatalogService] <- delete_song(id={song_id}) SOFT_DELETE_FALSE"
                 )
+                conn.rollback()
                 return False
 
             conn.commit()
-            logger.info(f"[CatalogService] <- delete_song(id={song_id}) DB_DELETED")
+            logger.info(
+                f"[CatalogService] <- delete_song(id={song_id}) SOFT_DELETED"
+            )
 
             # 3. Physical File Cleanup (Only after successful DB commit)
             # If path is in staging area, delete the physical file

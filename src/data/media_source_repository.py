@@ -120,22 +120,51 @@ class MediaSourceRepository(BaseRepository):
             notes=None,  # Not in core MediaSources table currently
         )
 
-    def delete(self, source_id: int, conn: sqlite3.Connection) -> bool:
+    def soft_delete(self, source_id: int, conn: sqlite3.Connection) -> bool:
         """
-        Universal hard delete for any MediaSource by ID.
-        Triggers CASCADE deletes into extension tables (Songs, etc.).
-        Returns True if a record was removed.
+        Soft-delete a MediaSource by setting IsDeleted = 1.
+        Returns True if a record was updated, False if not found or already deleted.
         """
-        logger.debug(f"[MediaSourceRepository] -> delete(id={source_id})")
+        logger.debug(f"[MediaSourceRepository] -> soft_delete(id={source_id})")
         cursor = conn.cursor()
 
-        # Hard Delete from the parent MediaSources table
-        cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (source_id,))
+        cursor.execute(
+            "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ? AND IsDeleted = 0",
+            (source_id,),
+        )
         count = cursor.rowcount
 
         if count > 0:
-            logger.info(f"[MediaSourceRepository] <- delete(id={source_id}) DELETED")
+            logger.info(
+                f"[MediaSourceRepository] <- soft_delete(id={source_id}) SOFT_DELETED"
+            )
             return True
 
-        logger.warning(f"[MediaSourceRepository] <- delete(id={source_id}) NOT_FOUND")
+        logger.warning(
+            f"[MediaSourceRepository] <- soft_delete(id={source_id}) NOT_FOUND_OR_ALREADY_DELETED"
+        )
         return False
+
+    def delete_song_links(self, source_id: int, conn: sqlite3.Connection) -> None:
+        """
+        Hard-delete all junction/link rows for a song.
+        Must be called before soft_delete since CASCADE won't fire on UPDATE.
+        """
+        logger.debug(f"[MediaSourceRepository] -> delete_song_links(id={source_id})")
+        cursor = conn.cursor()
+
+        link_tables = [
+            "SongCredits",
+            "SongAlbums",
+            "MediaSourceTags",
+            "RecordingPublishers",
+        ]
+        for table in link_tables:
+            cursor.execute(f"DELETE FROM {table} WHERE SourceID = ?", (source_id,))
+            logger.debug(
+                f"[MediaSourceRepository] Deleted {cursor.rowcount} rows from {table}"
+            )
+
+        logger.debug(
+            f"[MediaSourceRepository] <- delete_song_links(id={source_id}) DONE"
+        )
