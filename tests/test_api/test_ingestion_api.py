@@ -144,10 +144,14 @@ class TestBatchUploadApi:
     def test_no_files_uploaded_returns_422(self, client):
         """Uploading zero files returns 422 validation error."""
         resp = client.post("/api/v1/ingest/upload", files=[])
-        assert resp.status_code == 422, f"Expected 422 for no files, got {resp.status_code}"
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for no files, got {resp.status_code}"
 
         body = resp.json()
-        assert "detail" in body, f"Expected 'detail' in error response, got {list(body.keys())}"
+        assert (
+            "detail" in body
+        ), f"Expected 'detail' in error response, got {list(body.keys())}"
 
     def test_invalid_extension_files_returns_400(self, client, tmp_path):
         """Uploading only non-.mp3 files returns 400."""
@@ -160,10 +164,14 @@ class TestBatchUploadApi:
                 files=[("files", ("test.txt", f, "text/plain"))],
             )
 
-        assert resp.status_code == 400, f"Expected 400 for invalid extension, got {resp.status_code}"
+        assert (
+            resp.status_code == 400
+        ), f"Expected 400 for invalid extension, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
-        assert "No valid audio files" in body["detail"], f"Expected rejection message, got '{body['detail']}'"
+        assert (
+            "No valid audio files" in body["detail"]
+        ), f"Expected rejection message, got '{body['detail']}'"
 
     def test_batch_report_structure(self, client, tmp_path):
         """Valid batch upload returns BatchIngestReport with all required fields."""
@@ -203,7 +211,9 @@ class TestBatchUploadApi:
         ), f"Expected results to be list, got {type(data['results'])}"
 
         # Total should be at least 1 (the file we uploaded)
-        assert data["total_files"] >= 1, f"Expected at least 1 total_file, got {data['total_files']}"
+        assert (
+            data["total_files"] >= 1
+        ), f"Expected at least 1 total_file, got {data['total_files']}"
 
     def test_mixed_valid_invalid_files_filters_correctly(self, client, tmp_path):
         """Mix of .mp3 and .txt files only processes .mp3 files."""
@@ -216,7 +226,9 @@ class TestBatchUploadApi:
         mp3_2 = tmp_path / "song2.mp3"
         mp3_2.write_bytes(b"mock mp3 2")
 
-        with open(mp3_1, "rb") as f1, open(txt_file, "rb") as f2, open(mp3_2, "rb") as f3:
+        with open(mp3_1, "rb") as f1, open(txt_file, "rb") as f2, open(
+            mp3_2, "rb"
+        ) as f3:
             resp = client.post(
                 "/api/v1/ingest/upload",
                 files=[
@@ -230,7 +242,9 @@ class TestBatchUploadApi:
 
         data = resp.json()
         # Should process 2 mp3 files (txt skipped)
-        assert data["total_files"] == 2, f"Expected 2 files processed, got {data['total_files']}"
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 files processed, got {data['total_files']}"
 
 
 class TestScanFolderApi:
@@ -243,10 +257,14 @@ class TestScanFolderApi:
             json={"folder_path": "/absolutely/does/not/exist", "recursive": True},
         )
 
-        assert resp.status_code == 404, f"Expected 404 for nonexistent folder, got {resp.status_code}"
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 for nonexistent folder, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
-        assert "No audio files found" in body["detail"], f"Expected rejection message, got '{body['detail']}'"
+        assert (
+            "No audio files found" in body["detail"]
+        ), f"Expected rejection message, got '{body['detail']}'"
 
     def test_empty_folder_returns_404(self, client, tmp_path):
         """Scanning empty folder returns 404."""
@@ -258,7 +276,9 @@ class TestScanFolderApi:
             json={"folder_path": str(empty_dir), "recursive": True},
         )
 
-        assert resp.status_code == 404, f"Expected 404 for empty folder, got {resp.status_code}"
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 for empty folder, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
 
@@ -266,7 +286,9 @@ class TestScanFolderApi:
         """Missing folder_path field returns 422 validation error."""
         resp = client.post("/api/v1/ingest/scan-folder", json={"recursive": True})
 
-        assert resp.status_code == 422, f"Expected 422 for missing field, got {resp.status_code}"
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for missing field, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in validation error"
 
@@ -291,7 +313,9 @@ class TestScanFolderApi:
         ), f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
 
         # Should have found 2 files
-        assert data["total_files"] == 2, f"Expected 2 total_files, got {data['total_files']}"
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 total_files, got {data['total_files']}"
 
     def test_recursive_false_only_scans_top_level(self, client, tmp_path):
         """recursive=false only processes top-level files."""
@@ -312,7 +336,9 @@ class TestScanFolderApi:
         data = resp.json()
 
         # Should only find top.mp3 (not nested.mp3)
-        assert data["total_files"] == 1, f"Expected 1 file (non-recursive), got {data['total_files']}"
+        assert (
+            data["total_files"] == 1
+        ), f"Expected 1 file (non-recursive), got {data['total_files']}"
 
     def test_recursive_true_scans_subdirectories(self, client, tmp_path):
         """recursive=true processes all subdirectories."""
@@ -333,4 +359,6 @@ class TestScanFolderApi:
         data = resp.json()
 
         # Should find both files
-        assert data["total_files"] == 2, f"Expected 2 files (recursive), got {data['total_files']}"
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 files (recursive), got {data['total_files']}"

@@ -64,31 +64,53 @@ class TestInsertFullSong:
         saved = song_repo.get_by_id(new_id)
         assert saved is not None, "Expected song to be saved"
         assert saved.id == new_id, f"Expected id={new_id}, got {saved.id}"
-        assert saved.media_name == "Integration Test Song", f"Expected 'Integration Test Song', got '{saved.media_name}'"
-        assert saved.source_path == "/test/integration.mp3", f"Expected '/test/integration.mp3', got '{saved.source_path}'"
+        assert (
+            saved.media_name == "Integration Test Song"
+        ), f"Expected 'Integration Test Song', got '{saved.media_name}'"
+        assert (
+            saved.source_path == "/test/integration.mp3"
+        ), f"Expected '/test/integration.mp3', got '{saved.source_path}'"
         assert saved.duration_s == 210.5, f"Expected 210.5, got {saved.duration_s}"
-        assert saved.audio_hash == "integration_hash_001", f"Expected 'integration_hash_001', got '{saved.audio_hash}'"
+        assert (
+            saved.audio_hash == "integration_hash_001"
+        ), f"Expected 'integration_hash_001', got '{saved.audio_hash}'"
         assert saved.bpm == 128, f"Expected 128, got {saved.bpm}"
         assert saved.year == 2025, f"Expected 2025, got {saved.year}"
-        assert saved.isrc == "US-INT-25-00001", f"Expected 'US-INT-25-00001', got '{saved.isrc}'"
+        assert (
+            saved.isrc == "US-INT-25-00001"
+        ), f"Expected 'US-INT-25-00001', got '{saved.isrc}'"
 
         # --- Verify tags persisted ---
         tags = tag_repo.get_tags_for_songs([new_id])
         assert len(tags) == 2, f"Expected 2 tags, got {len(tags)}"
         tag_map = {t.name: t for _, t in tags}
         assert "Pop" in tag_map, f"Expected 'Pop' tag, got {list(tag_map.keys())}"
-        assert tag_map["Pop"].category == "Genre", f"Expected category 'Genre', got '{tag_map['Pop'].category}'"
-        assert tag_map["Pop"].is_primary is True, f"Expected Pop.is_primary=True, got {tag_map['Pop'].is_primary}"
+        assert (
+            tag_map["Pop"].category == "Genre"
+        ), f"Expected category 'Genre', got '{tag_map['Pop'].category}'"
+        assert (
+            tag_map["Pop"].is_primary is True
+        ), f"Expected Pop.is_primary=True, got {tag_map['Pop'].is_primary}"
         assert "Happy" in tag_map, f"Expected 'Happy' tag, got {list(tag_map.keys())}"
-        assert tag_map["Happy"].category == "Mood", f"Expected category 'Mood', got '{tag_map['Happy'].category}'"
+        assert (
+            tag_map["Happy"].category == "Mood"
+        ), f"Expected category 'Mood', got '{tag_map['Happy'].category}'"
 
         # --- Verify album persisted ---
         albums = album_repo.get_albums_for_songs([new_id])
         assert len(albums) == 1, f"Expected 1 album, got {len(albums)}"
-        assert albums[0].album_title == "Test Album", f"Expected 'Test Album', got '{albums[0].album_title}'"
-        assert albums[0].release_year == 2025, f"Expected 2025, got {albums[0].release_year}"
-        assert albums[0].track_number == 3, f"Expected track 3, got {albums[0].track_number}"
-        assert albums[0].disc_number == 1, f"Expected disc 1, got {albums[0].disc_number}"
+        assert (
+            albums[0].album_title == "Test Album"
+        ), f"Expected 'Test Album', got '{albums[0].album_title}'"
+        assert (
+            albums[0].release_year == 2025
+        ), f"Expected 2025, got {albums[0].release_year}"
+        assert (
+            albums[0].track_number == 3
+        ), f"Expected track 3, got {albums[0].track_number}"
+        assert (
+            albums[0].disc_number == 1
+        ), f"Expected disc 1, got {albums[0].disc_number}"
 
         # --- Verify publisher persisted ---
         pubs = pub_repo.get_publishers_for_songs([new_id])
@@ -99,8 +121,12 @@ class TestInsertFullSong:
         # --- Verify credits persisted ---
         credits = credit_repo.get_credits_for_songs([new_id])
         assert len(credits) == 1, f"Expected 1 credit, got {len(credits)}"
-        assert credits[0].display_name == "Test Artist", f"Expected 'Test Artist', got '{credits[0].display_name}'"
-        assert credits[0].role_name == "Performer", f"Expected 'Performer', got '{credits[0].role_name}'"
+        assert (
+            credits[0].display_name == "Test Artist"
+        ), f"Expected 'Test Artist', got '{credits[0].display_name}'"
+        assert (
+            credits[0].role_name == "Performer"
+        ), f"Expected 'Performer', got '{credits[0].role_name}'"
 
     def test_insert_song_with_no_metadata_still_works(self, populated_db):
         """A bare-bones song with no tags/albums/publishers should insert fine."""
@@ -119,7 +145,9 @@ class TestInsertFullSong:
 
         saved = song_repo.get_by_id(new_id)
         assert saved is not None, "Expected song to be saved"
-        assert saved.media_name == "Bare Song", f"Expected 'Bare Song', got '{saved.media_name}'"
+        assert (
+            saved.media_name == "Bare Song"
+        ), f"Expected 'Bare Song', got '{saved.media_name}'"
         assert saved.bpm is None, f"Expected None bpm, got {saved.bpm}"
         assert saved.year is None, f"Expected None year, got {saved.year}"
 
@@ -133,7 +161,9 @@ class TestInsertFullSong:
             duration_s=180.0,
             year=1991,
             tags=[Tag(name="Grunge", category="Genre")],
-            albums=[SongAlbum(album_title="Nevermind", release_year=1991, track_number=99)],
+            albums=[
+                SongAlbum(album_title="Nevermind", release_year=1991, track_number=99)
+            ],
         )
 
         conn = song_repo.get_connection()
@@ -147,8 +177,12 @@ class TestInsertFullSong:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind' AND ReleaseYear = 1991"
             ).fetchall()
-            assert len(rows) == 1, f"Expected 1 'Nevermind' album (reused), got {len(rows)}"
-            assert rows[0]["AlbumID"] == 100, f"Expected AlbumID=100, got {rows[0]['AlbumID']}"
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 'Nevermind' album (reused), got {len(rows)}"
+            assert (
+                rows[0]["AlbumID"] == 100
+            ), f"Expected AlbumID=100, got {rows[0]['AlbumID']}"
 
         # Verify tag reused (TagID=1)
         with song_repo._get_connection() as conn:

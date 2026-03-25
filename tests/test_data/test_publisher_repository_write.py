@@ -32,7 +32,9 @@ class TestInsertSongPublishers:
                 "SELECT PublisherID, PublisherName FROM Publishers WHERE PublisherName = 'Ninja Tune'"
             ).fetchone()
             assert row is not None, "Expected 'Ninja Tune' publisher row to exist"
-            assert row["PublisherName"] == "Ninja Tune", f"Expected 'Ninja Tune', got '{row['PublisherName']}'"
+            assert (
+                row["PublisherName"] == "Ninja Tune"
+            ), f"Expected 'Ninja Tune', got '{row['PublisherName']}'"
 
         # Verify RecordingPublishers link
         result = repo.get_publishers_for_songs([3])
@@ -56,8 +58,12 @@ class TestInsertSongPublishers:
             rows = conn.execute(
                 "SELECT PublisherID FROM Publishers WHERE PublisherName = 'DGC Records' COLLATE UTF8_NOCASE"
             ).fetchall()
-            assert len(rows) == 1, f"Expected 1 'DGC Records' row (reused), got {len(rows)}"
-            assert rows[0]["PublisherID"] == 10, f"Expected PublisherID=10 (original), got {rows[0]['PublisherID']}"
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 'DGC Records' row (reused), got {len(rows)}"
+            assert (
+                rows[0]["PublisherID"] == 10
+            ), f"Expected PublisherID=10 (original), got {rows[0]['PublisherID']}"
 
         # Verify link
         result = repo.get_publishers_for_songs([3])
@@ -78,7 +84,9 @@ class TestInsertSongPublishers:
             rows = conn.execute(
                 "SELECT PublisherID FROM Publishers WHERE PublisherName = 'DGC Records' COLLATE UTF8_NOCASE"
             ).fetchall()
-            assert len(rows) == 1, f"Expected 1 publisher row (case-insensitive reuse), got {len(rows)}"
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 publisher row (case-insensitive reuse), got {len(rows)}"
 
     def test_insert_empty_list_is_noop(self, populated_db):
         """Passing empty list should not crash or create any rows."""
@@ -86,11 +94,15 @@ class TestInsertSongPublishers:
 
         # Song 3 has no recording publishers before
         before = repo.get_publishers_for_songs([3])
-        assert len(before) == 0, f"Expected 0 publishers on Song 3 before, got {len(before)}"
+        assert (
+            len(before) == 0
+        ), f"Expected 0 publishers on Song 3 before, got {len(before)}"
 
         with repo._get_connection() as conn:
             repo.insert_song_publishers(3, [], conn)
             conn.commit()
 
         after = repo.get_publishers_for_songs([3])
-        assert len(after) == 0, f"Expected 0 publishers on Song 3 after empty insert, got {len(after)}"
+        assert (
+            len(after) == 0
+        ), f"Expected 0 publishers on Song 3 after empty insert, got {len(after)}"

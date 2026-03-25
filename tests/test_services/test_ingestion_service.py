@@ -530,7 +530,9 @@ def test_audio_folder(tmp_path):
 class TestScanFolder:
     """Tests for scan_folder() method - pure file discovery utility."""
 
-    def test_flat_scan_finds_top_level_files_only(self, populated_db, test_audio_folder):
+    def test_flat_scan_finds_top_level_files_only(
+        self, populated_db, test_audio_folder
+    ):
         """Non-recursive scan returns only top-level .mp3 files."""
         service = CatalogService(populated_db)
         files = service.scan_folder(test_audio_folder, recursive=False)
@@ -549,7 +551,9 @@ class TestScanFolder:
         assert "song4.mp3" not in filenames, "song4.mp3 should not be in flat scan"
         assert "song5.mp3" not in filenames, "song5.mp3 should not be in flat scan"
 
-    def test_recursive_scan_finds_all_audio_files(self, populated_db, test_audio_folder):
+    def test_recursive_scan_finds_all_audio_files(
+        self, populated_db, test_audio_folder
+    ):
         """Recursive scan returns all .mp3 files including subdirectories."""
         service = CatalogService(populated_db)
         files = service.scan_folder(test_audio_folder, recursive=True)
@@ -611,11 +615,17 @@ class TestIngestBatch:
         service = CatalogService(populated_db)
         report = service.ingest_batch([], max_workers=5)
 
-        assert report["total_files"] == 0, f"Expected 0 total_files, got {report['total_files']}"
+        assert (
+            report["total_files"] == 0
+        ), f"Expected 0 total_files, got {report['total_files']}"
         assert report["ingested"] == 0, f"Expected 0 ingested, got {report['ingested']}"
-        assert report["duplicates"] == 0, f"Expected 0 duplicates, got {report['duplicates']}"
+        assert (
+            report["duplicates"] == 0
+        ), f"Expected 0 duplicates, got {report['duplicates']}"
         assert report["errors"] == 0, f"Expected 0 errors, got {report['errors']}"
-        assert report["results"] == [], f"Expected empty results, got {report['results']}"
+        assert (
+            report["results"] == []
+        ), f"Expected empty results, got {report['results']}"
 
     def test_single_file_sequential_behavior(self, populated_db, tmp_path):
         """Single file batch behaves same as single ingest_file() call."""

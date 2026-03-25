@@ -187,7 +187,9 @@ class TestSongEdgeCases:
         assert (
             song.source_path == "/edge/5"
         ), f"Expected source_path='/edge/5', got {song.source_path}"
-        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_ms}"
+        assert (
+            song.duration_s == 0.0
+        ), f"Expected duration_s=0.0, got {song.duration_ms}"
         assert (
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
@@ -226,7 +228,9 @@ class TestSongEdgeCases:
         assert (
             view.source_path == "/edge/5"
         ), f"Expected source_path='/edge/5', got {view.source_path}"
-        assert view.duration_s == 0.0, f"Expected duration_s=0.0, got {view.duration_ms}"
+        assert (
+            view.duration_s == 0.0
+        ), f"Expected duration_s=0.0, got {view.duration_ms}"
         assert (
             view.audio_hash is None
         ), f"Expected audio_hash=None, got {view.audio_hash}"

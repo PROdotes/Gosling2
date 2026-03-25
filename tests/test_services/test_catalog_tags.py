@@ -26,7 +26,14 @@ class TestGetAllTags:
 
         # Verify sorted order
         names = [t.name for t in tags]
-        expected_order = ["90s", "Alt Rock", "Electronic", "Energetic", "English", "Grunge"]
+        expected_order = [
+            "90s",
+            "Alt Rock",
+            "Electronic",
+            "Energetic",
+            "English",
+            "Grunge",
+        ]
         assert names == expected_order, f"Expected {expected_order}, got {names}"
 
         # Verify complete fields for first tag (90s)
@@ -87,7 +94,9 @@ class TestSearchTags:
         service = CatalogService(populated_db)
         tags = service.search_tags("xyz_does_not_exist")
 
-        assert len(tags) == 0, f"Expected 0 results for nonexistent term, got {len(tags)}"
+        assert (
+            len(tags) == 0
+        ), f"Expected 0 results for nonexistent term, got {len(tags)}"
 
 
 class TestGetTag:
@@ -137,17 +146,29 @@ class TestGetTagSongs:
 
         song = songs[0]
         assert song.id == 2, f"Expected song_id=2, got {song.id}"
-        assert song.media_name == "Everlong", f"Expected 'Everlong', got '{song.media_name}'"
-        assert song.duration_ms == 240000, f"Expected 240000ms (240s), got {song.duration_ms}"
-        assert song.source_path == "/path/2", f"Expected '/path/2', got '{song.source_path}'"
-        assert song.audio_hash is None, f"Expected None (Song 2 has no hash), got '{song.audio_hash}'"
+        assert (
+            song.media_name == "Everlong"
+        ), f"Expected 'Everlong', got '{song.media_name}'"
+        assert (
+            song.duration_ms == 240000
+        ), f"Expected 240000ms (240s), got {song.duration_ms}"
+        assert (
+            song.source_path == "/path/2"
+        ), f"Expected '/path/2', got '{song.source_path}'"
+        assert (
+            song.audio_hash is None
+        ), f"Expected None (Song 2 has no hash), got '{song.audio_hash}'"
         assert song.year == 1997, f"Expected 1997, got {song.year}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
-        assert song.processing_status is None, f"Expected None, got {song.processing_status}"
+        assert (
+            song.processing_status is None
+        ), f"Expected None, got {song.processing_status}"
 
         # Verify tags are hydrated (Song 2 has only "90s" tag)
         assert len(song.tags) == 1, f"Expected 1 tag on Song 2, got {len(song.tags)}"
-        assert song.tags[0].name == "90s", f"Expected '90s' tag, got '{song.tags[0].name}'"
+        assert (
+            song.tags[0].name == "90s"
+        ), f"Expected '90s' tag, got '{song.tags[0].name}'"
 
     def test_tag_with_multiple_songs_returns_all_hydrated(self, populated_db):
         """Tag 1 (Grunge) is on Song 1 and Song 9."""
@@ -162,34 +183,63 @@ class TestGetTagSongs:
         # Song 1: Smells Like Teen Spirit
         song1 = songs_sorted[0]
         assert song1.id == 1, f"Expected song_id=1, got {song1.id}"
-        assert song1.media_name == "Smells Like Teen Spirit", f"Expected 'Smells Like Teen Spirit', got '{song1.media_name}'"
-        assert song1.duration_ms == 200000, f"Expected 200000ms (200s), got {song1.duration_ms}"
-        assert song1.source_path == "/path/1", f"Expected '/path/1', got '{song1.source_path}'"
-        assert song1.audio_hash == "hash_1", f"Expected 'hash_1', got '{song1.audio_hash}'"
+        assert (
+            song1.media_name == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{song1.media_name}'"
+        assert (
+            song1.duration_ms == 200000
+        ), f"Expected 200000ms (200s), got {song1.duration_ms}"
+        assert (
+            song1.source_path == "/path/1"
+        ), f"Expected '/path/1', got '{song1.source_path}'"
+        assert (
+            song1.audio_hash == "hash_1"
+        ), f"Expected 'hash_1', got '{song1.audio_hash}'"
         assert song1.year == 1991, f"Expected 1991, got {song1.year}"
         assert song1.is_active is True, f"Expected True, got {song1.is_active}"
-        assert song1.processing_status is None, f"Expected None, got {song1.processing_status}"
+        assert (
+            song1.processing_status is None
+        ), f"Expected None, got {song1.processing_status}"
 
         # Verify Song 1 has 3 tags: Grunge, Energetic, English
         assert len(song1.tags) == 3, f"Expected 3 tags on Song 1, got {len(song1.tags)}"
         song1_tag_names = sorted([t.name for t in song1.tags])
-        assert song1_tag_names == ["Energetic", "English", "Grunge"], f"Expected ['Energetic', 'English', 'Grunge'], got {song1_tag_names}"
+        assert song1_tag_names == [
+            "Energetic",
+            "English",
+            "Grunge",
+        ], f"Expected ['Energetic', 'English', 'Grunge'], got {song1_tag_names}"
 
         # Song 9: Priority Test
         song9 = songs_sorted[1]
         assert song9.id == 9, f"Expected song_id=9, got {song9.id}"
-        assert song9.media_name == "Priority Test", f"Expected 'Priority Test', got '{song9.media_name}'"
-        assert song9.duration_ms == 100000, f"Expected 100000ms (100s), got {song9.duration_ms}"
-        assert song9.source_path == "/path/9", f"Expected '/path/9', got '{song9.source_path}'"
-        assert song9.audio_hash is None, f"Expected None (Song 9 has no hash), got '{song9.audio_hash}'"
-        assert song9.year is None, f"Expected None (Song 9 has no year), got {song9.year}"
+        assert (
+            song9.media_name == "Priority Test"
+        ), f"Expected 'Priority Test', got '{song9.media_name}'"
+        assert (
+            song9.duration_ms == 100000
+        ), f"Expected 100000ms (100s), got {song9.duration_ms}"
+        assert (
+            song9.source_path == "/path/9"
+        ), f"Expected '/path/9', got '{song9.source_path}'"
+        assert (
+            song9.audio_hash is None
+        ), f"Expected None (Song 9 has no hash), got '{song9.audio_hash}'"
+        assert (
+            song9.year is None
+        ), f"Expected None (Song 9 has no year), got {song9.year}"
         assert song9.is_active is True, f"Expected True, got {song9.is_active}"
-        assert song9.processing_status is None, f"Expected None, got {song9.processing_status}"
+        assert (
+            song9.processing_status is None
+        ), f"Expected None, got {song9.processing_status}"
 
         # Verify Song 9 has 2 tags: Grunge, Alt Rock
         assert len(song9.tags) == 2, f"Expected 2 tags on Song 9, got {len(song9.tags)}"
         song9_tag_names = sorted([t.name for t in song9.tags])
-        assert song9_tag_names == ["Alt Rock", "Grunge"], f"Expected ['Alt Rock', 'Grunge'], got {song9_tag_names}"
+        assert song9_tag_names == [
+            "Alt Rock",
+            "Grunge",
+        ], f"Expected ['Alt Rock', 'Grunge'], got {song9_tag_names}"
 
         # Verify other songs are NOT included
         returned_ids = [s.id for s in songs]
@@ -203,9 +253,12 @@ class TestGetTagSongs:
 
         # Insert a tag directly without any MediaSourceTags link
         from src.data.tag_repository import TagRepository
+
         repo = TagRepository(populated_db)
         with repo._get_connection() as conn:
-            conn.execute("INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (100, 'Orphan Tag', 'Test')")
+            conn.execute(
+                "INSERT INTO Tags (TagID, TagName, TagCategory) VALUES (100, 'Orphan Tag', 'Test')"
+            )
             conn.commit()
 
         songs = service.get_tag_songs(100)
@@ -216,7 +269,9 @@ class TestGetTagSongs:
         service = CatalogService(populated_db)
         songs = service.get_tag_songs(999)
 
-        assert len(songs) == 0, f"Expected 0 songs for nonexistent tag, got {len(songs)}"
+        assert (
+            len(songs) == 0
+        ), f"Expected 0 songs for nonexistent tag, got {len(songs)}"
 
     def test_songs_include_credits_and_albums(self, populated_db):
         """Verify songs returned have credits and albums hydrated."""
@@ -228,13 +283,25 @@ class TestGetTagSongs:
         assert song1 is not None, "Expected Song 1 in results"
 
         # Credits check (Song 1 has Nirvana as Performer)
-        assert len(song1.credits) >= 1, f"Expected at least 1 credit on Song 1, got {len(song1.credits)}"
-        nirvana_credit = next((c for c in song1.credits if c.display_name == "Nirvana"), None)
+        assert (
+            len(song1.credits) >= 1
+        ), f"Expected at least 1 credit on Song 1, got {len(song1.credits)}"
+        nirvana_credit = next(
+            (c for c in song1.credits if c.display_name == "Nirvana"), None
+        )
         assert nirvana_credit is not None, "Expected Nirvana credit on Song 1"
-        assert nirvana_credit.role_name == "Performer", f"Expected role_name='Performer', got '{nirvana_credit.role_name}'"
+        assert (
+            nirvana_credit.role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{nirvana_credit.role_name}'"
 
         # Albums check (Song 1 is on "Nevermind")
-        assert len(song1.albums) >= 1, f"Expected at least 1 album on Song 1, got {len(song1.albums)}"
-        nevermind = next((a for a in song1.albums if a.album_title == "Nevermind"), None)
+        assert (
+            len(song1.albums) >= 1
+        ), f"Expected at least 1 album on Song 1, got {len(song1.albums)}"
+        nevermind = next(
+            (a for a in song1.albums if a.album_title == "Nevermind"), None
+        )
         assert nevermind is not None, "Expected 'Nevermind' album on Song 1"
-        assert nevermind.track_number == 1, f"Expected track_number=1, got {nevermind.track_number}"
+        assert (
+            nevermind.track_number == 1
+        ), f"Expected track_number=1, got {nevermind.track_number}"
