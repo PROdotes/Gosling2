@@ -8,15 +8,19 @@ import {
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
+    getTagDetail,
+    getTagSongs,
     isAbortError,
     searchAlbums,
     searchArtists,
     searchPublishers,
     searchSongs,
+    searchTags,
 } from "./api.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
+import { renderTags, renderTagDetailComplete, renderTagDetailLoading } from "./renderers/tags.js";
 import { renderSongDetailComplete, renderSongDetailLoading, renderSongs } from "./renderers/songs.js";
 import { formatCountLabel, renderEmptyState } from "./components/utils.js";
 
@@ -37,6 +41,7 @@ const state = {
     cachedIdentities: [],
     cachedAlbums: [],
     cachedPublishers: [],
+    cachedTags: [],
     debounceTimer: null,
     currentQuery: "",
     selectedIndex: -1,
@@ -66,6 +71,12 @@ const modeConfig = {
         noun: "publisher",
         fetcher: searchPublishers,
         renderer: renderPublisherResults,
+    },
+    tags: {
+        placeholder: "Search tags...",
+        noun: "tag",
+        fetcher: searchTags,
+        renderer: renderTags,
     },
     ingest: {
         placeholder: "Enter absolute file path...",
@@ -113,6 +124,9 @@ function getActiveList() {
     if (state.currentMode === "artists") {
         return state.cachedIdentities;
     }
+    if (state.currentMode === "tags") {
+        return state.cachedTags;
+    }
     return state.cachedPublishers;
 }
 
@@ -123,6 +137,8 @@ function setActiveCache(mode, items) {
         state.cachedAlbums = items;
     } else if (mode === "artists") {
         state.cachedIdentities = items;
+    } else if (mode === "tags") {
+        state.cachedTags = items;
     } else {
         state.cachedPublishers = items;
     }
@@ -319,6 +335,30 @@ async function openPublisherDetail(publisher) {
     renderPublisherDetailComplete(ctx, fullPublisher, songsResult.value);
 }
 
+async function openTagDetail(tag) {
+    const request = beginDetailRequest("tags", tag.id);
+    renderTagDetailLoading(ctx, tag);
+
+    const [tagResult, songsResult] = await Promise.allSettled([
+        getTagDetail(tag.id, { signal: request.signal }),
+        getTagSongs(tag.id, { signal: request.signal }),
+    ]);
+
+    if ((tagResult.status === "rejected" && isAbortError(tagResult.reason)) || (songsResult.status === "rejected" && isAbortError(songsResult.reason))) {
+        return;
+    }
+    if (!isActiveDetail("tags", tag.id)) {
+        return;
+    }
+    if (songsResult.status === "rejected") {
+        ctx.showDetailPanel('<div class="detail-content"><div class="file-status missing">Failed to load songs.</div></div>');
+        return;
+    }
+
+    const fullTag = tagResult.status === "fulfilled" ? tagResult.value : tag;
+    renderTagDetailComplete(ctx, fullTag, songsResult.value);
+}
+
 async function openSelectedResult(index) {
     const items = getActiveList();
     const selected = items[index];
@@ -332,6 +372,8 @@ async function openSelectedResult(index) {
         await openAlbumDetail(selected);
     } else if (state.currentMode === "artists") {
         await openArtistDetail(selected);
+    } else if (state.currentMode === "tags") {
+        await openTagDetail(selected);
     } else {
         await openPublisherDetail(selected);
     }

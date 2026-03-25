@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from src.models.domain import Publisher
+from src.models.domain import Publisher, Tag
 from src.models.view_models import (
     SongView,
     IdentityView,
@@ -162,6 +162,44 @@ async def get_album(album_id: int) -> AlbumView:
 
     # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)
+
+
+@router.get("/tags", response_model=List[Tag])
+async def get_all_tags() -> List[Tag]:
+    """Fetch a list of all tags."""
+    logger.debug("[CatalogRouter] get_all_tags()")
+    return _get_service().get_all_tags()
+
+
+@router.get("/tags/search", response_model=List[Tag])
+async def search_tags(q: str) -> List[Tag]:
+    """Search for tags by name."""
+    logger.debug(f"[CatalogRouter] search_tags(q='{q}')")
+    return _get_service().search_tags(q)
+
+
+@router.get("/tags/{tag_id:int}", response_model=Tag)
+async def get_tag(tag_id: int) -> Tag:
+    """Fetch a single tag by ID."""
+    logger.debug(f"[CatalogRouter] get_tag(id={tag_id})")
+    tag = _get_service().get_tag(tag_id)
+    if not tag:
+        logger.warning(f"[CatalogRouter] Tag ID {tag_id} not found")
+        raise HTTPException(status_code=404, detail=f"Tag ID {tag_id} not found")
+    return tag
+
+
+@router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
+async def get_tag_songs(tag_id: int) -> List[SongView]:
+    """Fetch all songs linked to this tag."""
+    logger.debug(f"[CatalogRouter] get_tag_songs(id={tag_id})")
+    # Verify existence
+    tag = _get_service().get_tag(tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+    songs = _get_service().get_tag_songs(tag_id)
+    return [SongView.from_domain(s) for s in songs]
 
 
 @router.post("/catalog/ingest/check", response_model=IngestionReportView)

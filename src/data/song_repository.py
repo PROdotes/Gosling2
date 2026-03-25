@@ -148,7 +148,7 @@ class SongRepository(MediaSourceRepository):
         """Fetch a Song by its audio-only hash, utilizing universal MediaSource lookup."""
         logger.debug(f"[SongRepository] -> get_by_hash(hash='{audio_hash}')")
         base = super().get_by_hash(audio_hash)
-        if base:
+        if base and base.id is not None:
             return self.get_by_id(base.id)
         return None
 
@@ -159,7 +159,7 @@ class SongRepository(MediaSourceRepository):
 
         logger.debug(f"[SongRepository] -> get_by_path(path='{path}')")
         base = super().get_by_path(path)
-        if base:
+        if base and base.id is not None:
             return self.get_by_id(base.id)
         return None
 

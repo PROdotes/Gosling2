@@ -162,3 +162,18 @@ export function deleteSong(id) {
         method: "DELETE",
     });
 }
+
+export function searchTags(query = "") {
+    const url = query
+        ? `/api/v1/tags/search?q=${encodeURIComponent(query)}`
+        : "/api/v1/tags";
+    return runSearch("tags", url);
+}
+
+export function getTagDetail(id, options = {}) {
+    return fetchJson(`/api/v1/tags/${id}`, options);
+}
+
+export function getTagSongs(id, options = {}) {
+    return fetchJson(`/api/v1/tags/${id}/songs`, options);
+}

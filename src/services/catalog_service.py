@@ -518,6 +518,43 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- Return count={len(result)}")
         return result
 
+    def get_all_tags(self) -> List[Tag]:
+        """Fetch the full directory of tags."""
+        logger.debug("[CatalogService] -> get_all_tags()")
+        tags = self._tag_repo.get_all()
+        logger.debug(f"[CatalogService] <- get_all_tags() count={len(tags)}")
+        return tags
+
+    def search_tags(self, query: str) -> List[Tag]:
+        """Search for tags by name match."""
+        logger.debug(f"[CatalogService] -> search_tags(q='{query}')")
+        tags = self._tag_repo.search(query)
+        logger.debug(f"[CatalogService] <- search_tags(q='{query}') count={len(tags)}")
+        return tags
+
+    def get_tag(self, tag_id: int) -> Optional[Tag]:
+        """Fetch a single tag by ID."""
+        logger.debug(f"[CatalogService] -> get_tag(id={tag_id})")
+        tag = self._tag_repo.get_by_id(tag_id)
+        if not tag:
+            logger.warning(f"[CatalogService] <- get_tag(id={tag_id}) NOT_FOUND")
+            return None
+        logger.debug(f"[CatalogService] <- get_tag(id={tag_id}) '{tag.name}'")
+        return tag
+
+    def get_tag_songs(self, tag_id: int) -> List[Song]:
+        """Fetch all songs linked to this tag."""
+        logger.debug(f"[CatalogService] -> get_tag_songs(id={tag_id})")
+        song_ids = self._tag_repo.get_song_ids_by_tag(tag_id)
+        if not song_ids:
+            logger.debug(f"[CatalogService] <- get_tag_songs(id={tag_id}) NO_SONGS")
+            return []
+
+        songs = self._song_repo.get_by_ids(song_ids)
+        result = self._hydrate_songs(songs)
+        logger.debug(f"[CatalogService] <- Return count={len(result)}")
+        return result
+
     def get_songs_by_identity(self, identity_id: int) -> List[Song]:
         """
         Reverse Credit lookup: Given a seed identity_id, find all related IDs (its aliases + members/groups)

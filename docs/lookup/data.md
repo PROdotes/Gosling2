@@ -190,6 +190,18 @@ Find all song IDs explicitly linked to this publisher (Master rights).
 *Location: `src/data/tag_repository.py`*
 **Responsibility**: DB reads and writes for the Tags table.
 
+### get_all() -> List[Tag]
+Fetch the full tag directory ordered by tag name.
+
+### search(query: str) -> List[Tag]
+Search tags by name match.
+
+### get_by_id(tag_id: int) -> Optional[Tag]
+Fetch a single tag by its ID.
+
+### get_song_ids_by_tag(tag_id: int) -> List[int]
+Fetch all song IDs linked to a specific tag.
+
 ### insert_tags(source_id: int, tags: List[Tag], conn: sqlite3.Connection) -> None
 Get-or-create `Tags` rows (case-insensitive match on `TagName`), then insert `MediaSourceTags` link rows with the `IsPrimary` flag.
 

@@ -88,6 +88,26 @@ Fetches a single Song domain model by its unique ID.
 - Fetches the full repertoire (Master rights) for a given publisher.
 - Wraps `CatalogService.get_publisher_songs`.
 
+### async def get_all_tags() -> List[Tag]
+**HTTP**: `GET /api/v1/tags`
+- Directory of all active metadata markers.
+- Wraps `CatalogService.get_all_tags`.
+
+### async def search_tags(q: str) -> List[Tag]
+**HTTP**: `GET /api/v1/tags/search?q={query}`
+- Searches tags by name match.
+- Wraps `CatalogService.search_tags`.
+
+### async def get_tag(tag_id: int) -> Tag
+**HTTP**: `GET /api/v1/tags/{tag_id}`
+- Fetches a single tag by ID.
+- Wraps `CatalogService.get_tag`.
+
+### async def get_tag_songs(tag_id: int) -> List[SongView]
+**HTTP**: `GET /api/v1/tags/{tag_id}/songs`
+- Fetches the full hydrated song repertoire linked to this tag.
+- Wraps `CatalogService.get_tag_songs`.
+
 ### async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
 **HTTP**: `POST /api/v1/catalog/ingest/check`
 - Performs a dry-run ingestion collision check.
