@@ -90,19 +90,21 @@ class TestSongDeletionIntegrity:
         try:
             conn.row_factory = sqlite3.Row
 
-            # CORE TABLES
+            # CORE TABLES (Marked for later restoration, but hidden from surface)
+            res = conn.execute(
+                "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (song_id,)
+            ).fetchone()
+            assert res is not None, "Song record should persist in MediaSources (soft-delete)"
+            assert (
+                res["IsDeleted"] == 1
+            ), f"Expected IsDeleted=1 for song {song_id}, got {res['IsDeleted']}"
+
             assert (
                 conn.execute(
                     "SELECT 1 FROM Songs WHERE SourceID = ?", (song_id,)
                 ).fetchone()
-                is None
-            ), "Song record remained in Songs table"
-            assert (
-                conn.execute(
-                    "SELECT 1 FROM MediaSources WHERE SourceID = ?", (song_id,)
-                ).fetchone()
-                is None
-            ), "Song record remained in MediaSources table"
+                is not None
+            ), "Song extension record should persist in Songs (soft-delete)"
 
             # JUNCTION TABLES (The Scars)
             assert (
@@ -178,19 +180,20 @@ class TestSongDeletionIntegrity:
         success = service.delete_song(999)
         assert success is True, f"Expected True, got {success}"
 
-        # Verify song is actually gone
+        # Verify song is marked deleted
         conn = _connect(empty_db)
         try:
+            conn.row_factory = sqlite3.Row
+            res = conn.execute(
+                "SELECT IsDeleted FROM MediaSources WHERE SourceID = 999"
+            ).fetchone()
+            assert (
+                res is not None and res["IsDeleted"] == 1
+            ), "Expected Song 999 to be soft-deleted in MediaSources"
             assert (
                 conn.execute("SELECT 1 FROM Songs WHERE SourceID = 999").fetchone()
-                is None
-            ), "Expected Song 999 to be deleted from Songs"
-            assert (
-                conn.execute(
-                    "SELECT 1 FROM MediaSources WHERE SourceID = 999"
-                ).fetchone()
-                is None
-            ), "Expected Song 999 to be deleted from MediaSources"
+                is not None
+            ), "Expected Song 999 extension to remain in Songs"
         finally:
             conn.close()
 
@@ -280,13 +283,13 @@ class TestSongDeletionIntegrity:
         try:
             conn.row_factory = sqlite3.Row
 
-            # COLLAPSED: The Song record and its links
+            # HIDDEN: The Song record is marked deleted
+            res = conn.execute(
+                "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (SID,)
+            ).fetchone()
             assert (
-                conn.execute(
-                    "SELECT 1 FROM MediaSources WHERE SourceID = ?", (SID,)
-                ).fetchone()
-                is None
-            ), "Expected MediaSources row to be deleted"
+                res is not None and res["IsDeleted"] == 1
+            ), "Expected MediaSources row to be soft-deleted"
             assert (
                 conn.execute(
                     "SELECT count(*) as c FROM SongCredits WHERE SourceID = ?", (SID,)
@@ -583,14 +586,14 @@ class TestSongDeletionIntegrity:
         try:
             conn.row_factory = sqlite3.Row
 
-            # 1. CHECK GONE (S1 & S2)
+            # 1. CHECK HIDDEN (S1 & S2)
             for sid in [S1, S2]:
+                res = conn.execute(
+                    "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (sid,)
+                ).fetchone()
                 assert (
-                    conn.execute(
-                        "SELECT 1 FROM MediaSources WHERE SourceID = ?", (sid,)
-                    ).fetchone()
-                    is None
-                ), f"Expected Song {sid} to be deleted from MediaSources"
+                    res is not None and res["IsDeleted"] == 1
+                ), f"Expected Song {sid} to be soft-deleted in MediaSources"
                 assert (
                     conn.execute(
                         "SELECT count(*) as c FROM SongCredits WHERE SourceID = ?",

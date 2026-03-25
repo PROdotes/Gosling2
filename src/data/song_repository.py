@@ -18,7 +18,7 @@ class SongRepository(MediaSourceRepository):
         m.ProcessingStatus, m.IsActive, m.SourceNotes, m.MediaName,
         s.TempoBPM, s.RecordingYear, s.ISRC
     """
-    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')"
+    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song') AND m.IsDeleted = 0"
 
     def insert(self, song: Song, conn: sqlite3.Connection) -> int:
         """

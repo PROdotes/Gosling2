@@ -32,8 +32,11 @@ Universal lookup by SourcePath. Returns the base `MediaSource` record (or None) 
 ### get_by_hash(audio_hash: str) -> Optional[MediaSource]
 Universal lookup by AudioHash. Returns the base `MediaSource` record (or None).
 
-### delete(source_id: int, conn: sqlite3.Connection) -> bool
-Universal hard delete for any media type. Triggers `ON DELETE CASCADE` into specialized tables (Songs, etc.). Returns `True` if deleted.
+### soft_delete(source_id: int, conn: sqlite3.Connection) -> bool
+Soft-delete a MediaSource by setting `IsDeleted = 1`. Returns `True` if a record was updated, `False` if not found or already deleted.
+
+### delete_song_links(source_id: int, conn: sqlite3.Connection) -> None
+Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSourceTags, RecordingPublishers). This must be called before `soft_delete` to ensure links are severed while the anchor record remains for undo/audit purposes.
 
 ### _row_to_source(row: sqlite3.Row) -> MediaSource
 **Internal**: Maps a physical database row to the base `MediaSource` domain model, preserving the duration in raw seconds (`duration_s`).

@@ -59,7 +59,7 @@ class MediaSourceRepository(BaseRepository):
                 """
                 SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
                 FROM MediaSources
-                WHERE SourcePath = ?
+                WHERE SourcePath = ? AND IsDeleted = 0
             """,
                 (path,),
             )
@@ -88,7 +88,7 @@ class MediaSourceRepository(BaseRepository):
                 """
                 SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
                 FROM MediaSources
-                WHERE AudioHash = ?
+                WHERE AudioHash = ? AND IsDeleted = 0
             """,
                 (audio_hash,),
             )

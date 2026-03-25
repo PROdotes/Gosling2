@@ -168,6 +168,21 @@ class TestGetByPath:
         source = repo.get_by_path("")
         assert source is None, f"Expected None for empty path, got {source}"
 
+    def test_soft_deleted_path_returns_none(self, populated_db):
+        """Soft-deleted path must be hidden from lookup."""
+        repo = MediaSourceRepository(populated_db)
+        source_id = 1
+        path = "/path/1"
+
+        # 1. Soft delete
+        with repo._get_connection() as conn:
+            repo.soft_delete(source_id, conn)
+            conn.commit()
+
+        # 2. Lookup by path (should return None)
+        source = repo.get_by_path(path)
+        assert source is None, "Soft-deleted source should not be found by path"
+
 
 class TestGetByHash:
     """MediaSourceRepository.get_by_hash contracts."""
@@ -198,11 +213,28 @@ class TestGetByHash:
         source = repo.get_by_hash("")
         assert source is None, f"Expected None for empty hash, got {source}"
 
+    def test_soft_deleted_hash_returns_none(self, populated_db):
+        """Soft-deleted hash must be hidden from lookup."""
+        repo = MediaSourceRepository(populated_db)
+        source_id = 1
+        audio_hash = "hash_1"
+
+        # 1. Soft delete
+        with repo._get_connection() as conn:
+            repo.soft_delete(source_id, conn)
+            conn.commit()
+
+        # 2. Lookup by hash (should return None)
+        source = repo.get_by_hash(audio_hash)
+        assert (
+            source is None
+        ), "Soft-deleted source should not be found by hash"
+
 
 class TestDelete:
-    """Verifies universal hard delete with cascade effects at the base level."""
+    """Verifies soft-delete protocol at the base level."""
 
-    def test_delete_existing_song_at_base_level_cascades_to_extension(
+    def test_soft_delete_marks_record_as_deleted_and_preserves_extension(
         self, populated_db
     ):
         repo = MediaSourceRepository(populated_db)
@@ -218,27 +250,34 @@ class TestDelete:
                 res[0] == 1
             ), f"Expected song {source_id} to exist in Songs table before delete"
 
-        # 2. Execute Delete on the Universal MediaSource Repo
+        # 2. Execute Soft Delete
         with repo._get_connection() as conn:
-            result = repo.delete(source_id, conn)
+            result = repo.soft_delete(source_id, conn)
             conn.commit()
 
         # 3. Assert return value
         assert result is True, f"Expected True (deleted), got {result}"
 
-        # 4. Verify cascade into extension table (Songs)
+        # 4. Verify record still exists but is marked deleted
+        with repo._get_connection() as conn:
+            res = conn.execute(
+                "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (source_id,)
+            ).fetchone()
+            assert res[0] == 1, "Expected IsDeleted = 1 after soft delete"
+
+        # 5. Verify preservation in extension table (Songs) - CASCADE does not fire on UPDATE
         with repo._get_connection() as conn:
             res = conn.execute(
                 "SELECT COUNT(*) FROM Songs WHERE SourceID = ?", (source_id,)
             ).fetchone()
             assert (
-                res[0] == 0
-            ), f"Expected 0 songs in Songs table after cascade delete, got {res[0]}"
+                res[0] == 1
+            ), f"Expected extension record to be preserved after soft delete, got {res[0]}"
 
-    def test_delete_nonexistent_id_returns_false(self, populated_db):
+    def test_soft_delete_nonexistent_id_returns_false(self, populated_db):
         repo = MediaSourceRepository(populated_db)
         with repo._get_connection() as conn:
-            result = repo.delete(9999, conn)
+            result = repo.soft_delete(9999, conn)
             conn.commit()
 
         assert result is False, f"Expected False for nonexistent ID, got {result}"

@@ -3,9 +3,9 @@ from src.data.song_credit_repository import SongCreditRepository
 
 
 class TestDelete:
-    """Verifies hard delete with cascade effects."""
+    """Verifies soft delete with visibility filtering and link severance."""
 
-    def test_delete_existing_song_removes_from_both_tables(self, populated_db):
+    def test_soft_delete_makes_song_unretrievable_and_severs_links(self, populated_db):
         repo = SongRepository(populated_db)
         credit_repo = SongCreditRepository(populated_db)
 
@@ -18,35 +18,41 @@ class TestDelete:
         credits = credit_repo.get_credits_for_songs([song_id])
         assert len(credits) > 0, "Song 1 should have credits in populated_db"
 
-        # 2. Execute Delete
+        # 2. Execute soft delete protocol
         with repo._get_connection() as conn:
-            result = repo.delete(song_id, conn)
+            # We must severed links manually while the anchor row remains
+            repo.delete_song_links(song_id, conn)
+            result = repo.soft_delete(song_id, conn)
             conn.commit()
 
         # 3. Assert return value
         assert result is True, f"Expected True (deleted), got {result}"
 
-        # 4. Verify song is gone (MediaSources + Songs via cascade)
+        # 4. Verify song is HIDDEN (MediaSources + Songs join filters it)
         assert (
             repo.get_by_id(song_id) is None
-        ), f"Song {song_id} should be None after delete"
+        ), f"Song {song_id} should be unretrievable after soft delete"
 
-        # 5. Verify credits are gone (Cascade verify)
-        # Note: SongCreditRepository uses a join, so if the song is gone from MediaSources,
-        # but the credits table itself might have orphans if PRAGMA foreign_keys is OFF.
-        # But we enabled it in BaseRepository.
+        # 5. Verify credits are PURGED (Manual links HARD delete)
         with repo._get_connection() as conn:
             res = conn.execute(
                 "SELECT COUNT(*) FROM SongCredits WHERE SourceID = ?", (song_id,)
             ).fetchone()
-            assert res[0] == 0, f"Expected 0 credits after cascade delete, got {res[0]}"
+            assert res[0] == 0, f"Expected 0 credits after link purge, got {res[0]}"
 
-    def test_delete_nonexistent_song_returns_false(self, populated_db):
+        # 6. Verify record actually PERESERVED (Sanity check for Undo support)
+        with repo._get_connection() as conn:
+            res = conn.execute(
+                "SELECT COUNT(*) FROM MediaSources WHERE SourceID = ?", (song_id,)
+            ).fetchone()
+            assert res[0] == 1, "MediaSource anchor should endure soft delete"
+
+    def test_soft_delete_nonexistent_song_returns_false(self, populated_db):
         repo = SongRepository(populated_db)
         song_id = 9999
 
         with repo._get_connection() as conn:
-            result = repo.delete(song_id, conn)
+            result = repo.soft_delete(song_id, conn)
             conn.commit()
 
         assert result is False, f"Expected False for nonexistent ID, got {result}"
