@@ -67,7 +67,7 @@ class SongAlbumRepository(BaseRepository):
 
         cursor = conn.cursor()
         for album in albums:
-            album_id = self._find_matching_album(cursor, album)
+            album_id, was_deleted = self._find_matching_album(cursor, album)
 
             if album_id is None:
                 cursor.execute(
@@ -79,6 +79,11 @@ class SongAlbumRepository(BaseRepository):
                     album_id, int
                 ), "Failed to retrieve AlbumID after insert"
                 self._insert_album_credits(cursor, album_id, album)
+            elif was_deleted:
+                # Reconnect soft-deleted album
+                cursor.execute(
+                    "UPDATE Albums SET IsDeleted = 0 WHERE AlbumID = ?", (album_id,)
+                )
 
             # Insert link
             cursor.execute(
@@ -97,12 +102,13 @@ class SongAlbumRepository(BaseRepository):
         )
 
     def _find_matching_album(self, cursor, album: SongAlbum):
-        """Find an existing album matching Title+Year+Artist. Returns AlbumID or None."""
+        """Find an existing album matching Title+Year+Artist. Returns AlbumID or None.
+        Includes soft-deleted albums — caller handles reconnection."""
         logger.debug(
             f"[SongAlbumRepository] -> _find_matching_album(title='{album.album_title}', year={album.release_year})"
         )
         rows = cursor.execute(
-            "SELECT AlbumID FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE AND ReleaseYear IS ?",
+            "SELECT AlbumID, IsDeleted FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE AND ReleaseYear IS ?",
             (album.album_title, album.release_year),
         ).fetchall()
 
@@ -110,7 +116,7 @@ class SongAlbumRepository(BaseRepository):
             logger.debug(
                 "[SongAlbumRepository] <- _find_matching_album() no title+year candidates"
             )
-            return None
+            return None, False
 
         incoming_artists = sorted(c.display_name.lower() for c in album.credits)
 
@@ -119,7 +125,7 @@ class SongAlbumRepository(BaseRepository):
             logger.debug(
                 f"[SongAlbumRepository] <- _find_matching_album() no incoming credits, reusing AlbumID={rows[0][0]}"
             )
-            return rows[0][0]
+            return rows[0][0], bool(rows[0][1])
 
         for row in rows:
             candidate_id = row[0]
@@ -136,18 +142,18 @@ class SongAlbumRepository(BaseRepository):
                 logger.debug(
                     f"[SongAlbumRepository] <- _find_matching_album() artist match, reusing AlbumID={candidate_id}"
                 )
-                return candidate_id
+                return candidate_id, bool(row[1])
             # Also match if the existing album has no credits yet
             if not existing_artists:
                 logger.debug(
                     f"[SongAlbumRepository] <- _find_matching_album() existing has no credits, reusing AlbumID={candidate_id}"
                 )
-                return candidate_id
+                return candidate_id, bool(row[1])
 
         logger.debug(
             "[SongAlbumRepository] <- _find_matching_album() no artist match, will create new"
         )
-        return None
+        return None, False
 
     def _insert_album_credits(self, cursor, album_id: int, album: SongAlbum) -> None:
         """Write AlbumCredits rows for a newly created album."""
@@ -172,12 +178,18 @@ class SongAlbumRepository(BaseRepository):
                 role_id = cursor.lastrowid
 
             # Get-or-create ArtistName
+            # Include soft-deleted rows to reconnect instead of duplicating.
             row = cursor.execute(
-                "SELECT NameID FROM ArtistNames WHERE DisplayName = ?",
+                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ?",
                 (credit.display_name,),
             ).fetchone()
             if row:
                 name_id = row[0]
+                if row[1]:  # IsDeleted — wake it up
+                    cursor.execute(
+                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
+                        (name_id,),
+                    )
             else:
                 cursor.execute(
                     "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",

@@ -15,7 +15,7 @@ class IdentityRepository(BaseRepository):
         i.IdentityID, i.IdentityType, i.LegalName, 
         COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
     """
-    _IDENTITY_JOIN = "LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1"
+    _IDENTITY_JOIN = "LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0"
 
     def get_by_id(self, identity_id: int) -> Optional[Identity]:
         """Fetch a basic Identity record."""
@@ -44,7 +44,7 @@ class IdentityRepository(BaseRepository):
             SELECT {self._IDENTITY_COLUMNS}
             FROM Identities i
             {self._IDENTITY_JOIN}
-            WHERE i.IdentityID IN ({placeholders})
+            WHERE i.IdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -61,6 +61,7 @@ class IdentityRepository(BaseRepository):
             SELECT {self._IDENTITY_COLUMNS}
             FROM Identities i
             {self._IDENTITY_JOIN}
+            WHERE i.IsDeleted = 0
             ORDER BY DisplayName COLLATE NOCASE ASC
         """
         with self._get_connection() as conn:
@@ -83,10 +84,10 @@ class IdentityRepository(BaseRepository):
             SELECT DISTINCT {self._IDENTITY_COLUMNS}
             FROM Identities i
             {self._IDENTITY_JOIN}
-            WHERE i.IdentityID IN (
+            WHERE i.IsDeleted = 0 AND (i.IdentityID IN (
                 SELECT OwnerIdentityID FROM ArtistNames 
-                WHERE DisplayName LIKE ?
-            ) OR i.LegalName LIKE ?
+                WHERE DisplayName LIKE ? AND IsDeleted = 0
+            ) OR i.LegalName LIKE ?)
             ORDER BY DisplayName ASC
         """
         with self._get_connection() as conn:
@@ -158,8 +159,8 @@ class IdentityRepository(BaseRepository):
                    COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
             FROM GroupMemberships gm
             JOIN Identities i ON gm.MemberIdentityID = i.IdentityID
-            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1
-            WHERE gm.GroupIdentityID IN ({placeholders})
+            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0
+            WHERE gm.GroupIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
 
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
@@ -188,8 +189,8 @@ class IdentityRepository(BaseRepository):
                    COALESCE(an.DisplayName, i.LegalName, 'Unknown Artist #' || i.IdentityID) AS DisplayName
             FROM GroupMemberships gm
             JOIN Identities i ON gm.GroupIdentityID = i.IdentityID
-            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1
-            WHERE gm.MemberIdentityID IN ({placeholders})
+            LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0
+            WHERE gm.MemberIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
 
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}

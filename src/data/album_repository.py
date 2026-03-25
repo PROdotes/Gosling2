@@ -15,7 +15,7 @@ class AlbumRepository(BaseRepository):
         """Fetch the full album directory."""
         logger.debug("[AlbumRepository] -> get_all()")
         query = (
-            f"SELECT {self._COLUMNS} FROM Albums ORDER BY AlbumTitle COLLATE NOCASE ASC"
+            f"SELECT {self._COLUMNS} FROM Albums WHERE IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
         )
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -27,7 +27,7 @@ class AlbumRepository(BaseRepository):
     def search(self, query: str) -> List[Album]:
         """Search albums by title."""
         logger.debug(f"[AlbumRepository] -> search(q='{query}')")
-        sql = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumTitle LIKE ? ORDER BY AlbumTitle COLLATE NOCASE ASC"
+        sql = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumTitle LIKE ? AND IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
@@ -40,7 +40,7 @@ class AlbumRepository(BaseRepository):
     def get_by_id(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID."""
         logger.debug(f"[AlbumRepository] -> get_by_id(id={album_id})")
-        query = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ?"
+        query = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ? AND IsDeleted = 0"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (album_id,)).fetchone()

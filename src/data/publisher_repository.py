@@ -26,7 +26,7 @@ class PublisherRepository(BaseRepository):
             SELECT ap.AlbumID, {self._COLUMNS}
             FROM AlbumPublishers ap
             JOIN Publishers p ON ap.PublisherID = p.PublisherID
-            WHERE ap.AlbumID IN ({placeholders})
+            WHERE ap.AlbumID IN ({placeholders}) AND p.IsDeleted = 0
         """
 
         with self._get_connection() as conn:
@@ -53,7 +53,7 @@ class PublisherRepository(BaseRepository):
             SELECT rp.SourceID, {self._COLUMNS}
             FROM RecordingPublishers rp
             JOIN Publishers p ON rp.PublisherID = p.PublisherID
-            WHERE rp.SourceID IN ({placeholders})
+            WHERE rp.SourceID IN ({placeholders}) AND p.IsDeleted = 0
         """
 
         with self._get_connection() as conn:
@@ -74,7 +74,7 @@ class PublisherRepository(BaseRepository):
             return {}
 
         placeholders = ",".join(["?" for _ in publisher_ids])
-        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders})"
+        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders}) AND IsDeleted = 0"
 
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -89,7 +89,7 @@ class PublisherRepository(BaseRepository):
         """Fetch the full directory of active publishers."""
         logger.debug("[PublisherRepository] -> get_all()")
         query = (
-            f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers ORDER BY PublisherName"
+            f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE IsDeleted = 0 ORDER BY PublisherName"
         )
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
@@ -101,7 +101,7 @@ class PublisherRepository(BaseRepository):
     def search(self, query: str) -> List[Publisher]:
         """Search for publishers by name match."""
         logger.debug(f"[PublisherRepository] -> search(q='{query}')")
-        sql = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherName LIKE ? ORDER BY PublisherName"
+        sql = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherName LIKE ? AND IsDeleted = 0 ORDER BY PublisherName"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
@@ -132,7 +132,7 @@ class PublisherRepository(BaseRepository):
         if not ids:
             return []
         placeholders = ",".join(["?" for _ in ids])
-        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders})"
+        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders}) AND IsDeleted = 0"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, ids).fetchall()
@@ -165,6 +165,7 @@ class PublisherRepository(BaseRepository):
                 SELECT {self._COLUMNS}
                 FROM Publishers p
                 JOIN Ancestry a ON p.PublisherID = a.ParentPublisherID
+                WHERE p.IsDeleted = 0
             )
             SELECT * FROM Ancestry;
         """
@@ -181,7 +182,7 @@ class PublisherRepository(BaseRepository):
     def get_children(self, parent_id: int) -> List[Publisher]:
         """Fetch all sub-publishers for a given parent."""
         logger.debug(f"[PublisherRepository] -> get_children(parent_id={parent_id})")
-        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE ParentPublisherID = ?"
+        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE ParentPublisherID = ? AND IsDeleted = 0"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, (parent_id,)).fetchall()
@@ -218,14 +219,20 @@ class PublisherRepository(BaseRepository):
 
         cursor = conn.cursor()
         for pub in publishers:
-            # Get-or-create: UNIQUE(PublisherName COLLATE UTF8_NOCASE) in schema
+            # Get-or-create: UNIQUE(PublisherName COLLATE UTF8_NOCASE) in schema.
+            # Include soft-deleted rows to reconnect instead of duplicating.
             row = cursor.execute(
-                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE",
+                "SELECT PublisherID, IsDeleted FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE",
                 (pub.name,),
             ).fetchone()
 
             if row:
                 pub_id = row[0]
+                if row[1]:  # IsDeleted — wake it up
+                    cursor.execute(
+                        "UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?",
+                        (pub_id,),
+                    )
             else:
                 cursor.execute(
                     "INSERT INTO Publishers (PublisherName, ParentPublisherID) VALUES (?, ?)",

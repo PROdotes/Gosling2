@@ -128,10 +128,10 @@ Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a se
 **Responsibility**: Loading first-class Album directory records and album-to-song links.
 
 ### get_all() -> List[Album]
-Fetch the full album directory ordered by album title.
+Fetch the full directory of active (non-deleted) albums, ordered by title.
 
 ### search(query: str) -> List[Album]
-Search albums by title match.
+Search active albums by title match.
 
 ### get_by_id(album_id: int) -> Optional[Album]
 Fetch a single album by its ID.
@@ -194,10 +194,10 @@ Find all song IDs explicitly linked to this publisher (Master rights).
 **Responsibility**: DB reads and writes for the Tags table.
 
 ### get_all() -> List[Tag]
-Fetch the full tag directory ordered by tag name.
+Fetch the full directory of active (non-deleted) tags, ordered by name.
 
 ### search(query: str) -> List[Tag]
-Search tags by name match.
+Search active tags by name match.
 
 ### get_by_id(tag_id: int) -> Optional[Tag]
 Fetch a single tag by its ID.
@@ -240,13 +240,13 @@ Batch-fetches credits for multiple albums in a single query.
 Hydrates a basic Identity record without tree expansion.
 
 ### get_all_identities() -> List[Identity]
-Fetches the directory of all identities.
+Fetches the full directory of active (non-deleted) identities.
 
 ### get_by_ids(identity_ids: List[int]) -> List[Identity]
 Batch-fetch multiple identities by ID.
 
 ### search_identities(query: str) -> List[Identity]
-Finds identities whose DisplayName, LegalName, or Alias match the query.
+Finds active identities whose DisplayName, LegalName, or Alias match the query.
 
 ### get_group_ids_for_members(member_ids: List[int]) -> List[int]
 Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs.

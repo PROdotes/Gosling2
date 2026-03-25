@@ -24,7 +24,7 @@ class SongCreditRepository(BaseRepository):
             FROM SongCredits sc
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
             JOIN Roles r ON sc.RoleID = r.RoleID
-            WHERE sc.SourceID IN ({placeholders})
+            WHERE sc.SourceID IN ({placeholders}) AND an.IsDeleted = 0
         """
 
         with self._get_connection() as conn:
@@ -63,14 +63,20 @@ class SongCreditRepository(BaseRepository):
                 role_id = cursor.lastrowid
 
             # Get-or-create ArtistName (match on DisplayName; new names get NULL identity)
+            # Include soft-deleted rows to reconnect instead of duplicating.
             # TODO: Validate NULL OwnerIdentityID pattern against work DB (~500 entries)
             row = cursor.execute(
-                "SELECT NameID FROM ArtistNames WHERE DisplayName = ?",
+                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ?",
                 (credit.display_name,),
             ).fetchone()
 
             if row:
                 name_id = row[0]
+                if row[1]:  # IsDeleted — wake it up
+                    cursor.execute(
+                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
+                        (name_id,),
+                    )
             else:
                 cursor.execute(
                     "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",

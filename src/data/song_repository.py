@@ -112,7 +112,7 @@ class SongRepository(MediaSourceRepository):
                OR m.SourceID IN (
                    SELECT sa.SourceID FROM SongAlbums sa
                    JOIN Albums a ON sa.AlbumID = a.AlbumID
-                   WHERE a.AlbumTitle LIKE ?
+                   WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
                )
         """
         with self._get_connection() as conn:
@@ -135,7 +135,7 @@ class SongRepository(MediaSourceRepository):
             WHERE m.SourceID IN (
                 SELECT sc.SourceID FROM SongCredits sc
                 JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                WHERE an.OwnerIdentityID IN ({placeholders})
+                WHERE an.OwnerIdentityID IN ({placeholders}) AND an.IsDeleted = 0
             )
         """
 
@@ -214,6 +214,7 @@ class SongRepository(MediaSourceRepository):
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
             WHERE sc.SourceID IN ({placeholders})
               AND sc.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'Performer')
+              AND an.IsDeleted = 0
         """
 
         source_performers: Dict[int, List[str]] = {}

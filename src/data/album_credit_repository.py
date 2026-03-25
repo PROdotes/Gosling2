@@ -25,7 +25,7 @@ class AlbumCreditRepository(BaseRepository):
             FROM AlbumCredits ac
             JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
             JOIN Roles r ON ac.RoleID = r.RoleID
-            WHERE ac.AlbumID IN ({placeholders})
+            WHERE ac.AlbumID IN ({placeholders}) AND an.IsDeleted = 0
         """
 
         with self._get_connection() as conn:

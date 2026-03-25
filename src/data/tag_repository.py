@@ -19,7 +19,7 @@ class TagRepository(BaseRepository):
             SELECT mst.SourceID, mst.IsPrimary, t.TagID, t.TagName, t.TagCategory
             FROM MediaSourceTags mst
             JOIN Tags t ON mst.TagID = t.TagID
-            WHERE mst.SourceID IN ({placeholders})
+            WHERE mst.SourceID IN ({placeholders}) AND t.IsDeleted = 0
         """
 
         try:
@@ -49,13 +49,18 @@ class TagRepository(BaseRepository):
         cursor = conn.cursor()
         for tag in tags:
             # Get-or-create: match on name + category. Schema enforces UNIQUE(TagName, TagCategory).
+            # Include soft-deleted rows to reconnect instead of duplicating.
             row = cursor.execute(
-                "SELECT TagID FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory IS ?",
+                "SELECT TagID, IsDeleted FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory IS ?",
                 (tag.name, tag.category),
             ).fetchone()
 
             if row:
                 tag_id = row[0]
+                if row[1]:  # IsDeleted — wake it up
+                    cursor.execute(
+                        "UPDATE Tags SET IsDeleted = 0 WHERE TagID = ?", (tag_id,)
+                    )
             else:
                 cursor.execute(
                     "INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)",
@@ -76,7 +81,7 @@ class TagRepository(BaseRepository):
     def get_all(self) -> List[Tag]:
         """Fetch all tags."""
         logger.debug("[TagRepository] -> get_all()")
-        query = "SELECT TagID, TagName, TagCategory FROM Tags ORDER BY TagName COLLATE NOCASE"
+        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE IsDeleted = 0 ORDER BY TagName COLLATE NOCASE"
         try:
             with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
@@ -94,7 +99,7 @@ class TagRepository(BaseRepository):
         sql = """
             SELECT TagID, TagName, TagCategory
             FROM Tags
-            WHERE TagName LIKE ? COLLATE NOCASE
+            WHERE TagName LIKE ? COLLATE NOCASE AND IsDeleted = 0
             ORDER BY TagName COLLATE NOCASE
         """
         try:
@@ -113,7 +118,7 @@ class TagRepository(BaseRepository):
     def get_by_id(self, tag_id: int) -> Tag | None:
         """Fetch a single tag by ID."""
         logger.debug(f"[TagRepository] -> get_by_id(id={tag_id})")
-        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ?"
+        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ? AND IsDeleted = 0"
         try:
             with self._get_connection() as conn:
                 conn.row_factory = sqlite3.Row
