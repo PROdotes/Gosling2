@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     AudioHash TEXT,
     IsActive BOOLEAN DEFAULT 0,
     ProcessingStatus INTEGER,  -- NULL = Pending/Unseen by engine
+    IsDeleted BOOLEAN DEFAULT 0,
     FOREIGN KEY (TypeID) REFERENCES Types(TypeID)
 );
 
@@ -29,7 +30,8 @@ CREATE TABLE IF NOT EXISTS Songs (
 CREATE TABLE IF NOT EXISTS Identities (
     IdentityID INTEGER PRIMARY KEY,
     IdentityType TEXT NOT NULL,
-    LegalName TEXT
+    LegalName TEXT,
+    IsDeleted BOOLEAN DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS ArtistNames (
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS ArtistNames (
     OwnerIdentityID INTEGER,
     DisplayName TEXT NOT NULL,
     IsPrimaryName BOOLEAN DEFAULT 0,
+    IsDeleted BOOLEAN DEFAULT 0,
     FOREIGN KEY (OwnerIdentityID) REFERENCES Identities(IdentityID)
 );
 
@@ -69,7 +72,8 @@ CREATE TABLE IF NOT EXISTS Albums (
     AlbumID INTEGER PRIMARY KEY,
     AlbumTitle TEXT NOT NULL,
     AlbumType TEXT,
-    ReleaseYear INTEGER
+    ReleaseYear INTEGER,
+    IsDeleted BOOLEAN DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS SongAlbums (
@@ -87,6 +91,7 @@ CREATE TABLE IF NOT EXISTS Publishers (
     PublisherID INTEGER PRIMARY KEY,
     PublisherName TEXT NOT NULL,
     ParentPublisherID INTEGER,
+    IsDeleted BOOLEAN DEFAULT 0,
     FOREIGN KEY (ParentPublisherID) REFERENCES Publishers(PublisherID),
     UNIQUE(PublisherName COLLATE UTF8_NOCASE)
 );
@@ -121,6 +126,7 @@ CREATE TABLE IF NOT EXISTS Tags (
     TagID INTEGER PRIMARY KEY,
     TagName TEXT NOT NULL,
     TagCategory TEXT,
+    IsDeleted BOOLEAN DEFAULT 0,
     UNIQUE(TagName COLLATE UTF8_NOCASE, TagCategory)
 );
 
