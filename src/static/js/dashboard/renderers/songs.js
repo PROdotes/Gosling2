@@ -99,7 +99,7 @@ function renderTagCollection(tags, variant = "") {
     `;
 }
 
-// TODO: Migrate to backend sorting during Phase 2 Advanced Filters
+// TODO: Migrate to backend sorting when expanding the frontend dashboard (Router, Service, and Repository ORDER BY support).
 // State for frontend sorting
 let currentSongs = [];
 let currentSort = { field: null, direction: null };

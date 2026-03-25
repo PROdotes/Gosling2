@@ -363,9 +363,7 @@ class CatalogService:
                 return False
 
             conn.commit()
-            logger.info(
-                f"[CatalogService] <- delete_song(id={song_id}) SOFT_DELETED"
-            )
+            logger.info(f"[CatalogService] <- delete_song(id={song_id}) SOFT_DELETED")
 
             # 3. Physical File Cleanup (Only after successful DB commit)
             # If path is in staging area, delete the physical file

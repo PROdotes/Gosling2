@@ -88,9 +88,7 @@ class PublisherRepository(BaseRepository):
     def get_all(self) -> List[Publisher]:
         """Fetch the full directory of active publishers."""
         logger.debug("[PublisherRepository] -> get_all()")
-        query = (
-            f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE IsDeleted = 0 ORDER BY PublisherName"
-        )
+        query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE IsDeleted = 0 ORDER BY PublisherName"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()

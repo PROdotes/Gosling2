@@ -12,7 +12,6 @@ Execution Checklist - [GOSLING2] Soft Delete Reading Logic
 10. [ ] Test & Implement - IdentityRepository (get_by_id, search_identities, etc.)
 """
 
-import sqlite3
 from src.data.album_repository import AlbumRepository
 from src.data.tag_repository import TagRepository
 from src.data.publisher_repository import PublisherRepository

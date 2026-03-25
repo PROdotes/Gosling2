@@ -14,9 +14,7 @@ class AlbumRepository(BaseRepository):
     def get_all(self) -> List[Album]:
         """Fetch the full album directory."""
         logger.debug("[AlbumRepository] -> get_all()")
-        query = (
-            f"SELECT {self._COLUMNS} FROM Albums WHERE IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
-        )
+        query = f"SELECT {self._COLUMNS} FROM Albums WHERE IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
@@ -40,7 +38,9 @@ class AlbumRepository(BaseRepository):
     def get_by_id(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID."""
         logger.debug(f"[AlbumRepository] -> get_by_id(id={album_id})")
-        query = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ? AND IsDeleted = 0"
+        query = (
+            f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ? AND IsDeleted = 0"
+        )
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (album_id,)).fetchone()

@@ -177,8 +177,8 @@ class TestGetTagSongs:
 
         assert len(songs) == 2, f"Expected 2 songs for Tag 1 (Grunge), got {len(songs)}"
 
-        # Sort by ID for consistent assertion
-        songs_sorted = sorted(songs, key=lambda s: s.id)
+        # Sort by ID for consistent assertion (using or 0 to satisfy Pyright)
+        songs_sorted = sorted(songs, key=lambda s: s.id or 0)
 
         # Song 1: Smells Like Teen Spirit
         song1 = songs_sorted[0]
