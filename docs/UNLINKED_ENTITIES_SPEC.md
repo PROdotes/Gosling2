@@ -49,14 +49,14 @@ Songs | Albums | Artists | Publishers | Tags | Ingest
 
 Tags view follows the same pattern as other entity views:
 - Card-based list view showing: tag name, category badge (genre/other)
-- Detail panel on selection showing: tag name, category, linked songs list, ~~delete button (if unlinked)~~, ~~audit history~~
+- Detail panel on selection showing: tag name, category, linked songs list, delete button (if unlinked), audit history
 
 **Implementation Notes:**
 - Backend: Added `TagRepository` methods (get_all, search, get_by_id, get_song_ids_by_tag)
 - Backend: Added `CatalogService` tag methods and `/api/v1/tags/*` endpoints
 - Frontend: Added tags mode to dashboard with [tags.js](../src/static/js/dashboard/renderers/tags.js) renderer
 - Category badges styled with `tag-category-badge` class (genre/other)
-- Delete button and audit history deferred to Phase 2
+- Delete button and audit history implementation follows Phase 2 Soft-Delete architecture
 
 ### 2. "Show Unlinked" Toggle
 - Located at the top of Albums/Artists/Publishers/Tags views
