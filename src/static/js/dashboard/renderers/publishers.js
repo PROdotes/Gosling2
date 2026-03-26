@@ -23,7 +23,7 @@ function renderSubPublishers(items) {
 }
 
 export function renderPublishers(ctx, publishers) {
-    ctx.setState({ selectedIndex: -1 });
+    ctx.setState({ selectedIndex: -1, displayedItems: publishers });
     ctx.updateResultsSummary(publishers.length, "publisher");
 
     if (!publishers.length) {

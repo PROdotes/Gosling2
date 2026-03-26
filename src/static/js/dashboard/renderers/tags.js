@@ -15,7 +15,7 @@ function renderCategoryBadge(category) {
 }
 
 export function renderTags(ctx, tags) {
-    ctx.setState({ selectedIndex: -1 });
+    ctx.setState({ selectedIndex: -1, displayedItems: tags });
     ctx.updateResultsSummary(tags.length, "tag");
 
     if (!tags.length) {

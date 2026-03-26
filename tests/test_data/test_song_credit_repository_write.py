@@ -15,9 +15,9 @@ from src.models.domain import SongCredit
 
 
 class TestInsertCredits:
-    def test_insert_new_artist_creates_name_row_and_credit_link(self, populated_db):
-        """A brand-new artist name should create an ArtistNames row (NULL identity)
-        and a SongCredits link."""
+    def test_insert_new_artist_creates_identity_and_links(self, populated_db):
+        """A brand-new artist name should create an Identity, an ArtistNames row
+        linked to it, and a SongCredits link."""
         repo = SongCreditRepository(populated_db)
 
         credits = [
@@ -28,19 +28,26 @@ class TestInsertCredits:
             repo.insert_credits(7, credits, conn)
             conn.commit()
 
-        # Verify ArtistNames row was created with NULL OwnerIdentityID
         with repo._get_connection() as conn:
             conn.row_factory = sqlite3.Row
+
+            # Verify Identity was created
+            identity = conn.execute(
+                "SELECT IdentityID, LegalName FROM Identities WHERE LegalName = 'Ella Maren'"
+            ).fetchone()
+            assert identity is not None, "Expected Identity for 'Ella Maren' to be created"
+
+            # Verify ArtistNames row is linked to that Identity
             row = conn.execute(
                 "SELECT NameID, OwnerIdentityID, IsPrimaryName FROM ArtistNames WHERE DisplayName = 'Ella Maren'"
             ).fetchone()
             assert row is not None, "Expected 'Ella Maren' ArtistNames row to exist"
             assert (
-                row["OwnerIdentityID"] is None
-            ), f"Expected NULL OwnerIdentityID, got {row['OwnerIdentityID']}"
+                row["OwnerIdentityID"] == identity["IdentityID"]
+            ), f"Expected OwnerIdentityID={identity['IdentityID']}, got {row['OwnerIdentityID']}"
             assert (
-                row["IsPrimaryName"] == 0
-            ), f"Expected IsPrimaryName=0, got {row['IsPrimaryName']}"
+                row["IsPrimaryName"] == 1
+            ), f"Expected IsPrimaryName=1, got {row['IsPrimaryName']}"
 
         # Verify credit is readable
         result = repo.get_credits_for_songs([7])

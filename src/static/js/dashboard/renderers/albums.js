@@ -45,7 +45,7 @@ function renderPublishers(publishers) {
 }
 
 export function renderAlbums(ctx, albums) {
-    ctx.setState({ selectedIndex: -1 });
+    ctx.setState({ selectedIndex: -1, displayedItems: albums });
     ctx.updateResultsSummary(albums.length, "album");
 
     if (!albums.length) {

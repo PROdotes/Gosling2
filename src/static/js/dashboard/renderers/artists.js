@@ -39,7 +39,7 @@ function renderAliasTags(items) {
 }
 
 export function renderArtists(ctx, artists) {
-    ctx.setState({ selectedIndex: -1 });
+    ctx.setState({ selectedIndex: -1, displayedItems: artists });
     ctx.updateResultsSummary(artists.length, "artist");
 
     if (!artists.length) {

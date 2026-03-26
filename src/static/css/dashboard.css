@@ -934,6 +934,19 @@ main {
     transform: translateY(-1px);
 }
 
+.ingest-btn-danger.confirming {
+    background: var(--danger);
+    color: #fff !important;
+    border-color: var(--danger);
+    animation: pulse-danger 0.8s infinite alternate;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes pulse-danger {
+    from { opacity: 0.85; transform: scale(1); }
+    to { opacity: 1; transform: scale(1.02); }
+}
+
 .ingest-btn-secondary {
     padding: 0.6rem 1rem;
     background: transparent;

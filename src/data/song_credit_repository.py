@@ -62,9 +62,8 @@ class SongCreditRepository(BaseRepository):
                 )
                 role_id = cursor.lastrowid
 
-            # Get-or-create ArtistName (match on DisplayName; new names get NULL identity)
+            # Get-or-create ArtistName (match on DisplayName)
             # Include soft-deleted rows to reconnect instead of duplicating.
-            # TODO: Validate NULL OwnerIdentityID pattern against work DB (~500 entries)
             row = cursor.execute(
                 "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ?",
                 (credit.display_name,),
@@ -77,10 +76,37 @@ class SongCreditRepository(BaseRepository):
                         "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
                         (name_id,),
                     )
+                    # Also reactivate the linked Identity if it was soft-deleted
+                    cursor.execute(
+                        """UPDATE Identities SET IsDeleted = 0
+                           WHERE IdentityID = (SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?)
+                             AND IsDeleted = 1""",
+                        (name_id,),
+                    )
             else:
-                cursor.execute(
-                    "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",
+                # Find or create an Identity for this artist (include soft-deleted to reactivate)
+                identity_row = cursor.execute(
+                    "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?",
                     (credit.display_name,),
+                ).fetchone()
+
+                if identity_row:
+                    owner_identity_id = identity_row[0]
+                    if identity_row[1]:  # Reactivate soft-deleted Identity
+                        cursor.execute(
+                            "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
+                            (owner_identity_id,),
+                        )
+                else:
+                    cursor.execute(
+                        "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
+                        (credit.display_name,),
+                    )
+                    owner_identity_id = cursor.lastrowid
+
+                cursor.execute(
+                    "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 1)",
+                    (owner_identity_id, credit.display_name),
                 )
                 name_id = cursor.lastrowid
 

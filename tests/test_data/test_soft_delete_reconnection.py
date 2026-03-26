@@ -247,6 +247,79 @@ class TestArtistNameReconnection:
         assert rows[0]["NameID"] == 20
         assert rows[0]["IsDeleted"] == 0
 
+    def test_soft_deleted_artist_name_reactivates_soft_deleted_identity(
+        self, populated_db
+    ):
+        """
+        Dave Grohl (NameID=10, OwnerIdentityID=1) exists in populated_db.
+        Soft-delete both the ArtistName and Identity, then insert a credit.
+        Both should be reactivated.
+        """
+        repo = SongCreditRepository(populated_db)
+
+        conn = _connect(populated_db)
+        conn.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = 10")
+        conn.execute("UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = 1")
+        conn.commit()
+        conn.close()
+
+        credits = [SongCredit(role_name="Performer", display_name="Dave Grohl")]
+        with repo._get_connection() as conn:
+            repo.insert_credits(7, credits, conn)
+            conn.commit()
+
+        conn = _connect(populated_db)
+        conn.row_factory = sqlite3.Row
+        name_row = conn.execute(
+            "SELECT NameID, IsDeleted FROM ArtistNames WHERE NameID = 10"
+        ).fetchone()
+        identity_row = conn.execute(
+            "SELECT IdentityID, IsDeleted FROM Identities WHERE IdentityID = 1"
+        ).fetchone()
+        conn.close()
+
+        assert name_row["IsDeleted"] == 0, "ArtistName should be reactivated"
+        assert identity_row["IsDeleted"] == 0, "Identity should be reactivated"
+
+    def test_new_artist_reactivates_soft_deleted_identity(self, populated_db):
+        """
+        Create an Identity with LegalName, soft-delete it, then insert a credit
+        with a matching display_name. Should reactivate the Identity and link to it.
+        """
+        repo = SongCreditRepository(populated_db)
+
+        conn = _connect(populated_db)
+        conn.execute(
+            "INSERT INTO Identities (IdentityID, IdentityType, LegalName, IsDeleted) "
+            "VALUES (99, 'person', 'Ghost Person', 1)"
+        )
+        conn.commit()
+        conn.close()
+
+        credits = [SongCredit(role_name="Performer", display_name="Ghost Person")]
+        with repo._get_connection() as conn:
+            repo.insert_credits(7, credits, conn)
+            conn.commit()
+
+        conn = _connect(populated_db)
+        conn.row_factory = sqlite3.Row
+        identity_row = conn.execute(
+            "SELECT IdentityID, IsDeleted FROM Identities WHERE IdentityID = 99"
+        ).fetchone()
+        name_row = conn.execute(
+            "SELECT OwnerIdentityID, IsPrimaryName FROM ArtistNames WHERE DisplayName = 'Ghost Person'"
+        ).fetchone()
+        # Should not have created a duplicate Identity
+        identity_count = conn.execute(
+            "SELECT COUNT(*) FROM Identities WHERE LegalName = 'Ghost Person'"
+        ).fetchone()[0]
+        conn.close()
+
+        assert identity_row["IsDeleted"] == 0, "Identity should be reactivated"
+        assert name_row["OwnerIdentityID"] == 99, "ArtistName should link to reactivated Identity"
+        assert name_row["IsPrimaryName"] == 1
+        assert identity_count == 1, "Should reuse, not duplicate"
+
 
 class TestAlbumReconnection:
     """SongAlbumRepository.insert_albums must wake up soft-deleted albums."""

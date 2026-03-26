@@ -42,6 +42,7 @@ const state = {
     cachedAlbums: [],
     cachedPublishers: [],
     cachedTags: [],
+    displayedItems: [], // Track currently displayed items in visual order (for keyboard nav)
     debounceTimer: null,
     currentQuery: "",
     selectedIndex: -1,
@@ -392,10 +393,20 @@ document.addEventListener("click", (event) => {
     }
 
     if (action === "select-result") {
+        event.preventDefault(); // Prevent focus change to keep keyboard nav working
         const index = Number(actionTarget.dataset.index);
         state.selectedIndex = Number.isNaN(index) ? -1 : index;
         updateSelection();
-        openSelectedResult(state.selectedIndex);
+
+        // Use displayedItems + ID lookup to handle sorting correctly
+        const selected = state.displayedItems[index];
+        if (selected) {
+            const cachedList = getActiveList();
+            const actualIndex = cachedList.findIndex(item => item.id === selected.id);
+            if (actualIndex >= 0) {
+                openSelectedResult(actualIndex);
+            }
+        }
         return;
     }
 
@@ -448,21 +459,45 @@ document.addEventListener("click", (event) => {
 
     if (action === "delete-song") {
         const { id, title } = actionTarget.dataset;
-        if (confirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`)) {
-            import("./api.js").then(async (m) => {
-                try {
-                    await m.deleteSong(id);
-                    ctx.hideDetailPanel();
-                    performSearch(); // Refresh the current view
-                } catch (err) {
-                    alert(`Deletion failed: ${err.message}`);
+
+        // Two-stage confirmation to avoid popup blockers
+        if (!actionTarget.classList.contains("confirming")) {
+            const originalText = actionTarget.textContent;
+            actionTarget.classList.add("confirming");
+            actionTarget.textContent = "Confirm Delete?";
+
+            // Reset after 3 seconds if not clicked again
+            setTimeout(() => {
+                if (actionTarget.classList.contains("confirming") && !actionTarget.disabled) {
+                    actionTarget.classList.remove("confirming");
+                    actionTarget.textContent = originalText;
                 }
-            });
+            }, 3000);
+            return;
         }
+
+        // Second click - proceed with deletion
+        actionTarget.disabled = true;
+        actionTarget.textContent = "Deleting...";
+
+        import("./api.js").then(async (m) => {
+            try {
+                await m.deleteSong(id);
+                ctx.hideDetailPanel();
+                performSearch(); // Refresh the current view
+            } catch (err) {
+                actionTarget.disabled = false;
+                actionTarget.classList.remove("confirming");
+                actionTarget.textContent = "Delete";
+                console.error(`Deletion failed: ${err.message}`);
+                alert(`Deletion failed: ${err.message}`);
+            }
+        });
     }
 });
 
 document.addEventListener("keydown", (event) => {
+    // Escape always works to close detail panel
     if (event.key === "Escape" && elements.detailPanel.style.display === "flex") {
         abortDetailRequest();
         ctx.hideDetailPanel();
@@ -471,8 +506,14 @@ document.addEventListener("keydown", (event) => {
         return;
     }
 
-    const items = getActiveList();
-    if (document.activeElement !== elements.searchInput || !items.length) {
+    // Don't intercept arrow keys when actively typing in search
+    if (document.activeElement === elements.searchInput) {
+        return;
+    }
+
+    // Arrow key navigation works globally (even after clicking buttons)
+    const items = state.displayedItems;
+    if (!items.length) {
         return;
     }
 
@@ -492,7 +533,15 @@ document.addEventListener("keydown", (event) => {
 
     if (event.key === "Enter" && state.selectedIndex >= 0) {
         event.preventDefault();
-        openSelectedResult(state.selectedIndex);
+        // Use displayedItems + ID lookup to handle sorting
+        const selected = items[state.selectedIndex];
+        if (selected) {
+            const cachedList = getActiveList();
+            const actualIndex = cachedList.findIndex(item => item.id === selected.id);
+            if (actualIndex >= 0) {
+                openSelectedResult(actualIndex);
+            }
+        }
     }
 });
 

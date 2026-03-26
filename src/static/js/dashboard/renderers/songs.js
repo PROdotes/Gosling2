@@ -138,12 +138,14 @@ function sortSongs(songs, field, direction) {
 function applySortAndRender(ctx, field, direction) {
     currentSort = { field, direction };
     const sorted = field ? sortSongs(currentSongs, field, direction) : currentSongs;
+    ctx.setState({ displayedItems: sorted });
     renderSongsCards(ctx, sorted);
     updateSortButtonStates();
 }
 
 function clearSort(ctx) {
     currentSort = { field: null, direction: null };
+    ctx.setState({ displayedItems: currentSongs });
     renderSongsCards(ctx, currentSongs);
     updateSortButtonStates();
 }
@@ -185,7 +187,7 @@ function renderSortControls(ctx) {
 
 function renderSongsCards(ctx, songs) {
     const cardsHtml = songs.map((song, index) => `
-        <article class="result-card song-card" data-action="select-result" data-index="${index}" data-selectable="true">
+        <article class="result-card song-card" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
             <div class="card-icon">♪</div>
             <div class="card-body">
                 <div class="card-title-row">
@@ -223,18 +225,19 @@ function renderSongsCards(ctx, songs) {
 }
 
 export function renderSongs(ctx, songs) {
-    ctx.setState({ selectedIndex: -1 });
     ctx.updateResultsSummary(songs.length, "song");
 
     currentSongs = songs;
 
     if (!songs.length) {
+        ctx.setState({ selectedIndex: -1, displayedItems: [] });
         ctx.elements.resultsContainer.innerHTML = renderEmptyState("No songs found");
         return;
     }
 
     // Apply current sort if active, otherwise show in API order
     const displaySongs = currentSort.field ? sortSongs(songs, currentSort.field, currentSort.direction) : songs;
+    ctx.setState({ selectedIndex: -1, displayedItems: displaySongs });
     renderSongsCards(ctx, displaySongs);
 }
 

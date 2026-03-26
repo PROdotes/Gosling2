@@ -23,6 +23,8 @@ EXPECTED_INGESTION_FIELDS = {
     "ghost_id",
     "title",
     "duration_s",
+    "year",
+    "isrc",
     "staged_path",
 }
 
