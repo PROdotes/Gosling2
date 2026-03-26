@@ -15,7 +15,16 @@ import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app
 
-EXPECTED_INGESTION_FIELDS = {"status", "match_type", "message", "song"}
+EXPECTED_INGESTION_FIELDS = {
+    "status",
+    "match_type",
+    "message",
+    "song",
+    "ghost_id",
+    "title",
+    "duration_s",
+    "staged_path",
+}
 
 
 @pytest.fixture
@@ -133,6 +142,7 @@ EXPECTED_BATCH_REPORT_FIELDS = {
     "total_files",
     "ingested",
     "duplicates",
+    "conflicts",
     "errors",
     "results",
 }

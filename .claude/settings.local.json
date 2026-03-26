@@ -6,7 +6,8 @@
       "Bash(findstr:*)",
       "Bash(ls:*)",
       "Bash(dir:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(pytest:*)"
     ]
   }
 }
