@@ -109,11 +109,11 @@ DUAL_CREDIT_EXPECTED = {
 
 
 class TestSearchSongsDeepSearch:
-    """Contract tests for CatalogService.search_songs() deep resolution."""
+    """Contract tests for CatalogService.search_songs_deep() deep resolution."""
 
     def test_search_by_title_returns_correct_song(self, catalog_service):
         """Surface match on title must return the song with all fields intact."""
-        results = catalog_service.search_songs("Spirit")
+        results = catalog_service.search_songs_deep("Spirit")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
 
         song = results[0]
@@ -121,7 +121,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_by_album_returns_correct_song(self, catalog_service):
         """Surface match on album title 'Nevermind' must return the song on that album."""
-        results = catalog_service.search_songs("Nevermind")
+        results = catalog_service.search_songs_deep("Nevermind")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
 
         song = results[0]
@@ -130,7 +130,7 @@ class TestSearchSongsDeepSearch:
     def test_search_by_alias_finds_own_songs_and_group_songs(self, catalog_service):
         """Searching for alias 'Grohlton' must find Grohlton's own songs plus
         songs from groups the parent identity belongs to (Nirvana, Foo Fighters)."""
-        results = catalog_service.search_songs("Grohlton")
+        results = catalog_service.search_songs_deep("Grohlton")
         titles = {s.title for s in results}
 
         assert (
@@ -160,7 +160,7 @@ class TestSearchSongsDeepSearch:
     def test_search_by_primary_name_resolves_groups(self, catalog_service):
         """Searching for 'Dave Grohl' must find songs from all his groups
         (Nirvana, Foo Fighters) plus direct-credit songs."""
-        results = catalog_service.search_songs("Dave Grohl")
+        results = catalog_service.search_songs_deep("Dave Grohl")
         titles = {s.title for s in results}
 
         expected_titles = {
@@ -192,7 +192,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_no_results_returns_empty_list(self, catalog_service):
         """A query matching nothing must return an empty list, not None or a partial."""
-        results = catalog_service.search_songs("NonexistentArtist")
+        results = catalog_service.search_songs_deep("NonexistentArtist")
         assert isinstance(results, list), f"Expected list, got {type(results).__name__}"
         assert (
             len(results) == 0
@@ -200,7 +200,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_returns_hydrated_credits(self, catalog_service):
         """Returned songs must have hydrated credits with correct display names."""
-        results = catalog_service.search_songs("Spirit")
+        results = catalog_service.search_songs_deep("Spirit")
         song = results[0]
 
         assert (
@@ -216,7 +216,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_returns_hydrated_albums(self, catalog_service):
         """Returned songs must have hydrated album associations."""
-        results = catalog_service.search_songs("Spirit")
+        results = catalog_service.search_songs_deep("Spirit")
         song = results[0]
 
         assert (
@@ -232,7 +232,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_returns_hydrated_tags(self, catalog_service):
         """Returned songs must have hydrated tags."""
-        results = catalog_service.search_songs("Spirit")
+        results = catalog_service.search_songs_deep("Spirit")
         song = results[0]
 
         tag_names = {t.name for t in song.tags}
@@ -247,7 +247,7 @@ class TestSearchSongsDeepSearch:
 
     def test_search_returns_hydrated_publishers(self, catalog_service):
         """Returned songs must have hydrated recording publishers."""
-        results = catalog_service.search_songs("Spirit")
+        results = catalog_service.search_songs_deep("Spirit")
         song = results[0]
 
         pub_names = {p.name for p in song.publishers}
@@ -258,7 +258,7 @@ class TestSearchSongsDeepSearch:
     def test_search_by_alias_expands_to_all_group_songs(self, catalog_service):
         """Searching for alias 'Grohlton' must expand to songs from all parent
         identity's groups, not just a subset."""
-        results = catalog_service.search_songs("Grohlton")
+        results = catalog_service.search_songs_deep("Grohlton")
         titles = {s.title for s in results}
 
         assert "Everlong" in titles, (
@@ -273,7 +273,7 @@ class TestSearchSongsDeepSearch:
     def test_search_excludes_duplicates(self, catalog_service):
         """Search must not return duplicate songs even when matched by
         both surface and deep paths."""
-        results = catalog_service.search_songs("Grohlton")
+        results = catalog_service.search_songs_deep("Grohlton")
         song_ids = [s.id for s in results]
         assert len(song_ids) == len(
             set(song_ids)

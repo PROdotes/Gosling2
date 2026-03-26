@@ -704,37 +704,69 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- Return count={len(result)}")
         return result
 
+    def search_songs_deep(self, query: str) -> List[Song]:
+        """Deep metadata + Corporate/Group Expansion resolution."""
+        logger.debug(f"[CatalogService] -> search_songs_deep(q='{query}')")
+        songs = self._song_repo.search(query)
+        return self._search_songs_composed(query, songs)
+
     def search_songs(self, query: str) -> List[Song]:
-        """
-        The Jazler-Debounce Hybrid:
-        1. Surface Discovery (Title/Album match).
-        2. Deep Resolution (Identity/Group expansion) via Fast Batching (4 Query method).
-        """
+        """Strictly Surface search (Titles/Albums/Performers). Fastest path."""
         logger.debug(f"[CatalogService] -> search_songs(q='{query}')")
+        songs = self._song_repo.search(query)
+        result = self._hydrate_songs(songs)
+        logger.debug(f"[CatalogService] <- surface results count={len(result)}")
+        return result
 
-        songs = self._song_repo.search_surface(query)
-        seen_ids = {s.id for s in songs}
+    def _search_songs_composed(self, query: str, initial_songs: List[Song]) -> List[Song]:
+        """Internal orchestrator that adds expanded discovery legs to an initial set."""
+        seen_ids = {s.id for s in initial_songs}
+        songs = list(initial_songs)
 
+        # 1. Identity Expansion (Member -> Group / The Grohlton Check)
+        identity_songs = self._expand_identity_songs(query)
+        for s in identity_songs:
+            if s.id not in seen_ids:
+                songs.append(s)
+                seen_ids.add(s.id)
+
+        # 2. Publisher Expansion (Parent -> Child / The Corporate Umbrella)
+        publisher_songs = self._expand_publisher_songs(query)
+        for s in publisher_songs:
+            if s.id not in seen_ids:
+                songs.append(s)
+                seen_ids.add(s.id)
+
+        result = self._hydrate_songs(songs)
+        logger.debug(f"[CatalogService] <- composed search results count={len(result)}")
+        return result
+
+    def _expand_identity_songs(self, query: str) -> List[Song]:
+        """Resolves all songs for identities matching the query, including group memberships."""
         seeds = self._identity_repo.search_identities(query)
         identity_ids = {seed.id for seed in seeds}
+        if not identity_ids:
+            return []
 
-        if identity_ids:
-            group_ids = self._identity_repo.get_group_ids_for_members(
-                list(identity_ids)
-            )
-            identity_ids.update(group_ids)
+        # Find encompassing groups (The Upward Leg)
+        group_ids = self._identity_repo.get_group_ids_for_members(list(identity_ids))
+        identity_ids.update(group_ids)
 
-            deep_songs = self._song_repo.get_by_identity_ids(list(identity_ids))
-            for s in deep_songs:
-                if s.id not in seen_ids:
-                    songs.append(s)
-                    seen_ids.add(s.id)
+        return self._song_repo.get_by_identity_ids(list(identity_ids))
 
-        results = self._hydrate_songs(songs)
-        logger.debug(
-            f"[CatalogService] <- search_songs(q='{query}') count={len(results)}"
-        )
-        return results
+    def _expand_publisher_songs(self, query: str) -> List[Song]:
+        """Resolves all songs for publishers matching the query, including corporate sub-labels."""
+        # Note: _pub_repo.search is now Deep (finds descendants)
+        expanded_publishers = self._pub_repo.search(query)
+        if not expanded_publishers:
+            return []
+
+        pub_ids = [p.id for p in expanded_publishers if p.id is not None]
+        song_ids = self._pub_repo.get_song_ids_by_publisher_batch(pub_ids)
+        if not song_ids:
+            return []
+
+        return self._song_repo.get_by_ids(song_ids)
 
     def _hydrate_songs(
         self,

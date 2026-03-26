@@ -38,6 +38,9 @@ Truth discovery lookup that ignores the `IsDeleted` filter. Returns basic metada
 ### soft_delete(source_id: int, conn: sqlite3.Connection) -> bool
 Soft-delete a MediaSource by setting `IsDeleted = 1`. Returns `True` if a record was updated, `False` if not found or already deleted.
 
+### reactivate_source(source_id: int, conn: sqlite3.Connection) -> bool
+Restores a previously soft-deleted record by setting `IsDeleted = 0`. Returns `True` if successful.
+
 ### delete_song_links(source_id: int, conn: sqlite3.Connection) -> None
 Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSourceTags, RecordingPublishers). This must be called before `soft_delete` to ensure links are severed while the anchor record remains for undo/audit purposes.
 
@@ -59,8 +62,10 @@ Batch-fetches core song records for multiple IDs.
 ### get_by_title(query: str) -> List[Song]
 Finds songs by case-insensitive title match (LIKE '%query%').
 
-### search_surface(query: str) -> List[Song]
-Discovery path on titles and albums. Fastest search.
+### search(query: str) -> List[Song]
+Unified direct-field discovery via indexed UNION scans.
+- Matches: Title, Performer (DisplayName + LegalName), Album, Publisher, Tag, Year, and ISRC.
+- Hierarchical expansion (Groups, Corporate Umbrellas) is handled by the `CatalogService`.
 
 ### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
 Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
@@ -76,6 +81,11 @@ Find songs matching Title, exact Performer set, and Recording Year. Avoids "Sing
 
 ### insert(song: Song, conn: sqlite3.Connection) -> int
 Atomic insert into `MediaSources`, `Songs`, and all relationship tables (tags, albums, publishers, credits). Delegates core file record to `MediaSourceRepository.insert_source`, then calls `TagRepository.insert_tags`, `SongAlbumRepository.insert_albums`, `PublisherRepository.insert_song_publishers`, and `SongCreditRepository.insert_credits`. Returns the new `SourceID`. Does NOT commit.
+
+### reactivate_ghost(song: Song, conn: sqlite3.Connection) -> bool
+Restores a soft-deleted song and updates it with new metadata (Tags, Credits, Albums, Publishers).
+- Calls `MediaSourceRepository.reactivate_source`.
+- Replaces links via `delete_song_links` + re-insertion.
 
 ### _row_to_song(row: sqlite3.Row) -> Song
 **Internal**: Maps a physical database row to the `Song` domain model, handling NULLs and preserving the duration in raw seconds (`duration_s`).
@@ -186,6 +196,9 @@ Fetch all sub-publishers for a given parent.
 
 ### get_song_ids_by_publisher(publisher_id: int) -> List[int]
 Find all song IDs explicitly linked to this publisher (Master rights).
+
+### get_song_ids_by_publisher_batch(publisher_ids: List[int]) -> Dict[int, List[int]]
+Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [SourceID].
 
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.

@@ -260,7 +260,7 @@ class TestSongEdgeCases:
     def test_search_unicode_title(self, edge_case_db):
         """Surface search can find unicode title."""
         repo = SongRepository(edge_case_db)
-        results = repo.search_surface("\u65e5\u672c\u8a9e")
+        results = repo.search("\u65e5\u672c\u8a9e")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         song = results[0]
         assert song.id == 103, f"Expected id=103, got {song.id}"
@@ -296,7 +296,7 @@ class TestSongEdgeCases:
     def test_search_single_char(self, edge_case_db):
         """Surface search with 'A' matches song 102."""
         repo = SongRepository(edge_case_db)
-        results = repo.search_surface("A")
+        results = repo.search("A")
         ids = [s.id for s in results]
         assert 102 in ids, f"Expected song 102 in results, got ids={ids}"
         for song in results:

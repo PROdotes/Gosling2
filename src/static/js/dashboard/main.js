@@ -33,6 +33,7 @@ const elements = {
     totalLabel: document.getElementById("total-label"),
     matchCount: document.getElementById("match-count"),
     matchLabel: document.getElementById("match-label"),
+    deepSearchToggle: document.getElementById("deepSearchToggle"),
 };
 
 const state = {
@@ -46,6 +47,7 @@ const state = {
     debounceTimer: null,
     currentQuery: "",
     selectedIndex: -1,
+    isDeep: false,
 };
 
 const modeConfig = {
@@ -190,7 +192,7 @@ async function performSearch(query = state.currentQuery) {
     elements.matchLabel.textContent = query ? "Matches" : "Visible";
 
     try {
-        const items = await fetcher(query);
+        const items = await fetcher(query, state.isDeep);
         if (items === ABORTED || mode !== state.currentMode || query !== state.currentQuery) {
             return;
         }
@@ -551,6 +553,11 @@ elements.searchInput.addEventListener("input", (event) => {
     state.debounceTimer = setTimeout(() => {
         performSearch(state.currentQuery);
     }, 250);
+});
+
+elements.deepSearchToggle.addEventListener("change", (event) => {
+    state.isDeep = event.target.checked;
+    performSearch(state.currentQuery);
 });
 
 syncModeUi();

@@ -158,24 +158,54 @@ class SongRepository(MediaSourceRepository):
             )
             return [self._row_to_song(row) for row in rows]
 
-    def search_surface(self, query: str) -> List[Song]:
-        """Discovery path on titles and albums. Fastest search."""
-        logger.debug(f"[SongRepository] -> search_surface(query='{query}')")
+    def search(self, query: str) -> List[Song]:
+        """
+        Unified direct-field discovery via indexed UNION scans.
+        Covers: Title, Album, Performer (DisplayName + LegalName),
+                Publisher, Tag, Year, BPM, ISRC.
+        Hierarchical expansion (Groups, Corporate Umbrellas) is handled
+        by the CatalogService layer above.
+        """
+        logger.debug(f"[SongRepository] -> search(query='{query}')")
         fmt_q = f"%{query}%"
+
         query_sql = f"""
             SELECT {self._COLUMNS} {self._JOIN}
-            WHERE m.MediaName LIKE ?
-               OR m.SourceID IN (
-                   SELECT sa.SourceID FROM SongAlbums sa
-                   JOIN Albums a ON sa.AlbumID = a.AlbumID
-                   WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
-               )
+            WHERE m.SourceID IN (
+                SELECT m2.SourceID FROM MediaSources m2
+                    WHERE m2.MediaName LIKE ? AND m2.IsDeleted = 0
+                UNION
+                SELECT sa.SourceID FROM SongAlbums sa
+                    JOIN Albums a ON sa.AlbumID = a.AlbumID
+                    WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
+                UNION
+                SELECT sc.SourceID FROM SongCredits sc
+                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                    WHERE an.DisplayName LIKE ? AND an.IsDeleted = 0
+                UNION
+                SELECT sc2.SourceID FROM SongCredits sc2
+                    JOIN ArtistNames an2 ON sc2.CreditedNameID = an2.NameID
+                    JOIN Identities i ON an2.OwnerIdentityID = i.IdentityID
+                    WHERE i.LegalName LIKE ? AND i.IsDeleted = 0
+                UNION
+                SELECT rp.SourceID FROM RecordingPublishers rp
+                    JOIN Publishers p ON rp.PublisherID = p.PublisherID
+                    WHERE p.PublisherName LIKE ? AND p.IsDeleted = 0
+                UNION
+                SELECT mst.SourceID FROM MediaSourceTags mst
+                    JOIN Tags t ON mst.TagID = t.TagID
+                    WHERE t.TagName LIKE ? AND t.IsDeleted = 0
+                UNION
+                SELECT s3.SourceID FROM Songs s3
+                    WHERE CAST(s3.RecordingYear AS TEXT) LIKE ?
+                       OR s3.ISRC LIKE ?
+            )
         """
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
+            rows = conn.execute(query_sql, (fmt_q,) * 8).fetchall()
             logger.debug(
-                f"[SongRepository] <- search_surface(query='{query}') found {len(rows)}"
+                f"[SongRepository] <- search(query='{query}') found {len(rows)}"
             )
             return [self._row_to_song(row) for row in rows]
 

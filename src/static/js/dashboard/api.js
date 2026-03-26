@@ -55,10 +55,14 @@ export function abortAllSearches() {
 
 export { isAbortError };
 
-export function searchSongs(query = "") {
-    const url = query
-        ? `/api/v1/songs/search?q=${encodeURIComponent(query)}`
-        : "/api/v1/songs/search";
+export function searchSongs(query = "", deep = false) {
+    let url = "/api/v1/songs/search";
+    if (query) {
+        url = `/api/v1/songs/search?q=${encodeURIComponent(query)}`;
+        if (deep) {
+            url += "&deep=true";
+        }
+    }
     return runSearch("songs", url);
 }
 

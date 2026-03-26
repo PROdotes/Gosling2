@@ -21,8 +21,8 @@ class TestGetById:
             identity.display_name == "Dave Grohl"
         ), f"Expected 'Dave Grohl', got '{identity.display_name}'"
         assert (
-            identity.legal_name is None
-        ), f"Expected None for legal_name, got {identity.legal_name}"
+            identity.legal_name == "David Eric Grohl"
+        ), f"Expected 'David Eric Grohl' for legal_name, got {identity.legal_name}"
         assert (
             identity.aliases == []
         ), f"Expected empty list for aliases, got {identity.aliases}"

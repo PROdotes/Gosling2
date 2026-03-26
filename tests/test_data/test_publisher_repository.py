@@ -111,15 +111,16 @@ class TestSearch:
         assert pubs == [], f"Expected empty list for no match, got {pubs}"
 
     def test_universal_match(self, populated_db):
-        """'Universal' should match only 'Universal Music Group'."""
+        """'Universal' should match Umbrella (4 publishers)."""
         repo = PublisherRepository(populated_db)
         pubs = repo.search("Universal")
 
-        assert len(pubs) == 1, f"Expected 1 publisher, got {len(pubs)}"
-        assert pubs[0].id == 1, f"Expected 1, got {pubs[0].id}"
+        assert len(pubs) == 4, f"Expected 4 publishers, got {len(pubs)}"
+        # Sorted by name: DGC(10), Island Def Jam(3), Island Records(2), Universal(1)
+        assert pubs[3].id == 1, f"Expected 1 at index 3, got {pubs[3].id}"
         assert (
-            pubs[0].name == "Universal Music Group"
-        ), f"Expected 'Universal Music Group', got '{pubs[0].name}'"
+            pubs[3].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pubs[3].name}'"
 
 
 class TestGetById:

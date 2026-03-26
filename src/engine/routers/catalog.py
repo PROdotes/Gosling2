@@ -22,14 +22,18 @@ def _get_service() -> CatalogService:
 
 @router.get("/songs/search", response_model=List[SongView])
 async def search_songs(
-    q: Optional[str] = None, query: Optional[str] = None
+    q: Optional[str] = None, query: Optional[str] = None, deep: bool = False
 ) -> List[SongView]:
-    """Search for songs by title match. Supports both 'q' and 'query'."""
-    search_term = q or query
-    logger.debug(f"[CatalogRouter] search_songs(q='{search_term}')")
+    """Search for songs. Use 'deep=true' for full resolution and metadata discovery."""
+    search_term = q or query or ""
+    logger.debug(f"[CatalogRouter] search_songs(q='{search_term}', deep={deep})")
 
-    # We allow empty/short queries to explore the DB
-    results = _get_service().search_songs(search_term or "")
+    service = _get_service()
+    if deep:
+        results = service.search_songs_deep(search_term)
+    else:
+        results = service.search_songs(search_term)
+
     logger.debug(f"[CatalogRouter] search_songs results={len(results)}")
     return [SongView.from_domain(s) for s in results]
 

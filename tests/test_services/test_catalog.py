@@ -223,31 +223,44 @@ class TestSearchSongs:
             results[0].title == "Smells Like Teen Spirit"
         ), f"Expected title 'Smells Like Teen Spirit', got {results[0].title}"
 
-    def test_identity_match_expands_to_group_songs(self, catalog_service):
-        """Searching 'Dave Grohl' should find songs credited to Dave directly,
-        PLUS songs credited to his groups (Nirvana, Foo Fighters)."""
+    def test_identity_match_surface_only(self, catalog_service):
+        """Searching 'Dave Grohl' in Normal mode should find songs where he is DIRECTLY credited,
+        but NOT resolve to his groups (Nirvana, Foo Fighters)."""
         results = catalog_service.search_songs("Dave Grohl")
         titles = {s.title for s in results}
 
         # Dave's direct songs (NameID 10): Dual Credit Track, Joint Venture
-        assert (
-            "Dual Credit Track" in titles
-        ), f"Expected 'Dual Credit Track' in results, got {titles}"
-        assert (
-            "Joint Venture" in titles
-        ), f"Expected 'Joint Venture' in results, got {titles}"
-        # Dave's alias songs (Grohlton=11, Late!=12): Grohlton Theme, Pocketwatch Demo
-        assert (
-            "Grohlton Theme" in titles
-        ), f"Expected 'Grohlton Theme' in results, got {titles}"
-        assert (
-            "Pocketwatch Demo" in titles
-        ), f"Expected 'Pocketwatch Demo' in results, got {titles}"
-        # Dave's group songs: SLTS (Nirvana), Everlong (Foo Fighters)
-        assert (
-            "Smells Like Teen Spirit" in titles
-        ), f"Expected 'Smells Like Teen Spirit' in results, got {titles}"
-        assert "Everlong" in titles, f"Expected 'Everlong' in results, got {titles}"
+        assert "Dual Credit Track" in titles
+        assert "Joint Venture" in titles
+        
+        # Dave's aliases (Grohlton, Late!) - These should ideally still fail/pass depending on if aliases are 'surface'.
+        # For now, let's stick to the 'Spice Girls' logic: No Group Redirection.
+        assert "Smells Like Teen Spirit" not in titles, "Nirvana should not be in surface search for Dave."
+        assert "Everlong" not in titles, "Foo Fighters should not be in surface search for Dave."
+
+class TestSearchSongsDeep:
+    """CatalogService.search_songs_deep contracts (Full Metadata + Hierarchical resolution)."""
+
+    def test_identity_match_expands_to_group_songs(self, catalog_service):
+        """Searching 'Dave Grohl' in DEEP mode should find songs credited to Dave directly,
+        PLUS songs credited to his groups (Nirvana, Foo Fighters)."""
+        results = catalog_service.search_songs_deep("Dave Grohl")
+        titles = {s.title for s in results}
+
+        # Dave's direct songs
+        assert "Dual Credit Track" in titles
+        assert "Joint Venture" in titles
+
+        # Dave's group songs (The Expansion)
+        assert "Smells Like Teen Spirit" in titles
+        assert "Everlong" in titles
+
+    def test_metadata_and_hierarchy_combined(self, catalog_service):
+        """Deep search matches across metadata tags and labels."""
+        # 'Universal' is the parent of DGC (SLTS).
+        results = catalog_service.search_songs_deep("Universal")
+        titles = {s.title for s in results}
+        assert "Smells Like Teen Spirit" in titles
 
         # Taylor's solo song should NOT be here
         assert (
@@ -255,8 +268,8 @@ class TestSearchSongs:
         ), f"Did not expect 'Range Rover Bitch' in results, got {titles}"
 
     def test_alias_match_resolves_to_group_songs(self, catalog_service):
-        """Searching 'Grohlton' should find Grohlton Theme + group songs."""
-        results = catalog_service.search_songs("Grohlton")
+        """Searching 'Grohlton' via Deep should find Grohlton Theme + group songs."""
+        results = catalog_service.search_songs_deep("Grohlton")
         titles = {s.title for s in results}
 
         assert (

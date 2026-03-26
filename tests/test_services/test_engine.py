@@ -242,7 +242,7 @@ class TestSearchSongs:
 
     def test_identity_expansion(self, client):
         """Searching 'Dave Grohl' expands to groups and returns Nirvana/FF songs."""
-        resp = client.get("/api/v1/songs/search", params={"q": "Dave Grohl"})
+        resp = client.get("/api/v1/songs/search", params={"q": "Dave Grohl", "deep": "true"})
         data = resp.json()
         titles = [s["title"] for s in data]
         assert (

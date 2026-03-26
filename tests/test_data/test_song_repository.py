@@ -241,7 +241,7 @@ class TestSearchSurface:
     def test_title_match(self, populated_db):
         """Search for song title should find the song."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("Everlong")
+        songs = repo.search("Everlong")
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
@@ -255,7 +255,7 @@ class TestSearchSurface:
     def test_album_title_match(self, populated_db):
         """Searching for album name 'Nevermind' should find Song 1 (linked to that album)."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("Nevermind")
+        songs = repo.search("Nevermind")
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
@@ -266,7 +266,7 @@ class TestSearchSurface:
     def test_album_title_match_colour(self, populated_db):
         """Searching for 'Colour' should find Song 2 via album 'The Colour and the Shape'."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("Colour")
+        songs = repo.search("Colour")
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
@@ -277,19 +277,20 @@ class TestSearchSurface:
     def test_no_match(self, populated_db):
         """Test search_surface returns [] for no matches."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("ZZZZZZZZZ")
+        songs = repo.search("ZZZZZZZZZ")
         assert songs == [], f"Expected empty list for no match, got {songs}"
 
-    def test_does_not_match_artist_name(self, populated_db):
-        """Surface search only covers titles/albums, NOT artist names."""
+    def test_matches_artist_name(self, populated_db):
+        """Surface search covers titles/albums AND credited artist names."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("Nirvana")
-        assert songs == [], f"Expected empty list for artist name search, got {songs}"
+        songs = repo.search("Nirvana")
+        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
+        assert songs[0].id == 1, f"Expected 1 (SLTS), got {songs[0].id}"
 
     def test_empty_query_returns_all(self, populated_db):
         """Empty string in LIKE '%...%' matches everything."""
         repo = SongRepository(populated_db)
-        songs = repo.search_surface("")
+        songs = repo.search("")
         assert len(songs) == 9, f"Expected 9 songs, got {len(songs)}"
 
 

@@ -15,10 +15,28 @@ Fetch a single song and all its credits by ID.
 - Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
 ### search_songs(query: str) -> List[Song]
-Search for songs by title, album, and identity expansion (groups/aliases).
-- Calls `SongRepository.search_surface` for titles/albums.
-- Calls `IdentityRepository.search_identities` and `get_group_ids_for_members` for deep expansion.
-- Uses `_hydrate_songs` to attach all metadata.
+Strictly Surface search for performance. 
+- Matches: Titles, Albums, Tag names, Publisher names, and direct Performers (Display + Legal).
+- Logic: Calls `SongRepository.search`.
+- No recursion or hierarchical expansion.
+
+### _expand_identity_songs(query: str) -> List[Song]
+Resolves identities matching the query and expands to all songs from any groups they belong to.
+- Logic: `IdentityRepository.search_identities` -> `get_group_ids_for_members` -> `SongRepository.get_by_identity_ids`.
+
+### _expand_publisher_songs(query: str) -> List[Song]
+Resolves publishers matching the query and expands to all songs from that publisher or any of its descendants.
+- Logic: `PublisherRepository.search` (Recursive) -> `SongRepository.get_by_publisher_ids`.
+
+### _search_songs_composed(query: str, initial_songs: List[Song]) -> List[Song]
+Orchestrator for Deep Discovery. Merges initial seed matches with Identity and Publisher expansion legs and hydrates the final set.
+
+### search_songs_deep(query: str) -> List[Song]
+Comprehensive discovery including corporate umbrellas and group legacies.
+- Matches: Everything in Surface + Year, ISRC, and Tags.
+- Logic: Calls `SongRepository.search`.
+- Resolution: Includes `_expand_identity_songs` (Member->Group) and `_expand_publisher_songs` (Parent->Child).
+- Use `_hydrate_songs` for full metadata.
 
 ### get_identity(identity_id: int) -> Optional[Identity]
 Fetch a single Identity and all its aliases/members/groups by ID.
@@ -80,6 +98,18 @@ Full write-path orchestration for a staged file.
 - If NEW, try insertion.
 - **Reactive Conflict**: Catches `sqlite3.IntegrityError`. If the hash matches a soft-deleted record, raises `ReingestionConflictError` (409) with ghost metadata for the Comparison UI.
 - Handles transaction lifecycle (commit/rollback).
+
+### _hydrate_songs(songs: List[Song]) -> List[Song]
+Bulk hydrates songs with credits, albums, publishers, and tags. 
+- Uses batch repositories for O(1) database complexity.
+
+### _hydrate_identities(identities: List[Identity]) -> List[Identity]
+Bulk hydrates identities with aliases, members, and groups. Recursively expands 1 level to ensure tree discovery.
+
+### resolve_conflict(conflict_id: str, mode: str) -> Dict[str, Any]
+Resolves a pending reingestion conflict.
+- Modes: `OVERWRITE` (Soft-Deletes current record, swaps in NEW ID3 tags), `CANCEL` (Drops staging file).
+- Logic: `MediaSourceRepository.delete_source` -> `ingest_file`.
 - Deletes `staged_path` on failure or active duplicate to prevent orphans.
 - **Persistence**: Preserves `staged_path` on `ReingestionConflictError` to allow for later restoration.
 - Returns `IngestionReportView` data.

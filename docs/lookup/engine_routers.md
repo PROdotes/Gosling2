@@ -157,6 +157,11 @@ Fetches a single Song domain model by its unique ID.
 - Triggers DB cascade and physical cleanup if in staging.
 - Returns `{"status": "DELETED", "id": song_id}`.
 
+### async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView
+**HTTP**: `POST /api/v1/ingest/resolve-conflict`
+- Resolves a ghost record conflict by reactivating a soft-deleted record with new metadata from a staged file.
+- Wraps `CatalogService.resolve_conflict`.
+
 ---
 
 ## Metabolic Router

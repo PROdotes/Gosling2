@@ -248,7 +248,7 @@ class TestSongSearchPhaseTwo:
 
     def test_identity_name_expands_to_group_songs(self, client):
         """'Dave Grohl' identity search expands to Nirvana + FF songs with full hydration."""
-        data = client.get("/api/v1/songs/search", params={"q": "Dave Grohl"}).json()
+        data = client.get("/api/v1/songs/search", params={"q": "Dave Grohl", "deep": "true"}).json()
         titles = sorted([s["title"] for s in data])
         assert (
             "Smells Like Teen Spirit" in titles
@@ -261,7 +261,7 @@ class TestSongSearchPhaseTwo:
 
     def test_alias_expands_to_identity_tree(self, client):
         """'Late!' (Dave's alias) resolves through Dave's identity tree and returns hydrated Pocketwatch Demo."""
-        data = client.get("/api/v1/songs/search", params={"q": "Late!"}).json()
+        data = client.get("/api/v1/songs/search", params={"q": "Late!", "deep": "true"}).json()
         song = _find_song(data, "Pocketwatch Demo")
         assert song["id"] == 5, f"Expected id=5, got {song['id']}"
         assert (
@@ -293,13 +293,13 @@ class TestSongSearchPhaseTwo:
 
     def test_group_name_returns_group_songs(self, client):
         """'Foo Fighters' returns Everlong with full hydration."""
-        data = client.get("/api/v1/songs/search", params={"q": "Foo Fighters"}).json()
+        data = client.get("/api/v1/songs/search", params={"q": "Foo Fighters", "deep": "true"}).json()
         song = _find_song(data, "Everlong")
         _assert_everlong(song)
 
     def test_taylor_hawkins_expansion(self, client):
         """'Taylor Hawkins' returns his solo + group (FF) songs with correct fields."""
-        data = client.get("/api/v1/songs/search", params={"q": "Taylor Hawkins"}).json()
+        data = client.get("/api/v1/songs/search", params={"q": "Taylor Hawkins", "deep": "true"}).json()
         titles = sorted([s["title"] for s in data])
         assert (
             "Range Rover Bitch" in titles
