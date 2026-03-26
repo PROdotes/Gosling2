@@ -59,6 +59,62 @@ class SongRepository(MediaSourceRepository):
         )
         return source_id
 
+    def reactivate_ghost(self, ghost_id: int, song: Song, conn: sqlite3.Connection) -> None:
+        """
+        Reactivate a soft-deleted ghost song record with new metadata.
+        1. Verify ghost exists and is deleted
+        2. Update MediaSources (delegated to parent)
+        3. Update Songs table
+        4. Delete old relationships and insert new ones
+        """
+        logger.debug(
+            f"[SongRepository] -> reactivate_ghost(id={ghost_id}, title='{song.media_name}')"
+        )
+
+        # 1. Verify ghost exists
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (ghost_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise ValueError(f"Ghost ID {ghost_id} does not exist")
+        if row[0] != 1:
+            raise ValueError(f"Song ID {ghost_id} is not deleted (IsDeleted={row[0]})")
+
+        # 2. Update MediaSources table (delegated to parent)
+        self.reactivate_source(ghost_id, song, conn)
+
+        # 2. Update Songs table
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE Songs
+            SET TempoBPM = ?,
+                RecordingYear = ?,
+                ISRC = ?
+            WHERE SourceID = ?
+            """,
+            (song.bpm, song.year, song.isrc, ghost_id),
+        )
+
+        # 3. Delete old relationships and insert new ones
+        self.delete_song_links(ghost_id, conn)
+
+        tag_repo = TagRepository(self.db_path)
+        album_repo = SongAlbumRepository(self.db_path)
+        pub_repo = PublisherRepository(self.db_path)
+        credit_repo = SongCreditRepository(self.db_path)
+
+        credit_repo.insert_credits(ghost_id, song.credits, conn)
+        tag_repo.insert_tags(ghost_id, song.tags, conn)
+        album_repo.insert_albums(ghost_id, song.albums, conn)
+        pub_repo.insert_song_publishers(ghost_id, song.publishers, conn)
+
+        logger.info(
+            f"[SongRepository] <- reactivate_ghost() REACTIVATED ID={ghost_id} '{song.media_name}'"
+        )
+
     def get_by_id(self, song_id: int) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
         logger.debug(f"[SongRepository] -> get_by_id(id={song_id})")

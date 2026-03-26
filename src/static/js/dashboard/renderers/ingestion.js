@@ -172,7 +172,7 @@ function setupDropZone(zoneId, resultsId, allowedExtensions) {
             const result = await uploadFiles(allFiles);
 
             // Result is now BatchIngestReport
-            const summary = `Processed ${result.total_files} files: ${result.ingested} ingested, ${result.duplicates} duplicates, ${result.errors} errors`;
+            const summary = `Processed ${result.total_files} files: ${result.ingested} ingested, ${result.duplicates} duplicates, ${result.conflicts || 0} conflicts, ${result.errors} errors`;
             appendBatchSummary(resultsId, result, summary);
 
             // Show individual file results
@@ -326,7 +326,7 @@ function appendBatchSummary(resultsId, batchReport, summary) {
                 ${renderStatus("found", `${successRate}% Success`)}
             </div>
             <div class="card-subtitle">${escapeHtml(summary)}</div>
-            <div class="batch-stats" style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
+            <div class="batch-stats" style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;">
                 <div class="stat-pill">
                     <div class="stat-value">${batchReport.total_files}</div>
                     <div class="stat-label muted-note">Total</div>
@@ -338,6 +338,10 @@ function appendBatchSummary(resultsId, batchReport, summary) {
                 <div class="stat-pill">
                     <div class="stat-value" style="color: var(--warning);">${batchReport.duplicates}</div>
                     <div class="stat-label muted-note">Duplicates</div>
+                </div>
+                <div class="stat-pill">
+                    <div class="stat-value" style="color: #ff9500;">${batchReport.conflicts || 0}</div>
+                    <div class="stat-label muted-note">Conflicts</div>
                 </div>
                 <div class="stat-pill">
                     <div class="stat-value" style="color: var(--danger);">${batchReport.errors}</div>
@@ -359,14 +363,26 @@ function createResultCard(result, path) {
         "NEW": { class: "found", icon: "&#10003;", text: "New File" },
         "INGESTED": { class: "found", icon: "&#10003;", text: "Ingested" },
         "ALREADY_EXISTS": { class: "loading", icon: "&#9888;", text: `Exists (${result.match_type})` },
+        "CONFLICT": { class: "loading", icon: "&#9888;", text: `Ghost (${result.match_type})` },
         "ERROR": { class: "missing", icon: "&#10007;", text: "Error" }
     };
 
     const config = statusConfig[status] || statusConfig["ERROR"];
 
+    // For CONFLICT status, use ghost record data
     const song = result.song;
-    const title = song?.media_name || song?.title || "Unknown Title";
+    const title = status === "CONFLICT" && result.title
+        ? result.title
+        : (song?.media_name || song?.title || "Unknown Title");
     const artist = song?.display_artist || "-";
+
+    // Helper to format duration (seconds to MM:SS)
+    const formatDuration = (seconds) => {
+        if (!seconds) return "Unknown";
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
 
     card.innerHTML = `
         <div class="card-icon ingest-icon">${config.icon}</div>
@@ -378,7 +394,37 @@ function createResultCard(result, path) {
             <div class="card-subtitle">${escapeHtml(artist)}</div>
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
-            
+
+            ${status === "CONFLICT" ? `
+                <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
+                    <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #ff9500; font-weight: 600;">EXISTING GHOST RECORD (Soft-Deleted)</div>
+                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; font-size: 0.85rem;">
+                        <div class="muted-note">ID:</div>
+                        <div class="mono" style="font-weight: 500;">#${result.ghost_id}</div>
+
+                        <div class="muted-note">Title:</div>
+                        <div style="font-weight: 500;">${escapeHtml(result.title || "Unknown")}</div>
+
+                        <div class="muted-note">Duration:</div>
+                        <div class="mono">${formatDuration(result.duration_s)}</div>
+
+                        <div class="muted-note">Year:</div>
+                        <div class="mono">${result.year || "(none)"}</div>
+
+                        <div class="muted-note">ISRC:</div>
+                        <div class="mono" style="font-size: 0.8rem;">${result.isrc ? escapeHtml(result.isrc) : "(none)"}</div>
+                    </div>
+                    <div class="muted-note" style="font-size: 0.75rem; margin-top: 0.75rem; font-style: italic;">
+                        This file matches a previously deleted record. Click below to re-activate with new metadata.
+                    </div>
+                    <div style="margin-top: 0.75rem;">
+                        <button style="padding: 0.5rem 1rem; background: #ff9500; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
+                            Re-ingest & Activate
+                        </button>
+                    </div>
+                </div>
+            ` : ""}
+
             ${status === "INGESTED" ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
@@ -387,7 +433,7 @@ function createResultCard(result, path) {
                     <span class="muted-note">• UUID Staged</span>
                 </div>
             ` : ""}
-            
+
             ${status === "NEW" ? `
                 <div class="ingest-actions-row">
                     <span class="muted-note">Verified. Drop physical file to commit.</span>

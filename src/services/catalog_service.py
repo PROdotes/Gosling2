@@ -214,6 +214,8 @@ class CatalogService:
                     ghost_id=ghost_meta["id"],
                     title=ghost_meta["title"],
                     duration_s=ghost_meta["duration_s"],
+                    year=ghost_meta.get("year"),
+                    isrc=ghost_meta.get("isrc"),
                 )
 
             # Standard integrity error handling (re-trace existing check)
@@ -374,9 +376,12 @@ class CatalogService:
             logger.warning(f"[CatalogService] Conflict detected in batch: {file_path}")
             return {
                 "status": "CONFLICT",
+                "match_type": "HASH",  # Conflicts are always hash-based
                 "ghost_id": e.ghost_id,
                 "title": e.title,
                 "duration_s": e.duration_s,
+                "year": e.year,
+                "isrc": e.isrc,
                 "staged_path": file_path,
                 "song": None,
             }
@@ -439,6 +444,60 @@ class CatalogService:
             conn.rollback()
             logger.error(f"[CatalogService] <- delete_song(id={song_id}) FAILED: {e}")
             return False
+        finally:
+            conn.close()
+
+    def resolve_conflict(self, ghost_id: int, staged_path: str) -> Dict[str, Any]:
+        """
+        Resolve a ghost conflict by re-activating the soft-deleted record with new file metadata.
+
+        1. Extract metadata from the staged file
+        2. Update the ghost record (IsDeleted=0, new metadata, keep staged path)
+        3. Return the reactivated song
+
+        Note: File stays in staging - no move operation (user moves files manually later).
+        """
+        logger.info(
+            f"[CatalogService] -> resolve_conflict(ghost_id={ghost_id}, staged_path='{staged_path}')"
+        )
+
+        if not os.path.exists(staged_path):
+            logger.error(f"[CatalogService] Staged file not found: {staged_path}")
+            return {"status": "ERROR", "message": "Staged file not found"}
+
+        conn = self._song_repo.get_connection()
+        try:
+            # 1. Extract metadata from staged file
+            raw_meta = self._metadata_service.extract_metadata(staged_path)
+            parsed_song = self._metadata_parser.parse(raw_meta, staged_path)
+            audio_hash = calculate_audio_hash(staged_path)
+
+            # 2. Create updated song model with ghost_id and staged path
+            reactivated_song = parsed_song.model_copy(update={
+                "id": ghost_id,
+                "source_path": staged_path,
+                "audio_hash": audio_hash,
+                "is_active": True,
+            })
+
+            # 3. Update the ghost record
+            self._song_repo.reactivate_ghost(ghost_id, reactivated_song, conn)
+
+            conn.commit()
+            logger.info(f"[CatalogService] <- resolve_conflict() REACTIVATED ID={ghost_id}")
+
+            # 4. Return the reactivated song with full hydration
+            hydrated_songs = self._hydrate_songs([reactivated_song])
+            return {
+                "status": "INGESTED",
+                "message": "Ghost record reactivated with new metadata",
+                "song": hydrated_songs[0] if hydrated_songs else reactivated_song,
+            }
+
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- resolve_conflict() FAILED: {e}")
+            return {"status": "ERROR", "message": f"Conflict resolution failed: {str(e)}"}
         finally:
             conn.close()
 

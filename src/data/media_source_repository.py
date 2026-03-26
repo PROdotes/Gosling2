@@ -127,9 +127,16 @@ class MediaSourceRepository(BaseRepository):
 
             cursor.execute(
                 """
-                SELECT SourceID, MediaName, SourceDuration, IsDeleted
-                FROM MediaSources
-                WHERE AudioHash = ?
+                SELECT
+                    ms.SourceID,
+                    ms.MediaName,
+                    ms.SourceDuration,
+                    ms.IsDeleted,
+                    s.RecordingYear,
+                    s.ISRC
+                FROM MediaSources ms
+                LEFT JOIN Songs s ON ms.SourceID = s.SourceID
+                WHERE ms.AudioHash = ?
             """,
                 (audio_hash,),
             )
@@ -141,6 +148,8 @@ class MediaSourceRepository(BaseRepository):
                     "title": row["MediaName"],
                     "duration_s": float(row["SourceDuration"] or 0),
                     "is_deleted": bool(row["IsDeleted"]),
+                    "year": row["RecordingYear"],
+                    "isrc": row["ISRC"],
                 }
 
             return None
@@ -208,4 +217,43 @@ class MediaSourceRepository(BaseRepository):
 
         logger.debug(
             f"[MediaSourceRepository] <- delete_song_links(id={source_id}) DONE"
+        )
+
+    def reactivate_source(
+        self, source_id: int, model: MediaSource, conn: sqlite3.Connection
+    ) -> None:
+        """
+        Reactivate a soft-deleted MediaSource record with new metadata.
+        Updates MediaSources table and sets IsDeleted=0.
+        """
+        logger.debug(
+            f"[MediaSourceRepository] -> reactivate_source(id={source_id}, name='{model.media_name}')"
+        )
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            UPDATE MediaSources
+            SET MediaName = ?,
+                SourcePath = ?,
+                SourceDuration = ?,
+                AudioHash = ?,
+                IsActive = ?,
+                ProcessingStatus = ?,
+                IsDeleted = 0
+            WHERE SourceID = ?
+            """,
+            (
+                model.media_name,
+                model.source_path,
+                model.duration_s,
+                model.audio_hash,
+                1 if model.is_active else 0,
+                model.processing_status if model.processing_status is not None else 1,
+                source_id,
+            ),
+        )
+
+        logger.debug(
+            f"[MediaSourceRepository] <- reactivate_source(id={source_id}) UPDATED"
         )

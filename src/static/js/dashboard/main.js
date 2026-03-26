@@ -404,6 +404,48 @@ document.addEventListener("click", (event) => {
         return;
     }
 
+    if (action === "resolve-conflict") {
+        const { ghostId, stagedPath } = actionTarget.dataset;
+
+        // Disable the button to prevent double-clicks
+        actionTarget.disabled = true;
+        actionTarget.textContent = "Processing...";
+
+        fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
+            method: "POST",
+        })
+            .then((res) => res.json())
+            .then((data) => {
+                if (data.status === "INGESTED") {
+                    // Success - replace the conflict card with success message
+                    const card = actionTarget.closest(".result-card");
+                    if (card) {
+                        card.style.background = "rgba(76, 175, 80, 0.1)";
+                        card.style.borderLeft = "3px solid #4CAF50";
+                        const conflictBox = card.querySelector('[style*="rgba(255, 149, 0"]');
+                        if (conflictBox) {
+                            conflictBox.innerHTML = `
+                                <div style="color: #4CAF50; font-weight: 600; margin-bottom: 0.5rem;">✓ Ghost Record Reactivated</div>
+                                <div class="muted-note" style="font-size: 0.85rem;">
+                                    Song "${data.song?.media_name || "Unknown"}" has been restored with new metadata.
+                                </div>
+                            `;
+                        }
+                    }
+                } else {
+                    actionTarget.disabled = false;
+                    actionTarget.textContent = "Re-ingest & Activate";
+                    console.error("Failed to reactivate:", data.message);
+                }
+            })
+            .catch((err) => {
+                actionTarget.disabled = false;
+                actionTarget.textContent = "Re-ingest & Activate";
+                console.error("Error:", err.message);
+            });
+        return;
+    }
+
     if (action === "delete-song") {
         const { id, title } = actionTarget.dataset;
         if (confirm(`Are you sure you want to permanently delete "${title}"? This cannot be undone.`)) {

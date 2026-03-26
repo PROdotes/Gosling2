@@ -15,10 +15,19 @@ class ReingestionConflictError(IngestionError):
     Carries the metadata needed for the frontend's comparison popup.
     """
 
-    def __init__(self, ghost_id: int, title: str, duration_s: float):
+    def __init__(
+        self,
+        ghost_id: int,
+        title: str,
+        duration_s: float,
+        year: int = None,
+        isrc: str = None,
+    ):
         self.ghost_id = ghost_id
         self.title = title
         self.duration_s = duration_s
+        self.year = year
+        self.isrc = isrc
         # User requested specific message format
         message = f"song with that hash already exists, {title}, {duration_s}"
         super().__init__(message, status_code=409)

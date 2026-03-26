@@ -504,6 +504,12 @@ def audit_service_empty(empty_db):
     return AuditService(empty_db)
 
 
+@pytest.fixture
+def test_audio_file():
+    """Path to a real audio file for integration tests."""
+    return str(Path(__file__).parent / "fixtures" / "silence.mp3")
+
+
 @pytest.fixture(autouse=True)
 def cleanup_staging_dir():
     """

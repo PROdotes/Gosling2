@@ -293,11 +293,13 @@ class IngestionReportView(BaseModel):
     match_type: Optional[str] = None  # "HASH", "PATH", "METADATA"
     message: Optional[str] = None
     song: Optional[SongView] = None
-    
+
     # Conflict/Ghost Metadata (Populated on 409 CONFLICT)
     ghost_id: Optional[int] = None
     title: Optional[str] = None
     duration_s: Optional[float] = None
+    year: Optional[int] = None
+    isrc: Optional[str] = None
     staged_path: Optional[str] = None
 
 

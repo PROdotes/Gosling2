@@ -111,3 +111,158 @@ class TestCatalogIngestionConflicts:
                 service.ingest_file(new_staged_path)
 
         assert exc_info.value.ghost_id == 1
+
+
+class TestResolveConflict:
+    """Tests for resolve_conflict - reactivating ghost records with new metadata."""
+
+    def test_resolve_conflict_happy_path_reactivates_ghost_with_new_metadata(
+        self, populated_db, tmp_path, test_audio_file
+    ):
+        """
+        When resolve_conflict is called with valid ghost_id and staged_path:
+        1. MediaSources: IsDeleted=0, all fields updated with new metadata
+        2. Songs: TempoBPM, RecordingYear, ISRC updated
+        3. Old relationships deleted, new relationships inserted
+        4. File stays in staging (no move operation)
+        5. Returns {"status": "INGESTED", "song": <complete SongView>}
+        """
+        service = CatalogService(populated_db)
+        ghost_id = 1  # Song 1: "Smells Like Teen Spirit", hash_1, 200s, 1991
+
+        # 1. Soft-delete the existing song to create a ghost
+        import sqlite3
+        import shutil
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
+        )
+        conn.execute("DELETE FROM SongCredits WHERE SourceID = ?", (ghost_id,))
+        conn.commit()
+        conn.close()
+
+        # 2. Copy real test audio file to staging with UUID name
+        staged_file = tmp_path / "uuid_staged_file.mp3"
+        shutil.copy(test_audio_file, staged_file)
+        staged_path = str(staged_file)
+
+        # 3. Execute - using REAL file and REAL metadata extraction
+        result = service.resolve_conflict(ghost_id, staged_path)
+
+        # 4. Exhaustive Assertions on Return Value
+        assert result["status"] == "INGESTED", f"Expected 'INGESTED', got {result['status']}"
+        assert "song" in result, "Result missing 'song' field"
+        assert result["song"] is not None, "Expected song object, got None"
+
+        song = result["song"]
+        assert song.id == ghost_id, f"Expected ID {ghost_id}, got {song.id}"
+        # The actual metadata will come from the test_audio_file, which we know from fixtures
+        assert song.media_name is not None, f"Expected media_name to be set, got None"
+        assert song.duration_s > 0, f"Expected duration > 0, got {song.duration_s}"
+        assert song.audio_hash is not None, f"Expected audio_hash to be set, got None"
+        assert song.is_active is True, f"Expected True, got {song.is_active}"
+
+        # 5. Database Side Effects - Verify IsDeleted=0
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute(
+            "SELECT MediaName, IsDeleted, SourceDuration, AudioHash FROM MediaSources WHERE SourceID = ?",
+            (ghost_id,),
+        ).fetchone()
+        conn.close()
+
+        assert row is not None, f"Ghost record {ghost_id} should still exist in DB"
+        assert row[1] == 0, f"Expected IsDeleted=0, got {row[1]}"
+        assert row[2] > 0, f"Expected duration > 0, got {row[2]}"
+        assert row[3] is not None, f"Expected hash to be set, got None"
+
+        # 6. File stays in staging (no move operation)
+        assert os.path.exists(staged_path), f"Staged file should remain in staging, but is missing at {staged_path}"
+
+    def test_resolve_conflict_nonexistent_ghost_id_returns_error(
+        self, populated_db, tmp_path
+    ):
+        """
+        When ghost_id doesn't exist in database, resolve_conflict returns error.
+        """
+        service = CatalogService(populated_db)
+        ghost_id = 999  # Does not exist
+
+        staged_file = tmp_path / "staged.mp3"
+        staged_file.write_text("content")
+        staged_path = str(staged_file)
+
+        result = service.resolve_conflict(ghost_id, staged_path)
+
+        assert result["status"] == "ERROR", f"Expected 'ERROR', got {result['status']}"
+        assert "message" in result, "Result missing 'message' field"
+        # Staged file should remain (not deleted on error)
+        assert os.path.exists(staged_path), "Staged file should remain after error"
+
+    def test_resolve_conflict_missing_staged_file_returns_error(
+        self, populated_db, tmp_path
+    ):
+        """
+        When staged_path doesn't exist, resolve_conflict returns error immediately.
+        """
+        service = CatalogService(populated_db)
+        ghost_id = 1
+
+        # Soft-delete to create ghost
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
+        )
+        conn.commit()
+        conn.close()
+
+        fake_path = str(tmp_path / "nonexistent.mp3")
+
+        result = service.resolve_conflict(ghost_id, fake_path)
+
+        assert result["status"] == "ERROR", f"Expected 'ERROR', got {result['status']}"
+        assert result["message"] == "Staged file not found", f"Expected 'Staged file not found', got '{result['message']}'"
+
+    def test_resolve_conflict_preserves_other_songs(self, populated_db, tmp_path, test_audio_file):
+        """
+        Reactivating ghost_id=1 should NOT affect songs 2, 3, etc.
+        """
+        service = CatalogService(populated_db)
+        ghost_id = 1
+
+        # Soft-delete song 1
+        import sqlite3
+        import shutil
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
+        )
+        conn.execute("DELETE FROM SongCredits WHERE SourceID = ?", (ghost_id,))
+        conn.commit()
+        conn.close()
+
+        # Snapshot song 2 before reactivation
+        from src.data.song_repository import SongRepository
+        repo = SongRepository(populated_db)
+        song_2_before = repo.get_by_id(2)
+        assert song_2_before is not None, "Song 2 should exist before test"
+
+        # Reactivate song 1 with real audio file
+        staged_file = tmp_path / "staged.mp3"
+        shutil.copy(test_audio_file, staged_file)
+        staged_path = str(staged_file)
+
+        service.resolve_conflict(ghost_id, staged_path)
+
+        # Verify song 2 unchanged - ALL FIELDS
+        song_2_after = repo.get_by_id(2)
+        assert song_2_after is not None, "Song 2 should still exist after reactivation"
+        assert song_2_after.id == song_2_before.id, f"Song 2 ID changed: {song_2_before.id} -> {song_2_after.id}"
+        assert song_2_after.media_name == song_2_before.media_name, f"Song 2 media_name changed: {song_2_before.media_name} -> {song_2_after.media_name}"
+        assert song_2_after.duration_s == song_2_before.duration_s, f"Song 2 duration changed: {song_2_before.duration_s} -> {song_2_after.duration_s}"
+        assert song_2_after.audio_hash == song_2_before.audio_hash, f"Song 2 hash changed: {song_2_before.audio_hash} -> {song_2_after.audio_hash}"
+        assert song_2_after.source_path == song_2_before.source_path, f"Song 2 path changed"
+        assert song_2_after.is_active == song_2_before.is_active, f"Song 2 is_active changed"
+        assert song_2_after.bpm == song_2_before.bpm, f"Song 2 BPM changed"
+        assert song_2_after.year == song_2_before.year, f"Song 2 year changed"
+        assert song_2_after.isrc == song_2_before.isrc, f"Song 2 ISRC changed"

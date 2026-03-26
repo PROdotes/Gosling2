@@ -10,6 +10,7 @@ from src.models.view_models import (
     SongView,
     FolderScanRequest,
     BatchIngestReport,
+    IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -113,6 +114,38 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
         logger.error(f"[IngestRouter] Batch ingestion error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
+        )
+
+
+@router.post("/resolve-conflict")
+async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView:
+    """
+    Resolve a ghost conflict by reactivating the soft-deleted record with new metadata.
+
+    Takes the ghost record ID and the path to the staged file,
+    updates the ghost record with new metadata, and sets IsDeleted=0.
+
+    Example:
+        POST /api/v1/ingest/resolve-conflict?ghost_id=123&staged_path=/path/to/staged/file.mp3
+    """
+    logger.info(
+        f"[IngestRouter] -> resolve_conflict(ghost_id={ghost_id}, staged_path='{staged_path}')"
+    )
+
+    try:
+        service = _get_service()
+        result = service.resolve_conflict(ghost_id, staged_path)
+
+        # Convert Domain Song to SongView if present
+        if "song" in result and result["song"]:
+            result["song"] = SongView.from_domain(result["song"])
+
+        return IngestionReportView(**result)
+
+    except Exception as e:
+        logger.error(f"[IngestRouter] Conflict resolution error: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Conflict resolution failed: {str(e)}"
         )
 
 

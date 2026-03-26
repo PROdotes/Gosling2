@@ -19,6 +19,9 @@ def get_library_root() -> str:
 # Staging Area (Uploaded but un-indexed files)
 STAGING_DIR = Path("temp/library/staging")
 
+# Media Directory (Permanent storage for ingested files)
+MEDIA_DIR = Path("temp/library/media")
+
 # Accepted file extensions for ingestion
 ACCEPTED_EXTENSIONS = [".mp3"]
 
