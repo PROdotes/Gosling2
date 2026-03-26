@@ -13,13 +13,11 @@ Project protocols for architectural integrity.
 - Non-trivial changes require a spec in `docs/`
 
 ---
-
 ## 2. Lookup Protocol
-- Check `docs/lookup/` before research or changes
-- Every entry must have: header, location, responsibility, signatures
-- Every method must have a strict Python signature
-- Every entry must have a single, definitive file path
-
+- **MANDATORY**: Every turn involving planning or changes MUST start by opening the relevant `docs/lookup/` file via `view_file`. No exceptions.
+- Every entry must have: header, location, responsibility, signatures.
+- Every method must have a strict Python signature.
+- Every entry must have a single, definitive file path.
 ---
 
 ## 3. Debug Protocol
@@ -70,3 +68,10 @@ A task is not done until:
 - Vows, rules, or promises made in the chat UI are meaningless because they are lost when a new chat starts.
 - Never write "From now on I'll do X" in a conversation.
 - If a workflow rule is broken, do not apologize. Immediately document the correction in `AGENTS.md` or Open Brain so it survives the reset.
+
+---
+
+## 9. Deduplication First
+- Before adding any new method or service, audit the `docs/lookup/` indices for existing similar logic.
+- If an existing path can be generalized (e.g., using a list parameter or optional query builder), you MUST refactor it rather than duplicating.
+- Structural duplication in repositories (shared SQL logic) is technical debt and must be flagged for cleanup.
