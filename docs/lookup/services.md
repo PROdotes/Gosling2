@@ -77,9 +77,11 @@ Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 ### ingest_file(staged_path: str) -> Dict[str, Any]
 Full write-path orchestration for a staged file.
 - Performs `check_ingestion`.
-- If NEW, inserts into `SongRepository` (atomic).
+- If NEW, try insertion.
+- **Reactive Conflict**: Catches `sqlite3.IntegrityError`. If the hash matches a soft-deleted record, raises `ReingestionConflictError` (409) with ghost metadata for the Comparison UI.
 - Handles transaction lifecycle (commit/rollback).
-- Deletes `staged_path` on failure to prevent orphans.
+- Deletes `staged_path` on failure or active duplicate to prevent orphans.
+- **Persistence**: Preserves `staged_path` on `ReingestionConflictError` to allow for later restoration.
 - Returns `IngestionReportView` data.
 
 ### scan_folder(folder_path: str, recursive: bool = True) -> List[str]

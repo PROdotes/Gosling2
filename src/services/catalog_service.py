@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.data.album_repository import AlbumRepository
@@ -19,6 +20,7 @@ from src.models.domain import (
     AlbumCredit,
     Tag,
 )
+from src.models.exceptions import ReingestionConflictError
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
 from src.services.metadata_service import MetadataService
@@ -126,16 +128,33 @@ class CatalogService:
                         "status": "ALREADY_EXISTS",
                         "match_type": "METADATA",
                         "message": f"Metadata match found: {', '.join(performers)} - {title} ({year})",
-                        "song": hydrated[0] if hydrated else matches[0],
+                        "song": hydrated[0],
                     }
 
+            # Final return for NEW songs
             logger.info(
                 f"[CatalogService] <- check_ingestion(file_path='{file_path}') NEW"
             )
             return {"status": "NEW", "song": parsed_song}
         except Exception as e:
+            # Re-signal 409 CONFLICT if the error is a collision that happened during write
+            # (Ensures the UI sees the specific Ghost that blocked the commit)
+            if "UNIQUE constraint failed" in str(e) or "ReingestionConflictError" in str(e):
+                from src.engine.exceptions import ReingestionConflictError
+                if isinstance(e, ReingestionConflictError):
+                    ghost_id = e.ghost_id
+                    ghost_data = self._song_repo.get_by_id_including_deleted(ghost_id)
+                    return {
+                        "status": "CONFLICT",
+                        "match_type": "HASH" if "audio_hash" in str(e) else "METADATA",
+                        "ghost_id": ghost_id,
+                        "staged_path": file_path,
+                        "ghost_song": ghost_data,
+                        "new_song": parsed_song  # Show the metadata of the file we dropped
+                    }
+            
             logger.error(
-                f"[CatalogService] <- check_ingestion(file_path='{file_path}') EXTRACTION_FAILED: {e}"
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') ERROR: {e}"
             )
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
@@ -143,9 +162,10 @@ class CatalogService:
         """
         Write path for a staged file.
         1. Check (Hash/Path/Meta collisions).
-        2. If NEW, insert into both tables.
-        3. Commit single transaction.
-        4. Rollback on failure + cleanup.
+        2. If NEW, try insertion.
+        3. Catch collisions and throw specific errors for Reingestion.
+        4. Commit single transaction.
+        5. Rollback on failure + cleanup.
         """
         logger.debug(f"[CatalogService] -> ingest_file(path='{staged_path}')")
 
@@ -155,11 +175,11 @@ class CatalogService:
             logger.info(
                 f"[CatalogService] <- ingest_file(path='{staged_path}') REJECTED: {check['status']}"
             )
-            # Cleanup staging file for rejected duplicates
+            # Cleanup staging file for rejected ACTIVE duplicates
             if os.path.exists(staged_path):
                 os.remove(staged_path)
                 logger.debug(
-                    f"[CatalogService] Deleted rejected staged file: {staged_path}"
+                    f"[CatalogService] Deleted duplicate staged file: {staged_path}"
                 )
             return check
 
@@ -176,6 +196,31 @@ class CatalogService:
                 f"[CatalogService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
             )
             return {"status": "INGESTED", "song": hydrated_song}
+
+        except sqlite3.IntegrityError as e:
+            logger.error(f"[CatalogService] IntegrityError during ingestion: {e}")
+            conn.rollback()
+            # 3. Reactive Conflict Resolution
+            # Check if this mismatch was with a ghost Musical Record
+            # Truth Discovery: Check hash even if IsDeleted=1
+            ghost_meta = self._song_repo.get_source_metadata_by_hash(song.audio_hash)
+            if ghost_meta and ghost_meta["is_deleted"]:
+                logger.warning(
+                    f"[CatalogService] <- Conflict with GHOST ID={ghost_meta['id']}: {ghost_meta['title']}"
+                )
+                # THROW 409 Exception (Musical sense - "Records" not "records")
+                # We do NOT delete the staged file here so it's ready for Phase 2 resolution
+                raise ReingestionConflictError(
+                    ghost_id=ghost_meta["id"],
+                    title=ghost_meta["title"],
+                    duration_s=ghost_meta["duration_s"],
+                )
+
+            # Standard integrity error handling (re-trace existing check)
+            logger.error(f"[CatalogService] <- ingest_file() IntegrityError: {e}")
+            if os.path.exists(staged_path):
+                os.remove(staged_path)
+            return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
 
         except Exception as e:
             conn.rollback()
@@ -261,6 +306,7 @@ class CatalogService:
         results = []
         ingested_count = 0
         duplicate_count = 0
+        conflict_count = 0
         error_count = 0
 
         # Use ThreadPoolExecutor for parallel processing
@@ -282,6 +328,8 @@ class CatalogService:
                         ingested_count += 1
                     elif report["status"] == "ALREADY_EXISTS":
                         duplicate_count += 1
+                    elif report["status"] == "CONFLICT":
+                        conflict_count += 1
                     else:  # ERROR
                         error_count += 1
 
@@ -303,13 +351,14 @@ class CatalogService:
         logger.info(
             f"[CatalogService] <- ingest_batch() "
             f"total={len(file_paths)} ingested={ingested_count} "
-            f"duplicates={duplicate_count} errors={error_count}"
+            f"duplicates={duplicate_count} conflicts={conflict_count} errors={error_count}"
         )
 
         return {
             "total_files": len(file_paths),
             "ingested": ingested_count,
             "duplicates": duplicate_count,
+            "conflicts": conflict_count,
             "errors": error_count,
             "results": results,
         }
@@ -321,6 +370,16 @@ class CatalogService:
         """
         try:
             return self.ingest_file(file_path)
+        except ReingestionConflictError as e:
+            logger.warning(f"[CatalogService] Conflict detected in batch: {file_path}")
+            return {
+                "status": "CONFLICT",
+                "ghost_id": e.ghost_id,
+                "title": e.title,
+                "duration_s": e.duration_s,
+                "staged_path": file_path,
+                "song": None,
+            }
         except Exception as e:
             logger.error(f"[CatalogService] Thread error processing {file_path}: {e}")
             return {

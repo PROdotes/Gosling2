@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS MediaSources (
     SourceNotes TEXT,
     SourcePath TEXT NOT NULL UNIQUE,
     SourceDuration REAL,
-    AudioHash TEXT,
+    AudioHash TEXT UNIQUE,
     IsActive BOOLEAN DEFAULT 0,
     ProcessingStatus INTEGER,  -- NULL = Pending/Unseen by engine
     IsDeleted BOOLEAN DEFAULT 0,

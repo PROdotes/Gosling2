@@ -1,4 +1,4 @@
-from typing import Optional, Mapping, Any
+from typing import Optional, Mapping, Any, Dict
 import sqlite3
 from src.models.domain import MediaSource
 from src.data.base_repository import BaseRepository
@@ -51,7 +51,8 @@ class MediaSourceRepository(BaseRepository):
     def get_by_path(self, path: str) -> Optional[MediaSource]:
         """Universal lookup by SourcePath. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_path(path='{path}')")
-        with self._get_connection() as conn:
+        conn = self.get_connection()
+        try:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -76,11 +77,14 @@ class MediaSourceRepository(BaseRepository):
                 f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND"
             )
             return None
+        finally:
+            conn.close()
 
     def get_by_hash(self, audio_hash: str) -> Optional[MediaSource]:
         """Universal lookup by AudioHash. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_hash(hash='{audio_hash}')")
-        with self._get_connection() as conn:
+        conn = self.get_connection()
+        try:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -105,6 +109,43 @@ class MediaSourceRepository(BaseRepository):
                 f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') NOT_FOUND"
             )
             return None
+        finally:
+            conn.close()
+
+    def get_source_metadata_by_hash(self, audio_hash: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieves basic metadata for a source by its hash, regardless of its deleted status.
+        Used for re-ingestion conflict resolution.
+        """
+        logger.debug(
+            f"[MediaSourceRepository] -> get_source_metadata_by_hash(hash='{audio_hash}')"
+        )
+        conn = self.get_connection()
+        try:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                SELECT SourceID, MediaName, SourceDuration, IsDeleted
+                FROM MediaSources
+                WHERE AudioHash = ?
+            """,
+                (audio_hash,),
+            )
+            row = cursor.fetchone()
+
+            if row:
+                return {
+                    "id": row["SourceID"],
+                    "title": row["MediaName"],
+                    "duration_s": float(row["SourceDuration"] or 0),
+                    "is_deleted": bool(row["IsDeleted"]),
+                }
+
+            return None
+        finally:
+            conn.close()
 
     def _row_to_source(self, row: Mapping[str, Any]) -> MediaSource:
         """Hydrates a base MediaSource from a raw MediaSources row."""

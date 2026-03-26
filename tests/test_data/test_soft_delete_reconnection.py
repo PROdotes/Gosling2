@@ -53,8 +53,12 @@ class TestTagReconnection:
         conn.close()
 
         assert len(rows) == 1, f"Expected 1 Grunge/Genre row (reused), got {len(rows)}"
-        assert rows[0]["TagID"] == 1, f"Expected TagID=1 (original), got {rows[0]['TagID']}"
-        assert rows[0]["IsDeleted"] == 0, f"Expected IsDeleted=0 (woken up), got {rows[0]['IsDeleted']}"
+        assert (
+            rows[0]["TagID"] == 1
+        ), f"Expected TagID=1 (original), got {rows[0]['TagID']}"
+        assert (
+            rows[0]["IsDeleted"] == 0
+        ), f"Expected IsDeleted=0 (woken up), got {rows[0]['IsDeleted']}"
 
     def test_soft_deleted_tag_case_insensitive_reconnection(self, populated_db):
         """
@@ -80,7 +84,9 @@ class TestTagReconnection:
         ).fetchall()
         conn.close()
 
-        assert len(rows) == 1, f"Expected 1 row (case-insensitive reuse), got {len(rows)}"
+        assert (
+            len(rows) == 1
+        ), f"Expected 1 row (case-insensitive reuse), got {len(rows)}"
         assert rows[0]["TagID"] == 1
         assert rows[0]["IsDeleted"] == 0
 
@@ -172,7 +178,9 @@ class TestPublisherReconnection:
 class TestArtistNameReconnection:
     """SongCreditRepository.insert_credits must wake up soft-deleted ArtistNames."""
 
-    def test_soft_deleted_artist_name_is_reconnected_via_credit_insert(self, populated_db):
+    def test_soft_deleted_artist_name_is_reconnected_via_credit_insert(
+        self, populated_db
+    ):
         """
         Dave Grohl (NameID=10) exists in populated_db.
         Soft-delete it, then insert a credit for 'Dave Grohl' on Song 7.
@@ -201,7 +209,9 @@ class TestArtistNameReconnection:
         assert rows[0]["NameID"] == 10
         assert rows[0]["IsDeleted"] == 0
 
-    def test_soft_deleted_artist_name_reconnected_via_album_credit_insert(self, populated_db):
+    def test_soft_deleted_artist_name_reconnected_via_album_credit_insert(
+        self, populated_db
+    ):
         """
         Same reconnection but through SongAlbumRepository._insert_album_credits path.
         Soft-delete 'Nirvana' (NameID=20), insert a new album with Nirvana credit on Song 7.

@@ -32,6 +32,9 @@ Universal lookup by SourcePath. Returns the base `MediaSource` record (or None) 
 ### get_by_hash(audio_hash: str) -> Optional[MediaSource]
 Universal lookup by AudioHash. Returns the base `MediaSource` record (or None).
 
+### get_source_metadata_by_hash(audio_hash: str) -> Optional[Dict[str, Any]]
+Truth discovery lookup that ignores the `IsDeleted` filter. Returns basic metadata (`id`, `title`, `duration_s`, `is_deleted`) for re-ingestion conflict resolution.
+
 ### soft_delete(source_id: int, conn: sqlite3.Connection) -> bool
 Soft-delete a MediaSource by setting `IsDeleted = 1`. Returns `True` if a record was updated, `False` if not found or already deleted.
 

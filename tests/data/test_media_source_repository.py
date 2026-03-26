@@ -226,9 +226,7 @@ class TestGetByHash:
 
         # 2. Lookup by hash (should return None)
         source = repo.get_by_hash(audio_hash)
-        assert (
-            source is None
-        ), "Soft-deleted source should not be found by hash"
+        assert source is None, "Soft-deleted source should not be found by hash"
 
 
 class TestDelete:
@@ -322,3 +320,40 @@ class TestDelete:
             assert res is not None
             type_id = res[0]
             assert row["TypeID"] == type_id
+
+
+class TestGetSourceMetadataByHash:
+    """MediaSourceRepository.get_source_metadata_by_hash contracts."""
+
+    def test_finds_active_source(self, populated_db):
+        repo = MediaSourceRepository(populated_db)
+        # Song 1: hash_1, Smells Like Teen Spirit, 200.0s
+        meta = repo.get_source_metadata_by_hash("hash_1")
+
+        assert meta is not None
+        assert meta["id"] == 1
+        assert meta["title"] == "Smells Like Teen Spirit"
+        assert meta["duration_s"] == 200.0
+        assert meta["is_deleted"] is False
+
+    def test_finds_soft_deleted_source(self, populated_db):
+        repo = MediaSourceRepository(populated_db)
+        source_id = 1
+
+        # 1. Soft delete
+        with repo._get_connection() as conn:
+            repo.soft_delete(source_id, conn)
+            conn.commit()
+
+        # 2. Lookup (should find it despite being deleted)
+        meta = repo.get_source_metadata_by_hash("hash_1")
+
+        assert meta is not None
+        assert meta["id"] == 1
+        assert meta["title"] == "Smells Like Teen Spirit"
+        assert meta["is_deleted"] is True
+
+    def test_returns_none_if_not_found(self, populated_db):
+        repo = MediaSourceRepository(populated_db)
+        meta = repo.get_source_metadata_by_hash("no_such_hash")
+        assert meta is None

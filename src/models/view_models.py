@@ -287,12 +287,18 @@ class IngestionCheckRequest(BaseModel):
 
 
 class IngestionReportView(BaseModel):
-    """The result of a dry-run ingestion check."""
+    """The result of a dry-run ingestion check or an actual ingestion attempt."""
 
-    status: str  # NEW, ALREADY_EXISTS, ERROR
+    status: str  # NEW, ALREADY_EXISTS, CONFLICT, ERROR
     match_type: Optional[str] = None  # "HASH", "PATH", "METADATA"
     message: Optional[str] = None
     song: Optional[SongView] = None
+    
+    # Conflict/Ghost Metadata (Populated on 409 CONFLICT)
+    ghost_id: Optional[int] = None
+    title: Optional[str] = None
+    duration_s: Optional[float] = None
+    staged_path: Optional[str] = None
 
 
 class FolderScanRequest(BaseModel):
@@ -308,6 +314,7 @@ class BatchIngestReport(BaseModel):
     total_files: int
     ingested: int
     duplicates: int
+    conflicts: int = 0
     errors: int
     results: List[IngestionReportView]
 

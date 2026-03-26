@@ -94,7 +94,9 @@ class TestSongDeletionIntegrity:
             res = conn.execute(
                 "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (song_id,)
             ).fetchone()
-            assert res is not None, "Song record should persist in MediaSources (soft-delete)"
+            assert (
+                res is not None
+            ), "Song record should persist in MediaSources (soft-delete)"
             assert (
                 res["IsDeleted"] == 1
             ), f"Expected IsDeleted=1 for song {song_id}, got {res['IsDeleted']}"
