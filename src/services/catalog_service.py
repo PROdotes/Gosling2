@@ -569,15 +569,12 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- get_all_albums() count={len(result)}")
         return result
 
-    def search_albums(self, query: str) -> List[Album]:
-        """Search for albums by title."""
-        logger.debug(f"[CatalogService] -> search_albums(q='{query}')")
-        albums = self._album_repo_dir.search(query)
-        result = self._hydrate_albums(albums)
-        logger.debug(
-            f"[CatalogService] <- search_albums(q='{query}') count={len(result)}"
-        )
-        return result
+    def search_albums_slim(self, query: str) -> List[dict]:
+        """Slim list-view album search. No tracklist hydration."""
+        logger.debug(f"[CatalogService] -> search_albums_slim(q='{query}')")
+        rows = self._album_repo_dir.search_slim(query)
+        logger.debug(f"[CatalogService] <- search_albums_slim count={len(rows)}")
+        return rows
 
     def get_album(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID with hydrated publishers, credits, and songs."""
@@ -704,19 +701,47 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- Return count={len(result)}")
         return result
 
-    def search_songs_deep(self, query: str) -> List[Song]:
-        """Deep metadata + Corporate/Group Expansion resolution."""
-        logger.debug(f"[CatalogService] -> search_songs_deep(q='{query}')")
-        songs = self._song_repo.search(query)
-        return self._search_songs_composed(query, songs)
+    def search_songs_slim(self, query: str) -> List[dict]:
+        """Slim list-view search. Returns raw dicts for SongSlimView — no hydration."""
+        logger.debug(f"[CatalogService] -> search_songs_slim(q='{query}')")
+        rows = self._song_repo.search_slim(query)
+        logger.debug(f"[CatalogService] <- search_songs_slim count={len(rows)}")
+        return rows
 
-    def search_songs(self, query: str) -> List[Song]:
-        """Strictly Surface search (Titles/Albums/Performers). Fastest path."""
-        logger.debug(f"[CatalogService] -> search_songs(q='{query}')")
-        songs = self._song_repo.search(query)
-        result = self._hydrate_songs(songs)
-        logger.debug(f"[CatalogService] <- surface results count={len(result)}")
-        return result
+    def search_songs_deep_slim(self, query: str) -> List[dict]:
+        """
+        Deep slim search. Base matches + identity/publisher expansion, no hydration.
+        """
+        logger.debug(f"[CatalogService] -> search_songs_deep_slim(q='{query}')")
+        base_rows = self._song_repo.search_slim(query)
+        seen_ids = {r["SourceID"] for r in base_rows}
+
+        # Identity expansion (Mel B → Spice Girls)
+        seeds = self._identity_repo.search_identities(query)
+        if seeds:
+            identity_ids = {s.id for s in seeds}
+            group_ids = self._identity_repo.get_group_ids_for_members(list(identity_ids))
+            identity_ids.update(group_ids)
+            identity_songs = self._song_repo.get_by_identity_ids(list(identity_ids))
+            extra_ids = [s.id for s in identity_songs if s.id not in seen_ids]
+            if extra_ids:
+                extra_rows = self._song_repo.search_slim_by_ids(extra_ids)
+                seen_ids.update(r["SourceID"] for r in extra_rows)
+                base_rows.extend(extra_rows)
+
+        # Publisher expansion (parent → all sub-labels)
+        expanded_pubs = self._pub_repo.search_deep(query)
+        if expanded_pubs:
+            pub_ids = [p.id for p in expanded_pubs if p.id is not None]
+            song_ids = self._pub_repo.get_song_ids_by_publisher_batch(pub_ids)
+            extra_ids = [sid for sid in song_ids if sid not in seen_ids]
+            if extra_ids:
+                extra_rows = self._song_repo.search_slim_by_ids(extra_ids)
+                base_rows.extend(extra_rows)
+
+        logger.debug(f"[CatalogService] <- search_songs_deep_slim count={len(base_rows)}")
+        return base_rows
+
 
     def _search_songs_composed(self, query: str, initial_songs: List[Song]) -> List[Song]:
         """Internal orchestrator that adds expanded discovery legs to an initial set."""
@@ -756,8 +781,7 @@ class CatalogService:
 
     def _expand_publisher_songs(self, query: str) -> List[Song]:
         """Resolves all songs for publishers matching the query, including corporate sub-labels."""
-        # Note: _pub_repo.search is now Deep (finds descendants)
-        expanded_publishers = self._pub_repo.search(query)
+        expanded_publishers = self._pub_repo.search_deep(query)
         if not expanded_publishers:
             return []
 

@@ -158,19 +158,30 @@ class SongRepository(MediaSourceRepository):
             )
             return [self._row_to_song(row) for row in rows]
 
-    def search(self, query: str) -> List[Song]:
+    def search_slim(self, query: str) -> List[dict]:
         """
-        Unified direct-field discovery via indexed UNION scans.
-        Covers: Title, Album, Performer (DisplayName + LegalName),
-                Publisher, Tag, Year, BPM, ISRC.
-        Hierarchical expansion (Groups, Corporate Umbrellas) is handled
-        by the CatalogService layer above.
+        Fast list-view query. Returns dicts with only the fields needed for
+        card rendering + the detail loading skeleton. No hydration.
+        Covers the same search scope as search() via the same UNION subquery.
         """
-        logger.debug(f"[SongRepository] -> search(query='{query}')")
+        logger.debug(f"[SongRepository] -> search_slim(query='{query}')")
         fmt_q = f"%{query}%"
 
-        query_sql = f"""
-            SELECT {self._COLUMNS} {self._JOIN}
+        query_sql = """
+            SELECT
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
+                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
+                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre
+            FROM MediaSources m
+            JOIN Songs s ON m.SourceID = s.SourceID
+                AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
+                AND m.IsDeleted = 0
+            LEFT JOIN SongCredits sc ON m.SourceID = sc.SourceID
+            LEFT JOIN ArtistNames an ON sc.CreditedNameID = an.NameID AND an.IsDeleted = 0
+            LEFT JOIN Roles r ON sc.RoleID = r.RoleID
+            LEFT JOIN MediaSourceTags mst ON m.SourceID = mst.SourceID
+            LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
             WHERE m.SourceID IN (
                 SELECT m2.SourceID FROM MediaSources m2
                     WHERE m2.MediaName LIKE ? AND m2.IsDeleted = 0
@@ -179,35 +190,65 @@ class SongRepository(MediaSourceRepository):
                     JOIN Albums a ON sa.AlbumID = a.AlbumID
                     WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
                 UNION
-                SELECT sc.SourceID FROM SongCredits sc
-                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                    WHERE an.DisplayName LIKE ? AND an.IsDeleted = 0
-                UNION
                 SELECT sc2.SourceID FROM SongCredits sc2
                     JOIN ArtistNames an2 ON sc2.CreditedNameID = an2.NameID
-                    JOIN Identities i ON an2.OwnerIdentityID = i.IdentityID
+                    WHERE an2.DisplayName LIKE ? AND an2.IsDeleted = 0
+                UNION
+                SELECT sc3.SourceID FROM SongCredits sc3
+                    JOIN ArtistNames an3 ON sc3.CreditedNameID = an3.NameID
+                    JOIN Identities i ON an3.OwnerIdentityID = i.IdentityID
                     WHERE i.LegalName LIKE ? AND i.IsDeleted = 0
                 UNION
                 SELECT rp.SourceID FROM RecordingPublishers rp
                     JOIN Publishers p ON rp.PublisherID = p.PublisherID
                     WHERE p.PublisherName LIKE ? AND p.IsDeleted = 0
                 UNION
-                SELECT mst.SourceID FROM MediaSourceTags mst
-                    JOIN Tags t ON mst.TagID = t.TagID
-                    WHERE t.TagName LIKE ? AND t.IsDeleted = 0
+                SELECT mst2.SourceID FROM MediaSourceTags mst2
+                    JOIN Tags t2 ON mst2.TagID = t2.TagID
+                    WHERE t2.TagName LIKE ? AND t2.IsDeleted = 0
                 UNION
-                SELECT s3.SourceID FROM Songs s3
-                    WHERE CAST(s3.RecordingYear AS TEXT) LIKE ?
-                       OR s3.ISRC LIKE ?
+                SELECT s2.SourceID FROM Songs s2
+                    WHERE CAST(s2.RecordingYear AS TEXT) LIKE ?
+                       OR s2.ISRC LIKE ?
             )
+            GROUP BY m.SourceID
         """
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (fmt_q,) * 8).fetchall()
             logger.debug(
-                f"[SongRepository] <- search(query='{query}') found {len(rows)}"
+                f"[SongRepository] <- search_slim(query='{query}') found {len(rows)}"
             )
-            return [self._row_to_song(row) for row in rows]
+            return [dict(row) for row in rows]
+
+    def search_slim_by_ids(self, ids: List[int]) -> List[dict]:
+        """Fetch slim list-view rows for a specific set of SourceIDs."""
+        if not ids:
+            return []
+        placeholders = ",".join(["?" for _ in ids])
+        query_sql = f"""
+            SELECT
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
+                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
+                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre
+            FROM MediaSources m
+            JOIN Songs s ON m.SourceID = s.SourceID
+                AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
+                AND m.IsDeleted = 0
+            LEFT JOIN SongCredits sc ON m.SourceID = sc.SourceID
+            LEFT JOIN ArtistNames an ON sc.CreditedNameID = an.NameID AND an.IsDeleted = 0
+            LEFT JOIN Roles r ON sc.RoleID = r.RoleID
+            LEFT JOIN MediaSourceTags mst ON m.SourceID = mst.SourceID
+            LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
+            WHERE m.SourceID IN ({placeholders})
+            GROUP BY m.SourceID
+        """
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query_sql, ids).fetchall()
+            logger.debug(f"[SongRepository] <- search_slim_by_ids() found {len(rows)}")
+            return [dict(row) for row in rows]
 
     def get_by_identity_ids(self, identity_ids: List[int]) -> List[Song]:
         """Retrieves songs where any given Identity ID is credited (The Grohlton Check base)."""

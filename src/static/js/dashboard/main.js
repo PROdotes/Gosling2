@@ -5,6 +5,7 @@ import {
     getArtistSongs,
     getArtistTree,
     getAuditHistory,
+    getCatalogSong,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
@@ -245,21 +246,23 @@ async function openSongDetail(song) {
     const request = beginDetailRequest("songs", song.id);
     renderSongDetailLoading(ctx, song);
 
-    const [fileResult, auditResult] = await Promise.allSettled([
+    const [catalogResult, fileResult, auditResult] = await Promise.allSettled([
+        getCatalogSong(song.id, { signal: request.signal }),
         getSongDetail(song.id, { signal: request.signal }),
         getAuditHistory("Songs", song.id, { signal: request.signal }),
     ]);
 
-    if ((fileResult.status === "rejected" && isAbortError(fileResult.reason)) || (auditResult.status === "rejected" && isAbortError(auditResult.reason))) {
+    if ([catalogResult, fileResult, auditResult].some(r => r.status === "rejected" && isAbortError(r.reason))) {
         return;
     }
     if (!isActiveDetail("songs", song.id)) {
         return;
     }
 
+    const catalogSong = catalogResult.status === "fulfilled" && catalogResult.value ? catalogResult.value : song;
     const fileData = fileResult.status === "fulfilled" ? fileResult.value : null;
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(ctx, song, fileData, auditHistory);
+    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory);
 }
 
 async function openAlbumDetail(album) {

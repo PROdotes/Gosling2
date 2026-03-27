@@ -14,11 +14,14 @@ Fetch a single song and all its credits by ID.
 - Accesses `SongRepository` to get the core record.
 - Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
-### search_songs(query: str) -> List[Song]
-Strictly Surface search for performance. 
-- Matches: Titles, Albums, Tag names, Publisher names, and direct Performers (Display + Legal).
-- Logic: Calls `SongRepository.search`.
-- No recursion or hierarchical expansion.
+### search_songs_slim(query: str) -> List[dict]
+Surface slim search. Returns raw dicts for `SongSlimView` — no hydration.
+- Logic: Calls `SongRepository.search_slim`.
+
+### search_songs_deep_slim(query: str) -> List[dict]
+Deep slim search. Base matches + identity/publisher expansion, no hydration.
+- Logic: `SongRepository.search_slim` (base) + identity expansion + publisher expansion.
+- Returns List[dict] with same keys as `search_slim`.
 
 ### _expand_identity_songs(query: str) -> List[Song]
 Resolves identities matching the query and expands to all songs from any groups they belong to.
@@ -26,17 +29,10 @@ Resolves identities matching the query and expands to all songs from any groups 
 
 ### _expand_publisher_songs(query: str) -> List[Song]
 Resolves publishers matching the query and expands to all songs from that publisher or any of its descendants.
-- Logic: `PublisherRepository.search` (Recursive) -> `SongRepository.get_by_publisher_ids`.
+- Logic: `PublisherRepository.search_deep` (Recursive) -> `SongRepository.get_by_publisher_ids`.
 
 ### _search_songs_composed(query: str, initial_songs: List[Song]) -> List[Song]
 Orchestrator for Deep Discovery. Merges initial seed matches with Identity and Publisher expansion legs and hydrates the final set.
-
-### search_songs_deep(query: str) -> List[Song]
-Comprehensive discovery including corporate umbrellas and group legacies.
-- Matches: Everything in Surface + Year, ISRC, and Tags.
-- Logic: Calls `SongRepository.search`.
-- Resolution: Includes `_expand_identity_songs` (Member->Group) and `_expand_publisher_songs` (Parent->Child).
-- Use `_hydrate_songs` for full metadata.
 
 ### get_identity(identity_id: int) -> Optional[Identity]
 Fetch a single Identity and all its aliases/members/groups by ID.
@@ -61,8 +57,8 @@ Fetch the full directory of albums with hydrated publishers, credits, and songs.
 ### search_publishers(query: str) -> List[Publisher]
 Search for publishers by name match with resolved hierarchy chains.
 
-### search_albums(query: str) -> List[Album]
-Search albums by title with hydrated publishers, credits, and songs.
+### search_albums_slim(query: str) -> List[dict]
+Slim album search. Returns raw dicts for `AlbumSlimView` — no tracklist hydration. Pass empty string to get all albums.
 
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 Fetch a single publisher by ID and resolve its full hierarchy and sub-publishers.

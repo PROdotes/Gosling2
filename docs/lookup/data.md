@@ -62,10 +62,13 @@ Batch-fetches core song records for multiple IDs.
 ### get_by_title(query: str) -> List[Song]
 Finds songs by case-insensitive title match (LIKE '%query%').
 
-### search(query: str) -> List[Song]
-Unified direct-field discovery via indexed UNION scans.
-- Matches: Title, Performer (DisplayName + LegalName), Album, Publisher, Tag, Year, and ISRC.
-- Hierarchical expansion (Groups, Corporate Umbrellas) is handled by the `CatalogService`.
+### search_slim(query: str) -> List[dict]
+Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated).
+- Matches: Title, Performer (DisplayName + LegalName), Album, Publisher, Tag, Year, and ISRC via UNION subquery.
+- No hydration. Used by the list-view endpoint.
+
+### search_slim_by_ids(ids: List[int]) -> List[dict]
+Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `search_slim`. Returns only found rows (skips missing IDs). Returns `[]` for empty input.
 
 ### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
 Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
@@ -143,8 +146,8 @@ Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a se
 ### get_all() -> List[Album]
 Fetch the full directory of active (non-deleted) albums, ordered by title.
 
-### search(query: str) -> List[Album]
-Search active albums by title match.
+### search_slim(query: str) -> List[dict]
+Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (first publisher), SongCount. No tracklist hydration. Pass empty string to get all albums.
 
 ### get_by_id(album_id: int) -> Optional[Album]
 Fetch a single album by its ID.
@@ -180,7 +183,10 @@ Resolve a flat list of ID -> Publisher objects.
 Fetch the full directory of active publishers.
 
 ### search(query: str) -> List[Publisher]
-Search for publishers by name match.
+Surface search for publishers by name match only (no recursive expansion).
+
+### search_deep(query: str) -> List[Publisher]
+Deep recursive search for publishers using a CTE. Returns matching publishers AND all their descendants (children, grandchildren). Used by the deep song search expansion leg only.
 
 ### get_by_id(publisher_id: int) -> Optional[Publisher]
 Fetch a single publisher by its ID.

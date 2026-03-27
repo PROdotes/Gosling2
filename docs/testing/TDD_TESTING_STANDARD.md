@@ -114,26 +114,28 @@
   ```
 
 #### Delete
-- Hard deletes only (`IsActive` is unrelated to deletion)
-- Return `True` if deleted, `False` if not found
-- Tests must verify cascade effects explicitly
+- **Soft Delete as Primary Protocol**: Record is marked `IsDeleted = 1`, not physically removed.
+- Return `True` if successfully flagged, `False` if not found or already deleted.
+- Tests must verify: 
+  1. Record is unretrievable by standard `get_by_id` lookups.
+  2. Record remains in database (verify via raw SQL on `MediaSources`).
+  3. Cascade effects (links/junctions) are explicitly severed.
 - **Example**:
   ```python
-  result = repo.delete(song_id=1)
+  result = repo.soft_delete_song(song_id=1, conn=conn)
   assert result is True, f"Expected True (deleted), got {result}"
 
-  # Verify song is gone
+  # 1. Verify song is HIDDEN (standard lookup filters it)
   song = repo.get_by_id(1)
-  assert song is None, f"Expected None (deleted), got {song}"
+  assert song is None, f"Expected None (soft-deleted), got {song}"
 
-  # Verify cascades (credits deleted)
+  # 2. Verify links are PURGED (Manual links hard-delete)
   credits = credit_repo.get_credits_for_songs([1])
   assert len(credits) == 0, f"Expected 0 credits after delete, got {len(credits)}"
 
-  # Verify preservation (album not deleted)
-  album = album_repo.get_by_id(100)
-  assert album is not None, f"Album should not be deleted when song is removed"
-  assert album.title == "Nevermind", f"Expected 'Nevermind', got '{album.title}'"
+  # 3. Verify record PERSISTED (Sanity check for Undo support)
+  res = conn.execute("SELECT IsDeleted FROM MediaSources WHERE SourceID = 1").fetchone()
+  assert res[0] == 1, f"Expected IsDeleted=1, got {res[0]}"
   ```
 
 ### NULL/Missing Fields

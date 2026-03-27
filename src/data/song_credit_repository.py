@@ -62,10 +62,10 @@ class SongCreditRepository(BaseRepository):
                 )
                 role_id = cursor.lastrowid
 
-            # Get-or-create ArtistName (match on DisplayName)
+            # Get-or-create ArtistName (match on DisplayName, case-insensitive)
             # Include soft-deleted rows to reconnect instead of duplicating.
             row = cursor.execute(
-                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ?",
+                "SELECT NameID, IsDeleted, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
                 (credit.display_name,),
             ).fetchone()
 
@@ -78,31 +78,16 @@ class SongCreditRepository(BaseRepository):
                     )
                     # Also reactivate the linked Identity if it was soft-deleted
                     cursor.execute(
-                        """UPDATE Identities SET IsDeleted = 0
-                           WHERE IdentityID = (SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?)
-                             AND IsDeleted = 1""",
-                        (name_id,),
+                        "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
+                        (row[2],),
                     )
             else:
-                # Find or create an Identity for this artist (include soft-deleted to reactivate)
-                identity_row = cursor.execute(
-                    "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?",
+                # New name — create a new Identity to own it
+                cursor.execute(
+                    "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
                     (credit.display_name,),
-                ).fetchone()
-
-                if identity_row:
-                    owner_identity_id = identity_row[0]
-                    if identity_row[1]:  # Reactivate soft-deleted Identity
-                        cursor.execute(
-                            "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
-                            (owner_identity_id,),
-                        )
-                else:
-                    cursor.execute(
-                        "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
-                        (credit.display_name,),
-                    )
-                    owner_identity_id = cursor.lastrowid
+                )
+                owner_identity_id = cursor.lastrowid
 
                 cursor.execute(
                     "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 1)",

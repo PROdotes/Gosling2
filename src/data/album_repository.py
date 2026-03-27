@@ -22,17 +22,30 @@ class AlbumRepository(BaseRepository):
             logger.debug(f"[AlbumRepository] <- get_all() count={len(result)}")
             return result
 
-    def search(self, query: str) -> List[Album]:
-        """Search albums by title."""
-        logger.debug(f"[AlbumRepository] -> search(q='{query}')")
-        sql = f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumTitle LIKE ? AND IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
+    def search_slim(self, query: str) -> List[dict]:
+        """Fast list-view query. Returns dicts for AlbumSlimView — no tracklist hydration."""
+        logger.debug(f"[AlbumRepository] -> search_slim(q='{query}')")
+        sql = """
+            SELECT
+                a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
+                GROUP_CONCAT(an.DisplayName, ', ') FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                MIN(p.PublisherName) AS DisplayPublisher,
+                (SELECT COUNT(*) FROM SongAlbums sa WHERE sa.AlbumID = a.AlbumID) AS SongCount
+            FROM Albums a
+            LEFT JOIN AlbumCredits ac ON a.AlbumID = ac.AlbumID
+            LEFT JOIN ArtistNames an ON ac.CreditedNameID = an.NameID AND an.IsDeleted = 0
+            LEFT JOIN Roles r ON ac.RoleID = r.RoleID
+            LEFT JOIN AlbumPublishers ap ON a.AlbumID = ap.AlbumID
+            LEFT JOIN Publishers p ON ap.PublisherID = p.PublisherID AND p.IsDeleted = 0
+            WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
+            GROUP BY a.AlbumID
+            ORDER BY a.AlbumTitle COLLATE NOCASE ASC
+        """
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
-            result = [self._row_to_album(row) for row in rows]
-            logger.debug(
-                f"[AlbumRepository] <- search(q='{query}') count={len(result)}"
-            )
+            result = [dict(row) for row in rows]
+            logger.debug(f"[AlbumRepository] <- search_slim(q='{query}') count={len(result)}")
             return result
 
     def get_by_id(self, album_id: int) -> Optional[Album]:

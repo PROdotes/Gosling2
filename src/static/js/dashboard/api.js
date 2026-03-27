@@ -87,6 +87,10 @@ export function searchPublishers(query = "") {
     return runSearch("publishers", url);
 }
 
+export function getCatalogSong(id, options = {}) {
+    return fetchJson(`/api/v1/songs/${id}`, options);
+}
+
 export async function getSongDetail(id, options = {}) {
     const response = await fetch(`/api/v1/metabolic/inspect-file/${id}`, options);
     if (response.ok) {

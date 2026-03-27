@@ -97,23 +97,31 @@ class PublisherRepository(BaseRepository):
             return result
 
     def search(self, query: str) -> List[Publisher]:
+        """Surface search for publishers by name match only."""
+        logger.debug(f"[PublisherRepository] -> search(q='{query}')")
+        query_sql = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherName LIKE ? AND IsDeleted = 0 ORDER BY PublisherName"
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
+            result = [self._row_to_publisher(row) for row in rows]
+            logger.debug(
+                f"[PublisherRepository] <- search(q='{query}') found {len(result)}"
+            )
+            return result
+
+    def search_deep(self, query: str) -> List[Publisher]:
         """
         Deep search for publishers by name match, including all descendants.
+        Used by the deep song search expansion leg only.
         Uses a recursive CTE to find the corporate tree for any matching seeds.
         """
-        logger.debug(f"[PublisherRepository] -> search(q='{query}')")
-        
-        # 1. Recursive CTE: Base Case (Direct matches) + Recursive Step (Find Children)
+        logger.debug(f"[PublisherRepository] -> search_deep(q='{query}')")
         query_sql = f"""
             WITH RECURSIVE Descendants({self._COLUMNS_NO_ALIAS}) AS (
-                -- Base Case: Seeds matching the query
                 SELECT {self._COLUMNS_NO_ALIAS}
                 FROM Publishers
                 WHERE PublisherName LIKE ? AND IsDeleted = 0
-                
                 UNION
-                
-                -- Recursive Down: Find children of those seeds
                 SELECT {self._COLUMNS}
                 FROM Publishers p
                 JOIN Descendants d ON p.ParentPublisherID = d.PublisherID
@@ -121,13 +129,12 @@ class PublisherRepository(BaseRepository):
             )
             SELECT DISTINCT {self._COLUMNS_NO_ALIAS} FROM Descendants ORDER BY PublisherName;
         """
-        
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(
-                f"[PublisherRepository] <- search(q='{query}') found {len(result)} total"
+                f"[PublisherRepository] <- search_deep(q='{query}') found {len(result)} total"
             )
             return result
 

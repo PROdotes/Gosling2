@@ -3,6 +3,8 @@ from typing import List, Optional
 from src.models.domain import Publisher, Tag
 from src.models.view_models import (
     SongView,
+    SongSlimView,
+    AlbumSlimView,
     IdentityView,
     AlbumView,
     IngestionCheckRequest,
@@ -20,22 +22,22 @@ def _get_service() -> CatalogService:
     return CatalogService(get_db_path())
 
 
-@router.get("/songs/search", response_model=List[SongView])
+@router.get("/songs/search", response_model=List[SongSlimView])
 async def search_songs(
     q: Optional[str] = None, query: Optional[str] = None, deep: bool = False
-) -> List[SongView]:
-    """Search for songs. Use 'deep=true' for full resolution and metadata discovery."""
+) -> List[SongSlimView]:
+    """Search for songs. Returns slim list-view models. Use 'deep=true' for full resolution."""
     search_term = q or query or ""
     logger.debug(f"[CatalogRouter] search_songs(q='{search_term}', deep={deep})")
 
     service = _get_service()
-    if deep:
-        results = service.search_songs_deep(search_term)
+    if deep and search_term:
+        rows = service.search_songs_deep_slim(search_term)
     else:
-        results = service.search_songs(search_term)
+        rows = service.search_songs_slim(search_term)
 
-    logger.debug(f"[CatalogRouter] search_songs results={len(results)}")
-    return [SongView.from_domain(s) for s in results]
+    logger.debug(f"[CatalogRouter] search_songs results={len(rows)}")
+    return [SongSlimView.from_row(r) for r in rows]
 
 
 @router.get("/songs/{song_id:int}", response_model=SongView)
@@ -139,20 +141,20 @@ async def get_publisher_songs(publisher_id: int) -> List[SongView]:
     return [SongView.from_domain(s) for s in songs]
 
 
-@router.get("/albums", response_model=List[AlbumView])
-async def get_all_albums() -> List[AlbumView]:
+@router.get("/albums", response_model=List[AlbumSlimView])
+async def get_all_albums() -> List[AlbumSlimView]:
     """Fetch a list of all albums."""
     logger.debug("[CatalogRouter] get_all_albums()")
-    albums = _get_service().get_all_albums()
-    return [AlbumView.from_domain(album) for album in albums]
+    rows = _get_service().search_albums_slim("")
+    return [AlbumSlimView.from_row(r) for r in rows]
 
 
-@router.get("/albums/search", response_model=List[AlbumView])
-async def search_albums(q: str) -> List[AlbumView]:
+@router.get("/albums/search", response_model=List[AlbumSlimView])
+async def search_albums(q: str) -> List[AlbumSlimView]:
     """Search albums by title."""
     logger.debug(f"[CatalogRouter] search_albums(q='{q}')")
-    albums = _get_service().search_albums(q)
-    return [AlbumView.from_domain(album) for album in albums]
+    rows = _get_service().search_albums_slim(q)
+    return [AlbumSlimView.from_row(r) for r in rows]
 
 
 @router.get("/albums/{album_id:int}", response_model=AlbumView)

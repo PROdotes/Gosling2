@@ -20,6 +20,8 @@ class Logger:
         # Set level from env at init
         env_level = os.getenv("GOSLING_LOG_LEVEL", "INFO").upper()
         self.current_level = self.LEVELS.get(env_level, 20)
+        self.console_enabled = os.getenv("GOSLING_LOG_CONSOLE", "on").lower() != "off"
+        self.file_enabled = os.getenv("GOSLING_LOG_FILE", "on").lower() != "off"
         self._f: Optional[TextIO] = None
 
     def _get_file(self) -> Optional[TextIO]:
@@ -45,17 +47,17 @@ class Logger:
         timestamp = datetime.datetime.now().isoformat()
         line = f"{timestamp} [{level:8}] {msg}"
 
-        # Always output to console
-        print(line)
+        if self.console_enabled:
+            print(line)
 
-        # Try persisted logging
-        f = self._get_file()
-        if f:
-            try:
-                f.write(line + "\n")
-                f.flush()  # Ensure it hits disk
-            except Exception as e:
-                sys.stderr.write(f"ERROR: Failed to write to log file: {e}\n")
+        if self.file_enabled:
+            f = self._get_file()
+            if f:
+                try:
+                    f.write(line + "\n")
+                    f.flush()  # Ensure it hits disk
+                except Exception as e:
+                    sys.stderr.write(f"ERROR: Failed to write to log file: {e}\n")
 
     def debug(self, msg: str):
         self._log("DEBUG", msg)

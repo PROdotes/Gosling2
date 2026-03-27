@@ -57,6 +57,48 @@ class SongAlbumView(BaseModel):
         return self.album_title
 
 
+class SongSlimView(BaseModel):
+    """Lightweight view-model for song list results. No hydration required."""
+
+    id: int
+    media_name: str
+    title: str
+    source_path: str
+    duration_s: float
+    year: Optional[int] = None
+    bpm: Optional[int] = None
+    isrc: Optional[str] = None
+    is_active: bool = False
+    display_artist: Optional[str] = None
+    primary_genre: Optional[str] = None
+
+    @computed_field
+    @property
+    def formatted_duration(self) -> str:
+        if not self.duration_s:
+            return "0:00"
+        total_seconds = int(self.duration_s)
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        return f"{minutes}:{seconds:02d}"
+
+    @classmethod
+    def from_row(cls, row: dict) -> "SongSlimView":
+        return cls(
+            id=row["SourceID"],
+            media_name=row["MediaName"],
+            title=row["MediaName"],
+            source_path=row["SourcePath"],
+            duration_s=float(row["SourceDuration"] or 0),
+            year=row["RecordingYear"],
+            bpm=row["TempoBPM"],
+            isrc=row["ISRC"],
+            is_active=bool(row["IsActive"]),
+            display_artist=row["DisplayArtist"],
+            primary_genre=row["PrimaryGenre"],
+        )
+
+
 class SongView(BaseModel):
     """View-model for Song data, including computed presentation fields."""
 
@@ -180,6 +222,30 @@ class SongView(BaseModel):
             return genre_tags[0].name
 
         return None
+
+
+class AlbumSlimView(BaseModel):
+    """Lightweight view-model for album list results. No tracklist or full hydration."""
+
+    id: int
+    title: str
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
+    display_artist: Optional[str] = None
+    display_publisher: Optional[str] = None
+    song_count: int = 0
+
+    @classmethod
+    def from_row(cls, row: dict) -> "AlbumSlimView":
+        return cls(
+            id=row["AlbumID"],
+            title=row["AlbumTitle"],
+            album_type=row["AlbumType"],
+            release_year=row["ReleaseYear"],
+            display_artist=row["DisplayArtist"],
+            display_publisher=row["DisplayPublisher"],
+            song_count=row["SongCount"],
+        )
 
 
 class AlbumView(BaseModel):
