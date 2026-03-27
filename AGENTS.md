@@ -75,3 +75,10 @@ A task is not done until:
 - Before adding any new method or service, audit the `docs/lookup/` indices for existing similar logic.
 - If an existing path can be generalized (e.g., using a list parameter or optional query builder), you MUST refactor it rather than duplicating.
 - Structural duplication in repositories (shared SQL logic) is technical debt and must be flagged for cleanup.
+
+---
+
+## 10. Implementation Walkthrough Protocol (Duck Rule)
+- For every atomic method, you MUST provide a brief (2-3 bullet point) "Implementation Walkthrough" before writing ANY code (test or implementation).
+- Flag potential sqlite3 / logic traps (integrity errors, N+1 queries, race conditions) during the chat phase.
+- This ensures the USER can "feel the wood" and align on the micro-level approach before execution.
