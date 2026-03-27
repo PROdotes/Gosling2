@@ -55,14 +55,14 @@ class TestGetAll:
 
 
 class TestItems:
-    """AlbumRepository.search and get_by_id tests."""
+    """AlbumRepository.search_slim and get_by_id tests."""
 
     def test_search_excludes_soft_deleted_albums(self, populated_db):
-        """Search 'Never' should find 100. Soft-delete 100, then search should find none."""
+        """search_slim('Never') finds 100. Soft-delete 100, then search returns none."""
         repo = AlbumRepository(populated_db)
 
         # 1. Verify it's found initially
-        assert len(repo.search("Never")) == 1
+        assert len(repo.search_slim("Never")) == 1
 
         # 2. Soft-delete
         conn = _connect(populated_db)
@@ -71,7 +71,7 @@ class TestItems:
         conn.close()
 
         # 3. Search again
-        results = repo.search("Never")
+        results = repo.search_slim("Never")
         assert (
             len(results) == 0
         ), f"Expected 0 results for 'Never' after soft-delete, got {len(results)}"

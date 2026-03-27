@@ -20,7 +20,7 @@ from src.models.domain import (
     Identity,
     ArtistName,
 )
-from src.models.view_models import SongView, AlbumView, IdentityView, SongAlbumView
+from src.models.view_models import SongView, AlbumView, IdentityView, SongAlbumView, SongSlimView, AlbumSlimView
 
 
 # ===========================================================================
@@ -960,3 +960,168 @@ class TestIdentityViewFromDomain:
         assert view.aliases == [], f"Expected aliases=[], got {view.aliases}"
         assert view.members == [], f"Expected members=[], got {view.members}"
         assert view.groups == [], f"Expected groups=[], got {view.groups}"
+
+
+# ===========================================================================
+# SongSlimView.from_row
+# ===========================================================================
+class TestSongSlimViewFromRow:
+    """SongSlimView.from_row mapper contracts."""
+
+    def _make_row(self, **overrides) -> dict:
+        base = {
+            "SourceID": 1,
+            "MediaName": "Smells Like Teen Spirit",
+            "SourcePath": "/path/1",
+            "SourceDuration": 200,
+            "RecordingYear": 1991,
+            "TempoBPM": 120,
+            "ISRC": "USRC17607839",
+            "IsActive": 1,
+            "DisplayArtist": "Nirvana",
+            "PrimaryGenre": "Grunge",
+        }
+        base.update(overrides)
+        return base
+
+    def test_all_fields_present(self):
+        """from_row maps all fields correctly from a complete row."""
+        row = self._make_row()
+        view = SongSlimView.from_row(row)
+
+        assert view.id == 1, f"Expected id=1, got {view.id}"
+        assert view.media_name == "Smells Like Teen Spirit", \
+            f"Expected 'Smells Like Teen Spirit', got '{view.media_name}'"
+        assert view.title == "Smells Like Teen Spirit", \
+            f"Expected title='Smells Like Teen Spirit', got '{view.title}'"
+        assert view.source_path == "/path/1", \
+            f"Expected '/path/1', got '{view.source_path}'"
+        assert view.duration_s == 200.0, \
+            f"Expected 200.0, got {view.duration_s}"
+        assert view.year == 1991, f"Expected 1991, got {view.year}"
+        assert view.bpm == 120, f"Expected 120, got {view.bpm}"
+        assert view.isrc == "USRC17607839", \
+            f"Expected 'USRC17607839', got '{view.isrc}'"
+        assert view.is_active is True, f"Expected True, got {view.is_active}"
+        assert view.display_artist == "Nirvana", \
+            f"Expected 'Nirvana', got '{view.display_artist}'"
+        assert view.primary_genre == "Grunge", \
+            f"Expected 'Grunge', got '{view.primary_genre}'"
+
+    def test_null_optional_fields_map_to_none(self):
+        """NULL optional fields (year, bpm, isrc, artist, genre) become None."""
+        row = self._make_row(
+            RecordingYear=None,
+            TempoBPM=None,
+            ISRC=None,
+            DisplayArtist=None,
+            PrimaryGenre=None,
+        )
+        view = SongSlimView.from_row(row)
+
+        assert view.year is None, f"Expected None for NULL year, got {view.year}"
+        assert view.bpm is None, f"Expected None for NULL bpm, got {view.bpm}"
+        assert view.isrc is None, f"Expected None for NULL isrc, got {view.isrc}"
+        assert view.display_artist is None, \
+            f"Expected None for NULL artist, got {view.display_artist}"
+        assert view.primary_genre is None, \
+            f"Expected None for NULL genre, got {view.primary_genre}"
+
+    def test_is_active_int_to_bool(self):
+        """IsActive=1 maps to True, IsActive=0 maps to False."""
+        active_view = SongSlimView.from_row(self._make_row(IsActive=1))
+        inactive_view = SongSlimView.from_row(self._make_row(IsActive=0))
+
+        assert active_view.is_active is True, \
+            f"Expected True for IsActive=1, got {active_view.is_active}"
+        assert inactive_view.is_active is False, \
+            f"Expected False for IsActive=0, got {inactive_view.is_active}"
+
+    def test_null_duration_defaults_to_zero(self):
+        """NULL SourceDuration maps to 0.0 (never raises)."""
+        row = self._make_row(SourceDuration=None)
+        view = SongSlimView.from_row(row)
+
+        assert view.duration_s == 0.0, \
+            f"Expected 0.0 for NULL duration, got {view.duration_s}"
+
+    def test_formatted_duration_computed(self):
+        """formatted_duration converts seconds to M:SS string."""
+        row = self._make_row(SourceDuration=200)
+        view = SongSlimView.from_row(row)
+
+        assert view.formatted_duration == "3:20", \
+            f"Expected '3:20' for 200s, got '{view.formatted_duration}'"
+
+    def test_formatted_duration_zero(self):
+        """formatted_duration returns '0:00' when duration is 0."""
+        row = self._make_row(SourceDuration=0)
+        view = SongSlimView.from_row(row)
+
+        assert view.formatted_duration == "0:00", \
+            f"Expected '0:00' for 0s, got '{view.formatted_duration}'"
+
+
+# ===========================================================================
+# AlbumSlimView.from_row
+# ===========================================================================
+class TestAlbumSlimViewFromRow:
+    """AlbumSlimView.from_row mapper contracts."""
+
+    def _make_row(self, **overrides) -> dict:
+        base = {
+            "AlbumID": 100,
+            "AlbumTitle": "Nevermind",
+            "AlbumType": None,
+            "ReleaseYear": 1991,
+            "DisplayArtist": "Nirvana",
+            "DisplayPublisher": "DGC Records",
+            "SongCount": 5,
+        }
+        base.update(overrides)
+        return base
+
+    def test_all_fields_present(self):
+        """from_row maps all fields correctly from a complete row."""
+        row = self._make_row()
+        view = AlbumSlimView.from_row(row)
+
+        assert view.id == 100, f"Expected id=100, got {view.id}"
+        assert view.title == "Nevermind", \
+            f"Expected 'Nevermind', got '{view.title}'"
+        assert view.album_type is None, \
+            f"Expected album_type=None, got {view.album_type!r}"
+        assert view.release_year == 1991, \
+            f"Expected 1991, got {view.release_year}"
+        assert view.display_artist == "Nirvana", \
+            f"Expected 'Nirvana', got '{view.display_artist}'"
+        assert view.display_publisher == "DGC Records", \
+            f"Expected 'DGC Records', got '{view.display_publisher}'"
+        assert view.song_count == 5, \
+            f"Expected 5, got {view.song_count}"
+
+    def test_null_optional_fields_map_to_none(self):
+        """NULL optional fields (album_type, year, artist, publisher) become None."""
+        row = self._make_row(
+            AlbumType=None,
+            ReleaseYear=None,
+            DisplayArtist=None,
+            DisplayPublisher=None,
+        )
+        view = AlbumSlimView.from_row(row)
+
+        assert view.album_type is None, \
+            f"Expected None for NULL album_type, got {view.album_type!r}"
+        assert view.release_year is None, \
+            f"Expected None for NULL year, got {view.release_year}"
+        assert view.display_artist is None, \
+            f"Expected None for NULL artist, got {view.display_artist}"
+        assert view.display_publisher is None, \
+            f"Expected None for NULL publisher, got {view.display_publisher}"
+
+    def test_song_count_zero(self):
+        """SongCount=0 maps to song_count=0."""
+        row = self._make_row(SongCount=0)
+        view = AlbumSlimView.from_row(row)
+
+        assert view.song_count == 0, f"Expected 0, got {view.song_count}"

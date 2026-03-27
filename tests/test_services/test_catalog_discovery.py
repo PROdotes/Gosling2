@@ -1,45 +1,53 @@
+"""
+CatalogService: Flat (surface) vs Recursive (deep) discovery leg verification.
+Both search_songs_slim and search_songs_deep_slim return List[dict].
+"""
 import pytest
 
-class TestSearchSongsDiscovery:
-    """CatalogService verification of Flat (Direct) vs Recursive (Expansion) discovery legs."""
 
-    # --- LEVEL 1: DIRECT (FLAT) MATCHES ---
-    
+class TestSearchSongsDiscovery:
+    """CatalogService verification of surface vs deep discovery modes."""
+
+    # --- LEVEL 1: DIRECT (FLAT/SLIM) MATCHES ---
+
     def test_direct_metadata_match_year(self, catalog_service):
-        """Direct match on RecordingYear is now part of the unified discovery path."""
-        # Song 1 (SLTS) is 1991. 
-        # Both Normal and Deep should find it by year
-        assert "Smells Like Teen Spirit" in {s.title for s in catalog_service.search_songs("1991")}
-        assert "Smells Like Teen Spirit" in {s.title for s in catalog_service.search_songs_deep("1991")}
+        """RecordingYear match is covered by both slim and deep_slim."""
+        slim_names = {r["MediaName"] for r in catalog_service.search_songs_slim("1991")}
+        deep_names = {r["MediaName"] for r in catalog_service.search_songs_deep_slim("1991")}
+        assert "Smells Like Teen Spirit" in slim_names, \
+            "Slim search should find SLTS by year '1991'"
+        assert "Smells Like Teen Spirit" in deep_names, \
+            "Deep slim search should also find SLTS by year '1991'"
 
     def test_direct_credit_match(self, catalog_service):
-        """Direct string match on a credited name (Identity independent)."""
-        # Dave Grohl (NameID=10) is credited on Songs 6 & 8.
-        # Nirvana (NameID=20) is credited on Song 1.
-        results = catalog_service.search_songs("Dave Grohl")
-        titles = {s.title for s in results}
-        assert "Dual Credit Track" in titles
-        assert "Joint Venture" in titles
-        assert "Smells Like Teen Spirit" not in titles, "Normal search should not resolve members to groups."
+        """Surface slim finds songs directly credited to 'Dave Grohl'."""
+        rows = catalog_service.search_songs_slim("Dave Grohl")
+        media_names = {r["MediaName"] for r in rows}
+        assert "Dual Credit Track" in media_names, \
+            "Expected 'Dual Credit Track' — Dave is directly credited"
+        assert "Joint Venture" in media_names, \
+            "Expected 'Joint Venture' — Dave is directly credited"
+        assert "Smells Like Teen Spirit" not in media_names, \
+            "Surface slim should not resolve Dave to Nirvana"
 
-    # --- LEVEL 2: RECURSIVE (RESOLUTION) MATCHES ---
+    # --- LEVEL 2: RECURSIVE (DEEP SLIM) MATCHES ---
 
     def test_recursive_identity_resolution_only_in_deep(self, catalog_service):
-        """Dave Grohl (Identity) finds Nirvana songs ONLY in Deep mode."""
-        # 1. Normal (Surface) - Should NOT find Nirvana via Dave
-        results_norm = catalog_service.search_songs("Dave Grohl")
-        assert "Smells Like Teen Spirit" not in {s.title for s in results_norm}
+        """Dave Grohl finds Nirvana songs ONLY via deep_slim, not surface slim."""
+        slim_names = {r["MediaName"] for r in catalog_service.search_songs_slim("Dave Grohl")}
+        assert "Smells Like Teen Spirit" not in slim_names, \
+            "Surface slim should NOT expand Dave→Nirvana"
 
-        # 2. Deep - SHOULD find Nirvana via Dave resolve
-        results_deep = catalog_service.search_songs_deep("Dave Grohl")
-        assert "Smells Like Teen Spirit" in {s.title for s in results_deep}
+        deep_names = {r["MediaName"] for r in catalog_service.search_songs_deep_slim("Dave Grohl")}
+        assert "Smells Like Teen Spirit" in deep_names, \
+            "Deep slim SHOULD expand Dave→Nirvana"
 
     def test_recursive_publisher_resolution_only_in_deep(self, catalog_service):
-        """Universal (Parent) finds DGC songs ONLY in Deep mode."""
-        # 1. Normal (Surface) - Should NOT find DGC via Universal
-        results_norm = catalog_service.search_songs("Universal")
-        assert "Smells Like Teen Spirit" not in {s.title for s in results_norm}
+        """Universal (parent) finds DGC songs ONLY via deep_slim, not surface slim."""
+        slim_names = {r["MediaName"] for r in catalog_service.search_songs_slim("Universal")}
+        assert "Smells Like Teen Spirit" not in slim_names, \
+            "Surface slim should NOT expand Universal→DGC songs"
 
-        # 2. Deep - SHOULD find DGC via Universal umbrella
-        results_deep = catalog_service.search_songs_deep("Universal")
-        assert "Smells Like Teen Spirit" in {s.title for s in results_deep}
+        deep_names = {r["MediaName"] for r in catalog_service.search_songs_deep_slim("Universal")}
+        assert "Smells Like Teen Spirit" in deep_names, \
+            "Deep slim SHOULD find DGC songs via Universal umbrella"

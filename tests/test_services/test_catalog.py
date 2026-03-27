@@ -202,117 +202,116 @@ class TestGetSong:
 
 
 # ===================================================================
-# CatalogService.search_songs
+# CatalogService.search_songs_slim
 # ===================================================================
-class TestSearchSongs:
-    """CatalogService.search_songs contracts (title + album + identity resolution)."""
+class TestSearchSongsSlim:
+    """CatalogService.search_songs_slim contracts — surface search, returns List[dict]."""
 
     def test_title_match(self, catalog_service):
-        """Searching 'Spirit' matches Song 1 by title."""
-        results = catalog_service.search_songs("Spirit")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        assert (
-            results[0].title == "Smells Like Teen Spirit"
-        ), f"Expected title 'Smells Like Teen Spirit', got {results[0].title}"
+        """search_songs_slim('Spirit') matches Song 1 by title."""
+        rows = catalog_service.search_songs_slim("Spirit")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", \
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_album_match(self, catalog_service):
-        """Searching 'Nevermind' matches Song 1 via album title."""
-        results = catalog_service.search_songs("Nevermind")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        assert (
-            results[0].title == "Smells Like Teen Spirit"
-        ), f"Expected title 'Smells Like Teen Spirit', got {results[0].title}"
+        """search_songs_slim('Nevermind') matches Song 1 via album title."""
+        rows = catalog_service.search_songs_slim("Nevermind")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", \
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_identity_match_surface_only(self, catalog_service):
-        """Searching 'Dave Grohl' in Normal mode should find songs where he is DIRECTLY credited,
-        but NOT resolve to his groups (Nirvana, Foo Fighters)."""
-        results = catalog_service.search_songs("Dave Grohl")
-        titles = {s.title for s in results}
+        """search_songs_slim('Dave Grohl') finds directly-credited songs only —
+        no group expansion (Nirvana, Foo Fighters)."""
+        rows = catalog_service.search_songs_slim("Dave Grohl")
+        media_names = {r["MediaName"] for r in rows}
 
-        # Dave's direct songs (NameID 10): Dual Credit Track, Joint Venture
-        assert "Dual Credit Track" in titles
-        assert "Joint Venture" in titles
-        
-        # Dave's aliases (Grohlton, Late!) - These should ideally still fail/pass depending on if aliases are 'surface'.
-        # For now, let's stick to the 'Spice Girls' logic: No Group Redirection.
-        assert "Smells Like Teen Spirit" not in titles, "Nirvana should not be in surface search for Dave."
-        assert "Everlong" not in titles, "Foo Fighters should not be in surface search for Dave."
+        assert "Dual Credit Track" in media_names, \
+            "Expected 'Dual Credit Track' in surface results for 'Dave Grohl'"
+        assert "Joint Venture" in media_names, \
+            "Expected 'Joint Venture' in surface results for 'Dave Grohl'"
 
-class TestSearchSongsDeep:
-    """CatalogService.search_songs_deep contracts (Full Metadata + Hierarchical resolution)."""
-
-    def test_identity_match_expands_to_group_songs(self, catalog_service):
-        """Searching 'Dave Grohl' in DEEP mode should find songs credited to Dave directly,
-        PLUS songs credited to his groups (Nirvana, Foo Fighters)."""
-        results = catalog_service.search_songs_deep("Dave Grohl")
-        titles = {s.title for s in results}
-
-        # Dave's direct songs
-        assert "Dual Credit Track" in titles
-        assert "Joint Venture" in titles
-
-        # Dave's group songs (The Expansion)
-        assert "Smells Like Teen Spirit" in titles
-        assert "Everlong" in titles
-
-    def test_metadata_and_hierarchy_combined(self, catalog_service):
-        """Deep search matches across metadata tags and labels."""
-        # 'Universal' is the parent of DGC (SLTS).
-        results = catalog_service.search_songs_deep("Universal")
-        titles = {s.title for s in results}
-        assert "Smells Like Teen Spirit" in titles
-
-        # Taylor's solo song should NOT be here
-        assert (
-            "Range Rover Bitch" not in titles
-        ), f"Did not expect 'Range Rover Bitch' in results, got {titles}"
-
-    def test_alias_match_resolves_to_group_songs(self, catalog_service):
-        """Searching 'Grohlton' via Deep should find Grohlton Theme + group songs."""
-        results = catalog_service.search_songs_deep("Grohlton")
-        titles = {s.title for s in results}
-
-        assert (
-            "Grohlton Theme" in titles
-        ), f"Expected 'Grohlton Theme' in results, got {titles}"
-        # Because Grohlton resolves to Dave (identity 1), which is in Nirvana/Foo Fighters
-        assert (
-            "Smells Like Teen Spirit" in titles
-        ), f"Expected 'Smells Like Teen Spirit' in results, got {titles}"
-        assert "Everlong" in titles, f"Expected 'Everlong' in results, got {titles}"
+        # No group expansion in slim surface search
+        assert "Smells Like Teen Spirit" not in media_names, \
+            "Nirvana should not appear in surface search for Dave Grohl"
+        assert "Everlong" not in media_names, \
+            "Foo Fighters should not appear in surface search for Dave Grohl"
 
     def test_group_match(self, catalog_service):
-        """Searching 'Nirvana' should find SLTS directly."""
-        results = catalog_service.search_songs("Nirvana")
-        titles = {s.title for s in results}
-        assert (
-            "Smells Like Teen Spirit" in titles
-        ), f"Expected 'Smells Like Teen Spirit' in results, got {titles}"
+        """search_songs_slim('Nirvana') finds SLTS directly via artist credit."""
+        rows = catalog_service.search_songs_slim("Nirvana")
+        media_names = {r["MediaName"] for r in rows}
+        assert "Smells Like Teen Spirit" in media_names, \
+            f"Expected 'Smells Like Teen Spirit', got {media_names}"
 
-    def test_no_results(self, catalog_service):
-        """Searching non-existent term returns empty list."""
-        results = catalog_service.search_songs("ZZZZNONEXISTENT")
-        assert results == [], f"Expected empty results, got {results}"
+    def test_no_results_returns_empty_list(self, catalog_service):
+        """search_songs_slim returns [] for a non-existent query."""
+        rows = catalog_service.search_songs_slim("ZZZZNONEXISTENT")
+        assert rows == [], f"Expected empty results, got {rows}"
 
-    def test_results_are_hydrated(self, catalog_service):
-        """Search results should have credits, albums, tags filled in."""
-        results = catalog_service.search_songs("Everlong")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        song = results[0]
-        assert len(song.credits) == 1, f"Expected 1 credit, got {len(song.credits)}"
-        assert (
-            song.credits[0].display_name == "Foo Fighters"
-        ), f"Expected credit 'Foo Fighters', got {song.credits[0].display_name}"
-        assert len(song.albums) == 1, f"Expected 1 album, got {len(song.albums)}"
-        assert (
-            song.albums[0].album_title == "The Colour and the Shape"
-        ), f"Expected album 'The Colour and the Shape', got {song.albums[0].album_title}"
+    def test_returns_slim_dict_not_domain_objects(self, catalog_service):
+        """Result items must be dicts, not Song domain objects (no hydration)."""
+        rows = catalog_service.search_songs_slim("Everlong")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        assert isinstance(rows[0], dict), \
+            f"Expected dict, got {type(rows[0]).__name__}"
+        assert "SourceID" in rows[0], "Dict missing 'SourceID'"
 
     def test_no_duplicates(self, catalog_service):
-        """Search should not return duplicate songs even if matched via multiple paths."""
-        results = catalog_service.search_songs("Dave Grohl")
-        ids = [s.id for s in results]
-        assert len(ids) == len(set(ids)), f"Duplicate song IDs in search results: {ids}"
+        """No duplicate SourceIDs in results."""
+        rows = catalog_service.search_songs_slim("Dave Grohl")
+        ids = [r["SourceID"] for r in rows]
+        assert len(ids) == len(set(ids)), f"Duplicate SourceIDs: {ids}"
+
+
+class TestSearchSongsDeepSlim:
+    """CatalogService.search_songs_deep_slim contracts — identity + publisher expansion."""
+
+    def test_identity_match_expands_to_group_songs(self, catalog_service):
+        """search_songs_deep_slim('Dave Grohl') finds his direct songs + group songs."""
+        rows = catalog_service.search_songs_deep_slim("Dave Grohl")
+        media_names = {r["MediaName"] for r in rows}
+
+        assert "Dual Credit Track" in media_names, "Expected direct Dave credit"
+        assert "Joint Venture" in media_names, "Expected direct Dave credit"
+        assert "Smells Like Teen Spirit" in media_names, \
+            "Expected Nirvana songs via group expansion"
+        assert "Everlong" in media_names, \
+            "Expected Foo Fighters songs via group expansion"
+
+    def test_metadata_and_hierarchy_combined(self, catalog_service):
+        """search_songs_deep_slim('Universal') finds DGC child-label songs."""
+        rows = catalog_service.search_songs_deep_slim("Universal")
+        media_names = {r["MediaName"] for r in rows}
+        assert "Smells Like Teen Spirit" in media_names, \
+            "Expected SLTS via publisher expansion (Universal → DGC)"
+
+        assert "Range Rover Bitch" not in media_names, \
+            "Range Rover Bitch has no Universal publisher link — should be excluded"
+
+    def test_alias_match_resolves_to_group_songs(self, catalog_service):
+        """search_songs_deep_slim('Grohlton') finds Grohlton Theme + group songs via alias→identity."""
+        rows = catalog_service.search_songs_deep_slim("Grohlton")
+        media_names = {r["MediaName"] for r in rows}
+
+        assert "Grohlton Theme" in media_names, \
+            f"Expected 'Grohlton Theme', got {media_names}"
+        assert "Smells Like Teen Spirit" in media_names, \
+            "Expected Nirvana songs via Grohlton→Dave→Nirvana expansion"
+        assert "Everlong" in media_names, \
+            "Expected Foo Fighters songs via Grohlton→Dave→Foo Fighters expansion"
+
+    def test_no_results_returns_empty_list(self, catalog_service):
+        """search_songs_deep_slim returns [] for a non-existent query."""
+        rows = catalog_service.search_songs_deep_slim("ZZZZNONEXISTENT")
+        assert rows == [], f"Expected [], got {rows}"
+
+    def test_no_duplicates(self, catalog_service):
+        """No duplicate SourceIDs across expansion legs."""
+        rows = catalog_service.search_songs_deep_slim("Dave Grohl")
+        ids = [r["SourceID"] for r in rows]
+        assert len(ids) == len(set(ids)), f"Duplicate SourceIDs: {ids}"
 
 
 # ===================================================================
@@ -632,20 +631,19 @@ class TestGetAlbum:
         assert result is None, f"Expected None for non-existent album, got {result}"
 
 
-class TestSearchAlbums:
-    """CatalogService.search_albums contracts."""
+class TestSearchAlbumsSlim:
+    """CatalogService.search_albums_slim contracts — returns List[dict]."""
 
     def test_partial_match(self, catalog_service):
-        """Partial title match returns matching album."""
-        albums = catalog_service.search_albums("Never")
-        assert len(albums) == 1, f"Expected 1 result, got {len(albums)}"
-        assert (
-            albums[0].title == "Nevermind"
-        ), f"Expected title 'Nevermind', got {albums[0].title}"
+        """Partial title match returns matching album dict."""
+        rows = catalog_service.search_albums_slim("Never")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        assert rows[0]["AlbumTitle"] == "Nevermind", \
+            f"Expected 'Nevermind', got '{rows[0]['AlbumTitle']}'"
 
     def test_no_match(self, catalog_service):
         """Searching non-existent term returns empty list."""
-        result = catalog_service.search_albums("ZZZZZ")
+        result = catalog_service.search_albums_slim("ZZZZZ")
         assert result == [], f"Expected empty list, got {result}"
 
 

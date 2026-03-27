@@ -78,10 +78,10 @@ class TestGetAll:
 
 
 class TestSearch:
-    """PublisherRepository.search contracts."""
+    """PublisherRepository.search contracts — surface match only (no recursive expansion)."""
 
     def test_exact_match(self, populated_db):
-        """Test that exact name match returns publisher."""
+        """search('Sub Pop') returns only Sub Pop — no children (it has none)."""
         repo = PublisherRepository(populated_db)
         pubs = repo.search("Sub Pop")
 
@@ -92,12 +92,13 @@ class TestSearch:
             pubs[0].parent_id is None
         ), f"Expected None for parent_id, got {pubs[0].parent_id}"
 
-    def test_partial_match(self, populated_db):
-        """Test that partial match returns multiple publishers."""
+    def test_partial_match_surface_only(self, populated_db):
+        """search('Island') returns only name-matched publishers (Island Records + Island Def Jam),
+        NOT their children. No recursive expansion."""
         repo = PublisherRepository(populated_db)
         pubs = repo.search("Island")
 
-        assert len(pubs) == 2, f"Expected 2 publishers, got {len(pubs)}"
+        assert len(pubs) == 2, f"Expected 2 publishers (surface only), got {len(pubs)}"
         names = {p.name for p in pubs}
         assert names == {
             "Island Records",
@@ -105,22 +106,64 @@ class TestSearch:
         }, f"Unexpected names: {names}"
 
     def test_no_match_returns_empty(self, populated_db):
-        """Test that search returns empty list for no matches."""
+        """search('ZZZZZ') returns empty list."""
         repo = PublisherRepository(populated_db)
         pubs = repo.search("ZZZZZ")
         assert pubs == [], f"Expected empty list for no match, got {pubs}"
 
-    def test_universal_match(self, populated_db):
-        """'Universal' should match Umbrella (4 publishers)."""
+    def test_universal_surface_match_only(self, populated_db):
+        """search('Universal') returns only 'Universal Music Group' — NOT its children.
+        Use search_deep() to get the full corporate tree."""
         repo = PublisherRepository(populated_db)
         pubs = repo.search("Universal")
 
-        assert len(pubs) == 4, f"Expected 4 publishers, got {len(pubs)}"
-        # Sorted by name: DGC(10), Island Def Jam(3), Island Records(2), Universal(1)
-        assert pubs[3].id == 1, f"Expected 1 at index 3, got {pubs[3].id}"
-        assert (
-            pubs[3].name == "Universal Music Group"
-        ), f"Expected 'Universal Music Group', got '{pubs[3].name}'"
+        assert len(pubs) == 1, f"Expected 1 (surface match only), got {len(pubs)}"
+        assert pubs[0].id == 1, f"Expected ID=1 (UMG), got {pubs[0].id}"
+        assert pubs[0].name == "Universal Music Group", \
+            f"Expected 'Universal Music Group', got '{pubs[0].name}'"
+
+        # Negative: children should NOT be returned by surface search
+        returned_names = {p.name for p in pubs}
+        assert "DGC Records" not in returned_names, \
+            "DGC Records is a child — should not appear in surface search"
+        assert "Island Records" not in returned_names, \
+            "Island Records is a child — should not appear in surface search"
+
+
+class TestSearchDeep:
+    """PublisherRepository.search_deep contracts — recursive CTE expansion."""
+
+    def test_parent_finds_all_descendants(self, populated_db):
+        """search_deep('Universal') returns UMG + all descendants (Island, DGC, Def Jam)."""
+        repo = PublisherRepository(populated_db)
+        results = repo.search_deep("Universal")
+
+        assert len(results) == 4, f"Expected 4 publishers for 'Universal', got {len(results)}"
+        ids = {p.id for p in results}
+        assert ids == {1, 2, 3, 10}, f"Expected IDs {{1, 2, 3, 10}}, got {ids}"
+
+    def test_mid_tier_finds_children(self, populated_db):
+        """search_deep('Island') finds Island Records + Island Def Jam (its child)."""
+        repo = PublisherRepository(populated_db)
+        results = repo.search_deep("Island")
+
+        assert len(results) == 2, f"Expected 2 publishers for 'Island', got {len(results)}"
+        ids = {p.id for p in results}
+        assert ids == {2, 3}, f"Expected IDs {{2, 3}}, got {ids}"
+
+    def test_leaf_finds_only_itself(self, populated_db):
+        """search_deep('Def Jam') returns only itself — no children."""
+        repo = PublisherRepository(populated_db)
+        results = repo.search_deep("Def Jam")
+
+        assert len(results) == 1, f"Expected 1 publisher, got {len(results)}"
+        assert results[0].id == 3, f"Expected ID=3, got {results[0].id}"
+
+    def test_no_match_returns_empty(self, populated_db):
+        """search_deep('ZZZZZ') returns empty list."""
+        repo = PublisherRepository(populated_db)
+        results = repo.search_deep("ZZZZZ")
+        assert results == [], f"Expected [], got {results}"
 
 
 class TestGetById:

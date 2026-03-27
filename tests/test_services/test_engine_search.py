@@ -45,163 +45,48 @@ def _find_song(data, title):
 
 
 def _assert_slts(song):
-    """Exhaustive contract for 'Smells Like Teen Spirit' SongView."""
+    """Exhaustive contract for 'Smells Like Teen Spirit' SongSlimView (search result)."""
     assert song["id"] == 1, f"Expected id=1, got {song['id']}"
-    assert (
-        song["media_name"] == "Smells Like Teen Spirit"
-    ), f"Expected media_name='Smells Like Teen Spirit', got {song['media_name']}"
-    assert (
-        song["title"] == "Smells Like Teen Spirit"
-    ), f"Expected title='Smells Like Teen Spirit', got {song['title']}"
-    assert (
-        song["source_path"] == "/path/1"
-    ), f"Expected source_path='/path/1', got {song['source_path']}"
-    assert (
-        song["duration_ms"] == 200000
-    ), f"Expected duration_s=200.0, got {song['duration_ms']}"
-    assert (
-        song["audio_hash"] == "hash_1"
-    ), f"Expected audio_hash='hash_1', got {song['audio_hash']}"
-    assert (
-        song["processing_status"] is None
-    ), f"Expected processing_status=None, got {song['processing_status']}"
-    assert (
-        song["is_active"] is True
-    ), f"Expected is_active=True, got {song['is_active']}"
-    assert song["notes"] is None, f"Expected notes=None, got {song['notes']}"
+    assert song["media_name"] == "Smells Like Teen Spirit", \
+        f"Expected media_name='Smells Like Teen Spirit', got {song['media_name']}"
+    assert song["title"] == "Smells Like Teen Spirit", \
+        f"Expected title='Smells Like Teen Spirit', got {song['title']}"
+    assert song["source_path"] == "/path/1", \
+        f"Expected source_path='/path/1', got {song['source_path']}"
+    assert song["duration_s"] == 200.0, \
+        f"Expected duration_s=200.0, got {song['duration_s']}"
+    assert song["is_active"] is True, \
+        f"Expected is_active=True, got {song['is_active']}"
     assert song["bpm"] is None, f"Expected bpm=None, got {song['bpm']}"
     assert song["year"] == 1991, f"Expected year=1991, got {song['year']}"
     assert song["isrc"] is None, f"Expected isrc=None, got {song['isrc']}"
-    assert song["raw_tags"] == {}, f"Expected raw_tags={{}}, got {song['raw_tags']}"
-
-    # Credits: Nirvana Performer
-    assert len(song["credits"]) == 1, f"Expected 1 credit, got {len(song['credits'])}"
-    credit = song["credits"][0]
-    assert (
-        credit["display_name"] == "Nirvana"
-    ), f"Expected display_name='Nirvana', got {credit['display_name']}"
-    assert (
-        credit["role_name"] == "Performer"
-    ), f"Expected role_name='Performer', got {credit['role_name']}"
-    assert (
-        credit["is_primary"] is True
-    ), f"Expected is_primary=True, got {credit['is_primary']}"
-
-    # Albums: Nevermind track 1
-    assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
-    album = song["albums"][0]
-    assert (
-        album["album_title"] == "Nevermind"
-    ), f"Expected album_title='Nevermind', got {album['album_title']}"
-    assert (
-        album["track_number"] == 1
-    ), f"Expected track_number=1, got {album['track_number']}"
-
-    # Publishers: DGC Records (parent: Universal Music Group)
-    assert (
-        len(song["publishers"]) == 1
-    ), f"Expected 1 publisher, got {len(song['publishers'])}"
-    pub = song["publishers"][0]
-    assert (
-        pub["name"] == "DGC Records"
-    ), f"Expected publisher name='DGC Records', got {pub['name']}"
-    assert (
-        pub["parent_name"] == "Universal Music Group"
-    ), f"Expected parent_name='Universal Music Group', got {pub['parent_name']}"
-
-    # Tags: Energetic, English, Grunge (order may vary)
-    tag_names = sorted([t["name"] for t in song["tags"]])
-    assert tag_names == [
-        "Energetic",
-        "English",
-        "Grunge",
-    ], f"Expected tags=['Energetic','English','Grunge'], got {tag_names}"
-    tag_by_name = {t["name"]: t for t in song["tags"]}
-    assert (
-        tag_by_name["Grunge"]["category"] == "Genre"
-    ), f"Expected Grunge category='Genre', got {tag_by_name['Grunge']['category']}"
-    assert (
-        tag_by_name["Grunge"]["is_primary"] is False
-    ), f"Expected Grunge is_primary=False, got {tag_by_name['Grunge']['is_primary']}"
-    assert (
-        tag_by_name["Energetic"]["category"] == "Mood"
-    ), f"Expected Energetic category='Mood', got {tag_by_name['Energetic']['category']}"
-    assert (
-        tag_by_name["English"]["category"] == "Jezik"
-    ), f"Expected English category='Jezik', got {tag_by_name['English']['category']}"
-
-    # Computed fields
-    assert (
-        song["formatted_duration"] == "3:20"
-    ), f"Expected formatted_duration='3:20', got {song['formatted_duration']}"
-    assert (
-        song["display_artist"] == "Nirvana"
-    ), f"Expected display_artist='Nirvana', got {song['display_artist']}"
-    assert (
-        song["primary_genre"] == "Grunge"
-    ), f"Expected primary_genre='Grunge', got {song['primary_genre']}"
-    assert (
-        song["display_master_publisher"] == "DGC Records (Universal Music Group)"
-    ), f"Expected display_master_publisher='DGC Records (Universal Music Group)', got {song['display_master_publisher']}"
+    assert song["display_artist"] == "Nirvana", \
+        f"Expected display_artist='Nirvana', got {song['display_artist']}"
+    assert song["primary_genre"] == "Grunge", \
+        f"Expected primary_genre='Grunge', got {song['primary_genre']}"
+    assert song["formatted_duration"] == "3:20", \
+        f"Expected formatted_duration='3:20', got {song['formatted_duration']}"
 
 
 def _assert_everlong(song):
-    """Exhaustive contract for 'Everlong' SongView."""
+    """Exhaustive contract for 'Everlong' SongSlimView (search result)."""
     assert song["id"] == 2, f"Expected id=2, got {song['id']}"
-    assert (
-        song["media_name"] == "Everlong"
-    ), f"Expected media_name='Everlong', got {song['media_name']}"
-    assert (
-        song["title"] == "Everlong"
-    ), f"Expected title='Everlong', got {song['title']}"
-    assert (
-        song["source_path"] == "/path/2"
-    ), f"Expected source_path='/path/2', got {song['source_path']}"
-    assert (
-        song["duration_ms"] == 240000
-    ), f"Expected duration_s=240.0, got {song['duration_ms']}"
-    assert (
-        song["audio_hash"] is None
-    ), f"Expected audio_hash=None, got {song['audio_hash']}"
-    assert (
-        song["processing_status"] is None
-    ), f"Expected processing_status=None, got {song['processing_status']}"
-    assert (
-        song["is_active"] is True
-    ), f"Expected is_active=True, got {song['is_active']}"
+    assert song["media_name"] == "Everlong", \
+        f"Expected media_name='Everlong', got {song['media_name']}"
+    assert song["title"] == "Everlong", \
+        f"Expected title='Everlong', got {song['title']}"
+    assert song["source_path"] == "/path/2", \
+        f"Expected source_path='/path/2', got {song['source_path']}"
+    assert song["duration_s"] == 240.0, \
+        f"Expected duration_s=240.0, got {song['duration_s']}"
+    assert song["is_active"] is True, \
+        f"Expected is_active=True, got {song['is_active']}"
     assert song["year"] == 1997, f"Expected year=1997, got {song['year']}"
     assert song["isrc"] is None, f"Expected isrc=None, got {song['isrc']}"
-
-    # Credits: Foo Fighters Performer
-    assert len(song["credits"]) == 1, f"Expected 1 credit, got {len(song['credits'])}"
-    credit = song["credits"][0]
-    assert (
-        credit["display_name"] == "Foo Fighters"
-    ), f"Expected display_name='Foo Fighters', got {credit['display_name']}"
-    assert (
-        credit["role_name"] == "Performer"
-    ), f"Expected role_name='Performer', got {credit['role_name']}"
-
-    # Albums: The Colour and the Shape track 11
-    assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
-    album = song["albums"][0]
-    assert (
-        album["album_title"] == "The Colour and the Shape"
-    ), f"Expected album_title='The Colour and the Shape', got {album['album_title']}"
-    assert (
-        album["track_number"] == 11
-    ), f"Expected track_number=11, got {album['track_number']}"
-
-    # No recording publishers
-    assert song["publishers"] == [], f"Expected publishers=[], got {song['publishers']}"
-
-    # Computed fields
-    assert (
-        song["formatted_duration"] == "4:00"
-    ), f"Expected formatted_duration='4:00', got {song['formatted_duration']}"
-    assert (
-        song["display_artist"] == "Foo Fighters"
-    ), f"Expected display_artist='Foo Fighters', got {song['display_artist']}"
+    assert song["display_artist"] == "Foo Fighters", \
+        f"Expected display_artist='Foo Fighters', got {song['display_artist']}"
+    assert song["formatted_duration"] == "4:00", \
+        f"Expected formatted_duration='4:00', got {song['formatted_duration']}"
 
 
 # ===========================================================================
@@ -260,36 +145,21 @@ class TestSongSearchPhaseTwo:
         _assert_everlong(everlong)
 
     def test_alias_expands_to_identity_tree(self, client):
-        """'Late!' (Dave's alias) resolves through Dave's identity tree and returns hydrated Pocketwatch Demo."""
+        """'Late!' (Dave's alias) resolves through Dave's identity tree and returns Pocketwatch Demo."""
         data = client.get("/api/v1/songs/search", params={"q": "Late!", "deep": "true"}).json()
         song = _find_song(data, "Pocketwatch Demo")
         assert song["id"] == 5, f"Expected id=5, got {song['id']}"
-        assert (
-            song["media_name"] == "Pocketwatch Demo"
-        ), f"Expected media_name='Pocketwatch Demo', got {song['media_name']}"
-        assert (
-            song["source_path"] == "/path/5"
-        ), f"Expected source_path='/path/5', got {song['source_path']}"
-        assert (
-            song["duration_ms"] == 180000
-        ), f"Expected duration_s=180.0, got {song['duration_ms']}"
-        assert (
-            song["is_active"] is True
-        ), f"Expected is_active=True, got {song['is_active']}"
+        assert song["media_name"] == "Pocketwatch Demo", \
+            f"Expected media_name='Pocketwatch Demo', got {song['media_name']}"
+        assert song["source_path"] == "/path/5", \
+            f"Expected source_path='/path/5', got {song['source_path']}"
+        assert song["duration_s"] == 180.0, \
+            f"Expected duration_s=180.0, got {song['duration_s']}"
+        assert song["is_active"] is True, \
+            f"Expected is_active=True, got {song['is_active']}"
         assert song["year"] == 1992, f"Expected year=1992, got {song['year']}"
-        assert (
-            len(song["credits"]) == 1
-        ), f"Expected 1 credit, got {len(song['credits'])}"
-        assert (
-            song["credits"][0]["display_name"] == "Late!"
-        ), f"Expected display_name='Late!', got {song['credits'][0]['display_name']}"
-        assert (
-            song["credits"][0]["role_name"] == "Performer"
-        ), f"Expected role_name='Performer', got {song['credits'][0]['role_name']}"
-        assert song["albums"] == [], f"Expected albums=[], got {song['albums']}"
-        assert (
-            song["publishers"] == []
-        ), f"Expected publishers=[], got {song['publishers']}"
+        assert song["display_artist"] == "Late!", \
+            f"Expected display_artist='Late!', got '{song['display_artist']}'"
 
     def test_group_name_returns_group_songs(self, client):
         """'Foo Fighters' returns Everlong with full hydration."""
@@ -306,36 +176,20 @@ class TestSongSearchPhaseTwo:
         ), f"Expected 'Range Rover Bitch' in {titles}"
         assert "Everlong" in titles, f"Expected 'Everlong' in {titles}"
 
-        # Exhaustive check on Taylor's solo track
+        # Exhaustive slim check on Taylor's solo track
         rrb = _find_song(data, "Range Rover Bitch")
         assert rrb["id"] == 3, f"Expected id=3, got {rrb['id']}"
-        assert (
-            rrb["media_name"] == "Range Rover Bitch"
-        ), f"Expected media_name='Range Rover Bitch', got {rrb['media_name']}"
-        assert (
-            rrb["duration_ms"] == 180000
-        ), f"Expected duration_s=180.0, got {rrb['duration_ms']}"
-        assert (
-            rrb["is_active"] is True
-        ), f"Expected is_active=True, got {rrb['is_active']}"
+        assert rrb["media_name"] == "Range Rover Bitch", \
+            f"Expected media_name='Range Rover Bitch', got {rrb['media_name']}"
+        assert rrb["duration_s"] == 180.0, \
+            f"Expected duration_s=180.0, got {rrb['duration_s']}"
+        assert rrb["is_active"] is True, \
+            f"Expected is_active=True, got {rrb['is_active']}"
         assert rrb["year"] == 2016, f"Expected year=2016, got {rrb['year']}"
-        assert len(rrb["credits"]) == 1, f"Expected 1 credit, got {len(rrb['credits'])}"
-        assert (
-            rrb["credits"][0]["display_name"] == "Taylor Hawkins"
-        ), f"Expected display_name='Taylor Hawkins', got {rrb['credits'][0]['display_name']}"
-        assert (
-            rrb["credits"][0]["role_name"] == "Performer"
-        ), f"Expected role_name='Performer', got {rrb['credits'][0]['role_name']}"
-        assert rrb["albums"] == [], f"Expected albums=[], got {rrb['albums']}"
-        assert (
-            rrb["publishers"] == []
-        ), f"Expected publishers=[], got {rrb['publishers']}"
-        assert (
-            rrb["formatted_duration"] == "3:00"
-        ), f"Expected formatted_duration='3:00', got {rrb['formatted_duration']}"
-        assert (
-            rrb["display_artist"] == "Taylor Hawkins"
-        ), f"Expected display_artist='Taylor Hawkins', got {rrb['display_artist']}"
+        assert rrb["formatted_duration"] == "3:00", \
+            f"Expected formatted_duration='3:00', got {rrb['formatted_duration']}"
+        assert rrb["display_artist"] == "Taylor Hawkins", \
+            f"Expected display_artist='Taylor Hawkins', got {rrb['display_artist']}"
 
         # Exhaustive check on FF group song
         everlong = _find_song(data, "Everlong")
@@ -364,98 +218,48 @@ class TestSongSearchDeduplication:
         assert len(ids) == len(set(ids)), f"Duplicate song IDs found: {ids}"
 
 
-class TestSongSearchHydration:
-    """Search results must be fully hydrated SongViews."""
+class TestSongSearchSlimShape:
+    """Search endpoint returns SongSlimView — verify slim field contract.
+    No credits/albums/tags/publishers. Computed fields come from the slim aggregation."""
 
-    def test_credits_present(self, client):
-        """Search result for SLTS has Nirvana credit with all fields."""
+    def test_slim_fields_present_for_slts(self, client):
+        """SLTS search result has all slim fields with correct values."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
-        assert (
-            len(slts["credits"]) == 1
-        ), f"Expected 1 credit, got {len(slts['credits'])}"
-        credit = slts["credits"][0]
-        assert (
-            credit["display_name"] == "Nirvana"
-        ), f"Expected display_name='Nirvana', got {credit['display_name']}"
-        assert (
-            credit["role_name"] == "Performer"
-        ), f"Expected role_name='Performer', got {credit['role_name']}"
-        assert (
-            credit["is_primary"] is True
-        ), f"Expected is_primary=True, got {credit['is_primary']}"
+        _assert_slts(slts)
 
-    def test_album_present(self, client):
-        """Search result for SLTS has Nevermind album with track number."""
+    def test_display_artist_aggregated_from_credits(self, client):
+        """display_artist is the Performer credit aggregated by the SQL query."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
-        assert len(slts["albums"]) == 1, f"Expected 1 album, got {len(slts['albums'])}"
-        album = slts["albums"][0]
-        assert (
-            album["album_title"] == "Nevermind"
-        ), f"Expected album_title='Nevermind', got {album['album_title']}"
-        assert (
-            album["track_number"] == 1
-        ), f"Expected track_number=1, got {album['track_number']}"
+        assert slts["display_artist"] == "Nirvana", \
+            f"Expected 'Nirvana', got '{slts['display_artist']}'"
 
-    def test_tags_present(self, client):
-        """Search result for SLTS has tags: Grunge, Energetic, English with correct categories."""
+    def test_primary_genre_aggregated_from_tags(self, client):
+        """primary_genre is the primary Genre tag aggregated by the SQL query."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
-        tag_names = sorted([t["name"] for t in slts["tags"]])
-        assert tag_names == [
-            "Energetic",
-            "English",
-            "Grunge",
-        ], f"Expected tags=['Energetic','English','Grunge'], got {tag_names}"
-        tag_by_name = {t["name"]: t for t in slts["tags"]}
-        assert (
-            tag_by_name["Grunge"]["category"] == "Genre"
-        ), f"Expected Grunge category='Genre', got {tag_by_name['Grunge']['category']}"
-        assert (
-            tag_by_name["Grunge"]["is_primary"] is False
-        ), f"Expected Grunge is_primary=False, got {tag_by_name['Grunge']['is_primary']}"
-        assert (
-            tag_by_name["Energetic"]["category"] == "Mood"
-        ), f"Expected Energetic category='Mood', got {tag_by_name['Energetic']['category']}"
-        assert (
-            tag_by_name["English"]["category"] == "Jezik"
-        ), f"Expected English category='Jezik', got {tag_by_name['English']['category']}"
+        assert slts["primary_genre"] == "Grunge", \
+            f"Expected 'Grunge', got '{slts['primary_genre']}'"
 
-    def test_publishers_present(self, client):
-        """Search result for SLTS has DGC Records publisher with parent hierarchy."""
+    def test_no_hydrated_fields_in_slim_response(self, client):
+        """Slim response must NOT contain hydrated fields (credits, albums, tags, publishers)."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
-        assert (
-            len(slts["publishers"]) == 1
-        ), f"Expected 1 publisher, got {len(slts['publishers'])}"
-        pub = slts["publishers"][0]
-        assert (
-            pub["name"] == "DGC Records"
-        ), f"Expected publisher name='DGC Records', got {pub['name']}"
-        assert (
-            pub["parent_name"] == "Universal Music Group"
-        ), f"Expected parent_name='Universal Music Group', got {pub['parent_name']}"
+        assert "credits" not in slts, "Slim view should not have 'credits' field"
+        assert "albums" not in slts, "Slim view should not have 'albums' field"
+        assert "tags" not in slts, "Slim view should not have 'tags' field"
+        assert "publishers" not in slts, "Slim view should not have 'publishers' field"
 
-    def test_computed_fields(self, client):
-        """Search results include computed fields with exact values."""
+    def test_formatted_duration_computed(self, client):
+        """formatted_duration is computed from duration_s."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
-        assert (
-            slts["formatted_duration"] == "3:20"
-        ), f"Expected formatted_duration='3:20', got {slts['formatted_duration']}"
-        assert (
-            slts["display_artist"] == "Nirvana"
-        ), f"Expected display_artist='Nirvana', got {slts['display_artist']}"
-        assert (
-            slts["primary_genre"] == "Grunge"
-        ), f"Expected primary_genre='Grunge', got {slts['primary_genre']}"
-        assert (
-            slts["display_master_publisher"] == "DGC Records (Universal Music Group)"
-        ), f"Expected display_master_publisher='DGC Records (Universal Music Group)', got {slts['display_master_publisher']}"
+        assert slts["formatted_duration"] == "3:20", \
+            f"Expected '3:20', got '{slts['formatted_duration']}'"
 
-    def test_full_slts_contract(self, client):
-        """Complete exhaustive contract assertion for SLTS search result."""
+    def test_full_slts_slim_contract(self, client):
+        """Complete exhaustive slim contract for SLTS."""
         data = client.get("/api/v1/songs/search", params={"q": "Teen Spirit"}).json()
         slts = _find_song(data, "Smells Like Teen Spirit")
         _assert_slts(slts)

@@ -258,58 +258,33 @@ class TestSongEdgeCases:
         ), f"Expected primary_genre=None, got {view.primary_genre}"
 
     def test_search_unicode_title(self, edge_case_db):
-        """Surface search can find unicode title."""
+        """search_slim can find a unicode title."""
         repo = SongRepository(edge_case_db)
-        results = repo.search("\u65e5\u672c\u8a9e")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        song = results[0]
-        assert song.id == 103, f"Expected id=103, got {song.id}"
-        assert (
-            song.title == "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0"
-        ), f"Expected unicode title, got {song.title}"
-        assert (
-            song.media_name == "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0"
-        ), f"Expected unicode media_name, got {song.media_name}"
-        assert (
-            song.source_path == "/edge/4"
-        ), f"Expected source_path='/edge/4', got {song.source_path}"
-        assert (
-            song.duration_s == 200.0
-        ), f"Expected duration_s=200.0, got {song.duration_ms}"
-        assert (
-            song.audio_hash is None
-        ), f"Expected audio_hash=None, got {song.audio_hash}"
-        assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
-        assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
-        assert song.notes is None, f"Expected notes=None, got {song.notes}"
-        assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
-        assert song.year is None, f"Expected year=None, got {song.year}"
-        assert song.isrc is None, f"Expected isrc=None, got {song.isrc}"
-        assert song.credits == [], f"Expected no credits, got {song.credits}"
-        assert song.albums == [], f"Expected no albums, got {song.albums}"
-        assert song.publishers == [], f"Expected no publishers, got {song.publishers}"
-        assert song.tags == [], f"Expected no tags, got {song.tags}"
-        assert song.raw_tags == {}, f"Expected no raw_tags, got {song.raw_tags}"
+        rows = repo.search_slim("\u65e5\u672c\u8a9e")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        row = rows[0]
+        assert row["SourceID"] == 103, f"Expected SourceID=103, got {row['SourceID']}"
+        assert row["MediaName"] == "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0", \
+            f"Expected unicode MediaName, got '{row['MediaName']}'"
+        assert row["SourcePath"] == "/edge/4", \
+            f"Expected SourcePath='/edge/4', got '{row['SourcePath']}'"
+        assert row["SourceDuration"] == 200, \
+            f"Expected SourceDuration=200, got {row['SourceDuration']}"
+        assert row["IsActive"] == 1, f"Expected IsActive=1, got {row['IsActive']}"
+        assert row["RecordingYear"] is None, \
+            f"Expected RecordingYear=None, got {row['RecordingYear']}"
+        assert row["ISRC"] is None, f"Expected ISRC=None, got {row['ISRC']}"
 
     def test_search_single_char(self, edge_case_db):
-        """Surface search with 'A' matches song 102."""
+        """search_slim with 'A' finds at least song 102."""
         repo = SongRepository(edge_case_db)
-        results = repo.search("A")
-        ids = [s.id for s in results]
-        assert 102 in ids, f"Expected song 102 in results, got ids={ids}"
-        for song in results:
-            assert song.id is not None, f"Expected song.id to be set, got {song.id}"
-            assert (
-                song.title is not None
-            ), f"Expected song.title to be set, got {song.title}"
-            assert (
-                song.media_name is not None
-            ), f"Expected song.media_name to be set, got {song.media_name}"
-            assert (
-                song.source_path is not None
-            ), f"Expected song.source_path to be set, got {song.source_path}"
+        rows = repo.search_slim("A")
+        ids = [r["SourceID"] for r in rows]
+        assert 102 in ids, f"Expected SourceID=102 in results, got ids={ids}"
+        for row in rows:
+            assert row["SourceID"] is not None, "Expected SourceID to be set"
+            assert row["MediaName"] is not None, "Expected MediaName to be set"
+            assert row["SourcePath"] is not None, "Expected SourcePath to be set"
 
 
 # ===========================================================================
@@ -497,10 +472,10 @@ class TestEmptyDbEdgeCases:
             result is None
         ), f"Expected None for non-existent song on empty DB, got {result}"
 
-    def test_search_songs_returns_empty(self, empty_db):
-        """search_songs returns empty list on empty DB."""
+    def test_search_songs_slim_returns_empty(self, empty_db):
+        """search_songs_slim returns empty list on empty DB."""
         service = CatalogService(empty_db)
-        results = service.search_songs("anything")
+        results = service.search_songs_slim("anything")
         assert results == [], f"Expected empty list, got {results}"
 
     def test_get_all_identities_empty(self, empty_db):
@@ -522,9 +497,9 @@ class TestEmptyDbEdgeCases:
         assert publishers == [], f"Expected empty list, got {publishers}"
 
     def test_search_albums_empty(self, empty_db):
-        """search_albums returns empty list on empty DB."""
+        """search_albums_slim returns empty list on empty DB."""
         service = CatalogService(empty_db)
-        results = service.search_albums("anything")
+        results = service.search_albums_slim("anything")
         assert results == [], f"Expected empty list, got {results}"
 
     def test_search_publishers_empty(self, empty_db):

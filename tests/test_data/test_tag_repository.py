@@ -45,8 +45,8 @@ class TestGetTagsForSongs:
         assert grunge.name == "Grunge", f"Expected 'Grunge', got '{grunge.name}'"
         assert grunge.category == "Genre", f"Expected 'Genre', got '{grunge.category}'"
         assert (
-            grunge.is_primary is False
-        ), f"Expected is_primary=False (Song 1 tags all have IsPrimary=0), got {grunge.is_primary}"
+            grunge.is_primary is True
+        ), f"Expected is_primary=True (Grunge is primary genre for SLTS), got {grunge.is_primary}"
 
         energetic = tag_map["Energetic"]
         assert energetic.id == 2, f"Expected id=2, got {energetic.id}"

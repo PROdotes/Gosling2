@@ -345,7 +345,7 @@ def _populate_db_data(db_path):
 
     # --- Media Source Tags ---
     song_tags = [
-        (1, 1, 0),  # SLTS -> Grunge (not primary)
+        (1, 1, 1),  # SLTS -> Grunge (primary Genre — only/first genre)
         (1, 2, 0),  # SLTS -> Energetic
         (1, 5, 0),  # SLTS -> English
         (2, 3, 0),  # Everlong -> 90s

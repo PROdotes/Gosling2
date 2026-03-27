@@ -62,54 +62,57 @@ class TestAlbumRepositoryGetAll:
         assert result == [], f"Expected [], got {result!r}"
 
 
-class TestAlbumRepositorySearch:
+class TestAlbumRepositorySearchSlim:
+    """AlbumRepository.search_slim contracts — returns List[dict] for list-view rendering."""
+
     def test_exact_match_returns_single_album(self, populated_db):
-        """search('Nevermind') must return exactly one album with all fields populated."""
+        """search_slim('Nevermind') must return exactly one album dict with core fields."""
         repo = AlbumRepository(populated_db)
-        albums = repo.search("Nevermind")
-        assert len(albums) == 1, f"Expected 1 album, got {len(albums)}"
-        assert albums[0].id == 100, f"Expected id=100, got {albums[0].id}"
-        assert (
-            albums[0].title == "Nevermind"
-        ), f"Expected 'Nevermind', got '{albums[0].title}'"
-        assert (
-            albums[0].album_type is None
-        ), f"Expected album_type=None, got {albums[0].album_type!r}"
-        assert (
-            albums[0].release_year == 1991
-        ), f"Expected release_year=1991, got {albums[0].release_year}"
-        assert (
-            albums[0].publishers == []
-        ), f"Expected publishers=[], got {albums[0].publishers}"
-        assert albums[0].credits == [], f"Expected credits=[], got {albums[0].credits}"
-        assert albums[0].songs == [], f"Expected songs=[], got {albums[0].songs}"
+        rows = repo.search_slim("Nevermind")
+        assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
+        row = rows[0]
+        assert row["AlbumID"] == 100, f"Expected AlbumID=100, got {row['AlbumID']}"
+        assert row["AlbumTitle"] == "Nevermind", \
+            f"Expected 'Nevermind', got '{row['AlbumTitle']}'"
+        assert row["AlbumType"] is None, \
+            f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert row["ReleaseYear"] == 1991, \
+            f"Expected ReleaseYear=1991, got {row['ReleaseYear']}"
+        assert "SongCount" in row, "Row missing 'SongCount' field"
+        assert "DisplayArtist" in row, "Row missing 'DisplayArtist' field"
+        assert "DisplayPublisher" in row, "Row missing 'DisplayPublisher' field"
 
     def test_partial_match_returns_album(self, populated_db):
-        """search('Colour') must match 'The Colour and the Shape' via LIKE with all fields."""
+        """search_slim('Colour') must match 'The Colour and the Shape' via LIKE."""
         repo = AlbumRepository(populated_db)
-        albums = repo.search("Colour")
-        assert len(albums) == 1, f"Expected 1 album, got {len(albums)}"
-        assert albums[0].id == 200, f"Expected id=200, got {albums[0].id}"
-        assert (
-            albums[0].title == "The Colour and the Shape"
-        ), f"Expected 'The Colour and the Shape', got '{albums[0].title}'"
-        assert (
-            albums[0].album_type is None
-        ), f"Expected album_type=None, got {albums[0].album_type!r}"
-        assert (
-            albums[0].release_year == 1997
-        ), f"Expected release_year=1997, got {albums[0].release_year}"
-        assert (
-            albums[0].publishers == []
-        ), f"Expected publishers=[], got {albums[0].publishers}"
-        assert albums[0].credits == [], f"Expected credits=[], got {albums[0].credits}"
-        assert albums[0].songs == [], f"Expected songs=[], got {albums[0].songs}"
+        rows = repo.search_slim("Colour")
+        assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
+        row = rows[0]
+        assert row["AlbumID"] == 200, f"Expected AlbumID=200, got {row['AlbumID']}"
+        assert row["AlbumTitle"] == "The Colour and the Shape", \
+            f"Expected 'The Colour and the Shape', got '{row['AlbumTitle']}'"
+        assert row["AlbumType"] is None, \
+            f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert row["ReleaseYear"] == 1997, \
+            f"Expected ReleaseYear=1997, got {row['ReleaseYear']}"
 
     def test_no_match_returns_empty_list(self, populated_db):
-        """search('ZZZZZ') must return an empty list when no albums match."""
+        """search_slim('ZZZZZ') must return an empty list when no albums match."""
         repo = AlbumRepository(populated_db)
-        result = repo.search("ZZZZZ")
+        result = repo.search_slim("ZZZZZ")
         assert result == [], f"Expected [], got {result!r}"
+
+    def test_empty_query_returns_all_albums(self, populated_db):
+        """search_slim('') must return all albums (used by get_all_albums endpoint)."""
+        repo = AlbumRepository(populated_db)
+        rows = repo.search_slim("")
+        assert len(rows) >= 2, f"Expected at least 2 albums, got {len(rows)}"
+        ids = {r["AlbumID"] for r in rows}
+        assert 100 in ids, "Album 100 (Nevermind) missing from full list"
+        assert 200 in ids, "Album 200 (The Colour and the Shape) missing from full list"
+
+        # Negative isolation: soft-deleted should not appear
+        # (covered by test_soft_delete_visibility.py)
 
 
 class TestAlbumRepositoryGetById:
@@ -502,8 +505,8 @@ class TestTagRepository:
             tags["Grunge"].category == "Genre"
         ), f"Expected category='Genre' for Grunge, got '{tags['Grunge'].category}'"
         assert (
-            tags["Grunge"].is_primary is False
-        ), f"Expected is_primary=False for Grunge, got {tags['Grunge'].is_primary}"
+            tags["Grunge"].is_primary is True
+        ), f"Expected is_primary=True for Grunge (primary genre for SLTS), got {tags['Grunge'].is_primary}"
 
         assert (
             "Energetic" in tags

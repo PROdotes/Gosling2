@@ -235,63 +235,123 @@ class TestGetByTitle:
         assert songs == [], f"Expected empty list on empty DB, got {songs}"
 
 
-class TestSearchSurface:
-    """SongRepository.search_surface contracts (title + album title search)."""
+class TestSearchSlim:
+    """SongRepository.search_slim contracts — returns List[dict] for card rendering."""
 
     def test_title_match(self, populated_db):
-        """Search for song title should find the song."""
+        """search_slim('Everlong') should find Song 2 and return a dict with core fields."""
         repo = SongRepository(populated_db)
-        songs = repo.search("Everlong")
+        rows = repo.search_slim("Everlong")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
-        assert (
-            songs[0].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[0].title}'"
-        assert (
-            songs[0].duration_ms == 240000
-        ), f"Expected 240000, got {songs[0].duration_ms}"
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        row = rows[0]
+        assert row["SourceID"] == 2, f"Expected SourceID=2, got {row['SourceID']}"
+        assert row["MediaName"] == "Everlong", f"Expected 'Everlong', got '{row['MediaName']}'"
+        assert row["SourceDuration"] == 240, f"Expected 240s, got {row['SourceDuration']}"
+        assert row["SourcePath"] == "/path/2", f"Expected '/path/2', got '{row['SourcePath']}'"
 
     def test_album_title_match(self, populated_db):
-        """Searching for album name 'Nevermind' should find Song 1 (linked to that album)."""
+        """search_slim('Nevermind') should find Song 1 via album linkage."""
         repo = SongRepository(populated_db)
-        songs = repo.search("Nevermind")
+        rows = repo.search_slim("Nevermind")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        assert rows[0]["SourceID"] == 1, f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", \
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_album_title_match_colour(self, populated_db):
-        """Searching for 'Colour' should find Song 2 via album 'The Colour and the Shape'."""
+        """search_slim('Colour') should find Song 2 via album 'The Colour and the Shape'."""
         repo = SongRepository(populated_db)
-        songs = repo.search("Colour")
+        rows = repo.search_slim("Colour")
 
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
-        assert (
-            songs[0].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[0].title}'"
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        assert rows[0]["SourceID"] == 2, f"Expected SourceID=2, got {rows[0]['SourceID']}"
+        assert rows[0]["MediaName"] == "Everlong", f"Expected 'Everlong', got '{rows[0]['MediaName']}'"
 
-    def test_no_match(self, populated_db):
-        """Test search_surface returns [] for no matches."""
+    def test_no_match_returns_empty_list(self, populated_db):
+        """search_slim('ZZZZZZZZZ') returns [] for no matches."""
         repo = SongRepository(populated_db)
-        songs = repo.search("ZZZZZZZZZ")
-        assert songs == [], f"Expected empty list for no match, got {songs}"
+        rows = repo.search_slim("ZZZZZZZZZ")
+        assert rows == [], f"Expected empty list for no match, got {rows}"
 
     def test_matches_artist_name(self, populated_db):
-        """Surface search covers titles/albums AND credited artist names."""
+        """search_slim covers credited artist names."""
         repo = SongRepository(populated_db)
-        songs = repo.search("Nirvana")
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 1, f"Expected 1 (SLTS), got {songs[0].id}"
+        rows = repo.search_slim("Nirvana")
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        assert rows[0]["SourceID"] == 1, f"Expected SourceID=1 (SLTS), got {rows[0]['SourceID']}"
+
+        # Negative isolation: Foo Fighters songs should NOT appear
+        returned_ids = {r["SourceID"] for r in rows}
+        assert 2 not in returned_ids, "Everlong (Foo Fighters) should not match 'Nirvana'"
 
     def test_empty_query_returns_all(self, populated_db):
-        """Empty string in LIKE '%...%' matches everything."""
+        """Empty string in LIKE '%...%' matches all songs."""
         repo = SongRepository(populated_db)
-        songs = repo.search("")
-        assert len(songs) == 9, f"Expected 9 songs, got {len(songs)}"
+        rows = repo.search_slim("")
+        assert len(rows) == 9, f"Expected 9 rows, got {len(rows)}"
+
+    def test_returns_display_artist_field(self, populated_db):
+        """search_slim row must include DisplayArtist aggregated from SongCredits."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim("Smells Like Teen Spirit")
+
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        row = rows[0]
+        assert "DisplayArtist" in row, "Row missing 'DisplayArtist' field"
+        assert row["DisplayArtist"] is not None, \
+            f"Expected a performer name, got None for SLTS"
+
+    def test_returns_primary_genre_field(self, populated_db):
+        """search_slim row must include PrimaryGenre from MediaSourceTags."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim("Smells Like Teen Spirit")
+
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        assert "PrimaryGenre" in rows[0], "Row missing 'PrimaryGenre' field"
+
+
+class TestSearchSlimByIds:
+    """SongRepository.search_slim_by_ids contracts."""
+
+    def test_returns_slim_rows_for_valid_ids(self, populated_db):
+        """search_slim_by_ids([1, 2]) should return 2 slim dicts."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim_by_ids([1, 2])
+
+        assert len(rows) == 2, f"Expected 2 rows, got {len(rows)}"
+        ids = {r["SourceID"] for r in rows}
+        assert ids == {1, 2}, f"Expected IDs {{1, 2}}, got {ids}"
+
+    def test_skips_nonexistent_ids(self, populated_db):
+        """search_slim_by_ids([1, 999]) should return 1 row, skipping 999."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim_by_ids([1, 999])
+
+        assert len(rows) == 1, f"Expected 1 row (999 doesn't exist), got {len(rows)}"
+        assert rows[0]["SourceID"] == 1, f"Expected SourceID=1, got {rows[0]['SourceID']}"
+
+    def test_empty_ids_returns_empty_list(self, populated_db):
+        """search_slim_by_ids([]) should return [] immediately."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim_by_ids([])
+        assert rows == [], f"Expected [], got {rows}"
+
+    def test_returns_required_fields(self, populated_db):
+        """Each row must contain SourceID, MediaName, SourcePath, SourceDuration, IsActive."""
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim_by_ids([1])
+
+        assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
+        row = rows[0]
+        assert "SourceID" in row, "Row missing 'SourceID'"
+        assert "MediaName" in row, "Row missing 'MediaName'"
+        assert "SourcePath" in row, "Row missing 'SourcePath'"
+        assert "SourceDuration" in row, "Row missing 'SourceDuration'"
+        assert "IsActive" in row, "Row missing 'IsActive'"
+        assert "DisplayArtist" in row, "Row missing 'DisplayArtist'"
+        assert "PrimaryGenre" in row, "Row missing 'PrimaryGenre'"
 
 
 class TestGetByHash:

@@ -28,7 +28,7 @@ class AlbumRepository(BaseRepository):
         sql = """
             SELECT
                 a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
-                GROUP_CONCAT(an.DisplayName, ', ') FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(p.PublisherName) AS DisplayPublisher,
                 (SELECT COUNT(*) FROM SongAlbums sa WHERE sa.AlbumID = a.AlbumID) AS SongCount
             FROM Albums a

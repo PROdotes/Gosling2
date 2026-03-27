@@ -82,12 +82,25 @@ class SongCreditRepository(BaseRepository):
                         (row[2],),
                     )
             else:
-                # New name — create a new Identity to own it
-                cursor.execute(
-                    "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
+                # No ArtistName found — check if an Identity with this LegalName exists
+                # (possibly soft-deleted) before creating a new one.
+                identity_row = cursor.execute(
+                    "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?",
                     (credit.display_name,),
-                )
-                owner_identity_id = cursor.lastrowid
+                ).fetchone()
+                if identity_row:
+                    owner_identity_id = identity_row[0]
+                    if identity_row[1]:  # Reactivate soft-deleted Identity
+                        cursor.execute(
+                            "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
+                            (owner_identity_id,),
+                        )
+                else:
+                    cursor.execute(
+                        "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
+                        (credit.display_name,),
+                    )
+                    owner_identity_id = cursor.lastrowid
 
                 cursor.execute(
                     "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 1)",

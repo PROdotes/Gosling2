@@ -1,280 +1,138 @@
 """
-Contract tests for CatalogService.search_songs() deep resolution.
+Contract tests for CatalogService.search_songs_deep_slim() deep resolution.
 
-Verifies that search_songs() correctly discovers songs through:
+Verifies that search_songs_deep_slim() correctly discovers songs through:
 - Title surface match
 - Album surface match
 - Identity alias resolution
 - Identity primary-name resolution
 - Group membership expansion
+
+Returns List[dict] (slim rows). No hydration.
 """
 
 import pytest
-from src.models.domain import Song
 
 
-def _assert_song_fields(song: Song, expected: dict, context: str = ""):
-    """Assert every field of a Song against expected values.
-
-    Skips None-allowed fields when the expected value is None,
-    but still checks they are None. Verifies all non-optional fields explicitly.
-    """
-    for field, expected_val in expected.items():
-        actual = getattr(song, field, None)
-        assert (
-            actual == expected_val
-        ), f"[{context}] Field '{field}': expected {expected_val!r}, got {actual!r}"
-
-
-def _get_song_by_title(songs: list[Song], title: str, context: str = "") -> Song:
-    """Retrieve a single song by title from a result set, failing with a clear message."""
-    for s in songs:
-        if s.title == title:
-            return s
-    titles = [s.title for s in songs]
-    pytest.fail(f"[{context}] Song '{title}' not found in results: {titles}")
+def _get_row_by_media_name(rows: list[dict], media_name: str, context: str = "") -> dict:
+    """Retrieve a single row by MediaName, failing with a clear message."""
+    for r in rows:
+        if r["MediaName"] == media_name:
+            return r
+    names = [r["MediaName"] for r in rows]
+    pytest.fail(f"[{context}] '{media_name}' not found in results: {names}")
 
 
 # --------------------------------------------------------------------------
-# SLTS baseline expectations (Song 1)
+# Slim field expectations (subset — not all fields, just key identifiers)
 # --------------------------------------------------------------------------
-SLTS_EXPECTED = {
-    "id": 1,
-    "type_id": 1,
-    "media_name": "Smells Like Teen Spirit",
-    "source_path": "/path/1",
-    "duration_ms": 200000,
-    "audio_hash": "hash_1",
-    "processing_status": None,
-    "is_active": True,
-    "notes": None,
-    "bpm": None,
-    "year": 1991,
-    "isrc": None,
-}
-
-# --------------------------------------------------------------------------
-# Everlong baseline expectations (Song 2)
-# --------------------------------------------------------------------------
-EVERLONG_EXPECTED = {
-    "id": 2,
-    "type_id": 1,
-    "media_name": "Everlong",
-    "source_path": "/path/2",
-    "duration_ms": 240000,
-    "audio_hash": None,
-    "processing_status": None,
-    "is_active": True,
-    "notes": None,
-    "bpm": None,
-    "year": 1997,
-    "isrc": None,
-}
-
-# --------------------------------------------------------------------------
-# Grohlton Theme baseline expectations (Song 4)
-# --------------------------------------------------------------------------
-GROHLTON_THEME_EXPECTED = {
-    "id": 4,
-    "type_id": 1,
-    "media_name": "Grohlton Theme",
-    "source_path": "/path/4",
-    "duration_ms": 120000,
-    "audio_hash": None,
-    "processing_status": None,
-    "is_active": True,
-    "notes": None,
-    "bpm": None,
-    "year": None,
-    "isrc": None,
-}
-
-# --------------------------------------------------------------------------
-# Dual Credit Track baseline expectations (Song 6)
-# --------------------------------------------------------------------------
-DUAL_CREDIT_EXPECTED = {
-    "id": 6,
-    "type_id": 1,
-    "media_name": "Dual Credit Track",
-    "source_path": "/path/6",
-    "duration_ms": 300000,
-    "audio_hash": None,
-    "processing_status": None,
-    "is_active": True,
-    "notes": None,
-    "bpm": None,
-    "year": None,
-    "isrc": None,
-}
+SLTS_ROW = {"SourceID": 1, "MediaName": "Smells Like Teen Spirit", "SourceDuration": 200}
+EVERLONG_ROW = {"SourceID": 2, "MediaName": "Everlong", "SourceDuration": 240}
+GROHLTON_THEME_ROW = {"SourceID": 4, "MediaName": "Grohlton Theme"}
+DUAL_CREDIT_ROW = {"SourceID": 6, "MediaName": "Dual Credit Track"}
 
 
-class TestSearchSongsDeepSearch:
-    """Contract tests for CatalogService.search_songs_deep() deep resolution."""
+def _assert_slim_row(row: dict, expected: dict, context: str = ""):
+    for key, val in expected.items():
+        assert row[key] == val, f"[{context}] '{key}': expected {val!r}, got {row[key]!r}"
+
+
+class TestSearchSongsDeepSlimSearch:
+    """Contract tests for CatalogService.search_songs_deep_slim()."""
 
     def test_search_by_title_returns_correct_song(self, catalog_service):
-        """Surface match on title must return the song with all fields intact."""
-        results = catalog_service.search_songs_deep("Spirit")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-
-        song = results[0]
-        _assert_song_fields(song, SLTS_EXPECTED, context="search_by_title")
+        """Surface title match returns the correct slim row."""
+        rows = catalog_service.search_songs_deep_slim("Spirit")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        _assert_slim_row(rows[0], SLTS_ROW, context="search_by_title")
 
     def test_search_by_album_returns_correct_song(self, catalog_service):
-        """Surface match on album title 'Nevermind' must return the song on that album."""
-        results = catalog_service.search_songs_deep("Nevermind")
-        assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-
-        song = results[0]
-        _assert_song_fields(song, SLTS_EXPECTED, context="search_by_album")
+        """Album title match 'Nevermind' returns the song on that album."""
+        rows = catalog_service.search_songs_deep_slim("Nevermind")
+        assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
+        _assert_slim_row(rows[0], SLTS_ROW, context="search_by_album")
 
     def test_search_by_alias_finds_own_songs_and_group_songs(self, catalog_service):
-        """Searching for alias 'Grohlton' must find Grohlton's own songs plus
-        songs from groups the parent identity belongs to (Nirvana, Foo Fighters)."""
-        results = catalog_service.search_songs_deep("Grohlton")
-        titles = {s.title for s in results}
+        """Alias 'Grohlton' finds Grohlton's songs + all parent identity group songs."""
+        rows = catalog_service.search_songs_deep_slim("Grohlton")
+        media_names = {r["MediaName"] for r in rows}
 
-        assert (
-            "Grohlton Theme" in titles
-        ), f"Expected 'Grohlton Theme' in results, got {titles}"
-        assert (
-            "Smells Like Teen Spirit" in titles
-        ), f"Expected 'Smells Like Teen Spirit' in results, got {titles}"
-        assert "Everlong" in titles, f"Expected 'Everlong' in results, got {titles}"
+        assert "Grohlton Theme" in media_names, \
+            f"Expected 'Grohlton Theme', got {media_names}"
+        assert "Smells Like Teen Spirit" in media_names, \
+            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        assert "Everlong" in media_names, \
+            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
 
-        _assert_song_fields(
-            _get_song_by_title(results, "Grohlton Theme", "alias_search"),
-            GROHLTON_THEME_EXPECTED,
-            context="alias_search",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Grohlton Theme", "alias_search"),
+            GROHLTON_THEME_ROW, context="alias_search",
         )
-        _assert_song_fields(
-            _get_song_by_title(results, "Smells Like Teen Spirit", "alias_search"),
-            SLTS_EXPECTED,
-            context="alias_search",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Smells Like Teen Spirit", "alias_search"),
+            SLTS_ROW, context="alias_search",
         )
-        _assert_song_fields(
-            _get_song_by_title(results, "Everlong", "alias_search"),
-            EVERLONG_EXPECTED,
-            context="alias_search",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Everlong", "alias_search"),
+            EVERLONG_ROW, context="alias_search",
         )
 
     def test_search_by_primary_name_resolves_groups(self, catalog_service):
-        """Searching for 'Dave Grohl' must find songs from all his groups
-        (Nirvana, Foo Fighters) plus direct-credit songs."""
-        results = catalog_service.search_songs_deep("Dave Grohl")
-        titles = {s.title for s in results}
+        """'Dave Grohl' finds direct credits + group songs (Nirvana, Foo Fighters)."""
+        rows = catalog_service.search_songs_deep_slim("Dave Grohl")
+        media_names = {r["MediaName"] for r in rows}
 
-        expected_titles = {
+        expected = {
             "Smells Like Teen Spirit",
             "Everlong",
             "Dual Credit Track",
             "Joint Venture",
         }
-        for t in expected_titles:
-            assert (
-                t in titles
-            ), f"Expected '{t}' in results for 'Dave Grohl' search, got {titles}"
+        for title in expected:
+            assert title in media_names, \
+                f"Expected '{title}' in deep_slim results for 'Dave Grohl', got {media_names}"
 
-        _assert_song_fields(
-            _get_song_by_title(results, "Smells Like Teen Spirit", "primary_name"),
-            SLTS_EXPECTED,
-            context="primary_name",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Smells Like Teen Spirit", "primary_name"),
+            SLTS_ROW, context="primary_name",
         )
-        _assert_song_fields(
-            _get_song_by_title(results, "Everlong", "primary_name"),
-            EVERLONG_EXPECTED,
-            context="primary_name",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Everlong", "primary_name"),
+            EVERLONG_ROW, context="primary_name",
         )
-        _assert_song_fields(
-            _get_song_by_title(results, "Dual Credit Track", "primary_name"),
-            DUAL_CREDIT_EXPECTED,
-            context="primary_name",
+        _assert_slim_row(
+            _get_row_by_media_name(rows, "Dual Credit Track", "primary_name"),
+            DUAL_CREDIT_ROW, context="primary_name",
         )
 
     def test_search_no_results_returns_empty_list(self, catalog_service):
-        """A query matching nothing must return an empty list, not None or a partial."""
-        results = catalog_service.search_songs_deep("NonexistentArtist")
-        assert isinstance(results, list), f"Expected list, got {type(results).__name__}"
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for unknown query, got {len(results)}"
-
-    def test_search_returns_hydrated_credits(self, catalog_service):
-        """Returned songs must have hydrated credits with correct display names."""
-        results = catalog_service.search_songs_deep("Spirit")
-        song = results[0]
-
-        assert (
-            len(song.credits) == 1
-        ), f"Expected 1 credit for SLTS, got {len(song.credits)}"
-        credit = song.credits[0]
-        assert (
-            credit.display_name == "Nirvana"
-        ), f"Expected credit display_name 'Nirvana', got {credit.display_name!r}"
-        assert (
-            credit.role_name == "Performer"
-        ), f"Expected credit role_name 'Performer', got {credit.role_name!r}"
-
-    def test_search_returns_hydrated_albums(self, catalog_service):
-        """Returned songs must have hydrated album associations."""
-        results = catalog_service.search_songs_deep("Spirit")
-        song = results[0]
-
-        assert (
-            len(song.albums) == 1
-        ), f"Expected 1 album for SLTS, got {len(song.albums)}"
-        album = song.albums[0]
-        assert (
-            album.album_title == "Nevermind"
-        ), f"Expected album_title 'Nevermind', got {album.album_title!r}"
-        assert (
-            album.track_number == 1
-        ), f"Expected track_number 1, got {album.track_number}"
-
-    def test_search_returns_hydrated_tags(self, catalog_service):
-        """Returned songs must have hydrated tags."""
-        results = catalog_service.search_songs_deep("Spirit")
-        song = results[0]
-
-        tag_names = {t.name for t in song.tags}
-        assert "Grunge" in tag_names, f"Expected tag 'Grunge' for SLTS, got {tag_names}"
-        assert (
-            "Energetic" in tag_names
-        ), f"Expected tag 'Energetic' for SLTS, got {tag_names}"
-        assert (
-            "English" in tag_names
-        ), f"Expected tag 'English' for SLTS, got {tag_names}"
-        assert len(song.tags) == 3, f"Expected 3 tags for SLTS, got {len(song.tags)}"
-
-    def test_search_returns_hydrated_publishers(self, catalog_service):
-        """Returned songs must have hydrated recording publishers."""
-        results = catalog_service.search_songs_deep("Spirit")
-        song = results[0]
-
-        pub_names = {p.name for p in song.publishers}
-        assert (
-            "DGC Records" in pub_names
-        ), f"Expected publisher 'DGC Records' for SLTS, got {pub_names}"
+        """A query matching nothing returns an empty list."""
+        rows = catalog_service.search_songs_deep_slim("NonexistentArtist")
+        assert isinstance(rows, list), f"Expected list, got {type(rows).__name__}"
+        assert len(rows) == 0, f"Expected 0 results, got {len(rows)}"
 
     def test_search_by_alias_expands_to_all_group_songs(self, catalog_service):
-        """Searching for alias 'Grohlton' must expand to songs from all parent
-        identity's groups, not just a subset."""
-        results = catalog_service.search_songs_deep("Grohlton")
-        titles = {s.title for s in results}
+        """'Grohlton' expands to all parent groups, not a subset."""
+        rows = catalog_service.search_songs_deep_slim("Grohlton")
+        media_names = {r["MediaName"] for r in rows}
 
-        assert "Everlong" in titles, (
-            "Expected 'Everlong' (Foo Fighters group) via Grohlton alias expansion, "
-            f"got {titles}"
-        )
-        assert "Smells Like Teen Spirit" in titles, (
-            "Expected 'Smells Like Teen Spirit' (Nirvana group) via Grohlton alias expansion, "
-            f"got {titles}"
-        )
+        assert "Everlong" in media_names, \
+            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        assert "Smells Like Teen Spirit" in media_names, \
+            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
 
     def test_search_excludes_duplicates(self, catalog_service):
-        """Search must not return duplicate songs even when matched by
-        both surface and deep paths."""
-        results = catalog_service.search_songs_deep("Grohlton")
-        song_ids = [s.id for s in results]
-        assert len(song_ids) == len(
-            set(song_ids)
-        ), f"Duplicate song IDs in results: {song_ids}"
+        """No duplicate SourceIDs even when matched via multiple expansion paths."""
+        rows = catalog_service.search_songs_deep_slim("Grohlton")
+        source_ids = [r["SourceID"] for r in rows]
+        assert len(source_ids) == len(set(source_ids)), \
+            f"Duplicate SourceIDs in results: {source_ids}"
+
+    def test_result_rows_have_required_slim_fields(self, catalog_service):
+        """Every result row must contain the required slim dict keys."""
+        rows = catalog_service.search_songs_deep_slim("Spirit")
+        assert len(rows) >= 1, "Expected at least 1 result"
+        row = rows[0]
+        for key in ("SourceID", "MediaName", "SourcePath", "SourceDuration", "IsActive",
+                    "DisplayArtist", "PrimaryGenre"):
+            assert key in row, f"Result row missing required field '{key}'"

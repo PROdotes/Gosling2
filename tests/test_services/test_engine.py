@@ -280,23 +280,15 @@ class TestSearchSongs:
         resp = client.get("/api/v1/songs/search")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
-    def test_results_are_hydrated(self, client):
-        """Search results include credits, albums, tags."""
+    def test_results_include_aggregated_slim_fields(self, client):
+        """Search results include display_artist and primary_genre aggregated from DB."""
         resp = client.get("/api/v1/songs/search", params={"q": "Everlong"})
         data = resp.json()
         everlong = next(s for s in data if s["title"] == "Everlong")
-        assert (
-            len(everlong["credits"]) == 1
-        ), f"Expected 1 credit, got {len(everlong['credits'])}"
-        assert (
-            everlong["credits"][0]["display_name"] == "Foo Fighters"
-        ), f"Expected credit='Foo Fighters', got {everlong['credits'][0]['display_name']!r}"
-        assert (
-            len(everlong["albums"]) == 1
-        ), f"Expected 1 album, got {len(everlong['albums'])}"
-        assert (
-            everlong["albums"][0]["album_title"] == "The Colour and the Shape"
-        ), f"Expected album='The Colour and the Shape', got {everlong['albums'][0]['album_title']!r}"
+        assert everlong["display_artist"] == "Foo Fighters", \
+            f"Expected display_artist='Foo Fighters', got {everlong['display_artist']!r}"
+        assert everlong["duration_s"] == 240.0, \
+            f"Expected duration_s=240.0, got {everlong['duration_s']}"
 
     def test_no_duplicate_songs(self, client):
         """Search for 'Nirvana' should not return SLTS twice."""
@@ -690,48 +682,31 @@ class TestGetAllAlbums:
         assert len(data) == 2, f"Expected 2 albums, got {len(data)}"
 
     def test_nevermind(self, client):
-        """Nevermind (ID 100) with correct fields."""
+        """Nevermind (ID 100) slim fields: id, release_year, display_artist, song_count."""
         data = client.get("/api/v1/albums").json()
         nvm = next(a for a in data if a["title"] == "Nevermind")
         assert nvm["id"] == 100, f"Expected id=100, got {nvm['id']}"
-        assert (
-            nvm["release_year"] == 1991
-        ), f"Expected release_year=1991, got {nvm['release_year']}"
-        pub_names = sorted([p["name"] for p in nvm["publishers"]])
-        assert pub_names == [
-            "DGC Records",
-            "Sub Pop",
-        ], f"Expected publishers ['DGC Records', 'Sub Pop'], got {pub_names}"
-        assert len(nvm["credits"]) == 1, f"Expected 1 credit, got {len(nvm['credits'])}"
-        assert (
-            nvm["credits"][0]["display_name"] == "Nirvana"
-        ), f"Expected credit='Nirvana', got {nvm['credits'][0]['display_name']!r}"
+        assert nvm["release_year"] == 1991, \
+            f"Expected release_year=1991, got {nvm['release_year']}"
         assert nvm["song_count"] == 1, f"Expected song_count=1, got {nvm['song_count']}"
-        assert (
-            nvm["songs"][0]["title"] == "Smells Like Teen Spirit"
-        ), f"Expected song title='Smells Like Teen Spirit', got {nvm['songs'][0]['title']!r}"
+        assert nvm["display_artist"] == "Nirvana", \
+            f"Expected display_artist='Nirvana', got {nvm['display_artist']!r}"
+        # No hydrated publishers/credits/songs in slim view
+        assert "publishers" not in nvm, "Slim album should not have 'publishers'"
+        assert "credits" not in nvm, "Slim album should not have 'credits'"
+        assert "songs" not in nvm, "Slim album should not have 'songs'"
 
     def test_tcats(self, client):
-        """TCATS (ID 200) with Foo Fighters and Everlong."""
+        """TCATS (ID 200) slim fields: id, release_year, display_artist, song_count."""
         data = client.get("/api/v1/albums").json()
         tcats = next(a for a in data if a["title"] == "The Colour and the Shape")
         assert tcats["id"] == 200, f"Expected id=200, got {tcats['id']}"
-        assert (
-            tcats["release_year"] == 1997
-        ), f"Expected release_year=1997, got {tcats['release_year']}"
-        pub_names = [p["name"] for p in tcats["publishers"]]
-        assert pub_names == [
-            "Roswell Records"
-        ], f"Expected publishers ['Roswell Records'], got {pub_names}"
-        assert (
-            tcats["display_artist"] == "Foo Fighters"
-        ), f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
-        assert (
-            tcats["song_count"] == 1
-        ), f"Expected song_count=1, got {tcats['song_count']}"
-        assert (
-            tcats["songs"][0]["title"] == "Everlong"
-        ), f"Expected song title='Everlong', got {tcats['songs'][0]['title']!r}"
+        assert tcats["release_year"] == 1997, \
+            f"Expected release_year=1997, got {tcats['release_year']}"
+        assert tcats["display_artist"] == "Foo Fighters", \
+            f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
+        assert tcats["song_count"] == 1, \
+            f"Expected song_count=1, got {tcats['song_count']}"
 
     def test_empty_db(self, empty_client):
         """Empty DB returns empty list."""
