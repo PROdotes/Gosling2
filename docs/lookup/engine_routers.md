@@ -190,4 +190,172 @@ Fetches a single Song domain model by its unique ID.
 **HTTP**: `GET /api/v1/audit/history/{table}/{record_id}`
 - Fetches the complete unified audit timeline for a record.
 - Matches `ActionLog`, `ChangeLog`, and `DeletedRecords` snapshots.
-- Wraps `AuditService.get_history`.
+
+---
+
+#
+---
+
+## Song Updates Router
+*Location: `src/engine/routers/song_updates.py`*
+**Responsibility**: HTTP interface for partial metadata updates and relationship management.
+
+### SongScalarUpdate
+**Pydantic Model**: Request body for song metadata updates.
+- `media_name`: Optional[str]
+- `year`: Optional[int]
+- `bpm`: Optional[int]
+- `isrc`: Optional[str]
+- `notes`: Optional[str]
+
+### AddCreditBody
+**Pydantic Model**: Request body for adding credits.
+- `display_name`: str
+- `role_name`: str
+
+### UpdateCreditNameBody
+**Pydantic Model**: Request body for updating artist names globally.
+- `display_name`: str
+
+### AddAlbumBody
+**Pydantic Model**: Request body for linking albums / creating new ones.
+- `album_id`: Optional[int]
+- `title`: Optional[str]
+- `album_type`: Optional[str]
+- `release_year`: Optional[int]
+- `track_number`: Optional[int]
+- `disc_number`: Optional[int]
+
+### UpdateAlbumLinkBody
+**Pydantic Model**: Request body for updating track/disc info.
+- `track_number`: Optional[int]
+- `disc_number`: Optional[int]
+
+### UpdateAlbumBody
+**Pydantic Model**: Request body for global album updates.
+- `title`: Optional[str]
+- `album_type`: Optional[str]
+- `release_year`: Optional[int]
+
+### AddAlbumCreditBody
+**Pydantic Model**: Request body for adding album credits.
+- `artist_name`: str
+
+### SetAlbumPublisherBody
+**Pydantic Model**: Request body for setting album publisher.
+- `publisher_name`: str
+
+### AddTagBody
+**Pydantic Model**: Request body for adding tags.
+- `tag_name`: str
+- `category`: str
+
+### UpdateTagBody
+**Pydantic Model**: Request body for updating tags globally.
+- `tag_name`: str
+- `category`: str
+
+### AddPublisherBody
+**Pydantic Model**: Request body for adding song publishers.
+- `publisher_name`: str
+
+### UpdatePublisherBody
+**Pydantic Model**: Request body for updating publishers globally.
+- `publisher_name`: str
+
+### async def update_song_scalars(song_id: int, body: SongScalarUpdate, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/songs/{song_id}`
+- Partially updates core metadata (media_name, year, bpm, isrc, notes).
+- Raises `HTTPException(404)` if the song does not exist.
+- Wraps `CatalogService.update_song_scalars`.
+
+### async def add_song_credit(song_id: int, body: AddCreditBody, service: CatalogService = Depends(_get_service)) -> SongCredit
+**HTTP**: `POST /api/v1/songs/{song_id}/credits`
+- Adds a credited artist with a specific role.
+- Get-or-creates `ArtistNames` and `Roles` globally.
+- Wraps `CatalogService.add_song_credit`.
+
+### async def remove_song_credit(song_id: int, credit_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/songs/{song_id}/credits/{credit_id}`
+- Removes the specific `SongCredits` link.
+- Wraps `CatalogService.remove_song_credit`.
+
+### async def update_credit_name(song_id: int, name_id: int, body: UpdateCreditNameBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/songs/{song_id}/credits/{name_id}`
+- Updates an `ArtistNames` record display name globally across all songs.
+- Wraps `CatalogService.update_credit_name`.
+
+### async def add_song_album(song_id: int, body: AddAlbumBody, service: CatalogService = Depends(_get_service)) -> SongAlbum
+**HTTP**: `POST /api/v1/songs/{song_id}/albums`
+- Links a song to an existing album or creates a new album record and links it.
+- Resolves `album_id` vs `title` logic.
+- Wraps `CatalogService.add_song_album` and `CatalogService.create_and_link_album`.
+
+### async def remove_song_album(song_id: int, album_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/songs/{song_id}/albums/{album_id}`
+- Unlinks a song from an album.
+- Wraps `CatalogService.remove_song_album`.
+
+### async def update_song_album_link(song_id: int, album_id: int, body: UpdateAlbumLinkBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/songs/{song_id}/albums/{album_id}`
+- Updates the track/disc metadata for a specific song-album link.
+- Wraps `CatalogService.update_song_album_link`.
+
+### async def update_album(album_id: int, body: UpdateAlbumBody, service: CatalogService = Depends(_get_service)) -> Album
+**HTTP**: `PATCH /api/v1/albums/{album_id}`
+- Updates an `Albums` record metadata globally.
+- Wraps `CatalogService.update_album`.
+
+### async def add_album_credit(album_id: int, body: AddAlbumCreditBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `POST /api/v1/albums/{album_id}/credits`
+- Adds a credited artist to an album.
+- Wraps `CatalogService.add_album_credit`.
+
+### async def remove_album_credit(album_id: int, name_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/albums/{album_id}/credits/{name_id}`
+- Removes a credited artist from an album.
+- Wraps `CatalogService.remove_album_credit`.
+
+### async def set_album_publisher(album_id: int, body: SetAlbumPublisherBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/albums/{album_id}/publisher`
+- Sets the single primary publisher for an album record.
+- Wraps `CatalogService.update_album_publisher`.
+
+### async def add_song_tag(song_id: int, body: AddTagBody, service: CatalogService = Depends(_get_service)) -> Tag
+**HTTP**: `POST /api/v1/songs/{song_id}/tags`
+- Adds a tag to a song. Get-or-creates the tag record.
+- Wraps `CatalogService.add_song_tag`.
+
+### async def remove_song_tag(song_id: int, tag_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/songs/{song_id}/tags/{tag_id}`
+- Removes a tag-song link.
+- Wraps `CatalogService.remove_song_tag`.
+
+### async def update_tag(tag_id: int, body: UpdateTagBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/tags/{tag_id}`
+- Updates a tag name and category globally.
+- Wraps `CatalogService.update_tag`.
+
+### async def add_song_publisher(song_id: int, body: AddPublisherBody, service: CatalogService = Depends(_get_service)) -> Publisher
+**HTTP**: `POST /api/v1/songs/{song_id}/publishers`
+- Links a publisher to a song. Get-or-creates the publisher record.
+- Wraps `CatalogService.add_song_publisher`.
+
+### async def remove_song_publisher(song_id: int, publisher_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/songs/{song_id}/publishers/{publisher_id}`
+- Removes a publisher-song link.
+- Wraps `CatalogService.remove_song_publisher`.
+
+### async def update_publisher(publisher_id: int, body: UpdatePublisherBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/publishers/{publisher_id}`
+- Updates a publisher name globally across all songs.
+- Wraps `CatalogService.update_publisher`.
+
+### def _get_service() -> CatalogService
+**Internal**: Service factory for the router.
+
+### def _require_song(song_id: int, service: CatalogService)
+**Internal**: Raises 404 if the song does not exist.
+
+### def _require_album(album_id: int, service: CatalogService)
+**Internal**: Raises 404 if the album does not exist.

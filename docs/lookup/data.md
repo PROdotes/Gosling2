@@ -191,11 +191,6 @@ Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id
 ### update_album(album_id: int, fields: dict, conn: sqlite3.Connection) -> None
 Update editable Album fields (title, album_type, release_year). Partial updates. Does NOT commit.
 
-### add_album_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None
-Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
-
-### remove_album_credit(album_id: int, name_id: int, conn: sqlite3.Connection) -> None
-Remove a credit link from an album. Keeps ArtistName record. Does NOT commit.
 
 ### set_album_publisher(album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
 Set the publisher for an album (replaces existing). Does NOT commit.
@@ -314,6 +309,12 @@ Update a Tag's name and category globally. Affects all songs linked to this tag.
 Batch-fetches credits for multiple albums in a single query.
 - Returns a flat list of `AlbumCredit` entities.
 - Joins with `ArtistNames` and `Roles` tables to resolve human-readable names.
+
+### add_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None
+Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+
+### remove_credit(album_id: int, name_id: int, conn: sqlite3.Connection) -> None
+Remove a credit from an album. Deletes link only. Does NOT commit.
 
 ### _row_to_album_credit(row: sqlite3.Row) -> AlbumCredit
 **Internal**: Maps a physical database row to the `AlbumCredit` domain model.

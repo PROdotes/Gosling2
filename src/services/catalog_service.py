@@ -1296,9 +1296,9 @@ class CatalogService:
     def add_album_credit(self, album_id: int, artist_name: str) -> None:
         """Add a credited artist to an album. Get-or-create artist name."""
         logger.debug(f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{artist_name}')")
-        conn = self._album_repo_dir.get_connection()
+        conn = self._album_credit_repo.get_connection()
         try:
-            self._album_repo_dir.add_album_credit(album_id, artist_name, "Performer", conn)
+            self._album_credit_repo.add_credit(album_id, artist_name, "Performer", conn)
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1311,9 +1311,9 @@ class CatalogService:
     def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
         """Remove a credited artist from an album."""
         logger.debug(f"[CatalogService] -> remove_album_credit(album_id={album_id}, name_id={artist_name_id})")
-        conn = self._album_repo_dir.get_connection()
+        conn = self._album_credit_repo.get_connection()
         try:
-            self._album_repo_dir.remove_album_credit(album_id, artist_name_id, conn)
+            self._album_credit_repo.remove_credit(album_id, artist_name_id, conn)
             conn.commit()
         except Exception as e:
             conn.rollback()

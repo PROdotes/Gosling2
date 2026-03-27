@@ -144,30 +144,6 @@ class AlbumRepository(BaseRepository):
         )
         logger.debug(f"[AlbumRepository] <- update_album() done")
 
-    def add_album_credit(self, album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None:
-        """
-        Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
-        """
-        logger.debug(f"[AlbumRepository] -> add_album_credit(album_id={album_id}, name='{display_name}', role='{role_name}')")
-        credit_repo = SongCreditRepository(self.db_path)
-        cursor = conn.cursor()
-        role_id = credit_repo.get_or_create_role(role_name, cursor)
-        name_id = credit_repo.get_or_create_credit_name(display_name, cursor)
-        cursor.execute(
-            "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
-            (album_id, name_id, role_id),
-        )
-        logger.debug(f"[AlbumRepository] <- add_album_credit() done")
-
-    def remove_album_credit(self, album_id: int, name_id: int, conn: sqlite3.Connection) -> None:
-        """
-        Remove a credit link from an album. Keeps ArtistName record. Does NOT commit.
-        """
-        logger.debug(f"[AlbumRepository] -> remove_album_credit(album_id={album_id}, name_id={name_id})")
-        conn.cursor().execute(
-            "DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?", (album_id, name_id)
-        )
-        logger.debug(f"[AlbumRepository] <- remove_album_credit() done")
 
     def set_album_publisher(self, album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None:
         """
