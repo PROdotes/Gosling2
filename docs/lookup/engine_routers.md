@@ -201,57 +201,108 @@ Fetches a single Song domain model by its unique ID.
 **Responsibility**: HTTP interface for partial metadata updates and relationship management.
 
 ### SongScalarUpdate
-**Pydantic Model**: Request body for song metadata updates.
-- `media_name`: Optional[str]
-- `year`: Optional[int]
-- `bpm`: Optional[int]
-- `isrc`: Optional[str]
-- `notes`: Optional[str]
+**Pydantic Model**: Fields for partial song metadata record updates.
 
 ### AddCreditBody
-**Pydantic Model**: Request body for adding credits.
-- `display_name`: str
-- `role_name`: str
+**Pydantic Model**: Payload for adding song credits.
 
 ### UpdateCreditNameBody
-**Pydantic Model**: Request body for updating artist names globally.
-- `display_name`: str
+**Pydantic Model**: Payload for renaming actor identities globally.
 
 ### AddAlbumBody
-**Pydantic Model**: Request body for linking albums / creating new ones.
-- `album_id`: Optional[int]
-- `title`: Optional[str]
-- `album_type`: Optional[str]
-- `release_year`: Optional[int]
-- `track_number`: Optional[int]
-- `disc_number`: Optional[int]
+**Pydantic Model**: Payload for linking songs to existing or new albums.
 
 ### UpdateAlbumLinkBody
-**Pydantic Model**: Request body for updating track/disc info.
-- `track_number`: Optional[int]
-- `disc_number`: Optional[int]
+**Pydantic Model**: Payload for updating track/disc numbering in junction tables.
 
 ### UpdateAlbumBody
-**Pydantic Model**: Request body for global album updates.
-- `title`: Optional[str]
-- `album_type`: Optional[str]
-- `release_year`: Optional[int]
+**Pydantic Model**: Fields for global album metadata updates.
 
 ### AddAlbumCreditBody
-**Pydantic Model**: Request body for adding album credits.
-- `artist_name`: str
+**Pydantic Model**: Payload for adding album performer credits.
 
 ### SetAlbumPublisherBody
-**Pydantic Model**: Request body for setting album publisher.
-- `publisher_name`: str
+**Pydantic Model**: Payload for setting/replacing album-level publishers.
 
 ### AddTagBody
-**Pydantic Model**: Request body for adding tags.
-- `tag_name`: str
-- `category`: str
+**Pydantic Model**: Payload for adding metadata tags to songs.
 
 ### UpdateTagBody
-**Pydantic Model**: Request body for updating tags globally.
+**Pydantic Model**: Payload for global tag renames.
+
+### AddPublisherBody
+**Pydantic Model**: Payload for adding publishers to recordings.
+
+### UpdatePublisherBody
+**Pydantic Model**: Payload for global publisher renames.
+
+### async def update_song_scalars(song_id: int, body: SongScalarUpdate) -> Song
+**HTTP**: `PATCH /api/v1/songs/{song_id}`
+- Updates basic song fields (title, year, bpm, isrc, active, notes).
+
+### async def add_song_credit(song_id: int, body: AddCreditBody) -> SongCredit
+**HTTP**: `POST /api/v1/songs/{song_id}/credits`
+- Adds a credited artist/role to a song. Get-or-creates actor.
+
+### async def remove_song_credit(song_id: int, credit_id: int) -> None
+**HTTP**: `DELETE /api/v1/songs/{song_id}/credits/{credit_id}`
+- Unlinks a credit from a song.
+
+### async def update_credit_name(song_id: int, name_id: int, body: UpdateCreditNameBody) -> None
+**HTTP**: `PATCH /api/v1/songs/{song_id}/credits/{name_id}`
+- Globally renames an ArtistName record (affects all linked songs/albums).
+
+### async def add_song_album(song_id: int, body: AddAlbumBody) -> SongAlbum
+**HTTP**: `POST /api/v1/songs/{song_id}/albums`
+- Links an existing album or creates and links a new one.
+
+### async def remove_song_album(song_id: int, album_id: int) -> None
+**HTTP**: `DELETE /api/v1/songs/{song_id}/albums/{album_id}`
+- Unlinks a song from an album.
+
+### async def update_song_album_link(song_id: int, album_id: int, body: UpdateAlbumLinkBody) -> None
+**HTTP**: `PATCH /api/v1/songs/{song_id}/albums/{album_id}`
+- Updates track/disc number on a specific link. Atomic partial update.
+
+### async def update_album(album_id: int, body: UpdateAlbumBody) -> Album
+**HTTP**: `PATCH /api/v1/albums/{album_id}`
+- Globally updates album metadata (title, type, year).
+
+### async def add_album_credit(album_id: int, body: AddAlbumCreditBody) -> None
+**HTTP**: `POST /api/v1/albums/{album_id}/credits`
+- Adds a credited performer to an album.
+
+### async def remove_album_credit(album_id: int, name_id: int) -> None
+**HTTP**: `DELETE /api/v1/albums/{album_id}/credits/{name_id}`
+- Unlinks a performer from an album.
+
+### async def set_album_publisher(album_id: int, body: SetAlbumPublisherBody) -> None
+**HTTP**: `PATCH /api/v1/albums/{album_id}/publisher`
+- Sets or replaces the publisher for an album.
+
+### async def add_song_tag(song_id: int, body: AddTagBody) -> Tag
+**HTTP**: `POST /api/v1/songs/{song_id}/tags`
+- Adds a metadata tag to a song.
+
+### async def remove_song_tag(song_id: int, tag_id: int) -> None
+**HTTP**: `DELETE /api/v1/songs/{song_id}/tags/{tag_id}`
+- Unlinks a tag from a song.
+
+### async def update_tag(tag_id: int, body: UpdateTagBody) -> None
+**HTTP**: `PATCH /api/v1/tags/{tag_id}`
+- Globally renames a tag or changes its category.
+
+### async def add_song_publisher(song_id: int, body: AddPublisherBody) -> Publisher
+**HTTP**: `POST /api/v1/songs/{song_id}/publishers`
+- Links a publisher to a master recording.
+
+### async def remove_song_publisher(song_id: int, publisher_id: int) -> None
+**HTTP**: `DELETE /api/v1/songs/{song_id}/publishers/{publisher_id}`
+- Unlinks a publisher from a song.
+
+### async def update_publisher(publisher_id: int, body: UpdatePublisherBody) -> None
+**HTTP**: `PATCH /api/v1/publishers/{publisher_id}`
+- Globally renames a publisher.
 - `tag_name`: str
 - `category`: str
 

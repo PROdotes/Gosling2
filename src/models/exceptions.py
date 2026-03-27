@@ -1,5 +1,3 @@
-
-
 class IngestionError(Exception):
     """Base class for all ingestion-related errors."""
 

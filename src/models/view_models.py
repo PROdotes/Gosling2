@@ -346,6 +346,73 @@ class IdentityView(BaseModel):
         return cls(**data)
 
 
+# --- Song Update Request Bodies ---
+
+
+class SongScalarUpdate(BaseModel):
+    media_name: Optional[str] = None
+    year: Optional[int] = None
+    bpm: Optional[int] = None
+    isrc: Optional[str] = None
+    is_active: Optional[bool] = None
+    notes: Optional[str] = None
+
+
+class AddCreditBody(BaseModel):
+    display_name: str
+    role_name: str
+
+
+class UpdateCreditNameBody(BaseModel):
+    display_name: str
+
+
+class AddAlbumBody(BaseModel):
+    album_id: Optional[int] = None
+    title: Optional[str] = None
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
+    track_number: Optional[int] = None
+    disc_number: Optional[int] = None
+
+
+class UpdateAlbumLinkBody(BaseModel):
+    track_number: Optional[int] = None
+    disc_number: Optional[int] = None
+
+
+class UpdateAlbumBody(BaseModel):
+    title: Optional[str] = None
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
+
+
+class AddAlbumCreditBody(BaseModel):
+    artist_name: str
+
+
+class SetAlbumPublisherBody(BaseModel):
+    publisher_name: str
+
+
+class AddTagBody(BaseModel):
+    tag_name: str
+    category: str
+
+
+class UpdateTagBody(BaseModel):
+    tag_name: str
+    category: str
+
+
+class AddPublisherBody(BaseModel):
+    publisher_name: str
+
+
+class UpdatePublisherBody(BaseModel):
+    publisher_name: str
+
+
 class IngestionCheckRequest(BaseModel):
     """Payload for the dry-run ingestion check."""
 

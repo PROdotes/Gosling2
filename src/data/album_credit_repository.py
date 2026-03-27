@@ -48,13 +48,18 @@ class AlbumCreditRepository(BaseRepository):
             is_primary=bool(row["IsPrimaryName"]),
         )
 
-    def add_credit(self, album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None:
+    def add_credit(
+        self, album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection
+    ) -> None:
         """
         Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
         """
-        logger.debug(f"[AlbumCreditRepository] -> add_credit(album_id={album_id}, name='{display_name}', role='{role_name}')")
+        logger.debug(
+            f"[AlbumCreditRepository] -> add_credit(album_id={album_id}, name='{display_name}', role='{role_name}')"
+        )
         # In GOSLING2, SongCreditRepository currently serves as the de-facto 'People' repo for discovery.
         from src.data.song_credit_repository import SongCreditRepository
+
         credit_repo = SongCreditRepository(self.db_path)
         cursor = conn.cursor()
         role_id = credit_repo.get_or_create_role(role_name, cursor)
@@ -63,15 +68,21 @@ class AlbumCreditRepository(BaseRepository):
             "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
             (album_id, name_id, role_id),
         )
-        logger.debug(f"[AlbumCreditRepository] <- add_credit() done name_id={name_id} role_id={role_id}")
+        logger.debug(
+            f"[AlbumCreditRepository] <- add_credit() done name_id={name_id} role_id={role_id}"
+        )
 
-    def remove_credit(self, album_id: int, name_id: int, conn: sqlite3.Connection) -> None:
+    def remove_credit(
+        self, album_id: int, name_id: int, conn: sqlite3.Connection
+    ) -> None:
         """
         Remove a credit from an album. Deletes link only. Does NOT commit.
         """
-        logger.debug(f"[AlbumCreditRepository] -> remove_credit(album_id={album_id}, name_id={name_id})")
+        logger.debug(
+            f"[AlbumCreditRepository] -> remove_credit(album_id={album_id}, name_id={name_id})"
+        )
         conn.cursor().execute(
             "DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?",
             (album_id, name_id),
         )
-        logger.debug(f"[AlbumCreditRepository] <- remove_credit() done")
+        logger.debug("[AlbumCreditRepository] <- remove_credit() done")

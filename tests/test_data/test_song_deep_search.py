@@ -14,7 +14,9 @@ Returns List[dict] (slim rows). No hydration.
 import pytest
 
 
-def _get_row_by_media_name(rows: list[dict], media_name: str, context: str = "") -> dict:
+def _get_row_by_media_name(
+    rows: list[dict], media_name: str, context: str = ""
+) -> dict:
     """Retrieve a single row by MediaName, failing with a clear message."""
     for r in rows:
         if r["MediaName"] == media_name:
@@ -26,7 +28,11 @@ def _get_row_by_media_name(rows: list[dict], media_name: str, context: str = "")
 # --------------------------------------------------------------------------
 # Slim field expectations (subset — not all fields, just key identifiers)
 # --------------------------------------------------------------------------
-SLTS_ROW = {"SourceID": 1, "MediaName": "Smells Like Teen Spirit", "SourceDuration": 200}
+SLTS_ROW = {
+    "SourceID": 1,
+    "MediaName": "Smells Like Teen Spirit",
+    "SourceDuration": 200,
+}
 EVERLONG_ROW = {"SourceID": 2, "MediaName": "Everlong", "SourceDuration": 240}
 GROHLTON_THEME_ROW = {"SourceID": 4, "MediaName": "Grohlton Theme"}
 DUAL_CREDIT_ROW = {"SourceID": 6, "MediaName": "Dual Credit Track"}
@@ -34,7 +40,9 @@ DUAL_CREDIT_ROW = {"SourceID": 6, "MediaName": "Dual Credit Track"}
 
 def _assert_slim_row(row: dict, expected: dict, context: str = ""):
     for key, val in expected.items():
-        assert row[key] == val, f"[{context}] '{key}': expected {val!r}, got {row[key]!r}"
+        assert (
+            row[key] == val
+        ), f"[{context}] '{key}': expected {val!r}, got {row[key]!r}"
 
 
 class TestSearchSongsDeepSlimSearch:
@@ -57,24 +65,30 @@ class TestSearchSongsDeepSlimSearch:
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         media_names = {r["MediaName"] for r in rows}
 
-        assert "Grohlton Theme" in media_names, \
-            f"Expected 'Grohlton Theme', got {media_names}"
-        assert "Smells Like Teen Spirit" in media_names, \
-            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
-        assert "Everlong" in media_names, \
-            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        assert (
+            "Grohlton Theme" in media_names
+        ), f"Expected 'Grohlton Theme', got {media_names}"
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        assert (
+            "Everlong" in media_names
+        ), f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
 
         _assert_slim_row(
             _get_row_by_media_name(rows, "Grohlton Theme", "alias_search"),
-            GROHLTON_THEME_ROW, context="alias_search",
+            GROHLTON_THEME_ROW,
+            context="alias_search",
         )
         _assert_slim_row(
             _get_row_by_media_name(rows, "Smells Like Teen Spirit", "alias_search"),
-            SLTS_ROW, context="alias_search",
+            SLTS_ROW,
+            context="alias_search",
         )
         _assert_slim_row(
             _get_row_by_media_name(rows, "Everlong", "alias_search"),
-            EVERLONG_ROW, context="alias_search",
+            EVERLONG_ROW,
+            context="alias_search",
         )
 
     def test_search_by_primary_name_resolves_groups(self, catalog_service):
@@ -89,20 +103,24 @@ class TestSearchSongsDeepSlimSearch:
             "Joint Venture",
         }
         for title in expected:
-            assert title in media_names, \
-                f"Expected '{title}' in deep_slim results for 'Dave Grohl', got {media_names}"
+            assert (
+                title in media_names
+            ), f"Expected '{title}' in deep_slim results for 'Dave Grohl', got {media_names}"
 
         _assert_slim_row(
             _get_row_by_media_name(rows, "Smells Like Teen Spirit", "primary_name"),
-            SLTS_ROW, context="primary_name",
+            SLTS_ROW,
+            context="primary_name",
         )
         _assert_slim_row(
             _get_row_by_media_name(rows, "Everlong", "primary_name"),
-            EVERLONG_ROW, context="primary_name",
+            EVERLONG_ROW,
+            context="primary_name",
         )
         _assert_slim_row(
             _get_row_by_media_name(rows, "Dual Credit Track", "primary_name"),
-            DUAL_CREDIT_ROW, context="primary_name",
+            DUAL_CREDIT_ROW,
+            context="primary_name",
         )
 
     def test_search_no_results_returns_empty_list(self, catalog_service):
@@ -116,23 +134,33 @@ class TestSearchSongsDeepSlimSearch:
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         media_names = {r["MediaName"] for r in rows}
 
-        assert "Everlong" in media_names, \
-            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
-        assert "Smells Like Teen Spirit" in media_names, \
-            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        assert (
+            "Everlong" in media_names
+        ), f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
 
     def test_search_excludes_duplicates(self, catalog_service):
         """No duplicate SourceIDs even when matched via multiple expansion paths."""
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         source_ids = [r["SourceID"] for r in rows]
-        assert len(source_ids) == len(set(source_ids)), \
-            f"Duplicate SourceIDs in results: {source_ids}"
+        assert len(source_ids) == len(
+            set(source_ids)
+        ), f"Duplicate SourceIDs in results: {source_ids}"
 
     def test_result_rows_have_required_slim_fields(self, catalog_service):
         """Every result row must contain the required slim dict keys."""
         rows = catalog_service.search_songs_deep_slim("Spirit")
         assert len(rows) >= 1, "Expected at least 1 result"
         row = rows[0]
-        for key in ("SourceID", "MediaName", "SourcePath", "SourceDuration", "IsActive",
-                    "DisplayArtist", "PrimaryGenre"):
+        for key in (
+            "SourceID",
+            "MediaName",
+            "SourcePath",
+            "SourceDuration",
+            "IsActive",
+            "DisplayArtist",
+            "PrimaryGenre",
+        ):
             assert key in row, f"Result row missing required field '{key}'"

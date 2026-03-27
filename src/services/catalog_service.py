@@ -140,8 +140,11 @@ class CatalogService:
         except Exception as e:
             # Re-signal 409 CONFLICT if the error is a collision that happened during write
             # (Ensures the UI sees the specific Ghost that blocked the commit)
-            if "UNIQUE constraint failed" in str(e) or "ReingestionConflictError" in str(e):
+            if "UNIQUE constraint failed" in str(
+                e
+            ) or "ReingestionConflictError" in str(e):
                 from src.engine.exceptions import ReingestionConflictError
+
                 if isinstance(e, ReingestionConflictError):
                     ghost_id = e.ghost_id
                     ghost_data = self._song_repo.get_by_id_including_deleted(ghost_id)
@@ -151,9 +154,9 @@ class CatalogService:
                         "ghost_id": ghost_id,
                         "staged_path": file_path,
                         "ghost_song": ghost_data,
-                        "new_song": parsed_song  # Show the metadata of the file we dropped
+                        "new_song": parsed_song,  # Show the metadata of the file we dropped
                     }
-            
+
             logger.error(
                 f"[CatalogService] <- check_ingestion(file_path='{file_path}') ERROR: {e}"
             )
@@ -474,18 +477,22 @@ class CatalogService:
             audio_hash = calculate_audio_hash(staged_path)
 
             # 2. Create updated song model with ghost_id and staged path
-            reactivated_song = parsed_song.model_copy(update={
-                "id": ghost_id,
-                "source_path": staged_path,
-                "audio_hash": audio_hash,
-                "is_active": True,
-            })
+            reactivated_song = parsed_song.model_copy(
+                update={
+                    "id": ghost_id,
+                    "source_path": staged_path,
+                    "audio_hash": audio_hash,
+                    "is_active": True,
+                }
+            )
 
             # 3. Update the ghost record
             self._song_repo.reactivate_ghost(ghost_id, reactivated_song, conn)
 
             conn.commit()
-            logger.info(f"[CatalogService] <- resolve_conflict() REACTIVATED ID={ghost_id}")
+            logger.info(
+                f"[CatalogService] <- resolve_conflict() REACTIVATED ID={ghost_id}"
+            )
 
             # 4. Return the reactivated song with full hydration
             hydrated_songs = self._hydrate_songs([reactivated_song])
@@ -498,7 +505,10 @@ class CatalogService:
         except Exception as e:
             conn.rollback()
             logger.error(f"[CatalogService] <- resolve_conflict() FAILED: {e}")
-            return {"status": "ERROR", "message": f"Conflict resolution failed: {str(e)}"}
+            return {
+                "status": "ERROR",
+                "message": f"Conflict resolution failed: {str(e)}",
+            }
         finally:
             conn.close()
 
@@ -721,7 +731,9 @@ class CatalogService:
         seeds = self._identity_repo.search_identities(query)
         if seeds:
             identity_ids = {s.id for s in seeds}
-            group_ids = self._identity_repo.get_group_ids_for_members(list(identity_ids))
+            group_ids = self._identity_repo.get_group_ids_for_members(
+                list(identity_ids)
+            )
             identity_ids.update(group_ids)
             identity_songs = self._song_repo.get_by_identity_ids(list(identity_ids))
             extra_ids = [s.id for s in identity_songs if s.id not in seen_ids]
@@ -740,11 +752,14 @@ class CatalogService:
                 extra_rows = self._song_repo.search_slim_by_ids(extra_ids)
                 base_rows.extend(extra_rows)
 
-        logger.debug(f"[CatalogService] <- search_songs_deep_slim count={len(base_rows)}")
+        logger.debug(
+            f"[CatalogService] <- search_songs_deep_slim count={len(base_rows)}"
+        )
         return base_rows
 
-
-    def _search_songs_composed(self, query: str, initial_songs: List[Song]) -> List[Song]:
+    def _search_songs_composed(
+        self, query: str, initial_songs: List[Song]
+    ) -> List[Song]:
         """Internal orchestrator that adds expanded discovery legs to an initial set."""
         seen_ids = {s.id for s in initial_songs}
         songs = list(initial_songs)
@@ -1111,6 +1126,7 @@ class CatalogService:
 
         # Validate
         import datetime
+
         max_year = datetime.date.today().year + 1
         if "media_name" in fields:
             if not fields["media_name"] or not str(fields["media_name"]).strip():
@@ -1128,7 +1144,9 @@ class CatalogService:
         if "isrc" in fields and fields["isrc"] is not None:
             isrc = str(fields["isrc"]).replace("-", "").upper().strip()
             if not re.match(r"^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$", isrc):
-                raise ValueError("isrc must be 12 characters: 2-letter country, 3-char registrant, 2-digit year, 5-digit designation")
+                raise ValueError(
+                    "isrc must be 12 characters: 2-letter country, 3-char registrant, 2-digit year, 5-digit designation"
+                )
             fields = {**fields, "isrc": isrc}
 
         conn = self._song_repo.get_connection()
@@ -1137,7 +1155,9 @@ class CatalogService:
             conn.commit()
         except Exception as e:
             conn.rollback()
-            logger.error(f"[CatalogService] <- update_song_scalars(id={song_id}) FAILED: {e}")
+            logger.error(
+                f"[CatalogService] <- update_song_scalars(id={song_id}) FAILED: {e}"
+            )
             raise
         finally:
             conn.close()
@@ -1150,12 +1170,18 @@ class CatalogService:
 
     # --- Credits ---
 
-    def add_song_credit(self, song_id: int, display_name: str, role_name: str) -> SongCredit:
+    def add_song_credit(
+        self, song_id: int, display_name: str, role_name: str
+    ) -> SongCredit:
         """Add artist credit to a song. Get-or-create artist name and role."""
-        logger.debug(f"[CatalogService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}')")
+        logger.debug(
+            f"[CatalogService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}')"
+        )
         conn = self._credit_repo.get_connection()
         try:
-            credit = self._credit_repo.add_credit(song_id, display_name, role_name, conn)
+            credit = self._credit_repo.add_credit(
+                song_id, display_name, role_name, conn
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1163,12 +1189,16 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- add_song_credit OK credit_id={credit.credit_id}")
+        logger.debug(
+            f"[CatalogService] <- add_song_credit OK credit_id={credit.credit_id}"
+        )
         return credit
 
     def remove_song_credit(self, song_id: int, credit_id: int) -> None:
         """Remove a credit link from a song. Keeps the artist name record."""
-        logger.debug(f"[CatalogService] -> remove_song_credit(song_id={song_id}, credit_id={credit_id})")
+        logger.debug(
+            f"[CatalogService] -> remove_song_credit(song_id={song_id}, credit_id={credit_id})"
+        )
         conn = self._credit_repo.get_connection()
         try:
             self._credit_repo.remove_credit(credit_id, conn)
@@ -1179,11 +1209,13 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- remove_song_credit OK")
+        logger.debug("[CatalogService] <- remove_song_credit OK")
 
     def update_credit_name(self, name_id: int, new_name: str) -> None:
         """Update an artist's display name globally (affects all linked songs)."""
-        logger.debug(f"[CatalogService] -> update_credit_name(name_id={name_id}, new_name='{new_name}')")
+        logger.debug(
+            f"[CatalogService] -> update_credit_name(name_id={name_id}, new_name='{new_name}')"
+        )
         if not new_name or not new_name.strip():
             raise ValueError("Artist name cannot be empty")
         conn = self._credit_repo.get_connection()
@@ -1196,16 +1228,26 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- update_credit_name OK")
+        logger.debug("[CatalogService] <- update_credit_name OK")
 
     # --- Albums ---
 
-    def add_song_album(self, song_id: int, album_id: int, track_number: Optional[int] = None, disc_number: Optional[int] = None) -> SongAlbum:
+    def add_song_album(
+        self,
+        song_id: int,
+        album_id: int,
+        track_number: Optional[int] = None,
+        disc_number: Optional[int] = None,
+    ) -> SongAlbum:
         """Link an existing album to a song."""
-        logger.debug(f"[CatalogService] -> add_song_album(song_id={song_id}, album_id={album_id})")
+        logger.debug(
+            f"[CatalogService] -> add_song_album(song_id={song_id}, album_id={album_id})"
+        )
         conn = self._album_repo.get_connection()
         try:
-            self._album_repo.add_album(song_id, album_id, track_number, disc_number, conn)
+            self._album_repo.add_album(
+                song_id, album_id, track_number, disc_number, conn
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1215,10 +1257,16 @@ class CatalogService:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((l for l in links if l.album_id == album_id), None)
-        logger.debug(f"[CatalogService] <- add_song_album OK")
+        logger.debug("[CatalogService] <- add_song_album OK")
         return song_album
 
-    def create_and_link_album(self, song_id: int, album_data: dict, track_number: Optional[int] = None, disc_number: Optional[int] = None) -> SongAlbum:
+    def create_and_link_album(
+        self,
+        song_id: int,
+        album_data: dict,
+        track_number: Optional[int] = None,
+        disc_number: Optional[int] = None,
+    ) -> SongAlbum:
         """Create a new album record and link it to a song (single transaction)."""
         logger.debug(f"[CatalogService] -> create_and_link_album(song_id={song_id})")
         # Both repos share the same db_path — use one connection for atomicity
@@ -1231,7 +1279,9 @@ class CatalogService:
                 conn,
             )
             # Pass conn directly; _album_repo uses the same db_path so any conn works
-            self._album_repo.add_album(song_id, album_id, track_number, disc_number, conn)
+            self._album_repo.add_album(
+                song_id, album_id, track_number, disc_number, conn
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1241,12 +1291,16 @@ class CatalogService:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((l for l in links if l.album_id == album_id), None)
-        logger.debug(f"[CatalogService] <- create_and_link_album OK album_id={album_id}")
+        logger.debug(
+            f"[CatalogService] <- create_and_link_album OK album_id={album_id}"
+        )
         return song_album
 
     def remove_song_album(self, song_id: int, album_id: int) -> None:
         """Unlink a song from an album. Keeps the album record."""
-        logger.debug(f"[CatalogService] -> remove_song_album(song_id={song_id}, album_id={album_id})")
+        logger.debug(
+            f"[CatalogService] -> remove_song_album(song_id={song_id}, album_id={album_id})"
+        )
         conn = self._album_repo.get_connection()
         try:
             self._album_repo.remove_album(song_id, album_id, conn)
@@ -1257,14 +1311,24 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- remove_song_album OK")
+        logger.debug("[CatalogService] <- remove_song_album OK")
 
-    def update_song_album_link(self, song_id: int, album_id: int, track_number: Optional[int], disc_number: Optional[int]) -> None:
+    def update_song_album_link(
+        self,
+        song_id: int,
+        album_id: int,
+        track_number: Optional[int],
+        disc_number: Optional[int],
+    ) -> None:
         """Update track/disc numbers for a song-album link."""
-        logger.debug(f"[CatalogService] -> update_song_album_link(song_id={song_id}, album_id={album_id})")
+        logger.debug(
+            f"[CatalogService] -> update_song_album_link(song_id={song_id}, album_id={album_id})"
+        )
         conn = self._album_repo.get_connection()
         try:
-            self._album_repo.update_track_info(song_id, album_id, track_number, disc_number, conn)
+            self._album_repo.update_track_info(
+                song_id, album_id, track_number, disc_number, conn
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1272,7 +1336,7 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- update_song_album_link OK")
+        logger.debug("[CatalogService] <- update_song_album_link OK")
 
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record fields. Affects all linked songs globally."""
@@ -1290,12 +1354,14 @@ class CatalogService:
         album = self.get_album(album_id)
         if not album:
             raise LookupError(f"Album {album_id} not found after update")
-        logger.debug(f"[CatalogService] <- update_album OK")
+        logger.debug("[CatalogService] <- update_album OK")
         return album
 
     def add_album_credit(self, album_id: int, artist_name: str) -> None:
         """Add a credited artist to an album. Get-or-create artist name."""
-        logger.debug(f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{artist_name}')")
+        logger.debug(
+            f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{artist_name}')"
+        )
         conn = self._album_credit_repo.get_connection()
         try:
             self._album_credit_repo.add_credit(album_id, artist_name, "Performer", conn)
@@ -1306,11 +1372,13 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- add_album_credit OK")
+        logger.debug("[CatalogService] <- add_album_credit OK")
 
     def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
         """Remove a credited artist from an album."""
-        logger.debug(f"[CatalogService] -> remove_album_credit(album_id={album_id}, name_id={artist_name_id})")
+        logger.debug(
+            f"[CatalogService] -> remove_album_credit(album_id={album_id}, name_id={artist_name_id})"
+        )
         conn = self._album_credit_repo.get_connection()
         try:
             self._album_credit_repo.remove_credit(album_id, artist_name_id, conn)
@@ -1321,14 +1389,18 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- remove_album_credit OK")
+        logger.debug("[CatalogService] <- remove_album_credit OK")
 
     def update_album_publisher(self, album_id: int, publisher_name: str) -> None:
         """Set or update the publisher for an album. Get-or-create publisher."""
-        logger.debug(f"[CatalogService] -> update_album_publisher(album_id={album_id}, publisher='{publisher_name}')")
+        logger.debug(
+            f"[CatalogService] -> update_album_publisher(album_id={album_id}, publisher='{publisher_name}')"
+        )
         conn = self._album_repo_dir.get_connection()
         try:
-            publisher_id = self._pub_repo.get_or_create_publisher(publisher_name, conn.cursor())
+            publisher_id = self._pub_repo.get_or_create_publisher(
+                publisher_name, conn.cursor()
+            )
             self._album_repo_dir.set_album_publisher(album_id, publisher_id, conn)
             conn.commit()
         except Exception as e:
@@ -1337,13 +1409,15 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- update_album_publisher OK")
+        logger.debug("[CatalogService] <- update_album_publisher OK")
 
     # --- Tags ---
 
     def add_song_tag(self, song_id: int, tag_name: str, category: str) -> Tag:
         """Add a tag to a song. Get-or-create tag."""
-        logger.debug(f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', cat='{category}')")
+        logger.debug(
+            f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', cat='{category}')"
+        )
         conn = self._tag_repo.get_connection()
         try:
             tag = self._tag_repo.add_tag(song_id, tag_name, category, conn)
@@ -1359,7 +1433,9 @@ class CatalogService:
 
     def remove_song_tag(self, song_id: int, tag_id: int) -> None:
         """Remove a tag link from a song. Keeps the tag record."""
-        logger.debug(f"[CatalogService] -> remove_song_tag(song_id={song_id}, tag_id={tag_id})")
+        logger.debug(
+            f"[CatalogService] -> remove_song_tag(song_id={song_id}, tag_id={tag_id})"
+        )
         conn = self._tag_repo.get_connection()
         try:
             self._tag_repo.remove_tag(song_id, tag_id, conn)
@@ -1370,7 +1446,7 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- remove_song_tag OK")
+        logger.debug("[CatalogService] <- remove_song_tag OK")
 
     def update_tag(self, tag_id: int, new_name: str, new_category: str) -> None:
         """Update tag name/category globally (affects all linked songs)."""
@@ -1387,13 +1463,15 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- update_tag OK")
+        logger.debug("[CatalogService] <- update_tag OK")
 
     # --- Publishers ---
 
     def add_song_publisher(self, song_id: int, publisher_name: str) -> Publisher:
         """Add a publisher link to a song. Get-or-create publisher."""
-        logger.debug(f"[CatalogService] -> add_song_publisher(song_id={song_id}, publisher='{publisher_name}')")
+        logger.debug(
+            f"[CatalogService] -> add_song_publisher(song_id={song_id}, publisher='{publisher_name}')"
+        )
         conn = self._pub_repo.get_connection()
         try:
             publisher = self._pub_repo.add_song_publisher(song_id, publisher_name, conn)
@@ -1409,7 +1487,9 @@ class CatalogService:
 
     def remove_song_publisher(self, song_id: int, publisher_id: int) -> None:
         """Remove a publisher link from a song. Keeps the publisher record."""
-        logger.debug(f"[CatalogService] -> remove_song_publisher(song_id={song_id}, pub_id={publisher_id})")
+        logger.debug(
+            f"[CatalogService] -> remove_song_publisher(song_id={song_id}, pub_id={publisher_id})"
+        )
         conn = self._pub_repo.get_connection()
         try:
             self._pub_repo.remove_song_publisher(song_id, publisher_id, conn)
@@ -1420,7 +1500,7 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- remove_song_publisher OK")
+        logger.debug("[CatalogService] <- remove_song_publisher OK")
 
     def update_publisher(self, publisher_id: int, new_name: str) -> None:
         """Update publisher name globally (affects all linked songs)."""
@@ -1437,4 +1517,4 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- update_publisher OK")
+        logger.debug("[CatalogService] <- update_publisher OK")

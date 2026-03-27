@@ -14,6 +14,7 @@ populated_db reference:
   Publishers: DGC(10), Sub Pop(5), Roswell(4), BMI(2), ASCAP(3), Parent(1)
   Tags: Grunge(1/Genre), Energetic(2/Mood), 90s(3/Era), Electronic(4/Style), English(5/Jezik)
 """
+
 import pytest
 from src.services.catalog_service import CatalogService
 
@@ -45,17 +46,23 @@ class TestUpdateSongScalars:
     def test_update_isrc_valid_strips_dashes_and_saves(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"isrc": "US-RC1-99-00001"})
-        assert song.isrc == "USRC19900001", f"Expected 'USRC19900001' (dashes stripped), got '{song.isrc}'"
+        assert (
+            song.isrc == "USRC19900001"
+        ), f"Expected 'USRC19900001' (dashes stripped), got '{song.isrc}'"
 
     def test_update_isrc_no_dashes_saves_as_is(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"isrc": "USRC19900001"})
-        assert song.isrc == "USRC19900001", f"Expected 'USRC19900001', got '{song.isrc}'"
+        assert (
+            song.isrc == "USRC19900001"
+        ), f"Expected 'USRC19900001', got '{song.isrc}'"
 
     def test_update_is_active_false(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"is_active": False})
-        assert song.is_active is False, f"Expected is_active=False, got {song.is_active}"
+        assert (
+            song.is_active is False
+        ), f"Expected is_active=False, got {song.is_active}"
 
     def test_update_multiple_fields_at_once(self, populated_db):
         service = CatalogService(populated_db)
@@ -123,8 +130,12 @@ class TestAddSongCredit:
         service = CatalogService(populated_db)
         credit = service.add_song_credit(2, "Dave Grohl", "Composer")
         assert credit.credit_id is not None, "Expected credit_id to be assigned"
-        assert credit.display_name == "Dave Grohl", f"Expected 'Dave Grohl', got '{credit.display_name}'"
-        assert credit.role_name == "Composer", f"Expected 'Composer', got '{credit.role_name}'"
+        assert (
+            credit.display_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert (
+            credit.role_name == "Composer"
+        ), f"Expected 'Composer', got '{credit.role_name}'"
 
     def test_add_credit_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
@@ -137,9 +148,12 @@ class TestAddSongCredit:
         service = CatalogService(populated_db)
         # "Dave Grohl" (name_id=10) already exists in fixture
         credit = service.add_song_credit(2, "Dave Grohl", "Performer")
-        assert credit.display_name == "Dave Grohl", f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert (
+            credit.display_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
         # Verify no duplicate ArtistNames row created
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         count = conn.execute(
             "SELECT COUNT(*) FROM ArtistNames WHERE DisplayName = 'Dave Grohl'"
@@ -164,6 +178,7 @@ class TestRemoveSongCredit:
         credit = service.add_song_credit(1, "Dave Grohl", "Composer")
         service.remove_song_credit(1, credit.credit_id)
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         count = conn.execute(
             "SELECT COUNT(*) FROM ArtistNames WHERE DisplayName = 'Dave Grohl'"
@@ -179,7 +194,9 @@ class TestUpdateCreditName:
         service.update_credit_name(10, "Dave Grohl Jr.")
         song6 = service.get_song(6)
         names_6 = [c.display_name for c in song6.credits]
-        assert "Dave Grohl Jr." in names_6, f"Expected 'Dave Grohl Jr.' in song 6 credits, got {names_6}"
+        assert (
+            "Dave Grohl Jr." in names_6
+        ), f"Expected 'Dave Grohl Jr.' in song 6 credits, got {names_6}"
 
     def test_rename_empty_raises_value_error(self, populated_db):
         service = CatalogService(populated_db)
@@ -192,9 +209,15 @@ class TestAddSongAlbum:
         service = CatalogService(populated_db)
         # Song 3 has no album — link to Nevermind (100)
         song_album = service.add_song_album(3, 100, track_number=5, disc_number=1)
-        assert song_album.source_id == 3, f"Expected source_id=3, got {song_album.source_id}"
-        assert song_album.album_id == 100, f"Expected album_id=100, got {song_album.album_id}"
-        assert song_album.track_number == 5, f"Expected track=5, got {song_album.track_number}"
+        assert (
+            song_album.source_id == 3
+        ), f"Expected source_id=3, got {song_album.source_id}"
+        assert (
+            song_album.album_id == 100
+        ), f"Expected album_id=100, got {song_album.album_id}"
+        assert (
+            song_album.track_number == 5
+        ), f"Expected track=5, got {song_album.track_number}"
 
     def test_link_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
@@ -211,7 +234,9 @@ class TestRemoveSongAlbum:
         service.remove_song_album(1, 100)
         song = service.get_song(1)
         album_ids = [a.album_id for a in song.albums]
-        assert 100 not in album_ids, f"Album 100 should be unlinked from song 1, got {album_ids}"
+        assert (
+            100 not in album_ids
+        ), f"Album 100 should be unlinked from song 1, got {album_ids}"
         # Album itself still exists
         album = service.get_album(100)
         assert album is not None, "Album 100 should still exist after unlink"
@@ -235,13 +260,17 @@ class TestUpdateAlbum:
         service = CatalogService(populated_db)
         album = service.update_album(100, {"title": "Nevermind (Remaster)"})
         assert album.id == 100, f"Expected id=100, got {album.id}"
-        assert album.title == "Nevermind (Remaster)", f"Expected 'Nevermind (Remaster)', got '{album.title}'"
+        assert (
+            album.title == "Nevermind (Remaster)"
+        ), f"Expected 'Nevermind (Remaster)', got '{album.title}'"
 
     def test_update_album_persisted(self, populated_db):
         service = CatalogService(populated_db)
         service.update_album(100, {"title": "Nevermind (Remaster)"})
         album = service.get_album(100)
-        assert album.title == "Nevermind (Remaster)", f"Expected updated title, got '{album.title}'"
+        assert (
+            album.title == "Nevermind (Remaster)"
+        ), f"Expected updated title, got '{album.title}'"
 
 
 class TestAddSongTag:
@@ -263,7 +292,9 @@ class TestAddSongTag:
     def test_add_new_tag_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         tag = service.add_song_tag(1, "Live Recording", "Type")
-        assert tag.name == "Live Recording", f"Expected 'Live Recording', got '{tag.name}'"
+        assert (
+            tag.name == "Live Recording"
+        ), f"Expected 'Live Recording', got '{tag.name}'"
         assert tag.category == "Type", f"Expected 'Type', got '{tag.category}'"
 
 
@@ -277,6 +308,7 @@ class TestRemoveSongTag:
         assert 1 not in tag_ids, f"Tag 1 should be unlinked from song 1, got {tag_ids}"
         # Tag record still exists
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         count = conn.execute("SELECT COUNT(*) FROM Tags WHERE TagID = 1").fetchone()[0]
         conn.close()
@@ -289,7 +321,9 @@ class TestUpdateTag:
         service.update_tag(1, "Alternative Rock", "Genre")
         song = service.get_song(1)
         tag_names = [t.name for t in song.tags]
-        assert "Alternative Rock" in tag_names, f"Expected 'Alternative Rock' in tags, got {tag_names}"
+        assert (
+            "Alternative Rock" in tag_names
+        ), f"Expected 'Alternative Rock' in tags, got {tag_names}"
         assert "Grunge" not in tag_names, f"'Grunge' should be renamed, got {tag_names}"
 
     def test_rename_tag_empty_raises_value_error(self, populated_db):
@@ -304,19 +338,25 @@ class TestAddSongPublisher:
         # Song 2 has no publisher — add Sub Pop (pub_id=5)
         publisher = service.add_song_publisher(2, "Sub Pop")
         assert publisher.id is not None, "Expected publisher id"
-        assert publisher.name == "Sub Pop", f"Expected 'Sub Pop', got '{publisher.name}'"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{publisher.name}'"
 
     def test_add_publisher_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
         service.add_song_publisher(2, "Sub Pop")
         song = service.get_song(2)
         pub_names = [p.name for p in song.publishers]
-        assert "Sub Pop" in pub_names, f"Expected 'Sub Pop' in publishers, got {pub_names}"
+        assert (
+            "Sub Pop" in pub_names
+        ), f"Expected 'Sub Pop' in publishers, got {pub_names}"
 
     def test_add_new_publisher_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         publisher = service.add_song_publisher(1, "Brand New Label")
-        assert publisher.name == "Brand New Label", f"Expected 'Brand New Label', got '{publisher.name}'"
+        assert (
+            publisher.name == "Brand New Label"
+        ), f"Expected 'Brand New Label', got '{publisher.name}'"
 
 
 class TestRemoveSongPublisher:
@@ -326,9 +366,12 @@ class TestRemoveSongPublisher:
         service.remove_song_publisher(1, 10)
         song = service.get_song(1)
         pub_ids = [p.id for p in song.publishers]
-        assert 10 not in pub_ids, f"Publisher 10 should be unlinked from song 1, got {pub_ids}"
+        assert (
+            10 not in pub_ids
+        ), f"Publisher 10 should be unlinked from song 1, got {pub_ids}"
         # Publisher record still exists
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         count = conn.execute(
             "SELECT COUNT(*) FROM Publishers WHERE PublisherID = 10"
@@ -343,8 +386,9 @@ class TestUpdatePublisher:
         service.update_publisher(10, "DGC Records International")
         song = service.get_song(1)
         pub_names = [p.name for p in song.publishers]
-        assert "DGC Records International" in pub_names, \
-            f"Expected 'DGC Records International' in publishers, got {pub_names}"
+        assert (
+            "DGC Records International" in pub_names
+        ), f"Expected 'DGC Records International' in publishers, got {pub_names}"
 
     def test_rename_publisher_empty_raises_value_error(self, populated_db):
         service = CatalogService(populated_db)

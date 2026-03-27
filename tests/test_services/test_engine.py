@@ -242,7 +242,9 @@ class TestSearchSongs:
 
     def test_identity_expansion(self, client):
         """Searching 'Dave Grohl' expands to groups and returns Nirvana/FF songs."""
-        resp = client.get("/api/v1/songs/search", params={"q": "Dave Grohl", "deep": "true"})
+        resp = client.get(
+            "/api/v1/songs/search", params={"q": "Dave Grohl", "deep": "true"}
+        )
         data = resp.json()
         titles = [s["title"] for s in data]
         assert (
@@ -285,10 +287,12 @@ class TestSearchSongs:
         resp = client.get("/api/v1/songs/search", params={"q": "Everlong"})
         data = resp.json()
         everlong = next(s for s in data if s["title"] == "Everlong")
-        assert everlong["display_artist"] == "Foo Fighters", \
-            f"Expected display_artist='Foo Fighters', got {everlong['display_artist']!r}"
-        assert everlong["duration_s"] == 240.0, \
-            f"Expected duration_s=240.0, got {everlong['duration_s']}"
+        assert (
+            everlong["display_artist"] == "Foo Fighters"
+        ), f"Expected display_artist='Foo Fighters', got {everlong['display_artist']!r}"
+        assert (
+            everlong["duration_s"] == 240.0
+        ), f"Expected duration_s=240.0, got {everlong['duration_s']}"
 
     def test_no_duplicate_songs(self, client):
         """Search for 'Nirvana' should not return SLTS twice."""
@@ -686,11 +690,13 @@ class TestGetAllAlbums:
         data = client.get("/api/v1/albums").json()
         nvm = next(a for a in data if a["title"] == "Nevermind")
         assert nvm["id"] == 100, f"Expected id=100, got {nvm['id']}"
-        assert nvm["release_year"] == 1991, \
-            f"Expected release_year=1991, got {nvm['release_year']}"
+        assert (
+            nvm["release_year"] == 1991
+        ), f"Expected release_year=1991, got {nvm['release_year']}"
         assert nvm["song_count"] == 1, f"Expected song_count=1, got {nvm['song_count']}"
-        assert nvm["display_artist"] == "Nirvana", \
-            f"Expected display_artist='Nirvana', got {nvm['display_artist']!r}"
+        assert (
+            nvm["display_artist"] == "Nirvana"
+        ), f"Expected display_artist='Nirvana', got {nvm['display_artist']!r}"
         # No hydrated publishers/credits/songs in slim view
         assert "publishers" not in nvm, "Slim album should not have 'publishers'"
         assert "credits" not in nvm, "Slim album should not have 'credits'"
@@ -701,12 +707,15 @@ class TestGetAllAlbums:
         data = client.get("/api/v1/albums").json()
         tcats = next(a for a in data if a["title"] == "The Colour and the Shape")
         assert tcats["id"] == 200, f"Expected id=200, got {tcats['id']}"
-        assert tcats["release_year"] == 1997, \
-            f"Expected release_year=1997, got {tcats['release_year']}"
-        assert tcats["display_artist"] == "Foo Fighters", \
-            f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
-        assert tcats["song_count"] == 1, \
-            f"Expected song_count=1, got {tcats['song_count']}"
+        assert (
+            tcats["release_year"] == 1997
+        ), f"Expected release_year=1997, got {tcats['release_year']}"
+        assert (
+            tcats["display_artist"] == "Foo Fighters"
+        ), f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
+        assert (
+            tcats["song_count"] == 1
+        ), f"Expected song_count=1, got {tcats['song_count']}"
 
     def test_empty_db(self, empty_client):
         """Empty DB returns empty list."""

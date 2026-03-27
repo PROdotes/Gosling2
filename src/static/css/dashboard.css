@@ -1227,3 +1227,238 @@ main {
     border-color: var(--accent);
     box-shadow: 0 0 12px var(--accent-glow);
 }
+
+/* --- Section title row (title + add button) --- */
+
+.section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.section-title-row .section-title {
+    margin-bottom: 0;
+}
+
+.section-add-btn {
+    background: transparent;
+    border: 1px solid var(--border-accent);
+    color: var(--accent);
+    padding: 0.2rem 0.65rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.section-add-btn:hover {
+    background: var(--accent-glow);
+    color: var(--text-primary);
+}
+
+/* --- Link chips (editable relationship items) --- */
+
+.link-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.25rem 0;
+}
+
+.link-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--bg-card-raised);
+    border: 1px solid var(--border-accent);
+    border-radius: 20px;
+    padding: 0.2rem 0.5rem 0.2rem 0.65rem;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+}
+
+.link-chip-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.7rem;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.15s ease;
+}
+
+.link-chip-remove:hover {
+    color: var(--danger);
+}
+
+/* --- Link modal --- */
+
+.link-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.link-modal {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-accent);
+    border-radius: 14px;
+    width: min(480px, 90vw);
+    box-shadow: var(--shadow-deep);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+.link-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 14px 14px 0 0;
+    background: var(--bg-surface);
+}
+
+.link-modal-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.link-modal-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+}
+
+.link-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.link-modal-body {
+    padding: 1rem 1.25rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-radius: 0 0 14px 14px;
+    background: var(--bg-surface);
+}
+
+.link-modal-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    min-height: 2rem;
+}
+
+.link-modal-empty {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.link-modal-add {
+    position: relative;
+}
+
+.link-modal-input {
+    width: 100%;
+    background: var(--bg-card-raised);
+    border: 1px solid var(--border-accent);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.link-modal-input:focus {
+    border-color: var(--accent);
+}
+
+.link-modal-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card-raised);
+    border: 1px solid var(--border-accent);
+    border-radius: 8px;
+    z-index: 10;
+    overflow-y: auto;
+    max-height: 180px;
+    box-shadow: var(--shadow-deep);
+}
+
+.link-dropdown-item {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s ease, color 0.1s ease;
+}
+
+.link-dropdown-item:hover,
+.link-dropdown-item--active {
+    background: var(--accent-glow);
+    color: var(--text-primary);
+}
+
+.link-dropdown-create {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+.link-modal-error {
+    font-size: 0.8rem;
+    color: var(--danger);
+    padding: 0.25rem 0;
+}
+
+/* --- Inline field editing --- */
+
+.inline-edit-display {
+    cursor: pointer;
+    border-bottom: 1px dashed var(--text-muted);
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.inline-edit-display:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
+.inline-edit-input {
+    background: var(--bg-card-raised);
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--text-primary);
+    padding: 0.15rem 0.4rem;
+    font-size: inherit;
+    width: 100%;
+    outline: none;
+}
+
+.inline-edit-input--error {
+    border-color: var(--danger);
+}
+
+.inline-edit-error {
+    color: var(--danger);
+    font-size: 0.75rem;
+    margin-top: 0.2rem;
+}

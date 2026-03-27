@@ -250,7 +250,18 @@ def _populate_db_data(db_path):
     # --- Media Sources + Songs ---
     # sid, tid, name, path, dur, active, ahash, recording_year, bpm, isrc
     songs = [
-        (1, 1, "Smells Like Teen Spirit", "/path/1", 200, 1, "hash_1", 1991, None, None),
+        (
+            1,
+            1,
+            "Smells Like Teen Spirit",
+            "/path/1",
+            200,
+            1,
+            "hash_1",
+            1991,
+            None,
+            None,
+        ),
         (2, 1, "Everlong", "/path/2", 240, 1, None, 1997, None, None),
         (3, 1, "Range Rover Bitch", "/path/3", 180, 1, None, 2016, None, None),
         (4, 1, "Grohlton Theme", "/path/4", 120, 1, None, None, None, None),

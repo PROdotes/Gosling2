@@ -119,15 +119,18 @@ class TestSearch:
 
         assert len(pubs) == 1, f"Expected 1 (surface match only), got {len(pubs)}"
         assert pubs[0].id == 1, f"Expected ID=1 (UMG), got {pubs[0].id}"
-        assert pubs[0].name == "Universal Music Group", \
-            f"Expected 'Universal Music Group', got '{pubs[0].name}'"
+        assert (
+            pubs[0].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pubs[0].name}'"
 
         # Negative: children should NOT be returned by surface search
         returned_names = {p.name for p in pubs}
-        assert "DGC Records" not in returned_names, \
-            "DGC Records is a child — should not appear in surface search"
-        assert "Island Records" not in returned_names, \
-            "Island Records is a child — should not appear in surface search"
+        assert (
+            "DGC Records" not in returned_names
+        ), "DGC Records is a child — should not appear in surface search"
+        assert (
+            "Island Records" not in returned_names
+        ), "Island Records is a child — should not appear in surface search"
 
 
 class TestSearchDeep:
@@ -138,7 +141,9 @@ class TestSearchDeep:
         repo = PublisherRepository(populated_db)
         results = repo.search_deep("Universal")
 
-        assert len(results) == 4, f"Expected 4 publishers for 'Universal', got {len(results)}"
+        assert (
+            len(results) == 4
+        ), f"Expected 4 publishers for 'Universal', got {len(results)}"
         ids = {p.id for p in results}
         assert ids == {1, 2, 3, 10}, f"Expected IDs {{1, 2, 3, 10}}, got {ids}"
 
@@ -147,7 +152,9 @@ class TestSearchDeep:
         repo = PublisherRepository(populated_db)
         results = repo.search_deep("Island")
 
-        assert len(results) == 2, f"Expected 2 publishers for 'Island', got {len(results)}"
+        assert (
+            len(results) == 2
+        ), f"Expected 2 publishers for 'Island', got {len(results)}"
         ids = {p.id for p in results}
         assert ids == {2, 3}, f"Expected IDs {{2, 3}}, got {ids}"
 

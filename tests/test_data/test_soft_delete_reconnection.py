@@ -316,7 +316,9 @@ class TestArtistNameReconnection:
         conn.close()
 
         assert identity_row["IsDeleted"] == 0, "Identity should be reactivated"
-        assert name_row["OwnerIdentityID"] == 99, "ArtistName should link to reactivated Identity"
+        assert (
+            name_row["OwnerIdentityID"] == 99
+        ), "ArtistName should link to reactivated Identity"
         assert name_row["IsPrimaryName"] == 1
         assert identity_count == 1, "Should reuse, not duplicate"
 

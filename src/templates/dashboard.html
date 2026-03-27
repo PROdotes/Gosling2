@@ -66,6 +66,21 @@
         </section>
         <section class="detail-panel" id="detail-panel"></section>
     </main>
+    <div id="link-modal" class="link-modal-overlay" style="display:none">
+        <div class="link-modal">
+            <div class="link-modal-header">
+                <span class="link-modal-title" id="link-modal-title"></span>
+                <button class="link-modal-close" data-action="close-link-modal">✕</button>
+            </div>
+            <div class="link-modal-body">
+                <div id="link-modal-items" class="link-modal-items"></div>
+                <div class="link-modal-add">
+                    <input type="text" id="link-modal-input" class="link-modal-input" placeholder="Type to search or create..." autocomplete="off">
+                    <div id="link-modal-dropdown" class="link-modal-dropdown" style="display:none"></div>
+                </div>
+            </div>
+        </div>
+    </div>
     <script type="module" src="/static/js/dashboard/main.js"></script>
 </body>
 

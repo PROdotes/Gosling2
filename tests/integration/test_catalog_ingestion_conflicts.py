@@ -133,6 +133,7 @@ class TestResolveConflict:
         # 1. Soft-delete the existing song to create a ghost
         import sqlite3
         import shutil
+
         conn = sqlite3.connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
@@ -150,16 +151,18 @@ class TestResolveConflict:
         result = service.resolve_conflict(ghost_id, staged_path)
 
         # 4. Exhaustive Assertions on Return Value
-        assert result["status"] == "INGESTED", f"Expected 'INGESTED', got {result['status']}"
+        assert (
+            result["status"] == "INGESTED"
+        ), f"Expected 'INGESTED', got {result['status']}"
         assert "song" in result, "Result missing 'song' field"
         assert result["song"] is not None, "Expected song object, got None"
 
         song = result["song"]
         assert song.id == ghost_id, f"Expected ID {ghost_id}, got {song.id}"
         # The actual metadata will come from the test_audio_file, which we know from fixtures
-        assert song.media_name is not None, f"Expected media_name to be set, got None"
+        assert song.media_name is not None, "Expected media_name to be set, got None"
         assert song.duration_s > 0, f"Expected duration > 0, got {song.duration_s}"
-        assert song.audio_hash is not None, f"Expected audio_hash to be set, got None"
+        assert song.audio_hash is not None, "Expected audio_hash to be set, got None"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
 
         # 5. Database Side Effects - Verify IsDeleted=0
@@ -173,10 +176,12 @@ class TestResolveConflict:
         assert row is not None, f"Ghost record {ghost_id} should still exist in DB"
         assert row[1] == 0, f"Expected IsDeleted=0, got {row[1]}"
         assert row[2] > 0, f"Expected duration > 0, got {row[2]}"
-        assert row[3] is not None, f"Expected hash to be set, got None"
+        assert row[3] is not None, "Expected hash to be set, got None"
 
         # 6. File stays in staging (no move operation)
-        assert os.path.exists(staged_path), f"Staged file should remain in staging, but is missing at {staged_path}"
+        assert os.path.exists(
+            staged_path
+        ), f"Staged file should remain in staging, but is missing at {staged_path}"
 
     def test_resolve_conflict_nonexistent_ghost_id_returns_error(
         self, populated_db, tmp_path
@@ -209,6 +214,7 @@ class TestResolveConflict:
 
         # Soft-delete to create ghost
         import sqlite3
+
         conn = sqlite3.connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
@@ -221,9 +227,13 @@ class TestResolveConflict:
         result = service.resolve_conflict(ghost_id, fake_path)
 
         assert result["status"] == "ERROR", f"Expected 'ERROR', got {result['status']}"
-        assert result["message"] == "Staged file not found", f"Expected 'Staged file not found', got '{result['message']}'"
+        assert (
+            result["message"] == "Staged file not found"
+        ), f"Expected 'Staged file not found', got '{result['message']}'"
 
-    def test_resolve_conflict_preserves_other_songs(self, populated_db, tmp_path, test_audio_file):
+    def test_resolve_conflict_preserves_other_songs(
+        self, populated_db, tmp_path, test_audio_file
+    ):
         """
         Reactivating ghost_id=1 should NOT affect songs 2, 3, etc.
         """
@@ -233,6 +243,7 @@ class TestResolveConflict:
         # Soft-delete song 1
         import sqlite3
         import shutil
+
         conn = sqlite3.connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
@@ -243,6 +254,7 @@ class TestResolveConflict:
 
         # Snapshot song 2 before reactivation
         from src.data.song_repository import SongRepository
+
         repo = SongRepository(populated_db)
         song_2_before = repo.get_by_id(2)
         assert song_2_before is not None, "Song 2 should exist before test"
@@ -257,12 +269,24 @@ class TestResolveConflict:
         # Verify song 2 unchanged - ALL FIELDS
         song_2_after = repo.get_by_id(2)
         assert song_2_after is not None, "Song 2 should still exist after reactivation"
-        assert song_2_after.id == song_2_before.id, f"Song 2 ID changed: {song_2_before.id} -> {song_2_after.id}"
-        assert song_2_after.media_name == song_2_before.media_name, f"Song 2 media_name changed: {song_2_before.media_name} -> {song_2_after.media_name}"
-        assert song_2_after.duration_s == song_2_before.duration_s, f"Song 2 duration changed: {song_2_before.duration_s} -> {song_2_after.duration_s}"
-        assert song_2_after.audio_hash == song_2_before.audio_hash, f"Song 2 hash changed: {song_2_before.audio_hash} -> {song_2_after.audio_hash}"
-        assert song_2_after.source_path == song_2_before.source_path, f"Song 2 path changed"
-        assert song_2_after.is_active == song_2_before.is_active, f"Song 2 is_active changed"
-        assert song_2_after.bpm == song_2_before.bpm, f"Song 2 BPM changed"
-        assert song_2_after.year == song_2_before.year, f"Song 2 year changed"
-        assert song_2_after.isrc == song_2_before.isrc, f"Song 2 ISRC changed"
+        assert (
+            song_2_after.id == song_2_before.id
+        ), f"Song 2 ID changed: {song_2_before.id} -> {song_2_after.id}"
+        assert (
+            song_2_after.media_name == song_2_before.media_name
+        ), f"Song 2 media_name changed: {song_2_before.media_name} -> {song_2_after.media_name}"
+        assert (
+            song_2_after.duration_s == song_2_before.duration_s
+        ), f"Song 2 duration changed: {song_2_before.duration_s} -> {song_2_after.duration_s}"
+        assert (
+            song_2_after.audio_hash == song_2_before.audio_hash
+        ), f"Song 2 hash changed: {song_2_before.audio_hash} -> {song_2_after.audio_hash}"
+        assert (
+            song_2_after.source_path == song_2_before.source_path
+        ), "Song 2 path changed"
+        assert (
+            song_2_after.is_active == song_2_before.is_active
+        ), "Song 2 is_active changed"
+        assert song_2_after.bpm == song_2_before.bpm, "Song 2 BPM changed"
+        assert song_2_after.year == song_2_before.year, "Song 2 year changed"
+        assert song_2_after.isrc == song_2_before.isrc, "Song 2 ISRC changed"

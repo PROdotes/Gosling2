@@ -1,4 +1,7 @@
 import os
+import sqlite3
+from contextlib import asynccontextmanager
+from pathlib import Path
 import anyio.to_thread
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,10 +13,32 @@ from src.engine.routers.audit import router as audit_router
 from src.engine.routers.ingest import router as ingest_router
 from src.engine.routers.song_updates import router as song_updates_router
 from src.services.logger import logger
+from src.engine.config import TRUSTED_ORIGINS, get_db_path
+from src.data.schema import SCHEMA_SQL
 
-from src.engine.config import TRUSTED_ORIGINS
 
-app = FastAPI(title="GOSLING2 Engine")
+def _ensure_db():
+    db_path = Path(get_db_path())
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.create_collation(
+        "UTF8_NOCASE",
+        lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
+    )
+    conn.executescript(SCHEMA_SQL)
+    conn.execute("INSERT OR IGNORE INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
+    conn.commit()
+    conn.close()
+    logger.info(f"[EngineServer] DB ready at {db_path}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    _ensure_db()
+    yield
+
+
+app = FastAPI(title="GOSLING2 Engine", lifespan=lifespan)
 
 # CORS middleware (restricted to trusted origins - Audit #4)
 app.add_middleware(

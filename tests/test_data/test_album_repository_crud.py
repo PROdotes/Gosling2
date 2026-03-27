@@ -11,9 +11,7 @@ populated_db publishers:
   4: Roswell Records, 5: Sub Pop, 10: DGC Records
 """
 
-import sqlite3
 from src.data.album_repository import AlbumRepository
-from src.data.album_credit_repository import AlbumCreditRepository
 
 
 class TestCreateAlbum:
@@ -29,8 +27,12 @@ class TestCreateAlbum:
 
         album = repo.get_by_id(album_id)
         assert album is not None, f"Expected album to exist with id={album_id}"
-        assert album.title == "In Utero", f"Expected title='In Utero', got '{album.title}'"
-        assert album.release_year == 1993, f"Expected year=1993, got {album.release_year}"
+        assert (
+            album.title == "In Utero"
+        ), f"Expected title='In Utero', got '{album.title}'"
+        assert (
+            album.release_year == 1993
+        ), f"Expected year=1993, got {album.release_year}"
 
     def test_create_album_reuses_existing(self, populated_db):
         """Creating an album with same title+year as existing should return existing id."""
@@ -44,8 +46,12 @@ class TestCreateAlbum:
 
         # No duplicate row
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind'").fetchall()
-            assert len(rows) == 1, f"Expected 1 Nevermind row (no duplicate), got {len(rows)}"
+            rows = conn.execute(
+                "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind'"
+            ).fetchall()
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 Nevermind row (no duplicate), got {len(rows)}"
 
     def test_create_album_reactivates_soft_deleted(self, populated_db):
         """Creating an album matching a soft-deleted record should reactivate it."""
@@ -75,7 +81,9 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.title == "Nevermind (Deluxe)", f"Expected updated title, got '{album.title}'"
+        assert (
+            album.title == "Nevermind (Deluxe)"
+        ), f"Expected updated title, got '{album.title}'"
 
     def test_update_release_year(self, populated_db):
         """Update album release year."""
@@ -86,7 +94,9 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.release_year == 2011, f"Expected year=2011, got {album.release_year}"
+        assert (
+            album.release_year == 2011
+        ), f"Expected year=2011, got {album.release_year}"
 
     def test_update_partial_does_not_affect_other_fields(self, populated_db):
         """Updating only title should leave year unchanged."""
@@ -97,8 +107,12 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.title == "Changed Title", f"Expected 'Changed Title', got '{album.title}'"
-        assert album.release_year == 1991, f"Expected year=1991 unchanged, got {album.release_year}"
+        assert (
+            album.title == "Changed Title"
+        ), f"Expected 'Changed Title', got '{album.title}'"
+        assert (
+            album.release_year == 1991
+        ), f"Expected year=1991 unchanged, got {album.release_year}"
 
     def test_update_album_does_not_affect_other_albums(self, populated_db):
         """Updating Album 100 should not affect Album 200."""
@@ -110,10 +124,12 @@ class TestUpdateAlbum:
             conn.commit()
 
         after = repo.get_by_id(200)
-        assert after.title == before.title, f"Album 200 title should not change, got '{after.title}'"
-        assert after.release_year == before.release_year, f"Album 200 year should not change, got {after.release_year}"
-
-
+        assert (
+            after.title == before.title
+        ), f"Album 200 title should not change, got '{after.title}'"
+        assert (
+            after.release_year == before.release_year
+        ), f"Album 200 year should not change, got {after.release_year}"
 
 
 class TestSetAlbumPublisher:
@@ -126,7 +142,9 @@ class TestSetAlbumPublisher:
             conn.commit()
 
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 100").fetchall()
+            rows = conn.execute(
+                "SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 100"
+            ).fetchall()
             pub_ids = [r[0] for r in rows]
             assert pub_ids == [5], f"Expected only PublisherID=5, got {pub_ids}"
 
@@ -144,7 +162,9 @@ class TestSetAlbumPublisher:
             conn.commit()
 
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 100").fetchall()
+            rows = conn.execute(
+                "SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 100"
+            ).fetchall()
             assert len(rows) == 1, f"Expected 1 publisher link, got {len(rows)}"
             assert rows[0][0] == 4, f"Expected PublisherID=4, got {rows[0][0]}"
 
@@ -157,6 +177,10 @@ class TestSetAlbumPublisher:
             conn.commit()
 
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 200").fetchall()
+            rows = conn.execute(
+                "SELECT PublisherID FROM AlbumPublishers WHERE AlbumID = 200"
+            ).fetchall()
             pub_ids = [r[0] for r in rows]
-            assert 4 in pub_ids, f"Expected Album 200 to still have Roswell Records (4), got {pub_ids}"
+            assert (
+                4 in pub_ids
+            ), f"Expected Album 200 to still have Roswell Records (4), got {pub_ids}"

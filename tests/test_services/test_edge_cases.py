@@ -264,15 +264,19 @@ class TestSongEdgeCases:
         assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
         row = rows[0]
         assert row["SourceID"] == 103, f"Expected SourceID=103, got {row['SourceID']}"
-        assert row["MediaName"] == "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0", \
-            f"Expected unicode MediaName, got '{row['MediaName']}'"
-        assert row["SourcePath"] == "/edge/4", \
-            f"Expected SourcePath='/edge/4', got '{row['SourcePath']}'"
-        assert row["SourceDuration"] == 200, \
-            f"Expected SourceDuration=200, got {row['SourceDuration']}"
+        assert (
+            row["MediaName"] == "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0"
+        ), f"Expected unicode MediaName, got '{row['MediaName']}'"
+        assert (
+            row["SourcePath"] == "/edge/4"
+        ), f"Expected SourcePath='/edge/4', got '{row['SourcePath']}'"
+        assert (
+            row["SourceDuration"] == 200
+        ), f"Expected SourceDuration=200, got {row['SourceDuration']}"
         assert row["IsActive"] == 1, f"Expected IsActive=1, got {row['IsActive']}"
-        assert row["RecordingYear"] is None, \
-            f"Expected RecordingYear=None, got {row['RecordingYear']}"
+        assert (
+            row["RecordingYear"] is None
+        ), f"Expected RecordingYear=None, got {row['RecordingYear']}"
         assert row["ISRC"] is None, f"Expected ISRC=None, got {row['ISRC']}"
 
     def test_search_single_char(self, edge_case_db):

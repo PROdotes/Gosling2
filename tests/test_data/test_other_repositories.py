@@ -72,12 +72,15 @@ class TestAlbumRepositorySearchSlim:
         assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
         row = rows[0]
         assert row["AlbumID"] == 100, f"Expected AlbumID=100, got {row['AlbumID']}"
-        assert row["AlbumTitle"] == "Nevermind", \
-            f"Expected 'Nevermind', got '{row['AlbumTitle']}'"
-        assert row["AlbumType"] is None, \
-            f"Expected AlbumType=None, got {row['AlbumType']!r}"
-        assert row["ReleaseYear"] == 1991, \
-            f"Expected ReleaseYear=1991, got {row['ReleaseYear']}"
+        assert (
+            row["AlbumTitle"] == "Nevermind"
+        ), f"Expected 'Nevermind', got '{row['AlbumTitle']}'"
+        assert (
+            row["AlbumType"] is None
+        ), f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert (
+            row["ReleaseYear"] == 1991
+        ), f"Expected ReleaseYear=1991, got {row['ReleaseYear']}"
         assert "SongCount" in row, "Row missing 'SongCount' field"
         assert "DisplayArtist" in row, "Row missing 'DisplayArtist' field"
         assert "DisplayPublisher" in row, "Row missing 'DisplayPublisher' field"
@@ -89,12 +92,15 @@ class TestAlbumRepositorySearchSlim:
         assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
         row = rows[0]
         assert row["AlbumID"] == 200, f"Expected AlbumID=200, got {row['AlbumID']}"
-        assert row["AlbumTitle"] == "The Colour and the Shape", \
-            f"Expected 'The Colour and the Shape', got '{row['AlbumTitle']}'"
-        assert row["AlbumType"] is None, \
-            f"Expected AlbumType=None, got {row['AlbumType']!r}"
-        assert row["ReleaseYear"] == 1997, \
-            f"Expected ReleaseYear=1997, got {row['ReleaseYear']}"
+        assert (
+            row["AlbumTitle"] == "The Colour and the Shape"
+        ), f"Expected 'The Colour and the Shape', got '{row['AlbumTitle']}'"
+        assert (
+            row["AlbumType"] is None
+        ), f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert (
+            row["ReleaseYear"] == 1997
+        ), f"Expected ReleaseYear=1997, got {row['ReleaseYear']}"
 
     def test_no_match_returns_empty_list(self, populated_db):
         """search_slim('ZZZZZ') must return an empty list when no albums match."""

@@ -11,7 +11,6 @@ populated_db credits:
   Song 7: no credits
 """
 
-import sqlite3
 from src.data.song_credit_repository import SongCreditRepository
 
 
@@ -25,16 +24,28 @@ class TestAddCredit:
             conn.commit()
 
         assert result.source_id == 7, f"Expected source_id=7, got {result.source_id}"
-        assert result.name_id == 20, f"Expected name_id=20 (existing Nirvana), got {result.name_id}"
-        assert result.role_id == 1, f"Expected role_id=1 (Performer), got {result.role_id}"
-        assert result.role_name == "Performer", f"Expected role_name='Performer', got '{result.role_name}'"
-        assert result.display_name == "Nirvana", f"Expected display_name='Nirvana', got '{result.display_name}'"
-        assert result.credit_id is not None, f"Expected credit_id to be set, got None"
+        assert (
+            result.name_id == 20
+        ), f"Expected name_id=20 (existing Nirvana), got {result.name_id}"
+        assert (
+            result.role_id == 1
+        ), f"Expected role_id=1 (Performer), got {result.role_id}"
+        assert (
+            result.role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{result.role_name}'"
+        assert (
+            result.display_name == "Nirvana"
+        ), f"Expected display_name='Nirvana', got '{result.display_name}'"
+        assert result.credit_id is not None, "Expected credit_id to be set, got None"
 
         # Verify no duplicate ArtistName row
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = 'Nirvana'").fetchall()
-            assert len(rows) == 1, f"Expected 1 Nirvana row (no duplicate), got {len(rows)}"
+            rows = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = 'Nirvana'"
+            ).fetchall()
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 Nirvana row (no duplicate), got {len(rows)}"
 
     def test_add_new_credit_with_new_name_creates_artist(self, populated_db):
         """Add a credit with a brand-new name — should create ArtistName + Identity."""
@@ -45,15 +56,23 @@ class TestAddCredit:
             conn.commit()
 
         assert result.source_id == 7, f"Expected source_id=7, got {result.source_id}"
-        assert result.display_name == "Courtney Love", f"Expected display_name='Courtney Love', got '{result.display_name}'"
-        assert result.role_name == "Performer", f"Expected role_name='Performer', got '{result.role_name}'"
-        assert result.name_id is not None, f"Expected name_id to be set, got None"
-        assert result.credit_id is not None, f"Expected credit_id to be set, got None"
+        assert (
+            result.display_name == "Courtney Love"
+        ), f"Expected display_name='Courtney Love', got '{result.display_name}'"
+        assert (
+            result.role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{result.role_name}'"
+        assert result.name_id is not None, "Expected name_id to be set, got None"
+        assert result.credit_id is not None, "Expected credit_id to be set, got None"
 
         # Verify ArtistName row created
         with repo._get_connection() as conn:
-            row = conn.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = 'Courtney Love'").fetchone()
-            assert row is not None, "Expected ArtistName row for 'Courtney Love' to exist"
+            row = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = 'Courtney Love'"
+            ).fetchone()
+            assert (
+                row is not None
+            ), "Expected ArtistName row for 'Courtney Love' to exist"
 
     def test_add_new_credit_with_new_role(self, populated_db):
         """Add a credit with a brand-new role — should create Role row."""
@@ -64,7 +83,9 @@ class TestAddCredit:
             conn.commit()
 
         with repo._get_connection() as conn:
-            row = conn.execute("SELECT RoleID FROM Roles WHERE RoleName = 'Arranger'").fetchone()
+            row = conn.execute(
+                "SELECT RoleID FROM Roles WHERE RoleName = 'Arranger'"
+            ).fetchone()
             assert row is not None, "Expected Role row for 'Arranger' to be created"
 
     def test_add_credit_idempotent_on_duplicate(self, populated_db):
@@ -78,7 +99,9 @@ class TestAddCredit:
 
         credits = repo.get_credits_for_songs([7])
         nirvana_credits = [c for c in credits if c.display_name == "Nirvana"]
-        assert len(nirvana_credits) == 1, f"Expected 1 Nirvana credit (idempotent), got {len(nirvana_credits)}"
+        assert (
+            len(nirvana_credits) == 1
+        ), f"Expected 1 Nirvana credit (idempotent), got {len(nirvana_credits)}"
 
     def test_add_credit_does_not_affect_other_songs(self, populated_db):
         """Adding a credit to Song 7 should not affect Song 1's credits."""
@@ -90,7 +113,9 @@ class TestAddCredit:
             conn.commit()
 
         after = repo.get_credits_for_songs([1])
-        assert len(after) == len(before), f"Song 1 credit count should not change: expected {len(before)}, got {len(after)}"
+        assert len(after) == len(
+            before
+        ), f"Song 1 credit count should not change: expected {len(before)}, got {len(after)}"
 
 
 class TestRemoveCredit:
@@ -109,12 +134,18 @@ class TestRemoveCredit:
 
         # Link is gone
         credits_after = repo.get_credits_for_songs([1])
-        assert len(credits_after) == 0, f"Expected 0 credits on Song 1 after remove, got {len(credits_after)}"
+        assert (
+            len(credits_after) == 0
+        ), f"Expected 0 credits on Song 1 after remove, got {len(credits_after)}"
 
         # ArtistName record persists
         with repo._get_connection() as conn:
-            row = conn.execute("SELECT NameID FROM ArtistNames WHERE NameID = 20").fetchone()
-            assert row is not None, "Expected ArtistName (NameID=20) to persist after link removal"
+            row = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE NameID = 20"
+            ).fetchone()
+            assert (
+                row is not None
+            ), "Expected ArtistName (NameID=20) to persist after link removal"
 
     def test_remove_credit_does_not_affect_other_songs(self, populated_db):
         """Removing a credit from Song 1 should not affect Song 2's credits."""
@@ -128,8 +159,12 @@ class TestRemoveCredit:
             conn.commit()
 
         credits_song2 = repo.get_credits_for_songs([2])
-        assert len(credits_song2) == 1, f"Expected Song 2 to still have 1 credit, got {len(credits_song2)}"
-        assert credits_song2[0].display_name == "Foo Fighters", f"Expected 'Foo Fighters', got '{credits_song2[0].display_name}'"
+        assert (
+            len(credits_song2) == 1
+        ), f"Expected Song 2 to still have 1 credit, got {len(credits_song2)}"
+        assert (
+            credits_song2[0].display_name == "Foo Fighters"
+        ), f"Expected 'Foo Fighters', got '{credits_song2[0].display_name}'"
 
 
 class TestUpdateCreditName:
@@ -143,7 +178,9 @@ class TestUpdateCreditName:
 
         credits = repo.get_credits_for_songs([1])
         assert len(credits) == 1, f"Expected 1 credit on Song 1, got {len(credits)}"
-        assert credits[0].display_name == "Nirvana (Band)", f"Expected 'Nirvana (Band)', got '{credits[0].display_name}'"
+        assert (
+            credits[0].display_name == "Nirvana (Band)"
+        ), f"Expected 'Nirvana (Band)', got '{credits[0].display_name}'"
 
     def test_update_credit_name_is_global(self, populated_db):
         """Updating NameID=40 (Taylor Hawkins) affects all songs that credit him."""
@@ -155,14 +192,16 @@ class TestUpdateCreditName:
 
         # Song 3 credits Taylor
         credits_song3 = repo.get_credits_for_songs([3])
-        assert credits_song3[0].display_name == "Taylor Hawkins (Updated)", \
-            f"Expected updated name on Song 3, got '{credits_song3[0].display_name}'"
+        assert (
+            credits_song3[0].display_name == "Taylor Hawkins (Updated)"
+        ), f"Expected updated name on Song 3, got '{credits_song3[0].display_name}'"
 
         # Song 6 also credits Taylor
         credits_song6 = repo.get_credits_for_songs([6])
         taylor = next(c for c in credits_song6 if c.name_id == 40)
-        assert taylor.display_name == "Taylor Hawkins (Updated)", \
-            f"Expected updated name on Song 6, got '{taylor.display_name}'"
+        assert (
+            taylor.display_name == "Taylor Hawkins (Updated)"
+        ), f"Expected updated name on Song 6, got '{taylor.display_name}'"
 
     def test_update_credit_name_does_not_affect_other_names(self, populated_db):
         """Updating Nirvana's name should not affect Foo Fighters."""
@@ -173,5 +212,6 @@ class TestUpdateCreditName:
             conn.commit()
 
         credits_song2 = repo.get_credits_for_songs([2])
-        assert credits_song2[0].display_name == "Foo Fighters", \
-            f"Expected 'Foo Fighters' unchanged, got '{credits_song2[0].display_name}'"
+        assert (
+            credits_song2[0].display_name == "Foo Fighters"
+        ), f"Expected 'Foo Fighters' unchanged, got '{credits_song2[0].display_name}'"

@@ -238,7 +238,7 @@ class PublisherRepository(BaseRepository):
         )
         if not publisher_ids:
             return []
-        
+
         placeholders = ",".join(["?" for _ in publisher_ids])
         query = f"SELECT DISTINCT SourceID FROM RecordingPublishers WHERE PublisherID IN ({placeholders})"
         with self._get_connection() as conn:
@@ -283,17 +283,24 @@ class PublisherRepository(BaseRepository):
         if row:
             pub_id = row[0]
             if row[1]:
-                cursor.execute("UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?", (pub_id,))
+                cursor.execute(
+                    "UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?",
+                    (pub_id,),
+                )
             return pub_id
         cursor.execute("INSERT INTO Publishers (PublisherName) VALUES (?)", (name,))
         return cursor.lastrowid
 
-    def add_song_publisher(self, source_id: int, name: str, conn: sqlite3.Connection) -> Publisher:
+    def add_song_publisher(
+        self, source_id: int, name: str, conn: sqlite3.Connection
+    ) -> Publisher:
         """
         Add a publisher link to a song. Get-or-creates the Publisher record.
         Returns the Publisher. Does NOT commit.
         """
-        logger.debug(f"[PublisherRepository] -> add_song_publisher(source_id={source_id}, name='{name}')")
+        logger.debug(
+            f"[PublisherRepository] -> add_song_publisher(source_id={source_id}, name='{name}')"
+        )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         pub_id = self.get_or_create_publisher(name, cursor)
@@ -302,33 +309,49 @@ class PublisherRepository(BaseRepository):
             (source_id, pub_id),
         )
         row = cursor.execute(
-            "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherID = ?", (pub_id,)
+            "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherID = ?",
+            (pub_id,),
         ).fetchone()
         logger.debug(f"[PublisherRepository] <- add_song_publisher() pub_id={pub_id}")
         return self._row_to_publisher(row)
 
-    def remove_song_publisher(self, source_id: int, publisher_id: int, conn: sqlite3.Connection) -> None:
+    def remove_song_publisher(
+        self, source_id: int, publisher_id: int, conn: sqlite3.Connection
+    ) -> None:
         """
         Remove a publisher link from a song. Keeps Publisher record.
         Does NOT commit.
         """
-        logger.debug(f"[PublisherRepository] -> remove_song_publisher(source_id={source_id}, publisher_id={publisher_id})")
+        logger.debug(
+            f"[PublisherRepository] -> remove_song_publisher(source_id={source_id}, publisher_id={publisher_id})"
+        )
         conn.cursor().execute(
             "DELETE FROM RecordingPublishers WHERE SourceID = ? AND PublisherID = ?",
             (source_id, publisher_id),
         )
-        logger.debug(f"[PublisherRepository] <- remove_song_publisher() done")
+        logger.debug("[PublisherRepository] <- remove_song_publisher() done")
 
-    def update_publisher(self, publisher_id: int, name: str, conn: sqlite3.Connection) -> None:
+    def update_publisher(
+        self, publisher_id: int, name: str, conn: sqlite3.Connection
+    ) -> None:
         """
         Update a Publisher's name globally. Affects all songs linked to this publisher.
         Does NOT commit.
         """
-        logger.debug(f"[PublisherRepository] -> update_publisher(publisher_id={publisher_id}, name='{name}')")
-        conn.cursor().execute(
-            "UPDATE Publishers SET PublisherName = ? WHERE PublisherID = ?", (name, publisher_id)
+        logger.debug(
+            f"[PublisherRepository] -> update_publisher(publisher_id={publisher_id}, name='{name}')"
         )
-        logger.debug(f"[PublisherRepository] <- update_publisher() done")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Publishers SET PublisherName = ? WHERE PublisherID = ?",
+            (name, publisher_id),
+        )
+        if cursor.rowcount == 0:
+            logger.warning(
+                f"[PublisherRepository] update_publisher(id={publisher_id}) NOT_FOUND"
+            )
+            raise LookupError(f"Publisher {publisher_id} not found")
+        logger.debug("[PublisherRepository] <- update_publisher() done")
 
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""

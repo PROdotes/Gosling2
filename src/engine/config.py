@@ -25,6 +25,9 @@ MEDIA_DIR = Path("temp/library/media")
 # Accepted file extensions for ingestion
 ACCEPTED_EXTENSIONS = [".mp3"]
 
+# Fields whose values should additionally be split on ", " during metadata extraction
+COMMA_SPLIT_FIELDS = ["composers"]
+
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.
 TRUSTED_ORIGINS = [

@@ -34,8 +34,10 @@ class TestBaseRepoInfrastructure:
                     if any(col[2] == "AudioHash" for col in cols):
                         found_unique_hash = True
                         break
-            
-            assert found_unique_hash, "AudioHash column does not have a UNIQUE constraint/index"
+
+            assert (
+                found_unique_hash
+            ), "AudioHash column does not have a UNIQUE constraint/index"
         finally:
             conn.close()
 

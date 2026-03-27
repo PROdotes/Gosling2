@@ -17,11 +17,15 @@ class TestUpdateScalars:
         repo = SongRepository(populated_db)
 
         with repo._get_connection() as conn:
-            repo.update_scalars(1, {"media_name": "Smells Like Teen Spirit (Remaster)"}, conn)
+            repo.update_scalars(
+                1, {"media_name": "Smells Like Teen Spirit (Remaster)"}, conn
+            )
             conn.commit()
 
         song = repo.get_by_id(1)
-        assert song.title == "Smells Like Teen Spirit (Remaster)", f"Expected updated title, got '{song.title}'"
+        assert (
+            song.title == "Smells Like Teen Spirit (Remaster)"
+        ), f"Expected updated title, got '{song.title}'"
 
     def test_update_bpm(self, populated_db):
         """Update bpm — should change Songs.TempoBPM."""
@@ -54,7 +58,9 @@ class TestUpdateScalars:
             conn.commit()
 
         song = repo.get_by_id(1)
-        assert song.isrc == "USRC99999999", f"Expected isrc='USRC99999999', got '{song.isrc}'"
+        assert (
+            song.isrc == "USRC99999999"
+        ), f"Expected isrc='USRC99999999', got '{song.isrc}'"
 
     def test_update_is_active_false(self, populated_db):
         """Update is_active to False — should change MediaSources.IsActive."""
@@ -66,8 +72,12 @@ class TestUpdateScalars:
 
         with repo._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            row = conn.execute("SELECT IsActive FROM MediaSources WHERE SourceID = 1").fetchone()
-            assert bool(row["IsActive"]) is False, f"Expected IsActive=False, got {row['IsActive']}"
+            row = conn.execute(
+                "SELECT IsActive FROM MediaSources WHERE SourceID = 1"
+            ).fetchone()
+            assert (
+                bool(row["IsActive"]) is False
+            ), f"Expected IsActive=False, got {row['IsActive']}"
 
     def test_update_bpm_does_not_affect_other_fields(self, populated_db):
         """Updating only bpm should leave title, year, isrc, and is_active unchanged."""
@@ -80,23 +90,31 @@ class TestUpdateScalars:
 
         after = repo.get_by_id(1)
         assert after.bpm == 200, f"Expected bpm=200, got {after.bpm}"
-        assert after.title == before.title, f"Title should not change, got '{after.title}'"
+        assert (
+            after.title == before.title
+        ), f"Title should not change, got '{after.title}'"
         assert after.year == before.year, f"Year should not change, got {after.year}"
         assert after.isrc == before.isrc, f"ISRC should not change, got '{after.isrc}'"
-        assert after.is_active == before.is_active, f"is_active should not change, got {after.is_active}"
+        assert (
+            after.is_active == before.is_active
+        ), f"is_active should not change, got {after.is_active}"
 
     def test_update_multiple_fields_at_once(self, populated_db):
         """Update bpm + year + title in a single call — all three should change."""
         repo = SongRepository(populated_db)
 
         with repo._get_connection() as conn:
-            repo.update_scalars(1, {"bpm": 170, "year": 2000, "media_name": "New Title"}, conn)
+            repo.update_scalars(
+                1, {"bpm": 170, "year": 2000, "media_name": "New Title"}, conn
+            )
             conn.commit()
 
         song = repo.get_by_id(1)
         assert song.bpm == 170, f"Expected bpm=170, got {song.bpm}"
         assert song.year == 2000, f"Expected year=2000, got {song.year}"
-        assert song.title == "New Title", f"Expected title='New Title', got '{song.title}'"
+        assert (
+            song.title == "New Title"
+        ), f"Expected title='New Title', got '{song.title}'"
 
     def test_update_one_song_does_not_affect_another(self, populated_db):
         """Updating Song 1 should not affect Song 2."""
@@ -104,10 +122,18 @@ class TestUpdateScalars:
         before_song2 = repo.get_by_id(2)
 
         with repo._get_connection() as conn:
-            repo.update_scalars(1, {"bpm": 170, "year": 2000, "media_name": "Changed"}, conn)
+            repo.update_scalars(
+                1, {"bpm": 170, "year": 2000, "media_name": "Changed"}, conn
+            )
             conn.commit()
 
         after_song2 = repo.get_by_id(2)
-        assert after_song2.title == before_song2.title, f"Song 2 title should not change, got '{after_song2.title}'"
-        assert after_song2.year == before_song2.year, f"Song 2 year should not change, got {after_song2.year}"
-        assert after_song2.bpm == before_song2.bpm, f"Song 2 bpm should not change, got {after_song2.bpm}"
+        assert (
+            after_song2.title == before_song2.title
+        ), f"Song 2 title should not change, got '{after_song2.title}'"
+        assert (
+            after_song2.year == before_song2.year
+        ), f"Song 2 year should not change, got {after_song2.year}"
+        assert (
+            after_song2.bpm == before_song2.bpm
+        ), f"Song 2 bpm should not change, got {after_song2.bpm}"

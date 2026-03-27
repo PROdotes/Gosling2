@@ -140,17 +140,25 @@ class TagRepository(BaseRepository):
         if row:
             tag_id = row[0]
             if row[1]:
-                cursor.execute("UPDATE Tags SET IsDeleted = 0 WHERE TagID = ?", (tag_id,))
+                cursor.execute(
+                    "UPDATE Tags SET IsDeleted = 0 WHERE TagID = ?", (tag_id,)
+                )
             return tag_id
-        cursor.execute("INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)", (name, category))
+        cursor.execute(
+            "INSERT INTO Tags (TagName, TagCategory) VALUES (?, ?)", (name, category)
+        )
         return cursor.lastrowid
 
-    def add_tag(self, source_id: int, name: str, category: str, conn: sqlite3.Connection) -> Tag:
+    def add_tag(
+        self, source_id: int, name: str, category: str, conn: sqlite3.Connection
+    ) -> Tag:
         """
         Add a tag to a song. Get-or-creates the Tag record.
         Returns the Tag. Does NOT commit.
         """
-        logger.debug(f"[TagRepository] -> add_tag(source_id={source_id}, name='{name}', category='{category}')")
+        logger.debug(
+            f"[TagRepository] -> add_tag(source_id={source_id}, name='{name}', category='{category}')"
+        )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         tag_id = self.get_or_create_tag(name, category, cursor)
@@ -169,22 +177,34 @@ class TagRepository(BaseRepository):
         Remove a tag link from a song. Keeps Tag record.
         Does NOT commit.
         """
-        logger.debug(f"[TagRepository] -> remove_tag(source_id={source_id}, tag_id={tag_id})")
-        conn.cursor().execute(
-            "DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?", (source_id, tag_id)
+        logger.debug(
+            f"[TagRepository] -> remove_tag(source_id={source_id}, tag_id={tag_id})"
         )
-        logger.debug(f"[TagRepository] <- remove_tag() done")
+        conn.cursor().execute(
+            "DELETE FROM MediaSourceTags WHERE SourceID = ? AND TagID = ?",
+            (source_id, tag_id),
+        )
+        logger.debug("[TagRepository] <- remove_tag() done")
 
-    def update_tag(self, tag_id: int, name: str, category: str, conn: sqlite3.Connection) -> None:
+    def update_tag(
+        self, tag_id: int, name: str, category: str, conn: sqlite3.Connection
+    ) -> None:
         """
         Update a Tag's name and category globally. Affects all songs linked to this tag.
         Does NOT commit.
         """
-        logger.debug(f"[TagRepository] -> update_tag(tag_id={tag_id}, name='{name}', category='{category}')")
-        conn.cursor().execute(
-            "UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?", (name, category, tag_id)
+        logger.debug(
+            f"[TagRepository] -> update_tag(tag_id={tag_id}, name='{name}', category='{category}')"
         )
-        logger.debug(f"[TagRepository] <- update_tag() done")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?",
+            (name, category, tag_id),
+        )
+        if cursor.rowcount == 0:
+            logger.warning(f"[TagRepository] update_tag(id={tag_id}) NOT_FOUND")
+            raise LookupError(f"Tag {tag_id} not found")
+        logger.debug("[TagRepository] <- update_tag() done")
 
     def _row_to_tag(self, row: Mapping[str, Any]) -> Tag:
         """Map a database row to a Tag Pydantic model."""

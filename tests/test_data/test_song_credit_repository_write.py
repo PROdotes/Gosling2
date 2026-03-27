@@ -35,7 +35,9 @@ class TestInsertCredits:
             identity = conn.execute(
                 "SELECT IdentityID, LegalName FROM Identities WHERE LegalName = 'Ella Maren'"
             ).fetchone()
-            assert identity is not None, "Expected Identity for 'Ella Maren' to be created"
+            assert (
+                identity is not None
+            ), "Expected Identity for 'Ella Maren' to be created"
 
             # Verify ArtistNames row is linked to that Identity
             row = conn.execute(

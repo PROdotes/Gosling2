@@ -23,6 +23,22 @@ function compareRow(label, dbValue, fileValue) {
     `;
 }
 
+function editableScalarRow(label, field, dbValue, fileValue, songId) {
+    const display = dbValue === null || dbValue === undefined || dbValue === "" ? "-" : String(dbValue);
+    const right = fileValue === null || fileValue === undefined || fileValue === "" ? "-" : String(fileValue);
+    const matches = display.toLowerCase() === right.toLowerCase();
+    const rightClass = matches ? "comparison-match" : "comparison-miss";
+    return `
+        <tr>
+            <td>${escapeHtml(label)}</td>
+            <td>
+                <span class="inline-edit-display" data-action="start-edit-scalar" data-song-id="${songId}" data-field="${field}" title="Click to edit">${escapeHtml(display)}</span>
+            </td>
+            <td class="${rightClass}">${escapeHtml(right)}</td>
+        </tr>
+    `;
+}
+
 function renderCreditsGroups(credits) {
     const items = asArray(credits);
     if (!items.length) {
@@ -308,12 +324,12 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
                             </tr>
                         </thead>
                         <tbody>
-                            ${compareRow("Title", song.media_name, fileData && fileData.media_name)}
+                            ${editableScalarRow("Title", "media_name", song.media_name, fileData && fileData.media_name, song.id)}
                             ${compareRow("Artist", song.display_artist, fileData && fileData.display_artist)}
-                            ${compareRow("Year", song.year, fileData && fileData.year)}
-                            ${compareRow("BPM", song.bpm, fileData && fileData.bpm)}
+                            ${editableScalarRow("Year", "year", song.year, fileData && fileData.year, song.id)}
+                            ${editableScalarRow("BPM", "bpm", song.bpm, fileData && fileData.bpm, song.id)}
                             ${compareRow("Duration", song.formatted_duration, fileData && fileData.formatted_duration)}
-                            ${compareRow("ISRC", song.isrc, fileData && fileData.isrc)}
+                            ${editableScalarRow("ISRC", "isrc", song.isrc, fileData && fileData.isrc, song.id)}
                             ${compareRow("Publisher (Master)", song.display_master_publisher, fileData && fileData.display_master_publisher)}
                         </tbody>
                     </table>
@@ -379,9 +395,22 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Publishers</div>
+                <div class="section-title-row">
+                    <span class="section-title">Publishers</span>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="publishers" data-song-id="${song.id}">+ Add</button>
+                </div>
                 <div class="two-column">
-                    <div class="surface-box"><div class="mini-label">Library (${dbPublishers.length})</div>${renderTagCollection(dbPublishers, "publisher")}</div>
+                    <div class="surface-box">
+                        <div class="mini-label">Library (${dbPublishers.length})</div>
+                        <div class="link-chip-list">
+                            ${dbPublishers.length ? dbPublishers.map(p => `
+                                <span class="link-chip">
+                                    ${escapeHtml(p.name)}
+                                    <button class="link-chip-remove" data-action="remove-publisher" data-song-id="${song.id}" data-publisher-id="${p.id}" title="Remove">✕</button>
+                                </span>
+                            `).join("") : '<span class="muted-note">None</span>'}
+                        </div>
+                    </div>
                     <div class="surface-box"><div class="mini-label">File (${filePublishers.length})</div>${renderTagCollection(filePublishers, "publisher")}</div>
                 </div>
             </div>

@@ -59,7 +59,9 @@ class SongRepository(MediaSourceRepository):
         )
         return source_id
 
-    def reactivate_ghost(self, ghost_id: int, song: Song, conn: sqlite3.Connection) -> None:
+    def reactivate_ghost(
+        self, ghost_id: int, song: Song, conn: sqlite3.Connection
+    ) -> None:
         """
         Reactivate a soft-deleted ghost song record with new metadata.
         1. Verify ghost exists and is deleted
@@ -115,18 +117,30 @@ class SongRepository(MediaSourceRepository):
             f"[SongRepository] <- reactivate_ghost() REACTIVATED ID={ghost_id} '{song.media_name}'"
         )
 
-    def update_scalars(self, song_id: int, fields: dict, conn: sqlite3.Connection) -> None:
+    def update_scalars(
+        self, song_id: int, fields: dict, conn: sqlite3.Connection
+    ) -> None:
         """
         Update editable scalar fields for a song. Partial updates — only send changed fields.
         Splits updates between MediaSources (media_name, is_active) and Songs (bpm, year, isrc).
         Does NOT commit.
         """
-        logger.debug(f"[SongRepository] -> update_scalars(id={song_id}, fields={list(fields.keys())})")
+        logger.debug(
+            f"[SongRepository] -> update_scalars(id={song_id}, fields={list(fields.keys())})"
+        )
 
-        media_source_fields = {k: v for k, v in fields.items() if k in ("media_name", "is_active")}
+        media_source_fields = {
+            k: v for k, v in fields.items() if k in ("media_name", "is_active")
+        }
         songs_fields = {k: v for k, v in fields.items() if k in ("bpm", "year", "isrc")}
 
-        col_map = {"media_name": "MediaName", "is_active": "IsActive", "bpm": "TempoBPM", "year": "RecordingYear", "isrc": "ISRC"}
+        col_map = {
+            "media_name": "MediaName",
+            "is_active": "IsActive",
+            "bpm": "TempoBPM",
+            "year": "RecordingYear",
+            "isrc": "ISRC",
+        }
 
         cursor = conn.cursor()
         if media_source_fields:

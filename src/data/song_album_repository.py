@@ -175,37 +175,73 @@ class SongAlbumRepository(BaseRepository):
             f"[SongAlbumRepository] <- _insert_album_credits(album_id={album_id}) wrote {len(album.credits)} credits"
         )
 
-    def add_album(self, source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None:
+    def add_album(
+        self,
+        source_id: int,
+        album_id: int,
+        track_number: int,
+        disc_number: int,
+        conn: sqlite3.Connection,
+    ) -> None:
         """
         Link a song to an existing album. Does NOT commit.
         """
-        logger.debug(f"[SongAlbumRepository] -> add_album(source_id={source_id}, album_id={album_id})")
+        logger.debug(
+            f"[SongAlbumRepository] -> add_album(source_id={source_id}, album_id={album_id})"
+        )
         conn.cursor().execute(
             "INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, DiscNumber, IsPrimary) VALUES (?, ?, ?, ?, 1)",
             (source_id, album_id, track_number, disc_number),
         )
-        logger.debug(f"[SongAlbumRepository] <- add_album() done")
+        logger.debug("[SongAlbumRepository] <- add_album() done")
 
-    def remove_album(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> None:
+    def remove_album(
+        self, source_id: int, album_id: int, conn: sqlite3.Connection
+    ) -> None:
         """
         Remove a song-album link. Keeps Album record. Does NOT commit.
         """
-        logger.debug(f"[SongAlbumRepository] -> remove_album(source_id={source_id}, album_id={album_id})")
-        conn.cursor().execute(
-            "DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id)
+        logger.debug(
+            f"[SongAlbumRepository] -> remove_album(source_id={source_id}, album_id={album_id})"
         )
-        logger.debug(f"[SongAlbumRepository] <- remove_album() done")
+        conn.cursor().execute(
+            "DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?",
+            (source_id, album_id),
+        )
+        logger.debug("[SongAlbumRepository] <- remove_album() done")
 
-    def update_track_info(self, source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None:
+    def update_track_info(
+        self,
+        source_id: int,
+        album_id: int,
+        track_number: Optional[int],
+        disc_number: Optional[int],
+        conn: sqlite3.Connection,
+    ) -> None:
         """
-        Update track/disc number for a song-album link. Does NOT commit.
+        Update track/disc number for a song-album link. Partial updates supported.
         """
-        logger.debug(f"[SongAlbumRepository] -> update_track_info(source_id={source_id}, album_id={album_id})")
-        conn.cursor().execute(
-            "UPDATE SongAlbums SET TrackNumber = ?, DiscNumber = ? WHERE SourceID = ? AND AlbumID = ?",
-            (track_number, disc_number, source_id, album_id),
+        logger.debug(
+            f"[SongAlbumRepository] -> update_track_info(id={source_id}, album_id={album_id})"
         )
-        logger.debug(f"[SongAlbumRepository] <- update_track_info() done")
+
+        updates = []
+        params = []
+        if track_number is not None:
+            updates.append("TrackNumber = ?")
+            params.append(track_number)
+        if disc_number is not None:
+            updates.append("DiscNumber = ?")
+            params.append(disc_number)
+
+        if not updates:
+            logger.debug("[SongAlbumRepository] <- update_track_info() no-op")
+            return
+
+        params.extend([source_id, album_id])
+        sql = f"UPDATE SongAlbums SET {', '.join(updates)} WHERE SourceID = ? AND AlbumID = ?"
+        conn.cursor().execute(sql, params)
+        logger.debug("[SongAlbumRepository] <- update_track_info() done")
 
     def _row_to_song_album(self, row: Mapping[str, Any]) -> SongAlbum:
         """Map a database row to a SongAlbum Pydantic model."""

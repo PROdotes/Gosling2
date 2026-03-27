@@ -81,7 +81,9 @@ class SongCreditRepository(BaseRepository):
         if row:
             name_id = row[0]
             if row[1]:  # IsDeleted — wake it up
-                cursor.execute("UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (name_id,))
+                cursor.execute(
+                    "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (name_id,)
+                )
                 cursor.execute(
                     "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
                     (row[2],),
@@ -90,17 +92,20 @@ class SongCreditRepository(BaseRepository):
 
         # No ArtistName found — check if an Identity with this LegalName exists
         identity_row = cursor.execute(
-            "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?", (display_name,)
+            "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?",
+            (display_name,),
         ).fetchone()
         if identity_row:
             owner_identity_id = identity_row[0]
             if identity_row[1]:
                 cursor.execute(
-                    "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?", (owner_identity_id,)
+                    "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ?",
+                    (owner_identity_id,),
                 )
         else:
             cursor.execute(
-                "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)", (display_name,)
+                "INSERT INTO Identities (IdentityType, LegalName) VALUES ('person', ?)",
+                (display_name,),
             )
             owner_identity_id = cursor.lastrowid
 
@@ -110,12 +115,20 @@ class SongCreditRepository(BaseRepository):
         )
         return cursor.lastrowid
 
-    def add_credit(self, source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> SongCredit:
+    def add_credit(
+        self,
+        source_id: int,
+        display_name: str,
+        role_name: str,
+        conn: sqlite3.Connection,
+    ) -> SongCredit:
         """
         Add a single artist credit to a song. Get-or-creates ArtistName and Role.
         Returns the new SongCredit. Does NOT commit.
         """
-        logger.debug(f"[SongCreditRepository] -> add_credit(source_id={source_id}, name='{display_name}', role='{role_name}')")
+        logger.debug(
+            f"[SongCreditRepository] -> add_credit(source_id={source_id}, name='{display_name}', role='{role_name}')"
+        )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         role_id = self.get_or_create_role(role_name, cursor)
@@ -128,7 +141,9 @@ class SongCreditRepository(BaseRepository):
             f"SELECT {self._COLUMNS} FROM SongCredits sc JOIN ArtistNames an ON sc.CreditedNameID = an.NameID JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = ? AND sc.CreditedNameID = ? AND sc.RoleID = ?",
             (source_id, name_id, role_id),
         ).fetchone()
-        logger.debug(f"[SongCreditRepository] <- add_credit() done name_id={name_id} role_id={role_id}")
+        logger.debug(
+            f"[SongCreditRepository] <- add_credit() done name_id={name_id} role_id={role_id}"
+        )
         return self._row_to_song_credit(row)
 
     def remove_credit(self, credit_id: int, conn: sqlite3.Connection) -> None:
@@ -137,19 +152,32 @@ class SongCreditRepository(BaseRepository):
         Does NOT commit.
         """
         logger.debug(f"[SongCreditRepository] -> remove_credit(credit_id={credit_id})")
-        conn.cursor().execute("DELETE FROM SongCredits WHERE CreditID = ?", (credit_id,))
-        logger.debug(f"[SongCreditRepository] <- remove_credit(credit_id={credit_id}) done")
+        conn.cursor().execute(
+            "DELETE FROM SongCredits WHERE CreditID = ?", (credit_id,)
+        )
+        logger.debug(
+            f"[SongCreditRepository] <- remove_credit(credit_id={credit_id}) done"
+        )
 
-    def update_credit_name(self, name_id: int, new_name: str, conn: sqlite3.Connection) -> None:
+    def update_credit_name(
+        self, name_id: int, new_name: str, conn: sqlite3.Connection
+    ) -> None:
         """
         Update an ArtistName's DisplayName globally. Affects all songs linked to this name.
         Does NOT commit.
         """
-        logger.debug(f"[SongCreditRepository] -> update_credit_name(name_id={name_id}, new_name='{new_name}')")
-        conn.cursor().execute(
-            "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?", (new_name, name_id)
+        logger.debug(
+            f"[SongCreditRepository] -> update_credit_name(name_id={name_id}, new_name='{new_name}')"
         )
-        logger.debug(f"[SongCreditRepository] <- update_credit_name() done")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?",
+            (new_name, name_id),
+        )
+        if cursor.rowcount == 0:
+            logger.warning(f"[SongCreditRepository] update_credit_name(id={name_id}) NOT_FOUND")
+            raise LookupError(f"ArtistName {name_id} not found")
+        logger.debug("[SongCreditRepository] <- update_credit_name() done")
 
     def _row_to_song_credit(self, row: Mapping[str, Any]) -> SongCredit:
         """Maps a physical database row to the strict Pydantic SongCredit model, enforcing RoleID exists."""

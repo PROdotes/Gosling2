@@ -1,6 +1,7 @@
 import {
     ABORTED,
     abortAllSearches,
+    addSongPublisher,
     getAlbumDetail,
     getArtistSongs,
     getArtistTree,
@@ -12,12 +13,15 @@ import {
     getTagDetail,
     getTagSongs,
     isAbortError,
+    patchSongScalars,
+    removeSongPublisher,
     searchAlbums,
     searchArtists,
     searchPublishers,
     searchSongs,
     searchTags,
 } from "./api.js";
+import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -94,6 +98,8 @@ const modeConfig = {
 
 let detailController = null;
 let activeDetailKey = null;
+let cachedFileData = null;
+let cachedFileDataSongId = null;
 
 const ctx = {
     elements,
@@ -242,13 +248,19 @@ function navigate(mode, query = "") {
     elements.searchInput.focus();
 }
 
-async function openSongDetail(song) {
+async function openSongDetail(song, { reuseFileData = false } = {}) {
+    const existingContent = elements.detailPanel.querySelector(".detail-content");
+    const savedScroll = existingContent ? existingContent.scrollTop : 0;
     const request = beginDetailRequest("songs", song.id);
     renderSongDetailLoading(ctx, song);
 
+    const fetchFile = (!reuseFileData || cachedFileDataSongId !== String(song.id))
+        ? getSongDetail(song.id, { signal: request.signal })
+        : Promise.resolve(cachedFileData);
+
     const [catalogResult, fileResult, auditResult] = await Promise.allSettled([
         getCatalogSong(song.id, { signal: request.signal }),
-        getSongDetail(song.id, { signal: request.signal }),
+        fetchFile,
         getAuditHistory("Songs", song.id, { signal: request.signal }),
     ]);
 
@@ -261,8 +273,14 @@ async function openSongDetail(song) {
 
     const catalogSong = catalogResult.status === "fulfilled" && catalogResult.value ? catalogResult.value : song;
     const fileData = fileResult.status === "fulfilled" ? fileResult.value : null;
+    cachedFileData = fileData;
+    cachedFileDataSongId = String(song.id);
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
     renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory);
+    if (savedScroll) {
+        const newContent = elements.detailPanel.querySelector(".detail-content");
+        if (newContent) requestAnimationFrame(() => { newContent.scrollTop = savedScroll; });
+    }
 }
 
 async function openAlbumDetail(album) {
@@ -385,7 +403,7 @@ async function openSelectedResult(index) {
     }
 }
 
-document.addEventListener("click", (event) => {
+document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) {
         return;
@@ -459,6 +477,175 @@ document.addEventListener("click", (event) => {
                 actionTarget.textContent = "Re-ingest & Activate";
                 console.error("Error:", err.message);
             });
+        return;
+    }
+
+    if (action === "remove-publisher") {
+        const { songId, publisherId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeSongPublisher(songId, publisherId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove publisher failed: ${err.message}`);
+        }
+        return;
+    }
+
+    if (action === "close-link-modal") {
+        closeLinkModal();
+        return;
+    }
+
+    if (action === "open-link-modal") {
+        const { modalType, songId } = actionTarget.dataset;
+
+        if (modalType === "publishers") {
+            // Build current items from the chips already in the DOM
+            const chips = document.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`);
+            const currentItems = Array.from(chips).map(btn => ({
+                id: btn.dataset.publisherId,
+                label: btn.closest(".link-chip").childNodes[0].textContent.trim(),
+            }));
+
+            openLinkModal({
+                title: "Publishers",
+                items: currentItems,
+                onSearch: async (q) => {
+                    const results = await searchPublishers(q);
+                    return (results || []).map(p => ({ id: p.id, label: p.name }));
+                },
+                onAdd: async (opt) => {
+                    const publisher = await addSongPublisher(songId, opt.rawInput || opt.label);
+                    opt.id = publisher.id;
+                    opt.label = publisher.name;
+                    currentItems.push({ id: publisher.id, label: publisher.name });
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeSongPublisher(songId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => `Add "${q}" as new publisher`,
+            });
+        }
+        return;
+    }
+
+    if (action === "start-edit-scalar") {
+        const span = actionTarget;
+        const { songId, field } = span.dataset;
+        const currentValue = span.textContent === "-" ? "" : span.textContent;
+
+        const validators = {
+            media_name: (v) => v ? null : "Title cannot be empty",
+            year: (v) => {
+                if (!v) return null; // optional
+                const n = Number(v);
+                if (!Number.isInteger(n) || n < 1860 || n > new Date().getFullYear() + 1) {
+                    return `Year must be between 1860–${new Date().getFullYear() + 1}`;
+                }
+                return null;
+            },
+            bpm: (v) => {
+                if (!v) return null; // optional
+                const n = Number(v);
+                if (!Number.isInteger(n) || n < 1 || n > 300) return "BPM must be between 1–300";
+                return null;
+            },
+            isrc: (v) => {
+                if (!v) return null; // optional
+                const stripped = v.replace(/-/g, "");
+                if (stripped.length !== 12) return "ISRC must be 12 characters (dashes ignored)";
+                return null;
+            },
+        };
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = currentValue;
+        input.className = "inline-edit-input";
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "inline-edit-error";
+
+        span.replaceWith(input);
+        input.after(errorEl);
+        input.focus();
+        input.select();
+
+        async function commitEdit() {
+            const rawValue = input.value.trim();
+            errorEl.textContent = "";
+            input.classList.remove("inline-edit-input--error");
+
+            const validate = validators[field];
+            const error = validate ? validate(rawValue) : null;
+            if (error) {
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = error;
+                input.focus();
+                return;
+            }
+
+            if (rawValue === currentValue) {
+                input.replaceWith(span);
+                errorEl.remove();
+                return;
+            }
+
+            // Convert empty string to null for optional fields, numbers where needed
+            let payload;
+            if (field === "year" || field === "bpm") {
+                payload = rawValue === "" ? null : Number(rawValue);
+            } else {
+                payload = rawValue === "" ? null : rawValue;
+            }
+
+            input.disabled = true;
+            try {
+                const updatedSong = await patchSongScalars(songId, { [field]: payload });
+                // Keep list card in sync for title changes
+                if (field === "media_name") {
+                    const cached = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (cached) {
+                        cached.media_name = updatedSong.media_name;
+                        cached.title = updatedSong.media_name;
+                    }
+                }
+                openSongDetail(updatedSong, { reuseFileData: true });
+            } catch (err) {
+                input.disabled = false;
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = `Save failed: ${err.message}`;
+                input.focus();
+            }
+        }
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                commitEdit();
+            }
+            if (e.key === "Escape") {
+                input.replaceWith(span);
+                errorEl.remove();
+            }
+        });
+
+        input.addEventListener("blur", () => {
+            // Small delay so Enter keydown can fire commitEdit first
+            setTimeout(() => {
+                if (document.contains(input)) {
+                    commitEdit();
+                }
+            }, 100);
+        });
+
         return;
     }
 

@@ -165,6 +165,36 @@ export function scanFolder(folderPath, recursive = true) {
     });
 }
 
+export function addSongPublisher(songId, publisherName) {
+    return fetchJson(`/api/v1/songs/${songId}/publishers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publisher_name: publisherName }),
+    });
+}
+
+export async function removeSongPublisher(songId, publisherId) {
+    const response = await fetch(`/api/v1/songs/${songId}/publishers/${publisherId}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data && data.detail) errorMsg = data.detail;
+        } catch (e) { /* no body */ }
+        throw new Error(errorMsg);
+    }
+}
+
+export function patchSongScalars(songId, fields) {
+    return fetchJson(`/api/v1/songs/${songId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+    });
+}
+
 export function deleteSong(id) {
     return fetchJson(`/api/v1/ingest/songs/${id}`, {
         method: "DELETE",

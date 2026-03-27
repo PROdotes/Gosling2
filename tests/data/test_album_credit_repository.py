@@ -1,6 +1,5 @@
-import pytest
-import sqlite3
 from src.data.album_credit_repository import AlbumCreditRepository
+
 
 class TestAlbumCreditRepository:
     def test_add_credit_with_existing_name(self, populated_db):
@@ -13,11 +12,15 @@ class TestAlbumCreditRepository:
 
         credits = repo.get_credits_for_albums([200])
         names = [c.display_name for c in credits]
-        assert "Nirvana" in names, f"Expected 'Nirvana' in Album 200 credits, got {names}"
+        assert (
+            "Nirvana" in names
+        ), f"Expected 'Nirvana' in Album 200 credits, got {names}"
 
         # No duplicate ArtistName
         with repo._get_connection() as conn:
-            rows = conn.execute("SELECT NameID FROM ArtistNames WHERE DisplayName = 'Nirvana'").fetchall()
+            rows = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = 'Nirvana'"
+            ).fetchall()
             assert len(rows) == 1, f"Expected 1 Nirvana ArtistName row, got {len(rows)}"
 
     def test_add_credit_with_new_name(self, populated_db):
@@ -30,7 +33,9 @@ class TestAlbumCreditRepository:
 
         credits = repo.get_credits_for_albums([100])
         names = [c.display_name for c in credits]
-        assert "Krist Novoselic" in names, f"Expected 'Krist Novoselic' in Album 100 credits, got {names}"
+        assert (
+            "Krist Novoselic" in names
+        ), f"Expected 'Krist Novoselic' in Album 100 credits, got {names}"
 
     def test_add_credit_idempotent(self, populated_db):
         """Adding the same credit twice should not create duplicate AlbumCredits rows."""
@@ -43,7 +48,9 @@ class TestAlbumCreditRepository:
 
         credits = repo.get_credits_for_albums([100])
         nirvana = [c for c in credits if c.display_name == "Nirvana"]
-        assert len(nirvana) == 1, f"Expected 1 Nirvana credit (idempotent), got {len(nirvana)}"
+        assert (
+            len(nirvana) == 1
+        ), f"Expected 1 Nirvana credit (idempotent), got {len(nirvana)}"
 
     def test_remove_credit_deletes_link(self, populated_db):
         """Remove Nirvana (NameID=20) from Album 100 — link gone, ArtistName remains."""
@@ -55,12 +62,18 @@ class TestAlbumCreditRepository:
 
         credits = repo.get_credits_for_albums([100])
         name_ids = [c.name_id for c in credits]
-        assert 20 not in name_ids, f"Expected NameID=20 removed from Album 100, got {name_ids}"
+        assert (
+            20 not in name_ids
+        ), f"Expected NameID=20 removed from Album 100, got {name_ids}"
 
         # ArtistName persists
         with repo._get_connection() as conn:
-            row = conn.execute("SELECT NameID FROM ArtistNames WHERE NameID = 20").fetchone()
-            assert row is not None, "Expected ArtistName (NameID=20) to persist after link removal"
+            row = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE NameID = 20"
+            ).fetchone()
+            assert (
+                row is not None
+            ), "Expected ArtistName (NameID=20) to persist after link removal"
 
     def test_add_credit_does_not_affect_other_albums(self, populated_db):
         """Adding a credit to Album 100 should not affect Album 200's credits."""
@@ -72,7 +85,9 @@ class TestAlbumCreditRepository:
             conn.commit()
 
         after = repo.get_credits_for_albums([200])
-        assert len(after) == len(before), f"Album 200 credit count should not change: expected {len(before)}, got {len(after)}"
+        assert len(after) == len(
+            before
+        ), f"Album 200 credit count should not change: expected {len(before)}, got {len(after)}"
 
     def test_remove_credit_does_not_affect_other_albums(self, populated_db):
         """Removing a credit from Album 100 should not affect Album 200's credits."""
@@ -84,4 +99,6 @@ class TestAlbumCreditRepository:
             conn.commit()
 
         after = repo.get_credits_for_albums([200])
-        assert len(after) == len(before), f"Album 200 credit count should not change: expected {len(before)}, got {len(after)}"
+        assert len(after) == len(
+            before
+        ), f"Album 200 credit count should not change: expected {len(before)}, got {len(after)}"

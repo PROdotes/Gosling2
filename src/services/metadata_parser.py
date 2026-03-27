@@ -4,6 +4,7 @@ from typing import Dict, List, Any, Optional
 from pydantic import ValidationError
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
 from src.services.logger import logger
+from src.engine.config import COMMA_SPLIT_FIELDS
 
 
 class MetadataParser:
@@ -59,6 +60,7 @@ class MetadataParser:
         # Temporary buckets for list-based data to allow deduplication while preserving order
         credits_dict = {}  # role_name -> list of display_names
         tags_dict = {}  # category -> list of names
+        primary_tag_categories: set = set()  # categories that already have a primary from dynamic frames
         album_titles = []
         publisher_names = []
         album_artists = []
@@ -116,9 +118,18 @@ class MetadataParser:
                         album_artists.extend([str(v) for v in values])
                     else:
                         role_name = self._get_role_name(field_name)
-                        credits_dict.setdefault(role_name, []).extend(
-                            [str(v) for v in values]
-                        )
+                        if field_name in COMMA_SPLIT_FIELDS:
+                            split_values = [
+                                part.strip()
+                                for v in values
+                                for part in str(v).split(",")
+                                if part.strip()
+                            ]
+                            credits_dict.setdefault(role_name, []).extend(split_values)
+                        else:
+                            credits_dict.setdefault(role_name, []).extend(
+                                [str(v) for v in values]
+                            )
 
             # 3. Routing to Tags
             if category:
@@ -131,8 +142,10 @@ class MetadataParser:
                     prefix, desc = tag_id.split(":", 1)
                     # Normalize category name (e.g. FESTIVAL -> Festival)
                     cat_name = desc.capitalize()
-                    for v in values:
-                        song_data["tags"].append(Tag(name=str(v), category=cat_name))
+                    for i, v in enumerate(values):
+                        song_data["tags"].append(Tag(name=str(v), category=cat_name, is_primary=(i == 0)))
+                        if i == 0:
+                            primary_tag_categories.add(cat_name)
                 elif not field_name:
                     # Genuine raw tag (no descriptor), keep in raw_tags
                     label = (
@@ -150,8 +163,10 @@ class MetadataParser:
                 )
 
         for category, names in tags_dict.items():
-            for name in dict.fromkeys(names):
-                song_data["tags"].append(Tag(name=name, category=category))
+            already_has_primary = category in primary_tag_categories
+            for i, name in enumerate(dict.fromkeys(names)):
+                is_primary = (i == 0) and not already_has_primary
+                song_data["tags"].append(Tag(name=name, category=category, is_primary=is_primary))
 
         # Move contextual fields from root to relationship-only
         track_num = song_data.pop("track_number", None)

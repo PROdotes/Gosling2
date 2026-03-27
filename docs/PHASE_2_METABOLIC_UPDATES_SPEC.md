@@ -2,7 +2,14 @@
 
 **Feature:** CRUD infrastructure for modifying existing songs, including scalar data (BPM, ISRC) and relationship synchronization (Tags/Publishers).
 
-**Status:** Specification Complete - Ready for Implementation
+**Status:** Backend + API complete and tested. Frontend pending.
+
+### Implementation Progress
+- [x] Phase 1: Backend Foundation (repositories, service layer, validation)
+- [x] Phase 2: API Endpoints (all endpoints implemented, API tests passing)
+- [ ] Phase 3: Frontend - Scalar Editing
+- [ ] Phase 4: Frontend - Relationship Editing
+- [ ] Phase 5: Polish & Testing
 
 ---
 
@@ -99,6 +106,8 @@ LYRICIST
 
 ### Albums
 **Display:** Album cards showing title, year, type, publisher, album artist
+
+**Note:** Albums ingested from file metadata (TALB) have no year/artist/publisher populated — only a title. The detail panel should handle gracefully (show title only, suppress empty fields). When the user edits the album link, that's the opportunity to fill in the missing data.
 
 **Modal Structure:** Complex - shows full album context to help user pick correct album
 
@@ -502,6 +511,100 @@ Will revisit after CRUD implementation is complete and we can evaluate audit req
 - `src/services/catalog_service.py` - Add all update methods listed above
 - `src/static/js/dashboard/renderers/songs.js` - Add inline editing + relationship modals
 - `src/static/css/*` - Add styles for edit modes, modals, validation errors
+
+---
+
+## Frontend Architecture
+
+### Stack
+Vanilla JavaScript (ES6 modules), no framework. Single HTML entry point at `src/templates/dashboard.html`.
+
+### Key Files
+- `src/static/js/dashboard/api.js` — fetch wrapper (`fetchJson`), all API calls. New mutation calls go here.
+- `src/static/js/dashboard/main.js` — central `state` object, `setState()`, event delegation via `data-action` attributes, `openSongDetail()` orchestration.
+- `src/static/js/dashboard/renderers/songs.js` — `renderSongDetailComplete()` builds the full detail panel as a template string. Edit controls slot into this.
+- `src/static/css/dashboard.css` — 1,229 lines, CSS variables for theming, dark + orange accent. Modal and form styles will be added here.
+
+### Patterns to Follow
+- **Event handling:** Delegated listeners on `document` matching `data-action="..."` attributes. No inline `onclick`.
+- **Rendering:** Template strings → `innerHTML`. Re-render the relevant section after a successful save rather than patching individual DOM nodes.
+- **API calls:** Add mutation functions to `api.js` using `fetchJson` with `method: POST/PATCH/DELETE` and `headers: { "Content-Type": "application/json" }`.
+- **Aborting:** `runSearch()` / `AbortController` pattern is for search-as-you-type only. Mutation calls use plain `fetchJson`.
+
+### Scalar Editing — Implementation Notes
+The comparison table rows in `renderSongDetailComplete()` (Title, Year, BPM, ISRC) are the natural home for inline edit controls. Pattern:
+1. Render Library cell as `<span data-edit-field="year">1991</span> <button data-action="edit-field" data-song-id="..." data-field="year">✎</button>`
+2. Click → replace span with `<input>` pre-filled with current value
+3. Blur/Enter → validate → `PATCH /api/v1/songs/{id}` → re-render detail panel with updated song
+4. Validation error → add `.field-error` class + inline message, keep input focused
+
+`is_active` is a toggle (checkbox or button), not a text input — can live in the header or overview section.
+
+### Relationship Modals — Implementation Notes
+Modals are not yet in the codebase — need to be built. Suggested approach:
+- Single `<div id="edit-modal" class="modal-overlay">` injected into `dashboard.html` (hidden by default)
+- `openModal(html)` / `closeModal()` helpers in `main.js`
+- Each modal type (`credits`, `albums`, `tags`, `publishers`) renders its own content into the modal container
+- Atomic save on each action (add/remove/edit) — re-render the modal content after each save to reflect new state
+
+**Tags & Publishers modals** — same pattern, simplest to build first:
+- List current items as chips with `[x]` remove button (`data-action="remove-tag"` etc.)
+- Autocomplete text input — debounced search against `/api/v1/tags/search?q=...` or `/api/v1/publishers/search?q=...`
+- Dropdown results include existing matches + "Create new" option
+- Select → `POST /api/v1/songs/{id}/tags` or publishers → re-render chip list
+
+**Credits modal** — grouped by role, medium complexity:
+- Render groups from `song.credits` grouped by `role_name`
+- Each item: `[editable name] [x remove]` — name click → inline input → blur → `PATCH /api/v1/songs/{id}/credits/{name_id}`
+- "Add Performer / Composer / etc." → autocomplete within modal (searches identities via `/api/v1/identities/search?q=...`) → `POST /api/v1/songs/{id}/credits`
+- Roles available: Performer, Composer, Lyricist, Producer (from Roles table — currently hardcoded OK for MVP)
+
+**Albums modal** — most complex, defer last:
+- Search existing albums: `/api/v1/albums/search?q=...`, display rich context (title, year, artist, publisher)
+- After linking: show track/disc number inputs → `PATCH /api/v1/songs/{id}/albums/{album_id}`
+- Album record editing (title, year, type) → `PATCH /api/v1/albums/{album_id}`
+- Album artist editing → nested autocomplete → `POST /api/v1/albums/{album_id}/credits`
+- Album publisher → `PATCH /api/v1/albums/{album_id}/publisher`
+- "Import from song" shortcut: prefill album artist from `song.credits` where role=Performer
+
+### New API Functions Needed in `api.js`
+```js
+// Scalars
+patchSongScalars(songId, fields)          // PATCH /api/v1/songs/{id}
+
+// Credits
+addSongCredit(songId, displayName, roleName)   // POST /api/v1/songs/{id}/credits
+removeSongCredit(songId, creditId)             // DELETE /api/v1/songs/{id}/credits/{credit_id}
+updateCreditName(songId, nameId, displayName)  // PATCH /api/v1/songs/{id}/credits/{name_id}
+
+// Albums
+linkSongAlbum(songId, albumId, trackNumber, discNumber)  // POST /api/v1/songs/{id}/albums
+createAndLinkAlbum(songId, albumData, trackNumber, discNumber)
+unlinkSongAlbum(songId, albumId)               // DELETE /api/v1/songs/{id}/albums/{album_id}
+updateSongAlbumLink(songId, albumId, fields)   // PATCH /api/v1/songs/{id}/albums/{album_id}
+patchAlbum(albumId, fields)                    // PATCH /api/v1/albums/{album_id}
+addAlbumCredit(albumId, artistName)            // POST /api/v1/albums/{album_id}/credits
+removeAlbumCredit(albumId, nameId)             // DELETE /api/v1/albums/{album_id}/credits/{name_id}
+setAlbumPublisher(albumId, publisherName)      // PATCH /api/v1/albums/{album_id}/publisher
+
+// Tags
+addSongTag(songId, tagName, category)          // POST /api/v1/songs/{id}/tags
+removeSongTag(songId, tagId)                   // DELETE /api/v1/songs/{id}/tags/{tag_id}
+updateTag(tagId, tagName, category)            // PATCH /api/v1/tags/{tag_id}
+
+// Publishers
+addSongPublisher(songId, publisherName)        // POST /api/v1/songs/{id}/publishers
+removeSongPublisher(songId, publisherId)       // DELETE /api/v1/songs/{id}/publishers/{publisher_id}
+updatePublisher(publisherId, publisherName)    // PATCH /api/v1/publishers/{publisher_id}
+```
+
+### Suggested Build Order (Frontend)
+1. API functions in `api.js` (all at once — straightforward, no UI)
+2. Scalar inline editing (Title, Year, BPM, ISRC, is_active) + validation
+3. Tags modal (simplest relationship, good pattern to establish)
+4. Publishers modal (same pattern as tags)
+5. Credits modal (per-role grouping + inline name edit)
+6. Albums modal (defer — most complex)
 
 ---
 
