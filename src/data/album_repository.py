@@ -2,6 +2,7 @@ import sqlite3
 from typing import List, Optional, Dict, Mapping, Any
 
 from src.data.base_repository import BaseRepository
+from src.data.song_credit_repository import SongCreditRepository
 from src.models.domain import Album
 from src.services.logger import logger
 
@@ -101,6 +102,84 @@ class AlbumRepository(BaseRepository):
             f"[AlbumRepository] <- get_song_ids_for_albums() grouped={len(results)} albums"
         )
         return results
+
+    def create_album(self, title: str, album_type: str, release_year: int, conn: sqlite3.Connection) -> int:
+        """
+        Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id. Does NOT commit.
+        """
+        logger.debug(f"[AlbumRepository] -> create_album(title='{title}', year={release_year})")
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT AlbumID, IsDeleted FROM Albums WHERE AlbumTitle = ? COLLATE UTF8_NOCASE AND ReleaseYear IS ?",
+            (title, release_year),
+        ).fetchone()
+        if row:
+            album_id = row[0]
+            if row[1]:
+                cursor.execute("UPDATE Albums SET IsDeleted = 0 WHERE AlbumID = ?", (album_id,))
+            logger.debug(f"[AlbumRepository] <- create_album() reused album_id={album_id}")
+            return album_id
+        cursor.execute(
+            "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
+            (title, album_type, release_year),
+        )
+        album_id = cursor.lastrowid
+        logger.debug(f"[AlbumRepository] <- create_album() created album_id={album_id}")
+        return album_id
+
+    def update_album(self, album_id: int, fields: dict, conn: sqlite3.Connection) -> None:
+        """
+        Update editable Album fields. Partial updates — only send changed fields.
+        Does NOT commit.
+        """
+        logger.debug(f"[AlbumRepository] -> update_album(album_id={album_id}, fields={list(fields.keys())})")
+        col_map = {"title": "AlbumTitle", "album_type": "AlbumType", "release_year": "ReleaseYear"}
+        valid = {k: v for k, v in fields.items() if k in col_map}
+        if not valid:
+            return
+        set_clause = ", ".join(f"{col_map[k]} = ?" for k in valid)
+        conn.cursor().execute(
+            f"UPDATE Albums SET {set_clause} WHERE AlbumID = ?",
+            (*valid.values(), album_id),
+        )
+        logger.debug(f"[AlbumRepository] <- update_album() done")
+
+    def add_album_credit(self, album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None:
+        """
+        Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+        """
+        logger.debug(f"[AlbumRepository] -> add_album_credit(album_id={album_id}, name='{display_name}', role='{role_name}')")
+        credit_repo = SongCreditRepository(self.db_path)
+        cursor = conn.cursor()
+        role_id = credit_repo.get_or_create_role(role_name, cursor)
+        name_id = credit_repo.get_or_create_credit_name(display_name, cursor)
+        cursor.execute(
+            "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
+            (album_id, name_id, role_id),
+        )
+        logger.debug(f"[AlbumRepository] <- add_album_credit() done")
+
+    def remove_album_credit(self, album_id: int, name_id: int, conn: sqlite3.Connection) -> None:
+        """
+        Remove a credit link from an album. Keeps ArtistName record. Does NOT commit.
+        """
+        logger.debug(f"[AlbumRepository] -> remove_album_credit(album_id={album_id}, name_id={name_id})")
+        conn.cursor().execute(
+            "DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?", (album_id, name_id)
+        )
+        logger.debug(f"[AlbumRepository] <- remove_album_credit() done")
+
+    def set_album_publisher(self, album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None:
+        """
+        Set the publisher for an album (replaces existing). Does NOT commit.
+        """
+        logger.debug(f"[AlbumRepository] -> set_album_publisher(album_id={album_id}, publisher_id={publisher_id})")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+        cursor.execute(
+            "INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)", (album_id, publisher_id)
+        )
+        logger.debug(f"[AlbumRepository] <- set_album_publisher() done")
 
     def _row_to_album(self, row: Mapping[str, Any]) -> Album:
         return Album(

@@ -53,6 +53,9 @@ Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSo
 *Location: `src/data/song_repository.py`*
 **Responsibility**: Specialized access for the `Songs` table. Inherits core file management from `MediaSourceRepository`.
 
+### update_scalars(song_id: int, fields: dict, conn: sqlite3.Connection) -> None
+Update editable scalar fields for a song. Partial updates — only send changed fields. Splits between MediaSources (media_name, is_active) and Songs (bpm, year, isrc). Does NOT commit.
+
 ### get_by_id(song_id: int) -> Optional[Song]
 Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
 
@@ -109,6 +112,21 @@ Batch-fetches credits for multiple songs in a single query.
 - Performance optimized for list-views (Search/Folders).
 
 
+### get_or_create_role(role_name: str, cursor) -> int
+Get-or-create a Role by name. Returns role_id.
+
+### get_or_create_credit_name(display_name: str, cursor) -> int
+Get-or-create an ArtistName by display name. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
+
+### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> SongCredit
+Add a single credit to a song. Get-or-creates ArtistName and Role. Returns the SongCredit. Does NOT commit.
+
+### remove_credit(credit_id: int, conn: sqlite3.Connection) -> None
+Remove a single SongCredits link by CreditID. Keeps ArtistName record. Does NOT commit.
+
+### update_credit_name(name_id: int, new_name: str, conn: sqlite3.Connection) -> None
+Update an ArtistName's DisplayName globally. Affects all songs linked to this name. Does NOT commit.
+
 ### _row_to_song_credit(row: sqlite3.Row) -> SongCredit
 **Internal**: Maps a physical database row to the `SongCredit` domain model, ensuring that `RoleID` is correctly handled.
 
@@ -134,6 +152,15 @@ Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a se
 ### _insert_album_credits(cursor, album_id: int, album: SongAlbum) -> None
 **Internal**: Writes `AlbumCredits` rows for a newly created album. Get-or-creates `Roles` and `ArtistNames` (NULL identity for new names), then inserts `AlbumCredits` links.
 
+### add_album(source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None
+Link a song to an existing album. Does NOT commit.
+
+### remove_album(source_id: int, album_id: int, conn: sqlite3.Connection) -> None
+Remove a song-album link. Keeps Album record. Does NOT commit.
+
+### update_track_info(source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None
+Update track/disc number for a song-album link. Does NOT commit.
+
 ### _row_to_song_album(row: sqlite3.Row) -> SongAlbum
 **Internal**: Maps a physical database row to the strict Pydantic `SongAlbum` model.
 
@@ -157,6 +184,21 @@ Fetch all song IDs linked to a specific album, ordered by disc, track, and sourc
 
 ### get_song_ids_for_albums(album_ids: List[int]) -> Dict[int, List[int]]
 Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID].
+
+### create_album(title: str, album_type: str, release_year: int, conn: sqlite3.Connection) -> int
+Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id. Does NOT commit.
+
+### update_album(album_id: int, fields: dict, conn: sqlite3.Connection) -> None
+Update editable Album fields (title, album_type, release_year). Partial updates. Does NOT commit.
+
+### add_album_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None
+Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+
+### remove_album_credit(album_id: int, name_id: int, conn: sqlite3.Connection) -> None
+Remove a credit link from an album. Keeps ArtistName record. Does NOT commit.
+
+### set_album_publisher(album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
+Set the publisher for an album (replaces existing). Does NOT commit.
 
 ### _row_to_album(row: sqlite3.Row) -> Album
 **Internal**: Maps a physical database row to the strict Pydantic `Album` model.
@@ -206,6 +248,18 @@ Find all song IDs explicitly linked to this publisher (Master rights).
 ### get_song_ids_by_publisher_batch(publisher_ids: List[int]) -> Dict[int, List[int]]
 Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [SourceID].
 
+### get_or_create_publisher(name: str, cursor) -> int
+Get-or-create a Publisher by name. Reactivates soft-deleted. Returns publisher_id.
+
+### add_song_publisher(source_id: int, name: str, conn: sqlite3.Connection) -> Publisher
+Add a publisher link to a song. Get-or-creates the Publisher record. Returns the Publisher. Does NOT commit.
+
+### remove_song_publisher(source_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
+Remove a publisher link from a song. Keeps Publisher record. Does NOT commit.
+
+### update_publisher(publisher_id: int, name: str, conn: sqlite3.Connection) -> None
+Update a Publisher's name globally. Affects all songs linked to this publisher. Does NOT commit.
+
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
 
@@ -234,6 +288,18 @@ Get-or-create `Tags` rows (case-insensitive match on `TagName`), then insert `Me
 Batch-fetches tags for multiple songs (M2M).
 - Returns a flat list of `(SongID, Tag)` tuples.
 - Hydrates the `is_primary` flag from the `MediaSourceTags` table.
+
+### get_or_create_tag(name: str, category: str, cursor) -> int
+Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
+
+### add_tag(source_id: int, name: str, category: str, conn: sqlite3.Connection) -> Tag
+Add a tag to a song. Get-or-creates the Tag record. Returns the Tag. Does NOT commit.
+
+### remove_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
+Remove a tag link from a song. Keeps Tag record. Does NOT commit.
+
+### update_tag(tag_id: int, name: str, category: str, conn: sqlite3.Connection) -> None
+Update a Tag's name and category globally. Affects all songs linked to this tag. Does NOT commit.
 
 ### _row_to_tag(row: sqlite3.Row) -> Tag
 **Internal**: Maps a physical database row to the strict Pydantic `Tag` model, including the `IsPrimary` marker.

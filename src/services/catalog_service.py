@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 from typing import Optional, List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1088,3 +1089,352 @@ class CatalogService:
 
         logger.debug(f"[CatalogService] <- _get_songs_by_album(count={len(results)})")
         return results
+
+    # -------------------------------------------------------------------------
+    # CRUD Update Methods
+    # -------------------------------------------------------------------------
+
+    _SCALAR_ALLOWED = {"media_name", "year", "bpm", "isrc", "is_active"}
+
+    def update_song_scalars(self, song_id: int, fields: dict) -> Song:
+        """
+        Update editable scalar fields for a song.
+        Validates values per spec rules, then delegates to SongRepository.
+        Returns the fully hydrated Song.
+        Raises ValueError on validation failure, LookupError if song not found.
+        """
+        logger.debug(f"[CatalogService] -> update_song_scalars(id={song_id})")
+
+        unknown = set(fields) - self._SCALAR_ALLOWED
+        if unknown:
+            raise ValueError(f"Non-editable fields: {unknown}")
+
+        # Validate
+        import datetime
+        max_year = datetime.date.today().year + 1
+        if "media_name" in fields:
+            if not fields["media_name"] or not str(fields["media_name"]).strip():
+                raise ValueError("media_name cannot be empty")
+        if "year" in fields and fields["year"] is not None:
+            year = int(fields["year"])
+            if not (1860 <= year <= max_year):
+                raise ValueError(f"year must be between 1860 and {max_year}")
+            fields = {**fields, "year": year}
+        if "bpm" in fields and fields["bpm"] is not None:
+            bpm = int(fields["bpm"])
+            if not (1 <= bpm <= 300):
+                raise ValueError("bpm must be between 1 and 300")
+            fields = {**fields, "bpm": bpm}
+        if "isrc" in fields and fields["isrc"] is not None:
+            isrc = str(fields["isrc"]).replace("-", "").upper().strip()
+            if not re.match(r"^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$", isrc):
+                raise ValueError("isrc must be 12 characters: 2-letter country, 3-char registrant, 2-digit year, 5-digit designation")
+            fields = {**fields, "isrc": isrc}
+
+        conn = self._song_repo.get_connection()
+        try:
+            self._song_repo.update_scalars(song_id, fields, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_song_scalars(id={song_id}) FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+
+        song = self.get_song(song_id)
+        if not song:
+            raise LookupError(f"Song {song_id} not found after update")
+        logger.debug(f"[CatalogService] <- update_song_scalars(id={song_id}) OK")
+        return song
+
+    # --- Credits ---
+
+    def add_song_credit(self, song_id: int, display_name: str, role_name: str) -> SongCredit:
+        """Add artist credit to a song. Get-or-create artist name and role."""
+        logger.debug(f"[CatalogService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}')")
+        conn = self._credit_repo.get_connection()
+        try:
+            credit = self._credit_repo.add_credit(song_id, display_name, role_name, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- add_song_credit FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- add_song_credit OK credit_id={credit.credit_id}")
+        return credit
+
+    def remove_song_credit(self, song_id: int, credit_id: int) -> None:
+        """Remove a credit link from a song. Keeps the artist name record."""
+        logger.debug(f"[CatalogService] -> remove_song_credit(song_id={song_id}, credit_id={credit_id})")
+        conn = self._credit_repo.get_connection()
+        try:
+            self._credit_repo.remove_credit(credit_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_song_credit FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- remove_song_credit OK")
+
+    def update_credit_name(self, name_id: int, new_name: str) -> None:
+        """Update an artist's display name globally (affects all linked songs)."""
+        logger.debug(f"[CatalogService] -> update_credit_name(name_id={name_id}, new_name='{new_name}')")
+        if not new_name or not new_name.strip():
+            raise ValueError("Artist name cannot be empty")
+        conn = self._credit_repo.get_connection()
+        try:
+            self._credit_repo.update_credit_name(name_id, new_name, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_credit_name FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- update_credit_name OK")
+
+    # --- Albums ---
+
+    def add_song_album(self, song_id: int, album_id: int, track_number: Optional[int] = None, disc_number: Optional[int] = None) -> SongAlbum:
+        """Link an existing album to a song."""
+        logger.debug(f"[CatalogService] -> add_song_album(song_id={song_id}, album_id={album_id})")
+        conn = self._album_repo.get_connection()
+        try:
+            self._album_repo.add_album(song_id, album_id, track_number, disc_number, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- add_song_album FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        links = self._album_repo.get_albums_for_songs([song_id])
+        song_album = next((l for l in links if l.album_id == album_id), None)
+        logger.debug(f"[CatalogService] <- add_song_album OK")
+        return song_album
+
+    def create_and_link_album(self, song_id: int, album_data: dict, track_number: Optional[int] = None, disc_number: Optional[int] = None) -> SongAlbum:
+        """Create a new album record and link it to a song (single transaction)."""
+        logger.debug(f"[CatalogService] -> create_and_link_album(song_id={song_id})")
+        # Both repos share the same db_path — use one connection for atomicity
+        conn = self._album_repo_dir.get_connection()
+        try:
+            album_id = self._album_repo_dir.create_album(
+                album_data.get("title", ""),
+                album_data.get("album_type"),
+                album_data.get("release_year"),
+                conn,
+            )
+            # Pass conn directly; _album_repo uses the same db_path so any conn works
+            self._album_repo.add_album(song_id, album_id, track_number, disc_number, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- create_and_link_album FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        links = self._album_repo.get_albums_for_songs([song_id])
+        song_album = next((l for l in links if l.album_id == album_id), None)
+        logger.debug(f"[CatalogService] <- create_and_link_album OK album_id={album_id}")
+        return song_album
+
+    def remove_song_album(self, song_id: int, album_id: int) -> None:
+        """Unlink a song from an album. Keeps the album record."""
+        logger.debug(f"[CatalogService] -> remove_song_album(song_id={song_id}, album_id={album_id})")
+        conn = self._album_repo.get_connection()
+        try:
+            self._album_repo.remove_album(song_id, album_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_song_album FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- remove_song_album OK")
+
+    def update_song_album_link(self, song_id: int, album_id: int, track_number: Optional[int], disc_number: Optional[int]) -> None:
+        """Update track/disc numbers for a song-album link."""
+        logger.debug(f"[CatalogService] -> update_song_album_link(song_id={song_id}, album_id={album_id})")
+        conn = self._album_repo.get_connection()
+        try:
+            self._album_repo.update_track_info(song_id, album_id, track_number, disc_number, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_song_album_link FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- update_song_album_link OK")
+
+    def update_album(self, album_id: int, album_data: dict) -> Album:
+        """Update album record fields. Affects all linked songs globally."""
+        logger.debug(f"[CatalogService] -> update_album(album_id={album_id})")
+        conn = self._album_repo_dir.get_connection()
+        try:
+            self._album_repo_dir.update_album(album_id, album_data, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_album FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        album = self.get_album(album_id)
+        if not album:
+            raise LookupError(f"Album {album_id} not found after update")
+        logger.debug(f"[CatalogService] <- update_album OK")
+        return album
+
+    def add_album_credit(self, album_id: int, artist_name: str) -> None:
+        """Add a credited artist to an album. Get-or-create artist name."""
+        logger.debug(f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{artist_name}')")
+        conn = self._album_repo_dir.get_connection()
+        try:
+            self._album_repo_dir.add_album_credit(album_id, artist_name, "Performer", conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- add_album_credit FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- add_album_credit OK")
+
+    def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
+        """Remove a credited artist from an album."""
+        logger.debug(f"[CatalogService] -> remove_album_credit(album_id={album_id}, name_id={artist_name_id})")
+        conn = self._album_repo_dir.get_connection()
+        try:
+            self._album_repo_dir.remove_album_credit(album_id, artist_name_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_album_credit FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- remove_album_credit OK")
+
+    def update_album_publisher(self, album_id: int, publisher_name: str) -> None:
+        """Set or update the publisher for an album. Get-or-create publisher."""
+        logger.debug(f"[CatalogService] -> update_album_publisher(album_id={album_id}, publisher='{publisher_name}')")
+        conn = self._album_repo_dir.get_connection()
+        try:
+            publisher_id = self._pub_repo.get_or_create_publisher(publisher_name, conn.cursor())
+            self._album_repo_dir.set_album_publisher(album_id, publisher_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_album_publisher FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- update_album_publisher OK")
+
+    # --- Tags ---
+
+    def add_song_tag(self, song_id: int, tag_name: str, category: str) -> Tag:
+        """Add a tag to a song. Get-or-create tag."""
+        logger.debug(f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', cat='{category}')")
+        conn = self._tag_repo.get_connection()
+        try:
+            tag = self._tag_repo.add_tag(song_id, tag_name, category, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- add_song_tag FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- add_song_tag OK tag_id={tag.id}")
+        return tag
+
+    def remove_song_tag(self, song_id: int, tag_id: int) -> None:
+        """Remove a tag link from a song. Keeps the tag record."""
+        logger.debug(f"[CatalogService] -> remove_song_tag(song_id={song_id}, tag_id={tag_id})")
+        conn = self._tag_repo.get_connection()
+        try:
+            self._tag_repo.remove_tag(song_id, tag_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_song_tag FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- remove_song_tag OK")
+
+    def update_tag(self, tag_id: int, new_name: str, new_category: str) -> None:
+        """Update tag name/category globally (affects all linked songs)."""
+        logger.debug(f"[CatalogService] -> update_tag(tag_id={tag_id})")
+        if not new_name or not new_name.strip():
+            raise ValueError("Tag name cannot be empty")
+        conn = self._tag_repo.get_connection()
+        try:
+            self._tag_repo.update_tag(tag_id, new_name, new_category, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_tag FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- update_tag OK")
+
+    # --- Publishers ---
+
+    def add_song_publisher(self, song_id: int, publisher_name: str) -> Publisher:
+        """Add a publisher link to a song. Get-or-create publisher."""
+        logger.debug(f"[CatalogService] -> add_song_publisher(song_id={song_id}, publisher='{publisher_name}')")
+        conn = self._pub_repo.get_connection()
+        try:
+            publisher = self._pub_repo.add_song_publisher(song_id, publisher_name, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- add_song_publisher FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- add_song_publisher OK pub_id={publisher.id}")
+        return publisher
+
+    def remove_song_publisher(self, song_id: int, publisher_id: int) -> None:
+        """Remove a publisher link from a song. Keeps the publisher record."""
+        logger.debug(f"[CatalogService] -> remove_song_publisher(song_id={song_id}, pub_id={publisher_id})")
+        conn = self._pub_repo.get_connection()
+        try:
+            self._pub_repo.remove_song_publisher(song_id, publisher_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_song_publisher FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- remove_song_publisher OK")
+
+    def update_publisher(self, publisher_id: int, new_name: str) -> None:
+        """Update publisher name globally (affects all linked songs)."""
+        logger.debug(f"[CatalogService] -> update_publisher(pub_id={publisher_id})")
+        if not new_name or not new_name.strip():
+            raise ValueError("Publisher name cannot be empty")
+        conn = self._pub_repo.get_connection()
+        try:
+            self._pub_repo.update_publisher(publisher_id, new_name, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- update_publisher FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug(f"[CatalogService] <- update_publisher OK")

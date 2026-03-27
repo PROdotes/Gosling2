@@ -1,6 +1,7 @@
 import sqlite3
 from typing import Any, List, Mapping
 from src.data.base_repository import BaseRepository
+from src.data.song_credit_repository import SongCreditRepository
 from src.models.domain import SongAlbum
 from src.services.logger import logger
 
@@ -162,41 +163,10 @@ class SongAlbumRepository(BaseRepository):
         logger.debug(
             f"[SongAlbumRepository] -> _insert_album_credits(album_id={album_id}, count={len(album.credits)})"
         )
+        credit_repo = SongCreditRepository(self.db_path)
         for credit in album.credits:
-            # Get-or-create Role
-            row = cursor.execute(
-                "SELECT RoleID FROM Roles WHERE RoleName = ?",
-                (credit.role_name,),
-            ).fetchone()
-            if row:
-                role_id = row[0]
-            else:
-                cursor.execute(
-                    "INSERT INTO Roles (RoleName) VALUES (?)",
-                    (credit.role_name,),
-                )
-                role_id = cursor.lastrowid
-
-            # Get-or-create ArtistName
-            # Include soft-deleted rows to reconnect instead of duplicating.
-            row = cursor.execute(
-                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ?",
-                (credit.display_name,),
-            ).fetchone()
-            if row:
-                name_id = row[0]
-                if row[1]:  # IsDeleted — wake it up
-                    cursor.execute(
-                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
-                        (name_id,),
-                    )
-            else:
-                cursor.execute(
-                    "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (NULL, ?, 0)",
-                    (credit.display_name,),
-                )
-                name_id = cursor.lastrowid
-
+            role_id = credit_repo.get_or_create_role(credit.role_name, cursor)
+            name_id = credit_repo.get_or_create_credit_name(credit.display_name, cursor)
             cursor.execute(
                 "INSERT INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
                 (album_id, name_id, role_id),
@@ -204,6 +174,38 @@ class SongAlbumRepository(BaseRepository):
         logger.debug(
             f"[SongAlbumRepository] <- _insert_album_credits(album_id={album_id}) wrote {len(album.credits)} credits"
         )
+
+    def add_album(self, source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None:
+        """
+        Link a song to an existing album. Does NOT commit.
+        """
+        logger.debug(f"[SongAlbumRepository] -> add_album(source_id={source_id}, album_id={album_id})")
+        conn.cursor().execute(
+            "INSERT OR IGNORE INTO SongAlbums (SourceID, AlbumID, TrackNumber, DiscNumber, IsPrimary) VALUES (?, ?, ?, ?, 1)",
+            (source_id, album_id, track_number, disc_number),
+        )
+        logger.debug(f"[SongAlbumRepository] <- add_album() done")
+
+    def remove_album(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> None:
+        """
+        Remove a song-album link. Keeps Album record. Does NOT commit.
+        """
+        logger.debug(f"[SongAlbumRepository] -> remove_album(source_id={source_id}, album_id={album_id})")
+        conn.cursor().execute(
+            "DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?", (source_id, album_id)
+        )
+        logger.debug(f"[SongAlbumRepository] <- remove_album() done")
+
+    def update_track_info(self, source_id: int, album_id: int, track_number: int, disc_number: int, conn: sqlite3.Connection) -> None:
+        """
+        Update track/disc number for a song-album link. Does NOT commit.
+        """
+        logger.debug(f"[SongAlbumRepository] -> update_track_info(source_id={source_id}, album_id={album_id})")
+        conn.cursor().execute(
+            "UPDATE SongAlbums SET TrackNumber = ?, DiscNumber = ? WHERE SourceID = ? AND AlbumID = ?",
+            (track_number, disc_number, source_id, album_id),
+        )
+        logger.debug(f"[SongAlbumRepository] <- update_track_info() done")
 
     def _row_to_song_album(self, row: Mapping[str, Any]) -> SongAlbum:
         """Map a database row to a SongAlbum Pydantic model."""

@@ -131,6 +131,60 @@ Parallel batch ingestion of multiple already-staged files.
 - Ensures each thread gets its own database connection.
 - Catches exceptions and returns error report instead of crashing thread.
 
+### update_song_scalars(song_id: int, fields: dict) -> Song
+Update editable scalar fields (media_name, year, bpm, isrc, is_active). Validates values per spec rules. Returns the fully hydrated Song. Raises ValueError on validation failure, LookupError if not found.
+
+### add_song_credit(song_id: int, display_name: str, role_name: str) -> SongCredit
+Add an artist credit to a song. Get-or-create artist name and role. Returns the created SongCredit.
+
+### remove_song_credit(song_id: int, credit_id: int) -> None
+Remove a credit link from a song by credit_id. Keeps the artist name record.
+
+### update_credit_name(name_id: int, new_name: str) -> None
+Update an artist's display name globally (affects all songs linked to that artist).
+
+### add_song_album(song_id: int, album_id: int, track_number: Optional[int], disc_number: Optional[int]) -> SongAlbum
+Link an existing album to a song. Returns the SongAlbum link object.
+
+### create_and_link_album(song_id: int, album_data: dict, track_number: Optional[int], disc_number: Optional[int]) -> SongAlbum
+Create a new album record and link it to a song in a single transaction. Returns the SongAlbum link object.
+
+### remove_song_album(song_id: int, album_id: int) -> None
+Unlink a song from an album. Keeps the album record.
+
+### update_song_album_link(song_id: int, album_id: int, track_number: Optional[int], disc_number: Optional[int]) -> None
+Update track/disc numbers for an existing song-album link.
+
+### update_album(album_id: int, album_data: dict) -> Album
+Update album record fields (title, year, release_type). Returns the fully hydrated Album. Affects all linked songs globally.
+
+### add_album_credit(album_id: int, artist_name: str) -> None
+Add a credited artist to an album. Get-or-create artist name.
+
+### remove_album_credit(album_id: int, artist_name_id: int) -> None
+Remove a credited artist from an album.
+
+### update_album_publisher(album_id: int, publisher_name: str) -> None
+Set or update the publisher for an album. Get-or-create publisher.
+
+### add_song_tag(song_id: int, tag_name: str, category: str) -> Tag
+Add a tag to a song. Get-or-create tag. Returns the Tag object.
+
+### remove_song_tag(song_id: int, tag_id: int) -> None
+Remove a tag link from a song. Keeps the tag record.
+
+### update_tag(tag_id: int, new_name: str, new_category: str) -> None
+Update tag name/category globally (affects all linked songs).
+
+### add_song_publisher(song_id: int, publisher_name: str) -> Publisher
+Add a publisher link to a song. Get-or-create publisher. Returns the Publisher object.
+
+### remove_song_publisher(song_id: int, publisher_id: int) -> None
+Remove a publisher link from a song. Keeps the publisher record.
+
+### update_publisher(publisher_id: int, new_name: str) -> None
+Update publisher name globally (affects all linked songs).
+
 ### delete_song(song_id: int) -> bool
 Atomic hard-delete of a song and its physical file.
 - Removes record from DB via `SongRepository`.

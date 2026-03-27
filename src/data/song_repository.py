@@ -115,6 +115,36 @@ class SongRepository(MediaSourceRepository):
             f"[SongRepository] <- reactivate_ghost() REACTIVATED ID={ghost_id} '{song.media_name}'"
         )
 
+    def update_scalars(self, song_id: int, fields: dict, conn: sqlite3.Connection) -> None:
+        """
+        Update editable scalar fields for a song. Partial updates — only send changed fields.
+        Splits updates between MediaSources (media_name, is_active) and Songs (bpm, year, isrc).
+        Does NOT commit.
+        """
+        logger.debug(f"[SongRepository] -> update_scalars(id={song_id}, fields={list(fields.keys())})")
+
+        media_source_fields = {k: v for k, v in fields.items() if k in ("media_name", "is_active")}
+        songs_fields = {k: v for k, v in fields.items() if k in ("bpm", "year", "isrc")}
+
+        col_map = {"media_name": "MediaName", "is_active": "IsActive", "bpm": "TempoBPM", "year": "RecordingYear", "isrc": "ISRC"}
+
+        cursor = conn.cursor()
+        if media_source_fields:
+            set_clause = ", ".join(f"{col_map[k]} = ?" for k in media_source_fields)
+            cursor.execute(
+                f"UPDATE MediaSources SET {set_clause} WHERE SourceID = ?",
+                (*media_source_fields.values(), song_id),
+            )
+
+        if songs_fields:
+            set_clause = ", ".join(f"{col_map[k]} = ?" for k in songs_fields)
+            cursor.execute(
+                f"UPDATE Songs SET {set_clause} WHERE SourceID = ?",
+                (*songs_fields.values(), song_id),
+            )
+
+        logger.debug(f"[SongRepository] <- update_scalars(id={song_id}) done")
+
     def get_by_id(self, song_id: int) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
         logger.debug(f"[SongRepository] -> get_by_id(id={song_id})")

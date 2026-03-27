@@ -30,6 +30,7 @@ class MediaSource(DomainModel):
 class SongCredit(DomainModel):
     """The bridge between a Track and an Actor (Alias)."""
 
+    credit_id: Optional[int] = None
     source_id: Optional[int] = None
     name_id: Optional[int] = None
     identity_id: Optional[int] = None  # The parent Identity ID

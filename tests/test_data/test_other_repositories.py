@@ -647,6 +647,7 @@ class TestRowToAlbumCredit:
 class TestRowToSongCredit:
     def test_all_fields_present(self, mock_db_path):
         mock_row = {
+            "CreditID": 99,
             "SourceID": 1,
             "CreditedNameID": 10,
             "RoleID": 1,
@@ -667,6 +668,7 @@ class TestRowToSongCredit:
 
     def test_null_fields(self, mock_db_path):
         mock_row = {
+            "CreditID": None,
             "SourceID": None,
             "CreditedNameID": None,
             "RoleID": 1,
