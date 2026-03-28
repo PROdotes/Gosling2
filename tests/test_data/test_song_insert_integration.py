@@ -30,6 +30,7 @@ class TestInsertFullSong:
             media_name="Integration Test Song",
             source_path="/test/integration.mp3",
             duration_s=210.5,
+            processing_status=2,
             audio_hash="integration_hash_001",
             bpm=128,
             year=2025,
@@ -136,6 +137,7 @@ class TestInsertFullSong:
             media_name="Bare Song",
             source_path="/test/bare.mp3",
             duration_s=60.0,
+            processing_status=2,
         )
 
         conn = song_repo.get_connection()
@@ -159,6 +161,7 @@ class TestInsertFullSong:
             media_name="Another Nevermind Track",
             source_path="/test/nevermind_bonus.mp3",
             duration_s=180.0,
+            processing_status=2,
             year=1991,
             tags=[Tag(name="Grunge", category="Genre")],
             albums=[

@@ -16,11 +16,10 @@ def _assert_songview_defaults(
     assert (
         view.duration_ms == expected_duration_ms
     ), f"Expected duration_ms={expected_duration_ms}, got {view.duration_ms}"
-    assert view.audio_hash is None, f"Expected audio_hash=None, got {view.audio_hash}"
-    # MediaSource.processing_status is Optional[int] = None, so from_domain passes None
+    # MediaSource.processing_status is now a mandatory int
     assert (
-        view.processing_status is None
-    ), f"Expected processing_status=None, got {view.processing_status}"
+        view.processing_status == 0
+    ), f"Expected processing_status=0, got {view.processing_status}"
     assert view.is_active is False, f"Expected is_active=False, got {view.is_active}"
     assert view.notes is None, f"Expected notes=None, got {view.notes}"
     assert view.bpm is None, f"Expected bpm=None, got {view.bpm}"
@@ -45,6 +44,7 @@ class TestPublisherLogic:
             media_name="Test Song",
             source_path="test/path.mp3",
             duration_s=180.0,
+            processing_status=0,
             publishers=[pub_a, pub_b],
             albums=[
                 SongAlbum(album_title="Album None", album_publishers=[]),
@@ -122,6 +122,7 @@ class TestPublisherLogic:
             media_name="Test Song 2",
             source_path="test/path2.mp3",
             duration_s=180.0,
+            processing_status=0,
             publishers=[],
             albums=[
                 SongAlbum(album_title="Album A", album_publishers=[pub_a]),

@@ -44,6 +44,7 @@ class TestSongViewFromDomain:
             media_name="Test Song",
             source_path="/test/path",
             duration_s=200.0,
+            processing_status=0,
             is_active=True,
             credits=[],
             albums=[],
@@ -97,14 +98,14 @@ class TestSongViewFromDomain:
         self._assert_song_view_defaults(view, song)
 
     def test_basic_fields_default_optional_values(self):
-        """Optional fields default correctly when not provided."""
+        """Optional fields (except workflow status) default correctly when not provided."""
         song = self._make_song(
             bpm=None,
             year=None,
             isrc=None,
             notes=None,
             audio_hash=None,
-            processing_status=None,
+            processing_status=0,
         )
         view = SongView.from_domain(song)
         assert view.bpm is None, f"Expected bpm=None, got {view.bpm}"
@@ -115,8 +116,8 @@ class TestSongViewFromDomain:
             view.audio_hash is None
         ), f"Expected audio_hash=None, got {view.audio_hash}"
         assert (
-            view.processing_status is None
-        ), f"Expected processing_status=None, got {view.processing_status}"
+            view.processing_status == 0
+        ), f"Expected processing_status=0, got {view.processing_status}"
 
     def test_formatted_duration_standard(self):
         """3 min 20 sec = 200.0s -> '3:20'."""
@@ -452,6 +453,67 @@ class TestSongViewFromDomain:
 
 
 # ===========================================================================
+# SongView.review_blockers
+# ===========================================================================
+class TestSongViewReviewWorkflow:
+    """Tests the review_blockers logic from SONG_WORKFLOW_SPEC.md."""
+
+    def _make_song_view(self, **overrides) -> SongView:
+        defaults = {
+            "id": 1,
+            "media_name": "Test Song",
+            "title": "Test Song",
+            "source_path": "/test/path",
+            "duration_s": 180.0,
+            "year": 2024,
+            "credits": [
+                SongCredit(role_name="Performer", display_name="Artist A"),
+                SongCredit(role_name="Composer", display_name="Artist B"),
+            ],
+            "tags": [Tag(name="Rock", category="Genre")],
+            "publishers": [Publisher(name="Pub A")],
+            "processing_status": 1,
+        }
+        defaults.update(overrides)
+        return SongView(**defaults)
+
+    def test_ready_flow_all_fields_present(self):
+        """Standard valid song has no blockers."""
+        view = self._make_song_view()
+        assert view.review_blockers == []
+
+    def test_ready_flow_missing_performer(self):
+        """Required: at least 1 Performer."""
+        view = self._make_song_view(credits=[SongCredit(role_name="Composer", display_name="Artist B")])
+        assert "performers" in view.review_blockers
+
+    def test_ready_flow_missing_composer(self):
+        """Required: at least 1 Composer."""
+        view = self._make_song_view(credits=[SongCredit(role_name="Performer", display_name="Artist A")])
+        assert "composers" in view.review_blockers
+
+    def test_ready_flow_missing_genre(self):
+        """Required: at least 1 Genre tag."""
+        view = self._make_song_view(tags=[Tag(name="Fast", category="Tempo")])
+        assert "genres" in view.review_blockers
+
+    def test_ready_flow_missing_publisher(self):
+        """Required: at least 1 Publisher."""
+        view = self._make_song_view(publishers=[])
+        assert "publishers" in view.review_blockers
+
+    def test_ready_flow_missing_year(self):
+        """Required: Year."""
+        view = self._make_song_view(year=None)
+        assert "year" in view.review_blockers
+
+    def test_ready_flow_already_approved(self):
+        """Songs already at status 0 still report blockers correctly."""
+        view = self._make_song_view(processing_status=0)
+        assert view.review_blockers == []
+
+
+# ===========================================================================
 # SongAlbumView computed fields
 # ===========================================================================
 class TestSongAlbumViewComputed:
@@ -564,6 +626,7 @@ class TestAlbumViewFromDomain:
             media_name="Song",
             source_path="/p",
             duration_s=180.0,
+            processing_status=0,
             is_active=True,
         )
         defaults.update(overrides)
@@ -985,6 +1048,7 @@ class TestSongSlimViewFromRow:
             "TempoBPM": 120,
             "ISRC": "USRC17607839",
             "IsActive": 1,
+            "ProcessingStatus": 1,
             "DisplayArtist": "Nirvana",
             "PrimaryGenre": "Grunge",
         }
@@ -1013,6 +1077,9 @@ class TestSongSlimViewFromRow:
             view.isrc == "USRC17607839"
         ), f"Expected 'USRC17607839', got '{view.isrc}'"
         assert view.is_active is True, f"Expected True, got {view.is_active}"
+        assert (
+            view.processing_status == 1
+        ), f"Expected processing_status=1, got {view.processing_status}"
         assert (
             view.display_artist == "Nirvana"
         ), f"Expected 'Nirvana', got '{view.display_artist}'"
@@ -1052,6 +1119,20 @@ class TestSongSlimViewFromRow:
         assert (
             inactive_view.is_active is False
         ), f"Expected False for IsActive=0, got {inactive_view.is_active}"
+
+    def test_status_mapping(self):
+        """ProcessingStatus maps directly; missing key defaults to 0."""
+        status_0_view = SongSlimView.from_row(self._make_row(ProcessingStatus=0))
+        assert (
+            status_0_view.processing_status == 0
+        ), f"Expected 0, got {status_0_view.processing_status}"
+
+        # Test that missing key raises KeyError (Fail-Fast)
+        row = self._make_row()
+        del row["ProcessingStatus"]
+        import pytest
+        with pytest.raises(KeyError):
+            SongSlimView.from_row(row)
 
     def test_null_duration_defaults_to_zero(self):
         """NULL SourceDuration maps to 0.0 (never raises)."""

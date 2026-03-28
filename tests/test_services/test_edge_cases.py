@@ -93,8 +93,8 @@ class TestSongEdgeCases:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -124,8 +124,8 @@ class TestSongEdgeCases:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -159,8 +159,8 @@ class TestSongEdgeCases:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -194,8 +194,8 @@ class TestSongEdgeCases:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -235,8 +235,8 @@ class TestSongEdgeCases:
             view.audio_hash is None
         ), f"Expected audio_hash=None, got {view.audio_hash}"
         assert (
-            view.processing_status is None
-        ), f"Expected processing_status=None, got {view.processing_status}"
+            view.processing_status == 1
+        ), f"Expected processing_status=1, got {view.processing_status}"
         assert view.is_active is True, f"Expected is_active=True, got {view.is_active}"
         assert view.notes is None, f"Expected notes=None, got {view.notes}"
         assert view.bpm is None, f"Expected bpm=None, got {view.bpm}"
@@ -430,8 +430,8 @@ class TestCreditWithNoIdentityName:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -545,8 +545,8 @@ class TestSongsWithNoAlbum:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected processing_status=0, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -593,8 +593,8 @@ class TestSongsWithNoAlbum:
             song.audio_hash is None
         ), f"Expected audio_hash=None, got {song.audio_hash}"
         assert (
-            song.processing_status is None
-        ), f"Expected processing_status=None, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected processing_status=0, got {song.processing_status}"
         assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
         assert song.notes is None, f"Expected notes=None, got {song.notes}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
@@ -686,7 +686,7 @@ class TestGeneralEdgeCases:
         conn = sqlite3.connect(populated_db)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration) VALUES (99, 1, 'Composer Only', '/path/99', 100)"
+            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, ProcessingStatus) VALUES (99, 1, 'Composer Only', '/path/99', 100, 0)"
         )
         cursor.execute("INSERT INTO Songs (SourceID) VALUES (99)")
         cursor.execute(

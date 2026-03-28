@@ -247,34 +247,22 @@ def _populate_db_data(db_path):
         "INSERT INTO Publishers (PublisherID, PublisherName, ParentPublisherID) VALUES (10, 'DGC Records', 1)"
     )
 
-    # --- Media Sources + Songs ---
-    # sid, tid, name, path, dur, active, ahash, recording_year, bpm, isrc
+    # sid, tid, name, path, dur, active, ahash, status, recording_year, bpm, isrc
     songs = [
-        (
-            1,
-            1,
-            "Smells Like Teen Spirit",
-            "/path/1",
-            200,
-            1,
-            "hash_1",
-            1991,
-            None,
-            None,
-        ),
-        (2, 1, "Everlong", "/path/2", 240, 1, None, 1997, None, None),
-        (3, 1, "Range Rover Bitch", "/path/3", 180, 1, None, 2016, None, None),
-        (4, 1, "Grohlton Theme", "/path/4", 120, 1, None, None, None, None),
-        (5, 1, "Pocketwatch Demo", "/path/5", 180, 1, None, 1992, None, None),
-        (6, 1, "Dual Credit Track", "/path/6", 300, 1, None, None, None, None),
-        (7, 1, "Hollow Song", "/path/7", 10, 1, None, None, 128, "ISRC123"),
-        (8, 1, "Joint Venture", "/path/8", 180, 1, None, None, None, None),
-        (9, 1, "Priority Test", "/path/9", 100, 1, None, None, None, None),
+        (1, 1, "Smells Like Teen Spirit", "/path/1", 200, 1, "hash_1", 0, 1991, None, None),
+        (2, 1, "Everlong", "/path/2", 240, 1, None, 0, 1997, None, None),
+        (3, 1, "Range Rover Bitch", "/path/3", 180, 1, None, 0, 2016, None, None),
+        (4, 1, "Grohlton Theme", "/path/4", 120, 1, None, 0, None, None, None),
+        (5, 1, "Pocketwatch Demo", "/path/5", 180, 1, None, 0, 1992, None, None),
+        (6, 1, "Dual Credit Track", "/path/6", 300, 1, None, 0, None, None, None),
+        (7, 1, "Hollow Song", "/path/7", 10, 1, None, 1, None, 128, "ISRC123"),
+        (8, 1, "Joint Venture", "/path/8", 180, 1, None, 0, None, None, None),
+        (9, 1, "Priority Test", "/path/9", 100, 1, None, 1, None, None, None),
     ]
-    for sid, tid, name, path, dur, active, ahash, ryear, bpm, isrc in songs:
+    for sid, tid, name, path, dur, active, ahash, status, ryear, bpm, isrc in songs:
         cursor.execute(
-            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, AudioHash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (sid, tid, name, path, dur, active, ahash),
+            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, AudioHash, ProcessingStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (sid, tid, name, path, dur, active, ahash, status),
         )
         cursor.execute(
             "INSERT INTO Songs (SourceID, RecordingYear, TempoBPM, ISRC) VALUES (?, ?, ?, ?)",
@@ -455,24 +443,17 @@ def _populate_edge_case_data(db_path):
 
     # --- Songs ---
     edge_songs = [
-        (100, 1, "Orphaned Song", "/edge/1", 180, 1),
-        (101, 1, " ", "/edge/2", 60, 1),  # whitespace title
-        (102, 1, "A", "/edge/3", 30, 1),  # single char
-        (103, 1, "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0", "/edge/4", 200, 1),  # Japanese
-        (104, 1, "Zero Duration", "/edge/5", 0, 1),  # zero duration
-        (
-            105,
-            1,
-            "No Identity Name Song",
-            "/edge/6",
-            120,
-            1,
-        ),  # credits identity with no ArtistName
+        (100, 1, "Orphaned Song", "/edge/1", 180, 1, 1),
+        (101, 1, " ", "/edge/2", 60, 1, 1),
+        (102, 1, "A", "/edge/3", 30, 1, 1),
+        (103, 1, "\u65e5\u672c\u8a9e\u30bd\u30f3\u30b0", "/edge/4", 200, 1, 1),
+        (104, 1, "Zero Duration", "/edge/5", 0, 1, 1),
+        (105, 1, "No Identity Name Song", "/edge/6", 120, 1, 1),
     ]
-    for sid, tid, name, path, dur, active in edge_songs:
+    for sid, tid, name, path, dur, active, status in edge_songs:
         cursor.execute(
-            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) VALUES (?, ?, ?, ?, ?, ?)",
-            (sid, tid, name, path, dur, active),
+            "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, ProcessingStatus) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (sid, tid, name, path, dur, active, status),
         )
         cursor.execute("INSERT INTO Songs (SourceID) VALUES (?)", (sid,))
 

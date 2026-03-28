@@ -17,7 +17,7 @@ class MediaSource(DomainModel):
     source_path: str
     duration_s: float
     audio_hash: Optional[str] = None
-    processing_status: Optional[int] = None
+    processing_status: int
     is_active: bool = False
     notes: Optional[str] = None
 

@@ -175,7 +175,9 @@ class SongCreditRepository(BaseRepository):
             (new_name, name_id),
         )
         if cursor.rowcount == 0:
-            logger.warning(f"[SongCreditRepository] update_credit_name(id={name_id}) NOT_FOUND")
+            logger.warning(
+                f"[SongCreditRepository] update_credit_name(id={name_id}) NOT_FOUND"
+            )
             raise LookupError(f"ArtistName {name_id} not found")
         logger.debug("[SongCreditRepository] <- update_credit_name() done")
 

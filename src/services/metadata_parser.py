@@ -50,6 +50,7 @@ class MetadataParser:
             "media_name": "",
             "source_path": str(file_path),
             "duration_s": 0.0,
+            "processing_status": 2,  # Virgin: newly parsed, not yet enriched
             "credits": [],
             "tags": [],
             "albums": [],
@@ -60,7 +61,9 @@ class MetadataParser:
         # Temporary buckets for list-based data to allow deduplication while preserving order
         credits_dict = {}  # role_name -> list of display_names
         tags_dict = {}  # category -> list of names
-        primary_tag_categories: set = set()  # categories that already have a primary from dynamic frames
+        primary_tag_categories: set = (
+            set()
+        )  # categories that already have a primary from dynamic frames
         album_titles = []
         publisher_names = []
         album_artists = []
@@ -143,7 +146,9 @@ class MetadataParser:
                     # Normalize category name (e.g. FESTIVAL -> Festival)
                     cat_name = desc.capitalize()
                     for i, v in enumerate(values):
-                        song_data["tags"].append(Tag(name=str(v), category=cat_name, is_primary=(i == 0)))
+                        song_data["tags"].append(
+                            Tag(name=str(v), category=cat_name, is_primary=(i == 0))
+                        )
                         if i == 0:
                             primary_tag_categories.add(cat_name)
                 elif not field_name:
@@ -166,7 +171,9 @@ class MetadataParser:
             already_has_primary = category in primary_tag_categories
             for i, name in enumerate(dict.fromkeys(names)):
                 is_primary = (i == 0) and not already_has_primary
-                song_data["tags"].append(Tag(name=name, category=category, is_primary=is_primary))
+                song_data["tags"].append(
+                    Tag(name=name, category=category, is_primary=is_primary)
+                )
 
         # Move contextual fields from root to relationship-only
         track_num = song_data.pop("track_number", None)

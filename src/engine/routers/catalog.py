@@ -12,7 +12,7 @@ from src.models.view_models import (
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
-from src.engine.config import get_db_path
+from src.engine.config import get_db_path, SCALAR_VALIDATION
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
@@ -223,3 +223,22 @@ async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
         result["song"] = SongView.from_domain(result["song"])
 
     return IngestionReportView(**result)
+
+
+@router.get("/validation-rules")
+def get_validation_rules():
+    """Returns scalar field validation rules for frontend use."""
+    import datetime
+
+    year_rules = SCALAR_VALIDATION["year"]
+    return {
+        "year": {
+            "min": year_rules["min"],
+            "max": datetime.date.today().year + year_rules["max_offset"],
+        },
+        "bpm": {
+            "min": SCALAR_VALIDATION["bpm"]["min"],
+            "max": SCALAR_VALIDATION["bpm"]["max"],
+        },
+        "isrc": {"pattern": SCALAR_VALIDATION["isrc"]["pattern"]},
+    }

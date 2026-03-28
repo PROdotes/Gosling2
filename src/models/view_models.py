@@ -69,6 +69,7 @@ class SongSlimView(BaseModel):
     bpm: Optional[int] = None
     isrc: Optional[str] = None
     is_active: bool = False
+    processing_status: int
     display_artist: Optional[str] = None
     primary_genre: Optional[str] = None
 
@@ -94,6 +95,7 @@ class SongSlimView(BaseModel):
             bpm=row["TempoBPM"],
             isrc=row["ISRC"],
             is_active=bool(row["IsActive"]),
+            processing_status=row["ProcessingStatus"],
             display_artist=row["DisplayArtist"],
             primary_genre=row["PrimaryGenre"],
         )
@@ -220,8 +222,29 @@ class SongView(BaseModel):
         # 2. First Genre tag wins if no explicit primary
         if genre_tags:
             return genre_tags[0].name
-
         return None
+
+    @computed_field
+    @property
+    def review_blockers(self) -> list[str]:
+        """
+        Returns field names that must be filled before processing_status can be set to 0.
+        Empty list means the song is ready for review.
+        """
+        blockers = []
+        if not self.media_name:
+            blockers.append("media_name")
+        if not self.year:
+            blockers.append("year")
+        if not any(c.role_name == "Performer" for c in self.credits):
+            blockers.append("performers")
+        if not any(c.role_name == "Composer" for c in self.credits):
+            blockers.append("composers")
+        if not any(t.category and t.category.lower() == "genre" for t in self.tags):
+            blockers.append("genres")
+        if not self.publishers:
+            blockers.append("publishers")
+        return blockers
 
 
 class AlbumSlimView(BaseModel):
@@ -354,6 +377,7 @@ class SongScalarUpdate(BaseModel):
     year: Optional[int] = None
     bpm: Optional[int] = None
     isrc: Optional[str] = None
+    processing_status: Optional[int] = None
     is_active: Optional[bool] = None
     notes: Optional[str] = None
 

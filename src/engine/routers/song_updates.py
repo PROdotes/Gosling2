@@ -3,6 +3,7 @@ from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 from src.models.domain import SongCredit, Tag, Publisher, SongAlbum, Album
 from src.models.view_models import (
+    SongView,
     SongScalarUpdate,
     AddCreditBody,
     UpdateCreditNameBody,
@@ -54,7 +55,7 @@ async def update_song_scalars(
     try:
         song = service.update_song_scalars(song_id, fields)
         logger.debug(f"[SongUpdates] <- update_song_scalars(id={song_id}) OK")
-        return song
+        return SongView.from_domain(song)
     except ValueError as e:
         logger.warning(
             f"[SongUpdates] <- update_song_scalars(id={song_id}) VAL_ERROR: {e}"

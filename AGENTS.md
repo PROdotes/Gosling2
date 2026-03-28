@@ -53,14 +53,29 @@ A task is not done until:
 ---
 
 ## 7. Execution Protocol (Strict TDD Per-Method)
-- Every response that includes code MUST begin with the **Execution Checklist** progress status. 
-- If a response contains implementation code for more than one atomic item in that checklist, it is a **VIOLATION** and must be rejected.
-- **Rule 7.5 (Step Cap)**: You are strictly forbidden from executing more than **10 atomic tool calls** in any single turn without a "Stop-and-Report" event.
-- 1. Write the TEST for that one method.
-- 2. Write the IMPLEMENTATION for that one method.
-- 3. Run formatters and local tests.
-- 4. STOP execution entirely and present the diff. Wait for explicit user authorization.
-- NEVER implement or test multiple methods in a single step.
+
+### 7.0 Authorization Gate (MANDATORY PRE-CHECK)
+Before writing ANY code (tests, implementation, edits), classify the user's message:
+
+| Signal | Example | Action Allowed |
+|--------|---------|----------------|
+| **Imperative** | "fix this bug", "implement X", "add Y" | Code authorized. Proceed to 7.1. |
+| **Informational** | "I added a new doc", "check this out", "FYI" | **READ ONLY.** Read the referenced file, summarize findings, ask what to do next. |
+| **Analytical** | "what do we still need", "report on X", "how does Y work" | **REPORT ONLY.** Analyze and present findings. No code. |
+
+If in doubt, **ask**. The default is NO code.
+
+### 7.1 TDD Cadence (see `.agents/workflows/writing.md`)
+- The `/writing` workflow is the canonical execution protocol. Follow it exactly.
+- **"Atomic" means one method**, not one tool call. Use as many tools as needed to implement and test that single method correctly.
+- Every response that includes code MUST begin with the **Execution Checklist** progress status.
+- If a response contains implementation code for more than one method, it is a **VIOLATION**.
+- Cadence per method:
+  1. Write the TEST for that one method.
+  2. Write the IMPLEMENTATION for that one method.
+  3. Run formatters and local tests.
+  4. STOP. Present the diff. Wait for explicit user authorization before the next method.
+- The goal is **reviewable, authorized changes** -- not minimizing tool calls.
 
 ---
 

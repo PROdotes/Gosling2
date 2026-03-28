@@ -28,6 +28,24 @@ ACCEPTED_EXTENSIONS = [".mp3"]
 # Fields whose values should additionally be split on ", " during metadata extraction
 COMMA_SPLIT_FIELDS = ["composers"]
 
+# Scalar field validation rules (single source of truth — exposed via /api/v1/validation-rules)
+SCALAR_VALIDATION = {
+    "year": {"min": 1860, "max_offset": 1},  # max = current_year + max_offset
+    "bpm": {"min": 1, "max": 300},
+    "isrc": {
+        "pattern": r"^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$",
+        "strip": "-",
+        "uppercase": True,
+    },
+}
+
+# Song Approval Pipeline
+AUTO_MOVE_ON_APPROVE = os.getenv("GOSLING_AUTO_MOVE_ON_APPROVE") == "true"
+PROMPT_BEFORE_MOVE = os.getenv("GOSLING_PROMPT_BEFORE_MOVE") == "true"
+RENAME_RULES_PATH = Path(
+    os.getenv("GOSLING_RENAME_RULES_PATH", "config/rename_rules.json")
+)
+
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.
 TRUSTED_ORIGINS = [

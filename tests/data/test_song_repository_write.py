@@ -80,6 +80,7 @@ class TestInsert:
             source_path="/music/dup.mp3",
             duration_s=1.0,
             audio_hash="unique_hash_1",
+            processing_status=2,
         )
 
         with repo._get_connection() as conn:
@@ -100,6 +101,7 @@ class TestInsert:
             source_path="/music/same.mp3",
             duration_s=1.0,
             audio_hash="hash_a",
+            processing_status=2,
         )
 
         with repo._get_connection() as conn:

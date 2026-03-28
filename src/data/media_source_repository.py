@@ -35,18 +35,19 @@ class MediaSourceRepository(BaseRepository):
                 model.duration_s,
                 model.audio_hash,
                 1 if model.is_active else 0,
-                model.processing_status if model.processing_status is not None else 1,
+                model.processing_status if model.processing_status is not None else 2,
             ),
         )
 
         source_id = cursor.lastrowid
         if not source_id:
-            logger.error(
-                "[MediaSourceRepository] Failed to retrieve lastrowid during insert."
-            )
+            logger.error("[MediaSourceRepository] <- insert_source() FAILED_TO_GET_ID")
             raise sqlite3.Error("Failed to retrieve SourceID after insert.")
 
-        return source_id
+        logger.debug(
+            f"[MediaSourceRepository] <- insert_source() SourceID={source_id} (Virgin=2)"
+        )
+        return int(source_id)
 
     def get_by_path(self, path: str) -> Optional[MediaSource]:
         """Universal lookup by SourcePath. Returns base MediaSource or None."""

@@ -23,6 +23,10 @@ async function fetchJson(url, options = {}) {
     return response.json();
 }
 
+export async function fetchValidationRules() {
+    return fetchJson("/api/v1/validation-rules");
+}
+
 async function runSearch(key, url) {
     const previous = searchControllers.get(key);
     if (previous) {

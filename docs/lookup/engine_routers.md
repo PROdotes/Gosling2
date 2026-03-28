@@ -14,15 +14,16 @@
 
 ### async def get_song(song_id: int) -> SongView
 **HTTP**: `GET /api/v1/songs/{song_id}`
-Fetches a single Song domain model by its unique ID.
+Fetches a single Song domain model by its unique ID with full hydration.
 - Raises `HTTPException(404)` if the song does not exist.
 - Wraps `CatalogService.get_song`.
 
-### async def search_songs(q: str) -> List[SongView]
-**HTTP**: `GET /api/v1/songs/search?q={query}`
-- Validates query (at least 1 char now per user request).
-- Calls `CatalogService.search_songs(q)`.
-- Returns a JSON list of `Song` models.
+### async def search_songs(q: Optional[str] = None, query: Optional[str] = None, deep: bool = False) -> List[SongSlimView]
+**HTTP**: `GET /api/v1/songs/search?q={query}&query={alt_query}&deep={true|false}`
+- Surface slim search by default (`deep=false`). Full resolution when `deep=true`.
+- Accepts both `q` and `query` params (q takes precedence).
+- Wraps `CatalogService.search_songs_slim` or `search_songs_deep_slim`.
+- Returns a JSON list of `SongSlimView` models.
 - **Instrumentation**: Traces query and result count.
 
 ### async def get_identity(identity_id: int) -> IdentityView
@@ -114,6 +115,10 @@ Fetches a single Song domain model by its unique ID.
 - Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 - Wraps `CatalogService.check_ingestion`.
 
+### def get_validation_rules() -> Dict[str, Any]
+**HTTP**: `GET /api/v1/catalog/validation-rules`
+- Returns the required/optional field rules for song review readiness.
+
 ---
 
 
@@ -158,9 +163,16 @@ Fetches a single Song domain model by its unique ID.
 - Returns `{"status": "DELETED", "id": song_id}`.
 
 ### async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView
-**HTTP**: `POST /api/v1/ingest/resolve-conflict`
+**HTTP**: `POST /api/v1/ingest/resolve-conflict?ghost_id={id}&staged_path={path}`
 - Resolves a ghost record conflict by reactivating a soft-deleted record with new metadata from a staged file.
 - Wraps `CatalogService.resolve_conflict`.
+
+### async def delete_song(song_id: int) -> Dict[str, Any]
+**HTTP**: `DELETE /api/v1/ingest/songs/{song_id}`
+- Atomic hard-delete of a song by ID.
+- Triggers DB soft-delete and physical cleanup if file is in staging.
+- Returns `{"status": "DELETED", "id": song_id}`.
+- Wraps `CatalogService.delete_song`.
 
 ---
 
@@ -193,126 +205,10 @@ Fetches a single Song domain model by its unique ID.
 
 ---
 
-#
----
 
 ## Song Updates Router
 *Location: `src/engine/routers/song_updates.py`*
 **Responsibility**: HTTP interface for partial metadata updates and relationship management.
-
-### SongScalarUpdate
-**Pydantic Model**: Fields for partial song metadata record updates.
-
-### AddCreditBody
-**Pydantic Model**: Payload for adding song credits.
-
-### UpdateCreditNameBody
-**Pydantic Model**: Payload for renaming actor identities globally.
-
-### AddAlbumBody
-**Pydantic Model**: Payload for linking songs to existing or new albums.
-
-### UpdateAlbumLinkBody
-**Pydantic Model**: Payload for updating track/disc numbering in junction tables.
-
-### UpdateAlbumBody
-**Pydantic Model**: Fields for global album metadata updates.
-
-### AddAlbumCreditBody
-**Pydantic Model**: Payload for adding album performer credits.
-
-### SetAlbumPublisherBody
-**Pydantic Model**: Payload for setting/replacing album-level publishers.
-
-### AddTagBody
-**Pydantic Model**: Payload for adding metadata tags to songs.
-
-### UpdateTagBody
-**Pydantic Model**: Payload for global tag renames.
-
-### AddPublisherBody
-**Pydantic Model**: Payload for adding publishers to recordings.
-
-### UpdatePublisherBody
-**Pydantic Model**: Payload for global publisher renames.
-
-### async def update_song_scalars(song_id: int, body: SongScalarUpdate) -> Song
-**HTTP**: `PATCH /api/v1/songs/{song_id}`
-- Updates basic song fields (title, year, bpm, isrc, active, notes).
-
-### async def add_song_credit(song_id: int, body: AddCreditBody) -> SongCredit
-**HTTP**: `POST /api/v1/songs/{song_id}/credits`
-- Adds a credited artist/role to a song. Get-or-creates actor.
-
-### async def remove_song_credit(song_id: int, credit_id: int) -> None
-**HTTP**: `DELETE /api/v1/songs/{song_id}/credits/{credit_id}`
-- Unlinks a credit from a song.
-
-### async def update_credit_name(song_id: int, name_id: int, body: UpdateCreditNameBody) -> None
-**HTTP**: `PATCH /api/v1/songs/{song_id}/credits/{name_id}`
-- Globally renames an ArtistName record (affects all linked songs/albums).
-
-### async def add_song_album(song_id: int, body: AddAlbumBody) -> SongAlbum
-**HTTP**: `POST /api/v1/songs/{song_id}/albums`
-- Links an existing album or creates and links a new one.
-
-### async def remove_song_album(song_id: int, album_id: int) -> None
-**HTTP**: `DELETE /api/v1/songs/{song_id}/albums/{album_id}`
-- Unlinks a song from an album.
-
-### async def update_song_album_link(song_id: int, album_id: int, body: UpdateAlbumLinkBody) -> None
-**HTTP**: `PATCH /api/v1/songs/{song_id}/albums/{album_id}`
-- Updates track/disc number on a specific link. Atomic partial update.
-
-### async def update_album(album_id: int, body: UpdateAlbumBody) -> Album
-**HTTP**: `PATCH /api/v1/albums/{album_id}`
-- Globally updates album metadata (title, type, year).
-
-### async def add_album_credit(album_id: int, body: AddAlbumCreditBody) -> None
-**HTTP**: `POST /api/v1/albums/{album_id}/credits`
-- Adds a credited performer to an album.
-
-### async def remove_album_credit(album_id: int, name_id: int) -> None
-**HTTP**: `DELETE /api/v1/albums/{album_id}/credits/{name_id}`
-- Unlinks a performer from an album.
-
-### async def set_album_publisher(album_id: int, body: SetAlbumPublisherBody) -> None
-**HTTP**: `PATCH /api/v1/albums/{album_id}/publisher`
-- Sets or replaces the publisher for an album.
-
-### async def add_song_tag(song_id: int, body: AddTagBody) -> Tag
-**HTTP**: `POST /api/v1/songs/{song_id}/tags`
-- Adds a metadata tag to a song.
-
-### async def remove_song_tag(song_id: int, tag_id: int) -> None
-**HTTP**: `DELETE /api/v1/songs/{song_id}/tags/{tag_id}`
-- Unlinks a tag from a song.
-
-### async def update_tag(tag_id: int, body: UpdateTagBody) -> None
-**HTTP**: `PATCH /api/v1/tags/{tag_id}`
-- Globally renames a tag or changes its category.
-
-### async def add_song_publisher(song_id: int, body: AddPublisherBody) -> Publisher
-**HTTP**: `POST /api/v1/songs/{song_id}/publishers`
-- Links a publisher to a master recording.
-
-### async def remove_song_publisher(song_id: int, publisher_id: int) -> None
-**HTTP**: `DELETE /api/v1/songs/{song_id}/publishers/{publisher_id}`
-- Unlinks a publisher from a song.
-
-### async def update_publisher(publisher_id: int, body: UpdatePublisherBody) -> None
-**HTTP**: `PATCH /api/v1/publishers/{publisher_id}`
-- Globally renames a publisher.
-- `tag_name`: str
-- `category`: str
-
-### AddPublisherBody
-**Pydantic Model**: Request body for adding song publishers.
-- `publisher_name`: str
-
-### UpdatePublisherBody
-**Pydantic Model**: Request body for updating publishers globally.
-- `publisher_name`: str
 
 ### async def update_song_scalars(song_id: int, body: SongScalarUpdate, service: CatalogService = Depends(_get_service))
 **HTTP**: `PATCH /api/v1/songs/{song_id}`

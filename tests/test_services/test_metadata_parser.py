@@ -14,8 +14,8 @@ def _assert_song_defaults(song, source_path="fake/path.mp3"):
     assert song.type_id is None, f"Expected type_id=None, got {song.type_id}"
     assert song.audio_hash is None, f"Expected audio_hash=None, got {song.audio_hash}"
     assert (
-        song.processing_status is None
-    ), f"Expected processing_status=None, got {song.processing_status}"
+        song.processing_status == 2
+    ), f"Expected processing_status=2, got {song.processing_status}"
     assert song.is_active is False, f"Expected is_active=False, got {song.is_active}"
     assert song.notes is None, f"Expected notes=None, got {song.notes}"
     assert song.isrc is None, f"Expected isrc=None, got {song.isrc}"
@@ -134,9 +134,11 @@ class TestParse:
         for tag in song.tags:
             assert isinstance(tag, Tag), f"Expected Tag, got {type(tag)}"
             assert tag.id is None, f"Expected tag id=None, got {tag.id}"
-            assert (
-                tag.is_primary is False
-            ), f"Expected is_primary=False, got {tag.is_primary}"
+
+        # First tag in each category should be primary
+        assert genres[0].is_primary is True, f"Expected Dubstep is_primary=True, got {genres[0].is_primary}"
+        assert genres[1].is_primary is False, f"Expected Electronic is_primary=False, got {genres[1].is_primary}"
+        assert moods[0].is_primary is True, f"Expected Aggressive is_primary=True, got {moods[0].is_primary}"
 
     def test_safe_integer_casting(self, parser):
         """parse() must extract leading digits from messy year and return None for non-numeric BPM."""

@@ -19,7 +19,7 @@ class TestRowToSource:
             "SourcePath": "/path/1",
             "AudioHash": "hash_1",
             "IsActive": 1,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
         }
         repo = MediaSourceRepository(populated_db)
         source = repo._row_to_source(mock_row)
@@ -41,8 +41,8 @@ class TestRowToSource:
         ), f"Expected 'hash_1', got '{source.audio_hash}'"
         assert source.is_active is True, f"Expected True, got {source.is_active}"
         assert (
-            source.processing_status is None
-        ), f"Expected None, got {source.processing_status}"
+            source.processing_status == 0
+        ), f"Expected 0, got {source.processing_status}"
         assert source.notes is None, f"Expected None, got {source.notes}"
 
     def test_null_fields(self, populated_db):
@@ -55,7 +55,7 @@ class TestRowToSource:
             "SourcePath": "/path/4",
             "AudioHash": None,
             "IsActive": 1,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 1,
         }
         repo = MediaSourceRepository(populated_db)
         source = repo._row_to_source(mock_row)
@@ -65,8 +65,8 @@ class TestRowToSource:
             source.audio_hash is None
         ), f"Expected None for NULL hash, got {source.audio_hash}"
         assert (
-            source.processing_status is None
-        ), f"Expected None for NULL status, got {source.processing_status}"
+            source.processing_status == 1
+        ), f"Expected 1 for status, got {source.processing_status}"
 
     def test_null_duration_maps_to_zero(self, populated_db):
         """NULL SourceDuration must not crash - must map to 0.0."""
@@ -78,7 +78,7 @@ class TestRowToSource:
             "SourcePath": "/a",
             "AudioHash": None,
             "IsActive": 1,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
         }
         repo = MediaSourceRepository(populated_db)
         source = repo._row_to_source(mock_row)
@@ -98,7 +98,7 @@ class TestRowToSource:
             "SourcePath": "/a",
             "AudioHash": None,
             "IsActive": 1,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
         }
 
         row["SourceDuration"] = 200.0
@@ -122,7 +122,7 @@ class TestRowToSource:
             "SourcePath": "/a",
             "AudioHash": None,
             "IsActive": 1,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
         }
 
         # IsActive=1 -> True
@@ -291,6 +291,7 @@ class TestDelete:
             source_path="/music/universal.mp3",
             duration_s=60.0,
             audio_hash="universal_hash",
+            processing_status=2,
         )
 
         with repo._get_connection() as conn:

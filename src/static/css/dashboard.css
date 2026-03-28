@@ -573,6 +573,31 @@ main {
     border-color: rgba(239, 68, 68, 0.28);
 }
 
+.file-status.warning {
+    color: var(--warning);
+    background: rgba(234, 179, 8, 0.12);
+    border-color: rgba(234, 179, 8, 0.28);
+}
+
+.workflow-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.workflow-blockers {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+}
+
+.workflow-approve-btn {
+    margin-left: auto;
+}
+
 .credits-list,
 .stack-list {
     display: flex;

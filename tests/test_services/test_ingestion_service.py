@@ -50,8 +50,8 @@ def disambiguation_db(tmp_path, _master_populated_db):
 
     # Song 50: "Shared Title" by Nirvana, 1991
     c.execute(
-        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) "
-        "VALUES (50, 1, 'Shared Title', '/path/50', 200, 1)"
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, ProcessingStatus) "
+        "VALUES (50, 1, 'Shared Title', '/path/50', 200, 1, 0)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (50, 1991)")
     c.execute(
@@ -60,8 +60,8 @@ def disambiguation_db(tmp_path, _master_populated_db):
 
     # Song 51: "Shared Title" by Foo Fighters, 1991
     c.execute(
-        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) "
-        "VALUES (51, 1, 'Shared Title', '/path/51', 200, 1)"
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, ProcessingStatus) "
+        "VALUES (51, 1, 'Shared Title', '/path/51', 200, 1, 0)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (51, 1991)")
     c.execute(
@@ -70,8 +70,8 @@ def disambiguation_db(tmp_path, _master_populated_db):
 
     # Song 52: "Shared Title" by Dave Grohl + Taylor Hawkins, 1991
     c.execute(
-        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) "
-        "VALUES (52, 1, 'Shared Title', '/path/52', 200, 1)"
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, ProcessingStatus) "
+        "VALUES (52, 1, 'Shared Title', '/path/52', 200, 1, 0)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (52, 1991)")
     c.execute(
@@ -83,8 +83,8 @@ def disambiguation_db(tmp_path, _master_populated_db):
 
     # Song 53: "Shared Title" by Nirvana, 2020 (different year)
     c.execute(
-        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive) "
-        "VALUES (53, 1, 'Shared Title', '/path/53', 200, 1)"
+        "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, IsActive, ProcessingStatus) "
+        "VALUES (53, 1, 'Shared Title', '/path/53', 200, 1, 0)"
     )
     c.execute("INSERT INTO Songs (SourceID, RecordingYear) VALUES (53, 2020)")
     c.execute(

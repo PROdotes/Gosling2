@@ -171,7 +171,7 @@ class TestSongDeletionIntegrity:
 
             # 2. Setup record
             conn.execute(
-                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (999, 1, 'Anemic', '/path/999')"
+                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (999, 1, 'Anemic', '/path/999', 0)"
             )
             conn.execute("INSERT INTO Songs (SourceID) VALUES (999)")
             conn.commit()
@@ -238,7 +238,7 @@ class TestSongDeletionIntegrity:
 
             # Core Song
             conn.execute(
-                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (?, 1, 'Lone Song', '/lone/path')",
+                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (?, 1, 'Lone Song', '/lone/path', 0)",
                 (SID,),
             )
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (SID,))
@@ -385,12 +385,12 @@ class TestSongDeletionIntegrity:
 
             # Two Songs
             conn.execute(
-                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (?, 1, 'Song A', '/path/a')",
+                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (?, 1, 'Song A', '/path/a', 0)",
                 (S_A,),
             )
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (S_A,))
             conn.execute(
-                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (?, 1, 'Song B', '/path/b')",
+                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (?, 1, 'Song B', '/path/b', 0)",
                 (S_B,),
             )
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (S_B,))
@@ -509,7 +509,7 @@ class TestSongDeletionIntegrity:
                 (P1,),
             )
             conn.execute(
-                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (?, 1, 'Song 1', '/s/1')",
+                "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (?, 1, 'Song 1', '/s/1', 0)",
                 (S1,),
             )
             conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (S1,))
@@ -552,7 +552,7 @@ class TestSongDeletionIntegrity:
 
             for sid, name, path in [(S2, "Song 2", "/s/2"), (S3, "Song 3", "/s/3")]:
                 conn.execute(
-                    "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath) VALUES (?, 1, ?, ?)",
+                    "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, ProcessingStatus) VALUES (?, 1, ?, ?, 0)",
                     (sid, name, path),
                 )
                 conn.execute("INSERT INTO Songs (SourceID) VALUES (?)", (sid,))

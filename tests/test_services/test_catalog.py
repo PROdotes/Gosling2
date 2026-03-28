@@ -948,3 +948,91 @@ class TestAlbumViewFromCatalog:
             view.display_publisher == "Roswell Records"
         ), f"Expected display_publisher 'Roswell Records', got {view.display_publisher}"
         assert view.song_count == 1, f"Expected song_count 1, got {view.song_count}"
+
+# ===================================================================
+# Song Workflow & Validation
+# ===================================================================
+class TestSongWorkflowValidation:
+    """CatalogService lifecycle rules from SONG_WORKFLOW_SPEC.md."""
+
+    def test_activate_rejected_if_not_reviewed(self, catalog_service):
+        """Cannot activate a song (is_active=True) if processing_status != 0."""
+        from src.models.view_models import SongScalarUpdate
+
+        # 1. Force state to 0 (Inactive) and 1 (Imported)
+        from src.data.song_repository import SongRepository
+        repo = SongRepository(catalog_service._db_path)
+        conn = repo.get_connection()
+        conn.execute("UPDATE MediaSources SET IsActive = 0, ProcessingStatus = 1 WHERE SourceID = 7")
+        conn.commit()
+        conn.close()
+
+        # 2. Verify initial state matches our test requirement
+        original = catalog_service.get_song(7)
+        assert original.id == 7, f"Expected ID 7, got {original.id}"
+        assert original.is_active is False, f"Expected is_active False before activation attempt, got {original.is_active}"
+        assert original.processing_status == 1, f"Expected status 1 before activation attempt, got {original.processing_status}"
+
+        # 3. Attempt to activate
+        update = SongScalarUpdate(is_active=True)
+        import pytest
+        with pytest.raises(ValueError) as exc:
+            catalog_service.update_song_scalars(7, update.model_dump(exclude_unset=True))
+        
+        expected_msg = "Cannot activate song unless processing_status is 0 (Reviewed)"
+        assert expected_msg in str(exc.value), f"Expected error message '{expected_msg}', got '{exc.value}'"
+
+        # 4. Exhaustive check: Verify NOTHING changed
+        refreshed = catalog_service.get_song(7)
+        assert refreshed.id == 7, f"Expected ID 7, got {refreshed.id}"
+        assert refreshed.media_name == "Hollow Song", f"Expected 'Hollow Song', got '{refreshed.media_name}'"
+        assert refreshed.duration_s == 10.0, f"Expected 10.0, got {refreshed.duration_s}"
+        assert refreshed.is_active is False, f"Expected is_active False, got {refreshed.is_active}"
+        assert refreshed.processing_status == 1, f"Expected status 1, got {refreshed.processing_status}"
+
+    def test_activate_allowed_if_reviewed(self, catalog_service):
+        """Activation allowed if status is 0."""
+        from src.models.view_models import SongScalarUpdate
+        from src.data.song_repository import SongRepository
+
+        # Ensure status is 0
+        repo = SongRepository(catalog_service._db_path)
+        conn = repo.get_connection()
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 0 WHERE SourceID = 7")
+        conn.commit()
+        conn.close()
+
+        update = SongScalarUpdate(is_active=True)
+        success = catalog_service.update_song_scalars(7, update.model_dump(exclude_unset=True))
+        assert success is not None, "update_song_scalars should return the hydrated Song object"
+        
+        # Exhaustive check: Verify activation AND persistence of other fields
+        song = catalog_service.get_song(7)
+        assert song.id == 7, f"Expected ID 7, got {song.id}"
+        assert song.is_active is True, f"Expected is_active True, got {song.is_active}"
+        assert song.media_name == "Hollow Song", f"Expected 'Hollow Song', got '{song.media_name}'"
+        assert song.processing_status == 0, f"Expected status 0, got {song.processing_status}"
+        assert song.duration_s == 10.0, f"Expected 10.0, got {song.duration_s}"
+
+    def test_deactivate_always_allowed(self, catalog_service):
+        """Disabling is_active=False should NOT be blocked by status."""
+        from src.models.view_models import SongScalarUpdate
+        from src.data.song_repository import SongRepository
+
+        # Start with active song (Song 1: SLTS) and force status to 1
+        repo = SongRepository(catalog_service._db_path)
+        conn = repo.get_connection()
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 1 WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        update = SongScalarUpdate(is_active=False)
+        success = catalog_service.update_song_scalars(1, update.model_dump(exclude_unset=True))
+        assert success is not None
+
+        # Exhaustive check: Verify deactivation
+        song = catalog_service.get_song(1)
+        assert song.id == 1, f"Expected ID 1, got {song.id}"
+        assert song.is_active is False, f"Expected is_active False, got {song.is_active}"
+        assert song.media_name == "Smells Like Teen Spirit", f"Expected SLTS title, got '{song.media_name}'"
+        assert song.processing_status == 1, f"Expected status 1, got {song.processing_status}"

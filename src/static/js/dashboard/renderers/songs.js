@@ -277,6 +277,33 @@ export function renderSongDetailLoading(ctx, song) {
     `);
 }
 
+const STATUS_LABELS = { 0: "Reviewed", 1: "Ready for Review", 2: "Imported" };
+const STATUS_CSS   = { 0: "found",    1: "warning",        2: "missing"  };
+
+function renderWorkflowStatus(song) {
+    const status = song.processing_status ?? 1;
+    const blockers = asArray(song.review_blockers);
+    const label = STATUS_LABELS[status] ?? `Status ${status}`;
+    const css = STATUS_CSS[status] ?? "";
+
+    const blockerHtml = blockers.length
+        ? `<div class="workflow-blockers">Required: ${blockers.map(b => `<span class="pill">${escapeHtml(b)}</span>`).join("")}</div>`
+        : "";
+
+    const buttonHtml = status === 1 && blockers.length === 0
+        ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="mark-reviewed" data-id="${song.id}">Mark as Reviewed</button>`
+        : status === 0
+        ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`
+        : "";
+
+    return `
+        <div class="file-status ${css} workflow-status">
+            <span class="workflow-status-label">${escapeHtml(label)}</span>
+            ${blockerHtml}
+            ${buttonHtml}
+        </div>`;
+}
+
 export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
     const dbCredits = asArray(song.credits);
     const fileCredits = asArray(fileData && fileData.credits);
@@ -311,6 +338,7 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
         </div>
         <div class="detail-content">
             ${statusHtml}
+            ${renderWorkflowStatus(song)}
 
             <div class="detail-section">
                 <div class="section-title">Core Metadata</div>

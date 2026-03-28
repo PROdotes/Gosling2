@@ -53,6 +53,7 @@ Fetch the full directory of publishers with resolved hierarchy chains.
 
 ### get_all_albums() -> List[Album]
 Fetch the full directory of albums with hydrated publishers, credits, and songs.
+- Internally calls `search_albums_slim("")` then hydrates via `_hydrate_albums`.
 
 ### search_publishers(query: str) -> List[Publisher]
 Search for publishers by name match with resolved hierarchy chains.
@@ -116,6 +117,12 @@ Pure file discovery utility that scans a folder for audio files.
 - If `recursive=True`, walks entire directory tree.
 - If `recursive=False`, only scans top-level directory.
 - No staging or ingestion - just file system scanning.
+- Uses `ACCEPTED_EXTENSIONS` for filtering.
+
+### search_albums_slim(query: str) -> List[dict]
+Slim list-view album search. Returns raw dicts for `AlbumSlimView` — no tracklist hydration.
+- Pass empty string `""` to get all albums.
+- Accesses `AlbumRepository.search_slim`.
 
 ### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
 Parallel batch ingestion of multiple already-staged files.
@@ -130,6 +137,9 @@ Parallel batch ingestion of multiple already-staged files.
 - Called by `ingest_batch()` worker threads.
 - Ensures each thread gets its own database connection.
 - Catches exceptions and returns error report instead of crashing thread.
+
+### _enrich_metadata(song_id: int, conn: sqlite3.Connection) -> None
+**Internal**: Metadata enrichment sink. Moves status from Virgin (2) -> Enriched (1).
 
 ### update_song_scalars(song_id: int, fields: dict) -> Song
 Update editable scalar fields (media_name, year, bpm, isrc, is_active). Validates values per spec rules. Returns the fully hydrated Song. Raises ValueError on validation failure, LookupError if not found.

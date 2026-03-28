@@ -130,13 +130,16 @@ class SongRepository(MediaSourceRepository):
         )
 
         media_source_fields = {
-            k: v for k, v in fields.items() if k in ("media_name", "is_active")
+            k: v
+            for k, v in fields.items()
+            if k in ("media_name", "is_active", "processing_status")
         }
         songs_fields = {k: v for k, v in fields.items() if k in ("bpm", "year", "isrc")}
 
         col_map = {
             "media_name": "MediaName",
             "is_active": "IsActive",
+            "processing_status": "ProcessingStatus",
             "bpm": "TempoBPM",
             "year": "RecordingYear",
             "isrc": "ISRC",
@@ -213,7 +216,7 @@ class SongRepository(MediaSourceRepository):
 
         query_sql = """
             SELECT
-                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
                 s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre
@@ -272,7 +275,7 @@ class SongRepository(MediaSourceRepository):
         placeholders = ",".join(["?" for _ in ids])
         query_sql = f"""
             SELECT
-                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration,
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
                 s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre

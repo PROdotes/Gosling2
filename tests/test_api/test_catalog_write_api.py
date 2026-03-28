@@ -81,8 +81,8 @@ class TestCatalogWriteApi:
             song["is_active"] is False
         ), f"Expected default False, got {song['is_active']}"
         assert (
-            song["processing_status"] is None
-        ), f"Expected default None, got {song['processing_status']}"
+            song["processing_status"] == 1
+        ), f"Expected processing_status=1 after enrichment, got {song['processing_status']}"
         assert song["year"] is None, f"Expected year None, got {song['year']}"
         assert song["bpm"] is None, f"Expected bpm None, got {song['bpm']}"
         assert (
@@ -95,19 +95,20 @@ class TestCatalogWriteApi:
 
         # Verification of relations
         assert (
-            len(song["credits"]) == 2
-        ), f"Expected 2 credits, got {len(song['credits'])}"
+            len(song["credits"]) >= 2
+        ), f"Expected at least 2 credits, got {len(song['credits'])}"
         # Performer
-        assert song["credits"][0]["role_name"] == "Performer"
+        performer = next((c for c in song["credits"] if c["role_name"] == "Performer"), None)
+        assert performer is not None, "Expected a Performer credit"
         assert (
-            song["credits"][0]["display_name"] == "Atwater Collective feat. Jesse Ulma"
+            performer["display_name"] == "Atwater Collective feat. Jesse Ulma"
         )
-        # Composer
-        assert song["credits"][1]["role_name"] == "Composer"
-        assert (
-            song["credits"][1]["display_name"]
-            == "Will Kimbrough, Vince Green, Sam Wade, Linda Corelli"
-        )
+        # Composers - stored as separate credits due to COMMA_SPLIT_FIELDS
+        composers = [c for c in song["credits"] if c["role_name"] == "Composer"]
+        assert len(composers) == 4, f"Expected 4 Composer credits, got {len(composers)}"
+        composer_names = {c["display_name"] for c in composers}
+        expected_composers = {"Will Kimbrough", "Vince Green", "Sam Wade", "Linda Corelli"}
+        assert composer_names == expected_composers, f"Expected {expected_composers}, got {composer_names}"
 
         assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
         assert song["albums"][0]["album_title"] == "Mayor of Crazy Town"

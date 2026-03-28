@@ -51,6 +51,9 @@ Renders artist profiles, aliases, and group memberships.
 ### publishers.js
 Renders publisher details and repertoire listings.
 
+### tags.js
+Renders tag management cards with category badges and song counts.
+
 ### ingestion.js
 Renders the file verification panel with drag-and-drop support, path input, and result cards showing status (NEW/ALREADY_EXISTS/ERROR) with match type.
 
@@ -68,3 +71,10 @@ Universal renderer for a stack-list of songs with duration and BPM. Used in all 
 
 ### renderAuditTimeline(history)
 Renders a consistent vertical timeline of actions, changes, and lifecycles.
+
+## components/link_modal.js
+*Location: `src/static/js/dashboard/components/link_modal.js`*
+**Responsibility**: Modal dialog for linking entities (albums, tags, publishers) to songs.
+
+### showLinkModal(entityType, currentLinks, onSave)
+Displays the modal for linking a specific entity type to the current song.

@@ -33,8 +33,8 @@ class TestGetById:
         ), f"Expected 'hash_1', got '{song.audio_hash}'"
         assert song.year == 1991, f"Expected 1991, got {song.year}"
         assert (
-            song.processing_status is None
-        ), f"Expected None for NULL processing_status, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0 for processing_status, got {song.processing_status}"
         assert (
             song.credits == []
         ), f"Expected empty list for credits, got {song.credits}"
@@ -578,7 +578,7 @@ class TestRowToSong:
             "AudioHash": "hash123",
             "IsActive": 1,
             "RecordingYear": 2024,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
             "SourceNotes": None,
             "TempoBPM": 120,
             "ISRC": "USRC12345678",
@@ -604,8 +604,8 @@ class TestRowToSong:
         assert song.is_active is True, f"Expected True (1->True), got {song.is_active}"
         assert song.year == 2024, f"Expected 2024, got {song.year}"
         assert (
-            song.processing_status is None
-        ), f"Expected None, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0, got {song.processing_status}"
         assert song.notes is None, f"Expected None, got {song.notes}"
         assert song.bpm == 120, f"Expected 120, got {song.bpm}"
         assert (
@@ -625,7 +625,7 @@ class TestRowToSong:
             "AudioHash": None,
             "IsActive": 1,
             "RecordingYear": None,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,
@@ -639,8 +639,8 @@ class TestRowToSong:
         ), f"Expected None for NULL hash, got {song.audio_hash}"
         assert song.year is None, f"Expected None for NULL year, got {song.year}"
         assert (
-            song.processing_status is None
-        ), f"Expected None for NULL status, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0 for processing_status, got {song.processing_status}"
         assert song.notes is None, f"Expected None for NULL notes, got {song.notes}"
         assert song.bpm is None, f"Expected None for NULL bpm, got {song.bpm}"
         assert song.isrc is None, f"Expected None for NULL isrc, got {song.isrc}"
@@ -659,7 +659,7 @@ class TestRowToSong:
             "AudioHash": None,
             "IsActive": 1,
             "RecordingYear": None,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,
@@ -687,7 +687,7 @@ class TestRowToSong:
             "AudioHash": None,
             "IsActive": 1,
             "RecordingYear": None,
-            "ProcessingStatus": None,
+            "ProcessingStatus": 0,
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,

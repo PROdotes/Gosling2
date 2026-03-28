@@ -26,7 +26,7 @@ from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
-from src.engine.config import STAGING_DIR
+from src.engine.config import STAGING_DIR, SCALAR_VALIDATION
 
 
 class CatalogService:
@@ -195,9 +195,14 @@ class CatalogService:
             # Update the returned song object with the new db ID
             hydrated_song = song.model_copy(update={"id": new_id})
 
+            # 3. Simulate enrichment (Virgin 2 -> Enriched 1)
+            # This represents the future MusicBrainz background task.
+            self._enrich_metadata(new_id, conn)
+            hydrated_song = hydrated_song.model_copy(update={"processing_status": 1})
+
             conn.commit()
             logger.info(
-                f"[CatalogService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
+                f"[CatalogService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id} (Status=1)"
             )
             return {"status": "INGESTED", "song": hydrated_song}
 
@@ -242,6 +247,19 @@ class CatalogService:
             return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
         finally:
             conn.close()
+
+    def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
+        """
+        Internal sink for metadata enrichment.
+        Moves status from 2 (Virgin) -> 1 (Enriched/Ready for Review).
+        """
+        logger.info(
+            f"[CatalogService] -> _enrich_metadata(id={song_id}) [SIMULATED SUCCESS: 2 -> 1]"
+        )
+        self._song_repo.update_scalars(song_id, {"processing_status": 1}, conn)
+        logger.debug(
+            f"[CatalogService] <- _enrich_metadata(id={song_id}) Status is now 1"
+        )
 
     def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
         """
@@ -1109,7 +1127,15 @@ class CatalogService:
     # CRUD Update Methods
     # -------------------------------------------------------------------------
 
-    _SCALAR_ALLOWED = {"media_name", "year", "bpm", "isrc", "is_active"}
+    _SCALAR_ALLOWED = {
+        "media_name",
+        "year",
+        "bpm",
+        "isrc",
+        "is_active",
+        "processing_status",
+        "notes",
+    }
 
     def update_song_scalars(self, song_id: int, fields: dict) -> Song:
         """
@@ -1118,32 +1144,80 @@ class CatalogService:
         Returns the fully hydrated Song.
         Raises ValueError on validation failure, LookupError if song not found.
         """
-        logger.debug(f"[CatalogService] -> update_song_scalars(id={song_id})")
+        logger.debug(
+            f"[CatalogService] -> update_song_scalars(id={song_id}, fields={fields})"
+        )
 
         unknown = set(fields) - self._SCALAR_ALLOWED
         if unknown:
+            logger.warning(
+                f"[CatalogService] <- update_song_scalars(id={song_id}) INVALID_FIELDS {unknown}"
+            )
             raise ValueError(f"Non-editable fields: {unknown}")
+
+        # --- Workflow Validation ---
+        needs_song = fields.get("is_active") is True or fields.get("processing_status") == 0
+        if needs_song:
+            song = self.get_song(song_id)
+            if not song:
+                logger.warning(
+                    f"[CatalogService] <- update_song_scalars(id={song_id}) NOT_FOUND"
+                )
+                raise LookupError(f"Song {song_id} not found")
+
+            if fields.get("processing_status") == 0:
+                from src.models.view_models import SongView
+                view = SongView.from_domain(song)
+                blockers = view.review_blockers
+                if blockers:
+                    logger.info(
+                        f"[CatalogService] Branch: Blocked review approval - Song {song_id} missing: {blockers}"
+                    )
+                    raise ValueError(f"Cannot mark as reviewed, missing: {', '.join(blockers)}")
+                logger.debug(
+                    f"[CatalogService] Branch: Song {song_id} passes review checks. Approval allowed."
+                )
+
+            if fields.get("is_active") is True:
+                status = fields.get("processing_status", song.processing_status)
+                if status != 0:
+                    logger.info(
+                        f"[CatalogService] Branch: Blocked activation - Song {song_id} status is {status}"
+                    )
+                    raise ValueError(
+                        "Cannot activate song unless processing_status is 0 (Reviewed)"
+                    )
+                logger.debug(
+                    f"[CatalogService] Branch: Song {song_id} is reviewed (Status 0). Activation allowed."
+                )
 
         # Validate
         import datetime
 
-        max_year = datetime.date.today().year + 1
         if "media_name" in fields:
             if not fields["media_name"] or not str(fields["media_name"]).strip():
                 raise ValueError("media_name cannot be empty")
         if "year" in fields and fields["year"] is not None:
             year = int(fields["year"])
-            if not (1860 <= year <= max_year):
-                raise ValueError(f"year must be between 1860 and {max_year}")
+            year_rules = SCALAR_VALIDATION["year"]
+            max_year = datetime.date.today().year + year_rules["max_offset"]
+            if not (year_rules["min"] <= year <= max_year):
+                raise ValueError(
+                    f"year must be between {year_rules['min']} and {max_year}"
+                )
             fields = {**fields, "year": year}
         if "bpm" in fields and fields["bpm"] is not None:
             bpm = int(fields["bpm"])
-            if not (1 <= bpm <= 300):
-                raise ValueError("bpm must be between 1 and 300")
+            bpm_rules = SCALAR_VALIDATION["bpm"]
+            if not (bpm_rules["min"] <= bpm <= bpm_rules["max"]):
+                raise ValueError(
+                    f"bpm must be between {bpm_rules['min']} and {bpm_rules['max']}"
+                )
             fields = {**fields, "bpm": bpm}
         if "isrc" in fields and fields["isrc"] is not None:
-            isrc = str(fields["isrc"]).replace("-", "").upper().strip()
-            if not re.match(r"^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$", isrc):
+            isrc_rules = SCALAR_VALIDATION["isrc"]
+            isrc = str(fields["isrc"]).replace(isrc_rules["strip"], "").upper().strip()
+            if not re.match(isrc_rules["pattern"], isrc):
                 raise ValueError(
                     "isrc must be 12 characters: 2-letter country, 3-char registrant, 2-digit year, 5-digit designation"
                 )

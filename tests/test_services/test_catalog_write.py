@@ -96,8 +96,8 @@ class TestCatalogServiceIngestFile:
             song.is_active is False
         ), f"Expected default is_active=False, got {song.is_active}"
         assert (
-            song.processing_status is None
-        ), f"Expected default processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1 after enrichment, got {song.processing_status}"
 
         # Verify in DB via a fresh read
         db_song = service.get_song(song.id)
@@ -145,8 +145,8 @@ class TestCatalogServiceIngestFile:
         assert song.isrc is None, f"Expected None for isrc, got {song.isrc}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
         assert (
-            song.processing_status is None
-        ), f"Expected None (fixture default), got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0 (fixture default), got {song.processing_status}"
 
         # SIDE EFFECT: File should be deleted to prevent orphans
         assert not os.path.exists(
@@ -188,8 +188,8 @@ class TestCatalogServiceIngestFile:
         assert song.isrc is None, f"Expected None for isrc, got {song.isrc}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
         assert (
-            song.processing_status is None
-        ), f"Expected None (fixture default), got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0 (fixture default), got {song.processing_status}"
 
         # SIDE EFFECT: File should be deleted to prevent orphans
         assert not os.path.exists(
@@ -230,8 +230,8 @@ class TestCatalogServiceIngestFile:
             song.is_active is False
         ), f"Expected default is_active=False, got {song.is_active}"
         assert (
-            song.processing_status is None
-        ), f"Expected default processing_status=None, got {song.processing_status}"
+            song.processing_status == 1
+        ), f"Expected processing_status=1 after enrichment, got {song.processing_status}"
 
     def test_ingest_failure_rolls_back_and_deletes_staged_file(
         self, ingest_db, test_mp3, monkeypatch

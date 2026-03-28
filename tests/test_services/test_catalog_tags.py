@@ -161,8 +161,8 @@ class TestGetTagSongs:
         assert song.year == 1997, f"Expected 1997, got {song.year}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
         assert (
-            song.processing_status is None
-        ), f"Expected None, got {song.processing_status}"
+            song.processing_status == 0
+        ), f"Expected 0, got {song.processing_status}"
 
         # Verify tags are hydrated (Song 2 has only "90s" tag)
         assert len(song.tags) == 1, f"Expected 1 tag on Song 2, got {len(song.tags)}"
@@ -198,8 +198,8 @@ class TestGetTagSongs:
         assert song1.year == 1991, f"Expected 1991, got {song1.year}"
         assert song1.is_active is True, f"Expected True, got {song1.is_active}"
         assert (
-            song1.processing_status is None
-        ), f"Expected None, got {song1.processing_status}"
+            song1.processing_status == 0
+        ), f"Expected 0, got {song1.processing_status}"
 
         # Verify Song 1 has 3 tags: Grunge, Energetic, English
         assert len(song1.tags) == 3, f"Expected 3 tags on Song 1, got {len(song1.tags)}"
@@ -230,8 +230,8 @@ class TestGetTagSongs:
         ), f"Expected None (Song 9 has no year), got {song9.year}"
         assert song9.is_active is True, f"Expected True, got {song9.is_active}"
         assert (
-            song9.processing_status is None
-        ), f"Expected None, got {song9.processing_status}"
+            song9.processing_status == 1
+        ), f"Expected 1, got {song9.processing_status}"
 
         # Verify Song 9 has 2 tags: Grunge, Alt Rock
         assert len(song9.tags) == 2, f"Expected 2 tags on Song 9, got {len(song9.tags)}"

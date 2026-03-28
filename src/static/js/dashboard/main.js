@@ -2,6 +2,7 @@ import {
     ABORTED,
     abortAllSearches,
     addSongPublisher,
+    fetchValidationRules,
     getAlbumDetail,
     getArtistSongs,
     getArtistTree,
@@ -53,6 +54,7 @@ const state = {
     currentQuery: "",
     selectedIndex: -1,
     isDeep: false,
+    validationRules: null,
 };
 
 const modeConfig = {
@@ -541,26 +543,30 @@ document.addEventListener("click", async (event) => {
         const { songId, field } = span.dataset;
         const currentValue = span.textContent === "-" ? "" : span.textContent;
 
+        const rules = state.validationRules;
         const validators = {
             media_name: (v) => v ? null : "Title cannot be empty",
             year: (v) => {
                 if (!v) return null; // optional
                 const n = Number(v);
-                if (!Number.isInteger(n) || n < 1860 || n > new Date().getFullYear() + 1) {
-                    return `Year must be between 1860–${new Date().getFullYear() + 1}`;
-                }
+                const min = rules?.year?.min ?? 1860;
+                const max = rules?.year?.max ?? (new Date().getFullYear() + 1);
+                if (!Number.isInteger(n) || n < min || n > max) return `Year must be between ${min}–${max}`;
                 return null;
             },
             bpm: (v) => {
                 if (!v) return null; // optional
                 const n = Number(v);
-                if (!Number.isInteger(n) || n < 1 || n > 300) return "BPM must be between 1–300";
+                const min = rules?.bpm?.min ?? 1;
+                const max = rules?.bpm?.max ?? 300;
+                if (!Number.isInteger(n) || n < min || n > max) return `BPM must be between ${min}–${max}`;
                 return null;
             },
             isrc: (v) => {
                 if (!v) return null; // optional
-                const stripped = v.replace(/-/g, "");
-                if (stripped.length !== 12) return "ISRC must be 12 characters (dashes ignored)";
+                const stripped = v.replace(/-/g, "").toUpperCase();
+                const pattern = rules?.isrc?.pattern ? new RegExp(rules.isrc.pattern) : /^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$/;
+                if (!pattern.test(stripped)) return "ISRC format: CC-XXX-YY-NNNNN (2 letters, 3 alphanumeric, 2 digits, 5 digits)";
                 return null;
             },
         };
@@ -578,14 +584,18 @@ document.addEventListener("click", async (event) => {
         input.focus();
         input.select();
 
+        let hasError = false;
+
         async function commitEdit() {
             const rawValue = input.value.trim();
             errorEl.textContent = "";
             input.classList.remove("inline-edit-input--error");
+            hasError = false;
 
             const validate = validators[field];
             const error = validate ? validate(rawValue) : null;
             if (error) {
+                hasError = true;
                 input.classList.add("inline-edit-input--error");
                 errorEl.textContent = error;
                 input.focus();
@@ -626,18 +636,35 @@ document.addEventListener("click", async (event) => {
             }
         }
 
+        input.addEventListener("input", () => {
+            const validate = validators[field];
+            if (!validate) return;
+            const error = validate(input.value.trim());
+            if (error) {
+                hasError = true;
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = error;
+            } else {
+                hasError = false;
+                input.classList.remove("inline-edit-input--error");
+                errorEl.textContent = "";
+            }
+        });
+
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
                 commitEdit();
             }
             if (e.key === "Escape") {
+                e.stopPropagation();
                 input.replaceWith(span);
                 errorEl.remove();
             }
         });
 
         input.addEventListener("blur", () => {
+            if (hasError) return; // user must fix or press Escape to cancel
             // Small delay so Enter keydown can fire commitEdit first
             setTimeout(() => {
                 if (document.contains(input)) {
@@ -646,6 +673,18 @@ document.addEventListener("click", async (event) => {
             }, 100);
         });
 
+        return;
+    }
+
+    if (action === "mark-reviewed" || action === "unreview-song") {
+        const { id } = actionTarget.dataset;
+        const newStatus = action === "mark-reviewed" ? 0 : 1;
+        try {
+            const updatedSong = await patchSongScalars(id, { processing_status: newStatus });
+            openSongDetail(updatedSong, { reuseFileData: true });
+        } catch (err) {
+            alert(`Failed: ${err.message}`);
+        }
         return;
     }
 
@@ -751,4 +790,5 @@ elements.deepSearchToggle.addEventListener("change", (event) => {
 });
 
 syncModeUi();
+fetchValidationRules().then(rules => { state.validationRules = rules; });
 performSearch("");
