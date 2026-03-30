@@ -98,17 +98,24 @@ class TestCatalogWriteApi:
             len(song["credits"]) >= 2
         ), f"Expected at least 2 credits, got {len(song['credits'])}"
         # Performer
-        performer = next((c for c in song["credits"] if c["role_name"] == "Performer"), None)
-        assert performer is not None, "Expected a Performer credit"
-        assert (
-            performer["display_name"] == "Atwater Collective feat. Jesse Ulma"
+        performer = next(
+            (c for c in song["credits"] if c["role_name"] == "Performer"), None
         )
+        assert performer is not None, "Expected a Performer credit"
+        assert performer["display_name"] == "Atwater Collective feat. Jesse Ulma"
         # Composers - stored as separate credits due to COMMA_SPLIT_FIELDS
         composers = [c for c in song["credits"] if c["role_name"] == "Composer"]
         assert len(composers) == 4, f"Expected 4 Composer credits, got {len(composers)}"
         composer_names = {c["display_name"] for c in composers}
-        expected_composers = {"Will Kimbrough", "Vince Green", "Sam Wade", "Linda Corelli"}
-        assert composer_names == expected_composers, f"Expected {expected_composers}, got {composer_names}"
+        expected_composers = {
+            "Will Kimbrough",
+            "Vince Green",
+            "Sam Wade",
+            "Linda Corelli",
+        }
+        assert (
+            composer_names == expected_composers
+        ), f"Expected {expected_composers}, got {composer_names}"
 
         assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
         assert song["albums"][0]["album_title"] == "Mayor of Crazy Town"

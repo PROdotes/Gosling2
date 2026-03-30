@@ -76,6 +76,9 @@ Fetch the directory of all active metadata tags.
 ### search_tags(query: str) -> List[Tag]
 Search for tags by name match.
 
+### get_tag_categories() -> List[str]
+Fetch all distinct tag categories currently present in the database.
+
 ### get_tag(tag_id: int) -> Optional[Tag]
 Fetch a single tag by ID.
 
@@ -198,13 +201,15 @@ Update publisher name globally (affects all linked songs).
 ### set_publisher_parent(publisher_id: int, parent_id: Optional[int]) -> None
 Set or clear the parent of a publisher. Pass `None` to clear. Raises `LookupError` if publisher not found.
 
+### get_id3_frames_config() -> Dict[str, Any]
+Returns the consolidated ID3 frame mapping (Single Source of Truth) from the cached parser.
+
 ### delete_song(song_id: int) -> bool
 Atomic hard-delete of a song and its physical file.
 - Removes record from DB via `SongRepository`.
 - Commits transaction.
 - Deletes physical file only if it resides in `STAGING_DIR`.
 - Returns `True` if successfully deleted.
-
 
 ### _hydrate_songs(songs: List[Song], pre_albums: Optional[Dict[int, List[SongAlbum]]] = None) -> List[Song]
 **Internal**: Centralized batch hydration for all song metadata.
@@ -265,6 +270,15 @@ Atomic hard-delete of a song and its physical file.
 
 ---
 
+## MetadataFramesReader
+*Location: `src/services/metadata_frames_reader.py`*
+**Responsibility**: Single utility for loading and caching the ID3 frame configuration.
+
+### load_id3_frames(path: str = "json/id3_frames.json") -> ID3FrameMapping
+The single source of truth for ID3 frame mapping. Loads and validates the JSON configuration once and caches it in memory.
+
+---
+
 ## Logger
 *Location: `src/services/logger.py`*
 **Responsibility**: Simple console logging for the application.
@@ -320,9 +334,6 @@ Translates raw frame IDs (TPE1, TIT2) into domain fields, credits, and tags.
 - **Wisdom**: Implements a **Strict Data Contract**. Does not guess missing fields (no Composer->Artist or Mood->Genre fallbacks).
 - **Sub-tags**: Resolves frames by exact ID (e.g., TXXX:STATUS). Does not borrow configuration from base frames (TXXX) to prevent mis-mapping.
 - **Deduplication**: Handles "Frame Doubling" (e.g. merging TIPL and TPE1 into unique credits).
-
-### _load_config(json_path: str) -> Dict[str, Any]
-**Internal**: Loads the frame mapping configuration from JSON. Uses `utf-8-sig` to ignore Windows BOMs.
 
 ### _to_int(val: Any) -> Optional[int]
 **Internal**: Safely converts string values (e.g. "2024 (Remaster)") into clean integers by stripping non-digit characters.

@@ -200,8 +200,12 @@ class TestSetParent:
             conn.commit()
 
         publisher = repo.get_by_id(5)
-        assert publisher.parent_id == 1, f"Expected parent_id=1, got {publisher.parent_id}"
-        assert publisher.name == "Sub Pop", f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
+        assert (
+            publisher.parent_id == 1
+        ), f"Expected parent_id=1, got {publisher.parent_id}"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
 
     def test_clear_parent_sets_null(self, populated_db):
         """Clear parent from PublisherID=10 (DGC Records, parent=1) → parent=NULL."""
@@ -212,8 +216,12 @@ class TestSetParent:
             conn.commit()
 
         publisher = repo.get_by_id(10)
-        assert publisher.parent_id is None, f"Expected parent_id=None after clear, got {publisher.parent_id}"
-        assert publisher.name == "DGC Records", f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
+        assert (
+            publisher.parent_id is None
+        ), f"Expected parent_id=None after clear, got {publisher.parent_id}"
+        assert (
+            publisher.name == "DGC Records"
+        ), f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
 
     def test_set_parent_nonexistent_publisher_raises(self, populated_db):
         """set_parent on a nonexistent publisher_id should raise LookupError."""
@@ -221,6 +229,7 @@ class TestSetParent:
 
         with repo._get_connection() as conn:
             import pytest
+
             with pytest.raises(LookupError):
                 repo.set_parent(9999, 1, conn)
 
@@ -233,4 +242,6 @@ class TestSetParent:
             conn.commit()
 
         roswell = repo.get_by_id(4)
-        assert roswell.parent_id is None, f"Expected Roswell Records parent_id=None unchanged, got {roswell.parent_id}"
+        assert (
+            roswell.parent_id is None
+        ), f"Expected Roswell Records parent_id=None unchanged, got {roswell.parent_id}"

@@ -1,9 +1,9 @@
-import json
-from pathlib import Path
 from typing import Dict, List, Any, Optional
 from pydantic import ValidationError
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
+from src.models.metadata_frames import ID3FrameConfig
 from src.services.logger import logger
+from src.services.metadata_frames_reader import load_id3_frames
 from src.engine.config import COMMA_SPLIT_FIELDS
 
 
@@ -12,34 +12,17 @@ class MetadataParser:
 
     def __init__(self, json_path: str = "json/id3_frames.json"):
         """Initializes the parser with the frame mapping configuration."""
-        self.config = self._load_config(json_path)
+        self.config = load_id3_frames(json_path)
         # Pre-process config for faster lookup
         self.field_map = {}
         self.tag_map = {}
-
+        assert self.config is not None, "Metadata configuration failed to load"
         for tag_id, entry in self.config.items():
-            if isinstance(entry, dict):
-                field = entry.get("field")
-                if field:
+            if isinstance(entry, ID3FrameConfig):
+                if entry.field:
                     self.field_map[tag_id] = entry
-
-                category = entry.get("tag_category")
-                if category:
+                if entry.tag_category:
                     self.tag_map[tag_id] = entry
-
-    def _load_config(self, json_path: str) -> Dict[str, Any]:
-        """Loads the JSON configuration using utf-8-sig to handle BOM."""
-        try:
-            path = Path(json_path)
-            if not path.exists():
-                logger.warning(f"[MetadataParser] Config not found at {json_path}")
-                return {}
-
-            with open(path, "r", encoding="utf-8-sig") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"[MetadataParser] Error loading config: {e}")
-            return {}
 
     def parse(self, raw_metadata: Dict[str, List[str]], file_path: str) -> Song:
         """Translates raw tags into a Song object using the frame map."""
@@ -79,9 +62,9 @@ class MetadataParser:
                 # We don't continue here anymore; we let it fall through to Step 4.
                 pass
 
-            field_name = entry.get("field") if isinstance(entry, dict) else None
-            category = entry.get("tag_category") if isinstance(entry, dict) else None
-            type_info = entry.get("type", "text") if isinstance(entry, dict) else "text"
+            field_name = entry.field if isinstance(entry, ID3FrameConfig) else None
+            category = entry.tag_category if isinstance(entry, ID3FrameConfig) else None
+            type_info = entry.type if isinstance(entry, ID3FrameConfig) else "text"
 
             if isinstance(entry, str):
                 logger.debug(
@@ -153,9 +136,16 @@ class MetadataParser:
                             primary_tag_categories.add(cat_name)
                 elif not field_name:
                     # Genuine raw tag (no descriptor), keep in raw_tags
+                    entry_description = entry.description if isinstance(entry, ID3FrameConfig) else None
+                    if not entry_description and not tag_id:
+                        logger.error(
+                            f"[MetadataParser] CRITICAL: Unidentifiable tag found on song_id={song_data.get('id')}"
+                        )
+                        continue
+
                     label = (
-                        (entry.get("description") or tag_id)
-                        if isinstance(entry, dict)
+                        entry.description
+                        if isinstance(entry, ID3FrameConfig)
                         else (entry or tag_id)
                     )
                     song_data["raw_tags"][label] = values

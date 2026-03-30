@@ -603,9 +603,7 @@ class TestRowToSong:
         ), f"Expected 'hash123', got '{song.audio_hash}'"
         assert song.is_active is True, f"Expected True (1->True), got {song.is_active}"
         assert song.year == 2024, f"Expected 2024, got {song.year}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0, got {song.processing_status}"
+        assert song.processing_status == 0, f"Expected 0, got {song.processing_status}"
         assert song.notes is None, f"Expected None, got {song.notes}"
         assert song.bpm == 120, f"Expected 120, got {song.bpm}"
         assert (

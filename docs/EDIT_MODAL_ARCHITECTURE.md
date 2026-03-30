@@ -104,9 +104,30 @@ Clicking a child chip label opens a rename-only sub-modal using the same `#edit-
 
 ---
 
-## Backend: `setPublisherParent`
+## Backend
 
-New endpoint added for sub-publisher linking:
+### View Models
+
+Publisher and tag endpoints return view models, not domain models:
+
+- `PublisherView` — `id`, `name`, `parent_name`, `sub_publishers: List[PublisherView]`
+- `TagView` — `id`, `name`, `category`
+
+These are defined in `src/models/view_models.py` and used by all `GET /publishers*` and `GET /tags*` endpoints.
+
+### `AddPublisherBody` / `AddTagBody`
+
+Both support Truth-First linking — pass an ID to link an existing record, or a name to get-or-create:
+
+```json
+{ "publisher_id": 5 }           // link existing by ID
+{ "publisher_name": "Sub Pop" } // get-or-create by name
+
+{ "tag_id": 3 }                             // link existing by ID
+{ "tag_name": "Grunge", "category": "Genre" } // get-or-create by name
+```
+
+### `setPublisherParent`
 
 - **Repo**: `PublisherRepository.set_parent(publisher_id, parent_id, conn)` — sets `ParentPublisherID`
 - **Service**: `CatalogService.set_publisher_parent(publisher_id, parent_id)`
@@ -149,26 +170,31 @@ Also add a `+ Add` button for the section:
 
 ### 3. Add `open-edit-modal` branch in `main.js`
 
-Inside the `if (action === "open-edit-modal")` handler, add a new `chipType` branch. `onClose` is already defined as `refreshActiveDetail` above all branches — just use it:
+Inside the `if (action === "open-edit-modal")` handler, add a new `chipType` branch. `onClose` is already defined as `refreshActiveDetail` above all branches — just use it.
+
+Fetch fresh detail data rather than relying on the cached list — this ensures name/category are current even if the cache is stale:
 
 ```js
 if (chipType === "tag") {
-    const songEl = elements.detailPanel.querySelector("[data-action='delete-song']");
-    const songId = songEl && songEl.dataset.id;
-    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-    const tagItems = song ? song.tags : [];  // live ref from cached song
-    const tag = tagItems.find(t => String(t.id) === String(itemId));
+    const tagDetail = await getTagDetail(itemId).catch(() => null);
+    if (!tagDetail) return;
 
     openEditModal({
         title: "Edit Tag",
-        name: tag.name,
-        onRename: async (newName) => { await updateTag(tag.id, newName, tag.category); },
+        name: tagDetail.name,
+        onRename: async (newName) => {
+            await updateTag(itemId, newName, tagDetail.category);
+            tagDetail.name = newName;
+        },
         onClose,
         category: {
             label: "Category",
-            value: tag.category,
+            value: tagDetail.category,
             editable: true,
-            onSave: async (val) => { await updateTag(tag.id, tag.name, val); },
+            onSave: async (val) => {
+                await updateTag(itemId, tagDetail.name, val);
+                tagDetail.category = val;
+            },
         },
         children: null,
     }, actionTarget);
@@ -187,7 +213,7 @@ Inside `if (action === "open-link-modal")`, add a branch for the new `modalType`
 |-----------|-------------------|------------|-------------------|-------|
 | Publisher | ✅ | ✅ | ✅ | Sub-publishers children list; child rename wired |
 | Credit | ❌ | ❌ | ❌ | `role_name` is read-only; `display_name` renameable globally via `update_credit_name` |
-| Tag / Genre | ❌ | ❌ | ❌ | `name` + `category` both editable |
+| Tag / Genre | ✅ | ✅ | ✅ | `name` + `category` both editable; Truth-First add (ID or name+category) |
 | Album | ❌ | ❌ | ❌ | Most complex — track/disc numbers live on the link, not the album record |
 
 ---

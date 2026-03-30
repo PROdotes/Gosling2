@@ -274,15 +274,15 @@ class TestUpdateAlbum:
 
 
 class TestAddSongTag:
-    def test_add_existing_tag_returns_tag(self, populated_db):
+    def test_add_existing_tag_by_name_returns_tag(self, populated_db):
         service = CatalogService(populated_db)
-        # Song 2 has no tags — add Grunge (tag_id=1)
+        # Song 2 has no tags — add Grunge (tag_id=1) by name
         tag = service.add_song_tag(2, "Grunge", "Genre")
         assert tag.id is not None, "Expected tag id"
         assert tag.name == "Grunge", f"Expected 'Grunge', got '{tag.name}'"
         assert tag.category == "Genre", f"Expected 'Genre', got '{tag.category}'"
 
-    def test_add_tag_persisted_on_get_song(self, populated_db):
+    def test_add_tag_by_name_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
         service.add_song_tag(2, "Grunge", "Genre")
         song = service.get_song(2)
@@ -292,10 +292,33 @@ class TestAddSongTag:
     def test_add_new_tag_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         tag = service.add_song_tag(1, "Live Recording", "Type")
-        assert (
-            tag.name == "Live Recording"
-        ), f"Expected 'Live Recording', got '{tag.name}'"
+        assert tag.name == "Live Recording", f"Expected 'Live Recording', got '{tag.name}'"
         assert tag.category == "Type", f"Expected 'Type', got '{tag.category}'"
+
+    def test_add_tag_by_id_links_existing(self, populated_db):
+        service = CatalogService(populated_db)
+        # Song 2 has no tags — link Grunge (tag_id=1) by ID, no name/category passed
+        tag = service.add_song_tag(2, None, None, tag_id=1)
+        assert tag.id == 1, f"Expected tag id=1, got {tag.id}"
+        assert tag.name == "Grunge", f"Expected 'Grunge', got '{tag.name}'"
+        assert tag.category == "Genre", f"Expected 'Genre', got '{tag.category}'"
+
+    def test_add_tag_by_id_persisted_on_get_song(self, populated_db):
+        service = CatalogService(populated_db)
+        service.add_song_tag(2, None, None, tag_id=1)
+        song = service.get_song(2)
+        tag_ids = [t.id for t in song.tags]
+        assert 1 in tag_ids, f"Expected tag_id=1 linked to song 2, got {tag_ids}"
+
+    def test_add_tag_by_id_not_found_raises_lookup_error(self, populated_db):
+        service = CatalogService(populated_db)
+        with pytest.raises(LookupError):
+            service.add_song_tag(2, None, None, tag_id=9999)
+
+    def test_add_tag_by_name_missing_category_raises_value_error(self, populated_db):
+        service = CatalogService(populated_db)
+        with pytest.raises(ValueError):
+            service.add_song_tag(2, "Grunge", None)
 
 
 class TestRemoveSongTag:
@@ -333,23 +356,19 @@ class TestUpdateTag:
 
 
 class TestAddSongPublisher:
-    def test_add_existing_publisher_returns_publisher(self, populated_db):
+    def test_add_existing_publisher_by_name_returns_publisher(self, populated_db):
         service = CatalogService(populated_db)
-        # Song 2 has no publisher — add Sub Pop (pub_id=5)
+        # Song 2 has no publisher — add Sub Pop (pub_id=5) by name
         publisher = service.add_song_publisher(2, "Sub Pop")
         assert publisher.id is not None, "Expected publisher id"
-        assert (
-            publisher.name == "Sub Pop"
-        ), f"Expected 'Sub Pop', got '{publisher.name}'"
+        assert publisher.name == "Sub Pop", f"Expected 'Sub Pop', got '{publisher.name}'"
 
-    def test_add_publisher_persisted_on_get_song(self, populated_db):
+    def test_add_publisher_by_name_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
         service.add_song_publisher(2, "Sub Pop")
         song = service.get_song(2)
         pub_names = [p.name for p in song.publishers]
-        assert (
-            "Sub Pop" in pub_names
-        ), f"Expected 'Sub Pop' in publishers, got {pub_names}"
+        assert "Sub Pop" in pub_names, f"Expected 'Sub Pop' in publishers, got {pub_names}"
 
     def test_add_new_publisher_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
@@ -357,6 +376,30 @@ class TestAddSongPublisher:
         assert (
             publisher.name == "Brand New Label"
         ), f"Expected 'Brand New Label', got '{publisher.name}'"
+
+    def test_add_publisher_by_id_links_existing(self, populated_db):
+        service = CatalogService(populated_db)
+        # Song 2 has no publisher — link Sub Pop (pub_id=5) by ID
+        publisher = service.add_song_publisher(2, None, publisher_id=5)
+        assert publisher.id == 5, f"Expected publisher id=5, got {publisher.id}"
+        assert publisher.name == "Sub Pop", f"Expected 'Sub Pop', got '{publisher.name}'"
+
+    def test_add_publisher_by_id_persisted_on_get_song(self, populated_db):
+        service = CatalogService(populated_db)
+        service.add_song_publisher(2, None, publisher_id=5)
+        song = service.get_song(2)
+        pub_ids = [p.id for p in song.publishers]
+        assert 5 in pub_ids, f"Expected pub_id=5 linked to song 2, got {pub_ids}"
+
+    def test_add_publisher_by_id_not_found_raises_lookup_error(self, populated_db):
+        service = CatalogService(populated_db)
+        with pytest.raises(LookupError):
+            service.add_song_publisher(2, None, publisher_id=9999)
+
+    def test_add_publisher_by_name_missing_name_raises_value_error(self, populated_db):
+        service = CatalogService(populated_db)
+        with pytest.raises(ValueError):
+            service.add_song_publisher(2, None)
 
 
 class TestRemoveSongPublisher:
@@ -403,8 +446,12 @@ class TestSetPublisherParent:
         service.set_publisher_parent(5, 1)
 
         publisher = service.get_publisher(5)
-        assert publisher.parent_id == 1, f"Expected parent_id=1, got {publisher.parent_id}"
-        assert publisher.name == "Sub Pop", f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
+        assert (
+            publisher.parent_id == 1
+        ), f"Expected parent_id=1, got {publisher.parent_id}"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
 
     def test_clear_parent_sets_none(self, populated_db):
         """Clear parent from DGC Records (10, parent=1) → parent=None."""
@@ -412,8 +459,12 @@ class TestSetPublisherParent:
         service.set_publisher_parent(10, None)
 
         publisher = service.get_publisher(10)
-        assert publisher.parent_id is None, f"Expected parent_id=None after clear, got {publisher.parent_id}"
-        assert publisher.name == "DGC Records", f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
+        assert (
+            publisher.parent_id is None
+        ), f"Expected parent_id=None after clear, got {publisher.parent_id}"
+        assert (
+            publisher.name == "DGC Records"
+        ), f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
 
     def test_set_parent_nonexistent_publisher_raises(self, populated_db):
         """set_publisher_parent on nonexistent publisher should raise LookupError."""

@@ -11,6 +11,7 @@
  *       value: "major",
  *       editable: true,
  *       onSave: async (val) => {},
+ *       onSearch: async (q) => ["Genre", "Mood"],  // optional — renders search dropdown instead of plain input
  *     },
  *     children: {                               // null = no children section
  *       label: "Sub-publishers",
@@ -28,9 +29,7 @@ const titleEl   = document.getElementById("edit-modal-title");
 const bodyEl    = document.getElementById("edit-modal-body");
 
 let _config = null;
-let _suppressNextOverlayClick = false;
 let _parentSnapshot = null; // saved state when drilling into a child edit
-let _navigating = false;   // true while swapping modal content — suppress blur commits
 
 // ─── Children sub-section state ───────────────────────────────────────────────
 let _childItems = [];
@@ -41,12 +40,19 @@ let _childInput = null;
 let _childDropdown = null;
 let _childItemsEl = null;
 
+// ─── Category dropdown state ──────────────────────────────────────────────────
+let _catDebounce = null;
+let _catDropdownItems = [];
+let _catDropdownIndex = -1;
+let _catInput = null;
+let _catDropdown = null;
+
 // ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderBody() {
     const sections = [];
 
-    // Rename field
+    // Name field
     if (_config.onRename) {
         sections.push(`
             <div class="edit-modal-field" id="edit-modal-rename-field">
@@ -59,8 +65,19 @@ function renderBody() {
 
     // Category field
     if (_config.category) {
-        const { label, value, editable } = _config.category;
-        if (editable) {
+        const { label, value, editable, onSearch } = _config.category;
+        if (editable && onSearch) {
+            sections.push(`
+                <div class="edit-modal-field" id="edit-modal-category-field">
+                    <label for="edit-modal-category-input">${escapeHtml(label)}</label>
+                    <div class="link-modal-add" style="position:relative">
+                        <input type="text" id="edit-modal-category-input" class="link-modal-input"
+                            value="${escapeHtml(value || "")}" autocomplete="off">
+                        <div id="edit-modal-category-dropdown" class="link-modal-dropdown" style="display:none"></div>
+                    </div>
+                </div>
+            `);
+        } else if (editable) {
             sections.push(`
                 <div class="edit-modal-field" id="edit-modal-category-field">
                     <label for="edit-modal-category-input">${escapeHtml(label)}</label>
@@ -96,23 +113,63 @@ function renderBody() {
 }
 
 function attachHandlers() {
-    // Rename input — save on blur or Enter
+    // Rename input — save on Enter
     const nameInput = bodyEl.querySelector("#edit-modal-name-input");
     if (nameInput) {
+        nameInput.addEventListener("input", () => {
+            const field = nameInput.closest(".edit-modal-field");
+            field.classList.toggle("edit-modal-field--dirty", nameInput.value.trim() !== _lastCommittedName);
+        });
         nameInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); commitRename(nameInput); }
-            if (e.key === "Escape") { e.stopPropagation(); closeEditModal(); }
         });
-        nameInput.addEventListener("blur", () => { if (!_navigating) commitRename(nameInput); });
     }
 
-    // Category input — save on blur or Enter
+    // Category input — plain (save on Enter) or search dropdown
     const catInput = bodyEl.querySelector("#edit-modal-category-input");
     if (catInput) {
-        catInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitCategory(catInput); }
+        _catInput = catInput;
+        const hasSearch = !!_config.category?.onSearch;
+
+        catInput.addEventListener("input", () => {
+            const field = catInput.closest(".edit-modal-field");
+            field.classList.toggle("edit-modal-field--dirty", catInput.value.trim() !== _lastCommittedCategory);
+
+            if (hasSearch) {
+                clearTimeout(_catDebounce);
+                const q = catInput.value.trim();
+                if (!q) { hideCatDropdown(); return; }
+                _catDebounce = setTimeout(() => runCatSearch(q), 200);
+            }
         });
-        catInput.addEventListener("blur", () => commitCategory(catInput));
+
+        catInput.addEventListener("keydown", (e) => {
+            if (hasSearch) {
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    _catDropdownIndex = Math.min(_catDropdownIndex + 1, _catDropdownItems.length - 1);
+                    updateCatDropdownHighlight();
+                } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    _catDropdownIndex = Math.max(_catDropdownIndex - 1, 0);
+                    updateCatDropdownHighlight();
+                } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (_catDropdownIndex >= 0) selectCatOption(_catDropdownIndex);
+                    else commitCategory(catInput);
+                }
+            } else {
+                if (e.key === "Enter") { e.preventDefault(); commitCategory(catInput); }
+            }
+        });
+
+        catInput.addEventListener("blur", () => {
+            setTimeout(() => hideCatDropdown(), 150);
+        });
+
+        if (hasSearch) {
+            _catDropdown = bodyEl.querySelector("#edit-modal-category-dropdown");
+        }
     }
 
     // Children section
@@ -144,9 +201,6 @@ function attachHandlers() {
                 e.preventDefault();
                 if (_childDropdownIndex >= 0) selectChildOption(_childDropdownIndex);
                 else if (_childDropdownItems.length === 1) selectChildOption(0);
-            } else if (e.key === "Escape") {
-                e.stopPropagation();
-                closeEditModal();
             }
         });
 
@@ -169,6 +223,7 @@ async function commitRename(input) {
         await _config.onRename(newName);
         _config.name = newName;
         if (_config._triggerEl) _config._triggerEl.textContent = newName;
+        input.closest(".edit-modal-field")?.classList.remove("edit-modal-field--dirty");
         if (_parentSnapshot) { closeEditModal(); return; }
     } catch (err) {
         showError(`Rename failed: ${err.message}`);
@@ -191,6 +246,7 @@ async function commitCategory(input) {
     try {
         await _config.category.onSave(newVal);
         _config.category.value = newVal;
+        input.closest(".edit-modal-field")?.classList.remove("edit-modal-field--dirty");
     } catch (err) {
         showError(`Save failed: ${err.message}`);
         input.value = _config.category.value;
@@ -198,6 +254,69 @@ async function commitCategory(input) {
     } finally {
         input.disabled = false;
     }
+}
+
+async function runCatSearch(q) {
+    const results = await _config.category.onSearch(q);
+    // Filter to matching categories, case-insensitive
+    const filtered = results.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+    const exactMatch = filtered.some(c => c.toLowerCase() === q.toLowerCase());
+    const options = filtered.map(c => ({ label: c }));
+    if (!exactMatch) {
+        options.unshift({ label: `Use "${q}"`, rawInput: q, isCreate: true });
+    }
+    renderCatDropdown(options);
+}
+
+function renderCatDropdown(options) {
+    _catDropdownItems = options;
+    _catDropdownIndex = -1;
+
+    if (!options.length) { hideCatDropdown(); return; }
+
+    _catDropdown.innerHTML = options.map((opt, i) => `
+        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
+            ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
+        </div>
+    `).join("");
+
+    _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
+        el.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            selectCatOption(Number(el.dataset.index));
+        });
+    });
+
+    _catDropdown.style.display = "block";
+    updateCatDropdownHighlight();
+}
+
+function updateCatDropdownHighlight() {
+    _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
+        el.classList.toggle("link-dropdown-item--active", i === _catDropdownIndex);
+    });
+}
+
+function selectCatOption(index) {
+    const opt = _catDropdownItems[index];
+    if (!opt) return;
+
+    _isSelecting = true;
+    const value = opt.rawInput || opt.label;
+    _catInput.value = value;
+
+    hideCatDropdown();
+    // Mark dirty if different from last committed
+    const field = _catInput.closest(".edit-modal-field");
+    field.classList.toggle("edit-modal-field--dirty", value !== _lastCommittedCategory);
+    setTimeout(() => { _isSelecting = false; }, 150);
+}
+
+function hideCatDropdown() {
+    if (_catDropdown) _catDropdown.style.display = "none";
+    _catDropdownItems = [];
+    _catDropdownIndex = -1;
 }
 
 // ─── Children ─────────────────────────────────────────────────────────────────
@@ -288,12 +407,14 @@ function updateChildDropdownHighlight() {
 async function selectChildOption(index) {
     const opt = _childDropdownItems[index];
     if (!opt) return;
+
+    _isSelecting = true;
     _childInput.value = "";
     _childDropdown.style.display = "none";
     _childDropdownItems = [];
     _childDropdownIndex = -1;
     _childInput.disabled = true;
-    _suppressNextOverlayClick = true;
+
     try {
         await _config.children.onAdd(opt);
         if (_config) renderChildItems();
@@ -304,6 +425,7 @@ async function selectChildOption(index) {
             _childInput.disabled = false;
             _childInput.focus();
         }
+        setTimeout(() => { _isSelecting = false; }, 150);
     }
 }
 
@@ -323,9 +445,7 @@ function showError(msg) {
 // ─── Child edit (drill one level, no further) ────────────────────────────────
 
 function openChildEdit(item) {
-    _suppressNextOverlayClick = true;
-    _navigating = true;
-    // Save full parent state
+
     _parentSnapshot = {
         config: _config,
         childItems: _childItems,
@@ -333,7 +453,7 @@ function openChildEdit(item) {
         lastCommittedCategory: _lastCommittedCategory,
     };
 
-    const childConfig = {
+    openEditModal({
         title: `Edit: ${item.label}`,
         name: item.label,
         onRename: async (newName) => {
@@ -343,10 +463,7 @@ function openChildEdit(item) {
         onClose: null, // closing returns to parent, not refreshActiveDetail
         category: null,
         children: null,
-    };
-
-    openEditModal(childConfig);
-    _navigating = false;
+    });
 }
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
@@ -372,6 +489,10 @@ export function openEditModal(config, triggerEl = null) {
     _childInput = null;
     _childDropdown = null;
     _childItemsEl = null;
+    _catDropdownItems = [];
+    _catDropdownIndex = -1;
+    _catInput = null;
+    _catDropdown = null;
 
     titleEl.textContent = config.title;
     renderBody();
@@ -390,11 +511,9 @@ export function closeEditModal() {
 
     if (_parentSnapshot) {
         // Restore parent modal instead of fully closing
-        _navigating = true;
         const snap = _parentSnapshot;
         _parentSnapshot = null;
         openEditModal(snap.config, snap.config._triggerEl);
-        _navigating = false;
         return;
     }
 
@@ -406,6 +525,12 @@ export function closeEditModal() {
 
 // Close on overlay click outside modal box
 overlay.addEventListener("click", (e) => {
-    if (_suppressNextOverlayClick) { _suppressNextOverlayClick = false; return; }
+    if (_isSelecting) return;
+    if (!document.contains(e.target)) return; // ghost click from removed dropdown item
     if (!overlay.querySelector(".link-modal").contains(e.target)) closeEditModal();
+});
+
+// Escape from anywhere inside the modal closes it (registered once, covers all inputs)
+overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.stopPropagation(); closeEditModal(); }
 });

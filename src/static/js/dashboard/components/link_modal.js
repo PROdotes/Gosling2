@@ -12,16 +12,17 @@
  *   });
  */
 
-const overlay  = document.getElementById("link-modal");
-const titleEl  = document.getElementById("link-modal-title");
-const itemsEl  = document.getElementById("link-modal-items");
-const input    = document.getElementById("link-modal-input");
+const overlay = document.getElementById("link-modal");
+const titleEl = document.getElementById("link-modal-title");
+const itemsEl = document.getElementById("link-modal-items");
+const input = document.getElementById("link-modal-input");
 const dropdown = document.getElementById("link-modal-dropdown");
 
 let _config = null;
 let _debounce = null;
 let _dropdownItems = [];
 let _dropdownIndex = -1;
+let _isSelecting = false;
 
 function renderItems() {
     if (!_config.items.length) {
@@ -86,9 +87,12 @@ function updateDropdownHighlight() {
 }
 
 async function selectOption(index) {
+    if (_isSelecting) return;
+
     const opt = _dropdownItems[index];
     if (!opt) return;
 
+    _isSelecting = true;
     input.value = "";
     dropdown.style.display = "none";
     _dropdownItems = [];
@@ -96,14 +100,28 @@ async function selectOption(index) {
     input.disabled = true;
 
     try {
+        // Optimistic UI update before initiating long network/DOM work
+        const newItem = { id: opt.id, label: opt.label };
+        if (!_config.items.some(i => String(i.id) === String(opt.id))) {
+            _config.items.push(newItem);
+        }
+        renderItems();
+
+        // Perform the background addition and detail panel refresh
         await _config.onAdd(opt);
-        // onAdd is responsible for updating _config.items
+
+        // Final sync in case the server returned a different ID/Name (e.g. for new items)
+        newItem.id = opt.id;
+        newItem.label = opt.label;
         renderItems();
     } catch (err) {
         showError(`Add failed: ${err.message}`);
     } finally {
         input.disabled = false;
         input.focus();
+        setTimeout(() => {
+            _isSelecting = false;
+        }, 150);
     }
 }
 
@@ -122,7 +140,17 @@ async function runSearch(q) {
     const raw = q.trim();
     const results = raw ? await _config.onSearch(raw) : [];
 
-    const options = results.map(r => ({ id: r.id, label: r.label }));
+    // Filter out items already in the currentItems list
+    const filteredResults = results.filter(r => {
+        const alreadyLinked = _config.items.some(linked => {
+             const idMatch = r.id != null && String(linked.id) === String(r.id);
+             const labelMatch = linked.label.toLowerCase() === r.label.toLowerCase();
+             return idMatch || labelMatch;
+        });
+        return !alreadyLinked;
+    });
+
+    const options = filteredResults.map(r => ({ id: r.id, label: r.label }));
 
     // Add create-new option if query doesn't exactly match an existing result
     const exactMatch = results.some(r => r.label.toLowerCase() === raw.toLowerCase());
@@ -136,6 +164,7 @@ async function runSearch(q) {
 export function openLinkModal(config) {
     _config = config;
     titleEl.textContent = config.title;
+    input.placeholder = config.placeholder || "Type to search or create...";
     input.value = "";
     dropdown.style.display = "none";
     _dropdownItems = [];
@@ -163,6 +192,13 @@ input.addEventListener("input", () => {
     _debounce = setTimeout(() => runSearch(q), 200);
 });
 
+overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        e.stopPropagation();
+        closeLinkModal();
+    }
+});
+
 input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -179,8 +215,6 @@ input.addEventListener("keydown", (e) => {
         } else if (_dropdownItems.length === 1) {
             selectOption(0);
         }
-    } else if (e.key === "Escape") {
-        closeLinkModal();
     }
 });
 
@@ -191,5 +225,8 @@ input.addEventListener("blur", () => {
 
 // Close on overlay click outside modal box
 overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) closeLinkModal();
+    if (_isSelecting) return;
+    if (e.target === overlay) {
+        closeLinkModal();
+    }
 });

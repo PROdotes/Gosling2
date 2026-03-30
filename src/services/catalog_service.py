@@ -675,6 +675,11 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- get_all_tags() count={len(tags)}")
         return tags
 
+    def get_tag_categories(self) -> List[str]:
+        """Fetch all distinct tag categories."""
+        logger.debug("[CatalogService] -> get_tag_categories()")
+        return self._tag_repo.get_categories()
+
     def search_tags(self, query: str) -> List[Tag]:
         """Search for tags by name match."""
         logger.debug(f"[CatalogService] -> search_tags(q='{query}')")
@@ -1336,6 +1341,9 @@ class CatalogService:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((link for link in links if link.album_id == album_id), None)
+        assert (
+            song_album is not None
+        ), f"Failed to retrieve link for song {song_id} and album {album_id} after insertion"
         logger.debug("[CatalogService] <- add_song_album OK")
         return song_album
 
@@ -1370,6 +1378,9 @@ class CatalogService:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((link for link in links if link.album_id == album_id), None)
+        assert (
+            song_album is not None
+        ), f"Failed to retrieve link for song {song_id} and album {album_id} after creation"
         logger.debug(
             f"[CatalogService] <- create_and_link_album OK album_id={album_id}"
         )
@@ -1492,8 +1503,28 @@ class CatalogService:
 
     # --- Tags ---
 
-    def add_song_tag(self, song_id: int, tag_name: str, category: str) -> Tag:
-        """Add a tag to a song. Get-or-create tag."""
+    def add_song_tag(
+        self,
+        song_id: int,
+        tag_name: Optional[str],
+        category: Optional[str],
+        tag_id: Optional[int] = None,
+    ) -> Tag:
+        """Add a tag to a song. Links by ID if tag_id provided, otherwise get-or-creates by name+category."""
+        if tag_id is not None:
+            existing = self._tag_repo.get_by_id(tag_id)
+            if not existing:
+                raise LookupError(f"Tag {tag_id} not found")
+            tag_name = existing.name
+            category = existing.category
+        else:
+            if not tag_name or not category:
+                raise ValueError(
+                    "tag_name and category are required when tag_id is not provided"
+                )
+            tag_name = tag_name.strip()
+            category = category.strip()
+
         logger.debug(
             f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', cat='{category}')"
         )
@@ -1546,8 +1577,25 @@ class CatalogService:
 
     # --- Publishers ---
 
-    def add_song_publisher(self, song_id: int, publisher_name: str) -> Publisher:
-        """Add a publisher link to a song. Get-or-create publisher."""
+    def add_song_publisher(
+        self,
+        song_id: int,
+        publisher_name: Optional[str],
+        publisher_id: Optional[int] = None,
+    ) -> Publisher:
+        """Add a publisher link to a song. Links by ID if publisher_id provided, otherwise get-or-creates by name."""
+        if publisher_id is not None:
+            existing = self._pub_repo.get_by_id(publisher_id)
+            if not existing:
+                raise LookupError(f"Publisher {publisher_id} not found")
+            publisher_name = existing.name
+        else:
+            if not publisher_name:
+                raise ValueError(
+                    "publisher_name is required when publisher_id is not provided"
+                )
+            publisher_name = publisher_name.strip()
+
         logger.debug(
             f"[CatalogService] -> add_song_publisher(song_id={song_id}, publisher='{publisher_name}')"
         )
@@ -1614,3 +1662,7 @@ class CatalogService:
         finally:
             conn.close()
         logger.debug("[CatalogService] <- set_publisher_parent OK")
+
+    def get_id3_frames_config(self) -> Dict[str, Any]:
+        """Returns the ID3 frame configuration from the parser (Single Source of Truth)."""
+        return self._metadata_parser.config

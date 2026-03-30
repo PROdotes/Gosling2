@@ -484,12 +484,16 @@ class TestSongViewReviewWorkflow:
 
     def test_ready_flow_missing_performer(self):
         """Required: at least 1 Performer."""
-        view = self._make_song_view(credits=[SongCredit(role_name="Composer", display_name="Artist B")])
+        view = self._make_song_view(
+            credits=[SongCredit(role_name="Composer", display_name="Artist B")]
+        )
         assert "performers" in view.review_blockers
 
     def test_ready_flow_missing_composer(self):
         """Required: at least 1 Composer."""
-        view = self._make_song_view(credits=[SongCredit(role_name="Performer", display_name="Artist A")])
+        view = self._make_song_view(
+            credits=[SongCredit(role_name="Performer", display_name="Artist A")]
+        )
         assert "composers" in view.review_blockers
 
     def test_ready_flow_missing_genre(self):
@@ -1131,6 +1135,7 @@ class TestSongSlimViewFromRow:
         row = self._make_row()
         del row["ProcessingStatus"]
         import pytest
+
         with pytest.raises(KeyError):
             SongSlimView.from_row(row)
 

@@ -1,18 +1,25 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
-from src.models.domain import Publisher, Tag
 from src.models.view_models import (
     SongView,
     SongSlimView,
     AlbumSlimView,
-    IdentityView,
     AlbumView,
+    TagView,
+    PublisherView,
+    IdentityView,
     IngestionCheckRequest,
     IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
-from src.engine.config import get_db_path, SCALAR_VALIDATION
+from src.engine.config import (
+    get_db_path,
+    SCALAR_VALIDATION,
+    TAG_DEFAULT_CATEGORY,
+    TAG_CATEGORY_DELIMITER,
+    TAG_INPUT_FORMAT,
+)
 
 router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
@@ -101,22 +108,28 @@ async def get_songs_by_identity(identity_id: int) -> List[SongView]:
     return [SongView.from_domain(s) for s in songs]
 
 
-@router.get("/publishers", response_model=List[Publisher])
-async def get_all_publishers() -> List[Publisher]:
+@router.get("/publishers", response_model=List[PublisherView])
+async def get_all_publishers() -> List[PublisherView]:
     """Fetch a list of all active music publishers."""
     logger.debug("[CatalogRouter] get_all_publishers()")
-    return _get_service().get_all_publishers()
+    return [
+        PublisherView.model_validate(p.model_dump())
+        for p in _get_service().get_all_publishers()
+    ]
 
 
-@router.get("/publishers/search", response_model=List[Publisher])
-async def search_publishers(q: str) -> List[Publisher]:
+@router.get("/publishers/search", response_model=List[PublisherView])
+async def search_publishers(q: str) -> List[PublisherView]:
     """Search for publishers by name."""
     logger.debug(f"[CatalogRouter] search_publishers(q='{q}')")
-    return _get_service().search_publishers(q)
+    return [
+        PublisherView.model_validate(p.model_dump())
+        for p in _get_service().search_publishers(q)
+    ]
 
 
-@router.get("/publishers/{publisher_id:int}", response_model=Publisher)
-async def get_publisher(publisher_id: int) -> Publisher:
+@router.get("/publishers/{publisher_id:int}", response_model=PublisherView)
+async def get_publisher(publisher_id: int) -> PublisherView:
     """Fetch a single publisher by ID."""
     logger.debug(f"[CatalogRouter] get_publisher(id={publisher_id})")
     publisher = _get_service().get_publisher(publisher_id)
@@ -125,7 +138,7 @@ async def get_publisher(publisher_id: int) -> Publisher:
         raise HTTPException(
             status_code=404, detail=f"Publisher ID {publisher_id} not found"
         )
-    return publisher
+    return PublisherView.model_validate(publisher.model_dump())
 
 
 @router.get("/publishers/{publisher_id:int}/songs", response_model=List[SongView])
@@ -170,29 +183,40 @@ async def get_album(album_id: int) -> AlbumView:
     return AlbumView.from_domain(album)
 
 
-@router.get("/tags", response_model=List[Tag])
-async def get_all_tags() -> List[Tag]:
+@router.get("/tags", response_model=List[TagView])
+async def get_all_tags() -> List[TagView]:
     """Fetch a list of all tags."""
     logger.debug("[CatalogRouter] get_all_tags()")
-    return _get_service().get_all_tags()
+    return [
+        TagView.model_validate(t.model_dump()) for t in _get_service().get_all_tags()
+    ]
 
 
-@router.get("/tags/search", response_model=List[Tag])
-async def search_tags(q: str) -> List[Tag]:
+@router.get("/tags/categories", response_model=List[str])
+async def get_tag_categories() -> List[str]:
+    """Fetch all distinct tag categories."""
+    logger.debug("[CatalogRouter] get_tag_categories()")
+    return _get_service().get_tag_categories()
+
+
+@router.get("/tags/search", response_model=List[TagView])
+async def search_tags(q: str) -> List[TagView]:
     """Search for tags by name."""
     logger.debug(f"[CatalogRouter] search_tags(q='{q}')")
-    return _get_service().search_tags(q)
+    return [
+        TagView.model_validate(t.model_dump()) for t in _get_service().search_tags(q)
+    ]
 
 
-@router.get("/tags/{tag_id:int}", response_model=Tag)
-async def get_tag(tag_id: int) -> Tag:
+@router.get("/tags/{tag_id:int}", response_model=TagView)
+async def get_tag(tag_id: int) -> TagView:
     """Fetch a single tag by ID."""
     logger.debug(f"[CatalogRouter] get_tag(id={tag_id})")
     tag = _get_service().get_tag(tag_id)
     if not tag:
         logger.warning(f"[CatalogRouter] Tag ID {tag_id} not found")
         raise HTTPException(status_code=404, detail=f"Tag ID {tag_id} not found")
-    return tag
+    return TagView.model_validate(tag.model_dump())
 
 
 @router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
@@ -241,4 +265,9 @@ def get_validation_rules():
             "max": SCALAR_VALIDATION["bpm"]["max"],
         },
         "isrc": {"pattern": SCALAR_VALIDATION["isrc"]["pattern"]},
+        "tags": {
+            "default_category": TAG_DEFAULT_CATEGORY,
+            "delimiter": TAG_CATEGORY_DELIMITER,
+            "input_format": TAG_INPUT_FORMAT,
+        },
     }

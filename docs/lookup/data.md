@@ -273,6 +273,9 @@ Fetch the full directory of active (non-deleted) tags, ordered by name.
 ### search(query: str) -> List[Tag]
 Search active tags by name match.
 
+### get_categories() -> List[str]
+Fetch all distinct tag categories currently present in the database.
+
 ### get_by_id(tag_id: int) -> Optional[Tag]
 Fetch a single tag by its ID.
 

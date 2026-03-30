@@ -372,7 +372,7 @@ async def add_song_tag(
     _require_song(song_id, service)
     logger.debug(f"[SongUpdates] -> add_song_tag(id={song_id}, tag='{body.tag_name}')")
     try:
-        tag = service.add_song_tag(song_id, body.tag_name, body.category)
+        tag = service.add_song_tag(song_id, body.tag_name, body.category, body.tag_id)
         logger.debug("[SongUpdates] <- add_song_tag OK")
         return tag
     except Exception as e:
@@ -440,8 +440,11 @@ async def add_song_publisher(
         f"[SongUpdates] -> add_song_publisher(id={song_id}, pub='{body.publisher_name}')"
     )
     try:
-        publisher = service.add_song_publisher(song_id, body.publisher_name)
-        logger.debug("[SongUpdates] <- add_song_publisher OK")
+        # Pass the optional ID to ensure Truth-First identity linking
+        publisher = service.add_song_publisher(
+            song_id, body.publisher_name, body.publisher_id
+        )
+        logger.debug(f"[SongUpdates] <- add_song_publisher OK id={publisher.id}")
         return publisher
     except Exception as e:
         logger.error(f"[SongUpdates] <- add_song_publisher CRITICAL: {e}")

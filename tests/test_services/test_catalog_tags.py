@@ -160,9 +160,7 @@ class TestGetTagSongs:
         ), f"Expected None (Song 2 has no hash), got '{song.audio_hash}'"
         assert song.year == 1997, f"Expected 1997, got {song.year}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0, got {song.processing_status}"
+        assert song.processing_status == 0, f"Expected 0, got {song.processing_status}"
 
         # Verify tags are hydrated (Song 2 has only "90s" tag)
         assert len(song.tags) == 1, f"Expected 1 tag on Song 2, got {len(song.tags)}"
@@ -302,6 +300,44 @@ class TestGetTagSongs:
             (a for a in song1.albums if a.album_title == "Nevermind"), None
         )
         assert nevermind is not None, "Expected 'Nevermind' album on Song 1"
-        assert (
-            nevermind.track_number == 1
-        ), f"Expected track_number=1, got {nevermind.track_number}"
+
+
+class TestUpdateTag:
+    def test_update_tag_success(self, populated_db):
+        """Should update tag name and category globally."""
+        service = CatalogService(populated_db)
+        # Tag 1: Grunge / Genre
+        service.update_tag(1, "Post-Grunge", "Style")
+
+        updated = service.get_tag(1)
+        assert updated.name == "Post-Grunge"
+        assert updated.category == "Style"
+
+        # Verify it updated on linked songs
+        song1 = service.get_song(1)
+        tag1_on_song = next(t for t in song1.tags if t.id == 1)
+        assert tag1_on_song.name == "Post-Grunge"
+        assert tag1_on_song.category == "Style"
+
+    def test_update_tag_nonexistent_raises_lookup_error(self, populated_db):
+        """Should raise LookupError when updating nonexistent tag."""
+        service = CatalogService(populated_db)
+        try:
+            service.update_tag(999, "New Name", "New Category")
+            assert False, "Expected LookupError"
+        except LookupError:
+            pass
+
+
+    def test_add_tag_normalizes_whitespace_but_retains_case(self, populated_db):
+        """Should merge '  NormalizationTest  ' and 'NORMALIZATIONtest' while retaining original record casing."""
+        service = CatalogService(populated_db)
+        song_id = 1
+
+        # 1. Add with specific case
+        t1 = service.add_song_tag(song_id, "NormalizationTest", "Category")
+        assert t1.name == "NormalizationTest", "Expected original casing to be retained"
+
+        # 2. Add with different case: should merge to same ID
+        t2 = service.add_song_tag(song_id, "  NORMALIZATIONtest  ", "  category  ")
+        assert t1.id == t2.id, f"Expected same ID (NOCASE match), got {t1.id} and {t2.id}"

@@ -132,9 +132,10 @@ class TagRepository(BaseRepository):
             raise
 
     def get_or_create_tag(self, name: str, category: str, cursor) -> int:
-        """Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id."""
+        """Get-or-create a Tag by name+category (case-insensitive). Reactivates soft-deleted. Returns tag_id."""
+        category = category.strip().title() if category else category
         row = cursor.execute(
-            "SELECT TagID, IsDeleted FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory IS ?",
+            "SELECT TagID, IsDeleted FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ? COLLATE UTF8_NOCASE",
             (name, category),
         ).fetchone()
         if row:
@@ -197,6 +198,7 @@ class TagRepository(BaseRepository):
             f"[TagRepository] -> update_tag(tag_id={tag_id}, name='{name}', category='{category}')"
         )
         cursor = conn.cursor()
+        category = category.strip().title() if category else category
         cursor.execute(
             "UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?",
             (name, category, tag_id),
@@ -205,6 +207,23 @@ class TagRepository(BaseRepository):
             logger.warning(f"[TagRepository] update_tag(id={tag_id}) NOT_FOUND")
             raise LookupError(f"Tag {tag_id} not found")
         logger.debug("[TagRepository] <- update_tag() done")
+
+    def get_categories(self) -> List[str]:
+        """Fetch all distinct non-null tag categories, sorted."""
+        logger.debug("[TagRepository] -> get_categories()")
+        try:
+            with self._get_connection() as conn:
+                rows = conn.execute(
+                    "SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL AND IsDeleted = 0 ORDER BY TagCategory COLLATE NOCASE"
+                ).fetchall()
+                results = [row[0] for row in rows]
+                logger.debug(
+                    f"[TagRepository] <- get_categories() count={len(results)}"
+                )
+                return results
+        except Exception as e:
+            logger.error(f"[TagRepository] ERROR: Failed to fetch categories: {e}")
+            raise
 
     def _row_to_tag(self, row: Mapping[str, Any]) -> Tag:
         """Map a database row to a Tag Pydantic model."""

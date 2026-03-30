@@ -6,7 +6,6 @@ Covers identity expansion (member → group) and publisher expansion (parent →
 """
 
 
-
 class TestSearchSongsDeepSlim:
     """CatalogService.search_songs_deep_slim contracts."""
 

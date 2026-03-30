@@ -25,6 +25,11 @@ MEDIA_DIR = Path("temp/library/media")
 # Accepted file extensions for ingestion
 ACCEPTED_EXTENSIONS = [".mp3"]
 
+# Tag defaults
+TAG_DEFAULT_CATEGORY = os.getenv("GOSLING_TAG_DEFAULT_CATEGORY", "Genre")
+TAG_CATEGORY_DELIMITER = os.getenv("GOSLING_TAG_CATEGORY_DELIMITER", ":")
+TAG_INPUT_FORMAT = os.getenv("GOSLING_TAG_INPUT_FORMAT", "tag:category")
+
 # Fields whose values should additionally be split on ", " during metadata extraction
 COMMA_SPLIT_FIELDS = ["composers"]
 

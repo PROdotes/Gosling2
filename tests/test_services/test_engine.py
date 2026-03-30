@@ -560,9 +560,6 @@ class TestGetAllPublishers:
         data = client.get("/api/v1/publishers").json()
         umg = next(p for p in data if p["name"] == "Universal Music Group")
         assert (
-            umg["parent_id"] is None
-        ), f"Expected parent_id=None, got {umg['parent_id']!r}"
-        assert (
             umg["parent_name"] is None
         ), f"Expected parent_name=None, got {umg['parent_name']!r}"
 
@@ -633,8 +630,8 @@ class TestGetPublisher:
             data["name"] == "Roswell Records"
         ), f"Expected name='Roswell Records', got {data['name']!r}"
         assert (
-            data["parent_id"] is None
-        ), f"Expected parent_id=None, got {data['parent_id']!r}"
+            data["parent_name"] is None
+        ), f"Expected parent_name=None, got {data['parent_name']!r}"
         assert (
             data["sub_publishers"] == []
         ), f"Expected empty sub_publishers, got {data['sub_publishers']}"
