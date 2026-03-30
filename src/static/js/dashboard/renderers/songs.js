@@ -433,7 +433,7 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
                         <div class="link-chip-list">
                             ${dbPublishers.length ? dbPublishers.map(p => `
                                 <span class="link-chip">
-                                    ${escapeHtml(p.name)}
+                                    <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="publisher" data-item-id="${p.id}">${escapeHtml(p.name)}</button>
                                     <button class="link-chip-remove" data-action="remove-publisher" data-song-id="${song.id}" data-publisher-id="${p.id}" title="Remove">✕</button>
                                 </span>
                             `).join("") : '<span class="muted-note">None</span>'}

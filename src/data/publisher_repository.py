@@ -353,6 +353,22 @@ class PublisherRepository(BaseRepository):
             raise LookupError(f"Publisher {publisher_id} not found")
         logger.debug("[PublisherRepository] <- update_publisher() done")
 
+    def set_parent(
+        self, publisher_id: int, parent_id: Optional[int], conn: sqlite3.Connection
+    ) -> None:
+        """Set or clear the ParentPublisherID for a publisher. Does NOT commit."""
+        logger.debug(
+            f"[PublisherRepository] -> set_parent(publisher_id={publisher_id}, parent_id={parent_id})"
+        )
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Publishers SET ParentPublisherID = ? WHERE PublisherID = ? AND IsDeleted = 0",
+            (parent_id, publisher_id),
+        )
+        if cursor.rowcount == 0:
+            raise LookupError(f"Publisher {publisher_id} not found")
+        logger.debug("[PublisherRepository] <- set_parent() done")
+
     def _row_to_publisher(self, row: Mapping[str, Any]) -> Publisher:
         """Map a database row to a Publisher Pydantic model."""
         return Publisher(

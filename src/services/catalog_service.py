@@ -1156,7 +1156,9 @@ class CatalogService:
             raise ValueError(f"Non-editable fields: {unknown}")
 
         # --- Workflow Validation ---
-        needs_song = fields.get("is_active") is True or fields.get("processing_status") == 0
+        needs_song = (
+            fields.get("is_active") is True or fields.get("processing_status") == 0
+        )
         if needs_song:
             song = self.get_song(song_id)
             if not song:
@@ -1167,13 +1169,16 @@ class CatalogService:
 
             if fields.get("processing_status") == 0:
                 from src.models.view_models import SongView
+
                 view = SongView.from_domain(song)
                 blockers = view.review_blockers
                 if blockers:
                     logger.info(
                         f"[CatalogService] Branch: Blocked review approval - Song {song_id} missing: {blockers}"
                     )
-                    raise ValueError(f"Cannot mark as reviewed, missing: {', '.join(blockers)}")
+                    raise ValueError(
+                        f"Cannot mark as reviewed, missing: {', '.join(blockers)}"
+                    )
                 logger.debug(
                     f"[CatalogService] Branch: Song {song_id} passes review checks. Approval allowed."
                 )
@@ -1330,7 +1335,7 @@ class CatalogService:
         finally:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
-        song_album = next((l for l in links if l.album_id == album_id), None)
+        song_album = next((link for link in links if link.album_id == album_id), None)
         logger.debug("[CatalogService] <- add_song_album OK")
         return song_album
 
@@ -1364,7 +1369,7 @@ class CatalogService:
         finally:
             conn.close()
         links = self._album_repo.get_albums_for_songs([song_id])
-        song_album = next((l for l in links if l.album_id == album_id), None)
+        song_album = next((link for link in links if link.album_id == album_id), None)
         logger.debug(
             f"[CatalogService] <- create_and_link_album OK album_id={album_id}"
         )
@@ -1592,3 +1597,20 @@ class CatalogService:
         finally:
             conn.close()
         logger.debug("[CatalogService] <- update_publisher OK")
+
+    def set_publisher_parent(self, publisher_id: int, parent_id: Optional[int]) -> None:
+        """Set or clear the parent of a publisher."""
+        logger.debug(
+            f"[CatalogService] -> set_publisher_parent(pub_id={publisher_id}, parent_id={parent_id})"
+        )
+        conn = self._pub_repo.get_connection()
+        try:
+            self._pub_repo.set_parent(publisher_id, parent_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- set_publisher_parent FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug("[CatalogService] <- set_publisher_parent OK")

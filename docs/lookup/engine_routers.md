@@ -298,6 +298,12 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Updates a publisher name globally across all songs.
 - Wraps `CatalogService.update_publisher`.
 
+### async def set_publisher_parent(publisher_id: int, body: SetPublisherParentBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/publishers/{publisher_id}/parent`
+- Sets or clears the parent of a publisher. Pass `{"parent_id": null}` to clear.
+- Returns 404 if publisher or parent not found.
+- Wraps `CatalogService.set_publisher_parent`.
+
 ### def _get_service() -> CatalogService
 **Internal**: Service factory for the router.
 

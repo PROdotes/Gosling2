@@ -471,3 +471,37 @@ class TestSongPublishers:
         resp = api.patch("/api/v1/publishers/9999", json={"publisher_name": "X"})
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
+
+
+class TestSetPublisherParent:
+    def test_set_parent_returns_204(self, api):
+        # Sub Pop (5, parent=NULL) → parent=1 (Universal Music Group)
+        resp = api.patch("/api/v1/publishers/5/parent", json={"parent_id": 1})
+        assert resp.status_code == 204, f"Expected 204, got {resp.status_code}"
+
+    def test_set_parent_persisted(self, api):
+        # Sub Pop (5) → parent=1
+        api.patch("/api/v1/publishers/5/parent", json={"parent_id": 1})
+        publisher = api.get("/api/v1/publishers/5").json()
+        assert publisher["parent_id"] == 1, f"Expected parent_id=1, got {publisher['parent_id']}"
+        assert publisher["name"] == "Sub Pop", f"Expected name='Sub Pop', got '{publisher['name']}'"
+
+    def test_clear_parent_returns_204(self, api):
+        # DGC Records (10, parent=1) → clear parent
+        resp = api.patch("/api/v1/publishers/10/parent", json={"parent_id": None})
+        assert resp.status_code == 204, f"Expected 204, got {resp.status_code}"
+
+    def test_clear_parent_persisted(self, api):
+        api.patch("/api/v1/publishers/10/parent", json={"parent_id": None})
+        publisher = api.get("/api/v1/publishers/10").json()
+        assert publisher["parent_id"] is None, f"Expected parent_id=None after clear, got {publisher['parent_id']}"
+
+    def test_set_parent_404_unknown_publisher(self, api):
+        resp = api.patch("/api/v1/publishers/9999/parent", json={"parent_id": 1})
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        assert "detail" in resp.json(), "Error response missing 'detail'"
+
+    def test_set_parent_404_unknown_parent(self, api):
+        resp = api.patch("/api/v1/publishers/5/parent", json={"parent_id": 9999})
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        assert "detail" in resp.json(), "Error response missing 'detail'"

@@ -16,6 +16,7 @@ from src.models.view_models import (
     UpdateTagBody,
     AddPublisherBody,
     UpdatePublisherBody,
+    SetPublisherParentBody,
 )
 from src.engine.config import get_db_path
 
@@ -499,4 +500,35 @@ async def update_publisher(
         logger.debug("[SongUpdates] <- update_publisher OK")
     except Exception as e:
         logger.error(f"[SongUpdates] <- update_publisher CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/publishers/{publisher_id}/parent", status_code=204)
+async def set_publisher_parent(
+    publisher_id: int,
+    body: SetPublisherParentBody,
+    service: CatalogService = Depends(_get_service),
+):
+    logger.debug(
+        f"[SongUpdates] -> set_publisher_parent(id={publisher_id}, parent_id={body.parent_id})"
+    )
+    if not service.get_publisher(publisher_id):
+        logger.warning(
+            f"[SongUpdates] <- set_publisher_parent NOT_FOUND id={publisher_id}"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found"
+        )
+    if body.parent_id is not None and not service.get_publisher(body.parent_id):
+        logger.warning(
+            f"[SongUpdates] <- set_publisher_parent NOT_FOUND parent_id={body.parent_id}"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Parent publisher {body.parent_id} not found"
+        )
+    try:
+        service.set_publisher_parent(publisher_id, body.parent_id)
+        logger.debug("[SongUpdates] <- set_publisher_parent OK")
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- set_publisher_parent CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))

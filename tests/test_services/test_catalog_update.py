@@ -394,3 +394,29 @@ class TestUpdatePublisher:
         service = CatalogService(populated_db)
         with pytest.raises(ValueError, match="empty"):
             service.update_publisher(10, "")
+
+
+class TestSetPublisherParent:
+    def test_set_parent_assigns_parent(self, populated_db):
+        """Set Sub Pop (5, parent=NULL) to have parent Universal Music Group (1)."""
+        service = CatalogService(populated_db)
+        service.set_publisher_parent(5, 1)
+
+        publisher = service.get_publisher(5)
+        assert publisher.parent_id == 1, f"Expected parent_id=1, got {publisher.parent_id}"
+        assert publisher.name == "Sub Pop", f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
+
+    def test_clear_parent_sets_none(self, populated_db):
+        """Clear parent from DGC Records (10, parent=1) → parent=None."""
+        service = CatalogService(populated_db)
+        service.set_publisher_parent(10, None)
+
+        publisher = service.get_publisher(10)
+        assert publisher.parent_id is None, f"Expected parent_id=None after clear, got {publisher.parent_id}"
+        assert publisher.name == "DGC Records", f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
+
+    def test_set_parent_nonexistent_publisher_raises(self, populated_db):
+        """set_publisher_parent on nonexistent publisher should raise LookupError."""
+        service = CatalogService(populated_db)
+        with pytest.raises(LookupError):
+            service.set_publisher_parent(9999, 1)

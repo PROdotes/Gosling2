@@ -19,9 +19,7 @@ class TestBaseRepoInfrastructure:
         repo = BaseRepository(empty_db)
         conn = repo.get_connection()
         try:
-            # Check PRAGMA for the MediaSources table
-            # col 6 is AudioHash in the schema
-            res = conn.execute("PRAGMA table_info(MediaSources)").fetchall()
+            # Check for UNIQUE index on AudioHash
             indices = conn.execute("PRAGMA index_list(MediaSources)").fetchall()
             # Find an index that is UNIQUE and maps to AudioHash
             found_unique_hash = False

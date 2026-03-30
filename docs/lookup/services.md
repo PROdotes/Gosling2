@@ -195,6 +195,9 @@ Remove a publisher link from a song. Keeps the publisher record.
 ### update_publisher(publisher_id: int, new_name: str) -> None
 Update publisher name globally (affects all linked songs).
 
+### set_publisher_parent(publisher_id: int, parent_id: Optional[int]) -> None
+Set or clear the parent of a publisher. Pass `None` to clear. Raises `LookupError` if publisher not found.
+
 ### delete_song(song_id: int) -> bool
 Atomic hard-delete of a song and its physical file.
 - Removes record from DB via `SongRepository`.

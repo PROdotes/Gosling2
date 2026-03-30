@@ -437,6 +437,10 @@ class UpdatePublisherBody(BaseModel):
     publisher_name: str
 
 
+class SetPublisherParentBody(BaseModel):
+    parent_id: Optional[int]
+
+
 class IngestionCheckRequest(BaseModel):
     """Payload for the dry-run ingestion check."""
 

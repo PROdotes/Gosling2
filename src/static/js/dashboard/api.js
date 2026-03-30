@@ -205,6 +205,39 @@ export function deleteSong(id) {
     });
 }
 
+
+export async function setPublisherParent(publisherId, parentId) {
+    const response = await fetch(`/api/v1/publishers/${publisherId}/parent`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parent_id: parentId }),
+    });
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data && data.detail) errorMsg = data.detail;
+        } catch (e) { /* no body */ }
+        throw new Error(errorMsg);
+    }
+}
+
+export async function updatePublisher(publisherId, name) {
+    const response = await fetch(`/api/v1/publishers/${publisherId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publisher_name: name }),
+    });
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data && data.detail) errorMsg = data.detail;
+        } catch (e) { /* no body */ }
+        throw new Error(errorMsg);
+    }
+}
+
 export function searchTags(query = "") {
     const url = query
         ? `/api/v1/tags/search?q=${encodeURIComponent(query)}`

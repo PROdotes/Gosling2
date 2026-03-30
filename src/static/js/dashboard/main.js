@@ -21,8 +21,11 @@ import {
     searchPublishers,
     searchSongs,
     searchTags,
+    updatePublisher,
+    setPublisherParent,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
+import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -385,6 +388,19 @@ async function openTagDetail(tag) {
     renderTagDetailComplete(ctx, fullTag, songsResult.value);
 }
 
+function refreshActiveDetail() {
+    if (!activeDetailKey) return;
+    const [mode, id] = activeDetailKey.split(":");
+    const list = getActiveList();
+    const item = list.find(i => String(i.id) === id);
+    if (!item) return;
+    if (mode === "songs") openSongDetail(item, { reuseFileData: true });
+    else if (mode === "albums") openAlbumDetail(item);
+    else if (mode === "artists") openArtistDetail(item);
+    else if (mode === "tags") openTagDetail(item);
+    else if (mode === "publishers") openPublisherDetail(item);
+}
+
 async function openSelectedResult(index) {
     const items = getActiveList();
     const selected = items[index];
@@ -496,6 +512,51 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "close-edit-modal") {
+        closeEditModal();
+        return;
+    }
+
+    if (action === "open-edit-modal") {
+        const { chipType, itemId } = actionTarget.dataset;
+
+        const onClose = refreshActiveDetail;
+
+        if (chipType === "publisher") {
+            const publisherName = actionTarget.textContent.trim();
+            const publisherDetail = await getPublisherDetail(itemId).catch(() => null);
+            const childItems = publisherDetail && publisherDetail.sub_publishers
+                ? publisherDetail.sub_publishers.map(c => ({ id: c.id, label: c.name }))
+                : [];
+
+            openEditModal({
+                title: "Edit Publisher",
+                name: publisherDetail ? publisherDetail.name : publisherName,
+                onRename: async (newName) => { await updatePublisher(itemId, newName); },
+                onClose,
+                category: null,
+                children: {
+                    label: "Sub-publishers",
+                    items: childItems,
+                    onSearch: async (q) => {
+                        const results = await searchPublishers(q);
+                        return (results || []).map(p => ({ id: p.id, label: p.name }));
+                    },
+                    onAdd: async (opt) => {
+                        await setPublisherParent(opt.id, Number(itemId));
+                        childItems.push({ id: opt.id, label: opt.label });
+                    },
+                    onRemove: async (item) => {
+                        await setPublisherParent(item.id, null);
+                    },
+                    onRenameChild: async (item, newName) => { await updatePublisher(item.id, newName); },
+                    createLabel: (q) => `Add "${q}" as sub-publisher`,
+                },
+            }, actionTarget);
+        }
+        return;
+    }
+
     if (action === "close-link-modal") {
         closeLinkModal();
         return;
@@ -509,7 +570,7 @@ document.addEventListener("click", async (event) => {
             const chips = document.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`);
             const currentItems = Array.from(chips).map(btn => ({
                 id: btn.dataset.publisherId,
-                label: btn.closest(".link-chip").childNodes[0].textContent.trim(),
+                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? btn.closest(".link-chip").childNodes[0].textContent.trim(),
             }));
 
             openLinkModal({
