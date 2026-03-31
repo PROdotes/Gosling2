@@ -68,7 +68,9 @@ class AlbumCreditRepository(BaseRepository):
         credit_repo = SongCreditRepository(self.db_path)
         cursor = conn.cursor()
         role_id = credit_repo.get_or_create_role(role_name, cursor)
-        name_id = credit_repo.get_or_create_credit_name(display_name, cursor, identity_id)
+        name_id = credit_repo.get_or_create_credit_name(
+            display_name, cursor, identity_id
+        )
         cursor.execute(
             "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
             (album_id, name_id, role_id),

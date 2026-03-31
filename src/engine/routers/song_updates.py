@@ -18,6 +18,7 @@ from src.models.view_models import (
     AddPublisherBody,
     UpdatePublisherBody,
     SetPublisherParentBody,
+    AddAlbumPublisherBody,
 )
 from src.engine.config import get_db_path
 
@@ -322,10 +323,14 @@ async def add_album_credit(
         )
         album = service.get_album(album_id)
         if not album:
-            raise HTTPException(status_code=500, detail="Album not found after adding credit")
+            raise HTTPException(
+                status_code=500, detail="Album not found after adding credit"
+            )
         credit = next((c for c in album.credits if c.name_id == name_id), None)
         if not credit:
-            raise HTTPException(status_code=500, detail="Credit created but not retrievable")
+            raise HTTPException(
+                status_code=500, detail="Credit created but not retrievable"
+            )
         logger.debug("[SongUpdates] <- add_album_credit OK")
         return credit
     except HTTPException:
@@ -368,7 +373,7 @@ async def remove_album_credit(
 @router.post("/albums/{album_id}/publishers", response_model=Publisher)
 async def add_album_publisher(
     album_id: int,
-    body: AddPublisherBody,
+    body: AddAlbumPublisherBody,
     service: CatalogService = Depends(_get_service),
 ):
     _require_album(album_id, service)
@@ -376,7 +381,9 @@ async def add_album_publisher(
         f"[SongUpdates] -> add_album_publisher(id={album_id}, pub='{body.publisher_name}')"
     )
     try:
-        publisher = service.add_album_publisher(album_id, body.publisher_name, body.publisher_id)
+        publisher = service.add_album_publisher(
+            album_id, body.publisher_name, body.publisher_id
+        )
         logger.debug(f"[SongUpdates] <- add_album_publisher OK id={publisher.id}")
         return publisher
     except Exception as e:
@@ -604,5 +611,7 @@ async def move_song_to_library(
         )
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"[SongUpdates] <- move_song_to_library CRITICAL id={song_id}: {e}")
+        logger.error(
+            f"[SongUpdates] <- move_song_to_library CRITICAL id={song_id}: {e}"
+        )
         raise HTTPException(status_code=500, detail=str(e))

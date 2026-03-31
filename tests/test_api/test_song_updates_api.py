@@ -366,9 +366,9 @@ class TestAlbumUpdates:
 
     def test_add_album_credit_success_and_visible(self, api):
         resp = api.post(
-            "/api/v1/albums/100/credits", json={"artist_name": "Taylor Hawkins"}
+            "/api/v1/albums/100/credits", json={"display_name": "Taylor Hawkins"}
         )
-        assert resp.status_code == 204, f"Expected 204, got {resp.status_code}"
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         alb = api.get("/api/v1/albums/100")
         assert (
@@ -385,7 +385,7 @@ class TestAlbumUpdates:
         ), f"Expected existing 'Nirvana' credit to remain, got {names}"
 
     def test_add_album_credit_404_unknown_album(self, api):
-        resp = api.post("/api/v1/albums/9999/credits", json={"artist_name": "X"})
+        resp = api.post("/api/v1/albums/9999/credits", json={"display_name": "X"})
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
 
@@ -411,11 +411,11 @@ class TestAlbumUpdates:
         resp = api.delete("/api/v1/albums/100/credits/30")
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
 
-    def test_set_album_publisher_success(self, api):
-        resp = api.patch(
-            "/api/v1/albums/100/publisher", json={"publisher_name": "Island Records"}
+    def test_add_album_publisher_success(self, api):
+        resp = api.post(
+            "/api/v1/albums/100/publishers", json={"publisher_name": "Island Records"}
         )
-        assert resp.status_code == 204, f"Expected 204, got {resp.status_code}"
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         # Verify reflected on album
         alb = api.get("/api/v1/albums/100").json()
@@ -424,8 +424,8 @@ class TestAlbumUpdates:
             "Island Records" in pub_names
         ), f"Expected 'Island Records' in publishers, got {pub_names}"
 
-    def test_set_album_publisher_404_unknown_album(self, api):
-        resp = api.patch("/api/v1/albums/9999/publisher", json={"publisher_name": "X"})
+    def test_add_album_publisher_404_unknown_album(self, api):
+        resp = api.post("/api/v1/albums/9999/publishers", json={"publisher_name": "X"})
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
 

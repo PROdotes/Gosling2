@@ -335,7 +335,7 @@ class PublisherRepository(BaseRepository):
         self, album_id: int, name: str, conn: sqlite3.Connection
     ) -> Publisher:
         """
-        Add a publisher link to an album. Get-or-creates the Publisher record.
+        Add a publisher link for an album. Get-or-creates the Publisher record.
         Returns the Publisher. Does NOT commit.
         """
         logger.debug(

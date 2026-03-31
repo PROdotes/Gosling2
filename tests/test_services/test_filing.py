@@ -1,5 +1,4 @@
 import pytest
-from pathlib import Path
 from src.services.filing_service import FilingService
 from src.models.domain import Song, SongCredit, Tag
 
@@ -28,7 +27,7 @@ def test_evaluate_routing_basic(filing_service):
     )
     target = filing_service.evaluate_routing(song)
     assert "Oliver Dragojevic" in str(target)
-    assert target.isascii()
+    assert str(target).isascii()
 
 def test_evaluate_routing_missing_metadata_fails(filing_service):
     # This scenario technically shouldn't happen for status 0, but verified anyway
@@ -43,14 +42,14 @@ def test_evaluate_routing_missing_metadata_fails(filing_service):
 
 def test_move_song_to_library_collision_fails(filing_service, tmp_path):
     staging_dir = tmp_path / "staging"
-    staging_dir.mkdir()
+    staging_dir.mkdir(exist_ok=True)
     source_file = staging_dir / "test.mp3"
     source_file.write_text("content")
     library_root = tmp_path / "library"
-    library_root.mkdir()
+    library_root.mkdir(exist_ok=True)
     
     # Pre-create target file
-    (library_root / "2024").mkdir()
+    (library_root / "2024").mkdir(exist_ok=True)
     target_file = library_root / "2024" / "Artist - Title.mp3"
     target_file.write_text("existing")
     
@@ -62,7 +61,7 @@ def test_move_song_to_library_collision_fails(filing_service, tmp_path):
     )
     
     with pytest.raises(FileExistsError, match="Target path already exists"):
-        filing_service.move_to_library(song, library_root)
+        filing_service.copy_to_library(song, library_root)
     
     # Verify both files still exist (No deletion)
     assert source_file.exists()

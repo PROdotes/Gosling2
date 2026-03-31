@@ -163,7 +163,7 @@ class TestResolveConflict:
         assert song.media_name is not None, "Expected media_name to be set, got None"
         assert song.duration_s > 0, f"Expected duration > 0, got {song.duration_s}"
         assert song.audio_hash is not None, "Expected audio_hash to be set, got None"
-        assert song.is_active is True, f"Expected True, got {song.is_active}"
+        assert song.is_active is False, f"Expected False, got {song.is_active}"
 
         # 5. Database Side Effects - Verify IsDeleted=0
         conn = sqlite3.connect(populated_db)

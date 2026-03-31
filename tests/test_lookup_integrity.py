@@ -98,14 +98,15 @@ def get_members_to_verify(file_path: str):
     members = []
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if not node.name.startswith("__"):
+            # Exclude dunder and single-underscore (private/internal) members
+            if not node.name.startswith("_"):
                 members.append(node.name)
         elif isinstance(node, ast.ClassDef):
             if not node.name.startswith("_"):
                 members.append(node.name)
                 for item in node.body:
                     if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if not item.name.startswith("__"):
+                        if not item.name.startswith("_"):
                             members.append(item.name)
     return members
 

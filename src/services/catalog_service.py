@@ -23,13 +23,17 @@ from src.models.domain import (
     AlbumCredit,
     Tag,
 )
-from src.models.view_models import SongView
 from src.models.exceptions import ReingestionConflictError
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
-from src.engine.config import STAGING_DIR, SCALAR_VALIDATION, RENAME_RULES_PATH, get_library_root
+from src.engine.config import (
+    STAGING_DIR,
+    SCALAR_VALIDATION,
+    RENAME_RULES_PATH,
+    get_library_root,
+)
 from src.services.filing_service import FilingService
 
 
@@ -505,8 +509,8 @@ class CatalogService:
                     "id": ghost_id,
                     "source_path": staged_path,
                     "audio_hash": audio_hash,
-                    "is_active": False, # Stay inactive until library move/publish
-                    "processing_status": 1, # Ready for Review
+                    "is_active": False,  # Stay inactive until library move/publish
+                    "processing_status": 1,  # Ready for Review
                 }
             )
 
@@ -554,7 +558,6 @@ class CatalogService:
         result = hydrated[0]
         logger.debug(f"[CatalogService] <- get_song(id={song_id}) '{result.title}'")
         return result
-
 
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
@@ -1152,7 +1155,9 @@ class CatalogService:
         "notes",
     }
 
-    def update_song_scalars(self, song_id: int, fields: dict, conn: Optional[sqlite3.Connection] = None) -> Song:
+    def update_song_scalars(
+        self, song_id: int, fields: dict, conn: Optional[sqlite3.Connection] = None
+    ) -> Song:
         """
         Update editable scalar fields for a song.
         Validates values per spec rules, then delegates to SongRepository.
@@ -1482,7 +1487,9 @@ class CatalogService:
         )
         conn = self._album_credit_repo.get_connection()
         try:
-            name_id = self._album_credit_repo.add_credit(album_id, display_name, role_name, conn, identity_id)
+            name_id = self._album_credit_repo.add_credit(
+                album_id, display_name, role_name, conn, identity_id
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1516,7 +1523,7 @@ class CatalogService:
         publisher_name: Optional[str],
         publisher_id: Optional[int] = None,
     ) -> Publisher:
-        """Add a publisher link to an album. Links by ID if publisher_id provided, otherwise get-or-creates by name."""
+        """Add a publisher link for an album. Links by ID if publisher_id provided, otherwise get-or-creates by name."""
         if publisher_id is not None:
             existing = self._pub_repo.get_by_id(publisher_id)
             if not existing:
@@ -1534,7 +1541,9 @@ class CatalogService:
         )
         conn = self._pub_repo.get_connection()
         try:
-            publisher = self._pub_repo.add_album_publisher(album_id, publisher_name, conn)
+            publisher = self._pub_repo.add_album_publisher(
+                album_id, publisher_name, conn
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1542,7 +1551,9 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug(f"[CatalogService] <- add_album_publisher OK pub_id={publisher.id}")
+        logger.debug(
+            f"[CatalogService] <- add_album_publisher OK pub_id={publisher.id}"
+        )
         return publisher
 
     def remove_album_publisher(self, album_id: int, publisher_id: int) -> None:
@@ -1727,6 +1738,7 @@ class CatalogService:
     def get_id3_frames_config(self) -> Dict[str, Any]:
         """Returns the ID3 frame configuration from the parser (Single Source of Truth)."""
         return self._metadata_parser.config
+
     def move_song_to_library(self, song_id: int) -> str:
         """
         Orchestrates the move of a song from staging (or anywhere) to the organized library.
@@ -1734,18 +1746,24 @@ class CatalogService:
         Returns the new relative path for UI display.
         """
         logger.info(f"[CatalogService] -> move_song_to_library(id={song_id})")
-        
+
         # 1. Fetch hydrated song
         song = self.get_song(song_id)
         if not song:
-            logger.warning(f"[CatalogService] <- move_song_to_library(id={song_id}) NOT_FOUND")
+            logger.warning(
+                f"[CatalogService] <- move_song_to_library(id={song_id}) NOT_FOUND"
+            )
             raise LookupError(f"Song {song_id} not found")
-        
+
         # 0. State Guard: Only Reviewed songs can be moved
         if song.processing_status != 0:
-            logger.warning(f"[CatalogService] <- move_song_to_library(id={song_id}) REJECTED: Not in Reviewed state (Status {song.processing_status})")
-            raise ValueError(f"Cannot move song {song_id}: Must be in 'Reviewed' state (Status 0) first.")
-        
+            logger.warning(
+                f"[CatalogService] <- move_song_to_library(id={song_id}) REJECTED: Not in Reviewed state (Status {song.processing_status})"
+            )
+            raise ValueError(
+                f"Cannot move song {song_id}: Must be in 'Reviewed' state (Status 0) first."
+            )
+
         # 2. Stage 1: Copy to Library (Preserve source for safety)
         library_root = Path(get_library_root())
         source_abs_path = Path(song.source_path)
@@ -1755,7 +1773,7 @@ class CatalogService:
         except Exception as e:
             logger.error(f"[CatalogService] Copy phase failed: {e}")
             raise e
-        
+
         # 3. Stage 2: Commit to Database
         try:
             updates = {"source_path": str(new_abs_path)}
@@ -1763,26 +1781,36 @@ class CatalogService:
         except Exception as db_err:
             # ROLLBACK: If DB update fails, delete the LIBRARY CLONE.
             # Staging source remains untouched.
-            logger.critical(f"[CatalogService] DB Update failed! PURGING library clone: {new_abs_path}")
+            logger.critical(
+                f"[CatalogService] DB Update failed! PURGING library clone: {new_abs_path}"
+            )
             try:
                 if new_abs_path.exists():
                     new_abs_path.unlink()
             except Exception as unlink_err:
-                logger.critical(f"[CatalogService] COULD NOT PURGE CLONE at {new_abs_path}: {unlink_err}")
+                logger.critical(
+                    f"[CatalogService] COULD NOT PURGE CLONE at {new_abs_path}: {unlink_err}"
+                )
             raise db_err
-        
+
         # 4. Stage 3: Cleanup (Remove source from staging now that DB is committed)
         try:
             if source_abs_path.exists():
                 source_abs_path.unlink()
-                logger.info(f"[CatalogService] Successfully unlinked staging source: {source_abs_path}")
+                logger.info(
+                    f"[CatalogService] Successfully unlinked staging source: {source_abs_path}"
+                )
         except Exception as cleanup_err:
             # This is non-fatal to the workflow, but we should log it.
             # The file is moved, indexed, but an orphan remains in staging.
-            logger.warning(f"[CatalogService] Cleanup failed! Source orphan remains in staging: {cleanup_err}")
-        
+            logger.warning(
+                f"[CatalogService] Cleanup failed! Source orphan remains in staging: {cleanup_err}"
+            )
+
         # 4. Calculate relative path for UI
         relative = os.path.relpath(new_abs_path, library_root)
-        
-        logger.info(f"[CatalogService] <- move_song_to_library(id={song_id}) OK -> {relative}")
+
+        logger.info(
+            f"[CatalogService] <- move_song_to_library(id={song_id}) OK -> {relative}"
+        )
         return relative

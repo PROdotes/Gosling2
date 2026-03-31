@@ -176,8 +176,11 @@ Add a credited artist to an album. Get-or-create artist name.
 ### remove_album_credit(album_id: int, artist_name_id: int) -> None
 Remove a credited artist from an album.
 
-### update_album_publisher(album_id: int, publisher_name: str) -> None
-Set or update the publisher for an album. Get-or-create publisher.
+### add_album_publisher(album_id: int, publisher_name: Optional[str], publisher_id: Optional[int] = None) -> Publisher
+Add a publisher link for an album. Links by ID if publisher_id provided, otherwise get-or-creates by name. Returns the hydrated Publisher. Does NOT commit.
+
+### remove_album_publisher(album_id: int, publisher_id: int) -> None
+Remove a publisher link from an album.
 
 ### add_song_tag(song_id: int, tag_name: Optional[str], category: Optional[str], tag_id: Optional[int] = None) -> Tag
 Add a tag to a song. Links by ID if tag_id provided, otherwise get-or-creates by name+category. Returns the Tag object.
@@ -187,6 +190,13 @@ Remove a tag link from a song. Keeps the tag record.
 
 ### update_tag(tag_id: int, new_name: str, new_category: str) -> None
 Update tag name/category globally (affects all linked songs).
+
+### move_song_to_library(song_id: int) -> str
+Move a song from staging to the organized library.
+- Verification: Song must be in 'Reviewed' state (Status 0).
+- Copy-Commit-Purge: Copies to organized path, updates DB, then unlinks staging source.
+- Returns: New relative path within the library.
+- Errors: `ValueError` if not reviewed, `LookupError` if not found.
 
 ### add_song_publisher(song_id: int, publisher_name: Optional[str], publisher_id: Optional[int] = None) -> Publisher
 Add a publisher link to a song. Links by ID if publisher_id provided, otherwise get-or-creates by name. Returns the Publisher object.
@@ -349,5 +359,30 @@ Translates raw frame IDs (TPE1, TIT2) into domain fields, credits, and tags.
 ### get_history(record_id: int, table: str) -> List[Dict[str, Any]]
 Retrieves a unified timeline of actions and changes for a record.
 Merges `ActionLog` and `ChangeLog` entries, sorted by timestamp.
-Includes `DeletedRecords` lifecycles if available.
-Returns a list of dictionaries with `timestamp`, `type`, `label`, `details`, `user`, and `batch`.
+
+---
+
+## FilingService
+*Location: `src/services/filing_service.py`*
+**Responsibility**: Physically move and rename songs within the organized library based on metadata and rules.json.
+
+### FilingService(rules_path: Path)
+Constructor.
+
+### evaluate_routing(song: Song) -> Path
+Calculates the target relative path for a song based on rules.json. Applies ASCII-only sanitization for the physical filename structure.
+
+### copy_to_library(song: Song, library_root: Path) -> Path
+Copies the physical file to the organized library root. Stage 1 of a safe filing transaction.
+
+---
+
+## SearchService
+*Location: `src/services/search_service.py`*
+**Responsibility**: SearchService generates external search URLs (Spotify, Google) for Song domain models.
+
+### SearchService()
+Constructor.
+
+### get_search_url(song: Song, engine: str = "spotify") -> str
+Builds a search URL for the given song and engine.

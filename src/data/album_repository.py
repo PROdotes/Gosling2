@@ -165,7 +165,6 @@ class AlbumRepository(BaseRepository):
         )
         logger.debug("[AlbumRepository] <- update_album() done")
 
-
     def _row_to_album(self, row: Mapping[str, Any]) -> Album:
         return Album(
             id=row["AlbumID"],

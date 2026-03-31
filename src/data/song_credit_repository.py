@@ -62,7 +62,9 @@ class SongCreditRepository(BaseRepository):
         """Returns all role names from the Roles table."""
         with self._get_connection() as conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute("SELECT RoleName FROM Roles ORDER BY RoleName").fetchall()
+            rows = conn.execute(
+                "SELECT RoleName FROM Roles ORDER BY RoleName"
+            ).fetchall()
             return [row["RoleName"] for row in rows]
 
     def get_or_create_role(self, role_name: str, cursor) -> int:
@@ -92,7 +94,8 @@ class SongCreditRepository(BaseRepository):
                 name_id = row[0]
                 if row[1]:  # Reactivate
                     cursor.execute(
-                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (name_id,)
+                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
+                        (name_id,),
                     )
                 return name_id
 

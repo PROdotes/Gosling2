@@ -9,9 +9,6 @@
 *Location: `src/engine/routers/catalog.py`*
 **Responsibility**: HTTP interface for song and artist metadata.
 
-### def _get_service() -> CatalogService
-**Internal**: Centralized service factory for the router that injects `GOSLING_DB_PATH`.
-
 ### async def get_song(song_id: int) -> SongView
 **HTTP**: `GET /api/v1/songs/{song_id}`
 Fetches a single Song domain model by its unique ID with full hydration.
@@ -108,6 +105,12 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/tags/{tag_id}/songs`
 - Fetches the full hydrated song repertoire linked to this tag.
 - Wraps `CatalogService.get_tag_songs`.
+
+### async def get_song_web_search(song_id: int, service: CatalogService = Depends(_get_service)) -> List[dict]
+**HTTP**: `GET /api/v1/songs/{song_id}/web-search`
+- Triggers a background metadata discovery for a song by title/artist.
+- Returns list of search result candidates from external providers.
+- Wraps `CatalogService.get_song_web_search`.
 
 ### async def get_tag_categories() -> List[str]
 **HTTP**: `GET /api/v1/tags/categories`
@@ -278,10 +281,15 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Removes a credited artist from an album.
 - Wraps `CatalogService.remove_album_credit`.
 
-### async def set_album_publisher(album_id: int, body: SetAlbumPublisherBody, service: CatalogService = Depends(_get_service))
-**HTTP**: `PATCH /api/v1/albums/{album_id}/publisher`
-- Sets the single primary publisher for an album record.
-- Wraps `CatalogService.update_album_publisher`.
+### async def add_album_publisher(album_id: int, body: AddAlbumPublisherBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `POST /api/v1/albums/{album_id}/publishers`
+- Adds a publisher to an album record. Get-or-creates by name or links by ID.
+- Wraps `CatalogService.add_album_publisher`.
+
+### async def remove_album_publisher(album_id: int, publisher_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/albums/{album_id}/publishers/{publisher_id}`
+- Removes a publisher from an album.
+- Wraps `CatalogService.remove_album_publisher`.
 
 ### async def add_song_tag(song_id: int, body: AddTagBody, service: CatalogService = Depends(_get_service)) -> Tag
 **HTTP**: `POST /api/v1/songs/{song_id}/tags`
@@ -319,11 +327,17 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns 404 if publisher or parent not found.
 - Wraps `CatalogService.set_publisher_parent`.
 
-### def _get_service() -> CatalogService
-**Internal**: Service factory for the router.
+### async def move_song_to_library(song_id: int, service: CatalogService = Depends(_get_service)) -> str
+**HTTP**: `POST /api/v1/songs/{song_id}/move`
+- Moves a 'Reviewed' song from staging to the organized library.
+- Wraps `CatalogService.move_song_to_library`.
 
-### def _require_song(song_id: int, service: CatalogService)
-**Internal**: Raises 404 if the song does not exist.
+---
 
-### def _require_album(album_id: int, service: CatalogService)
-**Internal**: Raises 404 if the album does not exist.
+## Audio Router
+*Location: `src/engine/routers/audio.py`*
+
+### async def stream_song_audio(song_id: int)
+**HTTP**: `GET /api/v1/songs/{song_id}/audio`
+- Streams the audio file content for a song.
+- Returns a standard `FileResponse` with guessed mimetype.

@@ -68,11 +68,14 @@ async def get_song(song_id: int) -> SongView:
         try:
             from src.engine.config import get_library_root
             from pathlib import Path
+
             root = Path(get_library_root())
             preview = service._filing_service.evaluate_routing(song)
             view.organized_path_preview = str(root / preview)
         except Exception as e:
-            logger.debug(f"[CatalogRouter] Routing preview skipped for song {song_id}: {e}")
+            logger.debug(
+                f"[CatalogRouter] Routing preview skipped for song {song_id}: {e}"
+            )
 
     return view
 
@@ -237,6 +240,17 @@ async def get_tag(tag_id: int) -> TagView:
         raise HTTPException(status_code=404, detail=f"Tag ID {tag_id} not found")
     return TagView.model_validate(tag.model_dump())
 
+@router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
+async def get_tag_songs(tag_id: int) -> List[SongView]:
+    """Fetch all complete songs linked to this tag."""
+    logger.debug(f"[CatalogRouter] get_tag_songs(id={tag_id})")
+    # Verify existence
+    tag = _get_service().get_tag(tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+
+    songs = _get_service().get_tag_songs(tag_id)
+    return [SongView.from_domain(s) for s in songs]
 
 @router.get("/songs/{song_id:int}/web-search")
 async def get_song_web_search(

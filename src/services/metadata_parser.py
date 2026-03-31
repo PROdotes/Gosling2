@@ -136,7 +136,9 @@ class MetadataParser:
                             primary_tag_categories.add(cat_name)
                 elif not field_name:
                     # Genuine raw tag (no descriptor), keep in raw_tags
-                    entry_description = entry.description if isinstance(entry, ID3FrameConfig) else None
+                    entry_description = (
+                        entry.description if isinstance(entry, ID3FrameConfig) else None
+                    )
                     if not entry_description and not tag_id:
                         logger.error(
                             f"[MetadataParser] CRITICAL: Unidentifiable tag found on song_id={song_data.get('id')}"

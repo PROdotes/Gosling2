@@ -203,7 +203,9 @@ class SongView(BaseModel):
         """Joined names of all Genre tags."""
         if not self.tags:
             return None
-        genres = [t.name for t in self.tags if t.category and t.category.lower() == "genre"]
+        genres = [
+            t.name for t in self.tags if t.category and t.category.lower() == "genre"
+        ]
         if not genres:
             return None
         unique = []
@@ -466,7 +468,6 @@ class AddAlbumCreditBody(BaseModel):
     identity_id: Optional[int] = None
 
 
-
 class AddTagBody(BaseModel):
     tag_name: Optional[str] = None
     category: Optional[str] = None
@@ -479,6 +480,12 @@ class UpdateTagBody(BaseModel):
 
 
 class AddPublisherBody(BaseModel):
+    publisher_name: Optional[str] = None
+    publisher_id: Optional[int] = None
+
+
+class AddAlbumPublisherBody(BaseModel):
+    """Payload for adding a publisher to an album. Enforces 1:1 relation."""
     publisher_name: Optional[str] = None
     publisher_id: Optional[int] = None
 

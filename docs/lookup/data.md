@@ -195,9 +195,6 @@ Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id
 Update editable Album fields (title, album_type, release_year). Partial updates. Does NOT commit.
 
 
-### set_album_publisher(album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
-Set the publisher for an album (replaces existing). Does NOT commit.
-
 ### _row_to_album(row: sqlite3.Row) -> Album
 **Internal**: Maps a physical database row to the strict Pydantic `Album` model.
 
@@ -254,6 +251,12 @@ Add a publisher link to a song. Get-or-creates the Publisher record. Returns the
 
 ### remove_song_publisher(source_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
 Remove a publisher link from a song. Keeps Publisher record. Does NOT commit.
+
+### add_album_publisher(album_id: int, name: str, conn: sqlite3.Connection) -> Publisher
+Add a publisher link for an album. Get-or-creates the Publisher record. Returns the Publisher. Does NOT commit.
+
+### remove_album_publisher(album_id: int, publisher_id: int, conn: sqlite3.Connection) -> None
+Remove a publisher link from an album. Keeps Publisher record. Does NOT commit.
 
 ### update_publisher(publisher_id: int, name: str, conn: sqlite3.Connection) -> None
 Update a Publisher's name globally. Affects all songs linked to this publisher. Does NOT commit.
