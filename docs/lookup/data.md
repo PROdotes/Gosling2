@@ -255,6 +255,9 @@ Remove a publisher link from a song. Keeps Publisher record. Does NOT commit.
 ### update_publisher(publisher_id: int, name: str, conn: sqlite3.Connection) -> None
 Update a Publisher's name globally. Affects all songs linked to this publisher. Does NOT commit.
 
+### set_parent(publisher_id: int, parent_id: Optional[int], conn: sqlite3.Connection) -> None
+Set or clear the ParentPublisherID for a publisher. Pass `None` to clear. Raises `LookupError` if publisher not found. Does NOT commit.
+
 ### _row_to_publisher(row: sqlite3.Row) -> Publisher
 **Internal**: Maps a physical database row to the strict Pydantic `Publisher` model.
 
@@ -269,6 +272,9 @@ Fetch the full directory of active (non-deleted) tags, ordered by name.
 
 ### search(query: str) -> List[Tag]
 Search active tags by name match.
+
+### get_categories() -> List[str]
+Fetch all distinct tag categories currently present in the database.
 
 ### get_by_id(tag_id: int) -> Optional[Tag]
 Fetch a single tag by its ID.

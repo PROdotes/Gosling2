@@ -188,3 +188,60 @@ class TestUpdatePublisher:
         assert (
             roswell.name == "Roswell Records"
         ), f"Expected 'Roswell Records' unchanged, got '{roswell.name}'"
+
+
+class TestSetParent:
+    def test_set_parent_assigns_parent_id(self, populated_db):
+        """Set PublisherID=5 (Sub Pop, parent=NULL) to have parent=1 (Universal Music Group)."""
+        repo = PublisherRepository(populated_db)
+
+        with repo._get_connection() as conn:
+            repo.set_parent(5, 1, conn)
+            conn.commit()
+
+        publisher = repo.get_by_id(5)
+        assert (
+            publisher.parent_id == 1
+        ), f"Expected parent_id=1, got {publisher.parent_id}"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
+
+    def test_clear_parent_sets_null(self, populated_db):
+        """Clear parent from PublisherID=10 (DGC Records, parent=1) → parent=NULL."""
+        repo = PublisherRepository(populated_db)
+
+        with repo._get_connection() as conn:
+            repo.set_parent(10, None, conn)
+            conn.commit()
+
+        publisher = repo.get_by_id(10)
+        assert (
+            publisher.parent_id is None
+        ), f"Expected parent_id=None after clear, got {publisher.parent_id}"
+        assert (
+            publisher.name == "DGC Records"
+        ), f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
+
+    def test_set_parent_nonexistent_publisher_raises(self, populated_db):
+        """set_parent on a nonexistent publisher_id should raise LookupError."""
+        repo = PublisherRepository(populated_db)
+
+        with repo._get_connection() as conn:
+            import pytest
+
+            with pytest.raises(LookupError):
+                repo.set_parent(9999, 1, conn)
+
+    def test_set_parent_does_not_affect_other_publishers(self, populated_db):
+        """Changing parent of publisher 5 must not touch publisher 4."""
+        repo = PublisherRepository(populated_db)
+
+        with repo._get_connection() as conn:
+            repo.set_parent(5, 1, conn)
+            conn.commit()
+
+        roswell = repo.get_by_id(4)
+        assert (
+            roswell.parent_id is None
+        ), f"Expected Roswell Records parent_id=None unchanged, got {roswell.parent_id}"

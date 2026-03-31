@@ -336,6 +336,23 @@ class AlbumView(BaseModel):
         return len(self.songs)
 
 
+class TagView(BaseModel):
+    """View-model for tag detail."""
+
+    id: Optional[int] = None
+    name: str
+    category: Optional[str] = None
+
+
+class PublisherView(BaseModel):
+    """View-model for publisher detail."""
+
+    id: Optional[int] = None
+    name: str
+    parent_name: Optional[str] = None
+    sub_publishers: List["PublisherView"] = []
+
+
 class IdentityView(BaseModel):
     """View-model for the bidirectional artist tree."""
 
@@ -420,8 +437,9 @@ class SetAlbumPublisherBody(BaseModel):
 
 
 class AddTagBody(BaseModel):
-    tag_name: str
-    category: str
+    tag_name: Optional[str] = None
+    category: Optional[str] = None
+    tag_id: Optional[int] = None
 
 
 class UpdateTagBody(BaseModel):
@@ -430,11 +448,16 @@ class UpdateTagBody(BaseModel):
 
 
 class AddPublisherBody(BaseModel):
-    publisher_name: str
+    publisher_name: Optional[str] = None
+    publisher_id: Optional[int] = None
 
 
 class UpdatePublisherBody(BaseModel):
     publisher_name: str
+
+
+class SetPublisherParentBody(BaseModel):
+    parent_id: Optional[int]
 
 
 class IngestionCheckRequest(BaseModel):
@@ -478,6 +501,7 @@ class BatchIngestReport(BaseModel):
     results: List[IngestionReportView]
 
 
+PublisherView.model_rebuild()
 IdentityView.model_rebuild()
 SongAlbumView.model_rebuild()
 SongView.model_rebuild()

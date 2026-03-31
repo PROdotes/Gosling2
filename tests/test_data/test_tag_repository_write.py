@@ -179,3 +179,33 @@ class TestInsertTags:
                 "Genre",
                 "Mood",
             ], f"Expected ['Genre', 'Mood'], got {categories}"
+
+
+class TestGetOrCreateTag:
+    def test_get_or_create_tag_category_case_insensitive(self, populated_db):
+        """
+        If 'TagCategory' has different casing (jezik vs Jezik),
+        the lookup should still match and reuse the record.
+        """
+        repo = TagRepository(populated_db)
+
+        # 1. Setup: Ensure a tag exists with lowercase category 'jezik'
+        # We manually insert to avoid auto-standardization logic if we ever add it to Python
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO Tags (TagName, TagCategory) VALUES ('TestTag', 'jezik')"
+            )
+            existing_id = cursor.lastrowid
+            conn.commit()
+
+        # 2. Act: Try to lookup/create with Uppercase category 'JEZIK'
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            tag_id = repo.get_or_create_tag("TestTag", "JEZIK", cursor)
+            conn.commit()
+
+        # 3. Assert: Should have matched 'jezik' (lowercase)
+        assert (
+            tag_id == existing_id
+        ), f"Expected to reuse TagID {existing_id}, but got {tag_id}"

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.services.catalog_service import CatalogService
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
+from src.services.metadata_frames_reader import load_id3_frames
 from src.models.view_models import SongView
 from src.engine.config import get_db_path
 
@@ -33,3 +34,12 @@ async def inspect_file(
         return SongView.from_domain(parsed_song)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error inspecting file: {str(e)}")
+
+
+@router.get("/id3-frames")
+async def get_id3_frames():
+    """
+    Returns the raw frame-to-category mapping.
+    Used by the UI to style tags and categories dynamically.
+    """
+    return load_id3_frames()

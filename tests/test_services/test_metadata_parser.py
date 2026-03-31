@@ -136,9 +136,15 @@ class TestParse:
             assert tag.id is None, f"Expected tag id=None, got {tag.id}"
 
         # First tag in each category should be primary
-        assert genres[0].is_primary is True, f"Expected Dubstep is_primary=True, got {genres[0].is_primary}"
-        assert genres[1].is_primary is False, f"Expected Electronic is_primary=False, got {genres[1].is_primary}"
-        assert moods[0].is_primary is True, f"Expected Aggressive is_primary=True, got {moods[0].is_primary}"
+        assert (
+            genres[0].is_primary is True
+        ), f"Expected Dubstep is_primary=True, got {genres[0].is_primary}"
+        assert (
+            genres[1].is_primary is False
+        ), f"Expected Electronic is_primary=False, got {genres[1].is_primary}"
+        assert (
+            moods[0].is_primary is True
+        ), f"Expected Aggressive is_primary=True, got {moods[0].is_primary}"
 
     def test_safe_integer_casting(self, parser):
         """parse() must extract leading digits from messy year and return None for non-numeric BPM."""

@@ -54,11 +54,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Fetches the directory of all active music publishers.
 - Wraps `CatalogService.get_all_publishers`.
 
-### async def get_all_albums() -> List[AlbumView]
+### async def get_all_albums() -> List[AlbumSlimView]
 **HTTP**: `GET /api/v1/albums`
 - Fetches the directory of all albums.
 - Wraps `CatalogService.get_all_albums`.
-- Maps to `AlbumView` for dashboard rendering.
+- Maps to `AlbumSlimView` for dashboard rendering.
 
 ### async def search_publishers(q: str) -> List[Publisher]
 **HTTP**: `GET /api/v1/publishers/search?q={query}`
@@ -109,6 +109,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Fetches the full hydrated song repertoire linked to this tag.
 - Wraps `CatalogService.get_tag_songs`.
 
+### async def get_tag_categories() -> List[str]
+**HTTP**: `GET /api/v1/tags/categories`
+- Returns all distinct tag categories from the database.
+- Wraps `CatalogService.get_tag_categories`.
+
 ### async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
 **HTTP**: `POST /api/v1/catalog/ingest/check`
 - Performs a dry-run ingestion collision check.
@@ -117,7 +122,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ### def get_validation_rules() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/catalog/validation-rules`
-- Returns the required/optional field rules for song review readiness.
+- Returns scalar field validation rules and global metadata defaults (e.g., tag categories/delimiters) for frontend use.
 
 ---
 
@@ -188,6 +193,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Reads physical file metadata via `MetadataService`.
 - Parses into domain model via `MetadataParser`.
 - Returns a `SongView` for UI comparison.
+
+### async def get_id3_frames() -> Dict[str, Any]
+**HTTP**: `GET /api/v1/metabolic/id3-frames`
+- Returns the full ID3 frame mapping configuration.
+- Unified source of truth for icons and categories.
 
 ---
 
@@ -297,6 +307,12 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `PATCH /api/v1/publishers/{publisher_id}`
 - Updates a publisher name globally across all songs.
 - Wraps `CatalogService.update_publisher`.
+
+### async def set_publisher_parent(publisher_id: int, body: SetPublisherParentBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/publishers/{publisher_id}/parent`
+- Sets or clears the parent of a publisher. Pass `{"parent_id": null}` to clear.
+- Returns 404 if publisher or parent not found.
+- Wraps `CatalogService.set_publisher_parent`.
 
 ### def _get_service() -> CatalogService
 **Internal**: Service factory for the router.

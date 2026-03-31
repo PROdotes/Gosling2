@@ -21,8 +21,16 @@ import {
     searchPublishers,
     searchSongs,
     searchTags,
+    updatePublisher,
+    setPublisherParent,
+    updateTag,
+    getTagCategories,
+    addSongTag,
+    removeSongTag,
+    fetchId3Frames,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
+import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -55,6 +63,7 @@ const state = {
     selectedIndex: -1,
     isDeep: false,
     validationRules: null,
+    id3Frames: null,
 };
 
 const modeConfig = {
@@ -278,7 +287,7 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     cachedFileData = fileData;
     cachedFileDataSongId = String(song.id);
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory);
+    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames);
     if (savedScroll) {
         const newContent = elements.detailPanel.querySelector(".detail-content");
         if (newContent) requestAnimationFrame(() => { newContent.scrollTop = savedScroll; });
@@ -383,6 +392,19 @@ async function openTagDetail(tag) {
 
     const fullTag = tagResult.status === "fulfilled" ? tagResult.value : tag;
     renderTagDetailComplete(ctx, fullTag, songsResult.value);
+}
+
+function refreshActiveDetail() {
+    if (!activeDetailKey) return;
+    const [mode, id] = activeDetailKey.split(":");
+    const list = getActiveList();
+    const item = list.find(i => String(i.id) === id);
+    if (!item) return;
+    if (mode === "songs") openSongDetail(item, { reuseFileData: true });
+    else if (mode === "albums") openAlbumDetail(item);
+    else if (mode === "artists") openArtistDetail(item);
+    else if (mode === "tags") openTagDetail(item);
+    else if (mode === "publishers") openPublisherDetail(item);
 }
 
 async function openSelectedResult(index) {
@@ -496,6 +518,95 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "remove-tag") {
+        const { songId, tagId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeSongTag(songId, tagId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove tag failed: ${err.message}`);
+        }
+        return;
+    }
+
+    if (action === "close-edit-modal") {
+        closeEditModal();
+        return;
+    }
+
+    if (action === "open-edit-modal") {
+        const { chipType, itemId } = actionTarget.dataset;
+
+        const onClose = refreshActiveDetail;
+
+        if (chipType === "publisher") {
+            const publisherName = actionTarget.textContent.trim();
+            const publisherDetail = await getPublisherDetail(itemId).catch(() => null);
+            const childItems = publisherDetail && publisherDetail.sub_publishers
+                ? publisherDetail.sub_publishers.map(c => ({ id: c.id, label: c.name }))
+                : [];
+
+            openEditModal({
+                title: "Edit Publisher",
+                name: publisherDetail ? publisherDetail.name : publisherName,
+                onRename: async (newName) => { await updatePublisher(itemId, newName); },
+                onClose,
+                category: null,
+                children: {
+                    label: "Sub-publishers",
+                    items: childItems,
+                    onSearch: async (q) => {
+                        const results = await searchPublishers(q);
+                        return (results || []).map(p => ({ id: p.id, label: p.name }));
+                    },
+                    onAdd: async (opt) => {
+                        await setPublisherParent(opt.id, Number(itemId));
+                        childItems.push({ id: opt.id, label: opt.label });
+                    },
+                    onRemove: async (item) => {
+                        await setPublisherParent(item.id, null);
+                    },
+                    onRenameChild: async (item, newName) => { await updatePublisher(item.id, newName); },
+                    createLabel: (q) => `Add "${q}" as sub-publisher`,
+                },
+            }, actionTarget);
+        } else if (chipType === "tag") {
+            const tagDetail = await getTagDetail(itemId).catch(() => null);
+            if (!tagDetail) {
+                console.error(`Tag ${itemId} not found`);
+                return;
+            }
+
+            openEditModal({
+                title: "Edit Tag",
+                name: tagDetail.name,
+                onRename: async (newName) => {
+                    await updateTag(itemId, newName, tagDetail.category);
+                    tagDetail.name = newName;
+                },
+                onClose,
+                category: {
+                    label: "Category",
+                    value: tagDetail.category,
+                    editable: true,
+                    onSave: async (val) => {
+                        await updateTag(itemId, tagDetail.name, val);
+                        tagDetail.category = val;
+                    },
+                    onSearch: async (q) => {
+                        const all = await getTagCategories();
+                        return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+                    },
+                },
+                children: null,
+            }, actionTarget);
+        }
+        return;
+    }
+
     if (action === "close-link-modal") {
         closeLinkModal();
         return;
@@ -509,7 +620,7 @@ document.addEventListener("click", async (event) => {
             const chips = document.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`);
             const currentItems = Array.from(chips).map(btn => ({
                 id: btn.dataset.publisherId,
-                label: btn.closest(".link-chip").childNodes[0].textContent.trim(),
+                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? btn.closest(".link-chip").childNodes[0].textContent.trim(),
             }));
 
             openLinkModal({
@@ -520,10 +631,11 @@ document.addEventListener("click", async (event) => {
                     return (results || []).map(p => ({ id: p.id, label: p.name }));
                 },
                 onAdd: async (opt) => {
-                    const publisher = await addSongPublisher(songId, opt.rawInput || opt.label);
+                    // M2M Protocol: IDs are primary. Strings are for creation only.
+                    const publisherId = opt.id ? Number(opt.id) : null;
+                    const publisher = await addSongPublisher(songId, opt.rawInput || opt.label, publisherId);
                     opt.id = publisher.id;
                     opt.label = publisher.name;
-                    currentItems.push({ id: publisher.id, label: publisher.name });
                     const song = state.cachedSongs.find(s => String(s.id) === String(songId));
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
@@ -533,6 +645,70 @@ document.addEventListener("click", async (event) => {
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
                 createLabel: (q) => `Add "${q}" as new publisher`,
+            });
+        } else if (modalType === "tags") {
+            const section = actionTarget.closest(".detail-section");
+            const chips = section ? section.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
+            const currentItems = Array.from(chips).map(btn => ({
+                id: btn.dataset.tagId,
+                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
+            }));
+
+            const rules = state.validationRules?.tags || {};
+            const defaultCategory = rules.default_category || "Genre";
+            const delimiter = rules.delimiter || ":";
+            const format = rules.input_format || "tag:category";
+            const nameFirst = format.toLowerCase().startsWith("tag");
+
+            function parseTagInput(raw) {
+                if (!raw.includes(delimiter)) return { name: raw.trim(), category: defaultCategory };
+                const idx = raw.indexOf(delimiter);
+                const a = raw.slice(0, idx).trim();
+                const b = raw.slice(idx + delimiter.length).trim();
+                const name = nameFirst ? a : b;
+                const category = nameFirst ? b : a;
+                return { name, category };
+            }
+
+            openLinkModal({
+                title: "Tags",
+                placeholder: `Search or type (e.g. ${format})...`,
+                items: currentItems,
+                onSearch: async (q) => {
+                    const results = await searchTags(q);
+                    if (results === ABORTED) return [];
+                    return (results || []).map(t => ({ id: t.id, label: t.category ? `${t.name} (${t.category})` : t.name, name: t.name }));
+                },
+                onAdd: async (opt) => {
+                    let name, category;
+                    if (opt.id != null) {
+                        // Priority 1: Link existing tag by ID
+                        // We pass nulls for name/category as the backend resolves by ID
+                        name = null;
+                        category = null;
+                    } else {
+                        // Priority 2: Parse raw input for new tag creation
+                        const parsed = parseTagInput(opt.rawInput || opt.name || opt.label);
+                        name = parsed.name;
+                        category = parsed.category;
+                    }
+
+                    const tag = await addSongTag(songId, name, category, opt.id != null ? opt.id : null);
+                    opt.id = tag.id;
+                    opt.label = tag.name;
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeSongTag(songId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => {
+                    const { name, category } = parseTagInput(q);
+                    if (!name) return `Add tag (missing name)`;
+                    return `Add "${name}" in "${category}"`;
+                },
             });
         }
         return;
@@ -728,8 +904,12 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-    // Escape always works to close detail panel
-    if (event.key === "Escape" && elements.detailPanel.style.display === "flex") {
+    // Escape closes detail panel — but not if a modal is open (modal handles its own Escape)
+    const editModalOpen = document.getElementById("edit-modal")?.style.display === "flex";
+    const linkModalOpen = document.getElementById("link-modal")?.style.display === "flex";
+    const modalOpen = editModalOpen || linkModalOpen;
+
+    if (event.key === "Escape" && elements.detailPanel.style.display === "flex" && !modalOpen) {
         abortDetailRequest();
         ctx.hideDetailPanel();
         state.selectedIndex = -1;
@@ -790,5 +970,11 @@ elements.deepSearchToggle.addEventListener("change", (event) => {
 });
 
 syncModeUi();
-fetchValidationRules().then(rules => { state.validationRules = rules; });
+Promise.all([
+    fetchValidationRules().catch(() => null),
+    fetchId3Frames().catch(() => null)
+]).then(([rules, frames]) => {
+    state.validationRules = rules;
+    state.id3Frames = frames;
+});
 performSearch("");

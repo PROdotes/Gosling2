@@ -98,21 +98,61 @@ function renderAlbumCards(albums) {
     }).join("");
 }
 
-function renderTagCollection(tags, variant = "") {
+
+/**
+ * Renders clusters of tags grouped by their category (Genre, Mood, etc.).
+ * Mirrors the grouping logic used in credits.
+ */
+function renderTagGroups(tags, songId, id3Frames) {
     const items = asArray(tags);
     if (!items.length) {
-        return '<div class="muted-note">None</div>';
+        return '<div class="muted-note">No tags linked</div>';
     }
 
-    return `
-        <div class="tag-list">
-            ${items.map((tag) => {
-                const label = tag.name || tag.display_name || "-";
-                const className = variant ? `tag ${variant}` : "tag";
-                return `<span class="${className}">${escapeHtml(label)}</span>`;
-            }).join("")}
-        </div>
-    `;
+    // Group by category (Genre, Mood, Era, etc.)
+    const grouped = new Map();
+    items.forEach((tag) => {
+        const cat = tag.category || "Other";
+        if (!grouped.has(cat)) {
+            grouped.set(cat, []);
+        }
+        grouped.get(cat).push(tag);
+    });
+
+    return Array.from(grouped.entries())
+        .map(([cat, groupItems]) => `
+            <div class="stack-list" style="margin-bottom: 0.85rem;">
+                <div class="mini-label">${escapeHtml(cat)}</div>
+                <div class="link-chip-list">
+                    ${groupItems.map((tag) => {
+            const label = tag.name || "-";
+            // Find framing metadata for styling (colors/icons/variants)
+            const framesMap = id3Frames || {};
+            const frameDef = Object.values(framesMap).find(
+                f => typeof f === 'object' && f.tag_category === cat
+            );
+            const variant = (frameDef && frameDef.variant) ? frameDef.variant : "";
+            const chipClass = variant ? `link-chip tag ${variant}` : "link-chip tag";
+            return `
+                            <span class="${chipClass}">
+                                <button class="link-chip-label" 
+                                        data-action="open-edit-modal" 
+                                        data-chip-type="tag" 
+                                        data-item-id="${tag.id}">
+                                    ${escapeHtml(label)}
+                                </button>
+                                <button class="link-chip-remove" 
+                                        data-action="remove-tag" 
+                                        data-song-id="${songId}" 
+                                        data-tag-id="${tag.id}" 
+                                        title="Remove">✕</button>
+                            </span>
+                        `;
+        }).join("")}
+                </div>
+            </div>
+        `)
+        .join("");
 }
 
 // TODO: Migrate to backend sorting when expanding the frontend dashboard (Router, Service, and Repository ORDER BY support).
@@ -278,7 +318,7 @@ export function renderSongDetailLoading(ctx, song) {
 }
 
 const STATUS_LABELS = { 0: "Reviewed", 1: "Ready for Review", 2: "Imported" };
-const STATUS_CSS   = { 0: "found",    1: "warning",        2: "missing"  };
+const STATUS_CSS = { 0: "found", 1: "warning", 2: "missing" };
 
 function renderWorkflowStatus(song) {
     const status = song.processing_status ?? 1;
@@ -293,8 +333,8 @@ function renderWorkflowStatus(song) {
     const buttonHtml = status === 1 && blockers.length === 0
         ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="mark-reviewed" data-id="${song.id}">Mark as Reviewed</button>`
         : status === 0
-        ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`
-        : "";
+            ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`
+            : "";
 
     return `
         <div class="file-status ${css} workflow-status">
@@ -304,7 +344,7 @@ function renderWorkflowStatus(song) {
         </div>`;
 }
 
-export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
+export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3Frames) {
     const dbCredits = asArray(song.credits);
     const fileCredits = asArray(fileData && fileData.credits);
     const dbAlbums = asArray(song.albums);
@@ -313,10 +353,6 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
     const fileTags = asArray(fileData && fileData.tags);
     const dbPublishers = asArray(song.publishers);
     const filePublishers = asArray(fileData && fileData.publishers);
-    const dbGenres = dbTags.filter((tag) => String(tag.category || "").toLowerCase() === "genre");
-    const fileGenres = fileTags.filter((tag) => String(tag.category || "").toLowerCase() === "genre");
-    const dbOther = dbTags.filter((tag) => String(tag.category || "").toLowerCase() !== "genre");
-    const fileOther = fileTags.filter((tag) => String(tag.category || "").toLowerCase() !== "genre");
     const statusHtml = fileData ? renderStatus("found", "File verified") : renderStatus("missing", "File not found");
     const rawTags = fileData && fileData.raw_tags ? Object.entries(fileData.raw_tags) : [];
     const artistValue = song.display_artist
@@ -407,18 +443,19 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Genres</div>
-                <div class="two-column">
-                    <div class="surface-box"><div class="mini-label">Library (${dbGenres.length})</div>${renderTagCollection(dbGenres, "genre")}</div>
-                    <div class="surface-box"><div class="mini-label">File (${fileGenres.length})</div>${renderTagCollection(fileGenres, "genre")}</div>
+                <div class="section-title-row">
+                    <span class="section-title">Tags</span>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="tags" data-song-id="${song.id}">+ Add</button>
                 </div>
-            </div>
-
-            <div class="detail-section">
-                <div class="section-title">Other Tags</div>
                 <div class="two-column">
-                    <div class="surface-box"><div class="mini-label">Library (${dbOther.length})</div>${renderTagCollection(dbOther)}</div>
-                    <div class="surface-box"><div class="mini-label">File (${fileOther.length})</div>${renderTagCollection(fileOther)}</div>
+                    <div class="surface-box">
+                        <div class="mini-label">Library (${dbTags.length})</div>
+                        ${renderTagGroups(dbTags, song.id, id3Frames)}
+                    </div>
+                    <div class="surface-box">
+                        <div class="mini-label">File (${fileTags.length})</div>
+                        ${renderTagGroups(fileTags, song.id, id3Frames)}
+                    </div>
                 </div>
             </div>
 
@@ -433,13 +470,22 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory) {
                         <div class="link-chip-list">
                             ${dbPublishers.length ? dbPublishers.map(p => `
                                 <span class="link-chip">
-                                    ${escapeHtml(p.name)}
+                                    <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="publisher" data-item-id="${p.id}">${escapeHtml(p.name)}</button>
                                     <button class="link-chip-remove" data-action="remove-publisher" data-song-id="${song.id}" data-publisher-id="${p.id}" title="Remove">✕</button>
                                 </span>
                             `).join("") : '<span class="muted-note">None</span>'}
                         </div>
                     </div>
-                    <div class="surface-box"><div class="mini-label">File (${filePublishers.length})</div>${renderTagCollection(filePublishers, "publisher")}</div>
+                    <div class="surface-box"><div class="mini-label">File (${filePublishers.length})</div>
+                        <div class="link-chip-list">
+                            ${filePublishers.length ? filePublishers.map(tag => `
+                                <span class="link-chip tag publisher">
+                                    <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="tag" data-item-id="${tag.id}">${escapeHtml(tag.name || "-")}</button>
+                                    <button class="link-chip-remove" data-action="remove-tag" data-song-id="${song.id}" data-tag-id="${tag.id}" title="Remove">✕</button>
+                                </span>
+                            `).join("") : '<span class="muted-note">None</span>'}
+                        </div>
+                    </div>
                 </div>
             </div>
 

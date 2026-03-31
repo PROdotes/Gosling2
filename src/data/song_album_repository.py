@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Optional
 from src.data.base_repository import BaseRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.models.domain import SongAlbum

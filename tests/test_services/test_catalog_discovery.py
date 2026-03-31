@@ -4,7 +4,6 @@ Both search_songs_slim and search_songs_deep_slim return List[dict].
 """
 
 
-
 class TestSearchSongsDiscovery:
     """CatalogService verification of surface vs deep discovery modes."""
 
