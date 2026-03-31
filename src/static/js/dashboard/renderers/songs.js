@@ -107,9 +107,8 @@ function renderAlbumCards(albums, songId) {
 
     return items.map((album) => {
         const title = album.album_title || album.display_title || "Unknown Album";
-        const albumArtistNames = asArray(album.credits)
-            .map((credit) => credit.display_name || credit.name)
-            .filter(Boolean);
+        const albumCredits = asArray(album.credits);
+        const albumPublishers = asArray(album.album_publishers);
         const albumId = album.album_id || album.id;
         const isEditable = !!songId;
 
@@ -124,27 +123,51 @@ function renderAlbumCards(albums, songId) {
                         ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>`
                         : `<button class="inline-link" ${buildNavigateAttrs("albums", title)}>${escapeHtml(title)}</button>`
                     }
-                    ${isEditable ? `<button class="chip-remove-btn" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Remove album">✕</button>` : ""}
+                    ${isEditable ? `<button class="link-chip-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Remove album">✕</button>` : ""}
                 </div>
-                <div class="card-meta">
-                    ${isEditable
-                        ? `<select class="album-type-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>`
-                        : (album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : "")
-                    }
-                    ${isEditable
-                        ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>`
-                        : (album.release_year ? `<span class="pill mono">${escapeHtml(album.release_year)}</span>` : "")
-                    }
-                    ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
+                <div class="stack-list">
+                    <button class="mini-label mini-label--clickable" data-action="open-link-modal" data-modal-type="album-credits" data-album-id="${albumId}" data-song-id="${songId}" title="Add artist">Performer +</button>
+                    <div class="link-chip-list">
+                        ${isEditable ? albumCredits.map((credit) => `
+                            <span class="link-chip">
+                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="credit" data-album-id="${albumId}" data-item-id="${credit.name_id}">${escapeHtml(credit.display_name || credit.name || "-")}</button>
+                                <button class="link-chip-remove" data-action="remove-album-credit" data-album-id="${albumId}" data-song-id="${songId}" data-credit-id="${credit.name_id}" title="Remove">✕</button>
+                            </span>
+                        `).join("") : (albumCredits.length ? albumCredits.map((credit) => `<span class="link-chip"><button class="link-chip-label">${escapeHtml(credit.display_name || credit.name || "-")}</button></span>`).join("") : '<span class="muted-note">-</span>')}
+                    </div>
+                </div>
+                <div class="stack-list">
+                    <button class="mini-label mini-label--clickable" data-action="open-link-modal" data-modal-type="album-publishers" data-album-id="${albumId}" data-song-id="${songId}" title="Add publisher">Publisher +</button>
+                    <div class="link-chip-list">
+                        ${isEditable ? albumPublishers.map((p) => `
+                            <span class="link-chip tag publisher">
+                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="publisher" data-item-id="${p.id}">${escapeHtml(p.name)}</button>
+                                <button class="link-chip-remove" data-action="remove-album-publisher" data-album-id="${albumId}" data-song-id="${songId}" data-publisher-id="${p.id}" title="Remove">✕</button>
+                            </span>
+                        `).join("") : (albumPublishers.length ? albumPublishers.map((p) => `<span class="link-chip tag publisher">${escapeHtml(p.name)}</span>`).join("") : '<span class="muted-note">-</span>')}
+                    </div>
                 </div>
                 ${isEditable ? `
-                <div class="card-track-info">
-                    <span class="mini-label">Track:</span>
-                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
-                    <span class="mini-label">Disc:</span>
+                <div class="album-field-row">
+                    <span class="mini-label">Type</span>
+                    <select class="album-type-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
+                </div>` : `<div class="album-field-row"><span class="mini-label">Type</span> ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : `<span class="pill">-</span>`}</div>`}
+                ${isEditable ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Year</span>
+                    <span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>
+                </div>` : `<div class="album-field-row"><span class="mini-label">Year</span> ${album.release_year ? `<span class="pill mono">${escapeHtml(album.release_year)}</span>` : `<span class="pill mono">-</span>`}</div>`}
+                ${isEditable ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Disc</span>
                     <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
-                </div>` : ""}
-                ${albumArtistNames.length ? `<div class="card-subtitle">Album Artist: ${albumArtistNames.map((name) => `<button class="inline-link" ${buildNavigateAttrs("artists", name)}>${escapeHtml(name)}</button>`).join(", ")}</div>` : ""}
+                </div>` : `<div class="album-field-row"><span class="mini-label">Disc</span> <span class="pill mono">${album.disc_number ?? "-"}</span></div>`}
+                ${isEditable ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Track</span>
+                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
+                </div>` : `<div class="album-field-row"><span class="mini-label">Track</span> <span class="pill mono">${album.track_number ?? "-"}</span></div>`}
+                ${isEditable ? `<button class="section-add-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" style="margin-top:0.5rem">↓ sync from song</button>` : ""}
             </div>
         `;
     }).join("");
@@ -442,7 +465,9 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                         <tbody>
                             ${editableScalarRow("Title", "media_name", song.media_name, fileData && fileData.media_name, song.id)}
                             ${compareRow("Artist", song.display_artist, fileData && fileData.display_artist)}
+                            ${compareRow("Composer", song.display_composer, fileData && fileData.display_composer)}
                             ${editableScalarRow("Year", "year", song.year, fileData && fileData.year, song.id)}
+                            ${compareRow("Genre", song.display_genres, fileData && fileData.display_genres)}
                             ${editableScalarRow("BPM", "bpm", song.bpm, fileData && fileData.bpm, song.id)}
                             ${compareRow("Duration", song.formatted_duration, fileData && fileData.formatted_duration)}
                             ${editableScalarRow("ISRC", "isrc", song.isrc, fileData && fileData.isrc, song.id)}
@@ -471,12 +496,14 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Albums</div>
+                <div class="section-title-row">
+                    <span class="section-title">Albums</span>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}">+ Add</button>
+                </div>
                 <div class="two-column">
                     <div class="surface-box">
                         <div class="mini-label">Library (${dbAlbums.length})</div>
                         <div class="stack-list">${renderAlbumCards(dbAlbums, song.id)}</div>
-                        <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}">+ Add</button>
                     </div>
                     <div class="surface-box">
                         <div class="mini-label">File (${fileAlbums.length})</div>

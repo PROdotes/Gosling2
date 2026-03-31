@@ -9,36 +9,56 @@ import {
     textOrDash,
 } from "../components/utils.js";
 
-function renderCredits(credits) {
+function renderAlbumCredits(credits, albumId) {
     const items = asArray(credits);
     if (!items.length) {
         return '<div class="muted-note">No album credits linked</div>';
     }
 
     return `
-        <div class="credits-list">
+        <div class="link-chip-list">
             ${items.map((credit) => `
-                <div class="credit-item">
-                    <span class="credit-name"><button class="inline-link" ${buildNavigateAttrs("artists", credit.display_name || credit.name || "")}>${escapeHtml(credit.display_name || credit.name || "-")}</button></span>
-                    <span class="credit-role">${escapeHtml(credit.role_name || "-")}</span>
-                </div>
+                <span class="link-chip">
+                    <button class="link-chip-label"
+                            data-action="open-edit-modal"
+                            data-chip-type="credit"
+                            data-album-id="${albumId}"
+                            data-item-id="${credit.name_id}">
+                        ${escapeHtml(credit.display_name || credit.name || "-")}
+                    </button>
+                    <button class="link-chip-remove"
+                            data-action="remove-album-credit"
+                            data-album-id="${albumId}"
+                            data-credit-id="${credit.name_id}"
+                            title="Remove">✕</button>
+                </span>
             `).join("")}
         </div>
     `;
 }
 
-function renderPublishers(publishers) {
+function renderAlbumPublishers(publishers, albumId) {
     const items = asArray(publishers);
     if (!items.length) {
         return '<div class="muted-note">No album publishers linked</div>';
     }
 
     return `
-        <div class="tag-list">
+        <div class="link-chip-list">
             ${items.map((publisher) => `
-                <button class="tag publisher link" ${buildNavigateAttrs("publishers", publisher.name)}>
-                    ${escapeHtml(publisher.parent_name ? `${publisher.name} (${publisher.parent_name})` : publisher.name)}
-                </button>
+                <span class="link-chip tag publisher">
+                    <button class="link-chip-label"
+                            data-action="open-edit-modal"
+                            data-chip-type="publisher"
+                            data-item-id="${publisher.id}">
+                        ${escapeHtml(publisher.parent_name ? `${publisher.name} (${publisher.parent_name})` : publisher.name)}
+                    </button>
+                    <button class="link-chip-remove"
+                            data-action="remove-album-publisher"
+                            data-album-id="${albumId}"
+                            data-publisher-id="${publisher.id}"
+                            title="Remove">✕</button>
+                </span>
             `).join("")}
         </div>
     `;
@@ -88,6 +108,8 @@ export function renderAlbumDetailLoading(ctx, album) {
 export function renderAlbumDetailComplete(ctx, album, auditHistory) {
     const credits = asArray(album.credits);
     const songs = asArray(album.songs);
+    const publishers = asArray(album.publishers);
+    const albumId = album.id;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -106,13 +128,23 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Publishers</div>
-                ${renderPublishers(album.publishers)}
+                <div class="section-title-row">
+                    <span class="section-title">Publishers</span>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album-publishers" data-album-id="${albumId}">+ Add</button>
+                </div>
+                <div class="surface-box">
+                    ${renderAlbumPublishers(publishers, albumId)}
+                </div>
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Album Credits</div>
-                ${renderCredits(credits)}
+                <div class="section-title-row">
+                    <span class="section-title">Album Credits</span>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album-credits" data-album-id="${albumId}">+ Add</button>
+                </div>
+                <div class="surface-box">
+                    ${renderAlbumCredits(credits, albumId)}
+                </div>
             </div>
 
             <div class="detail-section">

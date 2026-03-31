@@ -1,8 +1,9 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
+from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
-from src.models.domain import SongCredit, Tag, Publisher, SongAlbum, Album
+from src.models.domain import SongCredit, Tag, Publisher, SongAlbum, Album, AlbumCredit
 from src.models.view_models import (
     SongView,
     SongScalarUpdate,
@@ -182,9 +183,10 @@ async def add_song_album(
             logger.debug(
                 f"[SongUpdates] -> add_song_album CREATE_AND_LINK(id={song_id}, title='{body.title}')"
             )
-            album_data: dict[str, Any] = {"title": body.title}
-            if body.album_type:
-                album_data["album_type"] = body.album_type
+            album_data: dict[str, Any] = {
+                "title": body.title,
+                "album_type": body.album_type or ALBUM_DEFAULT_TYPE,
+            }
             if body.release_year:
                 album_data["release_year"] = body.release_year
 
@@ -304,19 +306,30 @@ async def update_album(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/albums/{album_id}/credits", status_code=204)
+@router.post("/albums/{album_id}/credits", response_model=AlbumCredit)
 async def add_album_credit(
     album_id: int,
     body: AddAlbumCreditBody,
     service: CatalogService = Depends(_get_service),
-):
+) -> AlbumCredit:
     _require_album(album_id, service)
     logger.debug(
-        f"[SongUpdates] -> add_album_credit(id={album_id}, name='{body.artist_name}')"
+        f"[SongUpdates] -> add_album_credit(id={album_id}, name='{body.display_name}', role='{body.role_name}')"
     )
     try:
-        service.add_album_credit(album_id, body.artist_name)
+        name_id = service.add_album_credit(
+            album_id, body.display_name, body.role_name or "Performer", body.identity_id
+        )
+        album = service.get_album(album_id)
+        if not album:
+            raise HTTPException(status_code=500, detail="Album not found after adding credit")
+        credit = next((c for c in album.credits if c.name_id == name_id), None)
+        if not credit:
+            raise HTTPException(status_code=500, detail="Credit created but not retrievable")
         logger.debug("[SongUpdates] <- add_album_credit OK")
+        return credit
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"[SongUpdates] <- add_album_credit CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))

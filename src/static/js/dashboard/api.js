@@ -334,11 +334,13 @@ export function updateAlbum(albumId, fields) {
     });
 }
 
-export function addAlbumCredit(albumId, displayName, roleName) {
-    return fetchVoid(`/api/v1/albums/${albumId}/credits`, {
+export function addAlbumCredit(albumId, displayName, roleName = "Performer", identityId = null) {
+    const body = { display_name: displayName, role_name: roleName };
+    if (identityId !== null) body.identity_id = identityId;
+    return fetchJson(`/api/v1/albums/${albumId}/credits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName, role_name: roleName }),
+        body: JSON.stringify(body),
     });
 }
 

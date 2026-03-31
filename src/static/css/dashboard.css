@@ -532,7 +532,42 @@ main {
 .album-card-detail {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
+    gap: 0.55rem;
+    overflow: visible;
+}
+
+.album-field-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.album-field-row .mini-label {
+    flex-shrink: 0;
+    margin-bottom: 0;
+}
+
+.album-type-select {
+    background: var(--bg-card-raised);
+    border: 1px solid var(--border-accent);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 0.4rem 0.65rem;
+    font-size: 0.82rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+    width: 100%;
+}
+
+.album-type-select:focus {
+    border-color: var(--accent);
+}
+
+.album-type-select option {
+    background: var(--bg-card-raised);
+    color: var(--text-primary);
 }
 
 .meta-label {

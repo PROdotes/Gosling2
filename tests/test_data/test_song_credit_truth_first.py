@@ -1,5 +1,4 @@
 
-import pytest
 from src.data.song_credit_repository import SongCreditRepository
 
 class TestSongCreditTruthFirst:

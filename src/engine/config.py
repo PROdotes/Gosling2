@@ -33,6 +33,9 @@ TAG_INPUT_FORMAT = os.getenv("GOSLING_TAG_INPUT_FORMAT", "tag:category")
 # Fields whose values should additionally be split on ", " during metadata extraction
 COMMA_SPLIT_FIELDS = ["composers"]
 
+# Album defaults
+ALBUM_DEFAULT_TYPE = "Single"
+
 # Scalar field validation rules (single source of truth — exposed via /api/v1/validation-rules)
 SCALAR_VALIDATION = {
     "year": {"min": 1860, "max_offset": 1},  # max = current_year + max_offset

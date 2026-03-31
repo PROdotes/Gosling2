@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Optional
 
 from src.data.base_repository import BaseRepository
 from src.models.domain import AlbumCredit
@@ -49,21 +49,26 @@ class AlbumCreditRepository(BaseRepository):
         )
 
     def add_credit(
-        self, album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection
-    ) -> None:
+        self,
+        album_id: int,
+        display_name: str,
+        role_name: str,
+        conn: sqlite3.Connection,
+        identity_id: Optional[int] = None,
+    ) -> int:
         """
         Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+        Returns the name_id of the credited artist.
         """
         logger.debug(
-            f"[AlbumCreditRepository] -> add_credit(album_id={album_id}, name='{display_name}', role='{role_name}')"
+            f"[AlbumCreditRepository] -> add_credit(album_id={album_id}, name='{display_name}', role='{role_name}', identity_id={identity_id})"
         )
-        # In GOSLING2, SongCreditRepository currently serves as the de-facto 'People' repo for discovery.
         from src.data.song_credit_repository import SongCreditRepository
 
         credit_repo = SongCreditRepository(self.db_path)
         cursor = conn.cursor()
         role_id = credit_repo.get_or_create_role(role_name, cursor)
-        name_id = credit_repo.get_or_create_credit_name(display_name, cursor)
+        name_id = credit_repo.get_or_create_credit_name(display_name, cursor, identity_id)
         cursor.execute(
             "INSERT OR IGNORE INTO AlbumCredits (AlbumID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
             (album_id, name_id, role_id),
@@ -71,6 +76,7 @@ class AlbumCreditRepository(BaseRepository):
         logger.debug(
             f"[AlbumCreditRepository] <- add_credit() done name_id={name_id} role_id={role_id}"
         )
+        return name_id
 
     def remove_credit(
         self, album_id: int, name_id: int, conn: sqlite3.Connection

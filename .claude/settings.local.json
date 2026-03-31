@@ -8,7 +8,12 @@
       "Bash(dir:*)",
       "Bash(find:*)",
       "Bash(pytest:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(curl -s \"http://localhost:7860/api/v1/albums/2\")",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s \"http://localhost:7777/api/v1/albums/2\")",
+      "Bash(curl -s \"http://localhost:8000/api/v1/albums/2\")",
+      "Bash(curl -s \"http://localhost:8000/api/v1/songs/2\")"
     ]
   }
 }

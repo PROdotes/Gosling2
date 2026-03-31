@@ -1458,14 +1458,20 @@ class CatalogService:
         logger.debug("[CatalogService] <- update_album OK")
         return album
 
-    def add_album_credit(self, album_id: int, artist_name: str) -> None:
-        """Add a credited artist to an album. Get-or-create artist name."""
+    def add_album_credit(
+        self,
+        album_id: int,
+        display_name: str,
+        role_name: str = "Performer",
+        identity_id: Optional[int] = None,
+    ) -> int:
+        """Add a credited artist to an album. Get-or-create artist name. Returns name_id."""
         logger.debug(
-            f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{artist_name}')"
+            f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{display_name}', role='{role_name}', identity_id={identity_id})"
         )
         conn = self._album_credit_repo.get_connection()
         try:
-            self._album_credit_repo.add_credit(album_id, artist_name, "Performer", conn)
+            name_id = self._album_credit_repo.add_credit(album_id, display_name, role_name, conn, identity_id)
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1473,7 +1479,8 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        logger.debug("[CatalogService] <- add_album_credit OK")
+        logger.debug(f"[CatalogService] <- add_album_credit OK name_id={name_id}")
+        return name_id
 
     def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
         """Remove a credited artist from an album."""

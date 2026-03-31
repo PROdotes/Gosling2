@@ -36,6 +36,10 @@ import {
     removeSongAlbum,
     updateAlbum,
     updateSongAlbumLink,
+    addAlbumPublisher,
+    removeAlbumPublisher,
+    addAlbumCredit,
+    removeAlbumCredit,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
@@ -299,7 +303,13 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles);
     if (savedScroll) {
         const newContent = elements.detailPanel.querySelector(".detail-content");
-        if (newContent) requestAnimationFrame(() => { newContent.scrollTop = savedScroll; });
+        if (newContent) {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    newContent.scrollTop = savedScroll;
+                });
+            });
+        }
     }
 }
 
@@ -585,6 +595,34 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "remove-album-publisher") {
+        const { albumId, publisherId, songId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeAlbumPublisher(albumId, publisherId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove album publisher failed: ${err.message}`);
+        }
+        return;
+    }
+
+    if (action === "remove-album-credit") {
+        const { albumId, creditId, songId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeAlbumCredit(albumId, creditId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove album credit failed: ${err.message}`);
+        }
+        return;
+    }
+
     if (action === "start-edit-album-scalar") {
         const span = actionTarget;
         const { albumId, songId, field } = span.dataset;
@@ -652,6 +690,20 @@ document.addEventListener("click", async (event) => {
             }
         }
 
+        input.addEventListener("input", () => {
+            const v = input.value.trim();
+            if (field === "release_year" && v) {
+                const n = Number(v);
+                const year = new Date().getFullYear();
+                if (!Number.isInteger(n) || n < 1860 || n > year + 1) {
+                    input.classList.add("inline-edit-input--error");
+                    errorEl.textContent = `Year must be between 1860–${year + 1}`;
+                    return;
+                }
+            }
+            input.classList.remove("inline-edit-input--error");
+            errorEl.textContent = "";
+        });
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter") { e.preventDefault(); commitAlbumScalar(); }
             if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
@@ -725,6 +777,51 @@ document.addEventListener("click", async (event) => {
             if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
         });
         input.addEventListener("blur", () => { setTimeout(() => { if (document.contains(input)) commitAlbumLink(); }, 100); });
+        return;
+    }
+
+    if (action === "sync-album-from-song") {
+        const { albumId, songId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        actionTarget.textContent = "syncing...";
+        try {
+            const song = await getCatalogSong(songId);
+            const albumDetail = await getAlbumDetail(albumId);
+
+            const ops = [];
+
+            // Title — only if album title looks like a placeholder or matches song title already (skip — title is intentional)
+            // Year — only if missing
+            if (!albumDetail.release_year && song.year) {
+                ops.push(updateAlbum(albumId, { release_year: song.year }));
+            }
+
+            // Credits — add song performers not already on album (match by name_id)
+            const existingNameIds = new Set((albumDetail.credits || []).map(c => String(c.name_id)));
+            for (const credit of (song.credits || [])) {
+                if (credit.role_name !== "Performer") continue;
+                if (!existingNameIds.has(String(credit.name_id))) {
+                    ops.push(addAlbumCredit(albumId, credit.display_name, credit.role_name, credit.identity_id ?? null));
+                }
+            }
+
+            // Publishers — add song publishers not already on album (match by id)
+            const existingPubIds = new Set((albumDetail.publishers || []).map(p => String(p.id)));
+            for (const pub of (song.publishers || [])) {
+                if (!existingPubIds.has(String(pub.id))) {
+                    ops.push(addAlbumPublisher(albumId, pub.name, pub.id));
+                }
+            }
+
+            await Promise.all(ops);
+            const s = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (s) openSongDetail(s, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            actionTarget.textContent = "↓ sync from song";
+            console.error(`Sync failed: ${err.message}`);
+            alert(`Sync failed: ${err.message}`);
+        }
         return;
     }
 
@@ -813,14 +910,15 @@ document.addEventListener("click", async (event) => {
                 children: null,
             }, actionTarget);
         } else if (chipType === "credit") {
-            const { songId } = actionTarget.dataset;
+            const songId = actionTarget.dataset.songId;
+            const albumId = actionTarget.dataset.albumId;
             const displayName = actionTarget.textContent.trim();
 
             openEditModal({
                 title: "Global Name Edit",
                 name: displayName,
                 onRename: async (newName) => {
-                    await updateCreditName(songId, itemId, newName);
+                    await updateCreditName(songId || albumId, itemId, newName);
                 },
                 onClose,
                 category: null,
@@ -839,8 +937,9 @@ document.addEventListener("click", async (event) => {
         const { modalType, songId } = actionTarget.dataset;
 
         if (modalType === "publishers") {
-            // Build current items from the chips already in the DOM
-            const chips = document.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`);
+            const section = actionTarget.closest(".detail-section");
+            const libraryBox = section?.querySelector(".surface-box");
+            const chips = libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`) : [];
             const currentItems = Array.from(chips).map(btn => ({
                 id: btn.dataset.publisherId,
                 label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? btn.closest(".link-chip").childNodes[0].textContent.trim(),
@@ -870,8 +969,9 @@ document.addEventListener("click", async (event) => {
                 createLabel: (q) => `Add "${q}" as new publisher`,
             });
         } else if (modalType === "tags") {
-            const group = actionTarget.closest(".stack-list");
-            const chips = group ? group.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
+            const section = actionTarget.closest(".detail-section");
+            const libraryBox = section?.querySelector(".surface-box");
+            const chips = libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
             const currentItems = Array.from(chips).map(btn => ({
                 id: btn.dataset.tagId,
                 label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
@@ -974,8 +1074,10 @@ document.addEventListener("click", async (event) => {
             });
         } else if (modalType === "album") {
             const { songId } = actionTarget.dataset;
+            const section = actionTarget.closest(".detail-section");
+            const libraryBox = section?.querySelector(".surface-box");
             const currentCards = Array.from(
-                actionTarget.closest(".surface-box")?.querySelectorAll("[data-action='remove-album']") || []
+                libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-album"][data-song-id="${songId}"]`) : []
             ).map(btn => ({ id: btn.dataset.albumId, label: btn.closest(".album-card-detail")?.querySelector(".editable-scalar")?.textContent?.trim() ?? "" }));
 
             openLinkModal({
@@ -985,7 +1087,7 @@ document.addEventListener("click", async (event) => {
                 onSearch: async (q) => {
                     const results = await searchAlbums(q);
                     if (results === ABORTED) return [];
-                    return (results || []).map(a => ({ id: a.id, label: a.album_title || a.title }));
+                    return (results || []).map(a => ({ id: a.id, label: a.title }));
                 },
                 onAdd: async (opt) => {
                     await addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
@@ -998,6 +1100,64 @@ document.addEventListener("click", async (event) => {
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
                 createLabel: (q) => `Add "${q}" as new album`,
+            });
+        } else if (modalType === "album-publishers") {
+            const { albumId, songId } = actionTarget.dataset;
+            const chips = Array.from(
+                actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-publisher']") || []
+            ).map(btn => ({ id: btn.dataset.publisherId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
+
+            openLinkModal({
+                title: "Album Publishers",
+                items: chips,
+                onSearch: async (q) => {
+                    const results = await searchPublishers(q);
+                    return (results || []).map(p => ({ id: p.id, label: p.name }));
+                },
+                onAdd: async (opt) => {
+                    const publisherId = opt.id ? Number(opt.id) : null;
+                    const publisher = await addAlbumPublisher(albumId, opt.rawInput || opt.label, publisherId);
+                    opt.id = publisher.id;
+                    opt.label = publisher.name;
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeAlbumPublisher(albumId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => `Add "${q}" as album publisher`,
+            });
+        } else if (modalType === "album-credits") {
+            const { albumId, songId } = actionTarget.dataset;
+            const chips = Array.from(
+                actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-credit']") || []
+            ).map(btn => ({ id: btn.dataset.creditId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
+
+            openLinkModal({
+                title: "Album Credits",
+                placeholder: "Search for artist name...",
+                items: chips,
+                onSearch: async (q) => {
+                    const results = await searchArtists(q);
+                    if (results === ABORTED) return [];
+                    return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+                },
+                onAdd: async (opt) => {
+                    const identityId = opt.id;
+                    const credit = await addAlbumCredit(albumId, opt.rawInput || opt.label, "Performer", identityId);
+                    opt.id = credit.name_id;
+                    opt.label = credit.display_name;
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeAlbumCredit(albumId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => `Add "${q}" as Performer`,
             });
         }
         return;
