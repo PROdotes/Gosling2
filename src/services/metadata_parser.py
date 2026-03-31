@@ -173,7 +173,7 @@ class MetadataParser:
         album_credit_models = []
         for name in dict.fromkeys(album_artists):
             album_credit_models.append(
-                AlbumCredit(role_name="Album Artist", display_name=name)
+                AlbumCredit(role_name="Performer", display_name=name)
             )
 
         for album in dict.fromkeys(album_titles):
@@ -216,7 +216,6 @@ class MetadataParser:
             "producers": "Producer",
             "composers": "Composer",
             "lyricists": "Lyricist",
-            "album_artist": "Album Artist",
             "groups": "Group",
         }
         return mapping.get(field, field.capitalize())

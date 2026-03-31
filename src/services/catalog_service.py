@@ -1255,6 +1255,9 @@ class CatalogService:
 
     # --- Credits ---
 
+    def get_all_roles(self) -> list[str]:
+        return self._credit_repo.get_all_roles()
+
     def add_song_credit(
         self, song_id: int, display_name: str, role_name: str
     ) -> SongCredit:

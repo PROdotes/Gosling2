@@ -58,6 +58,13 @@ class SongCreditRepository(BaseRepository):
             f"[SongCreditRepository] <- insert_credits(source_id={source_id}) wrote {len(credits)} credits"
         )
 
+    def get_all_roles(self) -> List[str]:
+        """Returns all role names from the Roles table."""
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT RoleName FROM Roles ORDER BY RoleName").fetchall()
+            return [row["RoleName"] for row in rows]
+
     def get_or_create_role(self, role_name: str, cursor) -> int:
         """Get-or-create a Role by name. Returns role_id."""
         row = cursor.execute(

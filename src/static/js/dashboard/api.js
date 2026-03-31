@@ -192,6 +192,48 @@ export async function removeSongPublisher(songId, publisherId) {
     }
 }
 
+export function fetchRoles() {
+    return fetchJson("/api/v1/roles");
+}
+
+export function addSongCredit(songId, displayName, roleName) {
+    return fetchJson(`/api/v1/songs/${songId}/credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: displayName, role_name: roleName }),
+    });
+}
+
+export async function removeSongCredit(songId, creditId) {
+    const response = await fetch(`/api/v1/songs/${songId}/credits/${creditId}`, {
+        method: "DELETE",
+    });
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data && data.detail) errorMsg = data.detail;
+        } catch (e) { /* no body */ }
+        throw new Error(errorMsg);
+    }
+}
+
+export async function updateCreditName(songId, nameId, displayName) {
+    const response = await fetch(`/api/v1/songs/${songId}/credits/${nameId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: displayName }),
+    });
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const data = await response.json();
+            if (data && data.detail) errorMsg = data.detail;
+        } catch (e) { /* no body */ }
+        throw new Error(errorMsg);
+    }
+}
+
 export function patchSongScalars(songId, fields) {
     return fetchJson(`/api/v1/songs/${songId}`, {
         method: "PATCH",
@@ -298,7 +340,7 @@ export async function removeSongTag(songId, tagId) {
 }
 
 export async function fetchId3Frames() {
-    const resp = await fetch(`${API_ROOT}/metabolic/id3-frames`);
+    const resp = await fetch("/api/v1/metabolic/id3-frames");
     if (!resp.ok) throw new Error("Failed to fetch ID3 frame mapping");
     return await resp.json();
 }

@@ -28,6 +28,10 @@ import {
     addSongTag,
     removeSongTag,
     fetchId3Frames,
+    addSongCredit,
+    removeSongCredit,
+    updateCreditName,
+    fetchRoles,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
@@ -64,6 +68,7 @@ const state = {
     isDeep: false,
     validationRules: null,
     id3Frames: null,
+    allRoles: [],
 };
 
 const modeConfig = {
@@ -287,7 +292,7 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     cachedFileData = fileData;
     cachedFileDataSongId = String(song.id);
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames);
+    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles);
     if (savedScroll) {
         const newContent = elements.detailPanel.querySelector(".detail-content");
         if (newContent) requestAnimationFrame(() => { newContent.scrollTop = savedScroll; });
@@ -532,6 +537,20 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "remove-credit") {
+        const { songId, creditId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeSongCredit(songId, creditId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove credit failed: ${err.message}`);
+        }
+        return;
+    }
+
     if (action === "close-edit-modal") {
         closeEditModal();
         return;
@@ -603,6 +622,20 @@ document.addEventListener("click", async (event) => {
                 },
                 children: null,
             }, actionTarget);
+        } else if (chipType === "credit") {
+            const { songId } = actionTarget.dataset;
+            const displayName = actionTarget.textContent.trim();
+
+            openEditModal({
+                title: "Global Name Edit",
+                name: displayName,
+                onRename: async (newName) => {
+                    await updateCreditName(songId, itemId, newName);
+                },
+                onClose,
+                category: null,
+                children: null,
+            }, actionTarget);
         }
         return;
     }
@@ -647,8 +680,8 @@ document.addEventListener("click", async (event) => {
                 createLabel: (q) => `Add "${q}" as new publisher`,
             });
         } else if (modalType === "tags") {
-            const section = actionTarget.closest(".detail-section");
-            const chips = section ? section.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
+            const group = actionTarget.closest(".stack-list");
+            const chips = group ? group.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
             const currentItems = Array.from(chips).map(btn => ({
                 id: btn.dataset.tagId,
                 label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
@@ -709,6 +742,41 @@ document.addEventListener("click", async (event) => {
                     if (!name) return `Add tag (missing name)`;
                     return `Add "${name}" in "${category}"`;
                 },
+            });
+        } else if (modalType === "credits") {
+            const { songId, role } = actionTarget.dataset;
+            const group = actionTarget.closest(".stack-list");
+            const chips = group ? group.querySelectorAll(`[data-action="remove-credit"][data-song-id="${songId}"]`) : [];
+            const currentItems = Array.from(chips).map(btn => ({
+                id: btn.dataset.creditId,
+                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
+            }));
+
+            if (!role) throw new Error("credits button is missing data-role");
+
+            openLinkModal({
+                title: `Link ${role}`,
+                placeholder: `Search for artist name...`,
+                items: currentItems,
+                onSearch: async (q) => {
+                    const results = await searchArtists(q);
+                    if (results === ABORTED) return [];
+                    return (results || []).map(a => ({ id: a.id, label: a.name }));
+                },
+                onAdd: async (opt) => {
+                    // Logic: Explicitly use the role context provided by the UI button
+                    const credit = await addSongCredit(songId, opt.rawInput || opt.label, role);
+                    opt.id = credit.credit_id;
+                    opt.label = credit.display_name;
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeSongCredit(songId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => `Add "${q}" as ${role}`,
             });
         }
         return;
@@ -917,8 +985,8 @@ document.addEventListener("keydown", (event) => {
         return;
     }
 
-    // Don't intercept arrow keys when actively typing in search
-    if (document.activeElement === elements.searchInput) {
+    // Don't intercept arrow keys when a modal is open or when typing in search
+    if (modalOpen || document.activeElement === elements.searchInput) {
         return;
     }
 
@@ -972,9 +1040,11 @@ elements.deepSearchToggle.addEventListener("change", (event) => {
 syncModeUi();
 Promise.all([
     fetchValidationRules().catch(() => null),
-    fetchId3Frames().catch(() => null)
-]).then(([rules, frames]) => {
+    fetchId3Frames().catch(() => null),
+    fetchRoles(),
+]).then(([rules, frames, roles]) => {
     state.validationRules = rules;
     state.id3Frames = frames;
+    state.allRoles = roles;
 });
 performSearch("");

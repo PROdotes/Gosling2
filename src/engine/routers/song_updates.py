@@ -1,3 +1,4 @@
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -70,6 +71,14 @@ async def update_song_scalars(
             f"[SongUpdates] <- update_song_scalars(id={song_id}) CRITICAL: {e}"
         )
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Roles ---
+
+
+@router.get("/roles")
+async def get_all_roles(service: CatalogService = Depends(_get_service)):
+    return service.get_all_roles()
 
 
 # --- Credits ---
@@ -156,7 +165,7 @@ async def add_song_album(
     song_id: int,
     body: AddAlbumBody,
     service: CatalogService = Depends(_get_service),
-):
+) -> SongAlbum:
     _require_song(song_id, service)
     try:
         if body.album_id is not None:
@@ -172,7 +181,7 @@ async def add_song_album(
             logger.debug(
                 f"[SongUpdates] -> add_song_album CREATE_AND_LINK(id={song_id}, title='{body.title}')"
             )
-            album_data = {"title": body.title}
+            album_data: dict[str, Any] = {"title": body.title}
             if body.album_type:
                 album_data["album_type"] = body.album_type
             if body.release_year:

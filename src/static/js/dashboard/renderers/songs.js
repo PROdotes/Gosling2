@@ -39,36 +39,61 @@ function editableScalarRow(label, field, dbValue, fileValue, songId) {
     `;
 }
 
-function renderCreditsGroups(credits) {
+function renderCreditsGroups(credits, songId, allRoles) {
     const items = asArray(credits);
-    if (!items.length) {
-        return '<div class="muted-note">No credits found</div>';
-    }
 
-    // Group by exact role_name (preserve order of first occurrence)
+    // Group credits by role_name
     const grouped = new Map();
     items.forEach((credit) => {
         const role = credit.role_name || "";
-        if (!grouped.has(role)) {
-            grouped.set(role, []);
-        }
+        if (!grouped.has(role)) grouped.set(role, []);
         grouped.get(role).push(credit);
     });
 
-    return Array.from(grouped.entries())
-        .map(([role, groupItems]) => `
-            <div class="stack-list">
-                <div class="mini-label">${escapeHtml(role || "Unknown")}</div>
-                <div class="credits-list">
+    // Build ordered list: all known roles first, then any unexpected roles from credits
+    const roles = [...(allRoles || [])];
+    for (const role of grouped.keys()) {
+        if (role && !roles.includes(role)) roles.push(role);
+    }
+
+    if (!roles.length && !items.length) {
+        return '<div class="muted-note">No credits found</div>';
+    }
+
+    return roles
+        .map((role) => {
+            const groupItems = grouped.get(role) || [];
+            return `
+            <div class="stack-list" style="margin-bottom: 0.85rem;">
+                <button class="mini-label mini-label--clickable"
+                        data-action="open-link-modal"
+                        data-modal-type="credits"
+                        data-song-id="${songId}"
+                        data-role="${escapeHtml(role)}"
+                        title="Add ${escapeHtml(role)}">
+                    ${escapeHtml(role || "Unknown")} +
+                </button>
+                ${groupItems.length ? `
+                <div class="link-chip-list">
                     ${groupItems.map((credit) => `
-                        <div class="credit-item">
-                            <span class="credit-name">${credit.display_name ? `<button class="inline-link" ${buildNavigateAttrs("artists", credit.display_name)}>${escapeHtml(credit.display_name)}</button>` : "-"}</span>
-                            <span class="credit-role">${escapeHtml(credit.role_name || "-")}</span>
-                        </div>
+                        <span class="link-chip">
+                            <button class="link-chip-label"
+                                    data-action="open-edit-modal"
+                                    data-chip-type="credit"
+                                    data-song-id="${songId}"
+                                    data-item-id="${credit.name_id}">
+                                ${escapeHtml(credit.display_name || "-")}
+                            </button>
+                            <button class="link-chip-remove"
+                                    data-action="remove-credit"
+                                    data-song-id="${songId}"
+                                    data-credit-id="${credit.credit_id}"
+                                    title="Remove">✕</button>
+                        </span>
                     `).join("")}
-                </div>
-            </div>
-        `)
+                </div>` : ""}
+            </div>`;
+        })
         .join("");
 }
 
@@ -344,7 +369,7 @@ function renderWorkflowStatus(song) {
         </div>`;
 }
 
-export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3Frames) {
+export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3Frames, allRoles) {
     const dbCredits = asArray(song.credits);
     const fileCredits = asArray(fileData && fileData.credits);
     const dbAlbums = asArray(song.albums);
@@ -398,19 +423,9 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                         </tbody>
                     </table>
                 </div>
-            </div>
-
-            <div class="detail-section">
-                <div class="section-title">Overview</div>
-                <div class="meta-grid">
-                    <div class="meta-item"><div class="meta-label">Artist</div><div class="meta-value">${artistValue}</div></div>
-                    <div class="meta-item"><div class="meta-label">Year</div><div class="meta-value">${textOrDash(song.year)}</div></div>
-                    <div class="meta-item"><div class="meta-label">Duration</div><div class="meta-value">${textOrDash(song.formatted_duration)}</div></div>
-                    <div class="meta-item"><div class="meta-label">BPM</div><div class="meta-value mono">${textOrDash(song.bpm)}</div></div>
-                    <div class="meta-item" style="grid-column: span 2">
-                        <div class="meta-label">Audio Hash</div>
-                        <div class="meta-value mono" style="font-size: 0.72rem; word-break: break-all">${textOrDash(song.audio_hash)}</div>
-                    </div>
+                <div class="meta-item" style="grid-column: span 2">
+                    <div class="meta-label">Audio Hash</div>
+                    <div class="meta-value mono" style="font-size: 0.72rem; word-break: break-all">${textOrDash(song.audio_hash)}</div>
                 </div>
             </div>
 
@@ -419,11 +434,11 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                 <div class="two-column">
                     <div class="surface-box">
                         <div class="mini-label">Library (${dbCredits.length})</div>
-                        ${renderCreditsGroups(dbCredits)}
+                        ${renderCreditsGroups(dbCredits, song.id, allRoles)}
                     </div>
                     <div class="surface-box">
                         <div class="mini-label">File (${fileCredits.length})</div>
-                        ${renderCreditsGroups(fileCredits)}
+                        ${renderCreditsGroups(fileCredits, song.id)}
                     </div>
                 </div>
             </div>

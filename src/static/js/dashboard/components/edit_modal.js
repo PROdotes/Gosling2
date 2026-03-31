@@ -30,6 +30,7 @@ const bodyEl    = document.getElementById("edit-modal-body");
 
 let _config = null;
 let _parentSnapshot = null; // saved state when drilling into a child edit
+let _isSelecting = false;
 
 // ─── Children sub-section state ───────────────────────────────────────────────
 let _childItems = [];
@@ -530,7 +531,7 @@ overlay.addEventListener("click", (e) => {
     if (!overlay.querySelector(".link-modal").contains(e.target)) closeEditModal();
 });
 
-// Escape from anywhere inside the modal closes it (registered once, covers all inputs)
-overlay.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { e.stopPropagation(); closeEditModal(); }
+// Escape from anywhere (even if nothing inside the modal has focus) closes it
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.style.display === "flex") { e.stopPropagation(); closeEditModal(); }
 });

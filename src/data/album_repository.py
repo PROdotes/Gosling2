@@ -105,7 +105,11 @@ class AlbumRepository(BaseRepository):
         return results
 
     def create_album(
-        self, title: str, album_type: str, release_year: int, conn: sqlite3.Connection
+        self,
+        title: str,
+        album_type: Optional[str],
+        release_year: Optional[int],
+        conn: sqlite3.Connection,
     ) -> int:
         """
         Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id. Does NOT commit.
