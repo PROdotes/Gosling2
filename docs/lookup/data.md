@@ -112,14 +112,17 @@ Batch-fetches credits for multiple songs in a single query.
 - Performance optimized for list-views (Search/Folders).
 
 
+### get_all_roles() -> List[str]
+Returns all role names from the Roles table, ordered alphabetically.
+
 ### get_or_create_role(role_name: str, cursor) -> int
 Get-or-create a Role by name. Returns role_id.
 
-### get_or_create_credit_name(display_name: str, cursor) -> int
-Get-or-create an ArtistName by display name. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
+### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None) -> int
+Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
 
-### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> SongCredit
-Add a single credit to a song. Get-or-creates ArtistName and Role. Returns the SongCredit. Does NOT commit.
+### add_credit(source_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None) -> SongCredit
+Add a single credit to a song. Get-or-creates ArtistName and Role. Supports explicit identity_id for Truth-First linking. Returns the SongCredit. Does NOT commit.
 
 ### remove_credit(credit_id: int, conn: sqlite3.Connection) -> None
 Remove a single SongCredits link by CreditID. Keeps ArtistName record. Does NOT commit.

@@ -1259,16 +1259,23 @@ class CatalogService:
         return self._credit_repo.get_all_roles()
 
     def add_song_credit(
-        self, song_id: int, display_name: str, role_name: str
+        self,
+        song_id: int,
+        display_name: str,
+        role_name: str,
+        identity_id: Optional[int] = None,
     ) -> SongCredit:
-        """Add artist credit to a song. Get-or-create artist name and role."""
+        """
+        Add artist credit to a song. Get-or-create artist name and role.
+        Supports explicit identity_id for Truth-First linking.
+        """
         logger.debug(
-            f"[CatalogService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}')"
+            f"[CatalogService] -> add_song_credit(song_id={song_id}, name='{display_name}', role='{role_name}', identity_id={identity_id})"
         )
         conn = self._credit_repo.get_connection()
         try:
             credit = self._credit_repo.add_credit(
-                song_id, display_name, role_name, conn
+                song_id, display_name, role_name, conn, identity_id=identity_id
             )
             conn.commit()
         except Exception as e:

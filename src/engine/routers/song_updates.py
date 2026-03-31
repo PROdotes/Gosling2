@@ -95,7 +95,9 @@ async def add_song_credit(
         f"[SongUpdates] -> add_song_credit(id={song_id}, name='{body.display_name}', role='{body.role_name}')"
     )
     try:
-        credit = service.add_song_credit(song_id, body.display_name, body.role_name)
+        credit = service.add_song_credit(
+            song_id, body.display_name, body.role_name, identity_id=body.identity_id
+        )
         logger.debug(f"[SongUpdates] <- add_song_credit(id={song_id}) OK")
         return credit
     except ValueError as e:
@@ -541,6 +543,9 @@ async def set_publisher_parent(
     try:
         service.set_publisher_parent(publisher_id, body.parent_id)
         logger.debug("[SongUpdates] <- set_publisher_parent OK")
+    except LookupError as e:
+        logger.warning(f"[SongUpdates] <- set_publisher_parent NOT_FOUND: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.error(f"[SongUpdates] <- set_publisher_parent CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))

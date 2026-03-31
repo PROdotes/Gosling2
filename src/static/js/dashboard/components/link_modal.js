@@ -195,7 +195,7 @@ input.addEventListener("input", () => {
 // Escape from anywhere (even if nothing inside the modal has focus) closes it
 document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopPropagation();
+        e.stopImmediatePropagation();
         closeLinkModal();
     }
 });

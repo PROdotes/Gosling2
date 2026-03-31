@@ -1,4 +1,4 @@
-from typing import List, Mapping, Any
+from typing import List, Mapping, Any, Optional
 from src.models.domain import SongCredit
 from src.data.base_repository import BaseRepository
 from src.services.logger import logger
@@ -75,11 +75,40 @@ class SongCreditRepository(BaseRepository):
         cursor.execute("INSERT INTO Roles (RoleName) VALUES (?)", (role_name,))
         return cursor.lastrowid
 
-    def get_or_create_credit_name(self, display_name: str, cursor) -> int:
+    def get_or_create_credit_name(
+        self, display_name: str, cursor, identity_id: Optional[int] = None
+    ) -> int:
         """
-        Get-or-create an ArtistName by display name. Returns name_id.
-        Reactivates soft-deleted records. Creates linked Identity if needed.
+        Get-or-create an ArtistName by display name, with optional explicit identity linking.
+        Returns name_id. Reactivates soft-deleted records.
         """
+        if identity_id:
+            # Identity is explicit — check if this name is already linked to it
+            row = cursor.execute(
+                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ? AND OwnerIdentityID = ? COLLATE UTF8_NOCASE",
+                (display_name, identity_id),
+            ).fetchone()
+            if row:
+                name_id = row[0]
+                if row[1]:  # Reactivate
+                    cursor.execute(
+                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?", (name_id,)
+                    )
+                return name_id
+
+            # Name not linked to this identity — create it
+            # First ensure identity is active
+            cursor.execute(
+                "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
+                (identity_id,),
+            )
+            cursor.execute(
+                "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 0)",
+                (identity_id, display_name),
+            )
+            return cursor.lastrowid
+
+        # No explicit identity — fallback to legacy name-based lookup
         row = cursor.execute(
             "SELECT NameID, IsDeleted, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
             (display_name,),
@@ -128,18 +157,20 @@ class SongCreditRepository(BaseRepository):
         display_name: str,
         role_name: str,
         conn: sqlite3.Connection,
+        identity_id: Optional[int] = None,
     ) -> SongCredit:
         """
         Add a single artist credit to a song. Get-or-creates ArtistName and Role.
+        Supports explicit identity_id for Truth-First linking.
         Returns the new SongCredit. Does NOT commit.
         """
         logger.debug(
-            f"[SongCreditRepository] -> add_credit(source_id={source_id}, name='{display_name}', role='{role_name}')"
+            f"[SongCreditRepository] -> add_credit(source_id={source_id}, name='{display_name}', role='{role_name}', identity_id={identity_id})"
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         role_id = self.get_or_create_role(role_name, cursor)
-        name_id = self.get_or_create_credit_name(display_name, cursor)
+        name_id = self.get_or_create_credit_name(display_name, cursor, identity_id)
         cursor.execute(
             "INSERT OR IGNORE INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
             (source_id, name_id, role_id),

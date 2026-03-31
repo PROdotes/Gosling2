@@ -161,6 +161,18 @@ class TestAddSongCredit:
         conn.close()
         assert count == 1, f"Expected 1 ArtistNames row for 'Dave Grohl', got {count}"
 
+    def test_add_credit_with_identity_id_links_to_identity(self, populated_db):
+        service = CatalogService(populated_db)
+        # Identity 1 is Dave Grohl
+        credit = service.add_song_credit(2, "David Grohl", "Performer", identity_id=1)
+        assert credit.identity_id == 1
+        assert credit.display_name == "David Grohl"
+
+        # Verify through get_song
+        song = service.get_song(2)
+        target = next(c for c in song.credits if c.display_name == "David Grohl")
+        assert target.identity_id == 1, f"Expected link to identity 1, got {target.identity_id}"
+
 
 class TestRemoveSongCredit:
     def test_remove_existing_credit_link_deleted(self, populated_db):

@@ -196,11 +196,13 @@ export function fetchRoles() {
     return fetchJson("/api/v1/roles");
 }
 
-export function addSongCredit(songId, displayName, roleName) {
+export function addSongCredit(songId, displayName, roleName, identityId = null) {
+    const body = { display_name: displayName, role_name: roleName };
+    if (identityId !== null) body.identity_id = identityId;
     return fetchJson(`/api/v1/songs/${songId}/credits`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName, role_name: roleName }),
+        body: JSON.stringify(body),
     });
 }
 

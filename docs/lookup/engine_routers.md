@@ -65,11 +65,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Searches publishers by name.
 - Wraps `CatalogService.search_publishers`.
 
-### async def search_albums(q: str) -> List[AlbumView]
+### async def search_albums(q: str) -> List[AlbumSlimView]
 **HTTP**: `GET /api/v1/albums/search?q={query}`
 - Searches albums by title.
-- Wraps `CatalogService.search_albums`.
-- Maps to `AlbumView` for dashboard rendering.
+- Wraps `CatalogService.search_albums_slim`.
+- Returns `AlbumSlimView` for dashboard rendering.
 
 ### async def get_publisher(publisher_id: int) -> Publisher
 **HTTP**: `GET /api/v1/publishers/{publisher_id}`
@@ -225,6 +225,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Partially updates core metadata (media_name, year, bpm, isrc, notes).
 - Raises `HTTPException(404)` if the song does not exist.
 - Wraps `CatalogService.update_song_scalars`.
+
+### async def get_all_roles(service: CatalogService = Depends(_get_service)) -> List[str]
+**HTTP**: `GET /api/v1/roles`
+- Returns all distinct artist credit roles from the database.
+- Wraps `CatalogService.get_all_roles`.
 
 ### async def add_song_credit(song_id: int, body: AddCreditBody, service: CatalogService = Depends(_get_service)) -> SongCredit
 **HTTP**: `POST /api/v1/songs/{song_id}/credits`

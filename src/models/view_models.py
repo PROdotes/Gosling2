@@ -402,6 +402,7 @@ class SongScalarUpdate(BaseModel):
 class AddCreditBody(BaseModel):
     display_name: str
     role_name: str
+    identity_id: Optional[int] = None
 
 
 class UpdateCreditNameBody(BaseModel):

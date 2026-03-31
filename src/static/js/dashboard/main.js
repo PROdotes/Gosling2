@@ -432,13 +432,29 @@ async function openSelectedResult(index) {
     }
 }
 
+function isModalOpen() {
+    const editModal = document.getElementById("edit-modal");
+    if (editModal && editModal.style.display === "flex") return true;
+    const linkModal = document.getElementById("link-modal");
+    if (linkModal && linkModal.style.display === "flex") return true;
+    return false;
+}
+
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
-    if (!actionTarget) {
+    if (!actionTarget) return;
+
+    // Protocol: Modals are top-level. Block global click actions if any modal is open,
+    // UNLESS the action is actually inside a modal (edit-modal or link-modal)
+    // or is a close-modal action.
+    const { action } = actionTarget.dataset;
+    const isModalComponent = actionTarget.closest(".link-modal");
+    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal";
+
+    if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
     }
 
-    const { action } = actionTarget.dataset;
     if (action === "switch-mode") {
         switchMode(actionTarget.dataset.mode);
         return;
@@ -764,10 +780,14 @@ document.addEventListener("click", async (event) => {
                     return (results || []).map(a => ({ id: a.id, label: a.name }));
                 },
                 onAdd: async (opt) => {
-                    // Logic: Explicitly use the role context provided by the UI button
-                    const credit = await addSongCredit(songId, opt.rawInput || opt.label, role);
+                    // Logic: Use identityId (opt.id) from search results if available (Truth-First pattern)
+                    const identityId = opt.id; 
+                    const credit = await addSongCredit(songId, opt.rawInput || opt.label, role, identityId);
+                    
+                    // Sync the chip with the newly created/linked credit's IDs
                     opt.id = credit.credit_id;
                     opt.label = credit.display_name;
+                    
                     const song = state.cachedSongs.find(s => String(s.id) === String(songId));
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
@@ -972,10 +992,9 @@ document.addEventListener("click", async (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
-    // Escape closes detail panel — but not if a modal is open (modal handles its own Escape)
-    const editModalOpen = document.getElementById("edit-modal")?.style.display === "flex";
-    const linkModalOpen = document.getElementById("link-modal")?.style.display === "flex";
-    const modalOpen = editModalOpen || linkModalOpen;
+    // Protocol: Modals are top-level. Block global keyboard navigation if any modal is open.
+    // (Local Escape handling for detail-panel should only fire if no modal is active)
+    const modalOpen = isModalOpen();
 
     if (event.key === "Escape" && elements.detailPanel.style.display === "flex" && !modalOpen) {
         abortDetailRequest();

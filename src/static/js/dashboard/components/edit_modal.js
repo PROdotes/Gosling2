@@ -533,5 +533,8 @@ overlay.addEventListener("click", (e) => {
 
 // Escape from anywhere (even if nothing inside the modal has focus) closes it
 document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") { e.stopPropagation(); closeEditModal(); }
+    if (e.key === "Escape" && overlay.style.display === "flex") { 
+        e.stopImmediatePropagation(); 
+        closeEditModal(); 
+    }
 });

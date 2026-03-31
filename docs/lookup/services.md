@@ -122,10 +122,6 @@ Pure file discovery utility that scans a folder for audio files.
 - No staging or ingestion - just file system scanning.
 - Uses `ACCEPTED_EXTENSIONS` for filtering.
 
-### search_albums_slim(query: str) -> List[dict]
-Slim list-view album search. Returns raw dicts for `AlbumSlimView` — no tracklist hydration.
-- Pass empty string `""` to get all albums.
-- Accesses `AlbumRepository.search_slim`.
 
 ### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
 Parallel batch ingestion of multiple already-staged files.
@@ -147,8 +143,11 @@ Parallel batch ingestion of multiple already-staged files.
 ### update_song_scalars(song_id: int, fields: dict) -> Song
 Update editable scalar fields (media_name, year, bpm, isrc, is_active). Validates values per spec rules. Returns the fully hydrated Song. Raises ValueError on validation failure, LookupError if not found.
 
-### add_song_credit(song_id: int, display_name: str, role_name: str) -> SongCredit
-Add an artist credit to a song. Get-or-create artist name and role. Returns the created SongCredit.
+### get_all_roles() -> List[str]
+Fetch the list of all available artist credit roles from the database.
+
+### add_song_credit(song_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> SongCredit
+Add an artist credit to a song. Get-or-create artist name and role. Supports explicit identity_id for Truth-First linking. Returns the created SongCredit.
 
 ### remove_song_credit(song_id: int, credit_id: int) -> None
 Remove a credit link from a song by credit_id. Keeps the artist name record.
@@ -180,8 +179,8 @@ Remove a credited artist from an album.
 ### update_album_publisher(album_id: int, publisher_name: str) -> None
 Set or update the publisher for an album. Get-or-create publisher.
 
-### add_song_tag(song_id: int, tag_name: str, category: str) -> Tag
-Add a tag to a song. Get-or-create tag. Returns the Tag object.
+### add_song_tag(song_id: int, tag_name: Optional[str], category: Optional[str], tag_id: Optional[int] = None) -> Tag
+Add a tag to a song. Links by ID if tag_id provided, otherwise get-or-creates by name+category. Returns the Tag object.
 
 ### remove_song_tag(song_id: int, tag_id: int) -> None
 Remove a tag link from a song. Keeps the tag record.
@@ -189,8 +188,8 @@ Remove a tag link from a song. Keeps the tag record.
 ### update_tag(tag_id: int, new_name: str, new_category: str) -> None
 Update tag name/category globally (affects all linked songs).
 
-### add_song_publisher(song_id: int, publisher_name: str) -> Publisher
-Add a publisher link to a song. Get-or-create publisher. Returns the Publisher object.
+### add_song_publisher(song_id: int, publisher_name: Optional[str], publisher_id: Optional[int] = None) -> Publisher
+Add a publisher link to a song. Links by ID if publisher_id provided, otherwise get-or-creates by name. Returns the Publisher object.
 
 ### remove_song_publisher(song_id: int, publisher_id: int) -> None
 Remove a publisher link from a song. Keeps the publisher record.
