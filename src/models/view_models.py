@@ -124,6 +124,7 @@ class SongView(BaseModel):
     publishers: List[Publisher] = []
     tags: List[Tag] = []
     raw_tags: Dict[str, List[str]] = {}
+    organized_path_preview: Optional[str] = None
 
     @classmethod
     def from_domain(cls, song: Song) -> "SongView":

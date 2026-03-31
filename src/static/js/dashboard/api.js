@@ -111,6 +111,14 @@ export function getCatalogSong(id, options = {}) {
     return fetchJson(`/api/v1/songs/${id}`, options);
 }
 
+export function getSongWebSearch(id, engine = null) {
+    let url = `/api/v1/songs/${id}/web-search`;
+    if (engine) {
+        url += `?engine=${encodeURIComponent(engine)}`;
+    }
+    return fetchJson(url);
+}
+
 export async function getSongDetail(id, options = {}) {
     const response = await fetch(`/api/v1/metabolic/inspect-file/${id}`, options);
     if (response.ok) {
@@ -239,6 +247,12 @@ export function patchSongScalars(songId, fields) {
 export function deleteSong(id) {
     return fetchJson(`/api/v1/ingest/songs/${id}`, {
         method: "DELETE",
+    });
+}
+
+export function moveSongToLibrary(id) {
+    return fetchJson(`/api/v1/songs/${id}/move`, {
+        method: "POST",
     });
 }
 

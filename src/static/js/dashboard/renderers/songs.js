@@ -39,6 +39,32 @@ function editableScalarRow(label, field, dbValue, fileValue, songId) {
     `;
 }
 
+function clickableM2MRow(label, dbValue, fileValue, songId, modalType, role = null) {
+    const left = dbValue === null || dbValue === undefined || dbValue === "" ? "-" : String(dbValue);
+    const right = fileValue === null || fileValue === undefined || fileValue === "" ? "-" : String(fileValue);
+    const matches = left.toLowerCase() === right.toLowerCase();
+    const rightClass = matches ? "comparison-match" : "comparison-miss";
+
+    const roleAttr = role ? `data-role="${escapeHtml(role)}"` : "";
+
+    return `
+        <tr>
+            <td>${escapeHtml(label)}</td>
+            <td>
+                <button class="inline-link" 
+                        data-action="open-link-modal" 
+                        data-modal-type="${modalType}" 
+                        data-song-id="${songId}"
+                        ${roleAttr}
+                        title="Add/Link ${escapeHtml(label)}">
+                    ${escapeHtml(left)}
+                </button>
+            </td>
+            <td class="${rightClass}">${escapeHtml(right)}</td>
+        </tr>
+    `;
+}
+
 function renderCreditsGroups(credits, songId, allRoles) {
     const items = asArray(credits);
 
@@ -405,17 +431,31 @@ function renderWorkflowStatus(song) {
         ? `<div class="workflow-blockers">Required: ${blockers.map(b => `<span class="pill">${escapeHtml(b)}</span>`).join("")}</div>`
         : "";
 
-    const buttonHtml = status === 1 && blockers.length === 0
-        ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="mark-reviewed" data-id="${song.id}">Mark as Reviewed</button>`
-        : status === 0
-            ? `<button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`
-            : "";
+    const isInStaging = (song.source_path || "").toLowerCase().includes("staging");
+    let buttonHtml = "";
+    if (status === 1 && blockers.length === 0) {
+        buttonHtml = `<button class="ingest-btn-secondary workflow-approve-btn" data-action="mark-reviewed" data-id="${song.id}">Mark as Reviewed</button>`;
+    } else if (status === 0) {
+        if (isInStaging) {
+            buttonHtml = `
+                <button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>
+                <button class="ingest-btn-primary workflow-approve-btn" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>
+            `;
+        } else {
+            buttonHtml = `<button class="ingest-btn-secondary workflow-approve-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
+        }
+    }
+
+    const previewHtml = (isInStaging && song.organized_path_preview)
+        ? `<div class="target-preview">Target: <span class="mono">${escapeHtml(song.organized_path_preview)}</span></div>`
+        : "";
 
     return `
         <div class="file-status ${css} workflow-status">
             <span class="workflow-status-label">${escapeHtml(label)}</span>
             ${blockerHtml}
             ${buttonHtml}
+            ${previewHtml}
         </div>`;
 }
 
@@ -441,9 +481,17 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                     ${escapeHtml(song.title || song.media_name || "Untitled")} 
                     <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
                 </div>
-                <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
-                    Delete
-                </button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
+                        ▶ Play
+                    </button>
+                    <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
+                        Search
+                    </button>
+                    <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
+                        Delete
+                    </button>
+                </div>
             </div>
             <div class="detail-path">${escapeHtml(song.source_path || "No source path")}</div>
         </div>
@@ -452,7 +500,7 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
             ${renderWorkflowStatus(song)}
 
             <div class="detail-section">
-                <div class="section-title">Core Metadata</div>
+                <div class="section-title">Library Completion</div>
                 <div class="surface-box">
                     <table class="comparison-table">
                         <thead>
@@ -464,14 +512,24 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                         </thead>
                         <tbody>
                             ${editableScalarRow("Title", "media_name", song.media_name, fileData && fileData.media_name, song.id)}
-                            ${compareRow("Artist", song.display_artist, fileData && fileData.display_artist)}
-                            ${compareRow("Composer", song.display_composer, fileData && fileData.display_composer)}
                             ${editableScalarRow("Year", "year", song.year, fileData && fileData.year, song.id)}
-                            ${compareRow("Genre", song.display_genres, fileData && fileData.display_genres)}
-                            ${editableScalarRow("BPM", "bpm", song.bpm, fileData && fileData.bpm, song.id)}
+                            ${clickableM2MRow("Artist", song.display_artist, fileData && fileData.display_artist, song.id, "credits", "Performer")}
+                            ${clickableM2MRow("Composer", song.display_composer, fileData && fileData.display_composer, song.id, "credits", "Composer")}
+                            ${clickableM2MRow("Genre", song.display_genres, fileData && fileData.display_genres, song.id, "tags")}
+                            ${clickableM2MRow("Publisher (Master)", song.display_master_publisher, fileData && fileData.display_master_publisher, song.id, "publishers")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="detail-section">
+                <div class="section-title">Additional Metadata</div>
+                <div class="surface-box">
+                    <table class="comparison-table">
+                        <tbody>
                             ${compareRow("Duration", song.formatted_duration, fileData && fileData.formatted_duration)}
+                            ${editableScalarRow("BPM", "bpm", song.bpm, fileData && fileData.bpm, song.id)}
                             ${editableScalarRow("ISRC", "isrc", song.isrc, fileData && fileData.isrc, song.id)}
-                            ${compareRow("Publisher (Master)", song.display_master_publisher, fileData && fileData.display_master_publisher)}
                         </tbody>
                     </table>
                 </div>

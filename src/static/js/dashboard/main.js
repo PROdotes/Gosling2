@@ -40,9 +40,11 @@ import {
     removeAlbumPublisher,
     addAlbumCredit,
     removeAlbumCredit,
+    moveSongToLibrary,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
+import { openScrubberModal, closeScrubberModal } from "./components/scrubber_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -146,6 +148,22 @@ const ctx = {
         elements.detailPanel.style.display = "none";
         elements.detailPanel.innerHTML = "";
     },
+    showBanner(msg, type = "error") {
+        const banner = document.createElement("div");
+        banner.className = `ui-banner ui-banner-${type}`;
+        banner.textContent = msg;
+        
+        // Find existing banner and remove it
+        const existing = elements.detailPanel.querySelector(".ui-banner");
+        if (existing) existing.remove();
+        
+        elements.detailPanel.prepend(banner);
+        
+        // Auto-remove if success
+        if (type === "success") {
+            setTimeout(() => banner.remove(), 4000);
+        }
+    }
 };
 
 function getActiveList() {
@@ -451,6 +469,8 @@ function isModalOpen() {
     if (editModal && editModal.style.display === "flex") return true;
     const linkModal = document.getElementById("link-modal");
     if (linkModal && linkModal.style.display === "flex") return true;
+    const scrubberModal = document.getElementById("scrubber-modal");
+    if (scrubberModal && scrubberModal.style.display === "flex") return true;
     return false;
 }
 
@@ -819,8 +839,7 @@ document.addEventListener("click", async (event) => {
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = "↓ sync from song";
-            console.error(`Sync failed: ${err.message}`);
-            alert(`Sync failed: ${err.message}`);
+            ctx.showBanner(`Sync failed: ${err.message}`, "error");
         }
         return;
     }
@@ -925,6 +944,33 @@ document.addEventListener("click", async (event) => {
                 children: null,
             }, actionTarget);
         }
+        return;
+    }
+
+    if (action === "open-scrubber") {
+        const { songId, title } = actionTarget.dataset;
+        openScrubberModal(songId, title);
+        return;
+    }
+
+    if (action === "close-scrubber-modal") {
+        closeScrubberModal();
+        return;
+    }
+
+    if (action === "web-search") {
+        const { songId } = actionTarget.dataset;
+        import("./api.js").then(async (m) => {
+            try {
+                // Get the search URL from the backend (Truth-First)
+                const data = await m.getSongWebSearch(songId);
+                if (data && data.url) {
+                    window.open(data.url, "_blank");
+                }
+            } catch (err) {
+                ctx.showBanner(`Search failed: ${err.message}`, "error");
+            }
+        });
         return;
     }
 
@@ -1301,6 +1347,24 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "move-to-library") {
+        const { id } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        const originalText = actionTarget.textContent;
+        actionTarget.textContent = "Organizing...";
+        
+        try {
+            await moveSongToLibrary(id);
+            ctx.showBanner("Organized successfully!", "success");
+            openSongDetail({ id }, { reuseFileData: false });
+        } catch (err) {
+            actionTarget.disabled = false;
+            actionTarget.textContent = originalText;
+            ctx.showBanner(`Organization failed: ${err.message}`, "error");
+        }
+        return;
+    }
+
     if (action === "mark-reviewed" || action === "unreview-song") {
         const { id } = actionTarget.dataset;
         const newStatus = action === "mark-reviewed" ? 0 : 1;
@@ -1308,7 +1372,7 @@ document.addEventListener("click", async (event) => {
             const updatedSong = await patchSongScalars(id, { processing_status: newStatus });
             openSongDetail(updatedSong, { reuseFileData: true });
         } catch (err) {
-            alert(`Failed: ${err.message}`);
+            ctx.showBanner(`Failed to update status: ${err.message}`, "error");
         }
         return;
     }
@@ -1345,8 +1409,7 @@ document.addEventListener("click", async (event) => {
                 actionTarget.disabled = false;
                 actionTarget.classList.remove("confirming");
                 actionTarget.textContent = "Delete";
-                console.error(`Deletion failed: ${err.message}`);
-                alert(`Deletion failed: ${err.message}`);
+                ctx.showBanner(`Deletion failed: ${err.message}`, "error");
             }
         });
     }
@@ -1356,6 +1419,14 @@ document.addEventListener("keydown", (event) => {
     // Protocol: Modals are top-level. Block global keyboard navigation if any modal is open.
     // (Local Escape handling for detail-panel should only fire if no modal is active)
     const modalOpen = isModalOpen();
+
+    if (event.key === "Escape" && modalOpen) {
+        const scrubberModal = document.getElementById("scrubber-modal");
+        if (scrubberModal && scrubberModal.style.display === "flex") {
+            closeScrubberModal();
+        }
+        return;
+    }
 
     if (event.key === "Escape" && elements.detailPanel.style.display === "flex" && !modalOpen) {
         abortDetailRequest();

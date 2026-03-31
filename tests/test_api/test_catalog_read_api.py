@@ -245,3 +245,30 @@ class TestGetPublisherById:
         # `:int` path constraint causes FastAPI to return 405 (no matching route) for non-int IDs
         resp = api.get("/api/v1/publishers/not_an_int")
         assert resp.status_code == 405, f"Expected 405, got {resp.status_code}"
+
+
+# ---------------------------------------------------------------------------
+# Songs  GET /api/v1/songs/{id}/web-search
+# ---------------------------------------------------------------------------
+
+
+class TestGetSongWebSearch:
+    def test_returns_spotify_url_by_default(self, api):
+        # Using a song ID from populated_db (e.g. 1)
+        resp = api.get("/api/v1/songs/1/web-search")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "url" in data
+        assert "spotify.com/search/" in data["url"]
+
+    def test_returns_google_url_when_requested(self, api):
+        resp = api.get("/api/v1/songs/1/web-search?engine=google")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "url" in data
+        assert "google.com/search?q=" in data["url"]
+        assert "metadata" in data["url"]
+
+    def test_nonexistent_song_returns_404(self, api):
+        resp = api.get("/api/v1/songs/9999/web-search")
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"

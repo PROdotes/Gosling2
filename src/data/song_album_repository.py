@@ -71,9 +71,12 @@ class SongAlbumRepository(BaseRepository):
             album_id, was_deleted = self._find_matching_album(cursor, album)
 
             if album_id is None:
+                from src.engine.config import ALBUM_DEFAULT_TYPE
+
+                album_type = album.album_type or ALBUM_DEFAULT_TYPE
                 cursor.execute(
                     "INSERT INTO Albums (AlbumTitle, AlbumType, ReleaseYear) VALUES (?, ?, ?)",
-                    (album.album_title, album.album_type, album.release_year),
+                    (album.album_title, album_type, album.release_year),
                 )
                 album_id = cursor.lastrowid
                 assert isinstance(

@@ -1,4 +1,4 @@
-﻿{
+{
     "routing_rules": [
         {
             "match_genres": [
@@ -57,6 +57,5 @@
             ],
             "target_path": "Cro {genre}/{year}/{artist} - {title}"
         }
-    ],
-    "default_rule": "{genre}/{year}/{artist} - {title}"
+    ]
 }

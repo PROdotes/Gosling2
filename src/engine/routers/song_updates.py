@@ -580,3 +580,29 @@ async def set_publisher_parent(
     except Exception as e:
         logger.error(f"[SongUpdates] <- set_publisher_parent CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Filing ---
+
+
+@router.post("/songs/{song_id}/move")
+async def move_song_to_library(
+    song_id: int, service: CatalogService = Depends(_get_service)
+):
+    """Triggers the physical file move to the organized library root."""
+    logger.debug(f"[SongUpdates] -> move_song_to_library(id={song_id})")
+    try:
+        relative_path = service.move_song_to_library(song_id)
+        logger.debug(f"[SongUpdates] <- move_song_to_library(id={song_id}) OK")
+        return {"relative_path": relative_path}
+    except LookupError:
+        logger.warning(f"[SongUpdates] <- move_song_to_library NOT_FOUND id={song_id}")
+        raise HTTPException(status_code=404, detail=f"Song {song_id} not found")
+    except FileNotFoundError as e:
+        logger.warning(
+            f"[SongUpdates] <- move_song_to_library FILE_NOT_FOUND id={song_id}: {e}"
+        )
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- move_song_to_library CRITICAL id={song_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

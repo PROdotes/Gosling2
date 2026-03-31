@@ -12,6 +12,7 @@ from src.engine.routers.metabolic import router as metabolic_router
 from src.engine.routers.audit import router as audit_router
 from src.engine.routers.ingest import router as ingest_router
 from src.engine.routers.song_updates import router as song_updates_router
+from src.engine.routers.audio import router as audio_router
 from src.services.logger import logger
 from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
@@ -76,6 +77,7 @@ app.include_router(metabolic_router)
 app.include_router(audit_router)
 app.include_router(ingest_router)
 app.include_router(song_updates_router)
+app.include_router(audio_router)
 app.mount(
     "/static",
     StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),

@@ -25,7 +25,6 @@ import pytest  # noqa: E402
 from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
 from src.services.audit_service import AuditService  # noqa: E402
-from src.engine.config import STAGING_DIR  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -516,14 +515,20 @@ def test_audio_file():
 
 
 @pytest.fixture(autouse=True)
-def cleanup_staging_dir():
+def cleanup_staging_dir(tmp_path, monkeypatch):
     """
-    Auto-cleanup fixture that runs after every test.
-    Removes all files from STAGING_DIR to prevent test pollution.
+    Redirects STAGING_DIR to a per-test tmp directory so tests never
+    touch the real staging folder on disk.
     """
-    yield  # Let the test run first
+    test_staging = tmp_path / "staging"
+    test_staging.mkdir(parents=True, exist_ok=True)
 
-    # Cleanup after test
-    if STAGING_DIR.exists():
-        shutil.rmtree(STAGING_DIR)
-    STAGING_DIR.mkdir(parents=True, exist_ok=True)
+    import src.engine.config as config_mod
+    import src.engine.routers.ingest as ingest_mod
+    import src.services.catalog_service as catalog_service_mod
+
+    monkeypatch.setattr(config_mod, "STAGING_DIR", test_staging)
+    monkeypatch.setattr(ingest_mod, "STAGING_DIR", test_staging)
+    monkeypatch.setattr(catalog_service_mod, "STAGING_DIR", test_staging)
+
+    yield

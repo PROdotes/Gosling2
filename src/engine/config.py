@@ -50,8 +50,9 @@ SCALAR_VALIDATION = {
 # Song Approval Pipeline
 AUTO_MOVE_ON_APPROVE = os.getenv("GOSLING_AUTO_MOVE_ON_APPROVE") == "true"
 PROMPT_BEFORE_MOVE = os.getenv("GOSLING_PROMPT_BEFORE_MOVE") == "true"
+DEFAULT_SEARCH_ENGINE = os.getenv("GOSLING_DEFAULT_SEARCH_ENGINE", "spotify")
 RENAME_RULES_PATH = Path(
-    os.getenv("GOSLING_RENAME_RULES_PATH", "config/rename_rules.json")
+    os.getenv("GOSLING_RENAME_RULES_PATH", "json/rules.json")
 )
 
 # CORS Configuration (Audit #4)
