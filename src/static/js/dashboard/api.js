@@ -23,6 +23,22 @@ async function fetchJson(url, options = {}) {
     return response.json();
 }
 
+async function fetchVoid(url, options = {}) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        let errorMsg = `Request failed: ${response.status}`;
+        try {
+            const errorData = await response.json();
+            if (errorData && errorData.detail) {
+                errorMsg = errorData.detail;
+            }
+        } catch (e) {
+            // No JSON body
+        }
+        throw new Error(errorMsg);
+    }
+}
+
 export async function fetchValidationRules() {
     return fetchJson("/api/v1/validation-rules");
 }
@@ -178,18 +194,10 @@ export function addSongPublisher(songId, publisherName, publisherId = null) {
     });
 }
 
-export async function removeSongPublisher(songId, publisherId) {
-    const response = await fetch(`/api/v1/songs/${songId}/publishers/${publisherId}`, {
+export function removeSongPublisher(songId, publisherId) {
+    return fetchVoid(`/api/v1/songs/${songId}/publishers/${publisherId}`, {
         method: "DELETE",
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
 export function fetchRoles() {
@@ -206,34 +214,18 @@ export function addSongCredit(songId, displayName, roleName, identityId = null) 
     });
 }
 
-export async function removeSongCredit(songId, creditId) {
-    const response = await fetch(`/api/v1/songs/${songId}/credits/${creditId}`, {
+export function removeSongCredit(songId, creditId) {
+    return fetchVoid(`/api/v1/songs/${songId}/credits/${creditId}`, {
         method: "DELETE",
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
-export async function updateCreditName(songId, nameId, displayName) {
-    const response = await fetch(`/api/v1/songs/${songId}/credits/${nameId}`, {
+export function updateCreditName(songId, nameId, displayName) {
+    return fetchVoid(`/api/v1/songs/${songId}/credits/${nameId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ display_name: displayName }),
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
 export function patchSongScalars(songId, fields) {
@@ -251,36 +243,20 @@ export function deleteSong(id) {
 }
 
 
-export async function setPublisherParent(publisherId, parentId) {
-    const response = await fetch(`/api/v1/publishers/${publisherId}/parent`, {
+export function setPublisherParent(publisherId, parentId) {
+    return fetchVoid(`/api/v1/publishers/${publisherId}/parent`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ parent_id: parentId }),
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
-export async function updatePublisher(publisherId, name) {
-    const response = await fetch(`/api/v1/publishers/${publisherId}`, {
+export function updatePublisher(publisherId, name) {
+    return fetchVoid(`/api/v1/publishers/${publisherId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ publisher_name: name }),
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
 export function searchTags(query = "") {
@@ -302,20 +278,12 @@ export function getTagCategories() {
     return fetchJson("/api/v1/tags/categories");
 }
 
-export async function updateTag(tagId, name, category) {
-    const response = await fetch(`/api/v1/tags/${tagId}`, {
+export function updateTag(tagId, name, category) {
+    return fetchVoid(`/api/v1/tags/${tagId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tag_name: name, category: category }),
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
 export function addSongTag(songId, tagName, category, tagId = null) {
@@ -327,18 +295,10 @@ export function addSongTag(songId, tagName, category, tagId = null) {
     });
 }
 
-export async function removeSongTag(songId, tagId) {
-    const response = await fetch(`/api/v1/songs/${songId}/tags/${tagId}`, {
+export function removeSongTag(songId, tagId) {
+    return fetchVoid(`/api/v1/songs/${songId}/tags/${tagId}`, {
         method: "DELETE",
     });
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        try {
-            const data = await response.json();
-            if (data && data.detail) errorMsg = data.detail;
-        } catch (e) { /* no body */ }
-        throw new Error(errorMsg);
-    }
 }
 
 export async function fetchId3Frames() {
