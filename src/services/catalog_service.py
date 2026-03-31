@@ -1,3 +1,4 @@
+# TODO: Split this class into IngestionService, QueryService, EditService — it's 1594 lines
 import os
 import re
 import sqlite3
