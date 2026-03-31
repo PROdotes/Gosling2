@@ -301,6 +301,68 @@ export function removeSongTag(songId, tagId) {
     });
 }
 
+export function addSongAlbum(songId, albumId, title, trackNumber, discNumber) {
+    const body = albumId !== null ? { album_id: albumId } : { title };
+    if (trackNumber !== null) body.track_number = trackNumber;
+    if (discNumber !== null) body.disc_number = discNumber;
+    return fetchJson(`/api/v1/songs/${songId}/albums`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+}
+
+export function removeSongAlbum(songId, albumId) {
+    return fetchVoid(`/api/v1/songs/${songId}/albums/${albumId}`, {
+        method: "DELETE",
+    });
+}
+
+export function updateSongAlbumLink(songId, albumId, trackNumber, discNumber) {
+    return fetchVoid(`/api/v1/songs/${songId}/albums/${albumId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ track_number: trackNumber, disc_number: discNumber }),
+    });
+}
+
+export function updateAlbum(albumId, fields) {
+    return fetchJson(`/api/v1/albums/${albumId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+    });
+}
+
+export function addAlbumCredit(albumId, displayName, roleName) {
+    return fetchVoid(`/api/v1/albums/${albumId}/credits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: displayName, role_name: roleName }),
+    });
+}
+
+export function removeAlbumCredit(albumId, nameId) {
+    return fetchVoid(`/api/v1/albums/${albumId}/credits/${nameId}`, {
+        method: "DELETE",
+    });
+}
+
+export function addAlbumPublisher(albumId, publisherName, publisherId = null) {
+    const body = publisherId !== null ? { publisher_id: publisherId } : { publisher_name: publisherName };
+    return fetchJson(`/api/v1/albums/${albumId}/publishers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+    });
+}
+
+export function removeAlbumPublisher(albumId, publisherId) {
+    return fetchVoid(`/api/v1/albums/${albumId}/publishers/${publisherId}`, {
+        method: "DELETE",
+    });
+}
+
 export async function fetchId3Frames() {
     const resp = await fetch("/api/v1/metabolic/id3-frames");
     if (!resp.ok) throw new Error("Failed to fetch ID3 frame mapping");

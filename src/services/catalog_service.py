@@ -1492,25 +1492,57 @@ class CatalogService:
             conn.close()
         logger.debug("[CatalogService] <- remove_album_credit OK")
 
-    def update_album_publisher(self, album_id: int, publisher_name: str) -> None:
-        """Set or update the publisher for an album. Get-or-create publisher."""
+    def add_album_publisher(
+        self,
+        album_id: int,
+        publisher_name: Optional[str],
+        publisher_id: Optional[int] = None,
+    ) -> Publisher:
+        """Add a publisher link to an album. Links by ID if publisher_id provided, otherwise get-or-creates by name."""
+        if publisher_id is not None:
+            existing = self._pub_repo.get_by_id(publisher_id)
+            if not existing:
+                raise LookupError(f"Publisher {publisher_id} not found")
+            publisher_name = existing.name
+        else:
+            if not publisher_name:
+                raise ValueError(
+                    "publisher_name is required when publisher_id is not provided"
+                )
+            publisher_name = publisher_name.strip()
+
         logger.debug(
-            f"[CatalogService] -> update_album_publisher(album_id={album_id}, publisher='{publisher_name}')"
+            f"[CatalogService] -> add_album_publisher(album_id={album_id}, publisher='{publisher_name}')"
         )
-        conn = self._album_repo_dir.get_connection()
+        conn = self._pub_repo.get_connection()
         try:
-            publisher_id = self._pub_repo.get_or_create_publisher(
-                publisher_name, conn.cursor()
-            )
-            self._album_repo_dir.set_album_publisher(album_id, publisher_id, conn)
+            publisher = self._pub_repo.add_album_publisher(album_id, publisher_name, conn)
             conn.commit()
         except Exception as e:
             conn.rollback()
-            logger.error(f"[CatalogService] <- update_album_publisher FAILED: {e}")
+            logger.error(f"[CatalogService] <- add_album_publisher FAILED: {e}")
             raise
         finally:
             conn.close()
-        logger.debug("[CatalogService] <- update_album_publisher OK")
+        logger.debug(f"[CatalogService] <- add_album_publisher OK pub_id={publisher.id}")
+        return publisher
+
+    def remove_album_publisher(self, album_id: int, publisher_id: int) -> None:
+        """Remove a publisher link from an album. Keeps the publisher record."""
+        logger.debug(
+            f"[CatalogService] -> remove_album_publisher(album_id={album_id}, pub_id={publisher_id})"
+        )
+        conn = self._pub_repo.get_connection()
+        try:
+            self._pub_repo.remove_album_publisher(album_id, publisher_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- remove_album_publisher FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        logger.debug("[CatalogService] <- remove_album_publisher OK")
 
     # --- Tags ---
 

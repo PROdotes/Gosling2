@@ -12,7 +12,6 @@ from src.models.view_models import (
     UpdateAlbumLinkBody,
     UpdateAlbumBody,
     AddAlbumCreditBody,
-    SetAlbumPublisherBody,
     AddTagBody,
     UpdateTagBody,
     AddPublisherBody,
@@ -353,21 +352,40 @@ async def remove_album_credit(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.patch("/albums/{album_id}/publisher", status_code=204)
-async def set_album_publisher(
+@router.post("/albums/{album_id}/publishers", response_model=Publisher)
+async def add_album_publisher(
     album_id: int,
-    body: SetAlbumPublisherBody,
+    body: AddPublisherBody,
     service: CatalogService = Depends(_get_service),
 ):
     _require_album(album_id, service)
     logger.debug(
-        f"[SongUpdates] -> set_album_publisher(id={album_id}, pub='{body.publisher_name}')"
+        f"[SongUpdates] -> add_album_publisher(id={album_id}, pub='{body.publisher_name}')"
     )
     try:
-        service.update_album_publisher(album_id, body.publisher_name)
-        logger.debug("[SongUpdates] <- set_album_publisher OK")
+        publisher = service.add_album_publisher(album_id, body.publisher_name, body.publisher_id)
+        logger.debug(f"[SongUpdates] <- add_album_publisher OK id={publisher.id}")
+        return publisher
     except Exception as e:
-        logger.error(f"[SongUpdates] <- set_album_publisher CRITICAL: {e}")
+        logger.error(f"[SongUpdates] <- add_album_publisher CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/albums/{album_id}/publishers/{publisher_id}", status_code=204)
+async def remove_album_publisher(
+    album_id: int,
+    publisher_id: int,
+    service: CatalogService = Depends(_get_service),
+):
+    _require_album(album_id, service)
+    logger.debug(
+        f"[SongUpdates] -> remove_album_publisher(id={album_id}, pub_id={publisher_id})"
+    )
+    try:
+        service.remove_album_publisher(album_id, publisher_id)
+        logger.debug("[SongUpdates] <- remove_album_publisher OK")
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- remove_album_publisher CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

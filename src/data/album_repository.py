@@ -165,22 +165,6 @@ class AlbumRepository(BaseRepository):
         )
         logger.debug("[AlbumRepository] <- update_album() done")
 
-    def set_album_publisher(
-        self, album_id: int, publisher_id: int, conn: sqlite3.Connection
-    ) -> None:
-        """
-        Set the publisher for an album (replaces existing). Does NOT commit.
-        """
-        logger.debug(
-            f"[AlbumRepository] -> set_album_publisher(album_id={album_id}, publisher_id={publisher_id})"
-        )
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
-        cursor.execute(
-            "INSERT INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
-            (album_id, publisher_id),
-        )
-        logger.debug("[AlbumRepository] <- set_album_publisher() done")
 
     def _row_to_album(self, row: Mapping[str, Any]) -> Album:
         return Album(

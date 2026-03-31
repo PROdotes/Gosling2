@@ -331,6 +331,46 @@ class PublisherRepository(BaseRepository):
         )
         logger.debug("[PublisherRepository] <- remove_song_publisher() done")
 
+    def add_album_publisher(
+        self, album_id: int, name: str, conn: sqlite3.Connection
+    ) -> Publisher:
+        """
+        Add a publisher link to an album. Get-or-creates the Publisher record.
+        Returns the Publisher. Does NOT commit.
+        """
+        logger.debug(
+            f"[PublisherRepository] -> add_album_publisher(album_id={album_id}, name='{name}')"
+        )
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        pub_id = self.get_or_create_publisher(name, cursor)
+        cursor.execute(
+            "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
+            (album_id, pub_id),
+        )
+        row = cursor.execute(
+            "SELECT PublisherID, PublisherName, ParentPublisherID FROM Publishers WHERE PublisherID = ?",
+            (pub_id,),
+        ).fetchone()
+        logger.debug(f"[PublisherRepository] <- add_album_publisher() pub_id={pub_id}")
+        return self._row_to_publisher(row)
+
+    def remove_album_publisher(
+        self, album_id: int, publisher_id: int, conn: sqlite3.Connection
+    ) -> None:
+        """
+        Remove a publisher link from an album. Keeps Publisher record.
+        Does NOT commit.
+        """
+        logger.debug(
+            f"[PublisherRepository] -> remove_album_publisher(album_id={album_id}, publisher_id={publisher_id})"
+        )
+        conn.cursor().execute(
+            "DELETE FROM AlbumPublishers WHERE AlbumID = ? AND PublisherID = ?",
+            (album_id, publisher_id),
+        )
+        logger.debug("[PublisherRepository] <- remove_album_publisher() done")
+
     def update_publisher(
         self, publisher_id: int, name: str, conn: sqlite3.Connection
     ) -> None:

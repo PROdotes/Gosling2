@@ -433,9 +433,6 @@ class AddAlbumCreditBody(BaseModel):
     artist_name: str
 
 
-class SetAlbumPublisherBody(BaseModel):
-    publisher_name: str
-
 
 class AddTagBody(BaseModel):
     tag_name: Optional[str] = None

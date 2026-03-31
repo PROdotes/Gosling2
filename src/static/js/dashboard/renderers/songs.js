@@ -97,7 +97,9 @@ function renderCreditsGroups(credits, songId, allRoles) {
         .join("");
 }
 
-function renderAlbumCards(albums) {
+const ALBUM_TYPES = ["Album", "EP", "Single", "Compilation", "Anthology"];
+
+function renderAlbumCards(albums, songId) {
     const items = asArray(albums);
     if (!items.length) {
         return '<div class="muted-note">No albums linked</div>';
@@ -108,15 +110,40 @@ function renderAlbumCards(albums) {
         const albumArtistNames = asArray(album.credits)
             .map((credit) => credit.display_name || credit.name)
             .filter(Boolean);
+        const albumId = album.album_id || album.id;
+        const isEditable = !!songId;
+
+        const typeOptions = ALBUM_TYPES.map((t) =>
+            `<option value="${t}" ${album.album_type === t ? "selected" : ""}>${t}</option>`
+        ).join("");
 
         return `
             <div class="album-card-detail">
-                <div class="card-title"><button class="inline-link" ${buildNavigateAttrs("albums", title)}>${escapeHtml(title)}</button></div>
+                <div class="card-title-row">
+                    ${isEditable
+                        ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>`
+                        : `<button class="inline-link" ${buildNavigateAttrs("albums", title)}>${escapeHtml(title)}</button>`
+                    }
+                    ${isEditable ? `<button class="chip-remove-btn" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Remove album">✕</button>` : ""}
+                </div>
                 <div class="card-meta">
-                    ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : ""}
-                    ${album.release_year ? `<span class="pill mono">${escapeHtml(album.release_year)}</span>` : ""}
+                    ${isEditable
+                        ? `<select class="album-type-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>`
+                        : (album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : "")
+                    }
+                    ${isEditable
+                        ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>`
+                        : (album.release_year ? `<span class="pill mono">${escapeHtml(album.release_year)}</span>` : "")
+                    }
                     ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
                 </div>
+                ${isEditable ? `
+                <div class="card-track-info">
+                    <span class="mini-label">Track:</span>
+                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
+                    <span class="mini-label">Disc:</span>
+                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
+                </div>` : ""}
                 ${albumArtistNames.length ? `<div class="card-subtitle">Album Artist: ${albumArtistNames.map((name) => `<button class="inline-link" ${buildNavigateAttrs("artists", name)}>${escapeHtml(name)}</button>`).join(", ")}</div>` : ""}
             </div>
         `;
@@ -448,7 +475,8 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                 <div class="two-column">
                     <div class="surface-box">
                         <div class="mini-label">Library (${dbAlbums.length})</div>
-                        <div class="stack-list">${renderAlbumCards(dbAlbums)}</div>
+                        <div class="stack-list">${renderAlbumCards(dbAlbums, song.id)}</div>
+                        <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}">+ Add</button>
                     </div>
                     <div class="surface-box">
                         <div class="mini-label">File (${fileAlbums.length})</div>

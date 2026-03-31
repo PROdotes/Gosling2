@@ -32,6 +32,10 @@ import {
     removeSongCredit,
     updateCreditName,
     fetchRoles,
+    addSongAlbum,
+    removeSongAlbum,
+    updateAlbum,
+    updateSongAlbumLink,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
@@ -567,6 +571,176 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "remove-album") {
+        const { songId, albumId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await removeSongAlbum(songId, albumId);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Remove album failed: ${err.message}`);
+        }
+        return;
+    }
+
+    if (action === "start-edit-album-scalar") {
+        const span = actionTarget;
+        const { albumId, songId, field } = span.dataset;
+        const currentValue = span.textContent === "-" ? "" : span.textContent;
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = currentValue;
+        input.className = "inline-edit-input";
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "inline-edit-error";
+
+        span.replaceWith(input);
+        input.after(errorEl);
+        input.focus();
+        input.select();
+
+        async function commitAlbumScalar() {
+            const rawValue = input.value.trim();
+            errorEl.textContent = "";
+            input.classList.remove("inline-edit-input--error");
+
+            if (rawValue === currentValue) {
+                input.replaceWith(span);
+                errorEl.remove();
+                return;
+            }
+
+            let payload;
+            if (field === "release_year") {
+                if (rawValue === "") {
+                    payload = null;
+                } else {
+                    const n = Number(rawValue);
+                    const year = new Date().getFullYear();
+                    if (!Number.isInteger(n) || n < 1860 || n > year + 1) {
+                        input.classList.add("inline-edit-input--error");
+                        errorEl.textContent = `Year must be between 1860–${year + 1}`;
+                        input.focus();
+                        return;
+                    }
+                    payload = n;
+                }
+            } else {
+                payload = rawValue === "" ? null : rawValue;
+                if (field === "title" && !payload) {
+                    input.classList.add("inline-edit-input--error");
+                    errorEl.textContent = "Title cannot be empty";
+                    input.focus();
+                    return;
+                }
+            }
+
+            input.disabled = true;
+            try {
+                await updateAlbum(albumId, { [field]: payload });
+                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                if (song) openSongDetail(song, { reuseFileData: true });
+            } catch (err) {
+                input.disabled = false;
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = `Save failed: ${err.message}`;
+                input.focus();
+            }
+        }
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); commitAlbumScalar(); }
+            if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
+        });
+        input.addEventListener("blur", () => { setTimeout(() => { if (document.contains(input)) commitAlbumScalar(); }, 100); });
+        return;
+    }
+
+    if (action === "start-edit-album-link") {
+        const span = actionTarget;
+        const { albumId, songId, field } = span.dataset;
+        const currentValue = span.textContent === "-" ? "" : span.textContent;
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = currentValue;
+        input.className = "inline-edit-input";
+        input.style.width = "3rem";
+
+        const errorEl = document.createElement("div");
+        errorEl.className = "inline-edit-error";
+
+        span.replaceWith(input);
+        input.after(errorEl);
+        input.focus();
+        input.select();
+
+        async function commitAlbumLink() {
+            const rawValue = input.value.trim();
+            errorEl.textContent = "";
+            input.classList.remove("inline-edit-input--error");
+
+            if (rawValue === currentValue) {
+                input.replaceWith(span);
+                errorEl.remove();
+                return;
+            }
+
+            const n = rawValue === "" ? null : Number(rawValue);
+            if (n !== null && (!Number.isInteger(n) || n < 1)) {
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = "Must be a positive integer";
+                input.focus();
+                return;
+            }
+
+            // Read the sibling field value from the DOM to build the full patch
+            const card = input.closest(".album-card-detail");
+            const otherField = field === "track_number" ? "disc_number" : "track_number";
+            const otherSpan = card?.querySelector(`[data-field="${otherField}"]`);
+            const otherVal = otherSpan ? (otherSpan.textContent === "-" ? null : Number(otherSpan.textContent)) : null;
+
+            const track = field === "track_number" ? n : otherVal;
+            const disc = field === "disc_number" ? n : otherVal;
+
+            input.disabled = true;
+            try {
+                await updateSongAlbumLink(songId, albumId, track, disc);
+                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                if (song) openSongDetail(song, { reuseFileData: true });
+            } catch (err) {
+                input.disabled = false;
+                input.classList.add("inline-edit-input--error");
+                errorEl.textContent = `Save failed: ${err.message}`;
+                input.focus();
+            }
+        }
+
+        input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") { e.preventDefault(); commitAlbumLink(); }
+            if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
+        });
+        input.addEventListener("blur", () => { setTimeout(() => { if (document.contains(input)) commitAlbumLink(); }, 100); });
+        return;
+    }
+
+    if (action === "change-album-type") {
+        const { albumId, songId } = actionTarget.dataset;
+        const newType = actionTarget.value;
+        try {
+            await updateAlbum(albumId, { album_type: newType });
+        } catch (err) {
+            console.error(`Update album type failed: ${err.message}`);
+            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        }
+        return;
+    }
+
     if (action === "close-edit-modal") {
         closeEditModal();
         return;
@@ -777,7 +951,7 @@ document.addEventListener("click", async (event) => {
                 onSearch: async (q) => {
                     const results = await searchArtists(q);
                     if (results === ABORTED) return [];
-                    return (results || []).map(a => ({ id: a.id, label: a.name }));
+                    return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
                 },
                 onAdd: async (opt) => {
                     // Logic: Use identityId (opt.id) from search results if available (Truth-First pattern)
@@ -797,6 +971,33 @@ document.addEventListener("click", async (event) => {
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
                 createLabel: (q) => `Add "${q}" as ${role}`,
+            });
+        } else if (modalType === "album") {
+            const { songId } = actionTarget.dataset;
+            const currentCards = Array.from(
+                actionTarget.closest(".surface-box")?.querySelectorAll("[data-action='remove-album']") || []
+            ).map(btn => ({ id: btn.dataset.albumId, label: btn.closest(".album-card-detail")?.querySelector(".editable-scalar")?.textContent?.trim() ?? "" }));
+
+            openLinkModal({
+                title: "Link Album",
+                placeholder: "Search for album...",
+                items: currentCards,
+                onSearch: async (q) => {
+                    const results = await searchAlbums(q);
+                    if (results === ABORTED) return [];
+                    return (results || []).map(a => ({ id: a.id, label: a.album_title || a.title }));
+                },
+                onAdd: async (opt) => {
+                    await addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                onRemove: async (item) => {
+                    await removeSongAlbum(songId, item.id);
+                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                },
+                createLabel: (q) => `Add "${q}" as new album`,
             });
         }
         return;
