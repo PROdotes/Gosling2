@@ -76,6 +76,7 @@ async def get_song(song_id: int) -> SongView:
             logger.debug(
                 f"[CatalogRouter] Routing preview skipped for song {song_id}: {e}"
             )
+            view.organized_path_preview = f"[Routing error] {e}"
 
     return view
 
@@ -164,15 +165,15 @@ async def get_publisher(publisher_id: int) -> PublisherView:
 
 
 @router.get("/publishers/{publisher_id:int}/songs", response_model=List[SongView])
-async def get_publisher_songs(publisher_id: int) -> List[SongView]:
+async def get_songs_by_publisher(publisher_id: int) -> List[SongView]:
     """Fetch the full repertoire associated with a given publisher."""
-    logger.debug(f"[CatalogRouter] get_publisher_songs(id={publisher_id})")
+    logger.debug(f"[CatalogRouter] get_songs_by_publisher(id={publisher_id})")
     # Verify existence
     pub = _get_service().get_publisher(publisher_id)
     if not pub:
         raise HTTPException(status_code=404, detail="Publisher not found")
 
-    songs = _get_service().get_publisher_songs(publisher_id)
+    songs = _get_service().get_songs_by_publisher(publisher_id)
     return [SongView.from_domain(s) for s in songs]
 
 
@@ -242,15 +243,15 @@ async def get_tag(tag_id: int) -> TagView:
 
 
 @router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
-async def get_tag_songs(tag_id: int) -> List[SongView]:
+async def get_songs_by_tag(tag_id: int) -> List[SongView]:
     """Fetch all complete songs linked to this tag."""
-    logger.debug(f"[CatalogRouter] get_tag_songs(id={tag_id})")
+    logger.debug(f"[CatalogRouter] get_songs_by_tag(id={tag_id})")
     # Verify existence
     tag = _get_service().get_tag(tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    songs = _get_service().get_tag_songs(tag_id)
+    songs = _get_service().get_songs_by_tag(tag_id)
     return [SongView.from_domain(s) for s in songs]
 
 

@@ -108,19 +108,21 @@ class TestCatalogServiceIngestFile:
 
     def test_ingest_new_song_defaults_to_single_album_type(self, ingest_db, test_mp3):
         service = CatalogService(ingest_db)
-        
+
         # 1. Ingest
         report = service.ingest_file(test_mp3)
         assert report["status"] == "INGESTED"
         song = report["song"]
-        
+
         # 2. Verify Album Type is 'Single' (from config default)
         # Ingested song in report is from parser (relaxed), so we fetch from DB to see persistence
         db_song = service.get_song(song.id)
         assert db_song is not None
         assert len(db_song.albums) == 1
         album = db_song.albums[0]
-        assert album.album_type == "Single", f"Expected default 'Single', got {album.album_type}"
+        assert (
+            album.album_type == "Single"
+        ), f"Expected default 'Single', got {album.album_type}"
 
     def test_ingest_path_collision_returns_already_exists(self, populated_db, tmp_path):
         service = CatalogService(populated_db)

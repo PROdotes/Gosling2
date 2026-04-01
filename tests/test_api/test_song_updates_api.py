@@ -447,7 +447,9 @@ class TestAlbumUpdates:
         # Album 200 (The Colour and the Shape) has Roswell Records (4).
         # It DOES NOT have DGC Records (10).
         resp = api.delete("/api/v1/albums/200/publishers/10")
-        assert resp.status_code == 404, f"Expected 404 on missing link, got {resp.status_code}"
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 on missing link, got {resp.status_code}"
         assert "not found on album 200" in resp.json()["detail"]
 
 
@@ -554,7 +556,9 @@ class TestSongTags:
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
         assert data["name"] == "Grunge", f"Expected name='Grunge', got {data['name']}"
-        assert data["category"] == "Genre", f"Expected category='Genre', got {data['category']}"
+        assert (
+            data["category"] == "Genre"
+        ), f"Expected category='Genre', got {data['category']}"
 
     def test_add_tag_by_id_not_found_returns_500(self, api):
         resp = api.post("/api/v1/songs/2/tags", json={"tag_id": 9999})

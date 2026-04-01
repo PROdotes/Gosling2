@@ -81,10 +81,10 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Wraps `CatalogService.get_album`.
 - Maps to `AlbumView` for dashboard rendering.
 
-### async def get_publisher_songs(publisher_id: int) -> List[SongView]
+### async def get_songs_by_publisher(publisher_id: int) -> List[SongView]
 **HTTP**: `GET /api/v1/publishers/{publisher_id}/songs`
 - Fetches the full repertoire (Master rights) for a given publisher.
-- Wraps `CatalogService.get_publisher_songs`.
+- Wraps `CatalogService.get_songs_by_publisher`.
 
 ### async def get_all_tags() -> List[Tag]
 **HTTP**: `GET /api/v1/tags`
@@ -101,10 +101,10 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Fetches a single tag by ID.
 - Wraps `CatalogService.get_tag`.
 
-### async def get_tag_songs(tag_id: int) -> List[SongView]
+### async def get_songs_by_tag(tag_id: int) -> List[SongView]
 **HTTP**: `GET /api/v1/tags/{tag_id}/songs`
 - Fetches the full hydrated song repertoire linked to this tag.
-- Wraps `CatalogService.get_tag_songs`.
+- Wraps `CatalogService.get_songs_by_tag`.
 
 ### async def get_song_web_search(song_id: int, service: CatalogService = Depends(_get_service)) -> List[dict]
 **HTTP**: `GET /api/v1/songs/{song_id}/web-search`
@@ -341,3 +341,21 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/songs/{song_id}/audio`
 - Streams the audio file content for a song.
 - Returns a standard `FileResponse` with guessed mimetype.
+
+---
+
+## Spotify Router
+*Location: `src/engine/routers/spotify.py`*
+**Responsibility**: Stateless text parsing and atomic bulk credits ingestion.
+
+### async def parse_credits(request: SpotifyParseRequest) -> SpotifyParseResult
+**HTTP**: `POST /api/v1/spotify/parse`
+- Performs stateless regex-based parsing of raw Spotify credits text.
+- Validates the parsed title against the provided reference title.
+- Wraps `SpotifyService.parse_credits`.
+
+### async def import_credits(request: SpotifyImportRequest) -> None
+**HTTP**: `POST /api/v1/spotify/import`
+- Atomically imports a batch of credits and publishers for a song.
+- Performs a single transaction write; rolls back on any partial failure.
+- Wraps `CatalogService.import_credits_bulk`.

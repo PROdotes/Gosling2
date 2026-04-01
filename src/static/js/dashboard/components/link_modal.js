@@ -170,6 +170,30 @@ export function openLinkModal(config) {
     _dropdownItems = [];
     _dropdownIndex = -1;
     renderItems();
+
+    // Quick-add button (e.g. "New album named after song")
+    const existing = overlay.querySelector(".link-modal-quick-add");
+    if (existing) existing.remove();
+    if (config.quickAdd) {
+        const btn = document.createElement("button");
+        btn.className = "link-modal-quick-add ingest-btn-secondary";
+        btn.textContent = config.quickAdd.label;
+        btn.style.cssText = "width:100%; margin-top:0.5rem; font-size:0.8rem;";
+        btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            const opt = { id: null, label: config.quickAdd.rawInput, isCreate: true, rawInput: config.quickAdd.rawInput };
+            try {
+                _config.items.push({ id: null, label: config.quickAdd.rawInput });
+                renderItems();
+                await _config.onAdd(opt);
+            } catch (err) {
+                showError(`Add failed: ${err.message}`);
+                btn.disabled = false;
+            }
+        });
+        overlay.querySelector(".link-modal-body").appendChild(btn);
+    }
+
     overlay.style.display = "flex";
     input.focus();
 }

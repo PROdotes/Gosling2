@@ -384,3 +384,19 @@ export async function fetchId3Frames() {
     if (!resp.ok) throw new Error("Failed to fetch ID3 frame mapping");
     return await resp.json();
 }
+
+export function parseSpotifyCredits(rawText, referenceTitle) {
+    return fetchJson("/api/v1/spotify/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ raw_text: rawText, reference_title: referenceTitle }),
+    });
+}
+
+export function importSpotifyCredits(songId, credits, publishers) {
+    return fetchVoid("/api/v1/spotify/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_id: songId, credits, publishers }),
+    });
+}

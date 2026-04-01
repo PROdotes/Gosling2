@@ -17,19 +17,29 @@ class TestCreateAndLinkAlbum:
     def test_success_returns_hydrated_link(self, populated_db):
         service = CatalogService(populated_db)
         # Song 5 ("Pocketwatch Demo") has no album in fixture
-        album_data = {"title": "The Fresh Pot", "release_year": 2024, "album_type": "Studio"}
-        
-        link = service.create_and_link_album(5, album_data, track_number=1, disc_number=1)
-        
+        album_data = {
+            "title": "The Fresh Pot",
+            "release_year": 2024,
+            "album_type": "Studio",
+        }
+
+        link = service.create_and_link_album(
+            5, album_data, track_number=1, disc_number=1
+        )
+
         # 1. Assert Method Contract (Hydration)
         assert isinstance(link, SongAlbum), f"Expected SongAlbum, got {type(link)}"
-        assert link.album_title == "The Fresh Pot", f"Expected 'The Fresh Pot', got {link.album_title}"
+        assert (
+            link.album_title == "The Fresh Pot"
+        ), f"Expected 'The Fresh Pot', got {link.album_title}"
         assert link.release_year == 2024, f"Expected 2024, got {link.release_year}"
         assert link.track_number == 1, f"Expected track 1, got {link.track_number}"
         assert link.disc_number == 1, f"Expected disc 1, got {link.disc_number}"
-        assert link.is_primary is True, f"Expected is_primary=True, got {link.is_primary}"
+        assert (
+            link.is_primary is True
+        ), f"Expected is_primary=True, got {link.is_primary}"
         assert link.album_id is not None, "Expected album_id to be assigned"
-        
+
         # 2. Verify Persistence (Side Effect via Service)
         album = service.get_album(link.album_id)
         assert album is not None, "Album should be retrievable"
@@ -53,16 +63,18 @@ class TestCreateAndLinkAlbum:
         conn.execute("UPDATE Albums SET IsDeleted = 1 WHERE AlbumID = 100")
         conn.commit()
         conn.close()
-        
+
         album_data = {"title": "Nevermind", "release_year": 1991}
         link = service.create_and_link_album(5, album_data)
-        
+
         assert link.album_id == 100, f"Expected to reuse ID 100, got {link.album_id}"
         album = service.get_album(100)
         assert album is not None, "Album 100 should be retrievable via Service"
-        
+
         conn = sqlite3.connect(populated_db)
-        deleted = conn.execute("SELECT IsDeleted FROM Albums WHERE AlbumID = 100").fetchone()[0]
+        deleted = conn.execute(
+            "SELECT IsDeleted FROM Albums WHERE AlbumID = 100"
+        ).fetchone()[0]
         conn.close()
         assert deleted == 0, f"Expected IsDeleted=0, got {deleted}"
 
@@ -71,9 +83,11 @@ class TestCreateAndLinkAlbum:
         album_data = {"title": "Rollback Album", "release_year": 2024}
         with pytest.raises(LookupError):
             service.create_and_link_album(9999, album_data)
-            
+
         albums = service.search_albums_slim("Rollback Album")
-        assert len(albums) == 0, "Transaction failed to rollback: Album record created despite link failure"
+        assert (
+            len(albums) == 0
+        ), "Transaction failed to rollback: Album record created despite link failure"
 
     def test_missing_optional_track_info_returns_none(self, populated_db):
         service = CatalogService(populated_db)
@@ -87,12 +101,18 @@ class TestUpdateAlbum:
     def test_success_returns_hydrated_album(self, populated_db):
         service = CatalogService(populated_db)
         # Album 100: "Nevermind", 1991
-        updated = service.update_album(100, {"title": "Nevermind (Spl)", "release_year": 2011})
-        
+        updated = service.update_album(
+            100, {"title": "Nevermind (Spl)", "release_year": 2011}
+        )
+
         assert updated.id == 100
-        assert updated.title == "Nevermind (Spl)", f"Expected title update, got '{updated.title}'"
-        assert updated.release_year == 2011, f"Expected year update, got {updated.release_year}"
-        
+        assert (
+            updated.title == "Nevermind (Spl)"
+        ), f"Expected title update, got '{updated.title}'"
+        assert (
+            updated.release_year == 2011
+        ), f"Expected year update, got {updated.release_year}"
+
         # Verify persistence
         album = service.get_album(100)
         assert album.title == "Nevermind (Spl)"
@@ -120,7 +140,9 @@ class TestUpdateAlbum:
         names = [c.display_name for c in updated.credits]
         assert "Nirvana" in names, "Credits should remain hydrated in returned object"
         pubs = [p.name for p in updated.publishers]
-        assert "DGC Records" in pubs, "Publishers should remain hydrated in returned object"
+        assert (
+            "DGC Records" in pubs
+        ), "Publishers should remain hydrated in returned object"
 
 
 class TestAddSongAlbum:
@@ -128,13 +150,13 @@ class TestAddSongAlbum:
         service = CatalogService(populated_db)
         # Song 3 ("Range Rover Bitch") has no album — link to Nevermind (100)
         link = service.add_song_album(3, 100, track_number=5, disc_number=1)
-        
+
         assert isinstance(link, SongAlbum)
         assert link.source_id == 3
         assert link.album_id == 100
         assert link.album_title == "Nevermind"
         assert link.track_number == 5
-        
+
         # Verify persistence via Service
         song = service.get_song(3)
         album_ids = [a.album_id for a in song.albums]
@@ -163,21 +185,21 @@ class TestRemoveSongAlbum:
         service = CatalogService(populated_db)
         # Song 1 is linked to Nevermind (100)
         service.remove_song_album(1, 100)
-        
+
         # Verify link gone via Service
         song = service.get_song(1)
         album_ids = [a.album_id for a in song.albums]
         assert 100 not in album_ids, "Album 100 should be unlinked from song 1"
-        
+
         # Verify entity survival
         album = service.get_album(100)
         assert album is not None, "Album record should still exist"
 
     def test_missing_link_silently_succeeds(self, populated_db):
-         service = CatalogService(populated_db)
-         # Song 3 is not on Album 100
-         service.remove_song_album(3, 100)
-         # No error raised
+        service = CatalogService(populated_db)
+        # Song 3 is not on Album 100
+        service.remove_song_album(3, 100)
+        # No error raised
 
 
 class TestUpdateSongAlbumLink:
@@ -185,7 +207,7 @@ class TestUpdateSongAlbumLink:
         service = CatalogService(populated_db)
         # Song 1 / Album 100 is Track 1
         service.update_song_album_link(1, 100, track_number=7, disc_number=3)
-        
+
         # Verify Effect
         song = service.get_song(1)
         link = next((a for a in song.albums if a.album_id == 100), None)
@@ -204,9 +226,11 @@ class TestAlbumCredits:
     def test_add_credit_success_returns_name_id(self, populated_db):
         service = CatalogService(populated_db)
         # Album 100, add Taylor Hawkins as Producer (Identity 4, Name 40)
-        name_id = service.add_album_credit(100, "Taylor Hawkins", "Producer", identity_id=4)
+        name_id = service.add_album_credit(
+            100, "Taylor Hawkins", "Producer", identity_id=4
+        )
         assert name_id == 40
-        
+
         # Verify Persistence
         album = service.get_album(100)
         credits = [(c.display_name, c.role_name) for c in album.credits]
@@ -221,12 +245,12 @@ class TestAlbumCredits:
         service = CatalogService(populated_db)
         # Nirvana (20) is on Nevermind (100)
         service.remove_album_credit(100, 20)
-        
+
         # Verify unlinked
         album = service.get_album(100)
         names = [c.display_name for c in album.credits]
         assert "Nirvana" not in names
-        
+
         # Verify name record survived (Global rename check)
         service.update_credit_name(20, "Nirvana (Legend)")
         song1 = service.get_song(1)
@@ -239,7 +263,7 @@ class TestAlbumPublishers:
         pub = service.add_album_publisher(100, "Geffen")
         assert isinstance(pub, Publisher)
         assert pub.name == "Geffen"
-        
+
         # Verify Persistence
         album = service.get_album(100)
         pubs = [p.name for p in album.publishers]
@@ -250,7 +274,7 @@ class TestAlbumPublishers:
         # Roswell Records (4) is not on Nevermind (100)
         pub = service.add_album_publisher(100, None, publisher_id=4)
         assert pub.id == 4
-        
+
         album = service.get_album(100)
         assert any(p.id == 4 for p in album.publishers)
 
@@ -263,7 +287,7 @@ class TestAlbumPublishers:
         service = CatalogService(populated_db)
         # DGC Records (10) is on Nevermind (100)
         service.remove_album_publisher(100, 10)
-        
+
         album = service.get_album(100)
         pubs = [p.id for p in album.publishers]
         assert 10 not in pubs

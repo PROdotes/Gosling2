@@ -45,6 +45,7 @@ import {
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { openScrubberModal, closeScrubberModal } from "./components/scrubber_modal.js";
+import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -79,6 +80,7 @@ const state = {
     validationRules: null,
     id3Frames: null,
     allRoles: [],
+    activeSong: null,
 };
 
 const modeConfig = {
@@ -317,6 +319,7 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     const fileData = fileResult.status === "fulfilled" ? fileResult.value : null;
     cachedFileData = fileData;
     cachedFileDataSongId = String(song.id);
+    state.activeSong = catalogSong;
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
     renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles);
     if (savedScroll) {
@@ -471,6 +474,8 @@ function isModalOpen() {
     if (linkModal && linkModal.style.display === "flex") return true;
     const scrubberModal = document.getElementById("scrubber-modal");
     if (scrubberModal && scrubberModal.style.display === "flex") return true;
+    const spotifyModal = document.getElementById("spotify-modal");
+    if (spotifyModal && spotifyModal.style.display === "flex") return true;
     return false;
 }
 
@@ -483,7 +488,7 @@ document.addEventListener("click", async (event) => {
     // or is a close-modal action.
     const { action } = actionTarget.dataset;
     const isModalComponent = actionTarget.closest(".link-modal");
-    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal";
+    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal" || action === "close-spotify-modal";
 
     if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
@@ -570,6 +575,24 @@ document.addEventListener("click", async (event) => {
             actionTarget.disabled = false;
             console.error(`Remove publisher failed: ${err.message}`);
         }
+        return;
+    }
+
+    if (action === "open-spotify-modal") {
+        const { songId, title } = actionTarget.dataset;
+        openSpotifyModal({
+            songId,
+            title,
+            onComplete: () => {
+                refreshActiveDetail();
+                ctx.showBanner("Spotify credits imported successfully", "success");
+            }
+        });
+        return;
+    }
+
+    if (action === "close-spotify-modal") {
+        closeSpotifyModal();
         return;
     }
 
@@ -983,13 +1006,7 @@ document.addEventListener("click", async (event) => {
         const { modalType, songId } = actionTarget.dataset;
 
         if (modalType === "publishers") {
-            const section = actionTarget.closest(".detail-section");
-            const libraryBox = section?.querySelector(".surface-box");
-            const chips = libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-publisher"][data-song-id="${songId}"]`) : [];
-            const currentItems = Array.from(chips).map(btn => ({
-                id: btn.dataset.publisherId,
-                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? btn.closest(".link-chip").childNodes[0].textContent.trim(),
-            }));
+            const currentItems = (state.activeSong?.publishers || []).map(p => ({ id: p.id, label: p.name }));
 
             openLinkModal({
                 title: "Publishers",
@@ -1015,13 +1032,7 @@ document.addEventListener("click", async (event) => {
                 createLabel: (q) => `Add "${q}" as new publisher`,
             });
         } else if (modalType === "tags") {
-            const section = actionTarget.closest(".detail-section");
-            const libraryBox = section?.querySelector(".surface-box");
-            const chips = libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-tag"][data-song-id="${songId}"]`) : [];
-            const currentItems = Array.from(chips).map(btn => ({
-                id: btn.dataset.tagId,
-                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
-            }));
+            const currentItems = (state.activeSong?.tags || []).map(t => ({ id: t.id, label: t.name }));
 
             const rules = state.validationRules?.tags || {};
             const defaultCategory = rules.default_category || "Genre";
@@ -1081,12 +1092,9 @@ document.addEventListener("click", async (event) => {
             });
         } else if (modalType === "credits") {
             const { songId, role } = actionTarget.dataset;
-            const group = actionTarget.closest(".stack-list");
-            const chips = group ? group.querySelectorAll(`[data-action="remove-credit"][data-song-id="${songId}"]`) : [];
-            const currentItems = Array.from(chips).map(btn => ({
-                id: btn.dataset.creditId,
-                label: btn.closest(".link-chip").querySelector(".link-chip-label")?.textContent.trim() ?? "",
-            }));
+            const currentItems = (state.activeSong?.credits || [])
+                .filter(c => c.role_name === role)
+                .map(c => ({ id: c.credit_id, label: c.display_name }));
 
             if (!role) throw new Error("credits button is missing data-role");
 
@@ -1119,7 +1127,7 @@ document.addEventListener("click", async (event) => {
                 createLabel: (q) => `Add "${q}" as ${role}`,
             });
         } else if (modalType === "album") {
-            const { songId } = actionTarget.dataset;
+            const { songId, songTitle } = actionTarget.dataset;
             const section = actionTarget.closest(".detail-section");
             const libraryBox = section?.querySelector(".surface-box");
             const currentCards = Array.from(
@@ -1146,6 +1154,7 @@ document.addEventListener("click", async (event) => {
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },
                 createLabel: (q) => `Add "${q}" as new album`,
+                quickAdd: songTitle ? { label: `New album: "${songTitle}"`, rawInput: songTitle } : null,
             });
         } else if (modalType === "album-publishers") {
             const { albumId, songId } = actionTarget.dataset;

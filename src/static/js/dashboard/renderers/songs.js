@@ -493,6 +493,9 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                     <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
+                    <button class="ingest-btn-secondary" data-action="open-spotify-modal" data-song-id="${song.id}" data-title="${escapeHtml(song.media_name || song.title)}">
+                        Spotify ⇅
+                    </button>
                     <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
                         ▶ Play
                     </button>
@@ -567,7 +570,7 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
             <div class="detail-section">
                 <div class="section-title-row">
                     <span class="section-title">Albums</span>
-                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}">+ Add</button>
+                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}" data-song-title="${escapeHtml(song.media_name || song.title || '')}">+ Add</button>
                 </div>
                 <div class="two-column">
                     <div class="surface-box">

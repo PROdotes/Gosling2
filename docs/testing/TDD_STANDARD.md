@@ -2,6 +2,8 @@
 
 **One rule above all: tests are reviewed and approved by the user before any implementation is written.**
 
+**"Present tests for review" means: write them directly to the file. The user reviews in their editor — one read, from source. Never show the same test code in chat before writing it, after writing it, or as a summary. Repetition causes the user to skim and miss hallucinations.**
+
 ---
 
 ## The Workflow (Non-Negotiable)
@@ -60,7 +62,7 @@ Every method needs a test for **every combination of inputs that could behave di
 | Primary ID invalid (doesn't exist)                                                    | ✅                 |
 | Secondary ID invalid (doesn't exist)                                                  | ✅                 |
 | Both IDs invalid                                                                      | ✅                 |
-| IDs valid but relationship doesn't exist (e.g. song exists, album exists, not linked) | ✅                 |
+| IDs valid but relationship doesn't exist (e.g. song exists, album exists, not linked) | ✅ (if applicable) |
 | IDs valid but relationship already exists (duplicate add)                             | ✅ (if applicable) |
 | Any ID is `None`                                                                      | ✅                 |
 
@@ -156,6 +158,25 @@ class TestRemoveSongAlbum:
 | API        | Status codes, request/response shape           | TestClient responses      |
 
 Service tests do **not** duplicate repo tests. If the repo is already tested, the service test focuses on the orchestration (hydration, merging, error mapping).
+
+---
+
+## File Placement
+
+**Put code where it belongs, not where it's convenient.**
+
+A stateless utility (string parser, formatter, calculator) does not belong in a service class just because the service happens to call it. It belongs in its own file, imported directly by whatever needs it — service, router, test, doesn't matter.
+
+```python
+# Wrong — stuffed into CatalogService because that's nearby
+class CatalogService:
+    def tokenize_credits(self, text, separators): ...
+
+# Correct — standalone function, imported directly
+from src.services.tokenizer import tokenize_credits
+```
+
+Tests import the function directly too. No wrapper class, no fixture, no DB setup if none is needed.
 
 ---
 

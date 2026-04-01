@@ -9,12 +9,6 @@
         },
         {
             "match_genres": [
-                "cro pop"
-            ],
-            "target_path": "Cro/{year}/{artist} - {title}"
-        },
-        {
-            "match_genres": [
                 "pop"
             ],
             "target_path": "{year}/{artist} - {title}"
@@ -56,6 +50,12 @@
                 "Zabavne"
             ],
             "target_path": "Cro {genre}/{year}/{artist} - {title}"
+        },
+        {
+            "match_genres": [
+                "cro"
+            ],
+            "target_path": "{genre}/{year}/{artist} - {title}"
         }
     ]
 }

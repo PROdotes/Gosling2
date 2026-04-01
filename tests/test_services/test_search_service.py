@@ -1,6 +1,7 @@
 from src.services.search_service import SearchService
 from src.models.domain import Song, SongCredit
 
+
 def test_get_search_url_spotify():
     service = SearchService()
     song = Song(
@@ -12,14 +13,15 @@ def test_get_search_url_spotify():
         processing_status=1,
         credits=[
             SongCredit(role_name="Performer", display_name="Dubioza kolektiv"),
-            SongCredit(role_name="Composer", display_name="Brano Jakubovic")
-        ]
+            SongCredit(role_name="Composer", display_name="Brano Jakubovic"),
+        ],
     )
     url = service.get_search_url(song, engine="spotify")
     assert "spotify.com/search/" in url
     # Should include performers only for Spotify search by default if they exist
     assert "Dubioza" in url
     assert "Pravda%20za%20Vedrana" in url
+
 
 def test_get_search_url_spotify_multiple_artists():
     service = SearchService()
@@ -32,12 +34,13 @@ def test_get_search_url_spotify_multiple_artists():
         processing_status=1,
         credits=[
             SongCredit(role_name="Performer", display_name="Artist A"),
-            SongCredit(role_name="Performer", display_name="Artist B")
-        ]
+            SongCredit(role_name="Performer", display_name="Artist B"),
+        ],
     )
     url = service.get_search_url(song, engine="spotify")
     assert "Artist%20A" in url
     assert "Artist%20B" in url
+
 
 def test_get_search_url_google():
     service = SearchService()
@@ -48,9 +51,7 @@ def test_get_search_url_google():
         source_path="Z:\\Songs\\Pravda.mp3",
         duration_s=180.0,
         processing_status=1,
-        credits=[
-            SongCredit(role_name="Performer", display_name="Dubioza kolektiv")
-        ]
+        credits=[SongCredit(role_name="Performer", display_name="Dubioza kolektiv")],
     )
     url = service.get_search_url(song, engine="google")
     assert "google.com/search?q=" in url

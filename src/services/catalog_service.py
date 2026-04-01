@@ -35,6 +35,7 @@ from src.engine.config import (
     get_library_root,
 )
 from src.services.filing_service import FilingService
+from src.engine.models.spotify import SpotifyCredit
 
 
 class CatalogService:
@@ -666,13 +667,13 @@ class CatalogService:
         )
         return result
 
-    def get_publisher_songs(self, publisher_id: int) -> List[Song]:
+    def get_songs_by_publisher(self, publisher_id: int) -> List[Song]:
         """Fetch the full song repertoire for a given publisher."""
-        logger.debug(f"[CatalogService] -> get_publisher_songs(id={publisher_id})")
+        logger.debug(f"[CatalogService] -> get_songs_by_publisher(id={publisher_id})")
         song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id)
         if not song_ids:
             logger.debug(
-                f"[CatalogService] <- get_publisher_songs(id={publisher_id}) NO_REPERTOIRE"
+                f"[CatalogService] <- get_songs_by_publisher(id={publisher_id}) NO_REPERTOIRE"
             )
             return []
 
@@ -710,12 +711,12 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- get_tag(id={tag_id}) '{tag.name}'")
         return tag
 
-    def get_tag_songs(self, tag_id: int) -> List[Song]:
+    def get_songs_by_tag(self, tag_id: int) -> List[Song]:
         """Fetch all songs linked to this tag."""
-        logger.debug(f"[CatalogService] -> get_tag_songs(id={tag_id})")
+        logger.debug(f"[CatalogService] -> get_songs_by_tag(id={tag_id})")
         song_ids = self._tag_repo.get_song_ids_by_tag(tag_id)
         if not song_ids:
-            logger.debug(f"[CatalogService] <- get_tag_songs(id={tag_id}) NO_SONGS")
+            logger.debug(f"[CatalogService] <- get_songs_by_tag(id={tag_id}) NO_SONGS")
             return []
 
         songs = self._song_repo.get_by_ids(song_ids)
@@ -865,7 +866,7 @@ class CatalogService:
             assocs_by_song = self._get_albums_by_song(song_ids)
 
         pubs_by_song = self._get_publishers_by_song(song_ids)
-        tags_by_song = self._get_tags_by_song(song_ids)
+        tags_by_song = self._get_tags_by_songs(song_ids)
 
         hydrated_songs = []
         for song in songs:
@@ -1035,16 +1036,16 @@ class CatalogService:
         raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids)
         return self._resolve_publisher_associations(raw_assocs, "songs")
 
-    def _get_tags_by_song(self, song_ids: List[int]) -> Dict[int, List[Tag]]:
+    def _get_tags_by_songs(self, song_ids: List[int]) -> Dict[int, List[Tag]]:
         """Fetch and group tags by song ID."""
-        logger.debug(f"[CatalogService] -> _get_tags_by_song(count={len(song_ids)})")
+        logger.debug(f"[CatalogService] -> _get_tags_by_songs(count={len(song_ids)})")
         all_tags_tuples = self._tag_repo.get_tags_for_songs(song_ids)
         tags_by_song: Dict[int, List[Tag]] = {}
         for song_id, tag in all_tags_tuples:
             if song_id is not None:
                 tags_by_song.setdefault(song_id, []).append(tag)
         logger.debug(
-            f"[CatalogService] <- _get_tags_by_song(count={len(tags_by_song)})"
+            f"[CatalogService] <- _get_tags_by_songs(count={len(tags_by_song)})"
         )
         return tags_by_song
 
@@ -1748,6 +1749,47 @@ class CatalogService:
         finally:
             conn.close()
         logger.debug("[CatalogService] <- remove_song_publisher OK")
+
+    def import_credits_bulk(
+        self, song_id: int, credits: List[SpotifyCredit], publishers: List[str]
+    ) -> None:
+        """
+        Atomic bulk import for Spotify credits and publishers.
+        Orchestrates multiple repo writes in a single transaction.
+        """
+        logger.debug(
+            f"[CatalogService] -> import_credits_bulk(song_id={song_id}, credits={len(credits)}, pubs={len(publishers)})"
+        )
+
+        # 1. Existence Check
+        if not self._song_repo.get_by_id(song_id):
+            raise LookupError(f"Song {song_id} not found")
+
+        # 2. Atomic Write
+        conn = self._song_repo.get_connection()
+        try:
+            # Add Credits
+            for credit in credits:
+                self._credit_repo.add_credit(
+                    song_id, credit.name, credit.role, conn=conn
+                )
+
+            # Add Publishers
+            for pub_name in publishers:
+                self._pub_repo.add_song_publisher(song_id, pub_name, conn=conn)
+
+            conn.commit()
+            logger.info(
+                f"[CatalogService] <- import_credits_bulk(id={song_id}) SUCCESS"
+            )
+        except Exception as e:
+            conn.rollback()
+            logger.error(
+                f"[CatalogService] <- import_credits_bulk(id={song_id}) FAILED: {e}"
+            )
+            raise
+        finally:
+            conn.close()
 
     def update_publisher(self, publisher_id: int, new_name: str) -> None:
         """Update publisher name globally (affects all linked songs)."""

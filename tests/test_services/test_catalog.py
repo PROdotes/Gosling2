@@ -662,7 +662,7 @@ class TestSearchAlbumsSlim:
 
 
 # ===================================================================
-# CatalogService.get_all_publishers / get_publisher / search_publishers / get_publisher_songs
+# CatalogService.get_all_publishers / get_publisher / search_publishers / get_songs_by_publisher
 # ===================================================================
 class TestGetAllPublishers:
     """CatalogService.get_all_publishers contracts."""
@@ -793,11 +793,11 @@ class TestSearchPublishers:
 
 
 class TestGetPublisherSongs:
-    """CatalogService.get_publisher_songs contracts."""
+    """CatalogService.get_songs_by_publisher contracts."""
 
     def test_dgc_songs(self, catalog_service):
         """DGC Records (10) has Song 1 via RecordingPublishers."""
-        songs = catalog_service.get_publisher_songs(10)
+        songs = catalog_service.get_songs_by_publisher(10)
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert (
             songs[0].title == "Smells Like Teen Spirit"
@@ -809,7 +809,7 @@ class TestGetPublisherSongs:
 
     def test_publisher_with_no_songs(self, catalog_service):
         """Sub Pop (5) has no RecordingPublisher entries."""
-        songs = catalog_service.get_publisher_songs(5)
+        songs = catalog_service.get_songs_by_publisher(5)
         assert songs == [], f"Expected empty list, got {songs}"
 
 

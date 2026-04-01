@@ -30,6 +30,9 @@ TAG_DEFAULT_CATEGORY = os.getenv("GOSLING_TAG_DEFAULT_CATEGORY", "Genre")
 TAG_CATEGORY_DELIMITER = os.getenv("GOSLING_TAG_CATEGORY_DELIMITER", ":")
 TAG_INPUT_FORMAT = os.getenv("GOSLING_TAG_INPUT_FORMAT", "tag:category")
 
+# Default separators for the Artist Splitter feature
+DEFAULT_CREDIT_SEPARATORS = [" & ", " feat. ", " ft. ", " x ", " vs. ", ", "]
+
 # Fields whose values should additionally be split on ", " during metadata extraction
 COMMA_SPLIT_FIELDS = ["composers"]
 

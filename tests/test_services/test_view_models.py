@@ -395,9 +395,7 @@ class TestSongViewFromDomain:
     # --- display_genres ---
     def test_display_genres_single(self):
         """Single Genre tag yields its name."""
-        song = self._make_song(
-            tags=[Tag(id=1, name="Rock", category="Genre")]
-        )
+        song = self._make_song(tags=[Tag(id=1, name="Rock", category="Genre")])
         view = SongView.from_domain(song)
         assert view.display_genres == "Rock"
 

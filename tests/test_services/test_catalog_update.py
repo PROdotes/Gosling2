@@ -137,11 +137,13 @@ class TestUpdateSongScalars:
         service = CatalogService(populated_db)
         # Song 7 is Status 1. Ensure it is deactivated first.
         service.update_song_scalars(7, {"is_active": False})
-        
+
         # Attempting to activate (is_active=True) must fail validation for status 1.
-        with pytest.raises(ValueError, match="Cannot activate song unless processing_status is 0"):
+        with pytest.raises(
+            ValueError, match="Cannot activate song unless processing_status is 0"
+        ):
             service.update_song_scalars(7, {"is_active": True})
-        
+
         # Verify state did NOT change to True
         refreshed = service.get_song(7)
         assert refreshed.is_active is False
@@ -151,7 +153,9 @@ class TestUpdateSongScalars:
         service = CatalogService(populated_db)
         # Song 7 is Status 1 in fixture.
         song = service.update_song_scalars(7, {"is_active": False})
-        assert song.is_active is False, f"Expected is_active=False, got {song.is_active}"
+        assert (
+            song.is_active is False
+        ), f"Expected is_active=False, got {song.is_active}"
 
     def test_activate_and_review_validation_interaction(self, populated_db):
         """Verify that is_active=True check uses the NEW status if provided in same call."""
@@ -160,9 +164,11 @@ class TestUpdateSongScalars:
         service.update_song_scalars(7, {"is_active": False})
 
         # If we try to set is_active=True, it fails.
-        with pytest.raises(ValueError, match="Cannot activate song unless processing_status is 0"):
+        with pytest.raises(
+            ValueError, match="Cannot activate song unless processing_status is 0"
+        ):
             service.update_song_scalars(7, {"is_active": True})
-            
+
         # Verify state did NOT change to True
         refreshed = service.get_song(7)
         assert refreshed.is_active is False
@@ -197,12 +203,16 @@ class TestAddSongCredit:
         service = CatalogService(populated_db)
         # "Dave Grohl" (name_id=10) already exists in fixture
         credit = service.add_song_credit(2, "Dave Grohl", "Performer")
-        
+
         # 1. Assert Contract (Method works)
-        assert credit.display_name == "Dave Grohl", f"Expected 'Dave Grohl', got '{credit.display_name}'"
-        assert credit.role_name == "Performer", f"Expected 'Performer', got '{credit.role_name}'"
+        assert (
+            credit.display_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert (
+            credit.role_name == "Performer"
+        ), f"Expected 'Performer', got '{credit.role_name}'"
         assert credit.identity_id == 1, "Should have linked to existing identity ID 1"
-        
+
         # 2. Assert Effect (Verify no duplicate link via Service)
         song = service.get_song(2)
         matches = [c for c in song.credits if c.display_name == "Dave Grohl"]
@@ -218,7 +228,9 @@ class TestAddSongCredit:
         # Verify through get_song
         song = service.get_song(2)
         target = next(c for c in song.credits if c.display_name == "David Grohl")
-        assert target.identity_id == 1, f"Expected link to identity 1, got {target.identity_id}"
+        assert (
+            target.identity_id == 1
+        ), f"Expected link to identity 1, got {target.identity_id}"
 
 
 class TestRemoveSongCredit:
@@ -236,17 +248,19 @@ class TestRemoveSongCredit:
         service = CatalogService(populated_db)
         credit = service.add_song_credit(1, "Dave Grohl", "Composer")
         service.remove_song_credit(1, credit.credit_id)
-        
+
         # Verify link gone via Service
         song = service.get_song(1)
         credit_ids = [c.credit_id for c in song.credits]
         assert credit.credit_id not in credit_ids, "Credit link should be removed"
-        
+
         # Verify name record survives via secondary Service call
         # (We check Dave Grohl's existing name_id=10 is still renameable)
-        service.update_credit_name(10, "Dave G.") 
-        revived = service.get_song(6) # Song 6 uses name_id 10
-        assert any(c.display_name == "Dave G." for c in revived.credits), "Artist record should survive credit removal"
+        service.update_credit_name(10, "Dave G.")
+        revived = service.get_song(6)  # Song 6 uses name_id 10
+        assert any(
+            c.display_name == "Dave G." for c in revived.credits
+        ), "Artist record should survive credit removal"
 
 
 class TestUpdateCreditName:
@@ -288,7 +302,9 @@ class TestAddSongTag:
     def test_add_new_tag_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         tag = service.add_song_tag(1, "Live Recording", "Type")
-        assert tag.name == "Live Recording", f"Expected 'Live Recording', got '{tag.name}'"
+        assert (
+            tag.name == "Live Recording"
+        ), f"Expected 'Live Recording', got '{tag.name}'"
         assert tag.category == "Type", f"Expected 'Type', got '{tag.category}'"
 
     def test_add_tag_by_id_links_existing(self, populated_db):
@@ -322,22 +338,26 @@ class TestRemoveSongTag:
         service = CatalogService(populated_db)
         # Song 1 has Grunge (tag_id=1)
         service.remove_song_tag(1, 1)
-        
+
         # 1. Verify link gone via Service (Method effect on focus object)
         song = service.get_song(1)
         tag_ids = [t.id for t in song.tags]
         assert 1 not in tag_ids, f"Tag 1 should be unlinked from song 1, got {tag_ids}"
-        
+
         # 2. Verify record survives via second song that uses it (Persistence check)
         service.update_tag(1, "Grunge Rock", "Genre")
-        song9 = service.get_song(9) # Song 9 also has Grunge (1)
+        song9 = service.get_song(9)  # Song 9 also has Grunge (1)
         matches = [t for t in song9.tags if t.id == 1]
         assert len(matches) == 1, "Tag 1 should still be on song 9"
-        assert matches[0].name == "Grunge Rock", "Renaming should have applied to surviving tag record"
-        
+        assert (
+            matches[0].name == "Grunge Rock"
+        ), "Renaming should have applied to surviving tag record"
+
         # 3. Final global check via search
         tags = service.search_tags("Grunge Rock")
-        assert any(t.id == 1 for t in tags), "Tag should be globally searchable after being unlinked from one song"
+        assert any(
+            t.id == 1 for t in tags
+        ), "Tag should be globally searchable after being unlinked from one song"
 
 
 class TestUpdateTag:
@@ -363,14 +383,18 @@ class TestAddSongPublisher:
         # Song 2 has no publisher — add Sub Pop (pub_id=5) by name
         publisher = service.add_song_publisher(2, "Sub Pop")
         assert publisher.id is not None, "Expected publisher id"
-        assert publisher.name == "Sub Pop", f"Expected 'Sub Pop', got '{publisher.name}'"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{publisher.name}'"
 
     def test_add_publisher_by_name_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
         service.add_song_publisher(2, "Sub Pop")
         song = service.get_song(2)
         pub_names = [p.name for p in song.publishers]
-        assert "Sub Pop" in pub_names, f"Expected 'Sub Pop' in publishers, got {pub_names}"
+        assert (
+            "Sub Pop" in pub_names
+        ), f"Expected 'Sub Pop' in publishers, got {pub_names}"
 
     def test_add_new_publisher_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
@@ -384,7 +408,9 @@ class TestAddSongPublisher:
         # Song 2 has no publisher — link Sub Pop (pub_id=5) by ID
         publisher = service.add_song_publisher(2, None, publisher_id=5)
         assert publisher.id == 5, f"Expected publisher id=5, got {publisher.id}"
-        assert publisher.name == "Sub Pop", f"Expected 'Sub Pop', got '{publisher.name}'"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{publisher.name}'"
 
     def test_add_publisher_by_id_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)

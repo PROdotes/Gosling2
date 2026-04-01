@@ -5,7 +5,7 @@ Covers:
 - get_all_tags (directory fetch)
 - search_tags (name match)
 - get_tag (single fetch)
-- get_tag_songs (reverse lookup with hydration)
+- get_songs_by_tag (reverse lookup with hydration)
 
 Uses populated_db which has:
     Tags: 1=Grunge/Genre, 2=Energetic/Mood, 3=90s/Era, 4=Electronic/Style, 5=English/Jezik, 6=Alt Rock/Genre
@@ -140,7 +140,7 @@ class TestGetTagSongs:
     def test_tag_with_single_song_returns_hydrated_song(self, populated_db):
         """Tag 3 (90s) is only on Song 2."""
         service = CatalogService(populated_db)
-        songs = service.get_tag_songs(3)
+        songs = service.get_songs_by_tag(3)
 
         assert len(songs) == 1, f"Expected 1 song for Tag 3 (90s), got {len(songs)}"
 
@@ -171,7 +171,7 @@ class TestGetTagSongs:
     def test_tag_with_multiple_songs_returns_all_hydrated(self, populated_db):
         """Tag 1 (Grunge) is on Song 1 and Song 9."""
         service = CatalogService(populated_db)
-        songs = service.get_tag_songs(1)
+        songs = service.get_songs_by_tag(1)
 
         assert len(songs) == 2, f"Expected 2 songs for Tag 1 (Grunge), got {len(songs)}"
 
@@ -259,13 +259,13 @@ class TestGetTagSongs:
             )
             conn.commit()
 
-        songs = service.get_tag_songs(100)
+        songs = service.get_songs_by_tag(100)
         assert len(songs) == 0, f"Expected 0 songs for orphan tag, got {len(songs)}"
 
     def test_nonexistent_tag_returns_empty(self, populated_db):
         """Tag 999 doesn't exist, should return empty."""
         service = CatalogService(populated_db)
-        songs = service.get_tag_songs(999)
+        songs = service.get_songs_by_tag(999)
 
         assert (
             len(songs) == 0
@@ -274,7 +274,7 @@ class TestGetTagSongs:
     def test_songs_include_credits_and_albums(self, populated_db):
         """Verify songs returned have credits and albums hydrated."""
         service = CatalogService(populated_db)
-        songs = service.get_tag_songs(1)  # Tag 1 (Grunge) -> Song 1, 9
+        songs = service.get_songs_by_tag(1)  # Tag 1 (Grunge) -> Song 1, 9
 
         # Song 1 should have credits and albums
         song1 = next((s for s in songs if s.id == 1), None)
@@ -328,7 +328,6 @@ class TestUpdateTag:
         except LookupError:
             pass
 
-
     def test_add_tag_normalizes_whitespace_but_retains_case(self, populated_db):
         """Should merge '  NormalizationTest  ' and 'NORMALIZATIONtest' while retaining original record casing."""
         service = CatalogService(populated_db)
@@ -340,4 +339,6 @@ class TestUpdateTag:
 
         # 2. Add with different case: should merge to same ID
         t2 = service.add_song_tag(song_id, "  NORMALIZATIONtest  ", "  category  ")
-        assert t1.id == t2.id, f"Expected same ID (NOCASE match), got {t1.id} and {t2.id}"
+        assert (
+            t1.id == t2.id
+        ), f"Expected same ID (NOCASE match), got {t1.id} and {t2.id}"
