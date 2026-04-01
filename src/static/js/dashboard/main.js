@@ -1377,6 +1377,40 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "toggle-active") {
+        // Prevent card selection when toggling
+        if (event) event.stopPropagation();
+
+        if (actionTarget.classList.contains("disabled")) {
+            return;
+        }
+
+        const input = actionTarget.querySelector("input");
+        if (!input) return;
+
+        const { id } = actionTarget.dataset;
+        const isChecked = input.checked;
+
+        try {
+            await patchSongScalars(id, { is_active: isChecked });
+            
+            // Sync current items in any list results
+            state.cachedSongs = state.cachedSongs.map(s => 
+                String(s.id) === String(id) ? { ...s, is_active: isChecked } : s
+            );
+            
+            // If the song detail pane is open, refresh it
+            if (activeDetailKey === `songs:${id}`) {
+                refreshActiveDetail();
+            }
+        } catch (err) {
+            // Revert state if failed (validation error, etc.)
+            input.checked = !isChecked;
+            ctx.showBanner(`Failed to toggle activation: ${err.message}`, "error");
+        }
+        return;
+    }
+
     if (action === "delete-song") {
         const { id, title } = actionTarget.dataset;
 

@@ -124,6 +124,55 @@ class TestUpdateSongScalars:
         song = service.update_song_scalars(1, {"bpm": None})
         assert song.bpm is None, f"Expected bpm=None after clearing, got {song.bpm}"
 
+    def test_activate_reviewed_song_succeeds(self, populated_db):
+        """Case 01: Song in status 0 (Reviewed) can be activated."""
+        service = CatalogService(populated_db)
+        # Song 1 is Status 0 in fixture. Deactivate then reactivate.
+        service.update_song_scalars(1, {"is_active": False})
+        song = service.update_song_scalars(1, {"is_active": True})
+        assert song.is_active is True, f"Expected is_active=True, got {song.is_active}"
+
+    def test_activate_unreviewed_song_raises_value_error(self, populated_db):
+        """Case 03/05: Setting is_active=True fails if status is 1 or 2."""
+        service = CatalogService(populated_db)
+        # Song 7 is Status 1. Ensure it is deactivated first.
+        service.update_song_scalars(7, {"is_active": False})
+        
+        # Attempting to activate (is_active=True) must fail validation for status 1.
+        with pytest.raises(ValueError, match="Cannot activate song unless processing_status is 0"):
+            service.update_song_scalars(7, {"is_active": True})
+        
+        # Verify state did NOT change to True
+        refreshed = service.get_song(7)
+        assert refreshed.is_active is False
+
+    def test_deactivate_unreviewed_song_succeeds(self, populated_db):
+        """Case 04/06: Deactivation (is_active=False) is always allowed regardless of status."""
+        service = CatalogService(populated_db)
+        # Song 7 is Status 1 in fixture.
+        song = service.update_song_scalars(7, {"is_active": False})
+        assert song.is_active is False, f"Expected is_active=False, got {song.is_active}"
+
+    def test_activate_and_review_validation_interaction(self, populated_db):
+        """Verify that is_active=True check uses the NEW status if provided in same call."""
+        service = CatalogService(populated_db)
+        # Song 7 is Status 1. Ensure it is deactivated first.
+        service.update_song_scalars(7, {"is_active": False})
+
+        # If we try to set is_active=True, it fails.
+        with pytest.raises(ValueError, match="Cannot activate song unless processing_status is 0"):
+            service.update_song_scalars(7, {"is_active": True})
+            
+        # Verify state did NOT change to True
+        refreshed = service.get_song(7)
+        assert refreshed.is_active is False
+
+    def test_invalid_song_id_raises_lookup_error(self, populated_db):
+        """Case 08: Updating a non-existent song raises LookupError."""
+        service = CatalogService(populated_db)
+        with pytest.raises(LookupError, match="not found"):
+            service.update_song_scalars(99999, {"is_active": True})
+
 
 class TestAddSongCredit:
     def test_add_new_credit_returns_song_credit(self, populated_db):

@@ -488,6 +488,7 @@ class AddPublisherBody(BaseModel):
 
 class AddAlbumPublisherBody(BaseModel):
     """Payload for adding a publisher to an album. Enforces 1:1 relation."""
+
     publisher_name: Optional[str] = None
     publisher_id: Optional[int] = None
 

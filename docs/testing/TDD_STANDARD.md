@@ -1,4 +1,5 @@
 # TDD Standard
+
 **One rule above all: tests are reviewed and approved by the user before any implementation is written.**
 
 ---
@@ -10,7 +11,7 @@
 2. Check chain against existing code — fill in what exists, flag what's missing
 3. Present refined chain to user for review
 4. Discuss methods and contracts with user
-5. Write ALL tests for method N — present for review
+5. Write ALL tests for method N
 6. User approves tests
 7. Implement method N
 8. Tests pass → move to method N+1
@@ -37,7 +38,7 @@ frontend.load_song(song_id)
 Errors:
   song_id not found       → LookupError → 404
   song_id is None/invalid → 422
-  
+
 New methods needed: none — all layers exist
 ```
 
@@ -53,29 +54,45 @@ Every method needs a test for **every combination of inputs that could behave di
 
 ### For any method with ID parameters (song_id, album_id, tag_id, etc.):
 
-| Scenario | Required |
-|----------|----------|
-| All IDs valid, operation succeeds | ✅ |
-| Primary ID invalid (doesn't exist) | ✅ |
-| Secondary ID invalid (doesn't exist) | ✅ |
-| Both IDs invalid | ✅ |
-| IDs valid but relationship doesn't exist (e.g. song exists, album exists, not linked) | ✅ |
-| IDs valid but relationship already exists (duplicate add) | ✅ (if applicable) |
-| Any ID is `None` | ✅ |
+| Scenario                                                                              | Required           |
+| ------------------------------------------------------------------------------------- | ------------------ |
+| All IDs valid, operation succeeds                                                     | ✅                 |
+| Primary ID invalid (doesn't exist)                                                    | ✅                 |
+| Secondary ID invalid (doesn't exist)                                                  | ✅                 |
+| Both IDs invalid                                                                      | ✅                 |
+| IDs valid but relationship doesn't exist (e.g. song exists, album exists, not linked) | ✅                 |
+| IDs valid but relationship already exists (duplicate add)                             | ✅ (if applicable) |
+| Any ID is `None`                                                                      | ✅                 |
 
 ### For methods that return objects:
+
 - Assert **every field** of the returned object, not just key fields
 - Assert **unchanged fields stayed unchanged** (update tests)
 - Assert **the effect persisted** via a follow-up read (e.g. `service.get_song(id)`)
 
 ### For methods that remove/unlink:
+
 - Assert the link is gone
 - Assert the **entity record still exists** (keep-record contract)
 - Assert unrelated records are unaffected
 
 ### Error cases:
+
 - Assert the **correct exception type** (`LookupError`, `ValueError`, `sqlite3.IntegrityError`)
 - Do not test for `Exception` — be specific
+- **Always assert state after the error.** Catching the exception is not enough — verify the database is unchanged via a follow-up read. A method that writes then raises will pass the `pytest.raises` block but fail the state check.
+
+```python
+# Wrong — only tests that the exception fires
+with pytest.raises(LookupError):
+    service.create_and_link_album(9999, album_data)
+
+# Correct — also verifies the transaction rolled back
+with pytest.raises(LookupError):
+    service.create_and_link_album(9999, album_data)
+albums = service.search_albums_slim("Ghost Album")
+assert len(albums) == 0, "Transaction failed to rollback: album was created despite link failure"
+```
 
 ---
 
@@ -119,6 +136,7 @@ A fallback that makes a test pass is a bug with a green checkmark. The system ap
 **Assertion message format:** `assert x == y, f"Expected {y}, got {x}"`
 
 **Test class = one method:**
+
 ```python
 class TestRemoveSongAlbum:
     def test_valid_link_removes_link(self, populated_db): ...
@@ -131,11 +149,11 @@ class TestRemoveSongAlbum:
 
 ## Layer Rules
 
-| Layer | What to test | Verify effects via |
-|-------|-------------|-------------------|
-| Repository | SQL correctness, row mapping, NULL handling | Repo read methods |
-| Service | Orchestration, business logic, error contracts | Service read methods only |
-| API | Status codes, request/response shape | TestClient responses |
+| Layer      | What to test                                   | Verify effects via        |
+| ---------- | ---------------------------------------------- | ------------------------- |
+| Repository | SQL correctness, row mapping, NULL handling    | Repo read methods         |
+| Service    | Orchestration, business logic, error contracts | Service read methods only |
+| API        | Status codes, request/response shape           | TestClient responses      |
 
 Service tests do **not** duplicate repo tests. If the repo is already tested, the service test focuses on the orchestration (hydration, merging, error mapping).
 

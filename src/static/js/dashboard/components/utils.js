@@ -57,9 +57,20 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
         <div class="stack-list">
             ${items.map((song) => `
                 <div class="list-row linkable" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
-                    <div>
-                        <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
-                        <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                         <label class="switch ${song.processing_status !== 0 ? 'disabled' : ''}" 
+                                data-action="toggle-active" 
+                                data-id="${song.id}"
+                                title="${song.processing_status !== 0 ? 'Only reviewed songs can be active for airplay' : (song.is_active ? 'Deactivate' : 'Activate')}">
+                             <input type="checkbox" 
+                                    ${song.is_active ? 'checked' : ''} 
+                                    ${song.processing_status !== 0 ? 'disabled' : ''}>
+                             <span class="slider"></span>
+                        </label>
+                        <div>
+                            <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
+                            <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
+                        </div>
                     </div>
                     <div style="text-align: right">
                         <div class="credit-role mono">${escapeHtml(song.formatted_duration || "")}</div>

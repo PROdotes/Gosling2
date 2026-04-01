@@ -349,7 +349,18 @@ function renderSongsCards(ctx, songs) {
             <div class="card-body">
                 <div class="card-title-row">
                     <div class="card-title">${escapeHtml(song.title || song.media_name || "Untitled")}</div>
-                    <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
+                    <div class="card-title-actions">
+                        <label class="switch ${song.processing_status !== 0 ? 'disabled' : ''}" 
+                               data-action="toggle-active" 
+                               data-id="${song.id}"
+                               title="${song.processing_status !== 0 ? 'Only reviewed songs can be active for airplay' : (song.is_active ? 'Deactivate' : 'Activate')}">
+                             <input type="checkbox" 
+                                    ${song.is_active ? 'checked' : ''} 
+                                    ${song.processing_status !== 0 ? 'disabled' : ''}>
+                             <span class="slider"></span>
+                        </label>
+                        <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
+                    </div>
                 </div>
                 <div class="card-subtitle">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
                 <div class="card-meta">

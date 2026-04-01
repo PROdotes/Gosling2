@@ -10,7 +10,7 @@ Follows TDD_STANDARD.md:
 import pytest
 import sqlite3
 from src.services.catalog_service import CatalogService
-from src.models.domain import SongAlbum, Album, Publisher
+from src.models.domain import SongAlbum, Publisher
 
 
 class TestCreateAndLinkAlbum:

@@ -240,6 +240,7 @@ async def get_tag(tag_id: int) -> TagView:
         raise HTTPException(status_code=404, detail=f"Tag ID {tag_id} not found")
     return TagView.model_validate(tag.model_dump())
 
+
 @router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
 async def get_tag_songs(tag_id: int) -> List[SongView]:
     """Fetch all complete songs linked to this tag."""
@@ -251,6 +252,7 @@ async def get_tag_songs(tag_id: int) -> List[SongView]:
 
     songs = _get_service().get_tag_songs(tag_id)
     return [SongView.from_domain(s) for s in songs]
+
 
 @router.get("/songs/{song_id:int}/web-search")
 async def get_song_web_search(

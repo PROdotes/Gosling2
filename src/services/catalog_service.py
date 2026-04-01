@@ -1354,7 +1354,7 @@ class CatalogService:
         logger.debug(
             f"[CatalogService] -> add_song_album(song_id={song_id}, album_id={album_id})"
         )
-        
+
         # 1. Existence Checks
         if not self._song_repo.get_by_id(song_id):
             raise LookupError(f"Song {song_id} not found")
@@ -1368,14 +1368,14 @@ class CatalogService:
             )
             conn.commit()
         except sqlite3.IntegrityError:
-            conn.rollback() # Assume duplicate or conflict
+            conn.rollback()  # Assume duplicate or conflict
         except Exception as e:
             conn.rollback()
             logger.error(f"[CatalogService] <- add_song_album FAILED: {e}")
             raise
         finally:
             conn.close()
-            
+
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((link for link in links if link.album_id == album_id), None)
         return song_album
@@ -1389,12 +1389,12 @@ class CatalogService:
     ) -> SongAlbum:
         """Create a new album record and link it to a song (single transaction)."""
         logger.debug(f"[CatalogService] -> create_and_link_album(song_id={song_id})")
-        
+
         # 1. Validation
         title = album_data.get("title", "").strip()
         if not title:
             raise ValueError("Album title cannot be empty")
-            
+
         # 2. Existence Check (Fail Loudly with LookupError)
         song = self._song_repo.get_by_id(song_id)
         if not song:
@@ -1419,7 +1419,7 @@ class CatalogService:
             conn.rollback()
             logger.error(f"[CatalogService] <- create_and_link_album FAILED: {e}")
             raise LookupError(f"Persistence failure: {e}")
-        except Exception as e:
+        except Exception:
             conn.rollback()
             raise
         finally:
@@ -1429,9 +1429,13 @@ class CatalogService:
         links = self._album_repo.get_albums_for_songs([song_id])
         song_album = next((link for link in links if link.album_id == album_id), None)
         if not song_album:
-             raise LookupError(f"Failed to retrieve link for song {song_id} after creation")
-             
-        logger.debug(f"[CatalogService] <- create_and_link_album OK album_id={album_id}")
+            raise LookupError(
+                f"Failed to retrieve link for song {song_id} after creation"
+            )
+
+        logger.debug(
+            f"[CatalogService] <- create_and_link_album OK album_id={album_id}"
+        )
         return song_album
 
     def remove_song_album(self, song_id: int, album_id: int) -> None:
@@ -1462,11 +1466,13 @@ class CatalogService:
         logger.debug(
             f"[CatalogService] -> update_song_album_link(song_id={song_id}, album_id={album_id})"
         )
-        
+
         # 1. Existence Check
         links = self._album_repo.get_albums_for_songs([song_id])
         if not any(link.album_id == album_id for link in links):
-            raise LookupError(f"Link between song {song_id} and album {album_id} not found")
+            raise LookupError(
+                f"Link between song {song_id} and album {album_id} not found"
+            )
 
         conn = self._album_repo.get_connection()
         try:
@@ -1485,11 +1491,11 @@ class CatalogService:
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record fields. Affects all linked songs globally."""
         logger.debug(f"[CatalogService] -> update_album(album_id={album_id})")
-        
+
         # 1. Validation
         if "title" in album_data and not album_data["title"].strip():
-             raise ValueError("Album title cannot be empty")
-             
+            raise ValueError("Album title cannot be empty")
+
         # 2. Existence Check
         if not self._album_repo_dir.get_by_id(album_id):
             raise LookupError(f"Album {album_id} not found")
@@ -1517,12 +1523,12 @@ class CatalogService:
         logger.debug(
             f"[CatalogService] -> add_album_credit(album_id={album_id}, name='{display_name}', role='{role_name}', identity_id={identity_id})"
         )
-        
+
         # 1. Existence Check
         if not self._album_repo_dir.get_by_id(album_id):
-             raise LookupError(f"Album {album_id} not found")
+            raise LookupError(f"Album {album_id} not found")
         if identity_id and not self._identity_repo.get_by_id(identity_id):
-             raise LookupError(f"Identity {identity_id} not found")
+            raise LookupError(f"Identity {identity_id} not found")
 
         conn = self._album_credit_repo.get_connection()
         try:
@@ -1565,7 +1571,7 @@ class CatalogService:
         logger.debug(
             f"[CatalogService] -> add_album_publisher(album_id={album_id}, publisher='{publisher_name or publisher_id}')"
         )
-        
+
         # 1. Existence Check
         if not self._album_repo_dir.get_by_id(album_id):
             raise LookupError(f"Album {album_id} not found")

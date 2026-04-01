@@ -402,7 +402,9 @@ async def remove_album_publisher(
     )
     album = service.get_album(album_id)
     if not album:
-        logger.warning(f"[SongUpdates] <- remove_album_publisher NOT_FOUND id={album_id}")
+        logger.warning(
+            f"[SongUpdates] <- remove_album_publisher NOT_FOUND id={album_id}"
+        )
         raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
 
     if not any(p.id == publisher_id for p in album.publishers):
@@ -410,7 +412,8 @@ async def remove_album_publisher(
             f"[SongUpdates] <- remove_album_publisher NOT_FOUND link={publisher_id} on album={album_id}"
         )
         raise HTTPException(
-            status_code=404, detail=f"Publisher {publisher_id} not found on album {album_id}"
+            status_code=404,
+            detail=f"Publisher {publisher_id} not found on album {album_id}",
         )
 
     try:
