@@ -429,6 +429,27 @@ class TestAlbumUpdates:
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "detail" in resp.json(), "Error response missing 'detail'"
 
+    def test_remove_album_publisher_success(self, api):
+        # DGC Records (10) is on Nevermind (100)
+        resp = api.delete("/api/v1/albums/100/publishers/10")
+        assert resp.status_code == 204, f"Expected 204, got {resp.status_code}"
+
+        # Verify removed
+        alb = api.get("/api/v1/albums/100").json()
+        pub_ids = [p["id"] for p in alb["publishers"]]
+        assert 10 not in pub_ids, f"Publisher 10 should be removed: {pub_ids}"
+
+    def test_remove_album_publisher_404_unknown_album(self, api):
+        resp = api.delete("/api/v1/albums/9999/publishers/10")
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+
+    def test_remove_album_publisher_404_missing_link(self, api):
+        # Album 200 (The Colour and the Shape) has Roswell Records (4).
+        # It DOES NOT have DGC Records (10).
+        resp = api.delete("/api/v1/albums/200/publishers/10")
+        assert resp.status_code == 404, f"Expected 404 on missing link, got {resp.status_code}"
+        assert "not found on album 200" in resp.json()["detail"]
+
 
 # ---------------------------------------------------------------------------
 # Tags  POST/DELETE /api/v1/songs/{song_id}/tags  PATCH /api/v1/tags/{tag_id}

@@ -397,10 +397,22 @@ async def remove_album_publisher(
     publisher_id: int,
     service: CatalogService = Depends(_get_service),
 ):
-    _require_album(album_id, service)
     logger.debug(
         f"[SongUpdates] -> remove_album_publisher(id={album_id}, pub_id={publisher_id})"
     )
+    album = service.get_album(album_id)
+    if not album:
+        logger.warning(f"[SongUpdates] <- remove_album_publisher NOT_FOUND id={album_id}")
+        raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
+
+    if not any(p.id == publisher_id for p in album.publishers):
+        logger.warning(
+            f"[SongUpdates] <- remove_album_publisher NOT_FOUND link={publisher_id} on album={album_id}"
+        )
+        raise HTTPException(
+            status_code=404, detail=f"Publisher {publisher_id} not found on album {album_id}"
+        )
+
     try:
         service.remove_album_publisher(album_id, publisher_id)
         logger.debug("[SongUpdates] <- remove_album_publisher OK")

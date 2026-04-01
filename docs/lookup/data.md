@@ -322,8 +322,8 @@ Batch-fetches credits for multiple albums in a single query.
 - Returns a flat list of `AlbumCredit` entities.
 - Joins with `ArtistNames` and `Roles` tables to resolve human-readable names.
 
-### add_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection) -> None
-Add a credit to an album. Get-or-creates ArtistName and Role. Does NOT commit.
+### add_credit(album_id: int, display_name: str, role_name: str, conn: sqlite3.Connection, identity_id: Optional[int] = None) -> int
+Add a credit to an album. Get-or-creates ArtistName and Role. Returns name_id. Does NOT commit.
 
 ### remove_credit(album_id: int, name_id: int, conn: sqlite3.Connection) -> None
 Remove a credit from an album. Deletes link only. Does NOT commit.

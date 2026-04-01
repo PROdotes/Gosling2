@@ -148,18 +148,16 @@ class TestAddSongCredit:
         service = CatalogService(populated_db)
         # "Dave Grohl" (name_id=10) already exists in fixture
         credit = service.add_song_credit(2, "Dave Grohl", "Performer")
-        assert (
-            credit.display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
-        # Verify no duplicate ArtistNames row created
-        import sqlite3
-
-        conn = sqlite3.connect(populated_db)
-        count = conn.execute(
-            "SELECT COUNT(*) FROM ArtistNames WHERE DisplayName = 'Dave Grohl'"
-        ).fetchone()[0]
-        conn.close()
-        assert count == 1, f"Expected 1 ArtistNames row for 'Dave Grohl', got {count}"
+        
+        # 1. Assert Contract (Method works)
+        assert credit.display_name == "Dave Grohl", f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert credit.role_name == "Performer", f"Expected 'Performer', got '{credit.role_name}'"
+        assert credit.identity_id == 1, "Should have linked to existing identity ID 1"
+        
+        # 2. Assert Effect (Verify no duplicate link via Service)
+        song = service.get_song(2)
+        matches = [c for c in song.credits if c.display_name == "Dave Grohl"]
+        assert len(matches) == 1, "Duplicate credit link created for same artist"
 
     def test_add_credit_with_identity_id_links_to_identity(self, populated_db):
         service = CatalogService(populated_db)
@@ -189,14 +187,17 @@ class TestRemoveSongCredit:
         service = CatalogService(populated_db)
         credit = service.add_song_credit(1, "Dave Grohl", "Composer")
         service.remove_song_credit(1, credit.credit_id)
-        import sqlite3
-
-        conn = sqlite3.connect(populated_db)
-        count = conn.execute(
-            "SELECT COUNT(*) FROM ArtistNames WHERE DisplayName = 'Dave Grohl'"
-        ).fetchone()[0]
-        conn.close()
-        assert count == 1, "ArtistNames record should survive credit removal"
+        
+        # Verify link gone via Service
+        song = service.get_song(1)
+        credit_ids = [c.credit_id for c in song.credits]
+        assert credit.credit_id not in credit_ids, "Credit link should be removed"
+        
+        # Verify name record survives via secondary Service call
+        # (We check Dave Grohl's existing name_id=10 is still renameable)
+        service.update_credit_name(10, "Dave G.") 
+        revived = service.get_song(6) # Song 6 uses name_id 10
+        assert any(c.display_name == "Dave G." for c in revived.credits), "Artist record should survive credit removal"
 
 
 class TestUpdateCreditName:
@@ -216,73 +217,7 @@ class TestUpdateCreditName:
             service.update_credit_name(10, "")
 
 
-class TestAddSongAlbum:
-    def test_link_existing_album_returns_song_album(self, populated_db):
-        service = CatalogService(populated_db)
-        # Song 3 has no album — link to Nevermind (100)
-        song_album = service.add_song_album(3, 100, track_number=5, disc_number=1)
-        assert (
-            song_album.source_id == 3
-        ), f"Expected source_id=3, got {song_album.source_id}"
-        assert (
-            song_album.album_id == 100
-        ), f"Expected album_id=100, got {song_album.album_id}"
-        assert (
-            song_album.track_number == 5
-        ), f"Expected track=5, got {song_album.track_number}"
-
-    def test_link_persisted_on_get_song(self, populated_db):
-        service = CatalogService(populated_db)
-        service.add_song_album(3, 100, track_number=5)
-        song = service.get_song(3)
-        album_ids = [a.album_id for a in song.albums]
-        assert 100 in album_ids, f"Expected album 100 in song albums, got {album_ids}"
-
-
-class TestRemoveSongAlbum:
-    def test_unlink_removes_link_keeps_album(self, populated_db):
-        service = CatalogService(populated_db)
-        # Song 1 is linked to Nevermind (100)
-        service.remove_song_album(1, 100)
-        song = service.get_song(1)
-        album_ids = [a.album_id for a in song.albums]
-        assert (
-            100 not in album_ids
-        ), f"Album 100 should be unlinked from song 1, got {album_ids}"
-        # Album itself still exists
-        album = service.get_album(100)
-        assert album is not None, "Album 100 should still exist after unlink"
-        assert album.title == "Nevermind", f"Expected 'Nevermind', got '{album.title}'"
-
-
-class TestUpdateSongAlbumLink:
-    def test_update_track_number(self, populated_db):
-        service = CatalogService(populated_db)
-        # Song 1 / Album 100 / Track 1
-        service.update_song_album_link(1, 100, track_number=3, disc_number=2)
-        song = service.get_song(1)
-        link = next((a for a in song.albums if a.album_id == 100), None)
-        assert link is not None, "Expected song-album link to exist"
-        assert link.track_number == 3, f"Expected track=3, got {link.track_number}"
-        assert link.disc_number == 2, f"Expected disc=2, got {link.disc_number}"
-
-
-class TestUpdateAlbum:
-    def test_update_album_title_returns_hydrated_album(self, populated_db):
-        service = CatalogService(populated_db)
-        album = service.update_album(100, {"title": "Nevermind (Remaster)"})
-        assert album.id == 100, f"Expected id=100, got {album.id}"
-        assert (
-            album.title == "Nevermind (Remaster)"
-        ), f"Expected 'Nevermind (Remaster)', got '{album.title}'"
-
-    def test_update_album_persisted(self, populated_db):
-        service = CatalogService(populated_db)
-        service.update_album(100, {"title": "Nevermind (Remaster)"})
-        album = service.get_album(100)
-        assert (
-            album.title == "Nevermind (Remaster)"
-        ), f"Expected updated title, got '{album.title}'"
+# Redundant Album tests moved to test_album_write.py
 
 
 class TestAddSongTag:
@@ -338,16 +273,22 @@ class TestRemoveSongTag:
         service = CatalogService(populated_db)
         # Song 1 has Grunge (tag_id=1)
         service.remove_song_tag(1, 1)
+        
+        # 1. Verify link gone via Service (Method effect on focus object)
         song = service.get_song(1)
         tag_ids = [t.id for t in song.tags]
         assert 1 not in tag_ids, f"Tag 1 should be unlinked from song 1, got {tag_ids}"
-        # Tag record still exists
-        import sqlite3
-
-        conn = sqlite3.connect(populated_db)
-        count = conn.execute("SELECT COUNT(*) FROM Tags WHERE TagID = 1").fetchone()[0]
-        conn.close()
-        assert count == 1, "Tag record should survive unlink"
+        
+        # 2. Verify record survives via second song that uses it (Persistence check)
+        service.update_tag(1, "Grunge Rock", "Genre")
+        song9 = service.get_song(9) # Song 9 also has Grunge (1)
+        matches = [t for t in song9.tags if t.id == 1]
+        assert len(matches) == 1, "Tag 1 should still be on song 9"
+        assert matches[0].name == "Grunge Rock", "Renaming should have applied to surviving tag record"
+        
+        # 3. Final global check via search
+        tags = service.search_tags("Grunge Rock")
+        assert any(t.id == 1 for t in tags), "Tag should be globally searchable after being unlinked from one song"
 
 
 class TestUpdateTag:

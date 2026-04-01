@@ -170,14 +170,14 @@ Update track/disc numbers for an existing song-album link.
 ### update_album(album_id: int, album_data: dict) -> Album
 Update album record fields (title, year, release_type). Returns the fully hydrated Album. Affects all linked songs globally.
 
-### add_album_credit(album_id: int, artist_name: str) -> None
-Add a credited artist to an album. Get-or-create artist name.
+### add_album_credit(album_id: int, display_name: str, role_name: str = "Performer", identity_id: Optional[int] = None) -> int
+Add a credited artist to an album. Get-or-create artist name. Returns name_id.
 
 ### remove_album_credit(album_id: int, artist_name_id: int) -> None
 Remove a credited artist from an album.
 
 ### add_album_publisher(album_id: int, publisher_name: Optional[str], publisher_id: Optional[int] = None) -> Publisher
-Add a publisher link for an album. Links by ID if publisher_id provided, otherwise get-or-creates by name. Returns the hydrated Publisher. Does NOT commit.
+Add a publisher link for an album. Links by ID if publisher_id provided, otherwise get-or-creates by name. Returns the hydrated Publisher. Commits transaction.
 
 ### remove_album_publisher(album_id: int, publisher_id: int) -> None
 Remove a publisher link from an album.
