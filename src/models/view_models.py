@@ -277,6 +277,8 @@ class SongView(BaseModel):
             blockers.append("genres")
         if not self.publishers:
             blockers.append("publishers")
+        if (self.duration_s or 0) <= 0:
+            blockers.append("duration")
         return blockers
 
 

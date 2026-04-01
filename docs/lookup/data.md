@@ -177,7 +177,7 @@ Update track/disc number for a song-album link. Does NOT commit.
 Fetch the full directory of active (non-deleted) albums, ordered by title.
 
 ### search_slim(query: str) -> List[dict]
-Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (first publisher), SongCount. No tracklist hydration. Pass empty string to get all albums.
+Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (aggregated label string), SongCount. No tracklist hydration. Pass empty string to get all albums.
 
 ### get_by_id(album_id: int) -> Optional[Album]
 Fetch a single album by its ID.

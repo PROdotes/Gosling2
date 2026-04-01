@@ -588,6 +588,11 @@ class TestSongViewReviewWorkflow:
         view = self._make_song_view(year=None)
         assert "year" in view.review_blockers
 
+    def test_ready_flow_missing_duration(self):
+        """Required: at least 1 second duration."""
+        view = self._make_song_view(duration_s=0.0)
+        assert "duration" in view.review_blockers
+
     def test_ready_flow_already_approved(self):
         """Songs already at status 0 still report blockers correctly."""
         view = self._make_song_view(processing_status=0)

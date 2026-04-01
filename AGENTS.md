@@ -114,3 +114,12 @@ If in doubt, **ask**. The default is NO code.
 - For every atomic method, you MUST provide a brief (2-3 bullet point) "Implementation Walkthrough" before writing ANY code (test or implementation).
 - Flag potential sqlite3 / logic traps (integrity errors, N+1 queries, race conditions) during the chat phase.
 - This ensures the USER can "feel the wood" and align on the micro-level approach before execution.
+
+---
+
+## 11. Vertical Slice Blueprinting (VSB)
+
+- **The Contract**: Before any code, you MUST define the path from Repo -> Service -> API -> JS in a planning matrix. 
+- **The Outcome Matrix**: Map every meaningful [Input x State] permutation (Missing IDs, Nulls, Duplicates) to a hard-outcome. **NO SILENT FALLBACKS.** 
+- **Logic Integrity**: If an ID is missing, return a hard 404/LookupError. No "ghost" resolutions.
+- **Verification**: Every outcome in the Matrix MUST have a corresponding test case.
