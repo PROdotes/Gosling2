@@ -3,7 +3,6 @@ Write tests for IdentityRepository (Aliases and Hierarchy).
 Verifies that mutations follow the 'Truth-First' integrity rules.
 """
 
-import sqlite3
 import pytest
 from src.data.identity_repository import IdentityRepository
 

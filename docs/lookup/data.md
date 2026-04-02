@@ -58,6 +58,7 @@ Update editable scalar fields for a song. Partial updates — only send changed 
 
 ### get_by_id(song_id: int) -> Optional[Song]
 Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
+Only returns non-deleted records.
 
 ### get_by_ids(ids: List[int]) -> List[Song]
 Batch-fetches core song records for multiple IDs.
@@ -76,10 +77,10 @@ Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `s
 ### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
 Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
 
-### get_by_path(path: str) -> Optional[Song]
-Fetch a song by its exact physical source path.
+### get_by_path(file_path: str) -> Optional[Song]
+Returns a Song record by its exact physical path. Returns `None` if NOT_FOUND.
 
-### get_by_hash(ahash: str) -> Optional[Song]
+### get_by_hash(file_hash: str) -> Optional[Song]
 Fetch a song by its unique audio hash.
 
 ### find_by_metadata(title: str, artists: List[str], year: Optional[int]) -> List[Song]
@@ -110,7 +111,6 @@ Batch-fetches credits for multiple songs in a single query.
 - Returns a flat list of `SongCredit` entities.
 - Includes `identity_id` by joining `ArtistNames.OwnerIdentityID`.
 - Performance optimized for list-views (Search/Folders).
-
 
 ### get_all_roles() -> List[str]
 Returns all role names from the Roles table, ordered alphabetically.
@@ -302,11 +302,11 @@ Batch-fetches tags for multiple songs (M2M).
 - Returns a flat list of `(SongID, Tag)` tuples.
 - Hydrates the `is_primary` flag from the `MediaSourceTags` table.
 
-### get_or_create_tag(name: str, category: str, cursor) -> int
-Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
-
 ### add_tag(source_id: int, name: str, category: str, conn: sqlite3.Connection) -> Tag
 Add a tag to a song. Get-or-creates the Tag record. Returns the Tag. Does NOT commit.
+
+### get_or_create_tag(name: str, category: str, cursor) -> int
+Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
 
 ### remove_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
 Remove a tag link from a song. Keeps Tag record. Does NOT commit.
@@ -358,6 +358,15 @@ Finds active identities whose DisplayName, LegalName, or Alias match the query.
 ### get_group_ids_for_members(member_ids: List[int]) -> List[int]
 Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs.
 
+### find_identity_by_name(name: str) -> Optional[int]
+Return the IdentityID for an exact (case-insensitive) ArtistName match, or None.
+
+### add_alias(identity_id: int, display_name: str, cursor: sqlite3.Cursor, name_id: Optional[int] = None) -> int
+Link a name to an identity. ID-First: If `name_id` is provided, prioritize it. Handles collision checks and potential identity merges. Returns the `NameID`.
+
+### delete_alias(name_id: int, cursor: sqlite3.Cursor) -> None
+Soft-delete an alias link. Guard: primary names cannot be deleted.
+
 ### get_aliases_batch(identity_ids: List[int]) -> Dict[int, List[ArtistName]]
 Batch-fetch aliases (ArtistNames) for multiple identities.
 
@@ -390,5 +399,3 @@ Fetch the last JSON snapshot of a deleted record.
 ### _row_to_change(row: sqlite3.Row) -> AuditChange
 ### _row_to_deleted(row: sqlite3.Row) -> DeletedRecord
 **Internal**: Maps physical database rows to the `Audit*` domain models.
-
-

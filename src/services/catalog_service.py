@@ -159,7 +159,9 @@ class CatalogService:
 
                 if isinstance(e, ReingestionConflictError):
                     ghost_id = e.ghost_id
-                    ghost_data = self._song_repo.get_by_id_including_deleted(ghost_id)
+                    ghost_data = self._song_repo.get_source_metadata_by_hash(
+                        parsed_song.audio_hash
+                    )
                     return {
                         "status": "CONFLICT",
                         "match_type": "HASH" if "audio_hash" in str(e) else "METADATA",

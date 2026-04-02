@@ -50,6 +50,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/publishers`
 - Fetches the directory of all active music publishers.
 - Wraps `CatalogService.get_all_publishers`.
+- Returns `List[PublisherView]`.
 
 ### async def get_all_albums() -> List[AlbumSlimView]
 **HTTP**: `GET /api/v1/albums`
@@ -105,12 +106,23 @@ Fetches a single Song domain model by its unique ID with full hydration.
 **HTTP**: `GET /api/v1/tags/{tag_id}/songs`
 - Fetches the full hydrated song repertoire linked to this tag.
 - Wraps `CatalogService.get_songs_by_tag`.
+- Returns `List[SongView]`.
 
-### async def get_song_web_search(song_id: int, service: CatalogService = Depends(_get_service)) -> List[dict]
+### async def get_song_web_search(song_id: int, engine: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> dict
 **HTTP**: `GET /api/v1/songs/{song_id}/web-search`
-- Triggers a background metadata discovery for a song by title/artist.
-- Returns list of search result candidates from external providers.
-- Wraps `CatalogService.get_song_web_search`.
+- Generates an external search URL for a song.
+- Returns `{"url": "... "}`.
+- Wraps `SearchService.get_search_url`.
+
+### async def add_identity_alias(identity_id: int, body: AddAliasBody) -> dict
+**HTTP**: `POST /api/v1/identities/{identity_id}/aliases`
+- Add or re-link an alias name to an identity.
+- Wraps `CatalogService.add_identity_alias`.
+
+### async def remove_identity_alias(identity_id: int, name_id: int) -> None
+**HTTP**: `DELETE /api/v1/identities/{identity_id}/aliases/{name_id}`
+- Remove an alias from an identity.
+- Wraps `CatalogService.remove_identity_alias`.
 
 ### async def get_tag_categories() -> List[str]
 **HTTP**: `GET /api/v1/tags/categories`
@@ -123,8 +135,12 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 - Wraps `CatalogService.check_ingestion`.
 
+### AddAliasBody
+`{ display_name: str, name_id: int|null }`
+Used by `add_identity_alias`.
+
 ### def get_validation_rules() -> Dict[str, Any]
-**HTTP**: `GET /api/v1/catalog/validation-rules`
+**HTTP**: `GET /api/v1/validation-rules`
 - Returns scalar field validation rules and global metadata defaults (e.g., tag categories/delimiters) for frontend use.
 
 ---
@@ -170,17 +186,19 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Triggers DB cascade and physical cleanup if in staging.
 - Returns `{"status": "DELETED", "id": song_id}`.
 
+### ConvertRequest
+`{ staged_paths: List[str] }`
+Used by `convert_and_ingest`.
+
+### async def convert_and_ingest(body: ConvertRequest, background_tasks: BackgroundTasks) -> dict
+**HTTP**: `POST /api/v1/ingest/convert`
+- Background task: convert staged WAVs to MP3 and ingest.
+- Returns immediately with `status: "CONVERTING"`.
+
 ### async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView
 **HTTP**: `POST /api/v1/ingest/resolve-conflict?ghost_id={id}&staged_path={path}`
 - Resolves a ghost record conflict by reactivating a soft-deleted record with new metadata from a staged file.
 - Wraps `CatalogService.resolve_conflict`.
-
-### async def delete_song(song_id: int) -> Dict[str, Any]
-**HTTP**: `DELETE /api/v1/ingest/songs/{song_id}`
-- Atomic hard-delete of a song by ID.
-- Triggers DB soft-delete and physical cleanup if file is in staging.
-- Returns `{"status": "DELETED", "id": song_id}`.
-- Wraps `CatalogService.delete_song`.
 
 ---
 
@@ -390,7 +408,7 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - For each name, checks whether it already exists in the DB (exact match).
 - `target="credits"` checks ArtistNames; `target="publishers"` checks Publishers.
 - Returns `[{ name, exists: bool }, ...]` in input order.
-- Wraps `CatalogService.credit_name_exists` / `CatalogService.publisher_exists`.
+- Wraps `CatalogService.resolve_identity_by_name` / `CatalogService.publisher_exists`.
 
 ### confirm(body: ConfirmRequest) -> dict
 **HTTP**: `POST /api/v1/tools/splitter/confirm`
