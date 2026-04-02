@@ -78,17 +78,21 @@ Before writing ANY code (tests, implementation, edits), classify the user's mess
 
 If in doubt, **ask**. The default is NO code.
 
-### 7.1 TDD Cadence (see `.agents/workflows/writing.md`)
+### 7.1 TDD Cadence (The "One Rule Above All")
 
-- The `/writing` workflow is the canonical execution protocol. Follow it exactly.
+- **MANDATORY**: Every line of code MUST follow the process in `docs/testing/TDD_STANDARD.md`.
+- **The /writing workflow** is the canonical execution protocol, but the definition of "Task" for GOSLING2 is strictly defined by the **per-method TDD loop** in the TDD Standard.
 - **"Atomic" means one method**, not one tool call. Use as many tools as needed to implement and test that single method correctly.
 - Every response that includes code MUST begin with the **Execution Checklist** progress status.
 - If a response contains implementation code for more than one method, it is a **VIOLATION**.
 - Cadence per method:
-  1. Write the TEST for that one method.
-  2. Write the IMPLEMENTATION for that one method.
-  3. Run formatters and local tests.
-  4. STOP. Present the diff. Wait for explicit user authorization before the next method.
+  1. Present the **Feature Chain** (Trigger -> Repo) and get approval.
+  2. Write ALL tests for method N directly to the test file. (No chat code blocks).
+  3. **HARD STOP.** Wait for explicit user review AND authorization of the tests.
+  4. Write the **IMPLEMENTATION** for exactly that one method.
+  5. Run formatters and local tests.
+  6. Present the diff. Wait for explicit user authorization before the next method.
+- **Banker Mode (Rule 113)**: Fail loudly. No defaults (0 for years, row indices for IDs). Error tests must verify DB rollback.
 - The goal is **reviewable, authorized changes** -- not minimizing tool calls.
 
 ---
@@ -97,7 +101,7 @@ If in doubt, **ask**. The default is NO code.
 
 - Vows, rules, or promises made in the chat UI are meaningless because they are lost when a new chat starts.
 - Never write "From now on I'll do X" in a conversation.
-- If a workflow rule is broken, do not apologize. Immediately document the correction in `AGENTS.md` or Open Brain so it survives the reset.
+- If a workflow rule is broken, do not apologize. Immediately documented the correction in `AGENTS.md` or Open Brain so it survives the reset.
 
 ---
 
@@ -122,4 +126,5 @@ If in doubt, **ask**. The default is NO code.
 - **The Contract**: Before any code, you MUST define the path from Repo -> Service -> API -> JS in a planning matrix. 
 - **The Outcome Matrix**: Map every meaningful [Input x State] permutation (Missing IDs, Nulls, Duplicates) to a hard-outcome. **NO SILENT FALLBACKS.** 
 - **Logic Integrity**: If an ID is missing, return a hard 404/LookupError. No "ghost" resolutions.
-- **Verification**: Every outcome in the Matrix MUST have a corresponding test case.
+- **Verification**: Every outcome in the Matrix MUST have a corresponding test case. Final verification must use `docs/testing/TDD_STANDARD.md` criteria.
+
