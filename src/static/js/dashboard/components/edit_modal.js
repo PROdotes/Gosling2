@@ -330,7 +330,7 @@ function renderChildItems() {
     _childItemsEl.innerHTML = _childItems.map((item) => `
         <span class="link-chip">
             <button class="link-chip-label" data-edit-child-id="${item.id}">${escapeHtml(item.label)}</button>
-            <button class="link-chip-remove" data-remove-child-id="${item.id}" title="Remove">✕</button>
+            ${_config.children.onRemove ? `<button class="link-chip-remove" data-remove-child-id="${item.id}" title="Remove">✕</button>` : ""}
         </span>
     `).join("");
 
@@ -369,7 +369,7 @@ async function runChildSearch(q) {
         .filter(r => !linkedIds.has(String(r.id)))
         .map(r => ({ id: r.id, label: r.label }));
     const exactMatch = results.some(r => r.label.toLowerCase() === q.toLowerCase());
-    if (!exactMatch) {
+    if (!exactMatch && _config.children.createLabel) {
         options.unshift({ id: null, label: _config.children.createLabel(q), isCreate: true, rawInput: q });
     }
     renderChildDropdown(options);

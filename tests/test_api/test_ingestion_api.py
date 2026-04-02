@@ -147,6 +147,7 @@ EXPECTED_BATCH_REPORT_FIELDS = {
     "conflicts",
     "errors",
     "results",
+    "pending_conversion",
 }
 
 

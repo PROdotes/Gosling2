@@ -187,6 +187,18 @@ class SongCreditRepository(BaseRepository):
         )
         return self._row_to_song_credit(row)
 
+    def find_by_display_name(self, display_name: str) -> Optional[int]:
+        """Return the NameID for an exact (case-insensitive) ArtistName match, or None."""
+        conn = self.get_connection()
+        try:
+            row = conn.execute(
+                "SELECT NameID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+                (display_name,),
+            ).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
     def remove_credit(self, credit_id: int, conn: sqlite3.Connection) -> None:
         """
         Remove a single SongCredits link by its CreditID. Keeps ArtistName record.

@@ -1,8 +1,9 @@
-import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats } from "../api.js";
+import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats, convertAndIngest } from "../api.js";
 import {
     escapeHtml,
     renderStatus,
 } from "../components/utils.js";
+import { openFilenameParserModal } from "../components/filename_parser_modal.js";
 
 const PATH_INPUT_ID = "ingest-path-input";
 const CHECK_BTN_ID = "ingest-check-btn";
@@ -55,6 +56,12 @@ async function collectFilesFromItems(items, allowedExtensions) {
 
 export async function renderIngestionPanel(ctx) {
     ctx.updateResultsSummary(0, "ingestion check");
+    
+    // Initialize session state for this panel
+    const state = ctx.getState();
+    if (!state.ingestTasks) {
+        state.ingestTasks = [];
+    }
 
     const DROP_ZONE_ID = "ingest-drop-zone";
     let downloadsFolder = "";
@@ -107,6 +114,7 @@ export async function renderIngestionPanel(ctx) {
 
             <div class="ingest-actions">
                 <button class="ingest-btn-secondary" id="ingest-scan-folder-btn">Scan Server Folder</button>
+                <button class="ingest-btn-secondary" id="ingest-bulk-parse-btn">Fix Metadata (Bulk)</button>
                 <button class="ingest-btn-secondary" id="ingest-clear-btn">Clear Results</button>
                 <span class="ingest-hint muted-note">Press Enter to check</span>
             </div>
@@ -116,14 +124,52 @@ export async function renderIngestionPanel(ctx) {
         </div>
     `;
 
-    setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions);
+    setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions, ctx);
     setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID);
     setupClearButton("ingest-clear-btn", RESULTS_LIST_ID);
-    setupScanFolderButton("ingest-scan-folder-btn", PATH_INPUT_ID, RESULTS_LIST_ID);
+    setupScanFolderButton("ingest-scan-folder-btn", PATH_INPUT_ID, RESULTS_LIST_ID, ctx);
     setupManualIngestHandlers(RESULTS_LIST_ID);
+    setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
 }
 
-function setupDropZone(zoneId, resultsId, allowedExtensions) {
+function appendPendingConversionCard(resultsId, stagedPaths, ctx) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+
+    const card = document.createElement("article");
+    card.className = "result-card pending-conversion-card";
+    card.innerHTML = `
+        <div class="result-card-header">
+            <span class="result-status status-pending">PENDING CONVERSION</span>
+            <span class="result-path">${stagedPaths.length} WAV file(s) ready to convert</span>
+        </div>
+        <div class="result-card-body">
+            <button class="ingest-btn-primary convert-confirm-btn">Convert &amp; Ingest</button>
+            <button class="ingest-btn-secondary convert-dismiss-btn">Dismiss</button>
+        </div>
+    `;
+
+    card.querySelector(".convert-confirm-btn").addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = "Converting…";
+        try {
+            await convertAndIngest(stagedPaths);
+            ctx.showBanner(`Converting ${stagedPaths.length} WAV file(s) in background — refresh in a moment`, "info");
+            card.remove();
+        } catch (err) {
+            btn.disabled = false;
+            btn.textContent = "Convert & Ingest";
+            ctx.showBanner(`Conversion failed: ${err.message}`, "error");
+        }
+    });
+
+    card.querySelector(".convert-dismiss-btn").addEventListener("click", () => card.remove());
+
+    list.insertBefore(card, list.firstChild);
+}
+
+function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
 
@@ -178,11 +224,15 @@ function setupDropZone(zoneId, resultsId, allowedExtensions) {
             // Show individual file results
             for (const fileResult of result.results) {
                 const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
-                appendResult(resultsId, fileResult, fileName);
+                appendResult(resultsId, fileResult, fileName, ctx);
+            }
+
+            if (result.pending_conversion?.length) {
+                appendPendingConversionCard(resultsId, result.pending_conversion, ctx);
             }
         } catch (error) {
             console.error("Drop error:", error);
-            appendResult(resultsId, { status: "ERROR", message: error.message }, "Batch Upload");
+            appendResult(resultsId, { status: "ERROR", message: error.message }, "Batch Upload", ctx);
         } finally {
             showLoading(false);
         }
@@ -201,9 +251,9 @@ function setupInputHandlers(inputId, btnId, resultsId) {
         setLoading(btn, true);
         try {
             const result = await checkIngestion(path);
-            appendResult(resultsId, result, path);
+            appendResult(resultsId, result, path, ctx);
         } catch (error) {
-            appendResult(resultsId, { status: "ERROR", message: error.message }, path);
+            appendResult(resultsId, { status: "ERROR", message: error.message }, path, ctx);
         } finally {
             setLoading(btn, false);
         }
@@ -252,10 +302,12 @@ function setupClearButton(btnId, resultsId) {
 
     btn.addEventListener("click", () => {
         list.innerHTML = "";
+        const state = ctx.getState();
+        if (state.ingestTasks) state.ingestTasks = [];
     });
 }
 
-function setupScanFolderButton(btnId, inputId, resultsId) {
+function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
     const btn = document.getElementById(btnId);
     const input = document.getElementById(inputId);
     if (!btn || !input) return;
@@ -280,10 +332,14 @@ function setupScanFolderButton(btnId, inputId, resultsId) {
             // Show individual file results
             for (const fileResult of result.results) {
                 const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
-                appendResult(resultsId, fileResult, fileName);
+                appendResult(resultsId, fileResult, fileName, ctx);
+            }
+
+            if (result.pending_conversion?.length) {
+                appendPendingConversionCard(resultsId, result.pending_conversion, ctx);
             }
         } catch (error) {
-            appendResult(resultsId, { status: "ERROR", message: error.message }, folderPath);
+            appendResult(resultsId, { status: "ERROR", message: error.message }, folderPath, ctx);
         } finally {
             btn.disabled = false;
             btn.textContent = "Scan Server Folder";
@@ -299,9 +355,20 @@ function setLoading(btn, loading) {
     btn.disabled = loading;
 }
 
-function appendResult(resultsId, result, path) {
+function appendResult(resultsId, result, path, ctx) {
     const list = document.getElementById(resultsId);
     if (!list) return;
+
+    // Track in state for bulk tools
+    const state = ctx.getState();
+    if (state.ingestTasks) {
+        state.ingestTasks.push({
+            status: result.status,
+            id: result.song?.id || result.ghost_id,
+            filename: path.split(/[/\\]/).pop() || path,
+            path: path
+        });
+    }
 
     const item = createResultCard(result, path);
     list.insertBefore(item, list.firstChild);
@@ -450,4 +517,37 @@ function createResultCard(result, path) {
     `;
 
     return card;
+}
+
+function setupBulkParseButton(btnId, resultsId, ctx) {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+
+    btn.addEventListener("click", () => {
+        const state = ctx.getState();
+        if (!state.ingestTasks || state.ingestTasks.length === 0) {
+            alert("No files to parse. Ingest some files first.");
+            return;
+        }
+
+        // We only want songs that already exist in DB (INGESTED or CONFLICT/GHOST)
+        const entries = state.ingestTasks
+            .filter(t => t.id && (t.status === "INGESTED" || t.status === "CONFLICT"))
+            .map(t => ({
+                id: t.id,
+                filename: t.filename
+            }));
+
+        if (entries.length === 0) {
+            alert("No successfully ingested songs found in the results list.");
+            return;
+        }
+
+        openFilenameParserModal({
+            entries,
+            onApply: async () => {
+                // Refresh logic if needed
+            }
+        });
+    });
 }

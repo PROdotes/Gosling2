@@ -215,3 +215,21 @@ class TestUpdateCreditName:
         assert (
             credits_song2[0].display_name == "Foo Fighters"
         ), f"Expected 'Foo Fighters' unchanged, got '{credits_song2[0].display_name}'"
+
+
+class TestFindByDisplayName:
+    def test_known_name_returns_name_id(self, populated_db):
+        repo = SongCreditRepository(populated_db)
+        result = repo.find_by_display_name("Dave Grohl")
+        assert result is not None, "Expected to find 'Dave Grohl'"
+        assert result == 10, f"Expected name_id=10, got {result}"
+
+    def test_unknown_name_returns_none(self, populated_db):
+        repo = SongCreditRepository(populated_db)
+        result = repo.find_by_display_name("Nobody Famous")
+        assert result is None, f"Expected None, got {result}"
+
+    def test_case_insensitive(self, populated_db):
+        repo = SongCreditRepository(populated_db)
+        result = repo.find_by_display_name("dave grohl")
+        assert result is not None, "Expected case-insensitive match for 'dave grohl'"

@@ -191,7 +191,57 @@
             </div>
         </div>
     </div>
-    <script type="module" src="/static/js/dashboard/main.js"></script>
+    <div id="filename-parser-modal" class="link-modal-overlay" style="display:none">
+        <div class="link-modal" style="max-width:800px">
+            <div class="link-modal-header">
+                <span class="link-modal-title">Bulk Parse Filenames</span>
+                <button class="link-modal-close" data-action="close-filename-parser-modal">✕</button>
+            </div>
+            <div class="link-modal-body" style="padding: 1.5rem;">
+                <div class="section-title" style="margin-bottom:0.75rem;">Pattern Builder</div>
+                <div class="muted-note" style="margin-bottom:1.25rem;">
+                    Click tokens to add them to your pattern. Order matters. Use <code>{Ignore}</code> for junk.
+                </div>
+                
+                <div id="filename-parser-tokens" class="token-container" style="margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+                    <!-- Tokens will be injected here: {Artist}, {Title}, etc. -->
+                </div>
+
+                <div class="ingest-input-row" style="margin-bottom: 1.5rem;">
+                    <div style="flex:1; position:relative;">
+                        <input type="text" id="filename-pattern-input" class="link-modal-input" 
+                               placeholder="{Artist} - {Title}" 
+                               style="width: 100%; font-family: monospace; padding-right: 3rem;" autocomplete="off">
+                        <div id="pattern-valid-indicator" style="position:absolute; right:1rem; top:50%; transform:translateY(-50%); font-size:1.1rem;"></div>
+                    </div>
+                    <select id="filename-preset-select" class="link-modal-input" style="width: auto; max-width:180px;">
+                        <option value="">(No Preset)</option>
+                        <option value="{Artist} - {Title}">{Artist} - {Title}</option>
+                        <option value="{Artist} - {Title} ({Ignore})">{Artist} - {Title} (...)</option>
+                        <option value="{Ignore} - {Artist} - {Title}"># - Artist - Title</option>
+                    </select>
+                </div>
+
+                <div class="section-title" style="margin-bottom:0.75rem;">Live Preview</div>
+                <div class="preview-table-wrapper">
+                    <table class="preview-table">
+                        <thead id="filename-preview-thead">
+                            <!-- Dynamic headers based on tokens -->
+                        </thead>
+                        <tbody id="filename-preview-tbody">
+                            <!-- Dynamic rows based on filenames -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2rem;">
+                    <button class="ingest-btn-secondary" data-action="close-filename-parser-modal">Cancel</button>
+                    <button id="filename-parser-apply-btn" class="ingest-btn-primary" disabled>Apply Metadata</button>
+                </div>
+            </div>
+        </div>
+    </div>
+<script type="module" src="/static/js/dashboard/main.js"></script>
 </body>
 
 </html>

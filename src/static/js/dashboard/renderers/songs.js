@@ -107,9 +107,19 @@ function renderCreditsGroups(credits, songId, allRoles) {
                                     data-action="open-edit-modal"
                                     data-chip-type="credit"
                                     data-song-id="${songId}"
-                                    data-item-id="${credit.name_id}">
+                                    data-item-id="${credit.name_id}"
+                                    data-identity-id="${credit.identity_id || ''}">
                                 ${escapeHtml(credit.display_name || "-")}
                             </button>
+                            <button class="link-chip-split"
+                                    data-action="open-splitter-modal"
+                                    data-song-id="${songId}"
+                                    data-text="${escapeHtml(credit.display_name || "")}"
+                                    data-target="credits"
+                                    data-classification="${escapeHtml(role)}"
+                                    data-remove-type="credit"
+                                    data-remove-id="${credit.credit_id}"
+                                    title="Split">⋯</button>
                             <button class="link-chip-remove"
                                     data-action="remove-credit"
                                     data-song-id="${songId}"
@@ -389,6 +399,23 @@ function renderSongsCards(ctx, songs) {
         clearSort(ctx);
     });
 
+    ctx.elements.resultsContainer.querySelector("[data-action='bulk-parse-library']")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const state = ctx.getState();
+        const songs = state.displayedItems || [];
+        if (!songs.length) return;
+
+        import("../components/filename_parser_modal.js").then(m => {
+            m.openFilenameParserModal({
+                entries: songs.map(s => ({ id: s.id, filename: s.media_name || s.title })),
+                onApply: async () => {
+                    // Search view usually refreshes on navigate or state change
+                    // No easy way to 'refresh' current specific search filter without re-triggering main search
+                }
+            });
+        });
+    });
+
     updateSortButtonStates();
 }
 
@@ -493,14 +520,17 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                     <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
                 </div>
                 <div style="display: flex; gap: 0.5rem;">
+                    <button class="ingest-btn-secondary" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop().replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, ""))}" title="Parse filename for metadata">
+                        Parse Filename
+                    </button>
                     <button class="ingest-btn-secondary" data-action="open-spotify-modal" data-song-id="${song.id}" data-title="${escapeHtml(song.media_name || song.title)}">
                         Spotify ⇅
                     </button>
+                    <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
+                    Search
+                    </button>
                     <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
                         ▶ Play
-                    </button>
-                    <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
-                        Search
                     </button>
                     <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
                         Delete
@@ -613,6 +643,14 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                             ${dbPublishers.length ? dbPublishers.map(p => `
                                 <span class="link-chip">
                                     <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="publisher" data-item-id="${p.id}">${escapeHtml(p.name)}</button>
+                                    <button class="link-chip-split"
+                                            data-action="open-splitter-modal"
+                                            data-song-id="${song.id}"
+                                            data-text="${escapeHtml(p.name)}"
+                                            data-target="publishers"
+                                            data-remove-type="publisher"
+                                            data-remove-id="${p.id}"
+                                            title="Split">⋯</button>
                                     <button class="link-chip-remove" data-action="remove-publisher" data-song-id="${song.id}" data-publisher-id="${p.id}" title="Remove">✕</button>
                                 </span>
                             `).join("") : '<span class="muted-note">None</span>'}

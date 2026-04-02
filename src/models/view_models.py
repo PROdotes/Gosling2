@@ -540,6 +540,7 @@ class BatchIngestReport(BaseModel):
     conflicts: int = 0
     errors: int
     results: List[IngestionReportView]
+    pending_conversion: List[str] = []
 
 
 PublisherView.model_rebuild()

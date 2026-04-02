@@ -245,3 +245,20 @@ class TestSetParent:
         assert (
             roswell.parent_id is None
         ), f"Expected Roswell Records parent_id=None unchanged, got {roswell.parent_id}"
+
+
+class TestFindByName:
+    def test_known_name_returns_id(self, populated_db):
+        repo = PublisherRepository(populated_db)
+        result = repo.find_by_name("Sub Pop")
+        assert result == 5, f"Expected publisher_id=5, got {result}"
+
+    def test_unknown_name_returns_none(self, populated_db):
+        repo = PublisherRepository(populated_db)
+        result = repo.find_by_name("Nobody Records")
+        assert result is None, f"Expected None, got {result}"
+
+    def test_case_insensitive(self, populated_db):
+        repo = PublisherRepository(populated_db)
+        result = repo.find_by_name("sub pop")
+        assert result is not None, "Expected case-insensitive match for 'sub pop'"

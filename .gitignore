@@ -76,3 +76,6 @@ tests/test_repositories.py
 tools/
 # OpenCode artifact
 nul
+
+# FFmpeg binaries
+ffmpeg/

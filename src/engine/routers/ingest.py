@@ -3,8 +3,9 @@ import shutil
 from typing import Optional
 from uuid import uuid4
 from pathlib import Path
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from src.models.view_models import (
     SongView,
@@ -13,8 +14,14 @@ from src.models.view_models import (
     IngestionReportView,
 )
 from src.services.catalog_service import CatalogService
+from src.services.converter import convert_to_mp3
 from src.services.logger import logger
-from src.engine.config import get_db_path, STAGING_DIR, ACCEPTED_EXTENSIONS
+from src.engine.config import (
+    get_db_path,
+    STAGING_DIR,
+    ACCEPTED_EXTENSIONS,
+    WAV_AUTO_CONVERT,
+)
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 
@@ -98,23 +105,83 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
             detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
         )
 
-    # 3. Batch ingest
+    # 3. Split WAVs from MP3s
+    wav_paths = [p for p in staged_paths if Path(p).suffix.lower() == ".wav"]
+    ingest_paths = [p for p in staged_paths if Path(p).suffix.lower() != ".wav"]
+    pending_conversion = []
+
+    if wav_paths:
+        if WAV_AUTO_CONVERT:
+            for wav in wav_paths:
+                try:
+                    mp3 = convert_to_mp3(Path(wav))
+                    ingest_paths.append(str(mp3))
+                except RuntimeError as e:
+                    logger.error(f"[IngestRouter] WAV conversion failed for {wav}: {e}")
+        else:
+            pending_conversion = wav_paths
+
+    if not ingest_paths and pending_conversion:
+        return BatchIngestReport(
+            total_files=0,
+            ingested=0,
+            duplicates=0,
+            errors=0,
+            results=[],
+            pending_conversion=pending_conversion,
+        )
+
+    # 4. Batch ingest
     try:
         service = _get_service()
-        batch_report = service.ingest_batch(staged_paths)
+        batch_report = service.ingest_batch(ingest_paths)
 
-        # 4. Convert Domain Songs to SongViews for frontend compatibility
+        # 5. Convert Domain Songs to SongViews for frontend compatibility
         for result in batch_report["results"]:
             if "song" in result and result["song"]:
                 result["song"] = SongView.from_domain(result["song"])
 
-        return BatchIngestReport(**batch_report)
+        return BatchIngestReport(**batch_report, pending_conversion=pending_conversion)
 
     except Exception as e:
         logger.error(f"[IngestRouter] Batch ingestion error: {e}")
         raise HTTPException(
             status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
         )
+
+
+class ConvertRequest(BaseModel):
+    staged_paths: list[str]
+
+
+def _run_convert_and_ingest(staged_paths: list[str]) -> None:
+    """Background task: convert staged WAVs to MP3 and ingest."""
+    service = _get_service()
+    ingest_paths = []
+    for wav in staged_paths:
+        try:
+            mp3 = convert_to_mp3(Path(wav))
+            ingest_paths.append(str(mp3))
+        except RuntimeError as e:
+            logger.error(f"[IngestRouter] Background conversion failed for {wav}: {e}")
+    if ingest_paths:
+        service.ingest_batch(ingest_paths)
+
+
+@router.post("/convert")
+async def convert_and_ingest(body: ConvertRequest, background_tasks: BackgroundTasks):
+    """
+    Convert staged WAV files to MP3 and ingest them in the background.
+    Called by the frontend after the user confirms conversion.
+    Returns immediately — ingestion panel should refresh after a moment.
+    """
+    if not body.staged_paths:
+        raise HTTPException(status_code=400, detail="No staged paths provided")
+    background_tasks.add_task(_run_convert_and_ingest, body.staged_paths)
+    logger.info(
+        f"[IngestRouter] -> convert_and_ingest(count={len(body.staged_paths)}) queued"
+    )
+    return {"status": "CONVERTING", "count": len(body.staged_paths)}
 
 
 @router.post("/resolve-conflict")

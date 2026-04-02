@@ -5,6 +5,8 @@ import {
     fetchValidationRules,
     getAlbumDetail,
     getArtistSongs,
+    addIdentityAlias,
+    removeIdentityAlias,
     getArtistTree,
     getAuditHistory,
     getCatalogSong,
@@ -46,6 +48,7 @@ import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { openScrubberModal, closeScrubberModal } from "./components/scrubber_modal.js";
 import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.js";
+import { openSplitterModal, closeSplitterModal } from "./components/splitter_modal.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -476,6 +479,10 @@ function isModalOpen() {
     if (scrubberModal && scrubberModal.style.display === "flex") return true;
     const spotifyModal = document.getElementById("spotify-modal");
     if (spotifyModal && spotifyModal.style.display === "flex") return true;
+    const splitterModal = document.getElementById("splitter-modal");
+    if (splitterModal && splitterModal.style.display === "flex") return true;
+    const filenameParserModal = document.getElementById("filename-parser-modal");
+    if (filenameParserModal && filenameParserModal.style.display === "flex") return true;
     return false;
 }
 
@@ -488,7 +495,7 @@ document.addEventListener("click", async (event) => {
     // or is a close-modal action.
     const { action } = actionTarget.dataset;
     const isModalComponent = actionTarget.closest(".link-modal");
-    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal" || action === "close-spotify-modal";
+    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal" || action === "close-spotify-modal" || action === "close-splitter-modal" || action === "close-filename-parser-modal";
 
     if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
@@ -580,9 +587,17 @@ document.addEventListener("click", async (event) => {
 
     if (action === "open-spotify-modal") {
         const { songId, title } = actionTarget.dataset;
+        // Truth-First: Use the hydrated active song if it matches, otherwise fallback to cache
+        let song = state.cachedSongs.find(s => String(s.id) === String(songId));
+        if (state.activeSong && String(state.activeSong.id) === String(songId)) {
+            song = state.activeSong;
+        }
+
         openSpotifyModal({
             songId,
             title,
+            existingCredits: song?.credits || [],
+            existingPublishers: song?.publishers || [],
             onComplete: () => {
                 refreshActiveDetail();
                 ctx.showBanner("Spotify credits imported successfully", "success");
@@ -593,6 +608,49 @@ document.addEventListener("click", async (event) => {
 
     if (action === "close-spotify-modal") {
         closeSpotifyModal();
+        return;
+    }
+
+    if (action === "open-splitter-modal") {
+        const { songId, text, target, classification, removeType, removeId } = actionTarget.dataset;
+        openSplitterModal({
+            songId,
+            text,
+            target,
+            classification: classification || null,
+            remove: { type: removeType, id: Number(removeId) },
+            separators: state.validationRules?.credit_separators || [],
+            onConfirm: () => {
+                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+                if (song) openSongDetail(song, { reuseFileData: true });
+            },
+        });
+        return;
+    }
+
+    if (action === "open-filename-parser-single") {
+        const { id, filename } = actionTarget.dataset;
+        import("./components/filename_parser_modal.js").then(m => {
+            m.openFilenameParserModal({
+                entries: [{ id: Number(id), filename }],
+                onApply: async () => {
+                    const song = state.cachedSongs.find(s => String(s.id) === String(id));
+                    if (song) openSongDetail(song, { reuseFileData: true });
+                    ctx.showBanner("Metadata applied", "success");
+                },
+                onError: (msg) => ctx.showBanner(msg, "error"),
+            });
+        });
+        return;
+    }
+
+    if (action === "close-splitter-modal") {
+        closeSplitterModal();
+        return;
+    }
+
+if (action === "close-filename-parser-modal") {
+        import("./components/filename_parser_modal.js").then(m => m.closeFilenameParserModal());
         return;
     }
 
@@ -823,40 +881,43 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    async function syncAlbumWithSong(albumId, songId) {
+        const song = await getCatalogSong(songId);
+        const albumDetail = await getAlbumDetail(albumId);
+
+        const ops = [];
+
+        // Year — only if missing
+        if (!albumDetail.release_year && song.year) {
+            ops.push(updateAlbum(albumId, { release_year: song.year }));
+        }
+
+        // Credits — add song performers not already on album (match by name_id)
+        const existingNameIds = new Set((albumDetail.credits || []).map(c => String(c.name_id)));
+        for (const credit of (song.credits || [])) {
+            if (credit.role_name !== "Performer") continue;
+            if (!existingNameIds.has(String(credit.name_id))) {
+                ops.push(addAlbumCredit(albumId, credit.display_name, credit.role_name, credit.identity_id ?? null));
+            }
+        }
+
+        // Publishers — add song publishers not already on album (match by id)
+        const existingPubIds = new Set((albumDetail.publishers || []).map(p => String(p.id)));
+        for (const pub of (song.publishers || [])) {
+            if (!existingPubIds.has(String(pub.id))) {
+                ops.push(addAlbumPublisher(albumId, pub.name, pub.id));
+            }
+        }
+
+        await Promise.all(ops);
+    }
+
     if (action === "sync-album-from-song") {
         const { albumId, songId } = actionTarget.dataset;
         actionTarget.disabled = true;
         actionTarget.textContent = "syncing...";
         try {
-            const song = await getCatalogSong(songId);
-            const albumDetail = await getAlbumDetail(albumId);
-
-            const ops = [];
-
-            // Title — only if album title looks like a placeholder or matches song title already (skip — title is intentional)
-            // Year — only if missing
-            if (!albumDetail.release_year && song.year) {
-                ops.push(updateAlbum(albumId, { release_year: song.year }));
-            }
-
-            // Credits — add song performers not already on album (match by name_id)
-            const existingNameIds = new Set((albumDetail.credits || []).map(c => String(c.name_id)));
-            for (const credit of (song.credits || [])) {
-                if (credit.role_name !== "Performer") continue;
-                if (!existingNameIds.has(String(credit.name_id))) {
-                    ops.push(addAlbumCredit(albumId, credit.display_name, credit.role_name, credit.identity_id ?? null));
-                }
-            }
-
-            // Publishers — add song publishers not already on album (match by id)
-            const existingPubIds = new Set((albumDetail.publishers || []).map(p => String(p.id)));
-            for (const pub of (song.publishers || [])) {
-                if (!existingPubIds.has(String(pub.id))) {
-                    ops.push(addAlbumPublisher(albumId, pub.name, pub.id));
-                }
-            }
-
-            await Promise.all(ops);
+            await syncAlbumWithSong(albumId, songId);
             const s = state.cachedSongs.find(s => String(s.id) === String(songId));
             if (s) openSongDetail(s, { reuseFileData: true });
         } catch (err) {
@@ -952,19 +1013,42 @@ document.addEventListener("click", async (event) => {
                 children: null,
             }, actionTarget);
         } else if (chipType === "credit") {
-            const songId = actionTarget.dataset.songId;
-            const albumId = actionTarget.dataset.albumId;
-            const displayName = actionTarget.textContent.trim();
+            const identityId = actionTarget.dataset.identityId;
+            if (!identityId) return;
+
+            const identity = await getArtistTree(identityId).catch(() => null);
+            if (!identity) return;
+
+            const aliases = (identity.aliases || []).filter(a =>
+                a.display_name !== identity.display_name
+            );
+            const childItems = aliases.map(a => ({ id: a.id, label: a.display_name }));
 
             openEditModal({
-                title: "Global Name Edit",
-                name: displayName,
-                onRename: async (newName) => {
-                    await updateCreditName(songId || albumId, itemId, newName);
-                },
+                title: "Edit Artist",
+                name: identity.legal_name || identity.display_name,
+                onRename: null,
                 onClose,
                 category: null,
-                children: null,
+                children: {
+                    label: "Aliases",
+                    items: childItems,
+                    onSearch: async (q) => {
+                        const results = await searchArtists(q);
+                        return (results || []).map(i => ({ id: i.id, label: i.display_name }));
+                    },
+                    onAdd: async (opt) => {
+                        const result = await addIdentityAlias(identityId, opt.rawInput || opt.label, opt.id);
+                        childItems.push({ id: result.name_id, label: result.display_name });
+                    },
+                    onRemove: async (item) => {
+                        await removeIdentityAlias(identityId, item.id);
+                    },
+                    onRenameChild: async (item, newName) => {
+                        await updateCreditName(0, item.id, newName);
+                    },
+                    createLabel: (q) => `Add "${q}" as alias`,
+                },
             }, actionTarget);
         }
         return;
@@ -1144,7 +1228,17 @@ document.addEventListener("click", async (event) => {
                     return (results || []).map(a => ({ id: a.id, label: a.title }));
                 },
                 onAdd: async (opt) => {
-                    await addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
+                    const isNew = !opt.id;
+                    const res = await addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
+                    
+                    if (isNew && res && res.album_id) {
+                        try {
+                            await syncAlbumWithSong(res.album_id, songId);
+                        } catch (err) {
+                            console.warn("Auto-sync for new album failed (but album was created):", err);
+                        }
+                    }
+
                     const song = state.cachedSongs.find(s => String(s.id) === String(songId));
                     if (song) openSongDetail(song, { reuseFileData: true });
                 },

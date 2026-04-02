@@ -6,6 +6,20 @@
 
 ---
 
+## FilenameParser
+*Location: `src/services/filename_parser.py`*
+**Responsibility**: Compiles user-defined patterns into regular expressions to extract metadata from file stems.
+
+### parse_with_pattern(filename: str, pattern: str) -> Dict[str, str]
+Parses the filename (stem) using tokens like {Artist}, {Title}, and {Ignore}.
+- **Greedy**: The final token captures all remaining text.
+- **Sanitized**: Discards {Ignore} segments and strips whitespace from results.
+- **Identity Result**: Returns an empty dict if the pattern does not fully explain the stem.
+
+---
+
+
+
 ## CatalogService
 
 *Location: `src/services/catalog_service.py`_
@@ -19,10 +33,7 @@ Fetch a single song and all its credits by ID.
 - Uses `_hydrate_songs` to attach all credits, albums, and publishers.
 
 ### search_songs_slim(query: str) -> List[dict]
-
-Surface slim search. Returns raw dicts for `SongSlimView` — no hydration.
-
-- Logic: Calls `SongRepository.search_slim`.
+(-> `SongRepository.search_slim`)
 
 ### search_songs_deep_slim(query: str) -> List[dict]
 
@@ -58,6 +69,14 @@ Fetch a single Identity and all its aliases/members/groups by ID.
 
 Fetch a list of all active identities.
 
+### credit_name_exists(display_name: str) -> bool
+
+Returns True if an ArtistName with this exact display name exists in the DB. Wraps `SongCreditRepository.find_by_display_name`.
+
+### publisher_exists(name: str) -> bool
+
+Returns True if a Publisher with this exact name exists in the DB. Wraps `PublisherRepository.find_by_name`.
+
 ### search_identities(query: str) -> List[Identity]
 
 Search for identities by name or alias.
@@ -81,8 +100,7 @@ Fetch the full directory of albums with hydrated publishers, credits, and songs.
 Search for publishers by name match with resolved hierarchy chains.
 
 ### search_albums_slim(query: str) -> List[dict]
-
-Slim album search. Returns raw dicts for `AlbumSlimView` — no tracklist hydration. Pass empty string to get all albums.
+(-> `AlbumRepository.search_slim`)
 
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 
@@ -97,16 +115,14 @@ Fetch a single album by ID and hydrate its publishers, credits, and songs.
 Fetch the full song repertoire (Master rights) for a given publisher.
 
 ### get_all_tags() -> List[Tag]
-
-Fetch the directory of all active metadata tags.
+(-> `TagRepository.get_all`)
 
 ### search_tags(query: str) -> List[Tag]
 
 Search for tags by name match.
 
 ### get_tag_categories() -> List[str]
-
-Fetch all distinct tag categories currently present in the database.
+(-> `TagRepository.get_categories`)
 
 ### get_tag(tag_id: int) -> Optional[Tag]
 
@@ -185,8 +201,7 @@ Parallel batch ingestion of multiple already-staged files.
 Update editable scalar fields (media_name, year, bpm, isrc, is_active). Validates values per spec rules. Returns the fully hydrated Song. Raises ValueError on validation failure, LookupError if not found.
 
 ### get_all_roles() -> List[str]
-
-Fetch the list of all available artist credit roles from the database.
+(-> `SongCreditRepository.get_all_roles`)
 
 ### add_song_credit(song_id: int, display_name: str, role_name: str, identity_id: Optional[int] = None) -> SongCredit
 
@@ -199,6 +214,20 @@ Remove a credit link from a song by credit_id. Keeps the artist name record.
 ### update_credit_name(name_id: int, new_name: str) -> None
 
 Update an artist's display name globally (affects all songs linked to that artist).
+
+### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int] = None) -> int
+
+Link a new or existing alias name to an identity (Truth-First mapping).
+- **ID-First**: Prioritizes `name_id` for explicit re-linking. Supports `IdentityID` fallback for search results.
+- **Hierarchy Guard**: Re-parenting of a Primary Name is only permitted for **Solo Identities** (0 other active aliases). Raises `ValueError` for parent identities.
+- **Null-is-New**: If `name_id` is null, the name MUST be truly new. Raises `ValueError` on string collision with another identity.
+- **Audit**: Logs 'IDENTITY_ALIAS_ADD' in ActionLog.
+
+### remove_identity_alias(name_id: int) -> None
+
+Remove an alias mapping.
+- Guard: Raises ValueError if trying to delete a Primary Name.
+- Audit: Logs 'IDENTITY_ALIAS_REMOVE' in ActionLog.
 
 ### add_song_album(song_id: int, album_id: int, track_number: Optional[int], disc_number: Optional[int]) -> SongAlbum
 
@@ -385,6 +414,14 @@ Splits a raw credit string into a list of alternating `name` and `sep` tokens.
 - Preserves exact text — no stripping.
 - Returns `[]` for empty input. Returns a single name token if no separators match.
 - Each token: `{"type": "name"|"sep", "text": str}`
+
+### resolve_names(tokens: List[dict]) -> List[str]
+
+Collapses a token list into resolved name strings based on separator toggle state.
+
+- Sep tokens without `ignore` are split points — a new name starts after them.
+- Sep tokens with `ignore: True` are folded into the adjacent name text.
+- Returns `[]` for empty input.
 
 ---
 

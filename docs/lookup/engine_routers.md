@@ -344,6 +344,61 @@ Fetches a single Song domain model by its unique ID with full hydration.
 
 ---
 
+## Tools Router
+*Location: `src/engine/routers/tools.py`*
+**Responsibility**: Consolidated stateless utility endpoints (Parsing, Splitting, Tokenization).
+
+### FilenamePreviewRequest
+`{ filenames: List[str], pattern: str }`
+
+### FilenameApplyItem
+`{ song_id: int, filename: str }`
+
+### FilenameApplyRequest
+`{ items: List[FilenameApplyItem], pattern: str }`
+
+### TokenizeRequest
+`{ text: str, separators: List[str] }`
+
+### PreviewRequest
+`{ names: List[str], target: "credits"|"publishers" }`
+
+### RemoveRef
+`{ type: "credit"|"publisher", id: int }`
+
+### ConfirmRequest
+`{ song_id: int, tokens: List[dict], target: "credits"|"publishers", classification: str|null, remove: RemoveRef }`
+
+### filename_parser_preview(body: FilenamePreviewRequest) -> dict
+**HTTP**: `POST /api/v1/tools/filename-parser/preview`
+- Takes a list of filenames and a pattern.
+- Returns a list of parsed metadata results for as-you-type previews.
+- Wraps `src/services/filename_parser.py`.
+
+### filename_parser_apply(body: FilenameApplyRequest) -> dict
+**HTTP**: `POST /api/v1/tools/filename-parser/apply`
+- Parses each filename and applies extracted metadata to the DB.
+- Handles: Title, Year, BPM, ISRC (scalars), Artist (Performer credit), Genre (tag), Publisher.
+
+### tokenize(body: TokenizeRequest) -> List[dict]
+**HTTP**: `POST /api/v1/tools/splitter/tokenize`
+- Splits a raw credit string into alternating name/sep tokens.
+- Wraps `tokenize_credits` from `src/services/tokenizer.py`.
+
+### preview(body: PreviewRequest) -> List[dict]
+**HTTP**: `POST /api/v1/tools/splitter/preview`
+- For each name, checks whether it already exists in the DB (exact match).
+- `target="credits"` checks ArtistNames; `target="publishers"` checks Publishers.
+- Returns `[{ name, exists: bool }, ...]` in input order.
+- Wraps `CatalogService.credit_name_exists` / `CatalogService.publisher_exists`.
+
+### confirm(body: ConfirmRequest) -> dict
+**HTTP**: `POST /api/v1/tools/splitter/confirm`
+- Resolves token list into names via `resolve_names`, then adds each as a credit or publisher and removes the original.
+- Wraps `CatalogService.add_song_credit` / `add_song_publisher` / `remove_song_credit` / `remove_song_publisher`.
+
+---
+
 ## Spotify Router
 *Location: `src/engine/routers/spotify.py`*
 **Responsibility**: Stateless text parsing and atomic bulk credits ingestion.

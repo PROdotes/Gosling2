@@ -36,6 +36,27 @@ def tokenize_credits(text: str, separators: List[str]) -> List[dict]:
             tokens.append({"type": "name", "text": remaining[:earliest_idx]})
 
         tokens.append({"type": "sep", "text": earliest_sep})
-        remaining = remaining[earliest_idx + len(earliest_sep):]
+        remaining = remaining[earliest_idx + len(earliest_sep) :]
 
     return tokens
+
+
+def resolve_names(tokens: List[dict]) -> List[str]:
+    """
+    Collapse a token list into a list of name strings.
+    Sep tokens with ignore=True are folded into the adjacent name.
+    Sep tokens without ignore (the default) are split points.
+    """
+    names = []
+    current = []
+    for token in tokens:
+        if token["type"] == "name":
+            current.append(token["text"])
+        elif token.get("ignore"):
+            current.append(token["text"])
+        elif current:
+            names.append("".join(current))
+            current = []
+    if current:
+        names.append("".join(current))
+    return [n.strip() for n in names if n.strip()]

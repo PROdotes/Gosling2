@@ -118,6 +118,9 @@ Returns all role names from the Roles table, ordered alphabetically.
 ### get_or_create_role(role_name: str, cursor) -> int
 Get-or-create a Role by name. Returns role_id.
 
+### find_by_display_name(display_name: str) -> Optional[int]
+Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or None. Read-only.
+
 ### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None) -> int
 Get-or-create an ArtistName by display name, with optional explicit identity linking. Reactivates soft-deleted records. Creates linked Identity if needed. Returns name_id.
 
@@ -224,6 +227,9 @@ Surface search for publishers by name match only (no recursive expansion).
 
 ### search_deep(query: str) -> List[Publisher]
 Deep recursive search for publishers using a CTE. Returns matching publishers AND all their descendants (children, grandchildren). Used by the deep song search expansion leg only.
+
+### find_by_name(name: str) -> Optional[int]
+Exact case-insensitive lookup of a Publisher by PublisherName. Returns PublisherID or None. Read-only.
 
 ### get_by_id(publisher_id: int) -> Optional[Publisher]
 Fetch a single publisher by its ID.

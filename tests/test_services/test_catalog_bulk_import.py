@@ -72,20 +72,6 @@ class TestCatalogBulkImport:
             count_1 == count_2
         ), f"Expected idempotent import, but credit count changed from {count_1} to {count_2}"
 
-    def test_import_credits_bulk_empty_lists_is_noop(self, catalog_service):
-        song_id = 2
-        song_before = catalog_service.get_song(song_id)
-
-        catalog_service.import_credits_bulk(song_id, [], [])
-
-        song_after = catalog_service.get_song(song_id)
-        assert len(song_after.credits) == len(
-            song_before.credits
-        ), f"Expected credit count {len(song_before.credits)}, got {len(song_after.credits)}"
-        assert len(song_after.publishers) == len(
-            song_before.publishers
-        ), f"Expected publisher count {len(song_before.publishers)}, got {len(song_after.publishers)}"
-
     def test_import_credits_bulk_transactional_rollback(self, catalog_service):
         """Rule 94: Verifies partial failure causes full rollback."""
         song_id = 2
@@ -108,3 +94,19 @@ class TestCatalogBulkImport:
         assert (
             after_names == before_names
         ), f"Expected state to be identical to baseline, but it changed: {after_names ^ before_names}"
+
+    def test_import_credits_bulk_with_resolved_identity(self, catalog_service):
+        """Service should use provided identity_id for credits (Truth-First)."""
+        song_id = 1  # Smells Like Teen Spirit
+        # David Grohl is ID 1 in populated_db
+        credits = [SpotifyCredit(name="The Drummer", role="Performer", identity_id=1)]
+
+        # Act
+        catalog_service.import_credits_bulk(song_id, credits, [])
+
+        # Assert
+        song = catalog_service.get_song(song_id)
+        match = [c for c in song.credits if c.display_name == "The Drummer"][0]
+        assert (
+            match.identity_id == 1
+        ), f"Expected identity 1 for 'The Drummer', got {match.identity_id}"

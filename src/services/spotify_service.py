@@ -84,7 +84,9 @@ class SpotifyService:
                 if not current_name:
                     continue  # orphaned role
                 for r in line.split("\u2022"):
-                    if (credit_role := r.strip()) and credit_role.lower() in role_keywords:
+                    if (
+                        credit_role := r.strip()
+                    ) and credit_role.lower() in role_keywords:
                         credits.append(
                             SpotifyCredit(name=current_name, role=credit_role)
                         )

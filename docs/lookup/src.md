@@ -3,6 +3,13 @@
 
 ---
 
+## FilenameParser
+*Location: `src/services/filename_parser.py`*
+**Responsibility**: Pattern-to-Regex compiler for extracting metadata from filename stems. Supports tokens like {Artist}, {Title}, and {Ignore}.
+
+---
+
+
 ## engine_server
 *Location: `src/engine_server.py`*
 **Responsibility**: FastAPI application setup, CORS middleware, and routing for the entire API.

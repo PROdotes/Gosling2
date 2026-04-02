@@ -188,6 +188,16 @@ Tests import the function directly too. No wrapper class, no fixture, no DB setu
 
 ---
 
+## UI Feedback Standard
+
+Use `ctx.showBanner(message, type)` for all user-facing feedback. Never use `alert()`, `confirm()`, or browser-native popups. Never use toast libraries.
+
+- Success: `ctx.showBanner("Done", "success")`
+- Error: `ctx.showBanner("Something failed", "error")`
+- Info: `ctx.showBanner("Note", "info")`
+
+---
+
 ## Checklist (run through this before submitting tests for review)
 
 - [ ] Plan was presented and approved before tests were written

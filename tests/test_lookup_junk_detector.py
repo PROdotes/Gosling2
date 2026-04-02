@@ -161,7 +161,9 @@ class TestLookupJunkDetector:
                 if not py_file_path.endswith(".py") and not os.path.isdir(abs_py_path):
                     continue
 
-                if name not in actual:
+                # Strip Markdown backslash escapes (e.g. \_method_name)
+                clean_name = name.replace("\\", "")
+                if clean_name not in actual:
                     ghost_errors.append(
                         f"[GHOST SIGNATURE] '{name}' documented in {rel_md}:{line_num} not found in `{py_file_path}`"
                     )

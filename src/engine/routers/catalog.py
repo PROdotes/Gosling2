@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from typing import List, Optional
 from src.models.view_models import (
     SongView,
@@ -20,6 +21,7 @@ from src.engine.config import (
     TAG_CATEGORY_DELIMITER,
     TAG_INPUT_FORMAT,
     DEFAULT_SEARCH_ENGINE,
+    DEFAULT_CREDIT_SEPARATORS,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
@@ -110,6 +112,35 @@ async def search_identities(q: str) -> List[IdentityView]:
     logger.debug(f"[CatalogRouter] search_identities(q='{q}')")
     identities = _get_service().search_identities(q)
     return [IdentityView.from_domain(i) for i in identities]
+
+
+class AddAliasBody(BaseModel):
+    display_name: str
+    name_id: Optional[int] = None
+
+
+@router.post("/identities/{identity_id:int}/aliases")
+async def add_identity_alias(identity_id: int, body: AddAliasBody) -> dict:
+    """Add or re-link an alias name to an identity."""
+    try:
+        # Pass the name_id from the body to the service for Truth-First re-linking
+        name_id = _get_service().add_identity_alias(
+            identity_id, body.display_name, name_id=body.name_id
+        )
+        return {"name_id": name_id, "display_name": body.display_name}
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.delete("/identities/{identity_id:int}/aliases/{name_id:int}", status_code=204)
+async def remove_identity_alias(identity_id: int, name_id: int) -> None:  # noqa: ARG001
+    """Remove an alias from an identity."""
+    try:
+        _get_service().remove_identity_alias(name_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/identities/{identity_id:int}/songs", response_model=List[SongView])
@@ -314,4 +345,5 @@ def get_validation_rules():
             "input_format": TAG_INPUT_FORMAT,
         },
         "default_search_engine": DEFAULT_SEARCH_ENGINE,
+        "credit_separators": DEFAULT_CREDIT_SEPARATORS,
     }

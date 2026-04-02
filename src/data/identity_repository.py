@@ -127,7 +127,7 @@ class IdentityRepository(BaseRepository):
             return {}
 
         placeholders = ",".join(["?" for _ in identity_ids])
-        query = f"SELECT NameID, DisplayName, IsPrimaryName, OwnerIdentityID FROM ArtistNames WHERE OwnerIdentityID IN ({placeholders})"
+        query = f"SELECT NameID, DisplayName, IsPrimaryName, OwnerIdentityID FROM ArtistNames WHERE OwnerIdentityID IN ({placeholders}) AND IsDeleted = 0"
 
         result: Dict[int, List[ArtistName]] = {iid: [] for iid in identity_ids}
         with self._get_connection() as conn:
@@ -204,6 +204,159 @@ class IdentityRepository(BaseRepository):
             f"[IdentityRepository] <- get_groups_batch() batched={len(result)} IDs"
         )
         return result
+
+    def add_alias(
+        self,
+        identity_id: int,
+        display_name: str,
+        cursor: sqlite3.Cursor,
+        name_id: Optional[int] = None,
+    ) -> int:
+        """Link a name to an identity. ID-First: If name_id is provided, prioritize it."""
+        logger.debug(
+            f"[IdentityRepository] -> add_alias(id={identity_id}, name='{display_name}', name_id={name_id})"
+        )
+        display_name = display_name.strip()
+
+        # 1. Collision Check (Truth-First)
+        # If name_id is null, the name MUST be truly new OR already belong to this identity.
+        if not name_id:
+            collision = cursor.execute(
+                "SELECT NameID, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
+                (display_name,),
+            ).fetchone()
+
+            if collision:
+                if collision[1] == identity_id:
+                    # Scenario A: Already belongs to this identity (Idempotent)
+                    # Reactivate if it was soft-deleted
+                    cursor.execute(
+                        "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
+                        (collision[0],),
+                    )
+                    return collision[0]
+                else:
+                    # Theft/Ambiguity: Blocked
+                    logger.error(
+                        f"[IdentityRepository] Blocked: '{display_name}' already exists for identity {collision[1]}. Mandatory ID required for re-linking."
+                    )
+                    raise ValueError(
+                        f"Identity collision: '{display_name}' already exists in the database belonging to another identity. You must provide a specific NameID/IdentityID to re-parent this name."
+                    )
+
+        # 2. Lookup the record to move/idempotence check
+        found_row = None
+        if name_id:
+            # 2.1 Try NameID (Direct match from search results or specific alias)
+            found_row = cursor.execute(
+                "SELECT NameID, OwnerIdentityID, IsPrimaryName FROM ArtistNames WHERE NameID = ?",
+                (name_id,),
+            ).fetchone()
+
+            # 2.2 Fallback: Try IdentityID (Search Picker returns Identity IDs)
+            if not found_row:
+                found_row = cursor.execute(
+                    "SELECT NameID, OwnerIdentityID, IsPrimaryName FROM ArtistNames WHERE OwnerIdentityID = ? AND IsPrimaryName = 1",
+                    (name_id,),
+                ).fetchone()
+
+        if found_row:
+            found_name_id, current_owner, is_primary = (
+                found_row[0],
+                found_row[1],
+                bool(found_row[2]),
+            )
+
+            # Scenario A: Already belongs to this identity
+            if current_owner == identity_id:
+                # Reactivate if it was soft-deleted
+                cursor.execute(
+                    "UPDATE ArtistNames SET IsDeleted = 0 WHERE NameID = ?",
+                    (found_name_id,),
+                )
+                return found_name_id
+
+            # Scenario B: Move a non-primary alias (Safe)
+            if not is_primary:
+                cursor.execute(
+                    "UPDATE ArtistNames SET OwnerIdentityID = ?, IsDeleted = 0 WHERE NameID = ?",
+                    (identity_id, found_name_id),
+                )
+                logger.info(
+                    f"[IdentityRepository] Re-parented alias '{display_name}' (ID={found_name_id}) from {current_owner} to {identity_id}"
+                )
+                return found_name_id
+
+            # Scenario C: Re-parenting a PRIMARY name (Hierarchy check)
+            if self._is_parent_identity(current_owner, cursor):
+                logger.error(
+                    f"[IdentityRepository] Collision: '{display_name}' is primary for {current_owner} which already has other aliases."
+                )
+                raise ValueError(
+                    f"Cannot orphan a parent identity: '{display_name}' is the primary name for identity {current_owner} which already has other aliases linked to it."
+                )
+
+            # Scenario D: Re-parenting primary name of a "Dead" identity (Safe Merge)
+            cursor.execute(
+                "UPDATE ArtistNames SET OwnerIdentityID = ?, IsPrimaryName = 0, IsDeleted = 0 WHERE NameID = ?",
+                (identity_id, found_name_id),
+            )
+            # Mark old identity as deleted
+            cursor.execute(
+                "UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = ?",
+                (current_owner,),
+            )
+            logger.info(
+                f"[IdentityRepository] Merged identity {current_owner} into {identity_id} by re-parenting primary name '{display_name}'"
+            )
+            return found_name_id
+
+        # 2. Truly new name (or name_id was provided but not found, which shouldn't happen)
+        cursor.execute(
+            "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 0)",
+            (identity_id, display_name),
+        )
+        return cursor.lastrowid
+
+    def _is_parent_identity(self, identity_id: int, cursor: sqlite3.Cursor) -> bool:
+        """Return True if this identity has multiple aliases (is a parent of a tree)."""
+        # A solo identity is safe to merge. A parent with multiple aliases is not.
+        row = cursor.execute(
+            "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",
+            (identity_id,),
+        ).fetchone()
+        count = row[0] if row else 0
+        return count > 1
+
+    def delete_alias(self, name_id: int, cursor: sqlite3.Cursor) -> None:
+        """Remove an alias link. Guard: primary names cannot be deleted."""
+        logger.debug(f"[IdentityRepository] -> delete_alias(name_id={name_id})")
+        # 1. Primary check
+        row = cursor.execute(
+            "SELECT IsPrimaryName FROM ArtistNames WHERE NameID = ?", (name_id,)
+        ).fetchone()
+        if not row:
+            return
+        if row[0]:
+            raise ValueError("Cannot delete the primary name of an identity")
+
+        cursor.execute(
+            "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (name_id,)
+        )
+
+    def find_identity_by_name(self, name: str) -> Optional[int]:
+        """Return the IdentityID for an exact (case-insensitive) ArtistName match, or None."""
+        logger.debug(f"[IdentityRepository] -> find_identity_by_name(name='{name}')")
+        query = "SELECT OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0"
+        with self._get_connection() as conn:
+            row = conn.execute(query, (name,)).fetchone()
+            if row:
+                logger.debug(
+                    f"[IdentityRepository] <- find_identity_by_name() found ID={row[0]}"
+                )
+                return row[0]
+            logger.debug("[IdentityRepository] <- find_identity_by_name() NOT_FOUND")
+            return None
 
     def _row_to_identity(self, row: Mapping[str, Any]) -> Identity:
         return Identity(

@@ -142,6 +142,18 @@ export function getArtistSongs(id, options = {}) {
     return fetchJson(`/api/v1/identities/${id}/songs`, options);
 }
 
+export function addIdentityAlias(identityId, displayName, nameId = null) {
+    return fetchJson(`/api/v1/identities/${identityId}/aliases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ display_name: displayName, name_id: nameId }),
+    });
+}
+
+export function removeIdentityAlias(identityId, nameId) {
+    return fetchJson(`/api/v1/identities/${identityId}/aliases/${nameId}`, { method: "DELETE" });
+}
+
 export function getPublisherDetail(id, options = {}) {
     return fetchJson(`/api/v1/publishers/${id}`, options);
 }
@@ -398,5 +410,53 @@ export function importSpotifyCredits(songId, credits, publishers) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ song_id: songId, credits, publishers }),
+    });
+}
+
+export function splitterTokenize(text, separators) {
+    return fetchJson("/api/v1/tools/splitter/tokenize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, separators }),
+    });
+}
+
+export function splitterPreview(names, target) {
+    return fetchJson("/api/v1/tools/splitter/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names, target }),
+    });
+}
+
+export function splitterConfirm(songId, tokens, target, classification, remove) {
+    return fetchJson("/api/v1/tools/splitter/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ song_id: songId, tokens, target, classification, remove }),
+    });
+}
+
+export function previewFilenameParsing(filenames, pattern) {
+    return fetchJson("/api/v1/tools/filename-parser/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filenames, pattern }),
+    });
+}
+
+export function applyFilenameParsing(items, pattern) {
+    return fetchJson("/api/v1/tools/filename-parser/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, pattern }),
+    });
+}
+
+export function convertAndIngest(stagedPaths) {
+    return fetchJson("/api/v1/ingest/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staged_paths: stagedPaths }),
     });
 }

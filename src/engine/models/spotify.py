@@ -1,10 +1,11 @@
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 
 class SpotifyCredit(BaseModel):
     name: str
     role: str
+    identity_id: Optional[int] = None
 
 
 class SpotifyParseRequest(BaseModel):

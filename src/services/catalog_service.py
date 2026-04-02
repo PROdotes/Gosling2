@@ -13,6 +13,7 @@ from src.data.publisher_repository import PublisherRepository
 from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
+from src.data.audit_repository import AuditRepository
 from src.models.domain import (
     Song,
     Album,
@@ -51,6 +52,7 @@ class CatalogService:
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
+        self._audit_repo = AuditRepository(db_path)
 
         # Ingestion Helpers
         self._metadata_service = MetadataService()
@@ -585,6 +587,63 @@ class CatalogService:
         result = self._hydrate_identities(identities)
         logger.debug(f"[CatalogService] <- get_all_identities() count={len(result)}")
         return result
+
+    def resolve_identity_by_name(self, display_name: str) -> Optional[int]:
+        """Return the IdentityID for an ArtistName (Truth-First resolution)."""
+        return self._identity_repo.find_identity_by_name(display_name)
+
+    def add_identity_alias(
+        self, identity_id: int, display_name: str, name_id: Optional[int] = None
+    ) -> int:
+        """Link a new or existing alias name to an identity (Truth-First mapping)."""
+        logger.debug(
+            f"[CatalogService] -> add_identity_alias(id={identity_id}, name='{display_name}', name_id={name_id})"
+        )
+        # 1. Existence check (Banker Mode)
+        identity = self._identity_repo.get_by_id(identity_id)
+        if not identity:
+            raise LookupError(f"Identity {identity_id} not found")
+
+        # 2. Add via repo (Transactional)
+        with self._identity_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                # Prioritize explicit ID link over string search
+                result_name_id = self._identity_repo.add_alias(
+                    identity_id, display_name, cursor, name_id=name_id
+                )
+                conn.commit()
+                logger.debug(
+                    f"[CatalogService] <- add_identity_alias() OK, result_name_id={result_name_id}"
+                )
+                return result_name_id
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] add_identity_alias failed: {e}")
+                raise e
+
+    def remove_identity_alias(self, name_id: int) -> None:
+        """Remove an alias from an identity. Raises ValueError if it is the primary name."""
+        logger.debug(f"[CatalogService] -> remove_identity_alias(name_id={name_id})")
+        with self._identity_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                self._identity_repo.delete_alias(name_id, cursor)
+                conn.commit()
+                logger.debug(
+                    f"[CatalogService] <- remove_identity_alias(name_id={name_id}) OK"
+                )
+            except ValueError:
+                conn.rollback()
+                raise
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] remove_identity_alias failed: {e}")
+                raise
+
+    def publisher_exists(self, name: str) -> bool:
+        """Return True if a Publisher with this exact name exists."""
+        return self._pub_repo.find_by_name(name) is not None
 
     def search_identities(self, query: str) -> List[Identity]:
         """Search for identities by name or alias."""
@@ -1771,7 +1830,11 @@ class CatalogService:
             # Add Credits
             for credit in credits:
                 self._credit_repo.add_credit(
-                    song_id, credit.name, credit.role, conn=conn
+                    song_id,
+                    credit.name,
+                    credit.role,
+                    conn=conn,
+                    identity_id=credit.identity_id,
                 )
 
             # Add Publishers

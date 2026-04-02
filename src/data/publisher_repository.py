@@ -138,6 +138,18 @@ class PublisherRepository(BaseRepository):
             )
             return result
 
+    def find_by_name(self, name: str) -> Optional[int]:
+        """Return the PublisherID for an exact (case-insensitive) name match, or None."""
+        conn = self.get_connection()
+        try:
+            row = conn.execute(
+                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+                (name,),
+            ).fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
     def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
         """Fetch a single publisher by its ID."""
         logger.debug(f"[PublisherRepository] -> get_by_id(id={publisher_id})")
