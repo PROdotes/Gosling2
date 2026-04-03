@@ -197,15 +197,16 @@ Used by `update_identity_legal_name`.
 - Resolves a ghost record conflict by reactivating a soft-deleted record with new metadata from a staged file.
 - Wraps `CatalogService.resolve_conflict`.
 
-### async def convert_wav(song_id: int) -> Dict[str, Any]
-**HTTP**: `POST /api/v1/ingest/songs/{song_id}/convert-wav`
-- Queues a background WAV to MP3 conversion task.
-- Orchestrates FFmpeg conversion and finalizes via `CatalogService.finalize_wav_conversion`.
+### async def convert_wav(staged_path: str) -> dict
+**HTTP**: `POST /api/v1/ingest/convert-wav?staged_path={path}`
+- Converts a staged WAV to MP3 and ingests.
+- Wraps `CatalogService.ingest_file` after conversion.
 
-### async def cleanup_original_file(song_id: int) -> Dict[str, Any]
-**HTTP**: `DELETE /api/v1/ingest/songs/{song_id}/original-file`
-- Deletes the original source file (e.g., from Downloads) after it has been staged and ingested.
-- Securely restricts deletions to the Downloads folder via `get_downloads_folder`.
+### async def cleanup_original_file(request: CleanupOriginalRequest) -> dict
+**HTTP**: `POST /api/v1/ingest/cleanup-original`
+- Physically deletes the original source file (e.g. from Downloads).
+- Payload: `{"file_path": "... "}`.
+- Securely restricts deletions to the Downloads folder.
 
 ---
 
@@ -358,7 +359,7 @@ Used by `update_identity_legal_name`.
 - Wraps `CatalogService.move_song_to_library`.
 
 ### async def format_metadata_case(entity_type: str, entity_id: int, field: str, format_type: str, service: CatalogService = Depends(_get_service)) -> Any
-**HTTP**: `PATCH /api/v1/songs/format-case?entity_type={type}&entity_id={id}&field={field}&format_type={type}`
+**HTTP**: `PATCH /api/v1/formatting/case?entity_type={type}&entity_id={id}&field={field}&format_type={type}`
 - Action endpoint to manually fix casing of a song or album field.
 - Returns the updated hydrated entity (SongView or AlbumView).
 - Wraps `CatalogService.format_entity_field`.
