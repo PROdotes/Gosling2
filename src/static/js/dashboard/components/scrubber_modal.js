@@ -1,3 +1,4 @@
+import { wasMousedownInside } from "./utils.js";
 const overlay     = document.getElementById("scrubber-modal");
 const titleEl     = document.getElementById("scrubber-modal-title");
 const audio       = document.getElementById("scrubber-audio");
@@ -97,3 +98,9 @@ export function closeScrubberModal() {
     audio.src = "";
     overlay.style.display = "none";
 }
+
+// Close on overlay click outside modal box
+overlay.addEventListener("click", (e) => {
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
+    if (e.target === overlay) closeScrubberModal();
+});

@@ -7,6 +7,39 @@ import pytest
 from src.data.identity_repository import IdentityRepository
 
 
+# ---------------------------------------------------------------------------
+# update_legal_name
+# ---------------------------------------------------------------------------
+
+class TestUpdateLegalName:
+
+    def test_update_legal_name_success(self, populated_db):
+        """Update LegalName on an existing identity."""
+        repo = IdentityRepository(populated_db)
+        with repo.get_connection() as conn:
+            repo.update_legal_name(1, "David Eric Grohl Jr.", conn)
+            conn.commit()
+        result = repo.get_by_id(1)
+        assert result.legal_name == "David Eric Grohl Jr.", f"Expected updated name, got {result.legal_name}"
+
+    def test_update_legal_name_clears_to_none(self, populated_db):
+        """Setting legal_name to None clears the field."""
+        repo = IdentityRepository(populated_db)
+        with repo.get_connection() as conn:
+            repo.update_legal_name(1, None, conn)
+            conn.commit()
+        result = repo.get_by_id(1)
+        assert result.legal_name is None, f"Expected None, got {result.legal_name}"
+
+    def test_update_legal_name_invalid_id_raises(self, populated_db):
+        """Updating a non-existent identity should raise LookupError."""
+        repo = IdentityRepository(populated_db)
+        with repo.get_connection() as conn:
+            with pytest.raises(LookupError):
+                repo.update_legal_name(9999, "Ghost", conn)
+
+
+
 def test_add_alias_basic(populated_db):
     """Repo should successfully add a new alias to an existing identity."""
     repo = IdentityRepository(populated_db)

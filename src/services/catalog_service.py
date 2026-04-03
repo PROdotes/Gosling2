@@ -35,6 +35,7 @@ from src.engine.config import (
     RENAME_RULES_PATH,
     get_library_root,
 )
+from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
 from src.engine.models.spotify import SpotifyCredit
 
@@ -110,6 +111,20 @@ class CatalogService:
                 "song": hydrated[0] if hydrated else existing_by_hash,
             }
 
+        ghost_by_hash = self._song_repo.get_source_metadata_by_hash(audio_hash)
+        if ghost_by_hash and ghost_by_hash.get("is_deleted"):
+            logger.info(
+                f"[CatalogService] <- check_ingestion(file_path='{file_path}') HASH_GHOST"
+            )
+            return {
+                "status": "CONFLICT",
+                "match_type": "HASH",
+                "ghost_id": ghost_by_hash["id"],
+                "staged_path": file_path,
+                "ghost_song": ghost_by_hash,
+                "new_song": None,
+            }
+
         # 3. Metadata Extraction & Metadata Collision Check
         try:
             raw_meta = self._metadata_service.extract_metadata(file_path)
@@ -176,6 +191,117 @@ class CatalogService:
             )
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
+    def ingest_wav_as_converting(self, staged_path: str) -> Dict[str, Any]:
+        """
+        Ingest a WAV file immediately with processing_status=3 (Converting).
+        Returns a result dict with status CONVERTING and the song object so the
+        frontend can render a result card right away.
+        The caller is responsible for queuing the background conversion.
+        """
+        logger.debug(f"[CatalogService] -> ingest_wav_as_converting(path='{staged_path}')")
+
+        check = self.check_ingestion(staged_path)
+        if check["status"] != "NEW":
+            logger.info(
+                f"[CatalogService] <- ingest_wav_as_converting(path='{staged_path}') REJECTED: {check['status']}"
+            )
+            if check["status"] != "CONFLICT" and os.path.exists(staged_path):
+                os.remove(staged_path)
+            return check
+
+        song = check["song"]
+        song = song.model_copy(update={"processing_status": 3})
+        conn = self._song_repo.get_connection()
+        try:
+            new_id = self._song_repo.insert(song, conn)
+            hydrated_song = song.model_copy(update={"id": new_id})
+            conn.commit()
+            logger.info(
+                f"[CatalogService] <- ingest_wav_as_converting(path='{staged_path}') INGESTED ID={new_id} (Status=3)"
+            )
+            return {"status": "CONVERTING", "song": hydrated_song}
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- ingest_wav_as_converting() FAILED: {e}")
+            if os.path.exists(staged_path):
+                os.remove(staged_path)
+            return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
+        finally:
+            conn.close()
+
+    def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> None:
+        """
+        After background WAV→MP3 conversion succeeds, update the DB record:
+        swap SourcePath to the new MP3 path and set ProcessingStatus to 2 (Virgin).
+        """
+        logger.debug(
+            f"[CatalogService] -> finalize_wav_conversion(id={song_id}, mp3='{mp3_path}')"
+        )
+        mp3_hash = calculate_audio_hash(mp3_path)
+
+        # Check if another record already has this MP3 hash (including soft-deleted)
+        existing = self._song_repo.get_source_metadata_by_hash(mp3_hash)
+        if existing and existing["id"] != song_id:
+            if existing["is_deleted"]:
+                # Reactivate the ghost with the new MP3 path
+                logger.info(
+                    f"[CatalogService] <- finalize_wav_conversion(id={song_id}) GHOST: reactivating ID={existing['id']}"
+                )
+                conn = self._song_repo.get_connection()
+                try:
+                    raw_meta = self._metadata_service.extract_metadata(mp3_path)
+                    parsed_song = self._metadata_parser.parse(raw_meta, mp3_path)
+                    reactivated = parsed_song.model_copy(update={
+                        "id": existing["id"],
+                        "source_path": mp3_path,
+                        "audio_hash": mp3_hash,
+                        "is_active": False,
+                        "processing_status": 1,
+                    })
+                    self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
+                    self._song_repo.hard_delete(song_id, conn)
+                    conn.commit()
+                except Exception as ex:
+                    conn.rollback()
+                    logger.error(f"[CatalogService] <- finalize_wav_conversion() reactivate failed: {ex}")
+                finally:
+                    conn.close()
+            else:
+                # Active duplicate — discard the new record
+                logger.warning(
+                    f"[CatalogService] <- finalize_wav_conversion(id={song_id}) DUPLICATE: MP3 hash already owned by ID={existing['id']}, deleting new record"
+                )
+                conn = self._song_repo.get_connection()
+                try:
+                    self._song_repo.hard_delete(song_id, conn)
+                    conn.commit()
+                except Exception as ex:
+                    conn.rollback()
+                    logger.error(f"[CatalogService] <- finalize_wav_conversion() hard_delete failed: {ex}")
+                finally:
+                    conn.close()
+                if os.path.exists(mp3_path):
+                    os.remove(mp3_path)
+            return
+
+        conn = self._song_repo.get_connection()
+        try:
+            self._song_repo.update_scalars(
+                song_id,
+                {"source_path": mp3_path, "processing_status": 2, "audio_hash": mp3_hash},
+                conn,
+            )
+            self._enrich_metadata(song_id, conn)
+            conn.commit()
+            logger.info(
+                f"[CatalogService] <- finalize_wav_conversion(id={song_id}) Status now 1"
+            )
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- finalize_wav_conversion() FAILED: {e}")
+        finally:
+            conn.close()
+
     def ingest_file(self, staged_path: str) -> Dict[str, Any]:
         """
         Write path for a staged file.
@@ -193,6 +319,17 @@ class CatalogService:
             logger.info(
                 f"[CatalogService] <- ingest_file(path='{staged_path}') REJECTED: {check['status']}"
             )
+            
+            if check["status"] == "CONFLICT":
+                # Raising the specific conflict error for re-ingestion
+                raise ReingestionConflictError(
+                    ghost_id=check["ghost_id"],
+                    title=check["ghost_song"]["title"],
+                    duration_s=check["ghost_song"]["duration_s"],
+                    year=check["ghost_song"].get("year"),
+                    isrc=check["ghost_song"].get("isrc"),
+                )
+
             # Cleanup staging file for rejected ACTIVE duplicates
             if os.path.exists(staged_path):
                 os.remove(staged_path)
@@ -498,8 +635,12 @@ class CatalogService:
         )
 
         if not os.path.exists(staged_path):
-            logger.error(f"[CatalogService] Staged file not found: {staged_path}")
-            return {"status": "ERROR", "message": "Staged file not found"}
+            mp3_path = str(Path(staged_path).with_suffix(".mp3"))
+            if os.path.exists(mp3_path):
+                staged_path = mp3_path
+            else:
+                logger.error(f"[CatalogService] Staged file not found: {staged_path}")
+                return {"status": "ERROR", "message": "Staged file not found"}
 
         conn = self._song_repo.get_connection()
         try:
@@ -507,6 +648,14 @@ class CatalogService:
             raw_meta = self._metadata_service.extract_metadata(staged_path)
             parsed_song = self._metadata_parser.parse(raw_meta, staged_path)
             audio_hash = calculate_audio_hash(staged_path)
+
+            # 1b. Clear hash on any other soft-deleted record that already has this hash
+            #     (can happen when a WAV was previously converted and that ghost still holds the MP3 hash)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE MediaSources SET AudioHash = NULL WHERE AudioHash = ? AND SourceID != ? AND IsDeleted = 1",
+                (audio_hash, ghost_id),
+            )
 
             # 2. Create updated song model with ghost_id and staged path
             reactivated_song = parsed_song.model_copy(
@@ -641,6 +790,21 @@ class CatalogService:
             except Exception as e:
                 conn.rollback()
                 logger.error(f"[CatalogService] remove_identity_alias failed: {e}")
+                raise
+
+    def update_identity_legal_name(self, identity_id: int, legal_name: Optional[str]) -> None:
+        """Update the LegalName on an Identity. Raises LookupError if not found."""
+        logger.debug(f"[CatalogService] -> update_identity_legal_name(id={identity_id}, name={legal_name!r})")
+        with self._identity_repo.get_connection() as conn:
+            try:
+                self._identity_repo.update_legal_name(identity_id, legal_name, conn)
+                conn.commit()
+            except LookupError:
+                conn.rollback()
+                raise
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] update_identity_legal_name failed: {e}")
                 raise
 
     def publisher_exists(self, name: str) -> bool:
@@ -1216,6 +1380,56 @@ class CatalogService:
         "processing_status",
         "notes",
     }
+
+    def format_entity_field(
+        self, entity_type: str, entity_id: int, field: str, format_type: str
+    ) -> Any:
+        """Standardizes casing for any entity field (song, album, publisher, artist)."""
+        # 1. Fetch current value and resolve update method
+        current_value = None
+        if entity_type == "song":
+            entity = self.get_song(entity_id)
+            current_value = getattr(entity, field, None)
+        elif entity_type == "album":
+            entity = self.get_album(entity_id)
+            current_value = getattr(entity, field, None)
+        elif entity_type == "publisher":
+            entity = self.get_publisher(entity_id)
+            current_value = entity.name if entity else None
+            field = "name"
+        elif entity_type == "credit":
+            # For credits, identity resolution is needed or we update the ArtistName
+            # We assume entity_id is name_id here for simplicity
+            repo = MetadataRepository(self.db_path)
+            name_obj = repo.get_name_by_id(entity_id)
+            current_value = name_obj["name"] if name_obj else None
+            field = "name"
+        else:
+            raise ValueError(f"Unknown entity type: {entity_type}")
+
+        if current_value is None:
+            raise LookupError(f"{entity_type} {entity_id} not found or field {field} is empty")
+
+        # 2. Apply formatting
+        if format_type == "title":
+            new_value = CasingService.to_title_case(current_value)
+        elif format_type == "sentence":
+            new_value = CasingService.to_sentence_case(current_value)
+        else:
+            raise ValueError(f"Unknown format type: {format_type}")
+
+        # 3. Persist if changed
+        if new_value != current_value:
+            if entity_type == "song":
+                self.update_song_scalars(entity_id, {field: new_value})
+            elif entity_type == "album":
+                self.update_album(entity_id, {field: new_value})
+            elif entity_type == "publisher":
+                self.update_publisher(entity_id, name=new_value)
+            elif entity_type == "credit":
+                self.update_credit_name(entity_id, new_name=new_value)
+
+        return new_value
 
     def update_song_scalars(
         self, song_id: int, fields: dict, conn: Optional[sqlite3.Connection] = None

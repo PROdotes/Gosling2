@@ -41,6 +41,9 @@ Soft-delete a MediaSource by setting `IsDeleted = 1`. Returns `True` if a record
 ### reactivate_source(source_id: int, conn: sqlite3.Connection) -> bool
 Restores a previously soft-deleted record by setting `IsDeleted = 0`. Returns `True` if successful.
 
+### hard_delete(source_id: int, conn: sqlite3.Connection) -> None
+Hard-delete (destructive) a MediaSource and its specialized child (Song, etc.). Forces DB Cascade to clear all links. Used for discarding failed conversions or merging duplicates. Does NOT commit.
+
 ### delete_song_links(source_id: int, conn: sqlite3.Connection) -> None
 Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSourceTags, RecordingPublishers). This must be called before `soft_delete` to ensure links are severed while the anchor record remains for undo/audit purposes.
 
@@ -89,7 +92,7 @@ Find songs matching Title, exact Performer set, and Recording Year. Avoids "Sing
 ### insert(song: Song, conn: sqlite3.Connection) -> int
 Atomic insert into `MediaSources`, `Songs`, and all relationship tables (tags, albums, publishers, credits). Delegates core file record to `MediaSourceRepository.insert_source`, then calls `TagRepository.insert_tags`, `SongAlbumRepository.insert_albums`, `PublisherRepository.insert_song_publishers`, and `SongCreditRepository.insert_credits`. Returns the new `SourceID`. Does NOT commit.
 
-### reactivate_ghost(song: Song, conn: sqlite3.Connection) -> bool
+### reactivate_ghost(ghost_id: int, song: Song, conn: sqlite3.Connection) -> bool
 Restores a soft-deleted song and updates it with new metadata (Tags, Credits, Albums, Publishers).
 - Calls `MediaSourceRepository.reactivate_source`.
 - Replaces links via `delete_song_links` + re-insertion.
@@ -366,6 +369,9 @@ Link a name to an identity. ID-First: If `name_id` is provided, prioritize it. H
 
 ### delete_alias(name_id: int, cursor: sqlite3.Cursor) -> None
 Soft-delete an alias link. Guard: primary names cannot be deleted.
+
+### update_legal_name(identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection) -> None
+Update the LegalName field on an Identity record. Raises LookupError if not found. Does NOT commit.
 
 ### get_aliases_batch(identity_ids: List[int]) -> Dict[int, List[ArtistName]]
 Batch-fetch aliases (ArtistNames) for multiple identities.

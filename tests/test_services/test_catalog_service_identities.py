@@ -113,3 +113,27 @@ class TestRemoveIdentityAlias:
     def test_remove_nonexistent_name_is_noop(self, catalog_service):
         """Removing a name_id that doesn't exist should not raise."""
         catalog_service.remove_identity_alias(999)  # should not raise
+
+
+# ---------------------------------------------------------------------------
+# update_identity_legal_name
+# ---------------------------------------------------------------------------
+
+class TestUpdateIdentityLegalName:
+
+    def test_update_legal_name_success(self, catalog_service):
+        """Valid update persists and is returned by get_identity."""
+        catalog_service.update_identity_legal_name(1, "David Eric Grohl Jr.")
+        identity = catalog_service.get_identity(1)
+        assert identity.legal_name == "David Eric Grohl Jr.", f"Expected updated name, got {identity.legal_name}"
+
+    def test_update_legal_name_clear_to_none(self, catalog_service):
+        """Setting to None clears the legal name."""
+        catalog_service.update_identity_legal_name(1, None)
+        identity = catalog_service.get_identity(1)
+        assert identity.legal_name is None, f"Expected None, got {identity.legal_name}"
+
+    def test_update_legal_name_invalid_id_raises(self, catalog_service):
+        """Non-existent identity_id should raise LookupError."""
+        with pytest.raises(LookupError):
+            catalog_service.update_identity_legal_name(9999, "Ghost")

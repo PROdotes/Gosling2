@@ -181,8 +181,32 @@ Atomic import of Spotify credits and publishers.
 ### get_id3_frames_config() -> Dict[str, Any]
 Returns the consolidated ID3 frame mapping.
 
+### ingest_wav_as_converting(staged_path: str) -> Dict[str, Any]
+Ingest a WAV file immediately with processing_status=3 (Converting).
+
+### finalize_wav_conversion(song_id: int, mp3_path: str) -> None
+After background WAV→MP3 conversion succeeds, update the DB record to the new MP3 path and status.
+
 ### move_song_to_library(song_id: int) -> str
 Calculates the target routing, moves the physical file, and updates the database records.
+
+### update_identity_legal_name(identity_id: int, legal_name: Optional[str]) -> None
+Update the LegalName on an Identity. Raises LookupError if not found.
+
+### format_entity_field(entity_type: str, entity_id: int, field: str, format_type: str) -> Any
+Standardizes the casing of an entity's metadata field (Song/Album) based on "title" or "sentence" format.
+
+
+---
+
+## CasingService
+*Location: `src/services/casing_service.py`*
+
+### to_title_case(text: str) -> str
+Converts text to Title Case (Every word capitalized, no exclusions).
+
+### to_sentence_case(text: str) -> str
+Converts text to Sentence Case (First letter capitalized, the rest lowercase).
 
 ---
 
@@ -234,6 +258,8 @@ Builds a search URL.
 
 ### parse_credits(raw_text: str, reference_title: str, known_roles: list[str]) -> SpotifyParseResult
 Heuristic parser for Spotify credit blocks.
+- **Role Expansion**: Automatically expands "Writer" into ["Composer", "Lyricist"].
+- **Deduplication**: Ensures unique (Name, Role) pairs in the result.
 
 ---
 

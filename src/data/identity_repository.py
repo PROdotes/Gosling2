@@ -344,6 +344,19 @@ class IdentityRepository(BaseRepository):
             "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (name_id,)
         )
 
+    def update_legal_name(self, identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection) -> None:
+        """Update the LegalName field on an Identity. Pass None to clear it."""
+        logger.debug(f"[IdentityRepository] -> update_legal_name(id={identity_id}, name={legal_name!r})")
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT IdentityID FROM Identities WHERE IdentityID = ? AND IsDeleted = 0", (identity_id,)
+        ).fetchone()
+        if not row:
+            raise LookupError(f"Identity ID {identity_id} not found")
+        cursor.execute(
+            "UPDATE Identities SET LegalName = ? WHERE IdentityID = ?", (legal_name, identity_id)
+        )
+
     def find_identity_by_name(self, name: str) -> Optional[int]:
         """Return the IdentityID for an exact (case-insensitive) ArtistName match, or None."""
         logger.debug(f"[IdentityRepository] -> find_identity_by_name(name='{name}')")

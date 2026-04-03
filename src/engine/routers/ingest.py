@@ -1,17 +1,16 @@
 import os
 import shutil
-from typing import Optional
 from uuid import uuid4
 from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from src.models.view_models import (
     SongView,
     FolderScanRequest,
     BatchIngestReport,
     IngestionReportView,
+    CleanupOriginalRequest,
 )
 from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
@@ -21,6 +20,7 @@ from src.engine.config import (
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
     WAV_AUTO_CONVERT,
+    get_downloads_folder,
 )
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
@@ -31,20 +31,12 @@ def _get_service() -> CatalogService:
     return CatalogService(get_db_path())
 
 
-def _get_downloads_folder() -> Optional[str]:
-    """NT/POSIX compatible downloads folder path."""
-    if os.name == "nt":
-        return os.path.join(os.environ.get("USERPROFILE", ""), "Downloads")
-    elif os.name == "posix":
-        home = os.environ.get("HOME", "")
-        return os.path.join(home, "Downloads")
-    return None
 
 
 @router.get("/downloads-folder")
-async def get_downloads_folder():
+async def get_downloads_folder_json():
     """Retrieve the platform-specific default downloads folder."""
-    return JSONResponse({"path": _get_downloads_folder()})
+    return JSONResponse({"path": get_downloads_folder()})
 
 
 @router.get("/formats")
@@ -105,13 +97,16 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
             detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
         )
 
-    # 3. Split WAVs from MP3s
+    # 3. Split WAVs from non-WAVs
     wav_paths = [p for p in staged_paths if Path(p).suffix.lower() == ".wav"]
     ingest_paths = [p for p in staged_paths if Path(p).suffix.lower() != ".wav"]
-    pending_conversion = []
+
+    service = _get_service()
+    wav_results = []
 
     if wav_paths:
         if WAV_AUTO_CONVERT:
+            # Synchronous conversion: convert then ingest normally
             for wav in wav_paths:
                 try:
                     mp3 = convert_to_mp3(Path(wav))
@@ -119,29 +114,38 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
                 except RuntimeError as e:
                     logger.error(f"[IngestRouter] WAV conversion failed for {wav}: {e}")
         else:
-            pending_conversion = wav_paths
+            # Prompt mode: return PENDING_CONVERT cards, user confirms conversion manually
+            for wav in wav_paths:
+                wav_results.append({"status": "PENDING_CONVERT", "staged_path": wav})
 
-    if not ingest_paths and pending_conversion:
-        return BatchIngestReport(
-            total_files=0,
-            ingested=0,
-            duplicates=0,
-            errors=0,
-            results=[],
-            pending_conversion=pending_conversion,
+    # 4. Batch ingest non-WAVs
+    if not ingest_paths and not wav_results:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
         )
 
-    # 4. Batch ingest
     try:
-        service = _get_service()
-        batch_report = service.ingest_batch(ingest_paths)
+        combined_results = list(wav_results)
+        if ingest_paths:
+            batch_report = service.ingest_batch(ingest_paths)
+            for result in batch_report["results"]:
+                if "song" in result and result["song"]:
+                    result["song"] = SongView.from_domain(result["song"])
+            combined_results.extend(batch_report["results"])
 
-        # 5. Convert Domain Songs to SongViews for frontend compatibility
-        for result in batch_report["results"]:
-            if "song" in result and result["song"]:
-                result["song"] = SongView.from_domain(result["song"])
+        total = len(combined_results)
+        ingested = sum(1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING"))
+        duplicates = sum(1 for r in combined_results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH"))
+        errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
 
-        return BatchIngestReport(**batch_report, pending_conversion=pending_conversion)
+        return BatchIngestReport(
+            total_files=total,
+            ingested=ingested,
+            duplicates=duplicates,
+            errors=errors,
+            results=combined_results,
+        )
 
     except Exception as e:
         logger.error(f"[IngestRouter] Batch ingestion error: {e}")
@@ -150,38 +154,41 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
         )
 
 
-class ConvertRequest(BaseModel):
-    staged_paths: list[str]
-
-
-def _run_convert_and_ingest(staged_paths: list[str]) -> None:
-    """Background task: convert staged WAVs to MP3 and ingest."""
-    service = _get_service()
-    ingest_paths = []
-    for wav in staged_paths:
+def _run_wav_conversions(wav_paths: list[str], service: CatalogService) -> None:
+    """
+    Background task: convert each staged WAV to MP3 and finalize the DB record.
+    Each WAV was already ingested with processing_status=3; this moves it to status=1.
+    """
+    for wav in wav_paths:
+        song_id = None
         try:
+            # Look up the song_id by path before conversion deletes the WAV
+            existing = service._song_repo.get_by_path(wav)
+            if existing:
+                song_id = existing.id
             mp3 = convert_to_mp3(Path(wav))
-            ingest_paths.append(str(mp3))
+            if song_id is not None:
+                service.finalize_wav_conversion(song_id, str(mp3))
+            else:
+                logger.warning(f"[IngestRouter] No DB record found for {wav}, skipping finalize")
         except RuntimeError as e:
             logger.error(f"[IngestRouter] Background conversion failed for {wav}: {e}")
-    if ingest_paths:
-        service.ingest_batch(ingest_paths)
 
 
-@router.post("/convert")
-async def convert_and_ingest(body: ConvertRequest, background_tasks: BackgroundTasks):
-    """
-    Convert staged WAV files to MP3 and ingest them in the background.
-    Called by the frontend after the user confirms conversion.
-    Returns immediately — ingestion panel should refresh after a moment.
-    """
-    if not body.staged_paths:
-        raise HTTPException(status_code=400, detail="No staged paths provided")
-    background_tasks.add_task(_run_convert_and_ingest, body.staged_paths)
-    logger.info(
-        f"[IngestRouter] -> convert_and_ingest(count={len(body.staged_paths)}) queued"
-    )
-    return {"status": "CONVERTING", "count": len(body.staged_paths)}
+@router.post("/convert-wav")
+async def convert_wav(staged_path: str) -> dict:
+    """Convert a staged WAV to MP3 and ingest. Called when user confirms a PENDING_CONVERT card."""
+    logger.info(f"[IngestRouter] -> convert_wav(staged_path='{staged_path}')")
+    service = _get_service()
+    try:
+        mp3 = convert_to_mp3(Path(staged_path))
+        result = service.ingest_file(str(mp3))
+        if result.get("song"):
+            result["song"] = SongView.from_domain(result["song"])
+        return result
+    except RuntimeError as e:
+        logger.error(f"[IngestRouter] convert_wav failed: {e}")
+        return {"status": "ERROR", "message": str(e)}
 
 
 @router.post("/resolve-conflict")
@@ -306,3 +313,44 @@ async def delete_song(song_id: int):
 
     logger.info(f"[IngestRouter] <- delete_song(id={song_id}) SUCCESS")
     return {"status": "DELETED", "id": song_id}
+
+
+@router.post("/cleanup-original")
+async def cleanup_original_file(request: CleanupOriginalRequest):
+    """
+    Physical deletion of the original source file (e.g. from Downloads).
+    Safety: Path must be within the user's Downloads folder.
+    """
+    logger.info(f"[IngestRouter] -> cleanup_original_file(path='{request.file_path}')")
+
+    downloads = get_downloads_folder()
+    if not downloads:
+        raise HTTPException(
+            status_code=500, detail="Downloads folder not identified on this platform."
+        )
+
+    # Security: Ensure the path starts with the Downloads folder
+    # Need realpath to prevent '..' traversal or tricky symlinks
+    real_downloads = os.path.realpath(downloads)
+    real_target = os.path.realpath(request.file_path)
+
+    if not real_target.startswith(real_downloads):
+        logger.warning(
+            f"[IngestRouter] Security: Blocked deletion of file outside Downloads: {request.file_path}"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Deletion is restricted to the Downloads folder for safety.",
+        )
+
+    if not os.path.exists(real_target):
+        logger.warning(f"[IngestRouter] File not found for cleanup: {request.file_path}")
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    try:
+        os.remove(real_target)
+        logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
+        return {"status": "DELETED", "path": real_target}
+    except Exception as e:
+        logger.error(f"[IngestRouter] Cleanup failed for {real_target}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")

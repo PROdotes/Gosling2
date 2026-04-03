@@ -1,3 +1,15 @@
+// Track mousedown origin so overlay click handlers can ignore drag-outside events
+let _lastMousedownTarget = null;
+document.addEventListener("mousedown", (e) => { _lastMousedownTarget = e.target; }, true);
+
+/**
+ * Returns true if the most recent mousedown started inside the given element.
+ * Use this in overlay click handlers to prevent closing when the user drags out.
+ */
+export function wasMousedownInside(el) {
+    return el.contains(_lastMousedownTarget);
+}
+
 export function escapeHtml(value) {
     if (value === null || value === undefined) {
         return "";

@@ -1,3 +1,5 @@
+import re
+from pathlib import Path
 from typing import Dict, List, Any, Optional
 from pydantic import ValidationError
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
@@ -191,6 +193,10 @@ class MetadataParser:
 
         for pub_name in dict.fromkeys(publisher_names):
             song_data["publishers"].append(Publisher(name=pub_name))
+
+        if not song_data["media_name"]:
+            stem = Path(file_path).stem
+            song_data["media_name"] = re.sub(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_', '', stem)
 
         try:
             song = Song(**song_data)

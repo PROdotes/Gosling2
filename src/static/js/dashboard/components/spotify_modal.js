@@ -1,5 +1,5 @@
 import { parseSpotifyCredits, importSpotifyCredits, splitterPreview } from "../api.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, wasMousedownInside } from "./utils.js";
 
 const overlay = document.getElementById("spotify-modal");
 const textarea = document.getElementById("spotify-raw-text");
@@ -206,6 +206,7 @@ export function closeSpotifyModal() {
 // Overlay click to close
 overlay.addEventListener("click", (e) => {
     if (_isSelecting) return;
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
     if (e.target === overlay) closeSpotifyModal();
 });
 

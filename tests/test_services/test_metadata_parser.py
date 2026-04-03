@@ -56,7 +56,7 @@ class TestParse:
         song = parser.parse(raw, "fake/path.mp3")
 
         assert song.year == 2024, f"Expected year=2024, got {song.year}"
-        assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
+        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
         assert (
             song.duration_s == 0.0
@@ -157,7 +157,7 @@ class TestParse:
 
         assert song.year == 2023, f"Expected year=2023, got {song.year}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
-        assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
+        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
         assert (
             song.duration_s == 0.0
         ), f"Expected duration_s=0.0, got {song.duration_ms}"
@@ -242,11 +242,11 @@ class TestParse:
         }, f"Expected raw_tags={{'UNKNOWN': ['Some Value']}}, got {song.raw_tags}"
 
     def test_empty_fields_strict(self, parser):
-        """parse() with empty metadata must produce no defaults, no guessed titles, no assumed disc numbers."""
+        """parse() with empty metadata must fall back to filename stem, no other defaults."""
         raw = {}
         song = parser.parse(raw, "fake/path.mp3")
 
-        assert song.media_name == "", f"Expected media_name='', got '{song.media_name}'"
+        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
         assert song.year is None, f"Expected year=None, got {song.year}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
         assert (

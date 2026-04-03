@@ -74,6 +74,31 @@ async def update_song_scalars(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/formatting/case")
+async def format_metadata_case(
+    entity_type: str,
+    entity_id: int,
+    field: str,
+    format_type: str,
+    service: CatalogService = Depends(_get_service),
+):
+    """Universal action endpoint to fix casing of any metadata field."""
+    logger.debug(
+        f"[SongUpdates] -> format_metadata_case({entity_type}, id={entity_id}, field='{field}', type='{format_type}')"
+    )
+    try:
+        new_value = service.format_entity_field(entity_type, entity_id, field, format_type)
+        logger.debug(f"[SongUpdates] <- format_metadata_case OK")
+        return {"id": entity_id, "field": field, "new_value": new_value}
+    except (ValueError, LookupError) as e:
+        logger.warning(f"[SongUpdates] <- format_metadata_case VAL/LOOKUP_ERROR: {e}")
+        status_code = 404 if isinstance(e, LookupError) else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- format_metadata_case CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # --- Roles ---
 
 

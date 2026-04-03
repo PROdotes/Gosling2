@@ -59,7 +59,13 @@ class SpotifyService:
         # 4. Role keywords for heuristic detection, sourced from the DB Roles table
         role_keywords = {r.lower() for r in known_roles}
 
-        # 5. Parse the remaining lines
+        # 5. Fixed expansion rules (e.g. Writer -> [Composer, Lyricist])
+        role_expansions = {"writer": ["Composer", "Lyricist"]}
+        
+        # Ensure expansions are also treated as role triggers
+        role_triggers = role_keywords.union(role_expansions.keys())
+
+        # 6. Parse the remaining lines
         for line in original_lines[idx:]:
             if not line:
                 current_name = ""
@@ -77,19 +83,22 @@ class SpotifyService:
 
             # Core Heuristic: Role or Name?
             # Bullet lines are always roles; solo lines only if they exactly match a known role
-            is_role = "\u2022" in line or low_line in role_keywords
+            is_role = "\u2022" in line or low_line in role_triggers
 
             if is_role:
                 # It's a role line ($Person -> $Role association)
                 if not current_name:
                     continue  # orphaned role
                 for r in line.split("\u2022"):
-                    if (
-                        credit_role := r.strip()
-                    ) and credit_role.lower() in role_keywords:
-                        credits.append(
-                            SpotifyCredit(name=current_name, role=credit_role)
-                        )
+                    if not (credit_role := r.strip()):
+                        continue
+                    
+                    low_role = credit_role.lower()
+                    if low_role in role_expansions:
+                        for expanded in role_expansions[low_role]:
+                            credits.append(SpotifyCredit(name=current_name, role=expanded))
+                    elif low_role in role_keywords:
+                        credits.append(SpotifyCredit(name=current_name, role=credit_role))
             else:
                 # It's a name line
                 current_name = line
@@ -100,9 +109,19 @@ class SpotifyService:
             else False
         )
 
+        # 7. Deduplicate (The DB allows it, but UI should be clean)
+        # Use (name, role) as key to keep order (dict.fromkeys(credits) wouldn't work as well)
+        unique_credits = []
+        seen = set()
+        for c in credits:
+            key = (c.name, c.role)
+            if key not in seen:
+                unique_credits.append(c)
+                seen.add(key)
+
         return SpotifyParseResult(
             parsed_title=parsed_title,
             title_match=title_match,
-            credits=credits,
+            credits=unique_credits,
             publishers=list(dict.fromkeys(publishers)),  # Deduplicate
         )

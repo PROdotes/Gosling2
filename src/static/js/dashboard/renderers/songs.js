@@ -28,11 +28,23 @@ function editableScalarRow(label, field, dbValue, fileValue, songId) {
     const right = fileValue === null || fileValue === undefined || fileValue === "" ? "-" : String(fileValue);
     const matches = display.toLowerCase() === right.toLowerCase();
     const rightClass = matches ? "comparison-match" : "comparison-miss";
+    
+    // Only show casing buttons for titles
+    const hasValue = dbValue !== null && dbValue !== undefined && dbValue !== "";
+    const showActions = hasValue && ["media_name"].includes(field);
+    const actionsHtml = showActions ? `
+        <div class="case-actions">
+            <button class="btn-case" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="sentence" title="Sentence Case">S</button>
+            <button class="btn-case" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="title" title="Title Case">T</button>
+        </div>
+    ` : "";
+
     return `
         <tr>
             <td>${escapeHtml(label)}</td>
             <td>
                 <span class="inline-edit-display" data-action="start-edit-scalar" data-song-id="${songId}" data-field="${field}" title="Click to edit">${escapeHtml(display)}</span>
+                ${actionsHtml}
             </td>
             <td class="${rightClass}">${escapeHtml(right)}</td>
         </tr>
@@ -156,7 +168,11 @@ function renderAlbumCards(albums, songId) {
             <div class="album-card-detail">
                 <div class="card-title-row">
                     ${isEditable
-                        ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>`
+                        ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title" style="flex:1">${escapeHtml(title)}</span>
+                           <div class="case-actions">
+                               <button class="btn-case" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence Case">S</button>
+                               <button class="btn-case" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title Case">T</button>
+                           </div>`
                         : `<button class="inline-link" ${buildNavigateAttrs("albums", title)}>${escapeHtml(title)}</button>`
                     }
                     ${isEditable ? `<button class="link-chip-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Remove album">✕</button>` : ""}
@@ -166,7 +182,7 @@ function renderAlbumCards(albums, songId) {
                     <div class="link-chip-list">
                         ${isEditable ? albumCredits.map((credit) => `
                             <span class="link-chip">
-                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="credit" data-album-id="${albumId}" data-item-id="${credit.name_id}">${escapeHtml(credit.display_name || credit.name || "-")}</button>
+                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="credit" data-album-id="${albumId}" data-item-id="${credit.name_id}" data-identity-id="${credit.identity_id || ''}">${escapeHtml(credit.display_name || credit.name || "-")}</button>
                                 <button class="link-chip-remove" data-action="remove-album-credit" data-album-id="${albumId}" data-song-id="${songId}" data-credit-id="${credit.name_id}" title="Remove">✕</button>
                             </span>
                         `).join("") : (albumCredits.length ? albumCredits.map((credit) => `<span class="link-chip"><button class="link-chip-label">${escapeHtml(credit.display_name || credit.name || "-")}</button></span>`).join("") : '<span class="muted-note">-</span>')}
@@ -456,8 +472,8 @@ export function renderSongDetailLoading(ctx, song) {
     `);
 }
 
-const STATUS_LABELS = { 0: "Reviewed", 1: "Ready for Review", 2: "Imported" };
-const STATUS_CSS = { 0: "found", 1: "warning", 2: "missing" };
+const STATUS_LABELS = { 0: "Reviewed", 1: "Ready for Review", 2: "Imported", 3: "Converting" };
+const STATUS_CSS = { 0: "found", 1: "warning", 2: "missing", 3: "pending" };
 
 function renderWorkflowStatus(song) {
     const status = song.processing_status ?? 1;
@@ -484,16 +500,32 @@ function renderWorkflowStatus(song) {
         }
     }
 
-    const previewHtml = (isInStaging && song.organized_path_preview)
-        ? `<div class="target-preview">Target: <span class="mono">${escapeHtml(song.organized_path_preview)}</span></div>`
+    const targetHtml = (isInStaging && song.organized_path_preview)
+        ? `<div class="path-preview">Target: <span class="mono">${escapeHtml(song.organized_path_preview)}</span></div>`
         : "";
 
+    const originalClass = song.original_exists ? "exists-yes clickable" : "exists-no";
+    const originalAction = song.original_exists ? `data-action="cleanup-original" data-path="${escapeHtml(song.estimated_original_path)}"` : "";
+
+    const originalHtml = (isInStaging && song.estimated_original_path)
+        ? `<div class="path-preview ${originalClass}" ${originalAction}>Original: <span class="mono">${escapeHtml(song.estimated_original_path)}</span></div>`
+        : "";
+
+    // 3. Hide the entire banner if everything is 'OK' (Reviewed and in Library)
+    if (status === 0 && !isInStaging) {
+        return "";
+    }
+
+    // Use a more neutral styling for 'Reviewed' when in staging
+    const finalCss = (status === 0 && isInStaging) ? "" : css;
+
     return `
-        <div class="file-status ${css} workflow-status">
+        <div class="file-status ${finalCss} workflow-status">
             <span class="workflow-status-label">${escapeHtml(label)}</span>
             ${blockerHtml}
             ${buttonHtml}
-            ${previewHtml}
+            ${originalHtml}
+            ${targetHtml}
         </div>`;
 }
 
@@ -506,7 +538,7 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
     const fileTags = asArray(fileData && fileData.tags);
     const dbPublishers = asArray(song.publishers);
     const filePublishers = asArray(fileData && fileData.publishers);
-    const statusHtml = fileData ? renderStatus("found", "File verified") : renderStatus("missing", "File not found");
+    const statusHtml = fileData ? "" : renderStatus("missing", "File not found");
     const rawTags = fileData && fileData.raw_tags ? Object.entries(fileData.raw_tags) : [];
     const artistValue = song.display_artist
         ? `<button class="inline-link" ${buildNavigateAttrs("artists", song.display_artist)}>${escapeHtml(song.display_artist)}</button>`
@@ -514,28 +546,26 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
 
     ctx.showDetailPanel(`
         <div class="detail-header">
-            <div class="card-title-row" style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; width: 100%;">
-                <div class="detail-title" style="flex: 1;">
-                    ${escapeHtml(song.title || song.media_name || "Untitled")} 
-                    <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
-                </div>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button class="ingest-btn-secondary" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop().replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i, ""))}" title="Parse filename for metadata">
-                        Parse Filename
-                    </button>
-                    <button class="ingest-btn-secondary" data-action="open-spotify-modal" data-song-id="${song.id}" data-title="${escapeHtml(song.media_name || song.title)}">
-                        Spotify ⇅
-                    </button>
-                    <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
+            <div class="detail-title">
+                <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
+                ${escapeHtml(song.title || song.media_name || "Untitled")}
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <button class="ingest-btn-secondary" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop().replace(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{12}_/i, ""))}" title="Parse filename for metadata">
+                    Parse Filename
+                </button>
+                <button class="ingest-btn-secondary" data-action="open-spotify-modal" data-song-id="${song.id}" data-title="${escapeHtml(song.media_name || song.title)}">
+                    Spotify ⇅
+                </button>
+                <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
                     Search
-                    </button>
-                    <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
-                        ▶ Play
-                    </button>
-                    <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
-                        Delete
-                    </button>
-                </div>
+                </button>
+                <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
+                    ▶ Play
+                </button>
+                <button class="ingest-btn-danger" data-action="delete-song" data-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name)}">
+                    Delete
+                </button>
             </div>
             <div class="detail-path">${escapeHtml(song.source_path || "No source path")}</div>
         </div>

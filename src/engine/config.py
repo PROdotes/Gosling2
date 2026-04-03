@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 # --- GOSLING2 ENGINE CONFIG ---
 # Centralized source of truth for all paths and environment variables.
@@ -14,6 +15,16 @@ def get_db_path() -> str:
 # GOSLING_LIBRARY_ROOT: The organized parent folder for all songs.
 def get_library_root() -> str:
     return os.getenv("GOSLING_LIBRARY_ROOT", "Z:\\Songs")
+
+
+def get_downloads_folder() -> Optional[str]:
+    """NT/POSIX compatible downloads folder path."""
+    if os.name == "nt":
+        return os.path.join(os.environ.get("USERPROFILE", ""), "Downloads")
+    elif os.name == "posix":
+        home = os.environ.get("HOME", "")
+        return os.path.join(home, "Downloads")
+    return None
 
 
 # Staging Area (Uploaded but un-indexed files)

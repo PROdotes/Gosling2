@@ -1,3 +1,5 @@
+import { wasMousedownInside } from "./utils.js";
+
 /**
  * Generic edit modal — rename a record, optional category field, optional flat children list.
  *
@@ -527,8 +529,8 @@ export function closeEditModal() {
 // Close on overlay click outside modal box
 overlay.addEventListener("click", (e) => {
     if (_isSelecting) return;
-    if (!document.contains(e.target)) return; // ghost click from removed dropdown item
-    if (!overlay.querySelector(".link-modal").contains(e.target)) closeEditModal();
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
+    if (e.target === overlay) closeEditModal();
 });
 
 // Escape from anywhere (even if nothing inside the modal has focus) closes it

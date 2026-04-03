@@ -1,4 +1,4 @@
-import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats, convertAndIngest } from "../api.js";
+import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats } from "../api.js";
 import {
     escapeHtml,
     renderStatus,
@@ -132,43 +132,6 @@ export async function renderIngestionPanel(ctx) {
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
 }
 
-function appendPendingConversionCard(resultsId, stagedPaths, ctx) {
-    const list = document.getElementById(resultsId);
-    if (!list) return;
-
-    const card = document.createElement("article");
-    card.className = "result-card pending-conversion-card";
-    card.innerHTML = `
-        <div class="result-card-header">
-            <span class="result-status status-pending">PENDING CONVERSION</span>
-            <span class="result-path">${stagedPaths.length} WAV file(s) ready to convert</span>
-        </div>
-        <div class="result-card-body">
-            <button class="ingest-btn-primary convert-confirm-btn">Convert &amp; Ingest</button>
-            <button class="ingest-btn-secondary convert-dismiss-btn">Dismiss</button>
-        </div>
-    `;
-
-    card.querySelector(".convert-confirm-btn").addEventListener("click", async (e) => {
-        const btn = e.currentTarget;
-        btn.disabled = true;
-        btn.textContent = "Converting…";
-        try {
-            await convertAndIngest(stagedPaths);
-            ctx.showBanner(`Converting ${stagedPaths.length} WAV file(s) in background — refresh in a moment`, "info");
-            card.remove();
-        } catch (err) {
-            btn.disabled = false;
-            btn.textContent = "Convert & Ingest";
-            ctx.showBanner(`Conversion failed: ${err.message}`, "error");
-        }
-    });
-
-    card.querySelector(".convert-dismiss-btn").addEventListener("click", () => card.remove());
-
-    list.insertBefore(card, list.firstChild);
-}
-
 function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
     const zone = document.getElementById(zoneId);
     if (!zone) return;
@@ -227,9 +190,6 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
 
-            if (result.pending_conversion?.length) {
-                appendPendingConversionCard(resultsId, result.pending_conversion, ctx);
-            }
         } catch (error) {
             console.error("Drop error:", error);
             appendResult(resultsId, { status: "ERROR", message: error.message }, "Batch Upload", ctx);
@@ -335,9 +295,6 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
 
-            if (result.pending_conversion?.length) {
-                appendPendingConversionCard(resultsId, result.pending_conversion, ctx);
-            }
         } catch (error) {
             appendResult(resultsId, { status: "ERROR", message: error.message }, folderPath, ctx);
         } finally {
@@ -429,6 +386,8 @@ function createResultCard(result, path) {
     const statusConfig = {
         "NEW": { class: "found", icon: "&#10003;", text: "New File" },
         "INGESTED": { class: "found", icon: "&#10003;", text: "Ingested" },
+        "CONVERTING": { class: "loading", icon: "&#8635;", text: "Converting (WAV→MP3)" },
+        "PENDING_CONVERT": { class: "loading", icon: "&#9654;", text: "WAV — Awaiting Conversion" },
         "ALREADY_EXISTS": { class: "loading", icon: "&#9888;", text: `Exists (${result.match_type})` },
         "CONFLICT": { class: "loading", icon: "&#9888;", text: `Ghost (${result.match_type})` },
         "ERROR": { class: "missing", icon: "&#10007;", text: "Error" }
@@ -492,6 +451,17 @@ function createResultCard(result, path) {
                 </div>
             ` : ""}
 
+            ${status === "PENDING_CONVERT" ? `
+                <div class="pending-convert-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
+                    <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
+                        This WAV file needs to be converted to MP3 before ingestion.
+                    </div>
+                    <button style="padding: 0.5rem 1rem; background: #ff9500; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;" data-action="convert-wav" data-staged-path="${escapeHtml(result.staged_path)}">
+                        Convert & Ingest
+                    </button>
+                </div>
+            ` : ""}
+
             ${status === "INGESTED" ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
@@ -532,7 +502,7 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
 
         // We only want songs that already exist in DB (INGESTED or CONFLICT/GHOST)
         const entries = state.ingestTasks
-            .filter(t => t.id && (t.status === "INGESTED" || t.status === "CONFLICT"))
+            .filter(t => t.id && (t.status === "INGESTED" || t.status === "CONFLICT" || t.status === "CONVERTING"))
             .map(t => ({
                 id: t.id,
                 filename: t.filename

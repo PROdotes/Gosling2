@@ -220,6 +220,14 @@ class MediaSourceRepository(BaseRepository):
             f"[MediaSourceRepository] <- delete_song_links(id={source_id}) DONE"
         )
 
+    def hard_delete(self, source_id: int, conn: sqlite3.Connection) -> None:
+        """Hard-delete a MediaSource and its Songs row. Use for records that should never have existed."""
+        logger.debug(f"[MediaSourceRepository] -> hard_delete(id={source_id})")
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM Songs WHERE SourceID = ?", (source_id,))
+        cursor.execute("DELETE FROM MediaSources WHERE SourceID = ?", (source_id,))
+        logger.info(f"[MediaSourceRepository] <- hard_delete(id={source_id}) DONE")
+
     def reactivate_source(
         self, source_id: int, model: MediaSource, conn: sqlite3.Connection
     ) -> None:

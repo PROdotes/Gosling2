@@ -1,3 +1,5 @@
+import { wasMousedownInside } from "./utils.js";
+
 /**
  * Generic link modal — type-to-search autocomplete with existing item chips.
  *
@@ -251,7 +253,6 @@ input.addEventListener("blur", () => {
 // Close on overlay click outside modal box
 overlay.addEventListener("click", (e) => {
     if (_isSelecting) return;
-    if (e.target === overlay) {
-        closeLinkModal();
-    }
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
+    if (e.target === overlay) closeLinkModal();
 });

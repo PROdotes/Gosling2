@@ -13,6 +13,7 @@
  */
 
 import { splitterTokenize, splitterPreview, splitterConfirm } from "../api.js";
+import { wasMousedownInside } from "./utils.js";
 
 const overlay    = document.getElementById("splitter-modal");
 const tokenRow   = document.getElementById("splitter-token-row");
@@ -191,5 +192,6 @@ document.addEventListener("keydown", (e) => {
 });
 
 overlay.addEventListener("click", (e) => {
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
     if (e.target === overlay) closeSplitterModal();
 });

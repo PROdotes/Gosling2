@@ -9,6 +9,10 @@ The path to the SQLite library database. Defaults to `sqldb/gosling2.db`. Overri
 ### get_library_root() -> str
 The organized parent folder for all songs. Defaults to `Z:\Songs`. Override via `GOSLING_LIBRARY_ROOT`.
 
+### get_downloads_folder() -> str
+Returns the platform-specific default downloads folder (e.g., `~/Downloads` or `%USERPROFILE%\Downloads`). Used for safe source-file cleanup.
+
+
 ### STAGING_DIR
 The Path to the temporary ingestion staging area. Defaults to `temp/library/staging`.
 

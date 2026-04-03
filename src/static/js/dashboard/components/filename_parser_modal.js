@@ -9,7 +9,7 @@
  */
 
 import { previewFilenameParsing, applyFilenameParsing } from "../api.js";
-import { escapeHtml } from "./utils.js";
+import { escapeHtml, wasMousedownInside } from "./utils.js";
 
 const overlay = document.getElementById("filename-parser-modal");
 const patternInput = document.getElementById("filename-pattern-input");
@@ -211,6 +211,7 @@ export function closeFilenameParserModal() {
 
 // Modal closing helpers
 overlay.addEventListener("click", (e) => {
+    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
     if (e.target === overlay) closeFilenameParserModal();
 });
 

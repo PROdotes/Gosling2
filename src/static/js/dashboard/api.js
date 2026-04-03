@@ -151,7 +151,15 @@ export function addIdentityAlias(identityId, displayName, nameId = null) {
 }
 
 export function removeIdentityAlias(identityId, nameId) {
-    return fetchJson(`/api/v1/identities/${identityId}/aliases/${nameId}`, { method: "DELETE" });
+    return fetchVoid(`/api/v1/identities/${identityId}/aliases/${nameId}`, { method: "DELETE" });
+}
+
+export function updateIdentityLegalName(identityId, legalName) {
+    return fetchVoid(`/api/v1/identities/${identityId}/legal-name`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ legal_name: legalName }),
+    });
 }
 
 export function getPublisherDetail(id, options = {}) {
@@ -254,6 +262,11 @@ export function patchSongScalars(songId, fields) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fields),
     });
+}
+
+export function formatMetadataCase(entityType, entityId, field, formatType) {
+    const url = `/api/v1/formatting/case?entity_type=${entityType}&entity_id=${entityId}&field=${encodeURIComponent(field)}&format_type=${formatType}`;
+    return fetchJson(url, { method: "PATCH" });
 }
 
 export function deleteSong(id) {
@@ -458,5 +471,13 @@ export function convertAndIngest(stagedPaths) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ staged_paths: stagedPaths }),
+    });
+}
+
+export function cleanupOriginalFile(filePath) {
+    return fetchJson("/api/v1/ingest/cleanup-original", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_path: filePath }),
     });
 }

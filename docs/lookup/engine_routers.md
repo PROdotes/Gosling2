@@ -139,6 +139,15 @@ Fetches a single Song domain model by its unique ID with full hydration.
 `{ display_name: str, name_id: int|null }`
 Used by `add_identity_alias`.
 
+### UpdateLegalNameBody
+`{ legal_name: str|null }`
+Used by `update_identity_legal_name`.
+
+### async def update_identity_legal_name(identity_id: int, body: UpdateLegalNameBody) -> None
+**HTTP**: `PATCH /api/v1/identities/{identity_id}/legal-name`
+- Update the LegalName on an Identity globally.
+- Wraps `CatalogService.update_identity_legal_name`.
+
 ### def get_validation_rules() -> Dict[str, Any]
 **HTTP**: `GET /api/v1/validation-rules`
 - Returns scalar field validation rules and global metadata defaults (e.g., tag categories/delimiters) for frontend use.
@@ -153,10 +162,7 @@ Used by `add_identity_alias`.
 ### def _get_service() -> CatalogService
 **Internal**: Service factory for the ingestion router.
 
-### def _get_downloads_folder() -> Optional[str]
-**Internal**: NT/POSIX compatible downloads folder path.
-
-### async def get_downloads_folder() -> JSONResponse
+### async def get_downloads_folder_json() -> JSONResponse
 **HTTP**: `GET /api/v1/ingest/downloads-folder`
 - Returns the platform-specific default downloads folder.
 
@@ -186,19 +192,20 @@ Used by `add_identity_alias`.
 - Triggers DB cascade and physical cleanup if in staging.
 - Returns `{"status": "DELETED", "id": song_id}`.
 
-### ConvertRequest
-`{ staged_paths: List[str] }`
-Used by `convert_and_ingest`.
-
-### async def convert_and_ingest(body: ConvertRequest, background_tasks: BackgroundTasks) -> dict
-**HTTP**: `POST /api/v1/ingest/convert`
-- Background task: convert staged WAVs to MP3 and ingest.
-- Returns immediately with `status: "CONVERTING"`.
-
 ### async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportView
 **HTTP**: `POST /api/v1/ingest/resolve-conflict?ghost_id={id}&staged_path={path}`
 - Resolves a ghost record conflict by reactivating a soft-deleted record with new metadata from a staged file.
 - Wraps `CatalogService.resolve_conflict`.
+
+### async def convert_wav(song_id: int) -> Dict[str, Any]
+**HTTP**: `POST /api/v1/ingest/songs/{song_id}/convert-wav`
+- Queues a background WAV to MP3 conversion task.
+- Orchestrates FFmpeg conversion and finalizes via `CatalogService.finalize_wav_conversion`.
+
+### async def cleanup_original_file(song_id: int) -> Dict[str, Any]
+**HTTP**: `DELETE /api/v1/ingest/songs/{song_id}/original-file`
+- Deletes the original source file (e.g., from Downloads) after it has been staged and ingested.
+- Securely restricts deletions to the Downloads folder via `get_downloads_folder`.
 
 ---
 
@@ -349,6 +356,12 @@ Used by `convert_and_ingest`.
 **HTTP**: `POST /api/v1/songs/{song_id}/move`
 - Moves a 'Reviewed' song from staging to the organized library.
 - Wraps `CatalogService.move_song_to_library`.
+
+### async def format_metadata_case(entity_type: str, entity_id: int, field: str, format_type: str, service: CatalogService = Depends(_get_service)) -> Any
+**HTTP**: `PATCH /api/v1/songs/format-case?entity_type={type}&entity_id={id}&field={field}&format_type={type}`
+- Action endpoint to manually fix casing of a song or album field.
+- Returns the updated hydrated entity (SongView or AlbumView).
+- Wraps `CatalogService.format_entity_field`.
 
 ---
 

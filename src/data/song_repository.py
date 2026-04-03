@@ -132,7 +132,7 @@ class SongRepository(MediaSourceRepository):
         media_source_fields = {
             k: v
             for k, v in fields.items()
-            if k in ("media_name", "is_active", "processing_status", "source_path")
+            if k in ("media_name", "is_active", "processing_status", "source_path", "audio_hash")
         }
         songs_fields = {k: v for k, v in fields.items() if k in ("bpm", "year", "isrc")}
 
@@ -141,6 +141,7 @@ class SongRepository(MediaSourceRepository):
             "is_active": "IsActive",
             "processing_status": "ProcessingStatus",
             "source_path": "SourcePath",
+            "audio_hash": "AudioHash",
             "bpm": "TempoBPM",
             "year": "RecordingYear",
             "isrc": "ISRC",

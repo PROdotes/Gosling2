@@ -488,7 +488,7 @@ main {
 }
 
 .detail-panel {
-    width: min(520px, 45vw);
+    width: min(700px, 50vw);
     background: rgba(18, 19, 26, 0.94);
     display: none;
     flex-direction: column;
@@ -624,7 +624,7 @@ main {
 }
 
 .file-status {
-    padding: 0.9rem 1rem;
+    padding: 0.5rem 0.85rem;
     border-radius: 10px;
     border: 1px solid var(--border-subtle);
     font-size: 0.85rem;
@@ -669,7 +669,7 @@ main {
     font-size: 0.8rem;
 }
 
-.target-preview {
+.path-preview {
     font-size: 0.72rem;
     color: var(--text-muted);
     margin-top: 0.4rem;
@@ -679,6 +679,25 @@ main {
     border: 1px solid var(--border-subtle);
     width: 100%;
     word-break: break-all;
+}
+
+.path-preview.clickable {
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.path-preview.clickable:hover {
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.path-preview.exists-yes {
+    border-color: rgba(34, 197, 94, 0.3);
+    color: #8af7ae;
+}
+
+.path-preview.exists-no {
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #f78a8a;
 }
 
 .ui-banner {
@@ -790,6 +809,15 @@ main {
     text-align: left;
     vertical-align: top;
 }
+
+.comparison-table th:nth-child(1),
+.comparison-table td:nth-child(1) { width: 20%; }
+
+.comparison-table th:nth-child(2),
+.comparison-table td:nth-child(2) { width: 50%; }
+
+.comparison-table th:nth-child(3),
+.comparison-table td:nth-child(3) { width: 30%; }
 
 .comparison-table th {
     color: var(--text-secondary);
@@ -1841,6 +1869,48 @@ main {
     top: 0;
     background: var(--bg-card-raised);
     z-index: 10;
+    .workflow-status-label {
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+/* Casing Actions */
+.case-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+
+.comparison-table td:hover .case-actions {
+    opacity: 0.6;
+}
+
+.case-actions:hover {
+    opacity: 1 !important;
+}
+
+.btn-case {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.1s;
+}
+
+.btn-case:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
     text-transform: uppercase;
     font-size: 0.68rem;
     font-weight: 700;
@@ -1895,5 +1965,38 @@ main {
     border-color: var(--accent);
     box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
     transform: translateY(-1px);
+}
+
+/* Casing Actions */
+.case-actions {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.btn-case {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-dim);
+    font-size: 0.58rem;
+    font-weight: 800;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s;
+    opacity: 0.55;
+    padding: 0;
+}
+
+.btn-case:hover {
+    background: var(--bg-card-raised);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    opacity: 1;
 }
 

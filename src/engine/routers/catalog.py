@@ -64,12 +64,36 @@ async def get_song(song_id: int) -> SongView:
 
     view = SongView.from_domain(song)
 
-    # Calculate preview if in staging
+    # Calculate previews if in staging
     source_path = (song.source_path or "").lower()
     if "staging" in source_path:
+        from pathlib import Path
+
+        # 1. Estimated original source path (Downloads heuristic - metadata independent)
+        try:
+            from src.engine.config import get_downloads_folder
+            downloads = get_downloads_folder()
+            if downloads:
+                # Extract original filename from UUID prefix (36 hex + 1 underscore)
+                filename = Path(song.source_path).name
+                if len(filename) > 37 and "_" in filename[:38]:
+                    original_name = filename.split("_", 1)[1]
+                    view.estimated_original_path = str(Path(downloads) / original_name)
+                else:
+                    # Fallback for non-UUID files already in staging
+                    view.estimated_original_path = str(Path(downloads) / filename)
+
+                # Check if it actually exists (to color code the UI)
+                import os
+                if os.path.exists(view.estimated_original_path):
+                    view.original_exists = True
+
+        except Exception as e:
+            logger.debug(f"[CatalogRouter] Original path preview failed for song {song_id}: {e}")
+
+        # 2. Organized destination preview (May fail due to metadata error)
         try:
             from src.engine.config import get_library_root
-            from pathlib import Path
 
             root = Path(get_library_root())
             preview = service._filing_service.evaluate_routing(song)
@@ -141,6 +165,19 @@ async def remove_identity_alias(identity_id: int, name_id: int) -> None:  # noqa
         _get_service().remove_identity_alias(name_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class UpdateLegalNameBody(BaseModel):
+    legal_name: Optional[str] = None
+
+
+@router.patch("/identities/{identity_id:int}/legal-name", status_code=204)
+async def update_identity_legal_name(identity_id: int, body: UpdateLegalNameBody) -> None:
+    """Update the legal name of an identity."""
+    try:
+        _get_service().update_identity_legal_name(identity_id, body.legal_name)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/identities/{identity_id:int}/songs", response_model=List[SongView])

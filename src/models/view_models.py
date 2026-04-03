@@ -125,6 +125,8 @@ class SongView(BaseModel):
     tags: List[Tag] = []
     raw_tags: Dict[str, List[str]] = {}
     organized_path_preview: Optional[str] = None
+    estimated_original_path: Optional[str] = None
+    original_exists: bool = False
 
     @classmethod
     def from_domain(cls, song: Song) -> "SongView":
@@ -541,6 +543,12 @@ class BatchIngestReport(BaseModel):
     errors: int
     results: List[IngestionReportView]
     pending_conversion: List[str] = []
+
+
+class CleanupOriginalRequest(BaseModel):
+    """Request to physically delete an original source file."""
+
+    file_path: str
 
 
 PublisherView.model_rebuild()

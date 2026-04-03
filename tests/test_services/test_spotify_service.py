@@ -217,3 +217,49 @@ Hit Records"""
             len(blum_credits) == 1
         ), f"Expected 1 credit for Blum (Producer only), got {len(blum_credits)}"
         assert blum_credits[0].role == "Producer"
+
+    def test_parse_writer_role_expands_to_composer_and_lyricist(self):
+        """Verifies that 'Writer' role expands to both Composer and Lyricist."""
+        raw = "Credits\nTitle\nArtist\n\nJohn Doe\nWriter"
+        # Even if Composer/Lyricist are the only known roles, Writer should work as a heuristic
+        res = SpotifyService.parse_credits(
+            raw, reference_title="Title", known_roles=["Composer", "Lyricist"]
+        )
+
+        assert len(res.credits) == 2, f"Expected 2 credits for Writer, got {len(res.credits)}"
+        roles = {c.role for c in res.credits}
+        assert roles == {"Composer", "Lyricist"}, f"Expected roles {{'Composer', 'Lyricist'}}, got {roles}"
+        assert all(c.name == "John Doe" for c in res.credits)
+
+    def test_parse_writer_expansion_is_case_insensitive(self):
+        """Verifies that 'WRITER' or 'writer' also expand."""
+        raw = "Credits\nTitle\nArtist\n\nJane Doe\nWRITER"
+        res = SpotifyService.parse_credits(
+            raw, reference_title="Title", known_roles=["Composer", "Lyricist"]
+        )
+
+        roles = {c.role for c in res.credits}
+        assert roles == {"Composer", "Lyricist"}
+
+    def test_parse_writer_with_other_roles_on_same_line(self):
+        """Verifies that Writer expands when bulleted with other roles."""
+        raw = "Credits\nTitle\nArtist\n\nBob Smith\nProducer \u2022 Writer"
+        res = SpotifyService.parse_credits(
+            raw, reference_title="Title", known_roles=["Composer", "Lyricist", "Producer"]
+        )
+
+        roles = {c.role for c in res.credits}
+        assert roles == {"Producer", "Composer", "Lyricist"}
+
+    def test_parse_writer_expansion_deduplicates_against_explicit_roles(self):
+        """Verifies that if Composer is also listed, we don't get a duplicate 'Composer'."""
+        raw = "Credits\nTitle\nArtist\n\nAlice Ali\nComposer \u2022 Writer"
+        res = SpotifyService.parse_credits(
+            raw, reference_title="Title", known_roles=["Composer", "Lyricist"]
+        )
+
+        # Alice should have exactly 2 credits: Composer and Lyricist (not 2x Composer)
+        assert len(res.credits) == 2, f"Expected 2 credits, got {len(res.credits)}"
+        roles = [c.role for c in res.credits]
+        assert roles.count("Composer") == 1
+        assert roles.count("Lyricist") == 1

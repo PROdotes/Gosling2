@@ -43,6 +43,8 @@ import {
     addAlbumCredit,
     removeAlbumCredit,
     moveSongToLibrary,
+    cleanupOriginalFile,
+    formatMetadataCase,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
@@ -299,7 +301,8 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     const existingContent = elements.detailPanel.querySelector(".detail-content");
     const savedScroll = existingContent ? existingContent.scrollTop : 0;
     const request = beginDetailRequest("songs", song.id);
-    renderSongDetailLoading(ctx, song);
+    const isSameSong = state.activeSong?.id === song.id;
+    if (!isSameSong) renderSongDetailLoading(ctx, song);
 
     const fetchFile = (!reuseFileData || cachedFileDataSongId !== String(song.id))
         ? getSongDetail(song.id, { signal: request.signal })
@@ -529,6 +532,37 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    if (action === "convert-wav") {
+        const { stagedPath } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        actionTarget.textContent = "Converting...";
+
+        fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`, { method: "POST" })
+            .then((res) => res.json())
+            .then((data) => {
+                const card = actionTarget.closest(".result-card");
+                if ((data.status === "INGESTED" || data.status === "ALREADY_EXISTS") && card) {
+                    card.style.background = "rgba(76, 175, 80, 0.1)";
+                    card.style.borderLeft = "3px solid #4CAF50";
+                    const box = card.querySelector(".pending-convert-box");
+                    const msg = data.status === "ALREADY_EXISTS"
+                        ? `✓ Already in library as "${data.song?.media_name || "Unknown"}"`
+                        : `✓ Converted & Ingested as "${data.song?.media_name || "Unknown"}"`;
+                    if (box) box.innerHTML = `<div style="color: #4CAF50; font-weight: 600;">${msg}</div>`;
+                } else {
+                    actionTarget.disabled = false;
+                    actionTarget.textContent = "Convert & Ingest";
+                    console.error("Conversion failed:", data.message);
+                }
+            })
+            .catch((err) => {
+                actionTarget.disabled = false;
+                actionTarget.textContent = "Convert & Ingest";
+                console.error("Error:", err.message);
+            });
+        return;
+    }
+
     if (action === "resolve-conflict") {
         const { ghostId, stagedPath } = actionTarget.dataset;
 
@@ -568,6 +602,23 @@ document.addEventListener("click", async (event) => {
                 actionTarget.textContent = "Re-ingest & Activate";
                 console.error("Error:", err.message);
             });
+        return;
+    }
+
+    if (action === "format-case") {
+        const { entityType, entityId, songId, field, type } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await formatMetadataCase(entityType, entityId, field, type);
+            // Refresh detailed view to show new casing
+            const song = getActiveList().find(s => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+            ctx.showBanner(`Applied ${type} case to ${entityType} ${field}`, "success");
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Format case failed: ${err.message}`);
+            ctx.showBanner(err.message, "error");
+        }
         return;
     }
 
@@ -720,6 +771,26 @@ if (action === "close-filename-parser-modal") {
         } catch (err) {
             actionTarget.disabled = false;
             console.error(`Remove album credit failed: ${err.message}`);
+        }
+        return;
+    }
+
+    if (action === "cleanup-original") {
+        const { path } = actionTarget.dataset;
+        if (!confirm(`Are you sure you want to PERMANENTLY delete the original file?\n\nPath: ${path}`)) {
+            return;
+        }
+
+        actionTarget.style.opacity = "0.5";
+        actionTarget.style.pointerEvents = "none";
+        try {
+            await cleanupOriginalFile(path);
+            refreshActiveDetail();
+            ctx.showBanner("Original file deleted successfully", "success");
+        } catch (err) {
+            actionTarget.style.opacity = "1";
+            actionTarget.style.pointerEvents = "auto";
+            ctx.showBanner(`Cleanup failed: ${err.message}`, "error");
         }
         return;
     }
@@ -1019,15 +1090,16 @@ if (action === "close-filename-parser-modal") {
             const identity = await getArtistTree(identityId).catch(() => null);
             if (!identity) return;
 
-            const aliases = (identity.aliases || []).filter(a =>
-                a.display_name !== identity.display_name
-            );
+            const primaryAlias = (identity.aliases || []).find(a => a.is_primary);
+            const aliases = (identity.aliases || []).filter(a => !a.is_primary);
             const childItems = aliases.map(a => ({ id: a.id, label: a.display_name }));
 
             openEditModal({
                 title: "Edit Artist",
-                name: identity.legal_name || identity.display_name,
-                onRename: null,
+                name: primaryAlias?.display_name || identity.display_name,
+                onRename: async (newName) => {
+                    await updateCreditName(0, primaryAlias.id, newName);
+                },
                 onClose,
                 category: null,
                 children: {
