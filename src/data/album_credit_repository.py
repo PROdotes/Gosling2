@@ -11,7 +11,9 @@ class AlbumCreditRepository(BaseRepository):
 
     _COLUMNS = "ac.AlbumID, ac.CreditedNameID, ac.RoleID, an.DisplayName, an.IsPrimaryName, an.OwnerIdentityID, r.RoleName"
 
-    def get_credits_for_albums(self, album_ids: List[int]) -> List[AlbumCredit]:
+    def get_credits_for_albums(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[AlbumCredit]:
         """Batch-fetches credits for multiple albums in a single query."""
         if not album_ids:
             return []
@@ -28,9 +30,14 @@ class AlbumCreditRepository(BaseRepository):
             WHERE ac.AlbumID IN ({placeholders}) AND an.IsDeleted = 0
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, album_ids).fetchall()
+            return [self._row_to_album_credit(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, album_ids).fetchall()
 
             logger.debug(
                 f"[AlbumCreditRepository] Found {len(rows)} raw album credit rows."

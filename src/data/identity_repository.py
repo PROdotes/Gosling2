@@ -17,10 +17,12 @@ class IdentityRepository(BaseRepository):
     """
     _IDENTITY_JOIN = "LEFT JOIN ArtistNames an ON i.IdentityID = an.OwnerIdentityID AND an.IsPrimaryName = 1 AND an.IsDeleted = 0"
 
-    def get_by_id(self, identity_id: int) -> Optional[Identity]:
+    def get_by_id(
+        self, identity_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Identity]:
         """Fetch a basic Identity record."""
         logger.debug(f"[IdentityRepository] -> get_by_id(id={identity_id})")
-        identities = self.get_by_ids([identity_id])
+        identities = self.get_by_ids([identity_id], conn=conn)
         if not identities:
             logger.debug(
                 f"[IdentityRepository] <- get_by_id(id={identity_id}) NOT_FOUND"
@@ -33,7 +35,9 @@ class IdentityRepository(BaseRepository):
         )
         return identity
 
-    def get_by_ids(self, identity_ids: List[int]) -> List[Identity]:
+    def get_by_ids(
+        self, identity_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[Identity]:
         """Batch-fetch multiple identities by ID."""
         if not identity_ids:
             return []
@@ -46,15 +50,22 @@ class IdentityRepository(BaseRepository):
             {self._IDENTITY_JOIN}
             WHERE i.IdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, identity_ids).fetchall()
+            return [self._row_to_identity(row) for row in rows]
 
-        identities = [self._row_to_identity(row) for row in rows]
-        logger.debug(f"[IdentityRepository] <- get_by_ids() found {len(identities)}")
-        return identities
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, identity_ids).fetchall()
+            identities = [self._row_to_identity(row) for row in rows]
+            logger.debug(f"[IdentityRepository] <- get_by_ids() found {len(identities)}")
+            return identities
 
-    def get_all_identities(self) -> List[Identity]:
+    def get_all_identities(
+        self, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Identity]:
         """Fetch the directory of all identities."""
         logger.debug("[IdentityRepository] -> get_all_identities()")
         query = f"""
@@ -64,17 +75,24 @@ class IdentityRepository(BaseRepository):
             WHERE i.IsDeleted = 0
             ORDER BY DisplayName COLLATE NOCASE ASC
         """
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
+            return [self._row_to_identity(row) for row in rows]
 
-        identities = [self._row_to_identity(row) for row in rows]
-        logger.debug(
-            f"[IdentityRepository] <- get_all_identities() count={len(identities)}"
-        )
-        return identities
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query).fetchall()
+            identities = [self._row_to_identity(row) for row in rows]
+            logger.debug(
+                f"[IdentityRepository] <- get_all_identities() count={len(identities)}"
+            )
+            return identities
 
-    def search_identities(self, query: str) -> List[Identity]:
+    def search_identities(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Identity]:
         """Find identities whose DisplayName, LegalName, or Alias match the query."""
         logger.debug(f"[IdentityRepository] -> search_identities(q='{query}')")
         fmt_q = f"%{query}%"
@@ -90,16 +108,24 @@ class IdentityRepository(BaseRepository):
             ) OR i.LegalName LIKE ?)
             ORDER BY DisplayName ASC
         """
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
+            return [self._row_to_identity(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (fmt_q, fmt_q)).fetchall()
             result = [self._row_to_identity(row) for row in rows]
             logger.debug(
                 f"[IdentityRepository] <- search_identities(q='{query}') count={len(result)}"
             )
             return result
 
-    def get_group_ids_for_members(self, member_ids: List[int]) -> List[int]:
+    def get_group_ids_for_members(
+        self, member_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
         """Batch-fetch GroupIdentityIDs for a list of MemberIdentityIDs."""
         logger.debug(
             f"[IdentityRepository] -> get_group_ids_for_members(count={len(member_ids)})"
@@ -110,15 +136,23 @@ class IdentityRepository(BaseRepository):
         placeholders = ",".join(["?" for _ in member_ids])
         query = f"SELECT DISTINCT GroupIdentityID FROM GroupMemberships WHERE MemberIdentityID IN ({placeholders})"
 
-        with self._get_connection() as conn:
+        if conn:
             rows = conn.execute(query, member_ids).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, member_ids).fetchall()
             result = [row[0] for row in rows]
             logger.debug(
                 f"[IdentityRepository] <- get_group_ids_for_members() count={len(result)}"
             )
             return result
 
-    def get_aliases_batch(self, identity_ids: List[int]) -> Dict[int, List[ArtistName]]:
+    def get_aliases_batch(
+        self,
+        identity_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[int, List[ArtistName]]:
         """Batch-fetch aliases for a list of identities."""
         logger.debug(
             f"[IdentityRepository] -> get_aliases_batch(count={len(identity_ids)})"
@@ -130,9 +164,9 @@ class IdentityRepository(BaseRepository):
         query = f"SELECT NameID, DisplayName, IsPrimaryName, OwnerIdentityID FROM ArtistNames WHERE OwnerIdentityID IN ({placeholders}) AND IsDeleted = 0"
 
         result: Dict[int, List[ArtistName]] = {iid: [] for iid in identity_ids}
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            for row in conn.execute(query, identity_ids):
+
+        def process_rows(cursor):
+            for row in cursor:
                 alias = ArtistName(
                     id=row["NameID"],
                     display_name=row["DisplayName"],
@@ -140,12 +174,26 @@ class IdentityRepository(BaseRepository):
                 )
                 result[row["OwnerIdentityID"]].append(alias)
 
-        logger.debug(
-            f"[IdentityRepository] <- get_aliases_batch() batched={len(result)} IDs"
-        )
-        return result
+        if conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(query, identity_ids)
+            process_rows(cursor)
+            return result
 
-    def get_members_batch(self, identity_ids: List[int]) -> Dict[int, List[Identity]]:
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            cursor = new_conn.execute(query, identity_ids)
+            process_rows(cursor)
+            logger.debug(
+                f"[IdentityRepository] <- get_aliases_batch() batched={len(result)} IDs"
+            )
+            return result
+
+    def get_members_batch(
+        self,
+        identity_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[int, List[Identity]]:
         """Batch-fetch members for a list of group identities."""
         logger.debug(
             f"[IdentityRepository] -> get_members_batch(count={len(identity_ids)})"
@@ -164,18 +212,32 @@ class IdentityRepository(BaseRepository):
         """
 
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            for row in conn.execute(query, identity_ids):
+
+        def process_rows(cursor):
+            for row in cursor:
                 identity = self._row_to_identity(row)
                 result[row["GroupIdentityID"]].append(identity)
 
-        logger.debug(
-            f"[IdentityRepository] <- get_members_batch() batched={len(result)} IDs"
-        )
-        return result
+        if conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(query, identity_ids)
+            process_rows(cursor)
+            return result
 
-    def get_groups_batch(self, identity_ids: List[int]) -> Dict[int, List[Identity]]:
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            cursor = new_conn.execute(query, identity_ids)
+            process_rows(cursor)
+            logger.debug(
+                f"[IdentityRepository] <- get_members_batch() batched={len(result)} IDs"
+            )
+            return result
+
+    def get_groups_batch(
+        self,
+        identity_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[int, List[Identity]]:
         """Batch-fetch groups for a list of person identities."""
         logger.debug(
             f"[IdentityRepository] -> get_groups_batch(count={len(identity_ids)})"
@@ -194,16 +256,26 @@ class IdentityRepository(BaseRepository):
         """
 
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            for row in conn.execute(query, identity_ids):
+
+        def process_rows(cursor):
+            for row in cursor:
                 identity = self._row_to_identity(row)
                 result[row["MemberIdentityID"]].append(identity)
 
-        logger.debug(
-            f"[IdentityRepository] <- get_groups_batch() batched={len(result)} IDs"
-        )
-        return result
+        if conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute(query, identity_ids)
+            process_rows(cursor)
+            return result
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            cursor = new_conn.execute(query, identity_ids)
+            process_rows(cursor)
+            logger.debug(
+                f"[IdentityRepository] <- get_groups_batch() batched={len(result)} IDs"
+            )
+            return result
 
     def add_alias(
         self,
@@ -363,12 +435,21 @@ class IdentityRepository(BaseRepository):
             (legal_name, identity_id),
         )
 
-    def find_identity_by_name(self, name: str) -> Optional[int]:
+    def find_identity_by_name(
+        self, name: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[int]:
         """Return the IdentityID for an exact (case-insensitive) ArtistName match, or None."""
         logger.debug(f"[IdentityRepository] -> find_identity_by_name(name='{name}')")
         query = "SELECT OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0"
-        with self._get_connection() as conn:
+
+        if conn:
             row = conn.execute(query, (name,)).fetchone()
+            if row:
+                return row[0]
+            return None
+
+        with self._get_connection() as new_conn:
+            row = new_conn.execute(query, (name,)).fetchone()
             if row:
                 logger.debug(
                     f"[IdentityRepository] <- find_identity_by_name() found ID={row[0]}"

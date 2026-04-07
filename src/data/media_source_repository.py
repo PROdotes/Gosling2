@@ -49,71 +49,75 @@ class MediaSourceRepository(BaseRepository):
         )
         return int(source_id)
 
-    def get_by_path(self, path: str) -> Optional[MediaSource]:
+    def get_by_path(
+        self, path: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[MediaSource]:
         """Universal lookup by SourcePath. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_path(path='{path}')")
-        conn = self.get_connection()
-        try:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
 
-            cursor.execute(
-                """
-                SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
-                FROM MediaSources
-                WHERE SourcePath = ? AND IsDeleted = 0
-            """,
-                (path,),
-            )
-            row = cursor.fetchone()
+        query = """
+            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+            FROM MediaSources
+            WHERE SourcePath = ? AND IsDeleted = 0
+        """
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (path,)).fetchone()
+            return self._row_to_source(row) if row else None
+
+        with self.get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (path,)).fetchone()
 
             if row:
                 source = self._row_to_source(row)
-                logger.info(
+                logger.debug(
                     f"[MediaSourceRepository] <- get_by_path(path='{path}') FOUND id={source.id}"
                 )
                 return source
 
-            logger.info(
+            logger.debug(
                 f"[MediaSourceRepository] <- get_by_path(path='{path}') NOT_FOUND"
             )
             return None
-        finally:
-            conn.close()
 
-    def get_by_hash(self, audio_hash: str) -> Optional[MediaSource]:
+    def get_by_hash(
+        self, audio_hash: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[MediaSource]:
         """Universal lookup by AudioHash. Returns base MediaSource or None."""
         logger.debug(f"[MediaSourceRepository] -> get_by_hash(hash='{audio_hash}')")
-        conn = self.get_connection()
-        try:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
 
-            cursor.execute(
-                """
-                SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
-                FROM MediaSources
-                WHERE AudioHash = ? AND IsDeleted = 0
-            """,
-                (audio_hash,),
-            )
-            row = cursor.fetchone()
+        query = """
+            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+            FROM MediaSources
+            WHERE AudioHash = ? AND IsDeleted = 0
+        """
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (audio_hash,)).fetchone()
+            return self._row_to_source(row) if row else None
+
+        with self.get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (audio_hash,)).fetchone()
 
             if row:
                 source = self._row_to_source(row)
-                logger.info(
+                logger.debug(
                     f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') FOUND id={source.id}"
                 )
                 return source
 
-            logger.info(
+            logger.debug(
                 f"[MediaSourceRepository] <- get_by_hash(hash='{audio_hash}') NOT_FOUND"
             )
             return None
-        finally:
-            conn.close()
 
-    def get_source_metadata_by_hash(self, audio_hash: str) -> Optional[Dict[str, Any]]:
+    def get_source_metadata_by_hash(
+        self, audio_hash: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Retrieves basic metadata for a source by its hash, regardless of its deleted status.
         Used for re-ingestion conflict resolution.
@@ -121,13 +125,8 @@ class MediaSourceRepository(BaseRepository):
         logger.debug(
             f"[MediaSourceRepository] -> get_source_metadata_by_hash(hash='{audio_hash}')"
         )
-        conn = self.get_connection()
-        try:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
 
-            cursor.execute(
-                """
+        query = """
                 SELECT
                     ms.SourceID,
                     ms.MediaName,
@@ -138,24 +137,29 @@ class MediaSourceRepository(BaseRepository):
                 FROM MediaSources ms
                 LEFT JOIN Songs s ON ms.SourceID = s.SourceID
                 WHERE ms.AudioHash = ?
-            """,
-                (audio_hash,),
-            )
-            row = cursor.fetchone()
+            """
 
+        def map_row(r):
+            return {
+                "id": r["SourceID"],
+                "title": r["MediaName"],
+                "duration_s": float(r["SourceDuration"] or 0),
+                "is_deleted": bool(r["IsDeleted"]),
+                "year": r["RecordingYear"],
+                "isrc": r["ISRC"],
+            }
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (audio_hash,)).fetchone()
+            return map_row(row) if row else None
+
+        with self.get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (audio_hash,)).fetchone()
             if row:
-                return {
-                    "id": row["SourceID"],
-                    "title": row["MediaName"],
-                    "duration_s": float(row["SourceDuration"] or 0),
-                    "is_deleted": bool(row["IsDeleted"]),
-                    "year": row["RecordingYear"],
-                    "isrc": row["ISRC"],
-                }
-
+                return map_row(row)
             return None
-        finally:
-            conn.close()
 
     def _row_to_source(self, row: Mapping[str, Any]) -> MediaSource:
         """Hydrates a base MediaSource from a raw MediaSources row."""

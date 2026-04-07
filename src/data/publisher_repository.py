@@ -12,7 +12,7 @@ class PublisherRepository(BaseRepository):
     _COLUMNS_NO_ALIAS = "PublisherID, PublisherName, ParentPublisherID"
 
     def get_publishers_for_albums(
-        self, album_ids: List[int]
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> List[Tuple[int, Publisher]]:
         """Batch-fetch publisher objects for a list of Albums (M2M)."""
         logger.debug(
@@ -29,9 +29,14 @@ class PublisherRepository(BaseRepository):
             WHERE ap.AlbumID IN ({placeholders}) AND p.IsDeleted = 0
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, album_ids).fetchall()
+            return [(row["AlbumID"], self._row_to_publisher(row)) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, album_ids).fetchall()
             result = [(row["AlbumID"], self._row_to_publisher(row)) for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- get_publishers_for_albums() count={len(result)}"
@@ -39,7 +44,7 @@ class PublisherRepository(BaseRepository):
             return result
 
     def get_publishers_for_songs(
-        self, song_ids: List[int]
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> List[Tuple[int, Publisher]]:
         """Batch-fetch master publishers for a list of Songs (M2M)."""
         logger.debug(
@@ -56,16 +61,25 @@ class PublisherRepository(BaseRepository):
             WHERE rp.SourceID IN ({placeholders}) AND p.IsDeleted = 0
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, song_ids).fetchall()
+            return [(row["SourceID"], self._row_to_publisher(row)) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, song_ids).fetchall()
             result = [(row["SourceID"], self._row_to_publisher(row)) for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- get_publishers_for_songs() count={len(result)}"
             )
             return result
 
-    def get_publishers(self, publisher_ids: List[int]) -> Dict[int, Publisher]:
+    def get_publishers(
+        self,
+        publisher_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> Dict[int, Publisher]:
         """Resolve a flat list of ID -> Publisher objects."""
         logger.debug(
             f"[PublisherRepository] -> get_publishers(count={len(publisher_ids)})"
@@ -76,44 +90,64 @@ class PublisherRepository(BaseRepository):
         placeholders = ",".join(["?" for _ in publisher_ids])
         query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders}) AND IsDeleted = 0"
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, publisher_ids).fetchall()
+            return {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, publisher_ids).fetchall()
             result = {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
             logger.debug(
                 f"[PublisherRepository] <- get_publishers() resolved={len(result)}"
             )
             return result
 
-    def get_all(self) -> List[Publisher]:
+    def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]:
         """Fetch the full directory of active publishers."""
         logger.debug("[PublisherRepository] -> get_all()")
         query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE IsDeleted = 0 ORDER BY PublisherName"
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
+            return [self._row_to_publisher(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(f"[PublisherRepository] <- get_all() count={len(result)}")
             return result
 
-    def search(self, query: str) -> List[Publisher]:
+    def search(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Publisher]:
         """Surface search for publishers by name match only."""
         logger.debug(f"[PublisherRepository] -> search(q='{query}')")
         query_sql = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherName LIKE ? AND IsDeleted = 0 ORDER BY PublisherName"
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
+            return [self._row_to_publisher(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- search(q='{query}') found {len(result)}"
             )
             return result
 
-    def search_deep(self, query: str) -> List[Publisher]:
+    def search_deep(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Publisher]:
         """
         Deep search for publishers by name match, including all descendants.
         Used by the deep song search expansion leg only.
-        Uses a recursive CTE to find the corporate tree for any matching seeds.
         """
         logger.debug(f"[PublisherRepository] -> search_deep(q='{query}')")
         query_sql = f"""
@@ -129,31 +163,44 @@ class PublisherRepository(BaseRepository):
             )
             SELECT DISTINCT {self._COLUMNS_NO_ALIAS} FROM Descendants ORDER BY PublisherName;
         """
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
+            return [self._row_to_publisher(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (f"%{query}%",)).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- search_deep(q='{query}') found {len(result)} total"
             )
             return result
 
-    def find_by_name(self, name: str) -> Optional[int]:
+    def find_by_name(
+        self, name: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[int]:
         """Return the PublisherID for an exact (case-insensitive) name match, or None."""
-        conn = self.get_connection()
-        try:
+        if conn:
             row = conn.execute(
                 "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
                 (name,),
             ).fetchone()
             return row[0] if row else None
-        finally:
-            conn.close()
 
-    def get_by_id(self, publisher_id: int) -> Optional[Publisher]:
+        with self.get_connection() as new_conn:
+            row = new_conn.execute(
+                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+                (name,),
+            ).fetchone()
+            return row[0] if row else None
+
+    def get_by_id(
+        self, publisher_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Publisher]:
         """Fetch a single publisher by its ID."""
         logger.debug(f"[PublisherRepository] -> get_by_id(id={publisher_id})")
-        results = self.get_by_ids([publisher_id])
+        results = self.get_by_ids([publisher_id], conn)
         if results:
             res = results[0]
             logger.debug(
@@ -165,21 +212,31 @@ class PublisherRepository(BaseRepository):
         )
         return None
 
-    def get_by_ids(self, ids: List[int]) -> List[Publisher]:
+    def get_by_ids(
+        self, ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[Publisher]:
         """Batch-fetch multiple publishers by ID."""
         logger.debug(f"[PublisherRepository] -> get_by_ids(count={len(ids)})")
         if not ids:
             return []
         placeholders = ",".join(["?" for _ in ids])
         query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE PublisherID IN ({placeholders}) AND IsDeleted = 0"
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, ids).fetchall()
+            return [self._row_to_publisher(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, ids).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(f"[PublisherRepository] <- get_by_ids() count={len(result)}")
             return result
 
-    def get_hierarchy_batch(self, publisher_ids: List[int]) -> Dict[int, Publisher]:
+    def get_hierarchy_batch(
+        self, publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, Publisher]:
         """
         RESOLVER: Fetches the entire ancestry chain for a list of publishers in a SINGLE query.
         Uses a recursive Common Table Expression (CTE).
@@ -209,41 +266,63 @@ class PublisherRepository(BaseRepository):
             SELECT * FROM Ancestry;
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, publisher_ids).fetchall()
+            return {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, publisher_ids).fetchall()
             result = {row["PublisherID"]: self._row_to_publisher(row) for row in rows}
             logger.debug(
                 f"[PublisherRepository] <- get_hierarchy_batch() resolved={len(result)} ancestors"
             )
             return result
 
-    def get_children(self, parent_id: int) -> List[Publisher]:
+    def get_children(
+        self, parent_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Publisher]:
         """Fetch all sub-publishers for a given parent."""
         logger.debug(f"[PublisherRepository] -> get_children(parent_id={parent_id})")
         query = f"SELECT {self._COLUMNS_NO_ALIAS} FROM Publishers WHERE ParentPublisherID = ? AND IsDeleted = 0"
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, (parent_id,)).fetchall()
+            return [self._row_to_publisher(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, (parent_id,)).fetchall()
             result = [self._row_to_publisher(row) for row in rows]
             logger.debug(f"[PublisherRepository] <- get_children() count={len(result)}")
             return result
 
-    def get_song_ids_by_publisher(self, publisher_id: int) -> List[int]:
+    def get_song_ids_by_publisher(
+        self, publisher_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
         """Find all song IDs explicitly linked to this publisher (Master)."""
         logger.debug(
             f"[PublisherRepository] -> get_song_ids_by_publisher(id={publisher_id})"
         )
         query = "SELECT SourceID FROM RecordingPublishers WHERE PublisherID = ?"
-        with self._get_connection() as conn:
+
+        if conn:
             rows = conn.execute(query, (publisher_id,)).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, (publisher_id,)).fetchall()
             result = [row[0] for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- get_song_ids_by_publisher() count={len(result)}"
             )
             return result
 
-    def get_song_ids_by_publisher_batch(self, publisher_ids: List[int]) -> List[int]:
+    def get_song_ids_by_publisher_batch(
+        self, publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
         """Find all song IDs explicitly linked to any of these publishers."""
         logger.debug(
             f"[PublisherRepository] -> get_song_ids_by_publisher_batch(count={len(publisher_ids)})"
@@ -253,8 +332,13 @@ class PublisherRepository(BaseRepository):
 
         placeholders = ",".join(["?" for _ in publisher_ids])
         query = f"SELECT DISTINCT SourceID FROM RecordingPublishers WHERE PublisherID IN ({placeholders})"
-        with self._get_connection() as conn:
+
+        if conn:
             rows = conn.execute(query, publisher_ids).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, publisher_ids).fetchall()
             result = [row[0] for row in rows]
             logger.debug(
                 f"[PublisherRepository] <- get_song_ids_by_publisher_batch() count={len(result)}"

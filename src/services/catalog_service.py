@@ -715,18 +715,19 @@ class CatalogService:
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
         logger.debug(f"[CatalogService] -> get_song(id={song_id})")
-        song = self._song_repo.get_by_id(song_id)
-        if not song:
-            logger.warning(f"[CatalogService] <- get_song(id={song_id}) NOT_FOUND")
-            return None
+        with self._song_repo.get_connection() as conn:
+            song = self._song_repo.get_by_id(song_id, conn)
+            if not song:
+                logger.warning(f"[CatalogService] <- get_song(id={song_id}) NOT_FOUND")
+                return None
 
-        hydrated = self._hydrate_songs([song])
-        if not hydrated:
-            return None
+            hydrated = self._hydrate_songs([song], conn=conn)
+            if not hydrated:
+                return None
 
-        result = hydrated[0]
-        logger.debug(f"[CatalogService] <- get_song(id={song_id}) '{result.title}'")
-        return result
+            result = hydrated[0]
+            logger.debug(f"[CatalogService] <- get_song(id={song_id}) '{result.title}'")
+            return result
 
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
@@ -843,18 +844,20 @@ class CatalogService:
     def get_all_publishers(self) -> List[Publisher]:
         """Fetch the full directory of publishers with resolved hierarchies."""
         logger.debug("[CatalogService] -> get_all_publishers()")
-        pubs = self._pub_repo.get_all()
-        result = self._hydrate_publishers(pubs)
-        logger.debug(f"[CatalogService] <- get_all_publishers() count={len(result)}")
-        return result
+        with self._pub_repo.get_connection() as conn:
+            pubs = self._pub_repo.get_all(conn=conn)
+            result = self._hydrate_publishers(pubs, conn=conn)
+            logger.debug(f"[CatalogService] <- get_all_publishers() count={len(result)}")
+            return result
 
     def get_all_albums(self) -> List[Album]:
         """Fetch the full album directory with hydrated publishers, credits, and songs."""
         logger.debug("[CatalogService] -> get_all_albums()")
-        albums = self._album_repo_dir.get_all()
-        result = self._hydrate_albums(albums)
-        logger.debug(f"[CatalogService] <- get_all_albums() count={len(result)}")
-        return result
+        with self._album_repo_dir.get_connection() as conn:
+            albums = self._album_repo_dir.get_all(conn=conn)
+            result = self._hydrate_albums(albums, conn=conn)
+            logger.debug(f"[CatalogService] <- get_all_albums() count={len(result)}")
+            return result
 
     def search_albums_slim(self, query: str) -> List[dict]:
         """Slim list-view album search. No tracklist hydration."""
@@ -866,65 +869,69 @@ class CatalogService:
     def get_album(self, album_id: int) -> Optional[Album]:
         """Fetch a single album by ID with hydrated publishers, credits, and songs."""
         logger.debug(f"[CatalogService] -> get_album(id={album_id})")
-        album = self._album_repo_dir.get_by_id(album_id)
-        if not album:
-            logger.warning(f"[CatalogService] <- get_album(id={album_id}) NOT_FOUND")
-            return None
+        with self._album_repo_dir.get_connection() as conn:
+            album = self._album_repo_dir.get_by_id(album_id, conn=conn)
+            if not album:
+                logger.warning(f"[CatalogService] <- get_album(id={album_id}) NOT_FOUND")
+                return None
 
-        hydrated = self._hydrate_albums([album])
-        if not hydrated:
-            return None
+            hydrated = self._hydrate_albums([album], conn=conn)
+            if not hydrated:
+                return None
 
-        result = hydrated[0]
-        logger.debug(f"[CatalogService] <- get_album(id={album_id}) '{result.title}'")
-        return result
+            result = hydrated[0]
+            logger.debug(f"[CatalogService] <- get_album(id={album_id}) '{result.title}'")
+            return result
 
     def search_publishers(self, query: str) -> List[Publisher]:
         """Search for publishers by name match with resolved hierarchies."""
         logger.debug(f"[CatalogService] -> search_publishers(q='{query}')")
-        pubs = self._pub_repo.search(query)
-        result = self._hydrate_publishers(pubs)
-        logger.debug(
-            f"[CatalogService] <- search_publishers(q='{query}') count={len(result)}"
-        )
-        return result
+        with self._pub_repo.get_connection() as conn:
+            pubs = self._pub_repo.search(query, conn=conn)
+            result = self._hydrate_publishers(pubs, conn=conn)
+            logger.debug(
+                f"[CatalogService] <- search_publishers(q='{query}') count={len(result)}"
+            )
+            return result
 
     def get_publisher(self, publisher_id: int) -> Optional[Publisher]:
         """Fetch a single publisher by ID and resolve its full hierarchy."""
         logger.debug(f"[CatalogService] -> get_publisher(id={publisher_id})")
-        publisher = self._pub_repo.get_by_id(publisher_id)
-        if not publisher:
-            logger.warning(
-                f"[CatalogService] <- get_publisher(id={publisher_id}) NOT_FOUND"
+        with self._pub_repo.get_connection() as conn:
+            publisher = self._pub_repo.get_by_id(publisher_id, conn=conn)
+            if not publisher:
+                logger.warning(
+                    f"[CatalogService] <- get_publisher(id={publisher_id}) NOT_FOUND"
+                )
+                return None
+
+            children = self._pub_repo.get_children(publisher_id, conn=conn)
+            hydrated_list = self._hydrate_publishers([publisher], conn=conn)
+            if not hydrated_list:
+                return None
+
+            hydrated = hydrated_list[0]
+            result = hydrated.model_copy(update={"sub_publishers": children})
+            logger.debug(
+                f"[CatalogService] <- get_publisher(id={publisher_id}) '{result.name}'"
             )
-            return None
-
-        children = self._pub_repo.get_children(publisher_id)
-        hydrated_list = self._hydrate_publishers([publisher])
-        if not hydrated_list:
-            return None
-
-        hydrated = hydrated_list[0]
-        result = hydrated.model_copy(update={"sub_publishers": children})
-        logger.debug(
-            f"[CatalogService] <- get_publisher(id={publisher_id}) '{result.name}'"
-        )
-        return result
+            return result
 
     def get_songs_by_publisher(self, publisher_id: int) -> List[Song]:
         """Fetch the full song repertoire for a given publisher."""
         logger.debug(f"[CatalogService] -> get_songs_by_publisher(id={publisher_id})")
-        song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id)
-        if not song_ids:
-            logger.debug(
-                f"[CatalogService] <- get_songs_by_publisher(id={publisher_id}) NO_REPERTOIRE"
-            )
-            return []
+        with self._pub_repo.get_connection() as conn:
+            song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id, conn=conn)
+            if not song_ids:
+                logger.debug(
+                    f"[CatalogService] <- get_songs_by_publisher(id={publisher_id}) NO_REPERTOIRE"
+                )
+                return []
 
-        songs = self._song_repo.get_by_ids(song_ids)
-        result = self._hydrate_songs(songs)
-        logger.debug(f"[CatalogService] <- Return count={len(result)}")
-        return result
+            songs = self._song_repo.get_by_ids(song_ids, conn=conn)
+            result = self._hydrate_songs(songs, conn=conn)
+            logger.debug(f"[CatalogService] <- Return count={len(result)}")
+            return result
 
     def get_all_tags(self) -> List[Tag]:
         """Fetch the full directory of tags."""
@@ -958,15 +965,16 @@ class CatalogService:
     def get_songs_by_tag(self, tag_id: int) -> List[Song]:
         """Fetch all songs linked to this tag."""
         logger.debug(f"[CatalogService] -> get_songs_by_tag(id={tag_id})")
-        song_ids = self._tag_repo.get_song_ids_by_tag(tag_id)
-        if not song_ids:
-            logger.debug(f"[CatalogService] <- get_songs_by_tag(id={tag_id}) NO_SONGS")
-            return []
+        with self._tag_repo.get_connection() as conn:
+            song_ids = self._tag_repo.get_song_ids_by_tag(tag_id, conn=conn)
+            if not song_ids:
+                logger.debug(f"[CatalogService] <- get_songs_by_tag(id={tag_id}) NO_SONGS")
+                return []
 
-        songs = self._song_repo.get_by_ids(song_ids)
-        result = self._hydrate_songs(songs)
-        logger.debug(f"[CatalogService] <- Return count={len(result)}")
-        return result
+            songs = self._song_repo.get_by_ids(song_ids, conn=conn)
+            result = self._hydrate_songs(songs, conn=conn)
+            logger.debug(f"[CatalogService] <- Return count={len(result)}")
+            return result
 
     def get_songs_by_identity(self, identity_id: int) -> List[Song]:
         """
@@ -974,24 +982,25 @@ class CatalogService:
         and return all songs where any of those IDs are credited.
         """
         logger.debug(f"[CatalogService] -> get_songs_by_identity(id={identity_id})")
-        identity = self._identity_repo.get_by_id(identity_id)
-        if not identity:
-            logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
-            return []
+        with self._identity_repo.get_connection() as conn:
+            identity = self._identity_repo.get_by_id(identity_id, conn=conn)
+            if not identity:
+                logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
+                return []
 
-        related_ids = {identity.id}
-        members_by_id = self._identity_repo.get_members_batch([identity.id])
-        groups_by_id = self._identity_repo.get_groups_batch([identity.id])
+            related_ids = {identity.id}
+            members_by_id = self._identity_repo.get_members_batch([identity.id], conn=conn)
+            groups_by_id = self._identity_repo.get_groups_batch([identity.id], conn=conn)
 
-        for member in members_by_id.get(identity.id, []):
-            related_ids.add(member.id)
-        for group in groups_by_id.get(identity.id, []):
-            related_ids.add(group.id)
+            for member in members_by_id.get(identity.id, []):
+                related_ids.add(member.id)
+            for group in groups_by_id.get(identity.id, []):
+                related_ids.add(group.id)
 
-        songs = self._song_repo.get_by_identity_ids(list(related_ids))
-        result = self._hydrate_songs(songs)
-        logger.debug(f"[CatalogService] <- Return count={len(result)}")
-        return result
+            songs = self._song_repo.get_by_identity_ids(list(related_ids), conn=conn)
+            result = self._hydrate_songs(songs, conn=conn)
+            logger.debug(f"[CatalogService] <- Return count={len(result)}")
+            return result
 
     def search_songs_slim(self, query: str) -> List[dict]:
         """Slim list-view search. Returns raw dicts for SongSlimView — no hydration."""
@@ -1093,6 +1102,7 @@ class CatalogService:
         self,
         songs: List[Song],
         pre_albums: Optional[Dict[int, List[SongAlbum]]] = None,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> List[Song]:
         """Centralized batch hydration for songs and their relations."""
         if not songs:
@@ -1101,16 +1111,16 @@ class CatalogService:
         song_ids = [s.id for s in songs if s.id is not None]
         logger.debug(f"[CatalogService] -> _hydrate_songs(count={len(song_ids)})")
 
-        credits_by_song = self._get_credits_by_song(song_ids)
+        credits_by_song = self._get_credits_by_song(song_ids, conn=conn)
         # OPTIMIZATION: If we already have the album links (e.g. coming from an album view),
         # use them instead of re-querying the DB.
         if pre_albums is not None:
             assocs_by_song = pre_albums
         else:
-            assocs_by_song = self._get_albums_by_song(song_ids)
+            assocs_by_song = self._get_albums_by_song(song_ids, conn=conn)
 
-        pubs_by_song = self._get_publishers_by_song(song_ids)
-        tags_by_song = self._get_tags_by_songs(song_ids)
+        pubs_by_song = self._get_publishers_by_song(song_ids, conn=conn)
+        tags_by_song = self._get_tags_by_songs(song_ids, conn=conn)
 
         hydrated_songs = []
         for song in songs:
@@ -1159,7 +1169,11 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- _hydrate_identities(count={len(hydrated)})")
         return hydrated
 
-    def _hydrate_publishers(self, pubs: List[Publisher]) -> List[Publisher]:
+    def _hydrate_publishers(
+        self,
+        pubs: List[Publisher],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> List[Publisher]:
         """Batch-resolve full parent chains for publishers."""
         if not pubs:
             return []
@@ -1169,7 +1183,7 @@ class CatalogService:
         logger.debug(f"[CatalogService] -> _hydrate_publishers(count={len(seed_ids)})")
 
         # FETCH ENTIRE ANCESTRY IN ONE QUERY (CTE)
-        full_parent_map = self._pub_repo.get_hierarchy_batch(seed_ids)
+        full_parent_map = self._pub_repo.get_hierarchy_batch(seed_ids, conn=conn)
 
         hydrated = []
         for pub in pubs:
@@ -1193,7 +1207,9 @@ class CatalogService:
         logger.debug(f"[CatalogService] <- _hydrate_publishers(count={len(hydrated)})")
         return hydrated
 
-    def _hydrate_albums(self, albums: List[Album]) -> List[Album]:
+    def _hydrate_albums(
+        self, albums: List[Album], conn: Optional[sqlite3.Connection] = None
+    ) -> List[Album]:
         """Centralized batch hydration for albums and their related songs."""
         if not albums:
             return []
@@ -1201,9 +1217,9 @@ class CatalogService:
         album_ids = [album.id for album in albums if album.id is not None]
         logger.debug(f"[CatalogService] -> _hydrate_albums(count={len(album_ids)})")
 
-        pubs_by_album = self._get_publishers_by_album(album_ids)
-        credits_by_album = self._get_album_credits_by_album(album_ids)
-        songs_by_album = self._get_songs_by_album(album_ids)
+        pubs_by_album = self._get_publishers_by_album(album_ids, conn=conn)
+        credits_by_album = self._get_credits_by_album(album_ids, conn=conn)
+        songs_by_album = self._get_songs_by_album(album_ids, conn=conn)
 
         hydrated = []
         for album in albums:
@@ -1233,16 +1249,21 @@ class CatalogService:
                 results.setdefault(val, []).append(item)
         return results
 
-    def _get_credits_by_song(self, song_ids: List[int]) -> Dict[int, List[SongCredit]]:
+    def _get_credits_by_song(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, List[SongCredit]]:
         """Fetch and group credits by song ID."""
         logger.debug(f"[CatalogService] -> _get_credits_by_song(count={len(song_ids)})")
-        all_credits = self._credit_repo.get_credits_for_songs(song_ids)
+        all_credits = self._credit_repo.get_credits_for_songs(song_ids, conn=conn)
         results = self._batch_group_by_id(all_credits, "source_id")
         logger.debug(f"[CatalogService] <- _get_credits_by_song(count={len(results)})")
         return results
 
     def _resolve_publisher_associations(
-        self, raw_assocs: List[tuple], entity_label: str
+        self,
+        raw_assocs: List[tuple],
+        entity_label: str,
+        conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[int, List[Publisher]]:
         """Generic helper to hydrate and group publishers for any entity type."""
         if not raw_assocs:
@@ -1253,7 +1274,7 @@ class CatalogService:
 
         all_found_pubs = [pub for _, pub in raw_assocs]
         hydrated_map: Dict[int, Publisher] = {}
-        for p in self._hydrate_publishers(all_found_pubs):
+        for p in self._hydrate_publishers(all_found_pubs, conn=conn):
             if p.id is not None:
                 hydrated_map[p.id] = p
 
@@ -1271,19 +1292,21 @@ class CatalogService:
         return results
 
     def _get_publishers_by_song(
-        self, song_ids: List[int]
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> Dict[int, List[Publisher]]:
         """Fetch and group master publishers by song ID, then resolve hierarchies."""
         logger.debug(
             f"[CatalogService] -> _get_publishers_by_song(count={len(song_ids)})"
         )
-        raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids)
-        return self._resolve_publisher_associations(raw_assocs, "songs")
+        raw_assocs = self._pub_repo.get_publishers_for_songs(song_ids, conn=conn)
+        return self._resolve_publisher_associations(raw_assocs, "songs", conn=conn)
 
-    def _get_tags_by_songs(self, song_ids: List[int]) -> Dict[int, List[Tag]]:
+    def _get_tags_by_songs(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, List[Tag]]:
         """Fetch and group tags by song ID."""
         logger.debug(f"[CatalogService] -> _get_tags_by_songs(count={len(song_ids)})")
-        all_tags_tuples = self._tag_repo.get_tags_for_songs(song_ids)
+        all_tags_tuples = self._tag_repo.get_tags_for_songs(song_ids, conn=conn)
         tags_by_song: Dict[int, List[Tag]] = {}
         for song_id, tag in all_tags_tuples:
             if song_id is not None:
@@ -1293,14 +1316,16 @@ class CatalogService:
         )
         return tags_by_song
 
-    def _get_albums_by_song(self, song_ids: List[int]) -> Dict[int, List[SongAlbum]]:
+    def _get_albums_by_song(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, List[SongAlbum]]:
         """Fetch album associations and hydrate with publishers and credits."""
         logger.debug(f"[CatalogService] -> _get_albums_by_song(count={len(song_ids)})")
-        all_assocs = self._album_repo.get_albums_for_songs(song_ids)
+        all_assocs = self._album_repo.get_albums_for_songs(song_ids, conn=conn)
         album_ids = [a.album_id for a in all_assocs if a.album_id is not None]
 
-        pubs_by_album = self._get_publishers_by_album(album_ids)
-        credits_by_album = self._get_album_credits_by_album(album_ids)
+        pubs_by_album = self._get_publishers_by_album(album_ids, conn=conn)
+        credits_by_album = self._get_credits_by_album(album_ids, conn=conn)
 
         assocs_by_song: Dict[int, List[SongAlbum]] = {}
         for a in all_assocs:
@@ -1320,7 +1345,7 @@ class CatalogService:
         return assocs_by_song
 
     def _get_publishers_by_album(
-        self, album_ids: List[int]
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> Dict[int, List[Publisher]]:
         """Batch-fetch and hydrate publishers for albums."""
         logger.debug(
@@ -1328,26 +1353,28 @@ class CatalogService:
         )
         if not album_ids:
             return {}
-        raw_assocs = self._pub_repo.get_publishers_for_albums(album_ids)
-        return self._resolve_publisher_associations(raw_assocs, "albums")
+        raw_assocs = self._pub_repo.get_publishers_for_albums(album_ids, conn=conn)
+        return self._resolve_publisher_associations(raw_assocs, "albums", conn=conn)
 
-    def _get_album_credits_by_album(
-        self, album_ids: List[int]
+    def _get_credits_by_album(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> Dict[int, List[AlbumCredit]]:
         """Batch-fetch album credits grouped by album ID."""
-        logger.debug(
-            f"[CatalogService] -> _get_album_credits_by_album(count={len(album_ids)})"
-        )
+        logger.debug(f"[CatalogService] -> _get_credits_by_album(count={len(album_ids)})")
         if not album_ids:
             return {}
-        all_credits = self._album_credit_repo.get_credits_for_albums(album_ids)
+        all_credits = self._album_credit_repo.get_credits_for_albums(
+            album_ids, conn=conn
+        )
         results = self._batch_group_by_id(all_credits, "album_id")
         logger.debug(
-            f"[CatalogService] <- _get_album_credits_by_album(count={len(results)})"
+            f"[CatalogService] <- _get_credits_by_album(count={len(results)})"
         )
         return results
 
-    def _get_songs_by_album(self, album_ids: List[int]) -> Dict[int, List[Song]]:
+    def _get_songs_by_album(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, List[Song]]:
         """
         RESOLVER: Fetches and hydrates all songs for multiple albums in a single BATCH flow.
         Prevents the N+1 trap where each album individually triggers _hydrate_songs.
@@ -1358,7 +1385,7 @@ class CatalogService:
 
         # 1. Fetch all Song/Album associations (Single Repository Query)
         # Using SongAlbumRepository instead of AlbumRepository to get full SongAlbum objects for pre-seeding
-        all_assocs = self._album_repo.get_albums_for_songs_reverse(album_ids)
+        all_assocs = self._album_repo.get_albums_for_songs_reverse(album_ids, conn=conn)
         if not all_assocs:
             return {}
 
@@ -1373,8 +1400,10 @@ class CatalogService:
 
         # 3. Batch Fetch and Hydrate ALL songs in one orchestrator call
         # We pass pre_mapped_assocs to skip the redundant album link query in _hydrate_songs
-        all_songs = self._song_repo.get_by_ids(unique_song_ids)
-        hydrated_songs = self._hydrate_songs(all_songs, pre_albums=pre_mapped_assocs)
+        all_songs = self._song_repo.get_by_ids(unique_song_ids, conn=conn)
+        hydrated_songs = self._hydrate_songs(
+            all_songs, pre_albums=pre_mapped_assocs, conn=conn
+        )
 
         # 4. Map back to albums
         song_lookup = {s.id: s for s in hydrated_songs if s.id is not None}

@@ -171,10 +171,12 @@ class SongRepository(MediaSourceRepository):
 
         logger.debug(f"[SongRepository] <- update_scalars(id={song_id}) done")
 
-    def get_by_id(self, song_id: int) -> Optional[Song]:
+    def get_by_id(
+        self, song_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Song]:
         """Fetch a single Song by its SourceID."""
         logger.debug(f"[SongRepository] -> get_by_id(id={song_id})")
-        results = self.get_by_ids([song_id])
+        results = self.get_by_ids([song_id], conn)
         song = results[0] if results else None
         if song:
             logger.debug(f"[SongRepository] <- get_by_id(id={song_id}) '{song.title}'")
@@ -182,7 +184,9 @@ class SongRepository(MediaSourceRepository):
             logger.debug(f"[SongRepository] <- get_by_id(id={song_id}) NOT_FOUND")
         return song
 
-    def get_by_ids(self, ids: List[int]) -> List[Song]:
+    def get_by_ids(
+        self, ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[Song]:
         """Batch-fetch multiple Songs by their IDs."""
         if not ids:
             return []
@@ -193,28 +197,42 @@ class SongRepository(MediaSourceRepository):
             f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.SourceID IN ({placeholders})"
         )
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, ids).fetchall()
+            return [self._row_to_song(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, ids).fetchall()
             logger.debug(
                 f"[SongRepository] Found {len(rows)} out of {len(ids)} requested songs."
             )
             return [self._row_to_song(row) for row in rows]
 
-    def get_by_title(self, query: str) -> List[Song]:
+    def get_by_title(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Song]:
         """Find songs by title match."""
         logger.debug(f"[SongRepository] Searching for songs with title LIKE: {query}")
         query_sql = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.MediaName LIKE ?"
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (f"%{query}%",)).fetchall()
+            return [self._row_to_song(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (f"%{query}%",)).fetchall()
             logger.debug(
                 f"[SongRepository] Found {len(rows)} matches for query: '{query}'"
             )
             return [self._row_to_song(row) for row in rows]
 
-    def search_slim(self, query: str) -> List[dict]:
+    def search_slim(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[dict]:
         """
         Fast list-view query. Returns dicts with only the fields needed for
         card rendering + the detail loading skeleton. No hydration.
@@ -269,15 +287,22 @@ class SongRepository(MediaSourceRepository):
             )
             GROUP BY m.SourceID
         """
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, (fmt_q,) * 8).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, (fmt_q,) * 8).fetchall()
             logger.debug(
                 f"[SongRepository] <- search_slim(query='{query}') found {len(rows)}"
             )
             return [dict(row) for row in rows]
 
-    def search_slim_by_ids(self, ids: List[int]) -> List[dict]:
+    def search_slim_by_ids(
+        self, ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[dict]:
         """Fetch slim list-view rows for a specific set of SourceIDs."""
         if not ids:
             return []
@@ -300,13 +325,22 @@ class SongRepository(MediaSourceRepository):
             WHERE m.SourceID IN ({placeholders})
             GROUP BY m.SourceID
         """
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, ids).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, ids).fetchall()
             logger.debug(f"[SongRepository] <- search_slim_by_ids() found {len(rows)}")
             return [dict(row) for row in rows]
 
-    def get_by_identity_ids(self, identity_ids: List[int]) -> List[Song]:
+    def get_by_identity_ids(
+        self,
+        identity_ids: List[int],
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> List[Song]:
         """Retrieves songs where any given Identity ID is credited (The Grohlton Check base)."""
         if not identity_ids:
             return []
@@ -322,32 +356,45 @@ class SongRepository(MediaSourceRepository):
             )
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, identity_ids).fetchall()
             return [self._row_to_song(row) for row in rows]
 
-    def get_by_hash(self, audio_hash: str) -> Optional[Song]:
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query_sql, identity_ids).fetchall()
+            return [self._row_to_song(row) for row in rows]
+
+    def get_by_hash(
+        self, audio_hash: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Song]:
         """Fetch a Song by its audio-only hash, utilizing universal MediaSource lookup."""
         logger.debug(f"[SongRepository] -> get_by_hash(hash='{audio_hash}')")
-        base = super().get_by_hash(audio_hash)
+        base = super().get_by_hash(audio_hash, conn=conn)
         if base and base.id is not None:
-            return self.get_by_id(base.id)
+            return self.get_by_id(base.id, conn=conn)
         return None
 
-    def get_by_path(self, path: str) -> Optional[Song]:
+    def get_by_path(
+        self, path: str, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Song]:
         """Fetch a song by its absolute source path, utilizing universal MediaSource lookup."""
         if not path:
             return None
 
         logger.debug(f"[SongRepository] -> get_by_path(path='{path}')")
-        base = super().get_by_path(path)
+        base = super().get_by_path(path, conn=conn)
         if base and base.id is not None:
-            return self.get_by_id(base.id)
+            return self.get_by_id(base.id, conn=conn)
         return None
 
     def find_by_metadata(
-        self, title: str, artists: List[str], year: Optional[int]
+        self,
+        title: str,
+        artists: List[str],
+        year: Optional[int],
+        conn: Optional[sqlite3.Connection] = None,
     ) -> List[Song]:
         """
         Find songs matching Title, exact Performer set, and Recording Year.
@@ -359,8 +406,6 @@ class SongRepository(MediaSourceRepository):
             f"[SongRepository] -> find_by_metadata(title='{title}', artists={artists}, year={year})"
         )
 
-        # Step 1: Find all songs with this Title (and RecordingYear if provided)
-        # This is our candidate set.
         params: List[Any] = [title]
         year_filter = ""
         if year:
@@ -374,40 +419,44 @@ class SongRepository(MediaSourceRepository):
             {year_filter}
         """
 
-        with self._get_connection() as conn:
+        def fetch_performers(connection, c_ids):
+            p_placeholders = ",".join(["?" for _ in c_ids])
+            performer_sql = f"""
+                SELECT sc.SourceID, an.DisplayName 
+                FROM SongCredits sc
+                JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                WHERE sc.SourceID IN ({p_placeholders})
+                  AND sc.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'Performer')
+                  AND an.IsDeleted = 0
+            """
+            return connection.execute(performer_sql, c_ids).fetchall()
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, tuple(params)).fetchall()
             candidates = [self._row_to_song(row) for row in rows]
-
-        if not candidates:
-            return []
-
-        # Step 2: For each candidate, check if the Performer set matches exactly
-        # We need to hydrate the candidates (or at least their credits)
-        # But for this simple check, we can just fetch the names from the DB for these candidates.
-        found_matches = []
-        candidate_ids = [c.id for c in candidates if c.id is not None]
-        if not candidate_ids:
-            return []
-        placeholders = ",".join(["?" for _ in candidate_ids])
-
-        performer_sql = f"""
-            SELECT sc.SourceID, an.DisplayName 
-            FROM SongCredits sc
-            JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-            WHERE sc.SourceID IN ({placeholders})
-              AND sc.RoleID = (SELECT RoleID FROM Roles WHERE RoleName = 'Performer')
-              AND an.IsDeleted = 0
-        """
-
-        source_performers: Dict[int, List[str]] = {}
-        with self._get_connection() as conn:
-            conn.row_factory = sqlite3.Row
-            p_rows = conn.execute(performer_sql, candidate_ids).fetchall()
+            if not candidates:
+                return []
+            candidate_ids = [c.id for c in candidates if c.id is not None]
+            p_rows = fetch_performers(conn, candidate_ids)
+            source_performers: Dict[int, List[str]] = {}
             for r in p_rows:
                 source_performers.setdefault(r["SourceID"], []).append(r["DisplayName"])
+        else:
+            with self._get_connection() as new_conn:
+                new_conn.row_factory = sqlite3.Row
+                rows = new_conn.execute(query_sql, tuple(params)).fetchall()
+                candidates = [self._row_to_song(row) for row in rows]
+                if not candidates:
+                    return []
+                candidate_ids = [c.id for c in candidates if c.id is not None]
+                p_rows = fetch_performers(new_conn, candidate_ids)
+                source_performers: Dict[int, List[str]] = {}
+                for r in p_rows:
+                    source_performers.setdefault(r["SourceID"], []).append(r["DisplayName"])
 
         # Compare sets
+        found_matches = []
         target_set = set(a.lower() for a in artists)
         for song in candidates:
             if song.id is None:

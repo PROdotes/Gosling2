@@ -17,7 +17,9 @@ class SongAlbumRepository(BaseRepository):
         WHERE sa.SourceID IN ({placeholders})
     """
 
-    def get_albums_for_songs(self, song_ids: List[int]) -> List[SongAlbum]:
+    def get_albums_for_songs(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[SongAlbum]:
         """Batch-fetch album associations for multiple songs."""
         if not song_ids:
             return []
@@ -28,13 +30,20 @@ class SongAlbumRepository(BaseRepository):
         placeholders = ",".join(["?" for _ in song_ids])
         query = self._QUERY.format(placeholders=placeholders)
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, song_ids).fetchall()
+            return [self._row_to_song_album(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, song_ids).fetchall()
             logger.debug(f"[SongAlbumRepository] Found {len(rows)} album associations.")
             return [self._row_to_song_album(row) for row in rows]
 
-    def get_albums_for_songs_reverse(self, album_ids: List[int]) -> List[SongAlbum]:
+    def get_albums_for_songs_reverse(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[SongAlbum]:
         """Reverse Batch-fetch: Find all song associations for a set of albums."""
         if not album_ids:
             return []
@@ -49,9 +58,14 @@ class SongAlbumRepository(BaseRepository):
         )
         query = query.format(placeholders=placeholders)
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, album_ids).fetchall()
+            return [self._row_to_song_album(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, album_ids).fetchall()
             logger.debug(f"[SongAlbumRepository] Found {len(rows)} song associations.")
             return [self._row_to_song_album(row) for row in rows]
 

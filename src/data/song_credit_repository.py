@@ -10,7 +10,9 @@ class SongCreditRepository(BaseRepository):
 
     _COLUMNS = "sc.CreditID, sc.SourceID, sc.CreditedNameID, sc.RoleID, an.DisplayName, an.IsPrimaryName, an.OwnerIdentityID, r.RoleName"
 
-    def get_credits_for_songs(self, song_ids: List[int]) -> List[SongCredit]:
+    def get_credits_for_songs(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[SongCredit]:
         """Batch-fetches credits for multiple songs in a single query."""
         if not song_ids:
             return []
@@ -27,10 +29,14 @@ class SongCreditRepository(BaseRepository):
             WHERE sc.SourceID IN ({placeholders}) AND an.IsDeleted = 0
         """
 
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query, song_ids).fetchall()
+            return [self._row_to_song_credit(row) for row in rows]
 
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, song_ids).fetchall()
             logger.debug(f"[SongCreditRepository] Found {len(rows)} raw credit rows.")
             return [self._row_to_song_credit(row) for row in rows]
 

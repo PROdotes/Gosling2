@@ -11,18 +11,26 @@ class AlbumRepository(BaseRepository):
 
     _COLUMNS = "AlbumID, AlbumTitle, AlbumType, ReleaseYear"
 
-    def get_all(self) -> List[Album]:
+    def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Album]:
         """Fetch the full album directory."""
         logger.debug("[AlbumRepository] -> get_all()")
         query = f"SELECT {self._COLUMNS} FROM Albums WHERE IsDeleted = 0 ORDER BY AlbumTitle COLLATE NOCASE ASC"
-        with self._get_connection() as conn:
+
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
+            return [self._row_to_album(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query).fetchall()
             result = [self._row_to_album(row) for row in rows]
             logger.debug(f"[AlbumRepository] <- get_all() count={len(result)}")
             return result
 
-    def search_slim(self, query: str) -> List[dict]:
+    def search_slim(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[dict]:
         """Fast list-view query. Returns dicts for AlbumSlimView — no tracklist hydration."""
         logger.debug(f"[AlbumRepository] -> search_slim(q='{query}')")
         sql = """
@@ -41,24 +49,38 @@ class AlbumRepository(BaseRepository):
             GROUP BY a.AlbumID
             ORDER BY a.AlbumTitle COLLATE NOCASE ASC
         """
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(sql, (f"%{query}%",)).fetchall()
+            return [dict(row) for row in rows]
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(sql, (f"%{query}%",)).fetchall()
             result = [dict(row) for row in rows]
             logger.debug(
                 f"[AlbumRepository] <- search_slim(q='{query}') count={len(result)}"
             )
             return result
 
-    def get_by_id(self, album_id: int) -> Optional[Album]:
+    def get_by_id(
+        self, album_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Optional[Album]:
         """Fetch a single album by ID."""
         logger.debug(f"[AlbumRepository] -> get_by_id(id={album_id})")
         query = (
             f"SELECT {self._COLUMNS} FROM Albums WHERE AlbumID = ? AND IsDeleted = 0"
         )
-        with self._get_connection() as conn:
+        if conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (album_id,)).fetchone()
+            if row is None:
+                return None
+            return self._row_to_album(row)
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (album_id,)).fetchone()
             if row is None:
                 logger.warning(
                     f"[AlbumRepository] <- get_by_id(id={album_id}) NOT_FOUND"
@@ -70,19 +92,28 @@ class AlbumRepository(BaseRepository):
             )
             return result
 
-    def get_song_ids_by_album(self, album_id: int) -> List[int]:
+    def get_song_ids_by_album(
+        self, album_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
         """Fetch all song IDs linked to an album."""
         logger.debug(f"[AlbumRepository] -> get_song_ids_by_album(id={album_id})")
         query = "SELECT SourceID FROM SongAlbums WHERE AlbumID = ? ORDER BY DiscNumber, TrackNumber, SourceID"
-        with self._get_connection() as conn:
+
+        if conn:
             rows = conn.execute(query, (album_id,)).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, (album_id,)).fetchall()
             result = [row[0] for row in rows]
             logger.debug(
                 f"[AlbumRepository] <- get_song_ids_by_album() count={len(result)}"
             )
             return result
 
-    def get_song_ids_for_albums(self, album_ids: List[int]) -> Dict[int, List[int]]:
+    def get_song_ids_for_albums(
+        self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, List[int]]:
         """Batch fetch song IDs for a set of albums in a single query."""
         if not album_ids:
             return {}
@@ -94,15 +125,21 @@ class AlbumRepository(BaseRepository):
         query = f"SELECT AlbumID, SourceID FROM SongAlbums WHERE AlbumID IN ({placeholders}) ORDER BY DiscNumber, TrackNumber, SourceID"
 
         results: Dict[int, List[int]] = {}
-        with self._get_connection() as conn:
+        if conn:
             rows = conn.execute(query, album_ids).fetchall()
             for album_id, song_id in rows:
                 results.setdefault(album_id, []).append(song_id)
+            return results
 
-        logger.debug(
-            f"[AlbumRepository] <- get_song_ids_for_albums() grouped={len(results)} albums"
-        )
-        return results
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, album_ids).fetchall()
+            for album_id, song_id in rows:
+                results.setdefault(album_id, []).append(song_id)
+
+            logger.debug(
+                f"[AlbumRepository] <- get_song_ids_for_albums() grouped={len(results)} albums"
+            )
+            return results
 
     def create_album(
         self,

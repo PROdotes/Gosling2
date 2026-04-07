@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Any, List, Mapping, Tuple
+from typing import Any, List, Mapping, Tuple, Optional
 from src.data.base_repository import BaseRepository
 from src.models.domain import Tag
 from src.services.logger import logger
@@ -8,7 +8,9 @@ from src.services.logger import logger
 class TagRepository(BaseRepository):
     """Repository for loading Tags associated with MediaSources."""
 
-    def get_tags_for_songs(self, song_ids: List[int]) -> List[Tuple[int, Tag]]:
+    def get_tags_for_songs(
+        self, song_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> List[Tuple[int, Tag]]:
         """Batch-fetch all tags for a list of songs (M2M)."""
         logger.debug(f"[TagRepository] -> get_tags_for_songs(count={len(song_ids)})")
         if not song_ids:
@@ -22,10 +24,15 @@ class TagRepository(BaseRepository):
             WHERE mst.SourceID IN ({placeholders}) AND t.IsDeleted = 0
         """
 
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, song_ids).fetchall()
+            return [(row["SourceID"], self._row_to_tag(row)) for row in rows]
+
         try:
-            with self._get_connection() as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(query, song_ids).fetchall()
+            with self._get_connection() as new_conn:
+                new_conn.row_factory = sqlite3.Row
+                rows = new_conn.execute(query, song_ids).fetchall()
                 results = [(row["SourceID"], self._row_to_tag(row)) for row in rows]
                 logger.debug(
                     f"[TagRepository] <- get_tags_for_songs() count={len(results)}"
@@ -58,14 +65,20 @@ class TagRepository(BaseRepository):
             f"[TagRepository] <- insert_tags(source_id={source_id}) wrote {len(tags)} tags"
         )
 
-    def get_all(self) -> List[Tag]:
+    def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Tag]:
         """Fetch all tags."""
         logger.debug("[TagRepository] -> get_all()")
         query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE IsDeleted = 0 ORDER BY TagName COLLATE NOCASE"
+        
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query).fetchall()
+            return [self._row_to_tag(row) for row in rows]
+
         try:
-            with self._get_connection() as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(query).fetchall()
+            with self._get_connection() as new_conn:
+                new_conn.row_factory = sqlite3.Row
+                rows = new_conn.execute(query).fetchall()
                 results = [self._row_to_tag(row) for row in rows]
                 logger.debug(f"[TagRepository] <- get_all() count={len(results)}")
                 return results
@@ -73,7 +86,7 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch all tags: {e}")
             raise
 
-    def search(self, query: str) -> List[Tag]:
+    def search(self, query: str, conn: Optional[sqlite3.Connection] = None) -> List[Tag]:
         """Search tags by name."""
         logger.debug(f"[TagRepository] -> search(q='{query}')")
         sql = """
@@ -82,10 +95,16 @@ class TagRepository(BaseRepository):
             WHERE TagName LIKE ? COLLATE NOCASE AND IsDeleted = 0
             ORDER BY TagName COLLATE NOCASE
         """
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(sql, (f"%{query}%",)).fetchall()
+            return [self._row_to_tag(row) for row in rows]
+
         try:
-            with self._get_connection() as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(sql, (f"%{query}%",)).fetchall()
+            with self._get_connection() as new_conn:
+                new_conn.row_factory = sqlite3.Row
+                rows = new_conn.execute(sql, (f"%{query}%",)).fetchall()
                 results = [self._row_to_tag(row) for row in rows]
                 logger.debug(
                     f"[TagRepository] <- search(q='{query}') count={len(results)}"
@@ -95,14 +114,24 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to search tags: {e}")
             raise
 
-    def get_by_id(self, tag_id: int) -> Tag | None:
+    def get_by_id(
+        self, tag_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> Tag | None:
         """Fetch a single tag by ID."""
         logger.debug(f"[TagRepository] -> get_by_id(id={tag_id})")
         query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ? AND IsDeleted = 0"
+        
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (tag_id,)).fetchone()
+            if not row:
+                return None
+            return self._row_to_tag(row)
+
         try:
-            with self._get_connection() as conn:
-                conn.row_factory = sqlite3.Row
-                row = conn.execute(query, (tag_id,)).fetchone()
+            with self._get_connection() as new_conn:
+                new_conn.row_factory = sqlite3.Row
+                row = new_conn.execute(query, (tag_id,)).fetchone()
                 if not row:
                     logger.debug(f"[TagRepository] <- get_by_id(id={tag_id}) NOT_FOUND")
                     return None
@@ -115,13 +144,20 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch tag by ID: {e}")
             raise
 
-    def get_song_ids_by_tag(self, tag_id: int) -> List[int]:
+    def get_song_ids_by_tag(
+        self, tag_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
         """Get all song IDs linked to this tag."""
         logger.debug(f"[TagRepository] -> get_song_ids_by_tag(tag_id={tag_id})")
         query = "SELECT SourceID FROM MediaSourceTags WHERE TagID = ?"
+
+        if conn:
+            rows = conn.execute(query, (tag_id,)).fetchall()
+            return [row[0] for row in rows]
+
         try:
-            with self._get_connection() as conn:
-                rows = conn.execute(query, (tag_id,)).fetchall()
+            with self._get_connection() as new_conn:
+                rows = new_conn.execute(query, (tag_id,)).fetchall()
                 song_ids = [row[0] for row in rows]
                 logger.debug(
                     f"[TagRepository] <- get_song_ids_by_tag(tag_id={tag_id}) count={len(song_ids)}"
@@ -255,14 +291,18 @@ class TagRepository(BaseRepository):
             f"[TagRepository] <- set_primary_tag(source_id={source_id}, tag_id={tag_id}) OK"
         )
 
-    def get_categories(self) -> List[str]:
+    def get_categories(self, conn: Optional[sqlite3.Connection] = None) -> List[str]:
         """Fetch all distinct non-null tag categories, sorted."""
         logger.debug("[TagRepository] -> get_categories()")
+        query = "SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL AND IsDeleted = 0 ORDER BY TagCategory COLLATE NOCASE"
+
+        if conn:
+            rows = conn.execute(query).fetchall()
+            return [row[0] for row in rows]
+
         try:
-            with self._get_connection() as conn:
-                rows = conn.execute(
-                    "SELECT DISTINCT TagCategory FROM Tags WHERE TagCategory IS NOT NULL AND IsDeleted = 0 ORDER BY TagCategory COLLATE NOCASE"
-                ).fetchall()
+            with self._get_connection() as new_conn:
+                rows = new_conn.execute(query).fetchall()
                 results = [row[0] for row in rows]
                 logger.debug(
                     f"[TagRepository] <- get_categories() count={len(results)}"

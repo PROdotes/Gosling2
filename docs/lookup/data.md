@@ -30,17 +30,17 @@ Public connection accessor used by services for atomic transaction control.
 
 Writes the base record into `MediaSources`. Resolves `TypeID` from the given `type_name`. Returns the new `SourceID`.
 
-### get_by_path(path: str) -> Optional[MediaSource]
+### get_by_path(path: str, conn: Optional[sqlite3.Connection] = None) -> Optional[MediaSource]
 
-Universal lookup by SourcePath. Returns the base `MediaSource` record (or None) regardless of specialized type (Song, Podcast, etc.).
+Universal lookup by SourcePath. Returns the base `MediaSource` record (or None) regardless of specialized type (Song, Podcast, etc.). Supports optional shared connection.
 
-### get_by_hash(audio_hash: str) -> Optional[MediaSource]
+### get_by_hash(audio_hash: str, conn: Optional[sqlite3.Connection] = None) -> Optional[MediaSource]
 
-Universal lookup by AudioHash. Returns the base `MediaSource` record (or None).
+Universal lookup by AudioHash. Returns the base `MediaSource` record (or None). Supports optional shared connection.
 
-### get_source_metadata_by_hash(audio_hash: str) -> Optional[Dict[str, Any]]
+### get_source_metadata_by_hash(audio_hash: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Dict[str, Any]]
 
-Truth discovery lookup that ignores the `IsDeleted` filter. Returns basic metadata (`id`, `title`, `duration_s`, `is_deleted`) for re-ingestion conflict resolution.
+Truth discovery lookup that ignores the `IsDeleted` filter. Returns basic metadata (`id`, `title`, `duration_s`, `is_deleted`) for re-ingestion conflict resolution. Supports optional shared connection.
 
 ### soft_delete(source_id: int, conn: sqlite3.Connection) -> bool
 
@@ -73,45 +73,45 @@ Hard-delists all junction/link rows for a song (SongCredits, SongAlbums, MediaSo
 
 Update editable scalar fields for a song. Partial updates — only send changed fields. Splits between MediaSources (media_name, is_active) and Songs (bpm, year, isrc). Does NOT commit.
 
-### get_by_id(song_id: int) -> Optional[Song]
+### get_by_id(song_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]
 
-Fetches the core song record (Title, BPM, Year, Path, etc.) by ID.
+Fetches the core song record (Title, BPM, Year, Path, etc.) by ID. Supports optional shared connection.
 Only returns non-deleted records.
 
-### get_by_ids(ids: List[int]) -> List[Song]
+### get_by_ids(ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Song]
 
-Batch-fetches core song records for multiple IDs.
+Batch-fetches core song records for multiple IDs. Supports optional shared connection.
 
-### get_by_title(query: str) -> List[Song]
+### get_by_title(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Song]
 
-Finds songs by case-insensitive title match (LIKE '%query%').
+Finds songs by case-insensitive title match (LIKE '%query%'). Supports optional shared connection.
 
-### search_slim(query: str) -> List[dict]
+### search_slim(query: str, conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
-Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated).
+Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourcePath, SourceDuration, RecordingYear, TempoBPM, ISRC, IsActive, DisplayArtist (aggregated), PrimaryGenre (aggregated). Supports optional shared connection.
 
 - Matches: Title, Performer (DisplayName + LegalName), Album, Publisher, Tag, Year, and ISRC via UNION subquery.
 - No hydration. Used by the list-view endpoint.
 
-### search_slim_by_ids(ids: List[int]) -> List[dict]
+### search_slim_by_ids(ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
-Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `search_slim`. Returns only found rows (skips missing IDs). Returns `[]` for empty input.
+Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `search_slim`. Supports optional shared connection.
 
-### get_by_identity_ids(identity_ids: List[int]) -> List[Song]
+### get_by_identity_ids(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Song]
 
-Retrieves songs where any given Identity ID is credited. Forms the base of the "Grohlton Check".
+Retrieves songs where any given Identity ID is credited. Forms the base of the \"Grohlton Check\". Supports optional shared connection.
 
-### get_by_path(file_path: str) -> Optional[Song]
+### get_by_path(file_path: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]
 
-Returns a Song record by its exact physical path. Returns `None` if NOT_FOUND.
+Returns a Song record by its exact physical path. Supports optional shared connection.
 
-### get_by_hash(file_hash: str) -> Optional[Song]
+### get_by_hash(file_hash: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]
 
-Fetch a song by its unique audio hash.
+Fetch a song by its unique audio hash. Supports optional shared connection.
 
-### find_by_metadata(title: str, artists: List[str], year: Optional[int]) -> List[Song]
+### find_by_metadata(title: str, artists: List[str], year: Optional[int], conn: Optional[sqlite3.Connection] = None) -> List[Song]
 
-Find songs matching Title, exact Performer set, and Recording Year. Avoids "Single-Match" false duplicates by requiring the incoming performer set to be an exact match for the existing performer set.
+Find songs matching Title, exact Performer set, and Recording Year. Supports optional shared connection.
 
 ### insert(song: Song, conn: sqlite3.Connection) -> int
 
@@ -139,25 +139,25 @@ Restores a soft-deleted song and updates it with new metadata (Tags, Credits, Al
 
 Get-or-create `Roles` rows (exact match on `RoleName`) and `ArtistNames` rows (exact match on `DisplayName`; new names get `NULL` OwnerIdentityID, `IsPrimaryName=0`), then insert `SongCredits` link rows. Uses `INSERT OR IGNORE` for idempotency against the `UNIQUE(SourceID, CreditedNameID, RoleID)` constraint.
 
-### get_credits_for_songs(song_ids: List[int]) -> List[SongCredit]
+### get_credits_for_songs(song_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[SongCredit]
 
-Batch-fetches credits for multiple songs in a single query.
+Batch-fetches credits for multiple songs in a single query. Supports optional shared connection for performance.
 
 - Returns a flat list of `SongCredit` entities.
 - Includes `identity_id` by joining `ArtistNames.OwnerIdentityID`.
 - Performance optimized for list-views (Search/Folders).
 
-### get_all_roles() -> List[str]
+### get_all_roles(conn: Optional[sqlite3.Connection] = None) -> List[str]
 
-Returns all role names from the Roles table, ordered alphabetically.
+Returns all role names from the Roles table, ordered alphabetically. Supports optional shared connection.
 
 ### get_or_create_role(role_name: str, cursor) -> int
 
 Get-or-create a Role by name. Returns role_id.
 
-### find_by_display_name(display_name: str) -> Optional[int]
+### find_by_display_name(display_name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 
-Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or None. Read-only.
+Exact case-insensitive lookup of an ArtistName by DisplayName. Returns NameID or None. Read-only. Supports optional shared connection.
 
 ### get_or_create_credit_name(display_name: str, cursor, identity_id: Optional[int] = None) -> int
 
@@ -190,14 +190,14 @@ Update an ArtistName's DisplayName globally. Affects all songs linked to this na
 
 Get-or-create `Albums` rows (matched on `AlbumTitle` + `ReleaseYear` + album artist via `AlbumCredits`), then insert `SongAlbums` link rows with track/disc numbers. Also writes `AlbumCredits` for newly created albums. Falls back to Title+Year only when no credits are provided.
 
-### get_albums_for_songs(song_ids: List[int]) -> List[SongAlbum]
+### get_albums_for_songs(song_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[SongAlbum]
 
 Fetches album context (Title, Track, Disc, Primary, Publishers) for a set of Song IDs.
-Returns `SongAlbum` bridge models ready for publisher hydration by the Service.
+Returns `SongAlbum` bridge models ready for publisher hydration by the Service. Supports optional shared connection.
 
-### get_albums_for_songs_reverse(album_ids: List[int]) -> List[SongAlbum]
+### get_albums_for_songs_reverse(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[SongAlbum]
 
-Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a set of Album IDs. Used for efficient tracklist hydration.
+Reverse Batch-fetch: Find all song associations (SongAlbum link models) for a set of Album IDs. Used for efficient tracklist hydration. Supports optional shared connection.
 
 ### _find_matching_album(cursor, album: SongAlbum) -> int | None
 
@@ -230,25 +230,25 @@ Update track/disc number for a song-album link. Does NOT commit.
 *Location: `src/data/album_repository.py`_
 **Responsibility**: Loading first-class Album directory records and album-to-song links.
 
-### get_all() -> List[Album]
+### get_all(conn: Optional[sqlite3.Connection] = None) -> List[Album]
 
-Fetch the full directory of active (non-deleted) albums, ordered by title.
+Fetch the full directory of active (non-deleted) albums, ordered by title. Supports optional shared connection.
 
-### search_slim(query: str) -> List[dict]
+### search_slim(query: str, conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
-Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (aggregated label string), SongCount. No tracklist hydration. Pass empty string to get all albums.
+Fast list-view album search. Returns raw dicts with keys: AlbumID, AlbumTitle, AlbumType, ReleaseYear, DisplayArtist (aggregated), DisplayPublisher (aggregated label string), SongCount. No tracklist hydration. Pass empty string to get all albums. Supports optional shared connection.
 
-### get_by_id(album_id: int) -> Optional[Album]
+### get_by_id(album_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Album]
 
-Fetch a single album by its ID.
+Fetch a single album by its ID. Supports optional shared connection.
 
-### get_song_ids_by_album(album_id: int) -> List[int]
+### get_song_ids_by_album(album_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
 
-Fetch all song IDs linked to a specific album, ordered by disc, track, and source ID.
+Fetch all song IDs linked to a specific album, ordered by disc, track, and source ID. Supports optional shared connection.
 
-### get_song_ids_for_albums(album_ids: List[int]) -> Dict[int, List[int]]
+### get_song_ids_for_albums(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[int]]
 
-Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID].
+Batch fetch song IDs for a set of albums in a single query. Returns a map of AlbumID -> [SourceID]. Supports optional shared connection.
 
 ### create_album(title: str, album_type: str, release_year: int, conn: sqlite3.Connection) -> int
 
@@ -273,57 +273,57 @@ Update editable Album fields (title, album_type, release_year). Partial updates.
 
 Get-or-create `Publishers` rows (case-insensitive match on `PublisherName`), then insert `RecordingPublishers` link rows.
 
-### get_publishers_for_albums(album_ids: List[int]) -> List[Tuple[int, Publisher]]
+### get_publishers_for_albums(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Tuple[int, Publisher]]
 
-Batch-fetch publisher objects for a list of Albums (M2M resolution).
+Batch-fetch publisher objects for a list of Albums (M2M resolution). Supports optional shared connection.
 
-### get_publishers_for_songs(song_ids: List[int]) -> List[Tuple[int, Publisher]]
+### get_publishers_for_songs(song_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Tuple[int, Publisher]]
 
-Batch-fetch master record publisher objects for a list of Songs (M2M resolution).
+Batch-fetch master record publisher objects for a list of Songs (M2M resolution). Supports optional shared connection.
 
-### get_publishers(publisher_ids: List[int]) -> Dict[int, Publisher]
+### get_publishers(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, Publisher]
 
-Resolve a flat list of ID -> Publisher objects.
+Resolve a flat list of ID -> Publisher objects. Supports optional shared connection.
 
-### get_all() -> List[Publisher]
+### get_all(conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
-Fetch the full directory of active publishers.
+Fetch the full directory of active publishers. Supports optional shared connection.
 
-### search(query: str) -> List[Publisher]
+### search(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
-Surface search for publishers by name match only (no recursive expansion).
+Surface search for publishers by name match only (no recursive expansion). Supports optional shared connection.
 
-### search_deep(query: str) -> List[Publisher]
+### search_deep(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
-Deep recursive search for publishers using a CTE. Returns matching publishers AND all their descendants (children, grandchildren). Used by the deep song search expansion leg only.
+Deep recursive search for publishers using a CTE. Returns matching publishers AND all their descendants (children, grandchildren). Used by the deep song search expansion leg only. Supports optional shared connection.
 
-### find_by_name(name: str) -> Optional[int]
+### find_by_name(name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 
-Exact case-insensitive lookup of a Publisher by PublisherName. Returns PublisherID or None. Read-only.
+Exact case-insensitive lookup of a Publisher by PublisherName. Returns PublisherID or None. Read-only. Supports optional shared connection.
 
-### get_by_id(publisher_id: int) -> Optional[Publisher]
+### get_by_id(publisher_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Publisher]
 
-Fetch a single publisher by its ID.
+Fetch a single publisher by its ID. Supports optional shared connection.
 
-### get_by_ids(ids: List[int]) -> List[Publisher]
+### get_by_ids(ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
-Batch-fetch multiple publishers by ID. Used for parent chain resolution.
+Batch-fetch multiple publishers by ID. Used for parent chain resolution. Supports optional shared connection.
 
-### get_hierarchy_batch(publisher_ids: List[int]) -> Dict[int, Publisher]
+### get_hierarchy_batch(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, Publisher]
 
-RESOLVER: Fetches the entire ancestry chain for a list of publishers in a SINGLE query using a recursive CTE.
+RESOLVER: Fetches the entire ancestry chain for a list of publishers in a SINGLE query using a recursive CTE. Supports optional shared connection.
 
-### get_children(parent_id: int) -> List[Publisher]
+### get_children(parent_id: int, conn: Optional[sqlite3.Connection] = None) -> List[Publisher]
 
-Fetch all sub-publishers for a given parent.
+Fetch all sub-publishers for a given parent. Supports optional shared connection.
 
-### get_song_ids_by_publisher(publisher_id: int) -> List[int]
+### get_song_ids_by_publisher(publisher_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
 
-Find all song IDs explicitly linked to this publisher (Master rights).
+Find all song IDs explicitly linked to this publisher (Master rights). Supports optional shared connection.
 
-### get_song_ids_by_publisher_batch(publisher_ids: List[int]) -> Dict[int, List[int]]
+### get_song_ids_by_publisher_batch(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[int]]
 
-Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [SourceID].
+Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [SourceID]. Supports optional shared connection.
 
 ### get_or_create_publisher(name: str, cursor) -> int
 
@@ -364,25 +364,25 @@ Set or clear the ParentPublisherID for a publisher. Pass `None` to clear. Raises
 *Location: `src/data/tag_repository.py`_
 **Responsibility**: DB reads and writes for the Tags table.
 
-### get_all() -> List[Tag]
+### get_all(conn: Optional[sqlite3.Connection] = None) -> List[Tag]
 
-Fetch the full directory of active (non-deleted) tags, ordered by name.
+Fetch the full directory of active (non-deleted) tags, ordered by name. Supports optional shared connection.
 
-### search(query: str) -> List[Tag]
+### search(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Tag]
 
-Search active tags by name match.
+Search active tags by name match. Supports optional shared connection.
 
-### get_categories() -> List[str]
+### get_categories(conn: Optional[sqlite3.Connection] = None) -> List[str]
 
-Fetch all distinct tag categories currently present in the database.
+Fetch all distinct tag categories currently present in the database. Supports optional shared connection.
 
-### get_by_id(tag_id: int) -> Optional[Tag]
+### get_by_id(tag_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Tag]
 
-Fetch a single tag by its ID.
+Fetch a single tag by its ID. Supports optional shared connection.
 
-### get_song_ids_by_tag(tag_id: int) -> List[int]
+### get_song_ids_by_tag(tag_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
 
-Fetch all song IDs linked to a specific tag.
+Fetch all song IDs linked to a specific tag. Supports optional shared connection.
 
 ### insert_tags(source_id: int, tags: List[Tag], conn: sqlite3.Connection) -> None
 
@@ -425,9 +425,9 @@ Update a Tag's name/category globally. Does NOT commit.
 *Location: `src/data/album_credit_repository.py`_
 **Responsibility**: DB reads for the AlbumCredits table. Bridges Album IDs to Names and Roles.
 
-### get_credits_for_albums(album_ids: List[int]) -> List[AlbumCredit]
+### get_credits_for_albums(album_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[AlbumCredit]
 
-Batch-fetches credits for multiple albums in a single query.
+Batch-fetches credits for multiple albums in a single query. Supports optional shared connection.
 
 - Returns a flat list of `AlbumCredit` entities.
 - Joins with `ArtistNames` and `Roles` tables to resolve human-readable names.
@@ -451,29 +451,29 @@ Remove a credit from an album. Deletes link only. Does NOT commit.
 *Location: `src/data/identity_repository.py`_
 **Responsibility**: Handles resolution of Artist Identities, Aliases, and Group Memberships.
 
-### get_by_id(identity_id: int) -> Optional[Identity]
+### get_by_id(identity_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Identity]
 
-Hydrates a basic Identity record without tree expansion.
+Hydrates a basic Identity record without tree expansion. Supports optional shared connection.
 
-### get_all_identities() -> List[Identity]
+### get_all_identities(conn: Optional[sqlite3.Connection] = None) -> List[Identity]
 
-Fetches the full directory of active (non-deleted) identities.
+Fetches the full directory of active (non-deleted) identities. Supports optional shared connection.
 
-### get_by_ids(identity_ids: List[int]) -> List[Identity]
+### get_by_ids(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Identity]
 
-Batch-fetch multiple identities by ID.
+Batch-fetch multiple identities by ID. Supports optional shared connection.
 
-### search_identities(query: str) -> List[Identity]
+### search_identities(query: str, conn: Optional[sqlite3.Connection] = None) -> List[Identity]
 
-Finds active identities whose DisplayName, LegalName, or Alias match the query.
+Finds active identities whose DisplayName, LegalName, or Alias match the query. Supports optional shared connection.
 
-### get_group_ids_for_members(member_ids: List[int]) -> List[int]
+### get_group_ids_for_members(member_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[int]
 
-Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs.
+Batch fetches GroupIdentityIDs for a list of MemberIdentityIDs. Supports optional shared connection.
 
-### find_identity_by_name(name: str) -> Optional[int]
+### find_identity_by_name(name: str, conn: Optional[sqlite3.Connection] = None) -> Optional[int]
 
-Return the IdentityID for an exact (case-insensitive) ArtistName match, or None.
+Return the IdentityID for an exact (case-insensitive) ArtistName match, or None. Supports optional shared connection.
 
 ### add_alias(identity_id: int, display_name: str, cursor: sqlite3.Cursor, name_id: Optional[int] = None) -> int
 
@@ -487,17 +487,17 @@ Soft-delete an alias link. Guard: primary names cannot be deleted.
 
 Update the LegalName field on an Identity record. Raises LookupError if not found. Does NOT commit.
 
-### get_aliases_batch(identity_ids: List[int]) -> Dict[int, List[ArtistName]]
+### get_aliases_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[ArtistName]]
 
-Batch-fetch aliases (ArtistNames) for multiple identities.
+Batch-fetch aliases (ArtistNames) for multiple identities. Supports optional shared connection.
 
-### get_members_batch(identity_ids: List[int]) -> Dict[int, List[Identity]]
+### get_members_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[Identity]]
 
-Batch-fetch member identities for multiple group identities.
+Batch-fetch member identities for multiple group identities. Supports optional shared connection.
 
-### get_groups_batch(identity_ids: List[int]) -> Dict[int, List[Identity]]
+### get_groups_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[Identity]]
 
-Batch-fetch group identities that multiple person identities belong to.
+Batch-fetch group identities that multiple person identities belong to. Supports optional shared connection.
 
 ### _row_to_identity(row: sqlite3.Row) -> Identity
 
