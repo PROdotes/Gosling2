@@ -7,6 +7,11 @@ const playBtn     = document.getElementById("scrubber-play-pause");
 const volumeBar   = document.getElementById("scrubber-volume");
 const timeCurrent = document.getElementById("scrubber-time-current");
 const timeTotal   = document.getElementById("scrubber-time-total");
+const tagsBtn     = document.getElementById("scrubber-tags-btn");
+
+let _currentId = null;
+let _currentTitle = null;
+let _onTagsClick = null;
 
 // Playhead indicator inside the waveform box
 const playhead = document.createElement("div");
@@ -80,9 +85,18 @@ document.addEventListener("keydown", (e) => {
 if (e.key === " ") { e.preventDefault(); playBtn.click(); }
     if (e.key === "ArrowLeft" || e.key === "a") { e.preventDefault(); seek(-10); }
     if (e.key === "ArrowRight" || e.key === "d") { e.preventDefault(); seek(10); }
+    if (e.key === "+" || e.key === "NumpadAdd") { e.preventDefault(); tagsBtn.click(); }
 });
 
-export function openScrubberModal(songId, title) {
+tagsBtn?.addEventListener("click", () => {
+    if (_onTagsClick && _currentId) _onTagsClick(_currentId, _currentTitle);
+});
+ 
+export function openScrubberModal(songId, title, { autoPlay = false, onTagsClick = null } = {}) {
+    _currentId = songId;
+    _currentTitle = title;
+    _onTagsClick = onTagsClick;
+ 
     audio.pause();
     audio.src = `/api/v1/songs/${songId}/audio`;
     timeCurrent.textContent = "0:00";
@@ -91,14 +105,21 @@ export function openScrubberModal(songId, title) {
     updatePlayBtn();
     titleEl.textContent = title || "Player";
     overlay.style.display = "flex";
+    
+    if (autoPlay) {
+        audio.play().catch(err => console.warn("Auto-play blocked by browser:", err));
+    }
 }
-
+ 
 export function closeScrubberModal() {
     audio.pause();
     audio.src = "";
+    _currentId = null;
+    _currentTitle = null;
+    _onTagsClick = null;
     overlay.style.display = "none";
 }
-
+ 
 // Close on overlay click outside modal box
 overlay.addEventListener("click", (e) => {
     if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;

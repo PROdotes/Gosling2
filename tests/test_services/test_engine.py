@@ -52,7 +52,7 @@ class TestDashboard:
         """GET /static/... should serve extracted dashboard assets."""
         monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
         c = TestClient(app)
-        resp = c.get("/static/css/dashboard.css")
+        resp = c.get("/static/css/dashboard/base.css")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         assert (
             "--bg-deep" in resp.text

@@ -75,6 +75,7 @@ PROMPT_BEFORE_MOVE = True
 AUTO_SAVE_ID3 = True
 DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = Path("json/rules.json")
+SCRUBBER_AUTO_PLAY = True
 
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.

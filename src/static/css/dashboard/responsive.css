@@ -1,0 +1,94 @@
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 1100px) {
+    body {
+        overflow: auto;
+    }
+
+    header {
+        flex-wrap: wrap;
+        padding: 1rem 1.25rem;
+    }
+
+    .search-wrapper {
+        order: 3;
+        max-width: none;
+        width: 100%;
+    }
+
+    .stats-bar {
+        margin-left: 0;
+    }
+
+    main {
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .results-panel {
+        min-width: 0;
+        border-right: none;
+        border-bottom: 1px solid var(--border-subtle);
+        min-height: 45vh;
+    }
+
+    .detail-panel {
+        width: 100%;
+        min-height: 40vh;
+    }
+}
+
+@media (max-width: 720px) {
+    .mode-tabs {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .mode-tab {
+        flex: 1 1 calc(50% - 0.25rem);
+        text-align: center;
+    }
+
+    .stats-bar {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .result-card,
+    .credit-item,
+    .list-row {
+        padding: 0.9rem;
+    }
+
+    .detail-header,
+    .detail-content {
+        padding: 1rem;
+    }
+
+    .meta-grid,
+    .two-column {
+        grid-template-columns: 1fr;
+    }
+
+    .timeline-header {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+}

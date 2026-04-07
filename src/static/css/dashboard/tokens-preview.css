@@ -1,0 +1,198 @@
+/* Filename Parser & Chip Builder */
+.token-chip {
+    padding: 0.45rem 0.9rem;
+    border-radius: 10px;
+    background: var(--bg-card-raised);
+    border: 1px solid var(--border-accent);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--text-secondary);
+}
+
+.token-chip:hover {
+    border-color: var(--accent);
+    background: rgba(249, 115, 22, 0.08);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.token-chip.ignore:hover {
+    border-color: #666;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.token-chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.24);
+}
+
+.token-chip.ignore {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: var(--border-subtle);
+    color: var(--text-muted);
+}
+
+.token-chip.ignore.active {
+    background: #444;
+    border-color: #555;
+    color: #eee;
+    box-shadow: none;
+}
+
+.token-container {
+    padding: 1.15rem;
+    background: rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    min-height: 4.2rem;
+    align-items: center;
+}
+
+.preview-table-wrapper {
+    margin-top: 1.5rem;
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    background: var(--bg-card);
+    box-shadow: inset 0 0 0 1px var(--border-subtle);
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.preview-table th {
+    position: sticky;
+    top: 0;
+    background: var(--bg-card-raised);
+    z-index: 10;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    padding: 0.85rem 1.15rem;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+}
+
+.preview-table td {
+    padding: 0.75rem 1.15rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+.preview-table tr:last-child td {
+    border-bottom: none;
+}
+
+.preview-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-primary);
+}
+
+.preview-val-missing {
+    color: var(--danger);
+    opacity: 0.65;
+    font-style: italic;
+    font-size: 0.75rem;
+}
+
+.preview-val-found {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.workflow-status-label {
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+/* Casing Actions */
+.case-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    vertical-align: middle;
+}
+
+.comparison-table td:hover .case-actions {
+    opacity: 0.6;
+}
+
+.case-actions:hover {
+    opacity: 1 !important;
+}
+
+.btn-case {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.1s;
+}
+
+.btn-case:hover {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+/* Casing Actions */
+.case-actions {
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+.btn-case {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-dim);
+    font-size: 0.58rem;
+    font-weight: 800;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.1s;
+    opacity: 0.55;
+    padding: 0;
+}
+
+.btn-case:hover {
+    background: var(--bg-card-raised);
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    opacity: 1;
+}

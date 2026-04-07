@@ -21,6 +21,7 @@ from src.engine.config import (
     TAG_INPUT_FORMAT,
     DEFAULT_SEARCH_ENGINE,
     DEFAULT_CREDIT_SEPARATORS,
+    SCRUBBER_AUTO_PLAY,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
@@ -388,4 +389,5 @@ def get_validation_rules():
         },
         "default_search_engine": DEFAULT_SEARCH_ENGINE,
         "credit_separators": DEFAULT_CREDIT_SEPARATORS,
+        "scrubber_auto_play": SCRUBBER_AUTO_PLAY,
     }

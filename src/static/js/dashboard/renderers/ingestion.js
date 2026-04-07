@@ -13,7 +13,7 @@ const RESULTS_LIST_ID = "ingest-results";
  * Recursively collect all File objects from DataTransferItemList.
  * Handles both files and directories.
  */
-async function collectFilesFromItems(items, allowedExtensions) {
+export async function collectFilesFromItems(items, allowedExtensions) {
     const files = [];
     const queue = [];
     const exts = (allowedExtensions || []).map(e => e.toLowerCase());
@@ -34,7 +34,7 @@ async function collectFilesFromItems(items, allowedExtensions) {
         const entry = queue.shift();
 
         if (entry.isFile) {
-            const isAllowed = exts.some(ext => entry.name.toLowerCase().endsWith(ext));
+            const isAllowed = exts.length === 0 || exts.some(ext => entry.name.toLowerCase().endsWith(ext));
             if (isAllowed) {
                 // Get the actual File object
                 const file = await new Promise((resolve) => entry.file(resolve));

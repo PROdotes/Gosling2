@@ -46,12 +46,17 @@ import {
     cleanupOriginalFile,
     formatMetadataCase,
     setPrimarySongTag,
+    uploadFiles,
+    getAcceptedFormats,
 } from "./api.js";
+import { initToastSystem, showToast } from "./components/toast.js";
+import { collectFilesFromItems } from "./renderers/ingestion.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
 import { openScrubberModal, closeScrubberModal } from "./components/scrubber_modal.js";
 import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.js";
 import { openSplitterModal, closeSplitterModal } from "./components/splitter_modal.js";
+import * as orch from "./orchestrator.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -88,8 +93,11 @@ const state = {
     id3Frames: null,
     allRoles: [],
     activeSong: null,
+    allowedExtensions: [],
+    successCount: 0,
+    actionCount: 0,
 };
-
+ 
 const modeConfig = {
     songs: {
         placeholder: "Search songs, artists, albums...",
@@ -152,6 +160,7 @@ const ctx = {
         elements.matchCount.textContent = String(count);
         elements.matchLabel.textContent = state.currentQuery ? "Matches" : "Visible";
     },
+    openSongDetail: (...args) => openSongDetail(...args),
     showDetailPanel(html) {
         elements.detailPanel.innerHTML = html;
         elements.detailPanel.style.display = "flex";
@@ -282,6 +291,12 @@ function switchMode(mode) {
     state.currentMode = mode;
     state.currentQuery = "";
     state.selectedIndex = -1;
+    
+    // Aligned to Blueprint: Entering Ingest mode clears the action badge
+    if (mode === "ingest") {
+        state.actionCount = 0;
+        updateIngestBadges();
+    }
     elements.searchInput.value = "";
     syncModeUi();
     ctx.hideDetailPanel();
@@ -494,6 +509,90 @@ function isModalOpen() {
     return false;
 }
 
+function updateIngestBadges(successDelta = 0, actionDelta = 0) {
+    const tab = document.querySelector(".mode-tab[data-mode='ingest']");
+    if (!tab) return;
+    
+    state.successCount += successDelta;
+    state.actionCount += actionDelta;
+
+    const total = state.actionCount + state.successCount;
+    if (total <= 0) {
+        tab.removeAttribute("data-badge");
+        tab.removeAttribute("data-badge-type");
+        return;
+    }
+
+    tab.dataset.badge = String(total);
+    // Red (action) trumps Green (success)
+    tab.dataset.badgeType = state.actionCount > 0 ? "action" : "success";
+}
+
+async function setupHeaderDropZone() {
+    const tab = document.querySelector(".mode-tab[data-mode='ingest']");
+    if (!tab) return;
+
+    tab.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        tab.classList.add("drop-target");
+    });
+
+    tab.addEventListener("dragleave", (e) => {
+        if (!tab.contains(e.relatedTarget)) {
+            tab.classList.remove("drop-target");
+        }
+    });
+
+    tab.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        tab.classList.remove("drop-target");
+
+        const items = e.dataTransfer?.items;
+        if (!items || items.length === 0) return;
+
+        const allFiles = await collectFilesFromItems(items, state.allowedExtensions);
+
+        if (allFiles.length === 0) {
+            showToast("No valid audio files found in drop", "error", 3000);
+            return;
+        }
+
+        try {
+            const result = await uploadFiles(allFiles);
+            let successes = 0;
+            let actions = 0;
+
+            for (const fileResult of result.results) {
+                const title = fileResult.song?.media_name || fileResult.title || "Unknown";
+                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || title;
+
+                if (fileResult.status === "INGESTED") {
+                    showToast(`Ingested: ${title}`, "success", 3000);
+                    successes++;
+                } else if (fileResult.status === "ALREADY_EXISTS") {
+                    showToast(`Duplicate: ${title}`, "warning", 5000);
+                } else if (fileResult.status === "CONFLICT") {
+                    showToast(`Ghost record: ${title} — action needed`, "error", 0, { 
+                        label: "Review", onClick: () => navigate("ingest") 
+                    });
+                    actions++;
+                } else if (fileResult.status === "PENDING_CONVERT") {
+                    showToast(`Conversion required: ${fileName}`, "warning", 0, { 
+                        label: "Review", onClick: () => navigate("ingest") 
+                    });
+                    actions++;
+                } else if (fileResult.status === "ERROR") {
+                    showToast(`Error: ${fileResult.message || "Upload failed"}`, "error", 5000);
+                }
+            }
+            updateIngestBadges(successes, actions);
+        } catch (error) {
+            showToast(`Upload failed: ${error.message}`, "error", 5000);
+        }
+    });
+}
+
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
@@ -511,6 +610,17 @@ document.addEventListener("click", async (event) => {
 
     if (action === "switch-mode") {
         switchMode(actionTarget.dataset.mode);
+        return;
+    }
+
+    if (action === "refresh-results") {
+        actionTarget.classList.add("spinning");
+        // Aligned to Blueprint: Refreshing the list clears the successful ingest badge
+        state.successCount = 0;
+        updateIngestBadges(); 
+        performSearch(state.currentQuery).finally(() => {
+            actionTarget.classList.remove("spinning");
+        });
         return;
     }
 
@@ -1149,7 +1259,7 @@ if (action === "close-filename-parser-modal") {
 
     if (action === "open-scrubber") {
         const { songId, title } = actionTarget.dataset;
-        openScrubberModal(songId, title);
+        orch.orchestrateScrubber(ctx, songId, title);
         return;
     }
 
@@ -1209,64 +1319,9 @@ if (action === "close-filename-parser-modal") {
                 createLabel: (q) => `Add "${q}" as new publisher`,
             });
         } else if (modalType === "tags") {
-            const currentItems = (state.activeSong?.tags || []).map(t => ({ id: t.id, label: t.name }));
-
-            const rules = state.validationRules?.tags || {};
-            const defaultCategory = rules.default_category || "Genre";
-            const delimiter = rules.delimiter || ":";
-            const format = rules.input_format || "tag:category";
-            const nameFirst = format.toLowerCase().startsWith("tag");
-
-            function parseTagInput(raw) {
-                if (!raw.includes(delimiter)) return { name: raw.trim(), category: defaultCategory };
-                const idx = raw.indexOf(delimiter);
-                const a = raw.slice(0, idx).trim();
-                const b = raw.slice(idx + delimiter.length).trim();
-                const name = nameFirst ? a : b;
-                const category = nameFirst ? b : a;
-                return { name, category };
-            }
-
-            openLinkModal({
-                title: "Tags",
-                placeholder: `Search or type (e.g. ${format})...`,
-                items: currentItems,
-                onSearch: async (q) => {
-                    const results = await searchTags(q);
-                    if (results === ABORTED) return [];
-                    return (results || []).map(t => ({ id: t.id, label: t.category ? `${t.name} (${t.category})` : t.name, name: t.name }));
-                },
-                onAdd: async (opt) => {
-                    let name, category;
-                    if (opt.id != null) {
-                        // Priority 1: Link existing tag by ID
-                        // We pass nulls for name/category as the backend resolves by ID
-                        name = null;
-                        category = null;
-                    } else {
-                        // Priority 2: Parse raw input for new tag creation
-                        const parsed = parseTagInput(opt.rawInput || opt.name || opt.label);
-                        name = parsed.name;
-                        category = parsed.category;
-                    }
-
-                    const tag = await addSongTag(songId, name, category, opt.id != null ? opt.id : null);
-                    opt.id = tag.id;
-                    opt.label = tag.name;
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeSongTag(songId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => {
-                    const { name, category } = parseTagInput(q);
-                    if (!name) return `Add tag (missing name)`;
-                    return `Add "${name}" in "${category}"`;
-                },
-            });
+            const currentTags = state.activeSong?.tags || [];
+            const songTitle = state.activeSong?.title || "Song";
+            orch.manageSongTags(ctx, songId, songTitle, currentTags);
         } else if (modalType === "credits") {
             const { songId, role } = actionTarget.dataset;
             const currentItems = (state.activeSong?.credits || [])
@@ -1661,6 +1716,13 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && elements.detailPanel.style.display === "flex" && !modalOpen) {
         abortDetailRequest();
         ctx.hideDetailPanel();
+        
+        // If we were resolving items in Ingest mode, clear the action badge
+        if (state.currentMode === "ingest") {
+            state.actionCount = 0;
+            updateIngestBadges();
+        }
+        
         state.selectedIndex = -1;
         updateSelection();
         return;
@@ -1693,14 +1755,23 @@ document.addEventListener("keydown", (event) => {
 
     if (event.key === "Enter" && state.selectedIndex >= 0) {
         event.preventDefault();
-        // Use displayedItems + ID lookup to handle sorting
         const selected = items[state.selectedIndex];
-        if (selected) {
-            const cachedList = getActiveList();
-            const actualIndex = cachedList.findIndex(item => item.id === selected.id);
-            if (actualIndex >= 0) {
-                openSelectedResult(actualIndex);
-            }
+        if (!selected) return;
+
+        // Pattern: If detail panel is already open for this song, 'Enter' triggers the scrubber
+        const isSongDetailOpen = state.currentMode === "songs" && elements.detailPanel.style.display === "flex";
+        const isActiveSongDetail = isSongDetailOpen && state.activeSong && String(state.activeSong.id) === String(selected.id);
+
+        if (isActiveSongDetail) {
+            orch.orchestrateScrubber(ctx, state.activeSong.id, state.activeSong.media_name || state.activeSong.title);
+            return;
+        }
+
+        // Otherwise open the detail panel
+        const cachedList = getActiveList();
+        const actualIndex = cachedList.findIndex(item => item.id === selected.id);
+        if (actualIndex >= 0) {
+            openSelectedResult(actualIndex);
         }
     }
 });
@@ -1719,13 +1790,17 @@ elements.deepSearchToggle.addEventListener("change", (event) => {
 });
 
 syncModeUi();
+initToastSystem();
 Promise.all([
     fetchValidationRules().catch(() => null),
     fetchId3Frames().catch(() => null),
     fetchRoles(),
-]).then(([rules, frames, roles]) => {
+    getAcceptedFormats().catch(() => []),
+]).then(([rules, frames, roles, exts]) => {
     state.validationRules = rules;
     state.id3Frames = frames;
     state.allRoles = roles;
+    state.allowedExtensions = exts;
 });
+setupHeaderDropZone();
 performSearch("");

@@ -1,0 +1,264 @@
+.ingestion-view {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.ingestion-header {
+    text-align: center;
+}
+
+.ingest-drop-zone {
+    border: 2px dashed var(--border-accent);
+    border-radius: 16px;
+    padding: 2rem;
+    text-align: center;
+    transition: border-color 0.2s ease, background 0.2s ease;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.ingest-drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-glow);
+}
+
+.drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.drop-zone-icon {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+}
+
+.drop-zone-label {
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.drop-zone-hint {
+    font-size: 0.72rem;
+}
+
+.ingest-input-row {
+    display: flex;
+    gap: 0.75rem;
+}
+
+.ingest-input-row input {
+    flex: 1;
+    padding: 0.9rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ingest-input-row input::placeholder {
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+}
+
+.ingest-input-row input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.ingest-btn-primary {
+    padding: 0.9rem 1.5rem;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.16s ease;
+    min-width: 110px;
+}
+
+.ingest-btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.ingest-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ingest-btn-danger {
+    padding: 0.45rem 1rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.16s ease;
+}
+
+.ingest-btn-danger:hover {
+    background: var(--danger);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.ingest-btn-danger.confirming {
+    background: var(--danger);
+    color: #fff !important;
+    border-color: var(--danger);
+    animation: pulse-danger 0.8s infinite alternate;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes pulse-danger {
+    from {
+        opacity: 0.85;
+        transform: scale(1);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1.02);
+    }
+}
+
+.ingest-btn-secondary {
+    padding: 0.6rem 1rem;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.ingest-btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+.ingest-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.ingest-hint {
+    margin-left: auto;
+    font-size: 0.72rem;
+}
+
+.ingest-results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ingest-card {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.ingest-icon {
+    font-size: 1.2rem;
+}
+
+.ingest-card.new .ingest-icon {
+    color: var(--success);
+    background: rgba(34, 197, 94, 0.15);
+}
+
+.ingest-card.already_exists .ingest-icon {
+    color: var(--warning);
+    background: rgba(234, 179, 8, 0.15);
+}
+
+.ingest-card.ingested .ingest-icon {
+    color: var(--success);
+    background: rgba(34, 197, 94, 0.2);
+    box-shadow: 0 0 15px rgba(34, 197, 94, 0.15);
+}
+
+.ingest-card.error .ingest-icon {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.15);
+}
+
+.ingest-meta {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.ingest-actions-row {
+    margin-top: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.ingest-btn-link {
+    appearance: none;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--accent);
+    padding: 0;
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+    transition: color 0.16s ease;
+    display: inline-block;
+    line-height: inherit;
+}
+
+.ingest-btn-link:hover {
+    color: var(--text-primary);
+}
+
+/* Spinner and Uploading State */
+.drop-zone-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.ingest-drop-zone.uploading {
+    border-style: solid;
+    border-color: var(--accent-dim);
+    background: rgba(259, 115, 22, 0.04);
+}

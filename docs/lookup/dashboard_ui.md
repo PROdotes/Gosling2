@@ -97,6 +97,12 @@ Renders the file verification panel with drag-and-drop support, path input, and 
 - `renderSongList(songs, emptyMessage)`: Universal stack-list.
 - `renderAuditTimeline(history)`: Vertical audit trail.
 
+### edit_modal.js
+**Responsibility**: Multi-purpose modal for editing entity names, categories, and hierarchical children (aliases).
+
+### scrubber_modal.js
+**Responsibility**: Audio playback modal with waveform scrubbing, volume control, and basic transport (play/pause, seek).
+
 ### link_modal.js
 **Responsibility**: Universal modal for adding/removing metabolic links. Handles search, result selection, and multi-value submission.
 
