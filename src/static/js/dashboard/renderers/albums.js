@@ -77,17 +77,17 @@ export function renderAlbums(ctx, albums) {
         <article class="result-card album-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">LP</div>
             <div class="card-body">
-                <div class="card-title-row">
-                    <div class="card-title">${escapeHtml(album.title || "Untitled Album")}</div>
-                    <span class="pill mono">#${escapeHtml(album.id || "-")}</span>
-                </div>
+                <div class="card-title">${escapeHtml(album.title || "Untitled Album")}</div>
                 <div class="card-subtitle">${escapeHtml(album.display_artist || "Unknown Artist")}</div>
-                <div class="card-meta">
-                    ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : ""}
-                    <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
-                    ${album.song_count ? `<span class="pill mono">${escapeHtml(album.song_count)} track${album.song_count === 1 ? "" : "s"}</span>` : ""}
-                    ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
-                </div>
+            </div>
+            <div class="card-meta">
+                ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : ""}
+                <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
+                ${album.song_count ? `<span class="pill mono">${escapeHtml(album.song_count)} track${album.song_count === 1 ? "" : "s"}</span>` : ""}
+                ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
+            </div>
+            <div class="card-actions">
+                <span class="pill mono">#${escapeHtml(album.id || "-")}</span>
             </div>
         </article>
     `).join("");

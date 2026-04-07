@@ -36,54 +36,17 @@ The current "Bubble Card" layout for song results consumes significant vertical 
 - **Pills**: Shrink pill padding from `0.24rem 0.55rem` to `0.12rem 0.45rem`.
 - **Actions (Toggle/ID)**: Vertically center the switch and #ID badge.
 
-## CSS Logic (Draft)
-```css
-#results-container {
-    gap: 0;
-    padding: 0;
-}
+## Final Implementation: Horizontal Multi-Column List
 
-.result-card {
-    border: none;
-    border-bottom: 1px solid var(--border-subtle);
-    border-radius: 0;
-    padding: 0.6rem 1rem;
-    gap: 0.8rem;
-    align-items: center;
-    background: transparent;
-}
+The refactor successfully doubled the viewable capacity (from 4.5 to 9 items) by moving from a vertical stack to a horizontal multi-column distribution.
 
-.result-card.active {
-    border: none;
-    border-bottom: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--accent);
-    background: linear-gradient(90deg, rgba(249, 115, 22, 0.12), transparent);
-}
+### Final Structure
+- **Left Column**: Playback Icon (32x32px).
+- **Center-Left Column (Body)**: Title and Subtitle (Artist) stacked vertically.
+- **Center-Right Column (Meta)**: Metadata pills (Genre, Year, Duration) right-aligned, capped at 35% width.
+- **Far-Right Column (Actions)**: Active toggle switch and #ID badge.
 
-.card-icon {
-    width: 32px;
-    height: 32px;
-    font-size: 0.9rem;
-    border-radius: 8px;
-}
-
-.card-subtitle {
-    margin-top: 0.15rem;
-    font-size: 0.8rem;
-}
-
-.card-meta {
-    margin-top: 0.4rem;
-    gap: 0.35rem;
-}
-
-.pill {
-    padding: 0.12rem 0.45rem;
-    font-size: 0.7rem;
-}
-```
-
-## Verification Plan
-1. **Visual Regression**: Compare before/after screenshots.
-2. **Scroll Test**: Ensure 36 songs feel manageable.
-3. **Interactive Elements**: Verify selection and toggle switches.
+### Visual Tokens
+- **Padding**: `0.65rem 1.15rem`.
+- **Dividers**: `1px solid var(--border-subtle)` (bottom-only).
+- **Active State**: `border-left: 4px solid var(--accent)` + radiant sweep.

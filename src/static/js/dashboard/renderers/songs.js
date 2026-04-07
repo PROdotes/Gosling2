@@ -373,27 +373,25 @@ function renderSongsCards(ctx, songs) {
         <article class="result-card song-card" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
             <div class="card-icon">♪</div>
             <div class="card-body">
-                <div class="card-title-row">
-                    <div class="card-title">${escapeHtml(song.title || song.media_name || "Untitled")}</div>
-                    <div class="card-title-actions">
-                        <label class="switch ${song.processing_status !== 0 ? 'disabled' : ''}" 
-                               data-action="toggle-active" 
-                               data-id="${song.id}"
-                               title="${song.processing_status !== 0 ? 'Only reviewed songs can be active for airplay' : (song.is_active ? 'Deactivate' : 'Activate')}">
-                             <input type="checkbox" 
-                                    ${song.is_active ? 'checked' : ''} 
-                                    ${song.processing_status !== 0 ? 'disabled' : ''}>
-                             <span class="slider"></span>
-                        </label>
-                        <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
-                    </div>
-                </div>
+                <div class="card-title">${escapeHtml(song.title || song.media_name || "Untitled")}</div>
                 <div class="card-subtitle">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
-                <div class="card-meta">
-                    ${song.primary_genre ? `<span class="pill genre">${escapeHtml(song.primary_genre)}</span>` : ""}
-                    <span class="pill mono">${escapeHtml(song.year || "-")}</span>
-                    ${song.formatted_duration ? `<span class="pill mono">${escapeHtml(song.formatted_duration)}</span>` : ""}
-                </div>
+            </div>
+            <div class="card-meta">
+                ${song.primary_genre ? `<span class="pill genre">${escapeHtml(song.primary_genre)}</span>` : ""}
+                <span class="pill mono">${escapeHtml(song.year || "-")}</span>
+                ${song.formatted_duration ? `<span class="pill mono">${escapeHtml(song.formatted_duration)}</span>` : ""}
+            </div>
+            <div class="card-actions">
+                <label class="switch ${song.processing_status !== 0 ? 'disabled' : ''}" 
+                        data-action="toggle-active" 
+                        data-id="${song.id}"
+                        title="${song.processing_status !== 0 ? 'Only reviewed songs can be active for airplay' : (song.is_active ? 'Deactivate' : 'Activate')}">
+                        <input type="checkbox" 
+                            ${song.is_active ? 'checked' : ''} 
+                            ${song.processing_status !== 0 ? 'disabled' : ''}>
+                        <span class="slider"></span>
+                </label>
+                <span class="pill mono">#${escapeHtml(song.id || "-")}</span>
             </div>
         </article>
     `).join("");

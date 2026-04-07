@@ -51,11 +51,11 @@ export function renderArtists(ctx, artists) {
         <article class="result-card artist-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">ID</div>
             <div class="card-body">
-                <div class="card-title-row">
-                    <div class="card-title">${escapeHtml(artist.display_name || "Unnamed Identity")}</div>
-                    <span class="artist-badge">${escapeHtml(artist.type || "identity")}</span>
-                </div>
+                <div class="card-title">${escapeHtml(artist.display_name || "Unnamed Identity")}</div>
                 <div class="card-subtitle mono">#${escapeHtml(artist.id || "-")}</div>
+            </div>
+            <div class="card-meta">
+                <span class="pill artist-badge">${escapeHtml(artist.type || "identity")}</span>
             </div>
         </article>
     `).join("");
