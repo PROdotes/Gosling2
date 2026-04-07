@@ -227,35 +227,108 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
     });
 }
 
-// ─── SCALAR EDITS (EDIT MODAL) ───────────────────────────────────────────────
+// ─── ENTITY EDITING (EDIT MODAL) ─────────────────────────────────────────────
 
-export async function editArtist(ctx, artistId, artistName) {
-    const tree = await api.getArtistTree(artistId);
+export async function manageArtist(ctx, artistId, artistName) {
+    const identity = await api.getArtistTree(artistId);
+    if (!identity) return;
+
+    const aliases = identity.aliases || [];
+    const primary = aliases.find(a => a.is_primary) || { id: artistId, display_name: artistName };
+    const otherAliases = aliases.filter(a => !a.is_primary);
 
     openEditModal({
-        title: `Edit Artist: ${artistName}`,
-        name: artistName,
+        title: `Edit Artist: ${primary.display_name}`,
+        name: primary.display_name,
         onRename: async (newName) => {
-            await api.patchIdentityName(artistId, newName);
+            await api.updateCreditName(0, primary.id, newName);
             if (ctx.refreshLayout) ctx.refreshLayout();
         },
         category: null,
         children: {
-            label: "Aliases & Identities",
-            items: tree.map(identity => ({ id: identity.id, label: identity.name })),
+            label: "Aliases",
+            items: otherAliases.map(a => ({ id: a.id, label: a.display_name })),
             onSearch: async (q) => {
                 const results = await api.searchArtists(q);
-                return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+                return (results || []).map(a => ({ id: a.id, label: a.display_name || a.name }));
             },
             onAdd: async (opt) => {
-                await api.addIdentityAlias(artistId, opt.id);
+                const result = await api.addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
+                return { id: result.name_id, label: result.display_name };
             },
             onRemove: async (item) => {
                 await api.removeIdentityAlias(artistId, item.id);
+            },
+            onRenameChild: async (item, newName) => {
+                await api.updateCreditName(0, item.id, newName);
             }
         },
         onClose: () => {
-            if (ctx.refreshLayout) ctx.refreshLayout();
+            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+        }
+    });
+}
+
+export async function managePublisher(ctx, publisherId, publisherName) {
+    const detail = await api.getPublisherDetail(publisherId).catch(() => null);
+    const subPubs = detail?.sub_publishers || [];
+
+    openEditModal({
+        title: "Edit Publisher",
+        name: detail ? detail.name : publisherName,
+        onRename: async (newName) => { await api.updatePublisher(publisherId, newName); },
+        category: null,
+        children: {
+            label: "Sub-publishers",
+            items: subPubs.map(c => ({ id: c.id, label: c.name })),
+            onSearch: async (q) => {
+                const results = await api.searchPublishers(q);
+                return (results || []).map(p => ({ id: p.id, label: p.name }));
+            },
+            onAdd: async (opt) => {
+                await api.setPublisherParent(opt.id, Number(publisherId));
+            },
+            onRemove: async (item) => {
+                await api.setPublisherParent(item.id, null);
+            },
+            onRenameChild: async (item, newName) => {
+                await api.updatePublisher(item.id, newName);
+            },
+            createLabel: (q) => `Add "${q}" as sub-publisher`,
+        },
+        onClose: () => {
+            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+        }
+    });
+}
+
+export async function manageTag(ctx, tagId) {
+    const tagDetail = await api.getTagDetail(tagId).catch(() => null);
+    if (!tagDetail) return;
+
+    openEditModal({
+        title: "Edit Tag",
+        name: tagDetail.name,
+        onRename: async (newName) => {
+            await api.updateTag(tagId, newName, tagDetail.category);
+            tagDetail.name = newName;
+        },
+        category: {
+            label: "Category",
+            value: tagDetail.category,
+            editable: true,
+            onSave: async (val) => {
+                await api.updateTag(tagId, tagDetail.name, val);
+                tagDetail.category = val;
+            },
+            onSearch: async (q) => {
+                const all = await api.getTagCategories();
+                return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+            },
+        },
+        children: null,
+        onClose: () => {
+            if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
         }
     });
 }

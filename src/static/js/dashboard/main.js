@@ -151,6 +151,7 @@ const ctx = {
     setState(patch) {
         Object.assign(state, patch);
     },
+    refreshActiveDetail,
     updateResultsSummary(count, singular) {
         elements.resultsCount.textContent = formatCountLabel(count, singular);
         if (!state.currentQuery) {
@@ -765,6 +766,9 @@ document.addEventListener("click", async (event) => {
             title,
             existingCredits: song?.credits || [],
             existingPublishers: song?.publishers || [],
+            onClose: () => {
+                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
+            },
             onComplete: () => {
                 refreshActiveDetail();
                 ctx.showBanner("Spotify credits imported successfully", "success");
@@ -928,159 +932,41 @@ if (action === "close-filename-parser-modal") {
     }
 
     if (action === "start-edit-album-scalar") {
-        const span = actionTarget;
-        const { albumId, songId, field } = span.dataset;
-        const currentValue = span.textContent === "-" ? "" : span.textContent;
-
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = currentValue;
-        input.className = "inline-edit-input";
-
-        const errorEl = document.createElement("div");
-        errorEl.className = "inline-edit-error";
-
-        span.replaceWith(input);
-        input.after(errorEl);
-        input.focus();
-        input.select();
-
-        async function commitAlbumScalar() {
-            const rawValue = input.value.trim();
-            errorEl.textContent = "";
-            input.classList.remove("inline-edit-input--error");
-
-            if (rawValue === currentValue) {
-                input.replaceWith(span);
-                errorEl.remove();
-                return;
-            }
-
-            let payload;
-            if (field === "release_year") {
-                if (rawValue === "") {
-                    payload = null;
-                } else {
-                    const n = Number(rawValue);
-                    const year = new Date().getFullYear();
-                    if (!Number.isInteger(n) || n < 1860 || n > year + 1) {
-                        input.classList.add("inline-edit-input--error");
-                        errorEl.textContent = `Year must be between 1860–${year + 1}`;
-                        input.focus();
-                        return;
-                    }
-                    payload = n;
-                }
-            } else {
-                payload = rawValue === "" ? null : rawValue;
-                if (field === "title" && !payload) {
-                    input.classList.add("inline-edit-input--error");
-                    errorEl.textContent = "Title cannot be empty";
-                    input.focus();
-                    return;
-                }
-            }
-
-            input.disabled = true;
-            try {
-                await updateAlbum(albumId, { [field]: payload });
+        const { albumId, songId, field } = actionTarget.dataset;
+        activateInlineEdit(actionTarget, {
+            field,
+            validationRules: state.validationRules,
+            onCommit: async (val) => {
+                return await updateAlbum(albumId, { [field]: val });
+            },
+            onSave: () => {
                 const song = state.cachedSongs.find(s => String(s.id) === String(songId));
                 if (song) openSongDetail(song, { reuseFileData: true });
-            } catch (err) {
-                input.disabled = false;
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = `Save failed: ${err.message}`;
-                input.focus();
             }
-        }
-
-        input.addEventListener("input", () => {
-            const v = input.value.trim();
-            if (field === "release_year" && v) {
-                const n = Number(v);
-                const year = new Date().getFullYear();
-                if (!Number.isInteger(n) || n < 1860 || n > year + 1) {
-                    input.classList.add("inline-edit-input--error");
-                    errorEl.textContent = `Year must be between 1860–${year + 1}`;
-                    return;
-                }
-            }
-            input.classList.remove("inline-edit-input--error");
-            errorEl.textContent = "";
         });
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitAlbumScalar(); }
-            if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
-        });
-        input.addEventListener("blur", () => { setTimeout(() => { if (document.contains(input)) commitAlbumScalar(); }, 100); });
         return;
     }
 
     if (action === "start-edit-album-link") {
-        const span = actionTarget;
-        const { albumId, songId, field } = span.dataset;
-        const currentValue = span.textContent === "-" ? "" : span.textContent;
+        const { albumId, songId, field } = actionTarget.dataset;
+        activateInlineEdit(actionTarget, {
+            field,
+            validationRules: state.validationRules,
+            onCommit: async (val) => {
+                const card = actionTarget.closest(".album-card-detail");
+                const otherField = field === "track_number" ? "disc_number" : "track_number";
+                const otherSpan = card?.querySelector(`[data-field="${otherField}"]`);
+                const otherVal = otherSpan ? (otherSpan.textContent === "-" ? null : Number(otherSpan.textContent)) : null;
 
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = currentValue;
-        input.className = "inline-edit-input";
-        input.style.width = "3rem";
-
-        const errorEl = document.createElement("div");
-        errorEl.className = "inline-edit-error";
-
-        span.replaceWith(input);
-        input.after(errorEl);
-        input.focus();
-        input.select();
-
-        async function commitAlbumLink() {
-            const rawValue = input.value.trim();
-            errorEl.textContent = "";
-            input.classList.remove("inline-edit-input--error");
-
-            if (rawValue === currentValue) {
-                input.replaceWith(span);
-                errorEl.remove();
-                return;
-            }
-
-            const n = rawValue === "" ? null : Number(rawValue);
-            if (n !== null && (!Number.isInteger(n) || n < 1)) {
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = "Must be a positive integer";
-                input.focus();
-                return;
-            }
-
-            // Read the sibling field value from the DOM to build the full patch
-            const card = input.closest(".album-card-detail");
-            const otherField = field === "track_number" ? "disc_number" : "track_number";
-            const otherSpan = card?.querySelector(`[data-field="${otherField}"]`);
-            const otherVal = otherSpan ? (otherSpan.textContent === "-" ? null : Number(otherSpan.textContent)) : null;
-
-            const track = field === "track_number" ? n : otherVal;
-            const disc = field === "disc_number" ? n : otherVal;
-
-            input.disabled = true;
-            try {
-                await updateSongAlbumLink(songId, albumId, track, disc);
+                const track = field === "track_number" ? val : otherVal;
+                const disc = field === "disc_number" ? val : otherVal;
+                return await updateSongAlbumLink(songId, albumId, track, disc);
+            },
+            onSave: () => {
                 const song = state.cachedSongs.find(s => String(s.id) === String(songId));
                 if (song) openSongDetail(song, { reuseFileData: true });
-            } catch (err) {
-                input.disabled = false;
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = `Save failed: ${err.message}`;
-                input.focus();
             }
-        }
-
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitAlbumLink(); }
-            if (e.key === "Escape") { input.replaceWith(span); errorEl.remove(); }
         });
-        input.addEventListener("blur", () => { setTimeout(() => { if (document.contains(input)) commitAlbumLink(); }, 100); });
         return;
     }
 
@@ -1151,109 +1037,13 @@ if (action === "close-filename-parser-modal") {
 
     if (action === "open-edit-modal") {
         const { chipType, itemId } = actionTarget.dataset;
-
-        const onClose = refreshActiveDetail;
-
         if (chipType === "publisher") {
-            const publisherName = actionTarget.textContent.trim();
-            const publisherDetail = await getPublisherDetail(itemId).catch(() => null);
-            const childItems = publisherDetail && publisherDetail.sub_publishers
-                ? publisherDetail.sub_publishers.map(c => ({ id: c.id, label: c.name }))
-                : [];
-
-            openEditModal({
-                title: "Edit Publisher",
-                name: publisherDetail ? publisherDetail.name : publisherName,
-                onRename: async (newName) => { await updatePublisher(itemId, newName); },
-                onClose,
-                category: null,
-                children: {
-                    label: "Sub-publishers",
-                    items: childItems,
-                    onSearch: async (q) => {
-                        const results = await searchPublishers(q);
-                        return (results || []).map(p => ({ id: p.id, label: p.name }));
-                    },
-                    onAdd: async (opt) => {
-                        await setPublisherParent(opt.id, Number(itemId));
-                        childItems.push({ id: opt.id, label: opt.label });
-                    },
-                    onRemove: async (item) => {
-                        await setPublisherParent(item.id, null);
-                    },
-                    onRenameChild: async (item, newName) => { await updatePublisher(item.id, newName); },
-                    createLabel: (q) => `Add "${q}" as sub-publisher`,
-                },
-            }, actionTarget);
+            orch.managePublisher(ctx, itemId, actionTarget.textContent.trim());
         } else if (chipType === "tag") {
-            const tagDetail = await getTagDetail(itemId).catch(() => null);
-            if (!tagDetail) {
-                console.error(`Tag ${itemId} not found`);
-                return;
-            }
-
-            openEditModal({
-                title: "Edit Tag",
-                name: tagDetail.name,
-                onRename: async (newName) => {
-                    await updateTag(itemId, newName, tagDetail.category);
-                    tagDetail.name = newName;
-                },
-                onClose,
-                category: {
-                    label: "Category",
-                    value: tagDetail.category,
-                    editable: true,
-                    onSave: async (val) => {
-                        await updateTag(itemId, tagDetail.name, val);
-                        tagDetail.category = val;
-                    },
-                    onSearch: async (q) => {
-                        const all = await getTagCategories();
-                        return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
-                    },
-                },
-                children: null,
-            }, actionTarget);
+            orch.manageTag(ctx, itemId);
         } else if (chipType === "credit") {
             const identityId = actionTarget.dataset.identityId;
-            if (!identityId) return;
-
-            const identity = await getArtistTree(identityId).catch(() => null);
-            if (!identity) return;
-
-            const primaryAlias = (identity.aliases || []).find(a => a.is_primary);
-            const aliases = (identity.aliases || []).filter(a => !a.is_primary);
-            const childItems = aliases.map(a => ({ id: a.id, label: a.display_name }));
-
-            openEditModal({
-                title: "Edit Artist",
-                name: primaryAlias?.display_name || identity.display_name,
-                onRename: async (newName) => {
-                    await updateCreditName(0, primaryAlias.id, newName);
-                },
-                onClose,
-                category: null,
-                children: {
-                    label: "Aliases",
-                    items: childItems,
-                    onSearch: async (q) => {
-                        const results = await searchArtists(q);
-                        return (results || []).map(i => ({ id: i.id, label: i.display_name }));
-                    },
-                    onAdd: async (opt) => {
-                        const result = await addIdentityAlias(identityId, opt.rawInput || opt.label, opt.id);
-                        childItems.push({ id: result.name_id, label: result.display_name });
-                    },
-                    onRemove: async (item) => {
-                        await removeIdentityAlias(identityId, item.id);
-                    },
-                    onRenameChild: async (item, newName) => {
-                        await updateCreditName(0, item.id, newName);
-                    },
-                    createLabel: (q) => `Add "${q}" as alias`,
-                },
-            }, actionTarget);
+            if (identityId) orch.manageArtist(ctx, identityId, actionTarget.textContent.trim());
         }
         return;
     }
@@ -1332,9 +1122,11 @@ if (action === "close-filename-parser-modal") {
     if (action === "start-edit-scalar") {
         const { songId, field } = actionTarget.dataset;
         activateInlineEdit(actionTarget, {
-            songId,
             field,
             validationRules: state.validationRules,
+            onCommit: async (val) => {
+                return await patchSongScalars(songId, { [field]: val });
+            },
             onSave: (updatedSong, savedField) => {
                 if (savedField === "media_name") {
                     const cached = state.cachedSongs.find(s => String(s.id) === String(songId));

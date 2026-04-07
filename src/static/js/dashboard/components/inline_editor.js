@@ -1,26 +1,32 @@
-import { patchSongScalars } from "../api.js";
-
 /**
  * Activates an inline text editor on a <span> element.
- * Validates, commits on Enter/blur, cancels on Escape.
  *
- * Usage:
- *   activateInlineEdit(span, { songId, field, validationRules, onSave })
- *
- * onSave(updatedSong) is called after a successful PATCH.
+ * Options:
+ *   field: string (media_name, year, release_year, bpm, isrc, title, etc.)
+ *   validationRules: object (from state)
+ *   onCommit: async (value) => { ... } returns the updated entity
+ *   onSave: (updatedEntity, field) => { ... } called after successful commit
  */
-export function activateInlineEdit(span, { songId, field, validationRules, onSave }) {
+export function activateInlineEdit(span, { field, validationRules, onCommit, onSave }) {
     const currentValue = span.textContent === "-" ? "" : span.textContent;
 
     const rules = validationRules;
     const validators = {
         media_name: (v) => v ? null : "Title cannot be empty",
+        title: (v) => v ? null : "Title cannot be empty",
         year: (v) => {
             if (!v) return null;
             const n = Number(v);
             const min = rules?.year?.min ?? 1860;
             const max = rules?.year?.max ?? (new Date().getFullYear() + 1);
             if (!Number.isInteger(n) || n < min || n > max) return `Year must be between ${min}–${max}`;
+            return null;
+        },
+        release_year: (v) => {
+            if (!v) return null;
+            const n = Number(v);
+            const max = new Date().getFullYear() + 1;
+            if (!Number.isInteger(n) || n < 1860 || n > max) return `Year must be between 1860–${max}`;
             return null;
         },
         bpm: (v) => {
@@ -38,12 +44,27 @@ export function activateInlineEdit(span, { songId, field, validationRules, onSav
             if (!pattern.test(stripped)) return "ISRC format: CC-XXX-YY-NNNNN (2 letters, 3 alphanumeric, 2 digits, 5 digits)";
             return null;
         },
+        track_number: (v) => {
+            if (!v) return null;
+            const n = Number(v);
+            if (!Number.isInteger(n) || n < 1) return "Must be a positive integer";
+            return null;
+        },
+        disc_number: (v) => {
+            if (!v) return null;
+            const n = Number(v);
+            if (!Number.isInteger(n) || n < 1) return "Must be a positive integer";
+            return null;
+        }
     };
 
     const input = document.createElement("input");
     input.type = "text";
     input.value = currentValue;
     input.className = "inline-edit-input";
+    if (field === "track_number" || field === "disc_number") {
+        input.style.width = "3rem";
+    }
 
     const errorEl = document.createElement("div");
     errorEl.className = "inline-edit-error";
@@ -78,7 +99,7 @@ export function activateInlineEdit(span, { songId, field, validationRules, onSav
         }
 
         let payload;
-        if (field === "year" || field === "bpm") {
+        if (["year", "release_year", "bpm", "track_number", "disc_number"].includes(field)) {
             payload = rawValue === "" ? null : Number(rawValue);
         } else {
             payload = rawValue === "" ? null : rawValue;
@@ -86,8 +107,8 @@ export function activateInlineEdit(span, { songId, field, validationRules, onSav
 
         input.disabled = true;
         try {
-            const updatedSong = await patchSongScalars(songId, { [field]: payload });
-            if (onSave) onSave(updatedSong, field);
+            const updated = await onCommit(payload);
+            if (onSave) onSave(updated, field);
         } catch (err) {
             input.disabled = false;
             input.classList.add("inline-edit-input--error");
