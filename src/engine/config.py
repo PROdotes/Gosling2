@@ -7,14 +7,15 @@ from typing import Optional
 
 
 # Database Path
-def get_db_path() -> str:
-    return os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db")
+DB_PATH = Path("sqldb/gosling2.db")
 
+
+def get_db_path() -> Path:
+    return Path(os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db"))
 
 # Library Management (Phase 3.2+)
 # GOSLING_LIBRARY_ROOT: The organized parent folder for all songs.
-def get_library_root() -> str:
-    return os.getenv("GOSLING_LIBRARY_ROOT", "Z:\\Songs")
+LIBRARY_ROOT = Path("Z:\\Songs")
 
 
 def get_downloads_folder() -> Optional[str]:
@@ -37,9 +38,9 @@ MEDIA_DIR = Path("temp/library/media")
 ACCEPTED_EXTENSIONS = [".mp3", ".wav"]
 
 # Tag defaults
-TAG_DEFAULT_CATEGORY = os.getenv("GOSLING_TAG_DEFAULT_CATEGORY", "Genre")
-TAG_CATEGORY_DELIMITER = os.getenv("GOSLING_TAG_CATEGORY_DELIMITER", ":")
-TAG_INPUT_FORMAT = os.getenv("GOSLING_TAG_INPUT_FORMAT", "tag:category")
+TAG_DEFAULT_CATEGORY = "Genre"
+TAG_CATEGORY_DELIMITER = ":"
+TAG_INPUT_FORMAT = "tag:category"
 
 # Default separators for the Artist Splitter feature
 DEFAULT_CREDIT_SEPARATORS = ["&", "feat.", "ft.", " x ", "vs.", ",", ";", "/"]
@@ -62,14 +63,15 @@ SCALAR_VALIDATION = {
 }
 
 # FFmpeg
-FFMPEG_PATH = os.getenv("GOSLING_FFMPEG_PATH", "ffmpeg/ffmpeg.exe")
-WAV_AUTO_CONVERT = os.getenv("GOSLING_WAV_AUTO_CONVERT") == "true"
+FFMPEG_PATH = Path("ffmpeg/ffmpeg.exe")
+WAV_AUTO_CONVERT = True
 
 # Song Approval Pipeline
-AUTO_MOVE_ON_APPROVE = os.getenv("GOSLING_AUTO_MOVE_ON_APPROVE") == "true"
-PROMPT_BEFORE_MOVE = os.getenv("GOSLING_PROMPT_BEFORE_MOVE") == "true"
-DEFAULT_SEARCH_ENGINE = os.getenv("GOSLING_DEFAULT_SEARCH_ENGINE", "spotify")
-RENAME_RULES_PATH = Path(os.getenv("GOSLING_RENAME_RULES_PATH", "json/rules.json"))
+AUTO_MOVE_ON_APPROVE = True
+PROMPT_BEFORE_MOVE = True
+AUTO_SAVE_ID3 = True
+DEFAULT_SEARCH_ENGINE = "spotify"
+RENAME_RULES_PATH = Path("json/rules.json")
 
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.

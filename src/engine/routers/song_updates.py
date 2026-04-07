@@ -20,13 +20,12 @@ from src.models.view_models import (
     SetPublisherParentBody,
     AddAlbumPublisherBody,
 )
-from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1", tags=["song-updates"])
 
 
 def _get_service() -> CatalogService:
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 def _require_song(song_id: int, service: CatalogService):

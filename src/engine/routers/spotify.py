@@ -6,14 +6,13 @@ from src.engine.models.spotify import (
 )
 from src.services.spotify_service import SpotifyService
 from src.services.catalog_service import CatalogService
-from src.engine.config import get_db_path
 from src.services.logger import logger
 
 router = APIRouter(prefix="/api/v1/spotify", tags=["Spotify"])
 
 
 def _get_service() -> CatalogService:
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 @router.post("/parse", response_model=SpotifyParseResult)

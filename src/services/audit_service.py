@@ -1,12 +1,15 @@
 from typing import List, Dict, Any
 from src.data.audit_repository import AuditRepository
 from src.services.logger import logger
+from src.engine.config import get_db_path
 
 
 class AuditService:
     """Orchestrates audit history logs and snapshots."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = get_db_path()
         self._audit_repo = AuditRepository(db_path)
 
     def get_history(self, record_id: int, table: str) -> List[Dict[str, Any]]:

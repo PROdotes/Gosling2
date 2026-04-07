@@ -3,11 +3,14 @@
 
 **Responsibility**: Centralized source of truth for all paths and environment variables.
 
-### get_db_path() -> str
-The path to the SQLite library database. Defaults to `sqldb/gosling2.db`. Override via `GOSLING_DB_PATH`.
+### DB_PATH
+The path to the SQLite library database. Defaults to `sqldb/gosling2.db`.
 
-### get_library_root() -> str
-The organized parent folder for all songs. Defaults to `Z:\Songs`. Override via `GOSLING_LIBRARY_ROOT`.
+### get_db_path() -> Path
+Returns the DB path, reading `GOSLING_DB_PATH` env var at call time. Use this (not `DB_PATH`) anywhere the path needs to be overridable at runtime (e.g. tests).
+
+### LIBRARY_ROOT
+The organized parent folder for all songs. Defaults to `Z:\Songs`.
 
 ### get_downloads_folder() -> str
 Returns the platform-specific default downloads folder (e.g., `~/Downloads` or `%USERPROFILE%\Downloads`). Used for safe source-file cleanup.

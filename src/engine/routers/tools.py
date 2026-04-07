@@ -4,13 +4,12 @@ from typing import List, Literal, Optional
 from src.services.tokenizer import tokenize_credits, resolve_names
 from src.services.filename_parser import parse_with_pattern
 from src.services.catalog_service import CatalogService
-from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/tools", tags=["Tools"])
 
 
 def _get_service() -> CatalogService:
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 # --- Filename Parser ---

@@ -2,14 +2,13 @@ from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 from src.services.audit_service import AuditService
 from src.services.logger import logger
-from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 
 
 def _get_service() -> AuditService:
     """Centralized service factory for the router."""
-    return AuditService(get_db_path())
+    return AuditService()
 
 
 @router.get("/history/{table}/{record_id:int}")

@@ -33,7 +33,8 @@ from src.engine.config import (
     STAGING_DIR,
     SCALAR_VALIDATION,
     RENAME_RULES_PATH,
-    get_library_root,
+    LIBRARY_ROOT,
+    get_db_path,
 )
 from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
@@ -43,7 +44,9 @@ from src.engine.models.spotify import SpotifyCredit
 class CatalogService:
     """Entry point for song access. Stateless orchestrator."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            db_path = get_db_path()
         self._db_path = db_path
         self._song_repo = SongRepository(db_path)
         self._album_repo_dir = AlbumRepository(db_path)
@@ -2134,7 +2137,7 @@ class CatalogService:
             )
 
         # 2. Stage 1: Copy to Library (Preserve source for safety)
-        library_root = Path(get_library_root())
+        library_root = LIBRARY_ROOT
         source_abs_path = Path(song.source_path)
         try:
             # We copy first, original remains in staging as backup

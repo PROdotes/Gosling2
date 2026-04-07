@@ -4,14 +4,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from src.engine.config import get_db_path
 from src.services.catalog_service import CatalogService
 
 router = APIRouter(prefix="/api/v1", tags=["audio"])
 
 
 def _get_service() -> CatalogService:
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 @router.get("/songs/{song_id}/audio")

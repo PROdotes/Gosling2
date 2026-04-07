@@ -16,7 +16,6 @@ from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
 from src.services.logger import logger
 from src.engine.config import (
-    get_db_path,
     STAGING_DIR,
     ACCEPTED_EXTENSIONS,
     WAV_AUTO_CONVERT,
@@ -28,7 +27,7 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 
 def _get_service() -> CatalogService:
     """Service factory for the ingestion router."""
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 

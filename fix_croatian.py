@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from pathlib import Path
-from src.engine.config import get_db_path, get_library_root
+from src.engine.config import DB_PATH, LIBRARY_ROOT
 
 # GOSLING2 Technical Audit Fix (#5, #6, #7)
 # Refactored for transaction safety, dynamic paths, and robust error handling.
@@ -20,8 +20,8 @@ def fix_croatian_chars(text: str) -> str:
 
 
 def run_fix():
-    db_path = get_db_path()
-    library_root = Path(get_library_root())  # Dynamic from GOSLING_LIBRARY_ROOT
+    db_path = DB_PATH
+    library_root = LIBRARY_ROOT
 
     if not os.path.exists(db_path):
         print(f"ERROR: Database not found at {db_path}")

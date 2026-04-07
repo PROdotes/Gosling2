@@ -4,13 +4,12 @@ from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
 from src.services.metadata_frames_reader import load_id3_frames
 from src.models.view_models import SongView
-from src.engine.config import get_db_path
 
 router = APIRouter(prefix="/api/v1/metabolic", tags=["Metabolic"])
 
 
 def _get_catalog_service():
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 @router.get("/inspect-file/{song_id}", response_model=SongView)

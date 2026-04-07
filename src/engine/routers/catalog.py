@@ -15,7 +15,6 @@ from src.models.view_models import (
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
 from src.engine.config import (
-    get_db_path,
     SCALAR_VALIDATION,
     TAG_DEFAULT_CATEGORY,
     TAG_CATEGORY_DELIMITER,
@@ -31,7 +30,7 @@ router = APIRouter(prefix="/api/v1", tags=["catalog"])
 
 def _get_service() -> CatalogService:
     """Centralized service factory for the router."""
-    return CatalogService(get_db_path())
+    return CatalogService()
 
 
 @router.get("/songs/search", response_model=List[SongSlimView])
@@ -93,9 +92,9 @@ async def get_song(song_id: int) -> SongView:
 
         # 2. Organized destination preview (May fail due to metadata error)
         try:
-            from src.engine.config import get_library_root
+            from src.engine.config import LIBRARY_ROOT
 
-            root = Path(get_library_root())
+            root = LIBRARY_ROOT
             preview = service._filing_service.evaluate_routing(song)
             view.organized_path_preview = str(root / preview)
         except Exception as e:
