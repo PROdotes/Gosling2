@@ -1504,6 +1504,27 @@ main {
     color: var(--accent);
 }
 
+.link-chip-primary {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 0 0.1rem;
+    line-height: 1;
+    transition: color 0.15s ease, transform 0.15s ease, text-shadow 0.15s ease;
+}
+
+.link-chip-primary:hover {
+    color: var(--warning);
+    transform: scale(1.15);
+}
+
+.link-chip-primary.active {
+    color: var(--warning);
+    text-shadow: 0 0 8px rgba(234, 179, 8, 0.5);
+}
+
 /* --- Splitter modal --- */
 
 .splitter-name-token {

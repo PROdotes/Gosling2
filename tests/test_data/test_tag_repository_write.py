@@ -181,6 +181,44 @@ class TestInsertTags:
             ], f"Expected ['Genre', 'Mood'], got {categories}"
 
 
+    def test_add_tag_without_link_creates_tag_and_link(self, populated_db):
+        """Standard add_tag call with manual primary=0."""
+        repo = TagRepository(populated_db)
+        
+        # Song 3 has no tags in baseline
+        with repo.get_connection() as conn:
+            repo.add_tag(3, "Jazz", "Genre", conn, is_primary=0)
+            conn.commit()
+            
+        tags = repo.get_tags_for_songs([3])
+        assert len(tags) == 1
+        assert tags[0][1].is_primary is False
+        
+    def test_add_tag_with_explicit_primary_sets_it(self, populated_db):
+        """Repo should respect the explicit is_primary param."""
+        repo = TagRepository(populated_db)
+        
+        with repo.get_connection() as conn:
+            repo.add_tag(3, "Jazz", "Genre", conn, is_primary=1)
+            conn.commit()
+            
+        tags = repo.get_tags_for_songs([3])
+        assert tags[0][1].is_primary is True
+        
+    def test_add_tag_is_now_dumb_does_not_auto_primary(self, populated_db):
+        """Verify that repo DOES NOT automatically set primary status anymore."""
+        repo = TagRepository(populated_db)
+        
+        # Song 2 (Era: 90s) doesn't have any Genre tags. Original logic would have made this primary.
+        with repo.get_connection() as conn:
+            repo.add_tag(2, "Grunge", "Genre", conn) # Default is_primary=0
+            conn.commit()
+            
+        tags = repo.get_tags_for_songs([2])
+        tag_map = {t.name: t for _, t in tags}
+        assert tag_map["Grunge"].is_primary is False
+
+
 class TestGetOrCreateTag:
     def test_get_or_create_tag_category_case_insensitive(self, populated_db):
         """
@@ -209,3 +247,33 @@ class TestGetOrCreateTag:
         assert (
             tag_id == existing_id
         ), f"Expected to reuse TagID {existing_id}, but got {tag_id}"
+
+class TestSetPrimaryTag:
+    def test_set_primary_tag_updates_single_tag(self, populated_db):
+        """set_primary_tag should set only the target genre to primary."""
+        repo = TagRepository(populated_db)
+        
+        # Song 9 has 2 genres: Grunge (id=1, primary?), Alt Rock (id=6)
+        with repo._get_connection() as conn:
+            repo.set_primary_tag(9, 6, conn)
+            conn.commit()
+            
+        tags = repo.get_tags_for_songs([9])
+        tag_map = {t.name: t for _, t in tags}
+        
+        assert tag_map["Alt Rock"].is_primary is True
+        assert tag_map["Grunge"].is_primary is False
+        
+    def test_set_primary_tag_resets_others(self, populated_db):
+        """Verify that setting one tag as primary resets existing genre primary flags."""
+        repo = TagRepository(populated_db)
+        
+        # Song 9 has Grunge (id=1) and Alt Rock (id=6)
+        with repo.get_connection() as conn:
+            repo.set_primary_tag(9, 6, conn) 
+            conn.commit()
+            
+        tags = repo.get_tags_for_songs([9])
+        tag_map = {t.name: t for _, t in tags}
+        assert tag_map["Alt Rock"].is_primary is True
+        assert tag_map["Grunge"].is_primary is False

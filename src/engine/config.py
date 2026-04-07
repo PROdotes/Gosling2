@@ -7,11 +7,11 @@ from typing import Optional
 
 
 # Database Path
-DB_PATH = Path("sqldb/gosling2.db")
-
-
 def get_db_path() -> Path:
     return Path(os.getenv("GOSLING_DB_PATH", "sqldb/gosling2.db"))
+
+
+DB_PATH = get_db_path()
 
 # Library Management (Phase 3.2+)
 # GOSLING_LIBRARY_ROOT: The organized parent folder for all songs.

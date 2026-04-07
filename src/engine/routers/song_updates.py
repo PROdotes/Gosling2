@@ -496,6 +496,29 @@ async def remove_song_tag(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/songs/{song_id}/tags/{tag_id}/primary", response_model=Tag)
+async def set_primary_song_tag(
+    song_id: int,
+    tag_id: int,
+    service: CatalogService = Depends(_get_service),
+):
+    """Set a specific tag as primary (Genre only)."""
+    logger.debug(
+        f"[SongUpdates] -> set_primary_song_tag(id={song_id}, tag_id={tag_id})"
+    )
+    try:
+        tag = service.set_primary_song_tag(song_id, tag_id)
+        logger.debug("[SongUpdates] <- set_primary_song_tag OK")
+        return tag
+    except (ValueError, LookupError) as e:
+        logger.warning(f"[SongUpdates] <- set_primary_song_tag ERROR: {e}")
+        status = 404 if isinstance(e, LookupError) else 400
+        raise HTTPException(status_code=status, detail=str(e))
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- set_primary_song_tag CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.patch("/tags/{tag_id}", status_code=204)
 async def update_tag(
     tag_id: int,

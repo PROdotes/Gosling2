@@ -332,6 +332,12 @@ Used by `update_identity_legal_name`.
 - Updates a tag name and category globally.
 - Wraps `CatalogService.update_tag`.
 
+### async def set_primary_song_tag(song_id: int, tag_id: int, service: CatalogService = Depends(_get_service)) -> Tag
+**HTTP**: `PATCH /api/v1/songs/{song_id}/tags/{tag_id}/primary`
+- Promote a specific genre tag to primary status for a song. 
+- Atomic reset of all other genre links.
+- Wraps `CatalogService.set_primary_song_tag`.
+
 ### async def add_song_publisher(song_id: int, body: AddPublisherBody, service: CatalogService = Depends(_get_service)) -> Publisher
 **HTTP**: `POST /api/v1/songs/{song_id}/publishers`
 - Links a publisher to a song. Get-or-creates the publisher record.

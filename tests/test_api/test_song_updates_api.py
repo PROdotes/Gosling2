@@ -5,12 +5,10 @@ Uses populated_db fixture — see conftest.py for exact data map.
 
 import pytest
 from fastapi.testclient import TestClient
-from src.engine_server import app
-
-
 @pytest.fixture
 def api(populated_db, monkeypatch):
     monkeypatch.setenv("GOSLING_DB_PATH", populated_db)
+    from src.engine_server import app
     return TestClient(app)
 
 

@@ -298,27 +298,30 @@ Fetch a single tag by its ID.
 Fetch all song IDs linked to a specific tag.
 
 ### insert_tags(source_id: int, tags: List[Tag], conn: sqlite3.Connection) -> None
-Get-or-create `Tags` rows (case-insensitive match on `TagName`), then insert `MediaSourceTags` link rows with the `IsPrimary` flag.
+Get-or-create `Tags` rows (matched on `TagName` + `TagCategory`), then insert `MediaSourceTags` link rows. Preserves the `IsPrimary` flag from the `Tag` model.
 
 ### get_tags_for_songs(song_ids: List[int]) -> List[Tuple[int, Tag]]
-Batch-fetches tags for multiple songs (M2M).
-- Returns a flat list of `(SongID, Tag)` tuples.
-- Hydrates the `is_primary` flag from the `MediaSourceTags` table.
+Batch-fetches tag objects for a list of Songs.
 
-### add_tag(source_id: int, name: str, category: str, conn: sqlite3.Connection) -> Tag
-Add a tag to a song. Get-or-creates the Tag record. Returns the Tag. Does NOT commit.
-
-### get_or_create_tag(name: str, category: str, cursor) -> int
-Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
+### add_tag(source_id: int, name: str, category: str, conn: sqlite3.Connection, is_primary: int = 0) -> Tag
+Add a single tag to a song. Get-or-creates the Tag record. 
+Returns the Tag. Does NOT commit.
 
 ### remove_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
 Remove a tag link from a song. Keeps Tag record. Does NOT commit.
 
+### set_primary_tag(source_id: int, tag_id: int, conn: sqlite3.Connection) -> None
+Atomic reset of primary status for all genre tags on a song, then setting the target tag as primary.
+Does NOT commit.
+
+### get_or_create_tag(name: str, category: str, cursor) -> int
+Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
+
 ### update_tag(tag_id: int, name: str, category: str, conn: sqlite3.Connection) -> None
-Update a Tag's name and category globally. Affects all songs linked to this tag. Does NOT commit.
+Update a Tag's name/category globally. Does NOT commit.
 
 ### _row_to_tag(row: sqlite3.Row) -> Tag
-**Internal**: Maps a physical database row to the strict Pydantic `Tag` model, including the `IsPrimary` marker.
+**Internal**: Maps a physical database row to the strict Pydantic `Tag` model, preserving the `IsPrimary` flag from the link table.marker.
 
 ---
 

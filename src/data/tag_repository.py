@@ -151,21 +151,22 @@ class TagRepository(BaseRepository):
         return cursor.lastrowid
 
     def add_tag(
-        self, source_id: int, name: str, category: str, conn: sqlite3.Connection
+        self, source_id: int, name: str, category: str, conn: sqlite3.Connection, is_primary: int = 0
     ) -> Tag:
         """
         Add a tag to a song. Get-or-creates the Tag record.
         Returns the Tag. Does NOT commit.
         """
         logger.debug(
-            f"[TagRepository] -> add_tag(source_id={source_id}, name='{name}', category='{category}')"
+            f"[TagRepository] -> add_tag(source_id={source_id}, name='{name}', category='{category}', primary={is_primary})"
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         tag_id = self.get_or_create_tag(name, category, cursor)
+        
         cursor.execute(
-            "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (?, ?, 0)",
-            (source_id, tag_id),
+            "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (?, ?, ?)",
+            (source_id, tag_id, is_primary),
         )
         row = cursor.execute(
             "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ?", (tag_id,)
@@ -207,6 +208,43 @@ class TagRepository(BaseRepository):
             logger.warning(f"[TagRepository] update_tag(id={tag_id}) NOT_FOUND")
             raise LookupError(f"Tag {tag_id} not found")
         logger.debug("[TagRepository] <- update_tag() done")
+
+    def set_primary_tag(
+        self, source_id: int, tag_id: int, conn: sqlite3.Connection
+    ) -> None:
+        """
+        Set a specific tag as primary for its category (Genre).
+        Resets all other genre tags for this song to non-primary.
+        """
+        logger.debug(
+            f"[TagRepository] -> set_primary_tag(source_id={source_id}, tag_id={tag_id})"
+        )
+        cursor = conn.cursor()
+
+        # 1. Reset all genres for this song
+        cursor.execute(
+            """
+            UPDATE MediaSourceTags 
+            SET IsPrimary = 0 
+            WHERE SourceID = ? AND TagID IN (
+                SELECT TagID FROM Tags WHERE TagCategory COLLATE NOCASE = 'Genre'
+            )
+        """,
+            (source_id,),
+        )
+
+        # 2. Set target as primary
+        cursor.execute(
+            "UPDATE MediaSourceTags SET IsPrimary = 1 WHERE SourceID = ? AND TagID = ?",
+            (source_id, tag_id),
+        )
+        if cursor.rowcount == 0:
+            logger.warning(f"[TagRepository] set_primary_tag(song={source_id}, tag={tag_id}) LINK_NOT_FOUND")
+            raise LookupError(f"Link between song {source_id} and tag {tag_id} not found")
+
+        logger.debug(
+            f"[TagRepository] <- set_primary_tag(source_id={source_id}, tag_id={tag_id}) OK"
+        )
 
     def get_categories(self) -> List[str]:
         """Fetch all distinct non-null tag categories, sorted."""

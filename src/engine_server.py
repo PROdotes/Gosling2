@@ -15,12 +15,12 @@ from src.engine.routers.audio import router as audio_router
 from src.engine.routers.spotify import router as spotify_router
 from src.engine.routers.tools import router as tools_router
 from src.services.logger import logger
-from src.engine.config import TRUSTED_ORIGINS, DB_PATH
+from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
 
 
 def _ensure_db():
-    db_path = DB_PATH
+    db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.create_collation(

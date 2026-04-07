@@ -1905,8 +1905,8 @@ class CatalogService:
     def add_song_tag(
         self,
         song_id: int,
-        tag_name: Optional[str],
-        category: Optional[str],
+        tag_name: Optional[str] = None,
+        category: Optional[str] = None,
         tag_id: Optional[int] = None,
     ) -> Tag:
         """Add a tag to a song. Links by ID if tag_id provided, otherwise get-or-creates by name+category."""
@@ -1925,11 +1925,21 @@ class CatalogService:
             category = category.strip()
 
         logger.debug(
-            f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', cat='{category}')"
+            f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', category='{category}')"
         )
+        
+        # Auto-primary business logic: if no primary genre exists, the first one added is primary
+        is_primary = 0
+        if category and category.title() == "Genre":
+            existing_links = self._tag_repo.get_tags_for_songs([song_id])
+            has_primary = any(t.is_primary for sid, t in existing_links if sid == song_id and t.category == "Genre")
+            if not has_primary:
+                is_primary = 1
+                logger.info(f"[CatalogService] Auto-promoting first genre '{tag_name}' to primary for song {song_id}")
+
         conn = self._tag_repo.get_connection()
         try:
-            tag = self._tag_repo.add_tag(song_id, tag_name, category, conn)
+            tag = self._tag_repo.add_tag(song_id, tag_name, category, conn, is_primary=is_primary)
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1973,6 +1983,35 @@ class CatalogService:
         finally:
             conn.close()
         logger.debug("[CatalogService] <- update_tag OK")
+
+    def set_primary_song_tag(self, song_id: int, tag_id: int) -> Tag:
+        """Promote a specific tag to primary (Genre only)."""
+        logger.debug(f"[CatalogService] -> set_primary_song_tag(song_id={song_id}, tag_id={tag_id})")
+        
+        # Guard: Only Genres can be primary (Business Policy)
+        tag = self._tag_repo.get_by_id(tag_id)
+        if not tag:
+            raise LookupError(f"Tag {tag_id} not found")
+        if not tag.category or tag.category.title() != "Genre":
+            raise ValueError(f"Only Genre tags can be set as primary (tag={tag_id} is category={tag.category})")
+
+        conn = self._tag_repo.get_connection()
+        try:
+            self._tag_repo.set_primary_tag(song_id, tag_id, conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- set_primary_song_tag FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+        
+        song = self.get_song(song_id)
+        target = next((t for t in song.tags if t.id == tag_id), None)
+        if not target:
+            raise LookupError(f"Tag {tag_id} not found on song {song_id} after update")
+        logger.debug(f"[CatalogService] <- set_primary_song_tag OK")
+        return target
 
     # --- Publishers ---
 

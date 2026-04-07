@@ -260,8 +260,20 @@ function renderTagGroups(tags, songId, id3Frames) {
             );
             const variant = (frameDef && frameDef.variant) ? frameDef.variant : "";
             const chipClass = variant ? `link-chip tag ${variant}` : "link-chip tag";
+            const isGenre = cat === "Genre";
+            const isPrimary = !!tag.is_primary;
+            const primaryAction = isGenre ? `
+                <button class="link-chip-primary ${isPrimary ? 'active' : ''}" 
+                        data-action="set-primary-tag" 
+                        data-song-id="${songId}" 
+                        data-tag-id="${tag.id}" 
+                        title="${isPrimary ? 'Primary Genre' : 'Set as Primary Genre'}">
+                    ★
+                </button>` : "";
+
             return `
                             <span class="${chipClass}">
+                                ${primaryAction}
                                 <button class="link-chip-label" 
                                         data-action="open-edit-modal" 
                                         data-chip-type="tag" 

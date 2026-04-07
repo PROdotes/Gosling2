@@ -154,14 +154,20 @@ Add publisher to an album.
 ### remove_album_publisher(album_id: int, publisher_id: int) -> None
 Remove publisher from an album.
 
-### add_song_tag(song_id: int, tag_name: str, category: str) -> Tag
-Add a tag to a song.
+### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None) -> Tag
+Add a tag to a song. 
+- **Auto-Primary**: If category is 'Genre' and the song has no primary genre, the new link is automatically marked as primary.
 
 ### remove_song_tag(song_id: int, tag_id: int) -> None
 Remove a tag from a song.
 
 ### update_tag(tag_id: int, name: str, category: str) -> None
 Global tag update.
+
+### set_primary_song_tag(song_id: int, tag_id: int) -> Tag
+Promote a specific genre tag to primary status for a song. 
+- **Strictly for Genres**: Only tags with category 'Genre' (case-insensitive) are allowed.
+- **Atomic Reset**: Orchestrates the atomic repository update to ensure only one primary genre exists.
 
 ### add_song_publisher(song_id: int, publisher_name: str, publisher_id: Optional[int] = None) -> Publisher
 Link a master publisher to a song.

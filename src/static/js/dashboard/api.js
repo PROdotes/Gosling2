@@ -340,6 +340,12 @@ export function removeSongTag(songId, tagId) {
     });
 }
 
+export function setPrimarySongTag(songId, tagId) {
+    return fetchJson(`/api/v1/songs/${songId}/tags/${tagId}/primary`, {
+        method: "PATCH",
+    });
+}
+
 export function addSongAlbum(songId, albumId, title, trackNumber, discNumber) {
     const body = albumId !== null ? { album_id: albumId } : { title };
     if (trackNumber !== null) body.track_number = trackNumber;

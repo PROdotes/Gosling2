@@ -45,6 +45,7 @@ import {
     moveSongToLibrary,
     cleanupOriginalFile,
     formatMetadataCase,
+    setPrimarySongTag,
 } from "./api.js";
 import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
 import { openEditModal, closeEditModal } from "./components/edit_modal.js";
@@ -702,6 +703,22 @@ document.addEventListener("click", async (event) => {
 
 if (action === "close-filename-parser-modal") {
         import("./components/filename_parser_modal.js").then(m => m.closeFilenameParserModal());
+        return;
+    }
+
+
+    if (action === "set-primary-tag") {
+        const { songId, tagId } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        try {
+            await setPrimarySongTag(songId, tagId);
+            const song = getActiveList().find((s) => String(s.id) === String(songId));
+            if (song) openSongDetail(song, { reuseFileData: true });
+        } catch (err) {
+            actionTarget.disabled = false;
+            console.error(`Set primary tag failed: ${err.message}`);
+            ctx.showBanner(err.message, "error");
+        }
         return;
     }
 
