@@ -57,6 +57,7 @@ import { openScrubberModal, closeScrubberModal } from "./components/scrubber_mod
 import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.js";
 import { openSplitterModal, closeSplitterModal } from "./components/splitter_modal.js";
 import * as orch from "./orchestrator.js";
+import { activateInlineEdit } from "./components/inline_editor.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -1293,256 +1294,49 @@ if (action === "close-filename-parser-modal") {
         const { modalType, songId } = actionTarget.dataset;
 
         if (modalType === "publishers") {
-            const currentItems = (state.activeSong?.publishers || []).map(p => ({ id: p.id, label: p.name }));
-
-            openLinkModal({
-                title: "Publishers",
-                items: currentItems,
-                onSearch: async (q) => {
-                    const results = await searchPublishers(q);
-                    return (results || []).map(p => ({ id: p.id, label: p.name }));
-                },
-                onAdd: async (opt) => {
-                    // M2M Protocol: IDs are primary. Strings are for creation only.
-                    const publisherId = opt.id ? Number(opt.id) : null;
-                    const publisher = await addSongPublisher(songId, opt.rawInput || opt.label, publisherId);
-                    opt.id = publisher.id;
-                    opt.label = publisher.name;
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeSongPublisher(songId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => `Add "${q}" as new publisher`,
-            });
+            const currentPublishers = (state.activeSong?.publishers || []).map(p => ({ id: p.id, label: p.name }));
+            orch.manageSongPublishers(ctx, songId, currentPublishers);
         } else if (modalType === "tags") {
             const currentTags = state.activeSong?.tags || [];
             const songTitle = state.activeSong?.title || "Song";
             orch.manageSongTags(ctx, songId, songTitle, currentTags);
         } else if (modalType === "credits") {
-            const { songId, role } = actionTarget.dataset;
-            const currentItems = (state.activeSong?.credits || [])
-                .filter(c => c.role_name === role)
-                .map(c => ({ id: c.credit_id, label: c.display_name }));
-
+            const { role } = actionTarget.dataset;
             if (!role) throw new Error("credits button is missing data-role");
-
-            openLinkModal({
-                title: `Link ${role}`,
-                placeholder: `Search for artist name...`,
-                items: currentItems,
-                onSearch: async (q) => {
-                    const results = await searchArtists(q);
-                    if (results === ABORTED) return [];
-                    return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
-                },
-                onAdd: async (opt) => {
-                    // Logic: Use identityId (opt.id) from search results if available (Truth-First pattern)
-                    const identityId = opt.id; 
-                    const credit = await addSongCredit(songId, opt.rawInput || opt.label, role, identityId);
-                    
-                    // Sync the chip with the newly created/linked credit's IDs
-                    opt.id = credit.credit_id;
-                    opt.label = credit.display_name;
-                    
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeSongCredit(songId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => `Add "${q}" as ${role}`,
-            });
+            const currentCredits = (state.activeSong?.credits || []).filter(c => c.role_name === role);
+            orch.manageSongCredits(ctx, songId, role, currentCredits);
         } else if (modalType === "album") {
-            const { songId, songTitle } = actionTarget.dataset;
+            const { songTitle } = actionTarget.dataset;
             const section = actionTarget.closest(".detail-section");
             const libraryBox = section?.querySelector(".surface-box");
-            const currentCards = Array.from(
+            const currentAlbums = Array.from(
                 libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-album"][data-song-id="${songId}"]`) : []
             ).map(btn => ({ id: btn.dataset.albumId, label: btn.closest(".album-card-detail")?.querySelector(".editable-scalar")?.textContent?.trim() ?? "" }));
-
-            openLinkModal({
-                title: "Link Album",
-                placeholder: "Search for album...",
-                items: currentCards,
-                onSearch: async (q) => {
-                    const results = await searchAlbums(q);
-                    if (results === ABORTED) return [];
-                    return (results || []).map(a => ({ id: a.id, label: a.title }));
-                },
-                onAdd: async (opt) => {
-                    const isNew = !opt.id;
-                    const res = await addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
-                    
-                    if (isNew && res && res.album_id) {
-                        try {
-                            await syncAlbumWithSong(res.album_id, songId);
-                        } catch (err) {
-                            console.warn("Auto-sync for new album failed (but album was created):", err);
-                        }
-                    }
-
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeSongAlbum(songId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => `Add "${q}" as new album`,
-                quickAdd: songTitle ? { label: `New album: "${songTitle}"`, rawInput: songTitle } : null,
-            });
+            orch.manageSongAlbums(ctx, songId, songTitle, currentAlbums);
         } else if (modalType === "album-publishers") {
-            const { albumId, songId } = actionTarget.dataset;
+            const { albumId } = actionTarget.dataset;
             const chips = Array.from(
                 actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-publisher']") || []
             ).map(btn => ({ id: btn.dataset.publisherId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
-
-            openLinkModal({
-                title: "Album Publishers",
-                items: chips,
-                onSearch: async (q) => {
-                    const results = await searchPublishers(q);
-                    return (results || []).map(p => ({ id: p.id, label: p.name }));
-                },
-                onAdd: async (opt) => {
-                    const publisherId = opt.id ? Number(opt.id) : null;
-                    const publisher = await addAlbumPublisher(albumId, opt.rawInput || opt.label, publisherId);
-                    opt.id = publisher.id;
-                    opt.label = publisher.name;
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeAlbumPublisher(albumId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => `Add "${q}" as album publisher`,
-            });
+            orch.manageAlbumPublishers(ctx, albumId, songId, chips);
         } else if (modalType === "album-credits") {
-            const { albumId, songId } = actionTarget.dataset;
+            const { albumId } = actionTarget.dataset;
             const chips = Array.from(
                 actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-credit']") || []
             ).map(btn => ({ id: btn.dataset.creditId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
-
-            openLinkModal({
-                title: "Album Credits",
-                placeholder: "Search for artist name...",
-                items: chips,
-                onSearch: async (q) => {
-                    const results = await searchArtists(q);
-                    if (results === ABORTED) return [];
-                    return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
-                },
-                onAdd: async (opt) => {
-                    const identityId = opt.id;
-                    const credit = await addAlbumCredit(albumId, opt.rawInput || opt.label, "Performer", identityId);
-                    opt.id = credit.name_id;
-                    opt.label = credit.display_name;
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                onRemove: async (item) => {
-                    await removeAlbumCredit(albumId, item.id);
-                    const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                },
-                createLabel: (q) => `Add "${q}" as Performer`,
-            });
+            orch.manageAlbumCredits(ctx, albumId, songId, chips);
         }
         return;
     }
 
     if (action === "start-edit-scalar") {
-        const span = actionTarget;
-        const { songId, field } = span.dataset;
-        const currentValue = span.textContent === "-" ? "" : span.textContent;
-
-        const rules = state.validationRules;
-        const validators = {
-            media_name: (v) => v ? null : "Title cannot be empty",
-            year: (v) => {
-                if (!v) return null; // optional
-                const n = Number(v);
-                const min = rules?.year?.min ?? 1860;
-                const max = rules?.year?.max ?? (new Date().getFullYear() + 1);
-                if (!Number.isInteger(n) || n < min || n > max) return `Year must be between ${min}–${max}`;
-                return null;
-            },
-            bpm: (v) => {
-                if (!v) return null; // optional
-                const n = Number(v);
-                const min = rules?.bpm?.min ?? 1;
-                const max = rules?.bpm?.max ?? 300;
-                if (!Number.isInteger(n) || n < min || n > max) return `BPM must be between ${min}–${max}`;
-                return null;
-            },
-            isrc: (v) => {
-                if (!v) return null; // optional
-                const stripped = v.replace(/-/g, "").toUpperCase();
-                const pattern = rules?.isrc?.pattern ? new RegExp(rules.isrc.pattern) : /^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$/;
-                if (!pattern.test(stripped)) return "ISRC format: CC-XXX-YY-NNNNN (2 letters, 3 alphanumeric, 2 digits, 5 digits)";
-                return null;
-            },
-        };
-
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = currentValue;
-        input.className = "inline-edit-input";
-
-        const errorEl = document.createElement("div");
-        errorEl.className = "inline-edit-error";
-
-        span.replaceWith(input);
-        input.after(errorEl);
-        input.focus();
-        input.select();
-
-        let hasError = false;
-
-        async function commitEdit() {
-            const rawValue = input.value.trim();
-            errorEl.textContent = "";
-            input.classList.remove("inline-edit-input--error");
-            hasError = false;
-
-            const validate = validators[field];
-            const error = validate ? validate(rawValue) : null;
-            if (error) {
-                hasError = true;
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = error;
-                input.focus();
-                return;
-            }
-
-            if (rawValue === currentValue) {
-                input.replaceWith(span);
-                errorEl.remove();
-                return;
-            }
-
-            // Convert empty string to null for optional fields, numbers where needed
-            let payload;
-            if (field === "year" || field === "bpm") {
-                payload = rawValue === "" ? null : Number(rawValue);
-            } else {
-                payload = rawValue === "" ? null : rawValue;
-            }
-
-            input.disabled = true;
-            try {
-                const updatedSong = await patchSongScalars(songId, { [field]: payload });
-                // Keep list card in sync for title changes
-                if (field === "media_name") {
+        const { songId, field } = actionTarget.dataset;
+        activateInlineEdit(actionTarget, {
+            songId,
+            field,
+            validationRules: state.validationRules,
+            onSave: (updatedSong, savedField) => {
+                if (savedField === "media_name") {
                     const cached = state.cachedSongs.find(s => String(s.id) === String(songId));
                     if (cached) {
                         cached.media_name = updatedSong.media_name;
@@ -1550,51 +1344,8 @@ if (action === "close-filename-parser-modal") {
                     }
                 }
                 openSongDetail(updatedSong, { reuseFileData: true });
-            } catch (err) {
-                input.disabled = false;
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = `Save failed: ${err.message}`;
-                input.focus();
-            }
-        }
-
-        input.addEventListener("input", () => {
-            const validate = validators[field];
-            if (!validate) return;
-            const error = validate(input.value.trim());
-            if (error) {
-                hasError = true;
-                input.classList.add("inline-edit-input--error");
-                errorEl.textContent = error;
-            } else {
-                hasError = false;
-                input.classList.remove("inline-edit-input--error");
-                errorEl.textContent = "";
-            }
+            },
         });
-
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                commitEdit();
-            }
-            if (e.key === "Escape") {
-                e.stopPropagation();
-                input.replaceWith(span);
-                errorEl.remove();
-            }
-        });
-
-        input.addEventListener("blur", () => {
-            if (hasError) return; // user must fix or press Escape to cancel
-            // Small delay so Enter keydown can fire commitEdit first
-            setTimeout(() => {
-                if (document.contains(input)) {
-                    commitEdit();
-                }
-            }, 100);
-        });
-
         return;
     }
 

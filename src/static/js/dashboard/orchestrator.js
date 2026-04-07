@@ -179,22 +179,69 @@ export function manageSongPublishers(ctx, songId, currentPublishers) {
     });
 }
 
+// ─── ALBUM RELATIONSHIP MANAGERS ─────────────────────────────────────────────
+
+export function manageAlbumPublishers(ctx, albumId, songId, currentChips) {
+    openLinkModal({
+        title: "Album Publishers",
+        items: currentChips,
+        onSearch: async (q) => {
+            const results = await api.searchPublishers(q);
+            return (results || []).map(p => ({ id: p.id, label: p.name }));
+        },
+        onAdd: async (opt) => {
+            const publisher = await api.addAlbumPublisher(albumId, opt.rawInput || opt.label, opt.id ? Number(opt.id) : null);
+            opt.id = publisher.id;
+            opt.label = publisher.name;
+            await getUpdateCallback(ctx, songId)();
+        },
+        onRemove: async (item) => {
+            await api.removeAlbumPublisher(albumId, item.id);
+            await getUpdateCallback(ctx, songId)();
+        },
+        createLabel: (q) => `Add "${q}" as album publisher`,
+    });
+}
+
+export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
+    openLinkModal({
+        title: "Album Credits",
+        placeholder: "Search for artist name...",
+        items: currentChips,
+        onSearch: async (q) => {
+            const results = await api.searchArtists(q);
+            if (results === api.ABORTED) return [];
+            return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+        },
+        onAdd: async (opt) => {
+            const credit = await api.addAlbumCredit(albumId, opt.rawInput || opt.label, "Performer", opt.id);
+            opt.id = credit.name_id;
+            opt.label = credit.display_name;
+            await getUpdateCallback(ctx, songId)();
+        },
+        onRemove: async (item) => {
+            await api.removeAlbumCredit(albumId, item.id);
+            await getUpdateCallback(ctx, songId)();
+        },
+        createLabel: (q) => `Add "${q}" as Performer`,
+    });
+}
+
 // ─── SCALAR EDITS (EDIT MODAL) ───────────────────────────────────────────────
 
 export async function editArtist(ctx, artistId, artistName) {
     const tree = await api.getArtistTree(artistId);
-    
+
     openEditModal({
         title: `Edit Artist: ${artistName}`,
         name: artistName,
         onRename: async (newName) => {
             await api.patchIdentityName(artistId, newName);
-            // On artist rename, we usually want to refresh any active detail
             if (ctx.refreshLayout) ctx.refreshLayout();
         },
         category: null,
         children: {
-            label: "Aliases & Identitites",
+            label: "Aliases & Identities",
             items: tree.map(identity => ({ id: identity.id, label: identity.name })),
             onSearch: async (q) => {
                 const results = await api.searchArtists(q);
