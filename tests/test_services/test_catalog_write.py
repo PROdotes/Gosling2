@@ -3,6 +3,7 @@ import shutil
 import pytest
 from pathlib import Path
 from src.services.catalog_service import CatalogService
+from src.engine.config import SONG_DEFAULT_YEAR
 
 
 @pytest.fixture
@@ -239,7 +240,9 @@ class TestCatalogServiceIngestFile:
         ), f"Expected {unicode_mp3}, got {song.source_path}"
         assert 2.0 < song.duration_s < 3.0, f"Expected ~2.27s, got {song.duration_s}"
         assert song.audio_hash is not None, "Expected audio hash to be calculated"
-        assert song.year is None, f"Expected None for year, got {song.year}"
+        assert (
+            song.year == SONG_DEFAULT_YEAR
+        ), f"Expected {SONG_DEFAULT_YEAR} for year, got {song.year}"
         assert song.bpm is None, f"Expected None for bpm, got {song.bpm}"
         assert (
             song.isrc == "USCGJ2326543"

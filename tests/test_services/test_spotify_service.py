@@ -226,9 +226,14 @@ Hit Records"""
             raw, reference_title="Title", known_roles=["Composer", "Lyricist"]
         )
 
-        assert len(res.credits) == 2, f"Expected 2 credits for Writer, got {len(res.credits)}"
+        assert (
+            len(res.credits) == 2
+        ), f"Expected 2 credits for Writer, got {len(res.credits)}"
         roles = {c.role for c in res.credits}
-        assert roles == {"Composer", "Lyricist"}, f"Expected roles {{'Composer', 'Lyricist'}}, got {roles}"
+        assert roles == {
+            "Composer",
+            "Lyricist",
+        }, f"Expected roles {{'Composer', 'Lyricist'}}, got {roles}"
         assert all(c.name == "John Doe" for c in res.credits)
 
     def test_parse_writer_expansion_is_case_insensitive(self):
@@ -245,7 +250,9 @@ Hit Records"""
         """Verifies that Writer expands when bulleted with other roles."""
         raw = "Credits\nTitle\nArtist\n\nBob Smith\nProducer \u2022 Writer"
         res = SpotifyService.parse_credits(
-            raw, reference_title="Title", known_roles=["Composer", "Lyricist", "Producer"]
+            raw,
+            reference_title="Title",
+            known_roles=["Composer", "Lyricist", "Producer"],
         )
 
         roles = {c.role for c in res.credits}

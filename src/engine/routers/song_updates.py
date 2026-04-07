@@ -86,8 +86,10 @@ async def format_metadata_case(
         f"[SongUpdates] -> format_metadata_case({entity_type}, id={entity_id}, field='{field}', type='{format_type}')"
     )
     try:
-        new_value = service.format_entity_field(entity_type, entity_id, field, format_type)
-        logger.debug(f"[SongUpdates] <- format_metadata_case OK")
+        new_value = service.format_entity_field(
+            entity_type, entity_id, field, format_type
+        )
+        logger.debug("[SongUpdates] <- format_metadata_case OK")
         return {"id": entity_id, "field": field, "new_value": new_value}
     except (ValueError, LookupError) as e:
         logger.warning(f"[SongUpdates] <- format_metadata_case VAL/LOOKUP_ERROR: {e}")

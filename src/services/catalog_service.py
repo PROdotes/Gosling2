@@ -201,7 +201,9 @@ class CatalogService:
         frontend can render a result card right away.
         The caller is responsible for queuing the background conversion.
         """
-        logger.debug(f"[CatalogService] -> ingest_wav_as_converting(path='{staged_path}')")
+        logger.debug(
+            f"[CatalogService] -> ingest_wav_as_converting(path='{staged_path}')"
+        )
 
         check = self.check_ingestion(staged_path)
         if check["status"] != "NEW":
@@ -254,19 +256,23 @@ class CatalogService:
                 try:
                     raw_meta = self._metadata_service.extract_metadata(mp3_path)
                     parsed_song = self._metadata_parser.parse(raw_meta, mp3_path)
-                    reactivated = parsed_song.model_copy(update={
-                        "id": existing["id"],
-                        "source_path": mp3_path,
-                        "audio_hash": mp3_hash,
-                        "is_active": False,
-                        "processing_status": 1,
-                    })
+                    reactivated = parsed_song.model_copy(
+                        update={
+                            "id": existing["id"],
+                            "source_path": mp3_path,
+                            "audio_hash": mp3_hash,
+                            "is_active": False,
+                            "processing_status": 1,
+                        }
+                    )
                     self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
                     self._song_repo.hard_delete(song_id, conn)
                     conn.commit()
                 except Exception as ex:
                     conn.rollback()
-                    logger.error(f"[CatalogService] <- finalize_wav_conversion() reactivate failed: {ex}")
+                    logger.error(
+                        f"[CatalogService] <- finalize_wav_conversion() reactivate failed: {ex}"
+                    )
                 finally:
                     conn.close()
             else:
@@ -280,7 +286,9 @@ class CatalogService:
                     conn.commit()
                 except Exception as ex:
                     conn.rollback()
-                    logger.error(f"[CatalogService] <- finalize_wav_conversion() hard_delete failed: {ex}")
+                    logger.error(
+                        f"[CatalogService] <- finalize_wav_conversion() hard_delete failed: {ex}"
+                    )
                 finally:
                     conn.close()
                 if os.path.exists(mp3_path):
@@ -291,7 +299,11 @@ class CatalogService:
         try:
             self._song_repo.update_scalars(
                 song_id,
-                {"source_path": mp3_path, "processing_status": 2, "audio_hash": mp3_hash},
+                {
+                    "source_path": mp3_path,
+                    "processing_status": 2,
+                    "audio_hash": mp3_hash,
+                },
                 conn,
             )
             self._enrich_metadata(song_id, conn)
@@ -322,7 +334,7 @@ class CatalogService:
             logger.info(
                 f"[CatalogService] <- ingest_file(path='{staged_path}') REJECTED: {check['status']}"
             )
-            
+
             if check["status"] == "CONFLICT":
                 # Raising the specific conflict error for re-ingestion
                 raise ReingestionConflictError(
@@ -795,9 +807,13 @@ class CatalogService:
                 logger.error(f"[CatalogService] remove_identity_alias failed: {e}")
                 raise
 
-    def update_identity_legal_name(self, identity_id: int, legal_name: Optional[str]) -> None:
+    def update_identity_legal_name(
+        self, identity_id: int, legal_name: Optional[str]
+    ) -> None:
         """Update the LegalName on an Identity. Raises LookupError if not found."""
-        logger.debug(f"[CatalogService] -> update_identity_legal_name(id={identity_id}, name={legal_name!r})")
+        logger.debug(
+            f"[CatalogService] -> update_identity_legal_name(id={identity_id}, name={legal_name!r})"
+        )
         with self._identity_repo.get_connection() as conn:
             try:
                 self._identity_repo.update_legal_name(identity_id, legal_name, conn)
@@ -1403,15 +1419,16 @@ class CatalogService:
         elif entity_type == "credit":
             # For credits, identity resolution is needed or we update the ArtistName
             # We assume entity_id is name_id here for simplicity
-            repo = MetadataRepository(self.db_path)
-            name_obj = repo.get_name_by_id(entity_id)
-            current_value = name_obj["name"] if name_obj else None
+            identity = self._identity_repo.get_by_id(entity_id)
+            current_value = identity.display_name if identity else None
             field = "name"
         else:
             raise ValueError(f"Unknown entity type: {entity_type}")
 
         if current_value is None:
-            raise LookupError(f"{entity_type} {entity_id} not found or field {field} is empty")
+            raise LookupError(
+                f"{entity_type} {entity_id} not found or field {field} is empty"
+            )
 
         # 2. Apply formatting
         if format_type == "title":
@@ -1927,19 +1944,27 @@ class CatalogService:
         logger.debug(
             f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', category='{category}')"
         )
-        
+
         # Auto-primary business logic: if no primary genre exists, the first one added is primary
         is_primary = 0
         if category and category.title() == "Genre":
             existing_links = self._tag_repo.get_tags_for_songs([song_id])
-            has_primary = any(t.is_primary for sid, t in existing_links if sid == song_id and t.category == "Genre")
+            has_primary = any(
+                t.is_primary
+                for sid, t in existing_links
+                if sid == song_id and t.category == "Genre"
+            )
             if not has_primary:
                 is_primary = 1
-                logger.info(f"[CatalogService] Auto-promoting first genre '{tag_name}' to primary for song {song_id}")
+                logger.info(
+                    f"[CatalogService] Auto-promoting first genre '{tag_name}' to primary for song {song_id}"
+                )
 
         conn = self._tag_repo.get_connection()
         try:
-            tag = self._tag_repo.add_tag(song_id, tag_name, category, conn, is_primary=is_primary)
+            tag = self._tag_repo.add_tag(
+                song_id, tag_name, category, conn, is_primary=is_primary
+            )
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -1986,14 +2011,18 @@ class CatalogService:
 
     def set_primary_song_tag(self, song_id: int, tag_id: int) -> Tag:
         """Promote a specific tag to primary (Genre only)."""
-        logger.debug(f"[CatalogService] -> set_primary_song_tag(song_id={song_id}, tag_id={tag_id})")
-        
+        logger.debug(
+            f"[CatalogService] -> set_primary_song_tag(song_id={song_id}, tag_id={tag_id})"
+        )
+
         # Guard: Only Genres can be primary (Business Policy)
         tag = self._tag_repo.get_by_id(tag_id)
         if not tag:
             raise LookupError(f"Tag {tag_id} not found")
         if not tag.category or tag.category.title() != "Genre":
-            raise ValueError(f"Only Genre tags can be set as primary (tag={tag_id} is category={tag.category})")
+            raise ValueError(
+                f"Only Genre tags can be set as primary (tag={tag_id} is category={tag.category})"
+            )
 
         conn = self._tag_repo.get_connection()
         try:
@@ -2005,12 +2034,12 @@ class CatalogService:
             raise
         finally:
             conn.close()
-        
+
         song = self.get_song(song_id)
         target = next((t for t in song.tags if t.id == tag_id), None)
         if not target:
             raise LookupError(f"Tag {tag_id} not found on song {song_id} after update")
-        logger.debug(f"[CatalogService] <- set_primary_song_tag OK")
+        logger.debug("[CatalogService] <- set_primary_song_tag OK")
         return target
 
     # --- Publishers ---

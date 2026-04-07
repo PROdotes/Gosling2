@@ -6,7 +6,7 @@ from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, Album
 from src.models.metadata_frames import ID3FrameConfig
 from src.services.logger import logger
 from src.services.metadata_frames_reader import load_id3_frames
-from src.engine.config import COMMA_SPLIT_FIELDS
+from src.engine.config import COMMA_SPLIT_FIELDS, SONG_DEFAULT_YEAR
 
 
 class MetadataParser:
@@ -196,7 +196,14 @@ class MetadataParser:
 
         if not song_data["media_name"]:
             stem = Path(file_path).stem
-            song_data["media_name"] = re.sub(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_', '', stem)
+            song_data["media_name"] = re.sub(
+                r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_",
+                "",
+                stem,
+            )
+
+        if "year" not in song_data:
+            song_data["year"] = SONG_DEFAULT_YEAR
 
         try:
             song = Song(**song_data)

@@ -151,7 +151,12 @@ class TagRepository(BaseRepository):
         return cursor.lastrowid
 
     def add_tag(
-        self, source_id: int, name: str, category: str, conn: sqlite3.Connection, is_primary: int = 0
+        self,
+        source_id: int,
+        name: str,
+        category: str,
+        conn: sqlite3.Connection,
+        is_primary: int = 0,
     ) -> Tag:
         """
         Add a tag to a song. Get-or-creates the Tag record.
@@ -163,7 +168,7 @@ class TagRepository(BaseRepository):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         tag_id = self.get_or_create_tag(name, category, cursor)
-        
+
         cursor.execute(
             "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (?, ?, ?)",
             (source_id, tag_id, is_primary),
@@ -239,8 +244,12 @@ class TagRepository(BaseRepository):
             (source_id, tag_id),
         )
         if cursor.rowcount == 0:
-            logger.warning(f"[TagRepository] set_primary_tag(song={source_id}, tag={tag_id}) LINK_NOT_FOUND")
-            raise LookupError(f"Link between song {source_id} and tag {tag_id} not found")
+            logger.warning(
+                f"[TagRepository] set_primary_tag(song={source_id}, tag={tag_id}) LINK_NOT_FOUND"
+            )
+            raise LookupError(
+                f"Link between song {source_id} and tag {tag_id} not found"
+            )
 
         logger.debug(
             f"[TagRepository] <- set_primary_tag(source_id={source_id}, tag_id={tag_id}) OK"

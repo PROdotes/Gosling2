@@ -61,7 +61,7 @@ class SpotifyService:
 
         # 5. Fixed expansion rules (e.g. Writer -> [Composer, Lyricist])
         role_expansions = {"writer": ["Composer", "Lyricist"]}
-        
+
         # Ensure expansions are also treated as role triggers
         role_triggers = role_keywords.union(role_expansions.keys())
 
@@ -92,13 +92,17 @@ class SpotifyService:
                 for r in line.split("\u2022"):
                     if not (credit_role := r.strip()):
                         continue
-                    
+
                     low_role = credit_role.lower()
                     if low_role in role_expansions:
                         for expanded in role_expansions[low_role]:
-                            credits.append(SpotifyCredit(name=current_name, role=expanded))
+                            credits.append(
+                                SpotifyCredit(name=current_name, role=expanded)
+                            )
                     elif low_role in role_keywords:
-                        credits.append(SpotifyCredit(name=current_name, role=credit_role))
+                        credits.append(
+                            SpotifyCredit(name=current_name, role=credit_role)
+                        )
             else:
                 # It's a name line
                 current_name = line

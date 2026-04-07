@@ -1,5 +1,6 @@
 import re
 
+
 class CasingService:
     @staticmethod
     def to_title_case(text: str) -> str:
@@ -19,7 +20,7 @@ class CasingService:
         # Matches any sequence of word characters (including unicode/diacritics if supported by \w)
         # We capitalize every chunk of letters.
         # This handles parentheses correctly because they are not word characters.
-        return re.sub(r'[a-zA-Z\u00C0-\u017F]+', capitalize_word, text)
+        return re.sub(r"[a-zA-Z\u00C0-\u017F]+", capitalize_word, text)
 
     @staticmethod
     def to_sentence_case(text: str) -> str:
@@ -33,11 +34,11 @@ class CasingService:
             return ""
 
         # Find the first letter to capitalize
-        match = re.search(r'[a-zA-Z\u00C0-\u017F]', text)
+        match = re.search(r"[a-zA-Z\u00C0-\u017F]", text)
         if not match:
-            return text.lower() # No letters? just lower
+            return text.lower()  # No letters? just lower
 
         start_idx = match.start()
-        return (text[:start_idx] + 
-                text[start_idx].upper() + 
-                text[start_idx+1:].lower())
+        return (
+            text[:start_idx] + text[start_idx].upper() + text[start_idx + 1 :].lower()
+        )

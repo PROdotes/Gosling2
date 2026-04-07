@@ -1,6 +1,6 @@
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 
 
 def parse_with_pattern(filename: str, pattern: str) -> Dict[str, str]:
@@ -60,7 +60,9 @@ def parse_with_pattern(filename: str, pattern: str) -> Dict[str, str]:
         if count == 1:
             result[base_name] = raw[base_name]
         else:
-            values = [raw[base_name]] + [raw[f"{base_name}_{i}"] for i in range(1, count)]
+            values = [raw[base_name]] + [
+                raw[f"{base_name}_{i}"] for i in range(1, count)
+            ]
             result[base_name] = "; ".join(v for v in values if v)
 
     return result

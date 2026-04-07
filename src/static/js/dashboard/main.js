@@ -81,6 +81,7 @@ const state = {
     displayedItems: [], // Track currently displayed items in visual order (for keyboard nav)
     debounceTimer: null,
     currentQuery: "",
+    totalLibraryCount: 0,
     selectedIndex: -1,
     isDeep: false,
     validationRules: null,
@@ -143,7 +144,10 @@ const ctx = {
     },
     updateResultsSummary(count, singular) {
         elements.resultsCount.textContent = formatCountLabel(count, singular);
-        elements.totalCount.textContent = String(count);
+        if (!state.currentQuery) {
+            state.totalLibraryCount = count;
+        }
+        elements.totalCount.textContent = String(state.totalLibraryCount);
         elements.totalLabel.textContent = `${singular.charAt(0).toUpperCase()}${singular.slice(1)}s Loaded`;
         elements.matchCount.textContent = String(count);
         elements.matchLabel.textContent = state.currentQuery ? "Matches" : "Visible";

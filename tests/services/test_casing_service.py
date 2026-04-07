@@ -1,6 +1,7 @@
 import pytest
 from src.services.casing_service import CasingService
 
+
 class TestCasingServiceTitleCase:
     def test_title_case_standard(self):
         assert CasingService.to_title_case("RAZGLEDNICA") == "Razglednica"
@@ -10,11 +11,17 @@ class TestCasingServiceTitleCase:
 
     def test_title_case_every_word_capitalized(self):
         # User explicitly requested NO minor word exceptions
-        assert CasingService.to_title_case("queeen of the stone age") == "Queeen Of The Stone Age"
+        assert (
+            CasingService.to_title_case("queeen of the stone age")
+            == "Queeen Of The Stone Age"
+        )
 
     def test_title_case_parentheses(self):
         # (Radio Edit) should stay (Radio Edit)
-        assert CasingService.to_title_case("song name (radio edit)") == "Song Name (Radio Edit)"
+        assert (
+            CasingService.to_title_case("song name (radio edit)")
+            == "Song Name (Radio Edit)"
+        )
 
     def test_title_case_empty(self):
         assert CasingService.to_title_case("") == ""
@@ -22,6 +29,7 @@ class TestCasingServiceTitleCase:
     def test_title_case_none_raises(self):
         with pytest.raises(ValueError):
             CasingService.to_title_case(None)
+
 
 class TestCasingServiceSentenceCase:
     def test_sentence_case_standard(self):

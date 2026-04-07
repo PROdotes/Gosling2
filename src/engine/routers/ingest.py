@@ -2,7 +2,7 @@ import os
 import shutil
 from uuid import uuid4
 from pathlib import Path
-from fastapi import APIRouter, BackgroundTasks, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from src.models.view_models import (
@@ -28,8 +28,6 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 def _get_service() -> CatalogService:
     """Service factory for the ingestion router."""
     return CatalogService()
-
-
 
 
 @router.get("/downloads-folder")
@@ -134,8 +132,14 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
             combined_results.extend(batch_report["results"])
 
         total = len(combined_results)
-        ingested = sum(1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING"))
-        duplicates = sum(1 for r in combined_results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH"))
+        ingested = sum(
+            1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING")
+        )
+        duplicates = sum(
+            1
+            for r in combined_results
+            if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")
+        )
         errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
 
         return BatchIngestReport(
@@ -169,7 +173,9 @@ def _run_wav_conversions(wav_paths: list[str], service: CatalogService) -> None:
             if song_id is not None:
                 service.finalize_wav_conversion(song_id, str(mp3))
             else:
-                logger.warning(f"[IngestRouter] No DB record found for {wav}, skipping finalize")
+                logger.warning(
+                    f"[IngestRouter] No DB record found for {wav}, skipping finalize"
+                )
         except RuntimeError as e:
             logger.error(f"[IngestRouter] Background conversion failed for {wav}: {e}")
 
@@ -343,7 +349,9 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
         )
 
     if not os.path.exists(real_target):
-        logger.warning(f"[IngestRouter] File not found for cleanup: {request.file_path}")
+        logger.warning(
+            f"[IngestRouter] File not found for cleanup: {request.file_path}"
+        )
         raise HTTPException(status_code=404, detail="File not found.")
 
     try:

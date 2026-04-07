@@ -3,6 +3,7 @@ import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from src.engine_server import app
+from src.engine.config import SONG_DEFAULT_YEAR
 
 
 @pytest.fixture
@@ -83,7 +84,9 @@ class TestCatalogWriteApi:
         assert (
             song["processing_status"] == 1
         ), f"Expected processing_status=1 after enrichment, got {song['processing_status']}"
-        assert song["year"] is None, f"Expected year None, got {song['year']}"
+        assert (
+            song["year"] == SONG_DEFAULT_YEAR
+        ), f"Expected year {SONG_DEFAULT_YEAR}, got {song['year']}"
         assert song["bpm"] is None, f"Expected bpm None, got {song['bpm']}"
         assert (
             song["isrc"] == "USCGJ2326543"

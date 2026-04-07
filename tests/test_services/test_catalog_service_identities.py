@@ -119,13 +119,16 @@ class TestRemoveIdentityAlias:
 # update_identity_legal_name
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateIdentityLegalName:
 
     def test_update_legal_name_success(self, catalog_service):
         """Valid update persists and is returned by get_identity."""
         catalog_service.update_identity_legal_name(1, "David Eric Grohl Jr.")
         identity = catalog_service.get_identity(1)
-        assert identity.legal_name == "David Eric Grohl Jr.", f"Expected updated name, got {identity.legal_name}"
+        assert (
+            identity.legal_name == "David Eric Grohl Jr."
+        ), f"Expected updated name, got {identity.legal_name}"
 
     def test_update_legal_name_clear_to_none(self, catalog_service):
         """Setting to None clears the legal name."""

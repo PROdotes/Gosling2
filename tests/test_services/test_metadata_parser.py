@@ -1,6 +1,7 @@
 import pytest
 from src.services.metadata_parser import MetadataParser
 from src.models.domain import SongCredit, Tag
+from src.engine.config import SONG_DEFAULT_YEAR
 
 
 @pytest.fixture
@@ -56,7 +57,9 @@ class TestParse:
         song = parser.parse(raw, "fake/path.mp3")
 
         assert song.year == 2024, f"Expected year=2024, got {song.year}"
-        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
+        assert (
+            song.media_name == "path"
+        ), f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
         assert (
             song.duration_s == 0.0
@@ -157,10 +160,20 @@ class TestParse:
 
         assert song.year == 2023, f"Expected year=2023, got {song.year}"
         assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
-        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
+        assert (
+            song.media_name == "path"
+        ), f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
         assert (
             song.duration_s == 0.0
         ), f"Expected duration_s=0.0, got {song.duration_ms}"
+
+    def test_malformed_year_fallback(self, parser):
+        """parse() must fall back to SONG_DEFAULT_YEAR if the ID3 year string has no digits."""
+        raw = {"TYER": ["Just Text"]}
+        song = parser.parse(raw, "fake/path.mp3")
+        assert (
+            song.year == SONG_DEFAULT_YEAR
+        ), f"Expected year={SONG_DEFAULT_YEAR}, got {song.year}"
 
     def test_album_creation(self, parser):
         """parse() must create SongAlbum from TALB and Publisher objects from TPUB."""
@@ -242,22 +255,34 @@ class TestParse:
         }, f"Expected raw_tags={{'UNKNOWN': ['Some Value']}}, got {song.raw_tags}"
 
     def test_empty_fields_strict(self, parser):
-        """parse() with empty metadata must fall back to filename stem, no other defaults."""
+        """parse() with empty metadata must fall back to filename stem and SONG_DEFAULT_YEAR."""
         raw = {}
         song = parser.parse(raw, "fake/path.mp3")
 
-        assert song.media_name == "path", f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
-        assert song.year is None, f"Expected year=None, got {song.year}"
-        assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
         assert (
-            song.duration_s == 0.0
-        ), f"Expected duration_s=0.0, got {song.duration_ms}"
+            song.media_name == "path"
+        ), f"Expected media_name='path' (stem fallback), got '{song.media_name}'"
+        assert (
+            song.year == SONG_DEFAULT_YEAR
+        ), f"Expected year={SONG_DEFAULT_YEAR}, got {song.year}"
+        assert song.bpm is None, f"Expected bpm=None, got {song.bpm}"
+        assert song.duration_s == 0.0, f"Expected duration_s=0.0, got {song.duration_s}"
         assert song.credits == [], f"Expected no credits, got {song.credits}"
         assert song.tags == [], f"Expected no tags, got {song.tags}"
         assert song.albums == [], f"Expected no albums, got {song.albums}"
         assert song.publishers == [], f"Expected no publishers, got {song.publishers}"
         assert song.raw_tags == {}, f"Expected empty raw_tags, got {song.raw_tags}"
         _assert_song_defaults(song)
+
+    def test_year_fallback_only(self, parser):
+        """parse() must use SONG_DEFAULT_YEAR when other tags are present but year is missing."""
+        raw = {"TIT2": ["Explicit Title"]}
+        song = parser.parse(raw, "fake/path.mp3")
+
+        assert song.media_name == "Explicit Title"
+        assert (
+            song.year == SONG_DEFAULT_YEAR
+        ), f"Expected year={SONG_DEFAULT_YEAR}, got {song.year}"
 
     def test_no_txxx_config_borrowing(self, parser):
         """parse() must treat TXXX:DESCRIPTOR as dynamic Tag, not borrow base TXXX config."""

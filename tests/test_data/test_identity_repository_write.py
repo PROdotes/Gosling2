@@ -6,10 +6,10 @@ Verifies that mutations follow the 'Truth-First' integrity rules.
 import pytest
 from src.data.identity_repository import IdentityRepository
 
-
 # ---------------------------------------------------------------------------
 # update_legal_name
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateLegalName:
 
@@ -20,7 +20,9 @@ class TestUpdateLegalName:
             repo.update_legal_name(1, "David Eric Grohl Jr.", conn)
             conn.commit()
         result = repo.get_by_id(1)
-        assert result.legal_name == "David Eric Grohl Jr.", f"Expected updated name, got {result.legal_name}"
+        assert (
+            result.legal_name == "David Eric Grohl Jr."
+        ), f"Expected updated name, got {result.legal_name}"
 
     def test_update_legal_name_clears_to_none(self, populated_db):
         """Setting legal_name to None clears the field."""
@@ -37,7 +39,6 @@ class TestUpdateLegalName:
         with repo.get_connection() as conn:
             with pytest.raises(LookupError):
                 repo.update_legal_name(9999, "Ghost", conn)
-
 
 
 def test_add_alias_basic(populated_db):

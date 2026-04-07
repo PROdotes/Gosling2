@@ -71,6 +71,7 @@ async def get_song(song_id: int) -> SongView:
         # 1. Estimated original source path (Downloads heuristic - metadata independent)
         try:
             from src.engine.config import get_downloads_folder
+
             downloads = get_downloads_folder()
             if downloads:
                 # Extract original filename from UUID prefix (36 hex + 1 underscore)
@@ -84,11 +85,14 @@ async def get_song(song_id: int) -> SongView:
 
                 # Check if it actually exists (to color code the UI)
                 import os
+
                 if os.path.exists(view.estimated_original_path):
                     view.original_exists = True
 
         except Exception as e:
-            logger.debug(f"[CatalogRouter] Original path preview failed for song {song_id}: {e}")
+            logger.debug(
+                f"[CatalogRouter] Original path preview failed for song {song_id}: {e}"
+            )
 
         # 2. Organized destination preview (May fail due to metadata error)
         try:
@@ -171,7 +175,9 @@ class UpdateLegalNameBody(BaseModel):
 
 
 @router.patch("/identities/{identity_id:int}/legal-name", status_code=204)
-async def update_identity_legal_name(identity_id: int, body: UpdateLegalNameBody) -> None:
+async def update_identity_legal_name(
+    identity_id: int, body: UpdateLegalNameBody
+) -> None:
     """Update the legal name of an identity."""
     try:
         _get_service().update_identity_legal_name(identity_id, body.legal_name)
