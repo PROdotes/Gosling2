@@ -170,6 +170,19 @@ Used by `update_identity_legal_name`.
 **HTTP**: `GET /api/v1/ingest/formats`
 - Returns the list of supported file extensions for ingestion as defined in `ACCEPTED_EXTENSIONS`.
 
+### async def list_staging_files() -> List[Dict[str, Any]]
+**HTTP**: `GET /api/v1/ingest/staging`
+- List all files currently in the `STAGING_DIR`.
+- Returns metadata for each file, including `is_tracked` (True if the file path is already in the database).
+- Wraps `CatalogService.get_staged_files`.
+
+### async def discard_staged_file(filename: str) -> dict
+**HTTP**: `DELETE /api/v1/ingest/staging/{filename:path}`
+- Physically remove a file from the staging area.
+- Includes security checks to prevent directory traversal.
+- Returns `{"status": "DISCARDED", "filename": filename}`.
+- Wraps `CatalogService.discard_staged_file`.
+
 ### async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 **HTTP**: `POST /api/v1/ingest/upload`
 - Batch file ingestion entry point (supports single or multiple files).

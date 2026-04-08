@@ -1,4 +1,4 @@
-import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats } from "../api.js";
+import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats, getStagingOrphans, deleteStagingOrphan } from "../api.js";
 import {
     escapeHtml,
     renderStatus,
@@ -121,6 +121,11 @@ export async function renderIngestionPanel(ctx) {
 
             <div id="${RESULTS_LIST_ID}" class="ingest-results">
             </div>
+
+            <div id="ingest-orphan-section" class="orphan-section">
+                <button class="orphan-toggle muted-note">▶ Orphaned Staging Files</button>
+                <div class="orphan-body" style="display:none"></div>
+            </div>
         </div>
     `;
 
@@ -130,6 +135,67 @@ export async function renderIngestionPanel(ctx) {
     setupScanFolderButton("ingest-scan-folder-btn", PATH_INPUT_ID, RESULTS_LIST_ID, ctx);
     setupManualIngestHandlers(RESULTS_LIST_ID);
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
+    setupOrphanSection("ingest-orphan-section");
+}
+
+function setupOrphanSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+
+    const toggle = section.querySelector(".orphan-toggle");
+    const body = section.querySelector(".orphan-body");
+    if (!toggle || !body) return;
+
+    toggle.addEventListener("click", async () => {
+        const isOpen = body.style.display !== "none";
+        if (isOpen) {
+            body.style.display = "none";
+            toggle.textContent = "▶ Orphaned Staging Files";
+            return;
+        }
+        body.style.display = "block";
+        toggle.textContent = "▼ Orphaned Staging Files";
+        await refreshOrphanList(body);
+    });
+}
+
+async function refreshOrphanList(body) {
+    body.innerHTML = `<div class="muted-note" style="padding: 0.5rem 0;">Loading...</div>`;
+    try {
+        const orphans = await getStagingOrphans();
+        if (orphans.length === 0) {
+            body.innerHTML = `<div class="muted-note" style="padding: 0.5rem 0;">No orphaned files found.</div>`;
+            return;
+        }
+        body.innerHTML = orphans.map(f => `
+            <div class="orphan-row" data-path="${escapeHtml(f.path)}">
+                <span class="orphan-name mono">${escapeHtml(f.filename)}</span>
+                <span class="muted-note orphan-size">${(f.size_bytes / 1024).toFixed(0)} KB</span>
+                <button class="ingest-btn-danger orphan-delete-btn" data-path="${escapeHtml(f.path)}">Delete</button>
+            </div>
+        `).join("");
+
+        body.querySelectorAll(".orphan-delete-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const path = btn.dataset.path;
+                btn.disabled = true;
+                btn.textContent = "Deleting...";
+                try {
+                    await deleteStagingOrphan(path);
+                    btn.closest(".orphan-row").remove();
+                    if (body.querySelectorAll(".orphan-row").length === 0) {
+                        body.innerHTML = `<div class="muted-note" style="padding: 0.5rem 0;">No orphaned files found.</div>`;
+                    }
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = "Delete";
+                    alert(`Failed: ${err.message}`);
+                }
+            });
+        });
+    } catch (err) {
+        body.innerHTML = `<div class="muted-note" style="padding: 0.5rem 0; color: var(--danger);">Error: ${escapeHtml(err.message)}</div>`;
+    }
 }
 
 function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {

@@ -335,49 +335,31 @@ function applySortAndRender(ctx, field, direction) {
     const sorted = field ? sortSongs(currentSongs, field, direction) : currentSongs;
     ctx.setState({ displayedItems: sorted });
     renderSongsCards(ctx, sorted);
-    updateSortButtonStates();
 }
 
 function clearSort(ctx) {
     currentSort = { field: null, direction: null };
     ctx.setState({ displayedItems: currentSongs });
     renderSongsCards(ctx, currentSongs);
-    updateSortButtonStates();
 }
 
-function updateSortButtonStates() {
-    document.querySelectorAll("[data-sort-field]").forEach((btn) => {
-        const field = btn.getAttribute("data-sort-field");
-        const direction = btn.getAttribute("data-sort-direction");
-        if (field === currentSort.field && direction === currentSort.direction) {
-            btn.classList.add("active");
-        } else {
-            btn.classList.remove("active");
-        }
-    });
-}
 
 function renderSortControls(ctx) {
-    return `
-        <div class="sort-controls">
-            <span class="sort-label">Sort:</span>
-            <button class="sort-clear-btn" data-action="clear-sort">Clear</button>
-            <div class="sort-buttons">
-                <div class="sort-row">
-                    <span class="sort-direction">↑</span>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="media_name" data-sort-direction="asc">Title</button>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="display_artist" data-sort-direction="asc">Artist</button>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="id" data-sort-direction="asc">ID</button>
-                </div>
-                <div class="sort-row">
-                    <span class="sort-direction">↓</span>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="media_name" data-sort-direction="desc">Title</button>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="display_artist" data-sort-direction="desc">Artist</button>
-                    <button class="sort-btn" data-action="apply-sort" data-sort-field="id" data-sort-direction="desc">ID</button>
-                </div>
-            </div>
-        </div>
-    `;
+    const fields = [
+        { field: "media_name", label: "Title" },
+        { field: "display_artist", label: "Artist" },
+        { field: "id", label: "ID" },
+    ];
+    const buttons = fields.map(({ field, label }) => {
+        const isActive = currentSort.field === field;
+        const arrow = isActive ? (currentSort.direction === "asc" ? " ↑" : " ↓") : "";
+        const activeClass = isActive ? " active" : "";
+        return `<button class="sort-btn${activeClass}" data-action="toggle-sort" data-sort-field="${field}">${label}${arrow}</button>`;
+    }).join("");
+    const clearBtn = currentSort.field
+        ? `<button class="sort-clear-btn" data-action="clear-sort">Clear</button>`
+        : "";
+    return `<div class="sort-controls"><span class="sort-label">Sort:</span>${buttons}${clearBtn}</div>`;
 }
 
 function renderSongsCards(ctx, songs) {
@@ -411,11 +393,11 @@ function renderSongsCards(ctx, songs) {
     ctx.elements.resultsContainer.innerHTML = renderSortControls(ctx) + cardsHtml;
 
     // Attach event handlers
-    ctx.elements.resultsContainer.querySelectorAll("[data-action='apply-sort']").forEach((btn) => {
+    ctx.elements.resultsContainer.querySelectorAll("[data-action='toggle-sort']").forEach((btn) => {
         btn.addEventListener("click", (e) => {
             e.stopPropagation();
             const field = btn.getAttribute("data-sort-field");
-            const direction = btn.getAttribute("data-sort-direction");
+            const direction = currentSort.field === field && currentSort.direction === "asc" ? "desc" : "asc";
             applySortAndRender(ctx, field, direction);
         });
     });
@@ -442,7 +424,6 @@ function renderSongsCards(ctx, songs) {
         });
     });
 
-    updateSortButtonStates();
 }
 
 export function renderSongs(ctx, songs) {

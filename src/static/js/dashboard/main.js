@@ -34,16 +34,6 @@ import {
     removeSongCredit,
     updateCreditName,
     fetchRoles,
-    addSongAlbum,
-    removeSongAlbum,
-    updateAlbum,
-    updateSongAlbumLink,
-    addAlbumPublisher,
-    removeAlbumPublisher,
-    addAlbumCredit,
-    removeAlbumCredit,
-    moveSongToLibrary,
-    cleanupOriginalFile,
     formatMetadataCase,
     setPrimarySongTag,
     uploadFiles,
@@ -58,6 +48,7 @@ import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.
 import { openSplitterModal, closeSplitterModal } from "./components/splitter_modal.js";
 import * as orch from "./orchestrator.js";
 import { activateInlineEdit } from "./components/inline_editor.js";
+import { SongActionsHandler } from "./handlers/song_actions.js";
 import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
 import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
 import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
@@ -69,11 +60,10 @@ const elements = {
     searchInput: document.getElementById("searchInput"),
     resultsContainer: document.getElementById("results-container"),
     detailPanel: document.getElementById("detail-panel"),
-    resultsCount: document.getElementById("results-count"),
     totalCount: document.getElementById("total-count"),
     totalLabel: document.getElementById("total-label"),
     matchCount: document.getElementById("match-count"),
-    matchLabel: document.getElementById("match-label"),
+    statSep: document.getElementById("stat-sep"),
     deepSearchToggle: document.getElementById("deepSearchToggle"),
 };
 
@@ -153,16 +143,18 @@ const ctx = {
     },
     refreshActiveDetail,
     updateResultsSummary(count, singular) {
-        elements.resultsCount.textContent = formatCountLabel(count, singular);
         if (!state.currentQuery) {
             state.totalLibraryCount = count;
         }
-        elements.totalCount.textContent = String(state.totalLibraryCount);
-        elements.totalLabel.textContent = `${singular.charAt(0).toUpperCase()}${singular.slice(1)}s Loaded`;
+        const isFiltered = state.currentQuery && count !== state.totalLibraryCount;
         elements.matchCount.textContent = String(count);
-        elements.matchLabel.textContent = state.currentQuery ? "Matches" : "Visible";
+        elements.totalCount.textContent = String(state.totalLibraryCount);
+        elements.totalLabel.textContent = `${singular.charAt(0).toUpperCase()}${singular.slice(1)}s`;
+        elements.totalCount.style.display = isFiltered ? "" : "none";
+        elements.statSep.style.display = isFiltered ? "" : "none";
     },
     openSongDetail: (...args) => openSongDetail(...args),
+    performSearch: (query) => performSearch(query),
     showDetailPanel(html) {
         elements.detailPanel.innerHTML = html;
         elements.detailPanel.style.display = "flex";
@@ -188,6 +180,8 @@ const ctx = {
         }
     }
 };
+
+const songActions = new SongActionsHandler(ctx);
 
 function getActiveList() {
     if (state.currentMode === "songs") {
@@ -224,7 +218,6 @@ function syncModeUi() {
         button.classList.toggle("active", button.dataset.mode === state.currentMode);
     });
     elements.searchInput.placeholder = modeConfig[state.currentMode].placeholder;
-    elements.matchLabel.textContent = state.currentQuery ? "Matches" : "Visible";
 }
 
 function updateSelection() {
@@ -259,10 +252,8 @@ function isActiveDetail(mode, id) {
 
 async function performSearch(query = state.currentQuery) {
     const mode = state.currentMode;
-    const { fetcher, renderer, noun } = modeConfig[mode];
+    const { fetcher, renderer } = modeConfig[mode];
     state.currentQuery = query;
-    elements.matchLabel.textContent = query ? "Matches" : "Visible";
-
     try {
         const items = await fetcher(query, state.isDeep);
         if (items === ABORTED || mode !== state.currentMode || query !== state.currentQuery) {
@@ -276,7 +267,6 @@ async function performSearch(query = state.currentQuery) {
             return;
         }
         elements.resultsContainer.innerHTML = renderEmptyState(`Error: ${error.message}`);
-        elements.resultsCount.textContent = `0 ${noun}s`;
         elements.totalCount.textContent = "0";
         elements.matchCount.textContent = "0";
     }
@@ -514,20 +504,39 @@ function isModalOpen() {
 function updateIngestBadges(successDelta = 0, actionDelta = 0) {
     const tab = document.querySelector(".mode-tab[data-mode='ingest']");
     if (!tab) return;
-    
+
     state.successCount += successDelta;
     state.actionCount += actionDelta;
 
+    let badge = tab.querySelector(".ingest-badge");
+
     const total = state.actionCount + state.successCount;
     if (total <= 0) {
-        tab.removeAttribute("data-badge");
-        tab.removeAttribute("data-badge-type");
+        if (badge) badge.remove();
         return;
     }
 
-    tab.dataset.badge = String(total);
+    if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "ingest-badge";
+        tab.appendChild(badge);
+    }
+
+    const isSuccess = state.actionCount === 0;
     // Red (action) trumps Green (success)
-    tab.dataset.badgeType = state.actionCount > 0 ? "action" : "success";
+    badge.dataset.badgeType = isSuccess ? "success" : "action";
+
+    if (isSuccess) {
+        badge.textContent = `↺ ${total}`;
+        badge.title = "New songs ingested — click to refresh library";
+        badge.style.cursor = "pointer";
+        badge.dataset.action = "refresh-results";
+    } else {
+        badge.textContent = String(total);
+        badge.title = "";
+        badge.style.cursor = "default";
+        badge.removeAttribute("data-action");
+    }
 }
 
 async function setupHeaderDropZone() {
@@ -610,6 +619,13 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
+    // High-density delegation for Song Actions
+    try {
+        if (await songActions.handle(event)) return;
+    } catch (err) {
+        console.error(`[Main] SongActionsHandler CRASHED: ${err.message}`, err);
+    }
+
     if (action === "switch-mode") {
         switchMode(actionTarget.dataset.mode);
         return;
@@ -649,434 +665,112 @@ document.addEventListener("click", async (event) => {
         return;
     }
 
-    if (action === "convert-wav") {
-        const { stagedPath } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        actionTarget.textContent = "Converting...";
-
-        fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`, { method: "POST" })
-            .then((res) => res.json())
-            .then((data) => {
-                const card = actionTarget.closest(".result-card");
-                if ((data.status === "INGESTED" || data.status === "ALREADY_EXISTS") && card) {
-                    card.style.background = "rgba(76, 175, 80, 0.1)";
-                    card.style.borderLeft = "3px solid #4CAF50";
-                    const box = card.querySelector(".pending-convert-box");
-                    const msg = data.status === "ALREADY_EXISTS"
-                        ? `✓ Already in library as "${data.song?.media_name || "Unknown"}"`
-                        : `✓ Converted & Ingested as "${data.song?.media_name || "Unknown"}"`;
-                    if (box) box.innerHTML = `<div style="color: #4CAF50; font-weight: 600;">${msg}</div>`;
-                } else {
-                    actionTarget.disabled = false;
-                    actionTarget.textContent = "Convert & Ingest";
-                    console.error("Conversion failed:", data.message);
-                }
-            })
-            .catch((err) => {
-                actionTarget.disabled = false;
-                actionTarget.textContent = "Convert & Ingest";
-                console.error("Error:", err.message);
-            });
-        return;
-    }
-
-    if (action === "resolve-conflict") {
-        const { ghostId, stagedPath } = actionTarget.dataset;
-
-        // Disable the button to prevent double-clicks
-        actionTarget.disabled = true;
-        actionTarget.textContent = "Processing...";
-
-        fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
-            method: "POST",
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.status === "INGESTED") {
-                    // Success - replace the conflict card with success message
-                    const card = actionTarget.closest(".result-card");
-                    if (card) {
-                        card.style.background = "rgba(76, 175, 80, 0.1)";
-                        card.style.borderLeft = "3px solid #4CAF50";
-                        const conflictBox = card.querySelector('[style*="rgba(255, 149, 0"]');
-                        if (conflictBox) {
-                            conflictBox.innerHTML = `
-                                <div style="color: #4CAF50; font-weight: 600; margin-bottom: 0.5rem;">✓ Ghost Record Reactivated</div>
-                                <div class="muted-note" style="font-size: 0.85rem;">
-                                    Song "${data.song?.media_name || "Unknown"}" has been restored with new metadata.
-                                </div>
-                            `;
-                        }
-                    }
-                } else {
-                    actionTarget.disabled = false;
-                    actionTarget.textContent = "Re-ingest & Activate";
-                    console.error("Failed to reactivate:", data.message);
-                }
-            })
-            .catch((err) => {
-                actionTarget.disabled = false;
-                actionTarget.textContent = "Re-ingest & Activate";
-                console.error("Error:", err.message);
-            });
-        return;
-    }
-
-    if (action === "format-case") {
-        const { entityType, entityId, songId, field, type } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await formatMetadataCase(entityType, entityId, field, type);
-            // Refresh detailed view to show new casing
-            const song = getActiveList().find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-            ctx.showBanner(`Applied ${type} case to ${entityType} ${field}`, "success");
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Format case failed: ${err.message}`);
-            ctx.showBanner(err.message, "error");
-        }
-        return;
-    }
-
-    if (action === "remove-publisher") {
-        const { songId, publisherId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeSongPublisher(songId, publisherId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove publisher failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "open-spotify-modal") {
-        const { songId, title } = actionTarget.dataset;
-        // Truth-First: Use the hydrated active song if it matches, otherwise fallback to cache
-        let song = state.cachedSongs.find(s => String(s.id) === String(songId));
-        if (state.activeSong && String(state.activeSong.id) === String(songId)) {
-            song = state.activeSong;
-        }
-
-        openSpotifyModal({
-            songId,
-            title,
-            existingCredits: song?.credits || [],
-            existingPublishers: song?.publishers || [],
-            onClose: () => {
-                if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
-            },
-            onComplete: () => {
-                refreshActiveDetail();
-                ctx.showBanner("Spotify credits imported successfully", "success");
-            }
-        });
-        return;
-    }
-
-    if (action === "close-spotify-modal") {
-        closeSpotifyModal();
-        return;
-    }
-
-    if (action === "open-splitter-modal") {
-        const { songId, text, target, classification, removeType, removeId } = actionTarget.dataset;
-        openSplitterModal({
-            songId,
-            text,
-            target,
-            classification: classification || null,
-            remove: { type: removeType, id: Number(removeId) },
-            separators: state.validationRules?.credit_separators || [],
-            onConfirm: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                if (song) openSongDetail(song, { reuseFileData: true });
-            },
-        });
-        return;
-    }
-
-    if (action === "open-filename-parser-single") {
-        const { id, filename } = actionTarget.dataset;
-        import("./components/filename_parser_modal.js").then(m => {
-            m.openFilenameParserModal({
-                entries: [{ id: Number(id), filename }],
-                onApply: async () => {
-                    const song = state.cachedSongs.find(s => String(s.id) === String(id));
-                    if (song) openSongDetail(song, { reuseFileData: true });
-                    ctx.showBanner("Metadata applied", "success");
-                },
-                onError: (msg) => ctx.showBanner(msg, "error"),
-            });
-        });
-        return;
-    }
-
-    if (action === "close-splitter-modal") {
-        closeSplitterModal();
-        return;
-    }
-
-if (action === "close-filename-parser-modal") {
-        import("./components/filename_parser_modal.js").then(m => m.closeFilenameParserModal());
-        return;
-    }
-
-
-    if (action === "set-primary-tag") {
-        const { songId, tagId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await setPrimarySongTag(songId, tagId);
-            const song = getActiveList().find((s) => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Set primary tag failed: ${err.message}`);
-            ctx.showBanner(err.message, "error");
-        }
-        return;
-    }
-
-    if (action === "remove-tag") {
-        const { songId, tagId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeSongTag(songId, tagId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove tag failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "remove-credit") {
-        const { songId, creditId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeSongCredit(songId, creditId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove credit failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "remove-album") {
-        const { songId, albumId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeSongAlbum(songId, albumId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove album failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "remove-album-publisher") {
-        const { albumId, publisherId, songId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeAlbumPublisher(albumId, publisherId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove album publisher failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "remove-album-credit") {
-        const { albumId, creditId, songId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        try {
-            await removeAlbumCredit(albumId, creditId);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            console.error(`Remove album credit failed: ${err.message}`);
-        }
-        return;
-    }
-
-    if (action === "cleanup-original") {
-        const { path } = actionTarget.dataset;
-        if (!confirm(`Are you sure you want to PERMANENTLY delete the original file?\n\nPath: ${path}`)) {
-            return;
-        }
-
-        actionTarget.style.opacity = "0.5";
-        actionTarget.style.pointerEvents = "none";
-        try {
-            await cleanupOriginalFile(path);
-            refreshActiveDetail();
-            ctx.showBanner("Original file deleted successfully", "success");
-        } catch (err) {
-            actionTarget.style.opacity = "1";
-            actionTarget.style.pointerEvents = "auto";
-            ctx.showBanner(`Cleanup failed: ${err.message}`, "error");
-        }
-        return;
-    }
-
-    if (action === "start-edit-album-scalar") {
-        const { albumId, songId, field } = actionTarget.dataset;
-        activateInlineEdit(actionTarget, {
-            field,
-            validationRules: state.validationRules,
-            onCommit: async (val) => {
-                return await updateAlbum(albumId, { [field]: val });
-            },
-            onSave: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                if (song) openSongDetail(song, { reuseFileData: true });
-            }
-        });
-        return;
-    }
-
-    if (action === "start-edit-album-link") {
-        const { albumId, songId, field } = actionTarget.dataset;
-        activateInlineEdit(actionTarget, {
-            field,
-            validationRules: state.validationRules,
-            onCommit: async (val) => {
-                const card = actionTarget.closest(".album-card-detail");
-                const otherField = field === "track_number" ? "disc_number" : "track_number";
-                const otherSpan = card?.querySelector(`[data-field="${otherField}"]`);
-                const otherVal = otherSpan ? (otherSpan.textContent === "-" ? null : Number(otherSpan.textContent)) : null;
-
-                const track = field === "track_number" ? val : otherVal;
-                const disc = field === "disc_number" ? val : otherVal;
-                return await updateSongAlbumLink(songId, albumId, track, disc);
-            },
-            onSave: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                if (song) openSongDetail(song, { reuseFileData: true });
-            }
-        });
-        return;
-    }
-
-    async function syncAlbumWithSong(albumId, songId) {
-        const song = await getCatalogSong(songId);
-        const albumDetail = await getAlbumDetail(albumId);
-
-        const ops = [];
-
-        // Year — only if missing
-        if (!albumDetail.release_year && song.year) {
-            ops.push(updateAlbum(albumId, { release_year: song.year }));
-        }
-
-        // Credits — add song performers not already on album (match by name_id)
-        const existingNameIds = new Set((albumDetail.credits || []).map(c => String(c.name_id)));
-        for (const credit of (song.credits || [])) {
-            if (credit.role_name !== "Performer") continue;
-            if (!existingNameIds.has(String(credit.name_id))) {
-                ops.push(addAlbumCredit(albumId, credit.display_name, credit.role_name, credit.identity_id ?? null));
-            }
-        }
-
-        // Publishers — add song publishers not already on album (match by id)
-        const existingPubIds = new Set((albumDetail.publishers || []).map(p => String(p.id)));
-        for (const pub of (song.publishers || [])) {
-            if (!existingPubIds.has(String(pub.id))) {
-                ops.push(addAlbumPublisher(albumId, pub.name, pub.id));
-            }
-        }
-
-        await Promise.all(ops);
-    }
-
-    if (action === "sync-album-from-song") {
-        const { albumId, songId } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        actionTarget.textContent = "syncing...";
-        try {
-            await syncAlbumWithSong(albumId, songId);
-            const s = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (s) openSongDetail(s, { reuseFileData: true });
-        } catch (err) {
-            actionTarget.disabled = false;
-            actionTarget.textContent = "↓ sync from song";
-            ctx.showBanner(`Sync failed: ${err.message}`, "error");
-        }
-        return;
-    }
-
-    if (action === "change-album-type") {
-        const { albumId, songId } = actionTarget.dataset;
-        const newType = actionTarget.value;
-        try {
-            await updateAlbum(albumId, { album_type: newType });
-        } catch (err) {
-            console.error(`Update album type failed: ${err.message}`);
-            const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-            if (song) openSongDetail(song, { reuseFileData: true });
-        }
-        return;
-    }
-
-    if (action === "close-edit-modal") {
-        closeEditModal();
-        return;
-    }
-
     if (action === "open-edit-modal") {
         const { chipType, itemId } = actionTarget.dataset;
+
+        const onClose = refreshActiveDetail;
+
         if (chipType === "publisher") {
-            orch.managePublisher(ctx, itemId, actionTarget.textContent.trim());
+            const publisherName = actionTarget.textContent.trim();
+            const publisherDetail = await getPublisherDetail(itemId).catch(() => null);
+            const childItems = publisherDetail && publisherDetail.sub_publishers
+                ? publisherDetail.sub_publishers.map(c => ({ id: c.id, label: c.name }))
+                : [];
+
+            openEditModal({
+                title: "Edit Publisher",
+                name: publisherDetail ? publisherDetail.name : publisherName,
+                onRename: async (newName) => { await updatePublisher(itemId, newName); },
+                onClose,
+                category: null,
+                children: {
+                    label: "Sub-publishers",
+                    items: childItems,
+                    onSearch: async (q) => {
+                        const results = await searchPublishers(q);
+                        return (results || []).map(p => ({ id: p.id, label: p.name }));
+                    },
+                    onAdd: async (opt) => {
+                        await setPublisherParent(opt.id, Number(itemId));
+                        childItems.push({ id: opt.id, label: opt.label });
+                    },
+                    onRemove: async (item) => {
+                        await setPublisherParent(item.id, null);
+                    },
+                    onRenameChild: async (item, newName) => { await updatePublisher(item.id, newName); },
+                    createLabel: (q) => `Add "${q}" as sub-publisher`,
+                },
+            }, actionTarget);
         } else if (chipType === "tag") {
-            orch.manageTag(ctx, itemId);
+            const tagDetail = await getTagDetail(itemId).catch(() => null);
+            if (!tagDetail) {
+                console.error(`Tag ${itemId} not found`);
+                return;
+            }
+
+            openEditModal({
+                title: "Edit Tag",
+                name: tagDetail.name,
+                onRename: async (newName) => {
+                    await updateTag(itemId, newName, tagDetail.category);
+                    tagDetail.name = newName;
+                },
+                onClose,
+                category: {
+                    label: "Category",
+                    value: tagDetail.category,
+                    editable: true,
+                    onSave: async (val) => {
+                        await updateTag(itemId, tagDetail.name, val);
+                        tagDetail.category = val;
+                    },
+                    onSearch: async (q) => {
+                        const all = await getTagCategories();
+                        return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+                    },
+                },
+                children: null,
+            }, actionTarget);
         } else if (chipType === "credit") {
             const identityId = actionTarget.dataset.identityId;
-            if (identityId) orch.manageArtist(ctx, identityId, actionTarget.textContent.trim());
+            if (!identityId) return;
+
+            const identity = await getArtistTree(identityId).catch(() => null);
+            if (!identity) return;
+
+            const primaryAlias = (identity.aliases || []).find(a => a.is_primary);
+            const aliases = (identity.aliases || []).filter(a => !a.is_primary);
+            const childItems = aliases.map(a => ({ id: a.id, label: a.display_name }));
+
+            openEditModal({
+                title: "Edit Artist",
+                name: primaryAlias?.display_name || identity.display_name,
+                onRename: async (newName) => {
+                    await updateCreditName(0, primaryAlias.id, newName);
+                },
+                onClose,
+                category: null,
+                children: {
+                    label: "Aliases",
+                    items: childItems,
+                    onSearch: async (q) => {
+                        const results = await searchArtists(q);
+                        return (results || []).map(i => ({ id: i.id, label: i.display_name }));
+                    },
+                    onAdd: async (opt) => {
+                        const result = await addIdentityAlias(identityId, opt.rawInput || opt.label, opt.id);
+                        childItems.push({ id: result.name_id, label: result.display_name });
+                    },
+                    onRemove: async (item) => {
+                        await removeIdentityAlias(identityId, item.id);
+                    },
+                    onRenameChild: async (item, newName) => {
+                        await updateCreditName(0, item.id, newName);
+                    },
+                    createLabel: (q) => `Add "${q}" as alias`,
+                },
+            }, actionTarget);
         }
-        return;
-    }
-
-    if (action === "open-scrubber") {
-        const { songId, title } = actionTarget.dataset;
-        orch.orchestrateScrubber(ctx, songId, title);
-        return;
-    }
-
-    if (action === "close-scrubber-modal") {
-        closeScrubberModal();
-        return;
-    }
-
-    if (action === "web-search") {
-        const { songId } = actionTarget.dataset;
-        import("./api.js").then(async (m) => {
-            try {
-                // Get the search URL from the backend (Truth-First)
-                const data = await m.getSongWebSearch(songId);
-                if (data && data.url) {
-                    window.open(data.url, "_blank");
-                }
-            } catch (err) {
-                ctx.showBanner(`Search failed: ${err.message}`, "error");
-            }
-        });
-        return;
-    }
-
-    if (action === "close-link-modal") {
-        closeLinkModal();
         return;
     }
 
@@ -1119,128 +813,8 @@ if (action === "close-filename-parser-modal") {
         return;
     }
 
-    if (action === "start-edit-scalar") {
-        const { songId, field } = actionTarget.dataset;
-        activateInlineEdit(actionTarget, {
-            field,
-            validationRules: state.validationRules,
-            onCommit: async (val) => {
-                return await patchSongScalars(songId, { [field]: val });
-            },
-            onSave: (updatedSong, savedField) => {
-                if (savedField === "media_name") {
-                    const cached = state.cachedSongs.find(s => String(s.id) === String(songId));
-                    if (cached) {
-                        cached.media_name = updatedSong.media_name;
-                        cached.title = updatedSong.media_name;
-                    }
-                }
-                openSongDetail(updatedSong, { reuseFileData: true });
-            },
-        });
-        return;
-    }
 
-    if (action === "move-to-library") {
-        const { id } = actionTarget.dataset;
-        actionTarget.disabled = true;
-        const originalText = actionTarget.textContent;
-        actionTarget.textContent = "Organizing...";
-        
-        try {
-            await moveSongToLibrary(id);
-            ctx.showBanner("Organized successfully!", "success");
-            openSongDetail({ id }, { reuseFileData: false });
-        } catch (err) {
-            actionTarget.disabled = false;
-            actionTarget.textContent = originalText;
-            ctx.showBanner(`Organization failed: ${err.message}`, "error");
-        }
-        return;
-    }
 
-    if (action === "mark-reviewed" || action === "unreview-song") {
-        const { id } = actionTarget.dataset;
-        const newStatus = action === "mark-reviewed" ? 0 : 1;
-        try {
-            const updatedSong = await patchSongScalars(id, { processing_status: newStatus });
-            openSongDetail(updatedSong, { reuseFileData: true });
-        } catch (err) {
-            ctx.showBanner(`Failed to update status: ${err.message}`, "error");
-        }
-        return;
-    }
-
-    if (action === "toggle-active") {
-        // Prevent card selection when toggling
-        if (event) event.stopPropagation();
-
-        if (actionTarget.classList.contains("disabled")) {
-            return;
-        }
-
-        const input = actionTarget.querySelector("input");
-        if (!input) return;
-
-        const { id } = actionTarget.dataset;
-        const isChecked = input.checked;
-
-        try {
-            await patchSongScalars(id, { is_active: isChecked });
-            
-            // Sync current items in any list results
-            state.cachedSongs = state.cachedSongs.map(s => 
-                String(s.id) === String(id) ? { ...s, is_active: isChecked } : s
-            );
-            
-            // If the song detail pane is open, refresh it
-            if (activeDetailKey === `songs:${id}`) {
-                refreshActiveDetail();
-            }
-        } catch (err) {
-            // Revert state if failed (validation error, etc.)
-            input.checked = !isChecked;
-            ctx.showBanner(`Failed to toggle activation: ${err.message}`, "error");
-        }
-        return;
-    }
-
-    if (action === "delete-song") {
-        const { id, title } = actionTarget.dataset;
-
-        // Two-stage confirmation to avoid popup blockers
-        if (!actionTarget.classList.contains("confirming")) {
-            const originalText = actionTarget.textContent;
-            actionTarget.classList.add("confirming");
-            actionTarget.textContent = "Confirm Delete?";
-
-            // Reset after 3 seconds if not clicked again
-            setTimeout(() => {
-                if (actionTarget.classList.contains("confirming") && !actionTarget.disabled) {
-                    actionTarget.classList.remove("confirming");
-                    actionTarget.textContent = originalText;
-                }
-            }, 3000);
-            return;
-        }
-
-        // Second click - proceed with deletion
-        actionTarget.disabled = true;
-        actionTarget.textContent = "Deleting...";
-
-        import("./api.js").then(async (m) => {
-            try {
-                await m.deleteSong(id);
-                ctx.hideDetailPanel();
-                performSearch(); // Refresh the current view
-            } catch (err) {
-                actionTarget.disabled = false;
-                actionTarget.classList.remove("confirming");
-                actionTarget.textContent = "Delete";
-                ctx.showBanner(`Deletion failed: ${err.message}`, "error");
-            }
-        });
-    }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -1249,9 +823,19 @@ document.addEventListener("keydown", (event) => {
     const modalOpen = isModalOpen();
 
     if (event.key === "Escape" && modalOpen) {
-        const scrubberModal = document.getElementById("scrubber-modal");
-        if (scrubberModal && scrubberModal.style.display === "flex") {
-            closeScrubberModal();
+        // Universal modal drainage
+        if (typeof songActions.handle === "function") {
+            const openModal = ["edit-modal", "link-modal", "scrubber-modal", "spotify-modal", "splitter-modal", "filename-parser-modal"]
+                .find(id => {
+                    const el = document.getElementById(id);
+                    return el && el.style.display === "flex";
+                });
+            
+            if (openModal) {
+                const action = `close-${openModal}`;
+                // Dispatch a virtual event to the handler to reuse closing logic
+                songActions.handle({ target: { dataset: { action } }, stopPropagation: () => {} });
+            }
         }
         return;
     }

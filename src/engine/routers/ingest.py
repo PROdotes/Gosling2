@@ -361,3 +361,57 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
     except Exception as e:
         logger.error(f"[IngestRouter] Cleanup failed for {real_target}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
+@router.get("/staging-orphans")
+async def get_staging_orphans():
+    """
+    List files in the staging folder that have no matching DB record.
+    Returns [{filename, path, size_bytes}].
+    """
+    if not os.path.exists(STAGING_DIR):
+        return JSONResponse([])
+
+    service = _get_service()
+    orphans = []
+    for fname in os.listdir(STAGING_DIR):
+        fpath = os.path.join(STAGING_DIR, fname)
+        if not os.path.isfile(fpath):
+            continue
+        song = service._song_repo.get_by_path(fpath)
+        if song is None:
+            orphans.append({
+                "filename": fname,
+                "path": fpath,
+                "size_bytes": os.path.getsize(fpath),
+            })
+
+    return JSONResponse(orphans)
+
+
+@router.delete("/staging-orphans")
+async def delete_staging_orphan(path: str):
+    """
+    Delete a specific file from staging, only if it has no DB record.
+    Safety: Path must be within STAGING_DIR.
+    """
+    real_staging = os.path.realpath(STAGING_DIR)
+    real_target = os.path.realpath(path)
+
+    if not real_target.startswith(real_staging):
+        raise HTTPException(status_code=403, detail="Path must be within the staging folder.")
+
+    if not os.path.isfile(real_target):
+        raise HTTPException(status_code=404, detail="File not found.")
+
+    service = _get_service()
+    song = service._song_repo.get_by_path(real_target)
+    if song is not None:
+        raise HTTPException(status_code=409, detail="File is linked to a DB record. Delete the song instead.")
+
+    try:
+        os.remove(real_target)
+        logger.info(f"[IngestRouter] Deleted staging orphan: {real_target}")
+        return {"status": "DELETED", "path": real_target}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")

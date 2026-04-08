@@ -39,7 +39,7 @@ ACCEPTED_EXTENSIONS = [".mp3", ".wav"]
 
 # Tag defaults
 TAG_DEFAULT_CATEGORY = "Genre"
-TAG_CATEGORY_DELIMITER = ":"
+TAG_CATEGORY_DELIMITER = "::"
 TAG_INPUT_FORMAT = "tag:category"
 
 # Default separators for the Artist Splitter feature

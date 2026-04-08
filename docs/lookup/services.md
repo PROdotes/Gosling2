@@ -42,6 +42,7 @@ Soft-delete a single song by SourceID. Handles physical cleanup if in staging.
 ### resolve_conflict(ghost_id: int, staged_path: str) -> Dict[str, Any]
 Resolve a ghost conflict by re-activating the soft-deleted record with new file metadata.
 
+
 ### get_song(song_id: int) -> Optional[Song]
 Fetch a single song and all its credits by ID.
 

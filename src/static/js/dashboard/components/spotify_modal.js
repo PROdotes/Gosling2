@@ -209,11 +209,3 @@ overlay.addEventListener("click", (e) => {
     if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
     if (e.target === overlay) closeSpotifyModal();
 });
-
-// ESC to close
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopImmediatePropagation();
-        closeSpotifyModal();
-    }
-});

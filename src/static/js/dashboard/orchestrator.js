@@ -2,6 +2,7 @@ import * as api from "./api.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openEditModal } from "./components/edit_modal.js";
+import { syncAlbumWithSong } from "./handlers/song_actions.js";
 
 /**
  * GOSLING ORCHESTRATOR
@@ -70,13 +71,25 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
         placeholder: `Search or type (e.g. ${format})...`,
         items: currentTags.map(t => ({ id: t.id, label: t.name })),
         onSearch: async (q) => {
-            const results = await api.searchTags(q);
+            const { name: searchTerm, category: searchCategory } = parseTagInput(q);
+            const hasCategory = q.includes(delimiter);
+            const results = await api.searchTags(searchTerm);
             if (results === api.ABORTED) return [];
-            return (results || []).map(t => ({ 
-                id: t.id, 
-                label: t.category ? `${t.name} (${t.category})` : t.name, 
-                name: t.name 
+            const mapped = (results || []).map(t => ({
+                id: t.id,
+                label: t.category ? `${t.name} (${t.category})` : t.name,
+                name: t.name,
+                category: t.category || null,
             }));
+            if (hasCategory) {
+                const catLower = searchCategory.toLowerCase();
+                mapped.sort((a, b) => {
+                    const aMatch = (a.category || "").toLowerCase() === catLower;
+                    const bMatch = (b.category || "").toLowerCase() === catLower;
+                    return aMatch === bMatch ? 0 : aMatch ? -1 : 1;
+                });
+            }
+            return mapped;
         },
         onAdd: async (opt) => {
             let name, category;
@@ -99,6 +112,17 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             const { name, category } = parseTagInput(q);
             if (!name) return `Add tag (missing name)`;
             return `Add "${name}" in "${category}"`;
+        },
+        shouldCreate: (q, results) => {
+            const { name, category } = parseTagInput(q);
+            if (!name) return false;
+            const nameLower = name.toLowerCase();
+            const categoryLower = category.toLowerCase();
+            return !results.some(r =>
+                r.name != null &&
+                r.name.toLowerCase() === nameLower &&
+                (r.category == null || r.category.toLowerCase() === categoryLower)
+            );
         },
     });
 }
@@ -142,8 +166,8 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
         onAdd: async (opt) => {
             const isNew = !opt.id;
             const res = await api.addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
-            if (isNew && res && res.album_id) {
-                try { await api.syncAlbumWithSong(res.album_id, songId); }
+            if (isNew && res?.album_id) {
+                try { await syncAlbumWithSong(res.album_id, songId); }
                 catch (err) { console.warn("Auto-sync failed:", err); }
             }
             await getUpdateCallback(ctx, songId)();

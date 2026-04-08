@@ -487,3 +487,13 @@ export function cleanupOriginalFile(filePath) {
         body: JSON.stringify({ file_path: filePath }),
     });
 }
+
+export function getStagingOrphans() {
+    return fetchJson("/api/v1/ingest/staging-orphans");
+}
+
+export function deleteStagingOrphan(filePath) {
+    return fetchJson(`/api/v1/ingest/staging-orphans?path=${encodeURIComponent(filePath)}`, {
+        method: "DELETE",
+    });
+}

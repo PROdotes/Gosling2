@@ -154,9 +154,12 @@ async function runSearch(q) {
 
     const options = filteredResults.map(r => ({ id: r.id, label: r.label }));
 
-    // Add create-new option if query doesn't exactly match an existing result
+    // Add create-new option unless suppressed
     const exactMatch = results.some(r => r.label.toLowerCase() === raw.toLowerCase());
-    if (raw && !exactMatch) {
+    const showCreate = _config.shouldCreate
+        ? _config.shouldCreate(raw, results)
+        : !exactMatch;
+    if (raw && showCreate) {
         options.unshift({ id: null, label: _config.createLabel(raw), isCreate: true, rawInput: raw });
     }
 
