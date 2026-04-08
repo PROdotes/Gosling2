@@ -38,6 +38,8 @@ import {
     setPrimarySongTag,
     uploadFiles,
     getAcceptedFormats,
+    fetchAppConfig,
+    getSongWebSearch,
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import { collectFilesFromItems } from "./renderers/ingestion.js";
@@ -87,6 +89,8 @@ const state = {
     allowedExtensions: [],
     successCount: 0,
     actionCount: 0,
+    searchEngines: {},
+    defaultSearchEngine: null,
 };
  
 const modeConfig = {
@@ -339,7 +343,7 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
     cachedFileDataSongId = String(song.id);
     state.activeSong = catalogSong;
     const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles);
+    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles, state.searchEngines, state.defaultSearchEngine);
     if (savedScroll) {
         const newContent = elements.detailPanel.querySelector(".detail-content");
         if (newContent) {
@@ -603,6 +607,76 @@ async function setupHeaderDropZone() {
         }
     });
 }
+
+// Long-press on the web-search main button → one-time engine picker
+let _longPressTimer = null;
+let _longPressTriggered = false;
+document.addEventListener("pointerdown", (event) => {
+    const btn = event.target.closest(".web-search-main");
+    if (!btn) return;
+    _longPressTriggered = false;
+    _longPressTimer = setTimeout(() => {
+        _longPressTriggered = true;
+        const splitEl = btn.closest(".web-search-split");
+        if (!splitEl) return;
+        const dropdown = splitEl.querySelector(".web-search-dropdown");
+        if (!dropdown) return;
+
+        // Show ALL engines (including current default) for one-time pick
+        const songId = btn.dataset.songId;
+        const engines = state.searchEngines;
+        dropdown.innerHTML = Object.entries(engines).map(([id, label]) =>
+            `<button class="web-search-option web-search-once" data-engine="${id}" data-song-id="${songId}">${label}</button>`
+        ).join("");
+        dropdown.hidden = false;
+
+        dropdown.querySelectorAll(".web-search-once").forEach(opt => {
+            opt.onclick = async (e) => {
+                e.stopPropagation();
+                dropdown.hidden = true;
+                dropdown.innerHTML = "";
+                // Restore normal set-engine options on next open
+                const activeEngine = btn.dataset.engine;
+                const otherEngines = Object.entries(engines).filter(([id]) => id !== activeEngine);
+                dropdown.innerHTML = otherEngines.map(([id, label]) =>
+                    `<button class="web-search-option" data-engine="${id}">${label}</button>`
+                ).join("");
+                try {
+                    const data = await getSongWebSearch(songId, opt.dataset.engine);
+                    if (data && data.url) window.open(data.url, "_blank");
+                } catch (err) {
+                    ctx.showBanner?.(`Search failed: ${err.message}`, "error");
+                }
+            };
+        });
+
+        const close = (e) => {
+            if (!splitEl.contains(e.target)) {
+                dropdown.hidden = true;
+                // Restore normal options
+                const activeEngine = btn.dataset.engine;
+                const otherEngines = Object.entries(state.searchEngines).filter(([id]) => id !== activeEngine);
+                dropdown.innerHTML = otherEngines.map(([id, label]) =>
+                    `<button class="web-search-option" data-engine="${id}">${label}</button>`
+                ).join("");
+                document.removeEventListener("click", close, true);
+            }
+        };
+        document.addEventListener("click", close, true);
+    }, 500);
+});
+document.addEventListener("pointerup", () => {
+    clearTimeout(_longPressTimer);
+});
+document.addEventListener("pointercancel", () => {
+    clearTimeout(_longPressTimer);
+});
+document.addEventListener("click", (event) => {
+    if (_longPressTriggered && event.target.closest(".web-search-main")) {
+        event.stopImmediatePropagation();
+        _longPressTriggered = false;
+    }
+}, true);
 
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
@@ -923,11 +997,16 @@ Promise.all([
     fetchId3Frames().catch(() => null),
     fetchRoles(),
     getAcceptedFormats().catch(() => []),
-]).then(([rules, frames, roles, exts]) => {
+    fetchAppConfig().catch(() => null),
+]).then(([rules, frames, roles, exts, appConfig]) => {
     state.validationRules = rules;
     state.id3Frames = frames;
     state.allRoles = roles;
     state.allowedExtensions = exts;
+    if (appConfig) {
+        state.searchEngines = appConfig.search_engines || {};
+        state.defaultSearchEngine = appConfig.default_search_engine || null;
+    }
 });
 setupHeaderDropZone();
 performSearch("");

@@ -43,6 +43,10 @@ export async function fetchValidationRules() {
     return fetchJson("/api/v1/validation-rules");
 }
 
+export async function fetchAppConfig() {
+    return fetchJson("/api/v1/config");
+}
+
 async function runSearch(key, url) {
     const previous = searchControllers.get(key);
     if (previous) {

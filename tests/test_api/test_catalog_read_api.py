@@ -307,7 +307,13 @@ class TestGetSongWebSearch:
         data = resp.json()
         assert "url" in data
         assert "google.com/search?q=" in data["url"]
-        assert "metadata" in data["url"]
+
+    def test_returns_youtube_url_when_requested(self, api):
+        resp = api.get("/api/v1/songs/1/web-search?engine=youtube")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert "url" in data
+        assert "youtube.com/results?search_query=" in data["url"]
 
     def test_nonexistent_song_returns_404(self, api):
         resp = api.get("/api/v1/songs/9999/web-search")

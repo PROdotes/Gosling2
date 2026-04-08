@@ -847,7 +847,9 @@ class CatalogService:
         with self._pub_repo.get_connection() as conn:
             pubs = self._pub_repo.get_all(conn=conn)
             result = self._hydrate_publishers(pubs, conn=conn)
-            logger.debug(f"[CatalogService] <- get_all_publishers() count={len(result)}")
+            logger.debug(
+                f"[CatalogService] <- get_all_publishers() count={len(result)}"
+            )
             return result
 
     def get_all_albums(self) -> List[Album]:
@@ -872,7 +874,9 @@ class CatalogService:
         with self._album_repo_dir.get_connection() as conn:
             album = self._album_repo_dir.get_by_id(album_id, conn=conn)
             if not album:
-                logger.warning(f"[CatalogService] <- get_album(id={album_id}) NOT_FOUND")
+                logger.warning(
+                    f"[CatalogService] <- get_album(id={album_id}) NOT_FOUND"
+                )
                 return None
 
             hydrated = self._hydrate_albums([album], conn=conn)
@@ -880,7 +884,9 @@ class CatalogService:
                 return None
 
             result = hydrated[0]
-            logger.debug(f"[CatalogService] <- get_album(id={album_id}) '{result.title}'")
+            logger.debug(
+                f"[CatalogService] <- get_album(id={album_id}) '{result.title}'"
+            )
             return result
 
     def search_publishers(self, query: str) -> List[Publisher]:
@@ -968,7 +974,9 @@ class CatalogService:
         with self._tag_repo.get_connection() as conn:
             song_ids = self._tag_repo.get_song_ids_by_tag(tag_id, conn=conn)
             if not song_ids:
-                logger.debug(f"[CatalogService] <- get_songs_by_tag(id={tag_id}) NO_SONGS")
+                logger.debug(
+                    f"[CatalogService] <- get_songs_by_tag(id={tag_id}) NO_SONGS"
+                )
                 return []
 
             songs = self._song_repo.get_by_ids(song_ids, conn=conn)
@@ -985,12 +993,18 @@ class CatalogService:
         with self._identity_repo.get_connection() as conn:
             identity = self._identity_repo.get_by_id(identity_id, conn=conn)
             if not identity:
-                logger.warning(f"[CatalogService] Exit: Identity {identity_id} not found.")
+                logger.warning(
+                    f"[CatalogService] Exit: Identity {identity_id} not found."
+                )
                 return []
 
             related_ids = {identity.id}
-            members_by_id = self._identity_repo.get_members_batch([identity.id], conn=conn)
-            groups_by_id = self._identity_repo.get_groups_batch([identity.id], conn=conn)
+            members_by_id = self._identity_repo.get_members_batch(
+                [identity.id], conn=conn
+            )
+            groups_by_id = self._identity_repo.get_groups_batch(
+                [identity.id], conn=conn
+            )
 
             for member in members_by_id.get(identity.id, []):
                 related_ids.add(member.id)
@@ -1360,16 +1374,16 @@ class CatalogService:
         self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None
     ) -> Dict[int, List[AlbumCredit]]:
         """Batch-fetch album credits grouped by album ID."""
-        logger.debug(f"[CatalogService] -> _get_credits_by_album(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> _get_credits_by_album(count={len(album_ids)})"
+        )
         if not album_ids:
             return {}
         all_credits = self._album_credit_repo.get_credits_for_albums(
             album_ids, conn=conn
         )
         results = self._batch_group_by_id(all_credits, "album_id")
-        logger.debug(
-            f"[CatalogService] <- _get_credits_by_album(count={len(results)})"
-        )
+        logger.debug(f"[CatalogService] <- _get_credits_by_album(count={len(results)})")
         return results
 
     def _get_songs_by_album(

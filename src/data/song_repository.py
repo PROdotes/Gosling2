@@ -453,7 +453,9 @@ class SongRepository(MediaSourceRepository):
                 p_rows = fetch_performers(new_conn, candidate_ids)
                 source_performers: Dict[int, List[str]] = {}
                 for r in p_rows:
-                    source_performers.setdefault(r["SourceID"], []).append(r["DisplayName"])
+                    source_performers.setdefault(r["SourceID"], []).append(
+                        r["DisplayName"]
+                    )
 
         # Compare sets
         found_matches = []

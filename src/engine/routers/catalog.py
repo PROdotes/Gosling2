@@ -366,6 +366,15 @@ async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
     return IngestionReportView(**result)
 
 
+@router.get("/config")
+def get_config():
+    """Returns application configuration settings."""
+    return {
+        "search_engines": SearchService.ENGINES,
+        "default_search_engine": DEFAULT_SEARCH_ENGINE,
+    }
+
+
 @router.get("/validation-rules")
 def get_validation_rules():
     """Returns scalar field validation rules for frontend use."""
@@ -388,6 +397,7 @@ def get_validation_rules():
             "input_format": TAG_INPUT_FORMAT,
         },
         "default_search_engine": DEFAULT_SEARCH_ENGINE,
+        "search_engines": SearchService.ENGINES,
         "credit_separators": DEFAULT_CREDIT_SEPARATORS,
         "scrubber_auto_play": SCRUBBER_AUTO_PLAY,
     }

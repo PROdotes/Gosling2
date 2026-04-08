@@ -69,7 +69,7 @@ class TagRepository(BaseRepository):
         """Fetch all tags."""
         logger.debug("[TagRepository] -> get_all()")
         query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE IsDeleted = 0 ORDER BY TagName COLLATE NOCASE"
-        
+
         if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query).fetchall()
@@ -86,7 +86,9 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch all tags: {e}")
             raise
 
-    def search(self, query: str, conn: Optional[sqlite3.Connection] = None) -> List[Tag]:
+    def search(
+        self, query: str, conn: Optional[sqlite3.Connection] = None
+    ) -> List[Tag]:
         """Search tags by name."""
         logger.debug(f"[TagRepository] -> search(q='{query}')")
         sql = """
@@ -120,7 +122,7 @@ class TagRepository(BaseRepository):
         """Fetch a single tag by ID."""
         logger.debug(f"[TagRepository] -> get_by_id(id={tag_id})")
         query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagID = ? AND IsDeleted = 0"
-        
+
         if conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute(query, (tag_id,)).fetchone()

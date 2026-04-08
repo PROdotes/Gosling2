@@ -150,6 +150,50 @@
     color: var(--text-primary);
 }
 
+.web-search-split {
+    position: relative;
+    display: inline-flex;
+}
+
+.web-search-split .web-search-main {
+    border-radius: 8px 0 0 8px;
+    border-right: none;
+}
+
+.web-search-split .web-search-arrow {
+    border-radius: 0 8px 8px 0;
+    padding: 0.6rem 0.5rem;
+}
+
+.web-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 100;
+    background: var(--bg-card, #1e1e2e);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    overflow: hidden;
+    min-width: 100%;
+}
+
+.web-search-option {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    background: transparent;
+    color: var(--text-secondary);
+    border: none;
+    font-size: 0.82rem;
+    cursor: pointer;
+    text-align: left;
+}
+
+.web-search-option:hover {
+    background: var(--bg-hover, rgba(255,255,255,0.05));
+    color: var(--text-primary);
+}
+
 .ingest-actions {
     display: flex;
     align-items: center;

@@ -380,11 +380,13 @@ async def get_staging_orphans():
             continue
         song = service._song_repo.get_by_path(fpath)
         if song is None:
-            orphans.append({
-                "filename": fname,
-                "path": fpath,
-                "size_bytes": os.path.getsize(fpath),
-            })
+            orphans.append(
+                {
+                    "filename": fname,
+                    "path": fpath,
+                    "size_bytes": os.path.getsize(fpath),
+                }
+            )
 
     return JSONResponse(orphans)
 
@@ -399,7 +401,9 @@ async def delete_staging_orphan(path: str):
     real_target = os.path.realpath(path)
 
     if not real_target.startswith(real_staging):
-        raise HTTPException(status_code=403, detail="Path must be within the staging folder.")
+        raise HTTPException(
+            status_code=403, detail="Path must be within the staging folder."
+        )
 
     if not os.path.isfile(real_target):
         raise HTTPException(status_code=404, detail="File not found.")
@@ -407,7 +411,10 @@ async def delete_staging_orphan(path: str):
     service = _get_service()
     song = service._song_repo.get_by_path(real_target)
     if song is not None:
-        raise HTTPException(status_code=409, detail="File is linked to a DB record. Delete the song instead.")
+        raise HTTPException(
+            status_code=409,
+            detail="File is linked to a DB record. Delete the song instead.",
+        )
 
     try:
         os.remove(real_target)

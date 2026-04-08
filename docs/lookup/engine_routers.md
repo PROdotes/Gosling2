@@ -152,6 +152,11 @@ Used by `update_identity_legal_name`.
 **HTTP**: `GET /api/v1/validation-rules`
 - Returns scalar field validation rules and global metadata defaults (e.g., tag categories/delimiters) for frontend use.
 
+### def get_config() -> Dict[str, Any]
+**HTTP**: `GET /api/v1/config`
+- Returns application configuration settings.
+- Returns `search_engines` dictionary and `default_search_engine`.
+
 ---
 
 
@@ -170,18 +175,16 @@ Used by `update_identity_legal_name`.
 **HTTP**: `GET /api/v1/ingest/formats`
 - Returns the list of supported file extensions for ingestion as defined in `ACCEPTED_EXTENSIONS`.
 
-### async def list_staging_files() -> List[Dict[str, Any]]
-**HTTP**: `GET /api/v1/ingest/staging`
-- List all files currently in the `STAGING_DIR`.
-- Returns metadata for each file, including `is_tracked` (True if the file path is already in the database).
-- Wraps `CatalogService.get_staged_files`.
+### async def get_staging_orphans() -> JSONResponse
+**HTTP**: `GET /api/v1/ingest/staging-orphans`
+- List files in the staging folder that have no matching DB record.
+- Returns list of objects with `filename`, `path`, and `size_bytes`.
 
-### async def discard_staged_file(filename: str) -> dict
-**HTTP**: `DELETE /api/v1/ingest/staging/{filename:path}`
-- Physically remove a file from the staging area.
-- Includes security checks to prevent directory traversal.
-- Returns `{"status": "DISCARDED", "filename": filename}`.
-- Wraps `CatalogService.discard_staged_file`.
+### async def delete_staging_orphan(path: str) -> dict
+**HTTP**: `DELETE /api/v1/ingest/staging-orphans`
+- Delete a specific file from staging, only if it has no DB record.
+- Safety: Path must be within `STAGING_DIR`.
+- Returns `{"status": "DELETED", "path": path}`.
 
 ### async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 **HTTP**: `POST /api/v1/ingest/upload`

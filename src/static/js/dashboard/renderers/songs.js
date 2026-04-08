@@ -520,7 +520,7 @@ function renderWorkflowStatus(song) {
         </div>`;
 }
 
-export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3Frames, allRoles) {
+export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3Frames, allRoles, searchEngines = {}, defaultSearchEngine = null) {
     const dbCredits = asArray(song.credits);
     const fileCredits = asArray(fileData && fileData.credits);
     const dbAlbums = asArray(song.albums);
@@ -548,9 +548,21 @@ export function renderSongDetailComplete(ctx, song, fileData, auditHistory, id3F
                 <button class="ingest-btn-secondary" data-action="open-spotify-modal" data-song-id="${song.id}" data-title="${escapeHtml(song.media_name || song.title)}">
                     Spotify ⇅
                 </button>
-                <button class="ingest-btn-secondary" data-action="web-search" data-song-id="${song.id}">
-                    Search
-                </button>
+                ${(() => {
+                    const engines = Object.entries(searchEngines);
+                    if (!engines.length) return "";
+                    const activeEngine = defaultSearchEngine || engines[0][0];
+                    const activeLabel = searchEngines[activeEngine] || activeEngine;
+                    const otherEngines = engines.filter(([id]) => id !== activeEngine);
+                    return `<div class="web-search-split">
+                        <button class="ingest-btn-secondary web-search-main" data-action="web-search" data-song-id="${song.id}" data-engine="${escapeHtml(activeEngine)}" title="Hold for one-time engine picker">
+                            ${escapeHtml(activeLabel)}
+                        </button><button class="ingest-btn-secondary web-search-arrow" data-action="web-search-set-engine" data-song-id="${song.id}" title="Change default search engine">▾</button>
+                        <div class="web-search-dropdown" hidden>
+                            ${otherEngines.map(([id, label]) => `<button class="web-search-option" data-engine="${escapeHtml(id)}">${escapeHtml(label)}</button>`).join("")}
+                        </div>
+                    </div>`;
+                })()}
                 <button class="ingest-btn-secondary" data-action="open-scrubber" data-song-id="${song.id}" data-title="${escapeHtml(song.title || song.media_name || 'Untitled')}">
                     ▶ Play
                 </button>

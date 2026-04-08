@@ -60,7 +60,9 @@ class IdentityRepository(BaseRepository):
             new_conn.row_factory = sqlite3.Row
             rows = new_conn.execute(query, identity_ids).fetchall()
             identities = [self._row_to_identity(row) for row in rows]
-            logger.debug(f"[IdentityRepository] <- get_by_ids() found {len(identities)}")
+            logger.debug(
+                f"[IdentityRepository] <- get_by_ids() found {len(identities)}"
+            )
             return identities
 
     def get_all_identities(

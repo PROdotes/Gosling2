@@ -8,6 +8,12 @@ class SearchService:
     Centralizing this logic on the backend ensures consistency across all consumer frontends.
     """
 
+    ENGINES = {
+        "spotify": "Spotify",
+        "google": "Google",
+        "youtube": "YouTube",
+    }
+
     def get_search_url(self, song: Song, engine: str = "spotify") -> str:
         """
         Builds a search URL for the given song and engine.
@@ -34,9 +40,12 @@ class SearchService:
             return f"https://open.spotify.com/search/{urllib.parse.quote(base_query)}"
 
         elif engine.lower() == "google":
-            # Google search with 'metadata' suffix
-            full_query = f"{base_query} metadata"
-            return f"https://www.google.com/search?q={urllib.parse.quote(full_query)}"
+            # Google search
+            return f"https://www.google.com/search?q={urllib.parse.quote(base_query)}"
+
+        elif engine.lower() == "youtube":
+            # YouTube search
+            return f"https://www.youtube.com/results?search_query={urllib.parse.quote(base_query)}"
 
         else:
             # Fallback to a simple Google search if engine is unknown

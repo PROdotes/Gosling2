@@ -60,6 +60,7 @@ export class SongActionsHandler {
             "close-edit-modal",
             "open-scrubber",
             "web-search",
+            "web-search-set-engine",
             "close-link-modal",
             "start-edit-scalar",
             "move-to-library",
@@ -354,9 +355,9 @@ export class SongActionsHandler {
     }
 
     async handleWebSearch(actionTarget) {
-        const { songId } = actionTarget.dataset;
+        const { songId, engine } = actionTarget.dataset;
         try {
-            const data = await api.getSongWebSearch(songId);
+            const data = await api.getSongWebSearch(songId, engine || null);
             if (data && data.url) {
                 this._window.open(data.url, "_blank");
             }
@@ -365,6 +366,46 @@ export class SongActionsHandler {
                 this.ctx.showBanner(`Search failed: ${err.message}`, "error");
             }
         }
+    }
+
+    async handleWebSearchSetEngine(actionTarget) {
+        const splitEl = actionTarget.closest(".web-search-split");
+        if (!splitEl) return;
+        const dropdown = splitEl.querySelector(".web-search-dropdown");
+        if (!dropdown) return;
+        const isOpen = !dropdown.hidden;
+        dropdown.hidden = isOpen;
+        if (isOpen) return;
+
+        // Close on outside click
+        const close = (e) => {
+            if (!splitEl.contains(e.target)) {
+                dropdown.hidden = true;
+                document.removeEventListener("click", close, true);
+            }
+        };
+        document.addEventListener("click", close, true);
+
+        dropdown.querySelectorAll(".web-search-option").forEach(btn => {
+            btn.onclick = () => {
+                const newEngine = btn.dataset.engine;
+                const newLabel = btn.textContent.trim();
+                const mainBtn = splitEl.querySelector(".web-search-main");
+                const oldEngine = mainBtn.dataset.engine;
+                const oldLabel = mainBtn.textContent.trim();
+
+                // Swap main button
+                mainBtn.dataset.engine = newEngine;
+                mainBtn.textContent = newLabel;
+
+                // Swap this option to show the old engine
+                btn.dataset.engine = oldEngine;
+                btn.textContent = oldLabel;
+
+                dropdown.hidden = true;
+                document.removeEventListener("click", close, true);
+            };
+        });
     }
 
     async handleConvertWav(actionTarget) {

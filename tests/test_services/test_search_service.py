@@ -56,4 +56,20 @@ def test_get_search_url_google():
     url = service.get_search_url(song, engine="google")
     assert "google.com/search?q=" in url
     assert "Dubioza" in url
-    assert "metadata" in url
+
+
+def test_get_search_url_youtube():
+    service = SearchService()
+    song = Song(
+        id=1,
+        type_id=1,
+        media_name="Pravda za Vedrana",
+        source_path="Z:\\Songs\\Pravda.mp3",
+        duration_s=180.0,
+        processing_status=1,
+        credits=[SongCredit(role_name="Performer", display_name="Dubioza kolektiv")],
+    )
+    url = service.get_search_url(song, engine="youtube")
+    assert "youtube.com/results?search_query=" in url
+    assert "Dubioza" in url
+    assert "Pravda%20za%20Vedrana" in url
