@@ -165,6 +165,21 @@ class TagRepository(BaseRepository):
             logger.error(f"[TagRepository] ERROR: Failed to fetch song IDs by tag: {e}")
             raise
 
+    def soft_delete(self, tag_id: int, conn: sqlite3.Connection) -> bool:
+        """Set IsDeleted = 1. Returns True if a row was updated, False if not found or already deleted."""
+        logger.debug(f"[TagRepository] -> soft_delete(tag_id={tag_id})")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Tags SET IsDeleted = 1 WHERE TagID = ? AND IsDeleted = 0",
+            (tag_id,),
+        )
+        updated = cursor.rowcount > 0
+        if updated:
+            logger.debug(f"[TagRepository] <- soft_delete(tag_id={tag_id}) SOFT_DELETED")
+        else:
+            logger.debug(f"[TagRepository] <- soft_delete(tag_id={tag_id}) NOT_FOUND_OR_ALREADY_DELETED")
+        return updated
+
     def get_or_create_tag(self, name: str, category: str, cursor) -> int:
         """Get-or-create a Tag by name+category (case-insensitive). Reactivates soft-deleted. Returns tag_id."""
         category = category.strip() if category else category
