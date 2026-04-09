@@ -181,18 +181,12 @@ class PublisherRepository(BaseRepository):
         self, name: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[int]:
         """Return the PublisherID for an exact (case-insensitive) name match, or None."""
+        query = "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0"
         if conn:
-            row = conn.execute(
-                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
-                (name,),
-            ).fetchone()
+            row = conn.execute(query, (name,)).fetchone()
             return row[0] if row else None
-
         with self.get_connection() as new_conn:
-            row = new_conn.execute(
-                "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
-                (name,),
-            ).fetchone()
+            row = new_conn.execute(query, (name,)).fetchone()
             return row[0] if row else None
 
     def get_by_id(

@@ -4,6 +4,34 @@
  */
 
 import * as api from "../api.js";
+
+export async function updateSyncLed(songId) {
+    const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
+    if (!led) return;
+    led.title = "Checking sync...";
+    led.style.background = "#888";
+    const mismatchEl = document.querySelector(
+        `.sync-mismatch-list[data-song-id="${songId}"]`,
+    );
+    if (mismatchEl) mismatchEl.textContent = "";
+    try {
+        const result = await api.getSongSyncStatus(songId);
+        led.style.background = result.in_sync ? "#4caf50" : "#f44336";
+        led.title = result.in_sync
+            ? "In sync"
+            : `Out of sync:\n${result.mismatches.join("\n")}`;
+        if (mismatchEl) {
+            const labels = result.mismatches.map((m) =>
+                m.replace(/^credit:/, ""),
+            );
+            mismatchEl.textContent = result.in_sync ? "" : labels.join(" · ");
+        }
+    } catch {
+        led.style.background = "#888";
+        led.title = "Sync status unavailable";
+    }
+}
+
 import { activateInlineEdit } from "../components/inline_editor.js";
 
 export async function syncAlbumWithSong(albumId, songId) {
@@ -15,25 +43,37 @@ export async function syncAlbumWithSong(albumId, songId) {
     if (!albumDetail.release_year && song.year) {
         ops.push(api.updateAlbum(albumId, { release_year: song.year }));
     }
-    const existingNameIds = new Set((albumDetail.credits || []).map(c => String(c.name_id)));
-    for (const credit of (song.credits || [])) {
+    const existingNameIds = new Set(
+        (albumDetail.credits || []).map((c) => String(c.name_id)),
+    );
+    for (const credit of song.credits || []) {
         if (credit.role_name !== "Performer") continue;
         if (!existingNameIds.has(String(credit.name_id))) {
-            ops.push(api.addAlbumCredit(albumId, credit.display_name, credit.role_name, credit.identity_id ?? null));
+            ops.push(
+                api.addAlbumCredit(
+                    albumId,
+                    credit.display_name,
+                    credit.role_name,
+                    credit.identity_id ?? null,
+                ),
+            );
         }
     }
-    const existingPubIds = new Set((albumDetail.publishers || []).map(p => String(p.id)));
-    for (const pub of (song.publishers || [])) {
+    const existingPubIds = new Set(
+        (albumDetail.publishers || []).map((p) => String(p.id)),
+    );
+    for (const pub of song.publishers || []) {
         if (!existingPubIds.has(String(pub.id))) {
             ops.push(api.addAlbumPublisher(albumId, pub.name, pub.id));
         }
     }
     await Promise.all(ops);
 }
+
 import { showConfirm } from "../components/confirm_modal.js";
 
 export class SongActionsHandler {
-    constructor(ctx, _window = typeof window !== 'undefined' ? window : null) {
+    constructor(ctx, _window = typeof window !== "undefined" ? window : null) {
         this.ctx = ctx;
         this._window = _window;
         // List of actions this handler is responsible for.
@@ -71,20 +111,22 @@ export class SongActionsHandler {
             "close-spotify-modal",
             "close-splitter-modal",
             "close-filename-parser-modal",
-            "close-scrubber-modal"
+            "close-scrubber-modal",
+            "sync-id3",
         ]);
     }
 
     /**
      * Dispatcher for click events.
-     * @param {Event} event 
+     * @param {Event} event
      * @returns {Promise<boolean>} True if action was handled
      */
     async handle(event) {
         // Support both real DOM events and virtual dispatch objects
-        const actionTarget = (event.target && typeof event.target.closest === "function") 
-            ? event.target.closest("[data-action]") 
-            : event.target;
+        const actionTarget =
+            event.target && typeof event.target.closest === "function"
+                ? event.target.closest("[data-action]")
+                : event.target;
 
         if (!actionTarget) return false;
 
@@ -93,20 +135,32 @@ export class SongActionsHandler {
 
         // Protocol: Modals are top-level. Block actions if any modal is open,
         // UNLESS the action is specifically a close-modal action or inside a modal.
-        const isInsideModal = (typeof actionTarget.closest === "function") && actionTarget.closest(".link-modal");
-        if (this.isModalOpen() && !isInsideModal && !action.startsWith("close-")) {
+        const isInsideModal =
+            typeof actionTarget.closest === "function" &&
+            actionTarget.closest(".link-modal");
+        if (
+            this.isModalOpen() &&
+            !isInsideModal &&
+            !action.startsWith("close-")
+        ) {
             return false;
         }
 
         // Method dispatch pattern: handleActionName
-        const methodName = `handle${action.split("-").map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("")}`;
-        
+        const methodName = `handle${action
+            .split("-")
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+            .join("")}`;
+
         if (typeof this[methodName] === "function") {
             try {
                 await this[methodName](actionTarget, event);
                 return true;
             } catch (err) {
-                console.error(`[Handler] Method ${methodName} failed: ${err.message}`, err);
+                console.error(
+                    `[Handler] Method ${methodName} failed: ${err.message}`,
+                    err,
+                );
                 return true;
             }
         }
@@ -120,10 +174,14 @@ export class SongActionsHandler {
      */
     isModalOpen() {
         const modals = [
-            "edit-modal", "link-modal", "scrubber-modal", 
-            "spotify-modal", "splitter-modal", "filename-parser-modal"
+            "edit-modal",
+            "link-modal",
+            "scrubber-modal",
+            "spotify-modal",
+            "splitter-modal",
+            "filename-parser-modal",
         ];
-        return modals.some(id => {
+        return modals.some((id) => {
             const el = document.getElementById(id);
             return el && el.style.display === "flex";
         });
@@ -143,7 +201,10 @@ export class SongActionsHandler {
 
             // Reset after 3 seconds if not clicked again
             setTimeout(() => {
-                if (actionTarget.classList.contains("confirming") && !actionTarget.disabled) {
+                if (
+                    actionTarget.classList.contains("confirming") &&
+                    !actionTarget.disabled
+                ) {
                     actionTarget.classList.remove("confirming");
                     actionTarget.textContent = originalText;
                 }
@@ -159,7 +220,7 @@ export class SongActionsHandler {
             await api.deleteSong(id);
             // Integration: Call the search refresh passed via context
             if (this.ctx.hideDetailPanel) this.ctx.hideDetailPanel();
-            
+
             // Allow main.js or other systems to refresh the list
             // In Gosling v3, we prefer performSearch()
             if (typeof performSearch === "function") {
@@ -193,16 +254,19 @@ export class SongActionsHandler {
 
         try {
             await api.patchSongScalars(id, { is_active: isChecked });
-            
+
             // Sync current items in any list results
             const state = this.ctx.getState();
-            state.cachedSongs = state.cachedSongs.map(s => 
-                String(s.id) === String(id) ? { ...s, is_active: isChecked } : s
+            state.cachedSongs = state.cachedSongs.map((s) =>
+                String(s.id) === String(id)
+                    ? { ...s, is_active: isChecked }
+                    : s,
             );
-            
+
             // If the song detail pane is open, refresh it
             // Compatibility: main.js uses activeDetailKey global
-            const activeKey = typeof activeDetailKey !== "undefined" ? activeDetailKey : null;
+            const activeKey =
+                typeof activeDetailKey !== "undefined" ? activeDetailKey : null;
             if (activeKey === `songs:${id}`) {
                 this.ctx.refreshActiveDetail();
             }
@@ -210,7 +274,10 @@ export class SongActionsHandler {
             // Revert state if failed (validation error, etc.)
             input.checked = !isChecked;
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to toggle activation: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to toggle activation: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -226,13 +293,18 @@ export class SongActionsHandler {
     async _handleReviewStatus(actionTarget, newStatus) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            const updatedSong = await api.patchSongScalars(id, { processing_status: newStatus });
+            const updatedSong = await api.patchSongScalars(id, {
+                processing_status: newStatus,
+            });
             if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
             }
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to update status: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to update status: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -255,8 +327,30 @@ export class SongActionsHandler {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Organization failed: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Organization failed: ${err.message}`,
+                    "error",
+                );
             }
+        }
+    }
+
+    async handleSyncId3(actionTarget) {
+        const id = actionTarget.dataset.songId;
+        actionTarget.disabled = true;
+        const originalText = actionTarget.textContent;
+        actionTarget.textContent = "Syncing...";
+        try {
+            await api.syncSongId3(id);
+            if (this.ctx.showBanner)
+                this.ctx.showBanner("ID3 tags updated.", "success");
+            await updateSyncLed(id);
+        } catch (err) {
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(`ID3 sync failed: ${err.message}`, "error");
+        } finally {
+            actionTarget.disabled = false;
+            actionTarget.textContent = originalText;
         }
     }
 
@@ -272,14 +366,18 @@ export class SongActionsHandler {
             },
             onSave: (updatedSong, savedField) => {
                 if (savedField === "media_name" || savedField === "title") {
-                    const cached = state.cachedSongs.find(s => String(s.id) === String(songId));
+                    const cached = state.cachedSongs.find(
+                        (s) => String(s.id) === String(songId),
+                    );
                     if (cached) {
                         cached.media_name = updatedSong.media_name;
                         cached.title = updatedSong.media_name;
                     }
                 }
                 if (this.ctx.openSongDetail) {
-                    this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
+                    this.ctx.openSongDetail(updatedSong, {
+                        reuseFileData: true,
+                    });
                 }
             },
         });
@@ -292,7 +390,10 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to set primary tag: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to set primary tag: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -304,7 +405,10 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to remove tag: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to remove tag: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -316,7 +420,10 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to remove credit: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to remove credit: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -328,7 +435,10 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Failed to remove album: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Failed to remove album: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -343,13 +453,21 @@ export class SongActionsHandler {
     async handleFormatCase(actionTarget) {
         const { entityId, entityType, field, type } = actionTarget.dataset; // type = title or sentence
         try {
-            const updatedSong = await api.formatMetadataCase(entityType, entityId, field, type);
+            const updatedSong = await api.formatMetadataCase(
+                entityType,
+                entityId,
+                field,
+                type,
+            );
             if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
             }
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(`Formatting failed: ${err.message}`, "error");
+                this.ctx.showBanner(
+                    `Formatting failed: ${err.message}`,
+                    "error",
+                );
             }
         }
     }
@@ -386,7 +504,7 @@ export class SongActionsHandler {
         };
         document.addEventListener("click", close, true);
 
-        dropdown.querySelectorAll(".web-search-option").forEach(btn => {
+        dropdown.querySelectorAll(".web-search-option").forEach((btn) => {
             btn.onclick = () => {
                 const newEngine = btn.dataset.engine;
                 const newLabel = btn.textContent.trim();
@@ -415,17 +533,26 @@ export class SongActionsHandler {
         actionTarget.textContent = "Converting...";
 
         try {
-            const res = await fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`, { method: "POST" });
+            const res = await fetch(
+                `/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`,
+                { method: "POST" },
+            );
             const data = await res.json();
             const card = actionTarget.closest(".result-card");
-            if ((data.status === "INGESTED" || data.status === "ALREADY_EXISTS") && card) {
+            if (
+                (data.status === "INGESTED" ||
+                    data.status === "ALREADY_EXISTS") &&
+                card
+            ) {
                 card.style.background = "rgba(76, 175, 80, 0.1)";
                 card.style.borderLeft = "3px solid #4CAF50";
                 const box = card.querySelector(".pending-convert-box");
-                const msg = data.status === "ALREADY_EXISTS"
-                    ? `✓ Already in library as "${data.song?.media_name || "Unknown"}"`
-                    : `✓ Converted & Ingested as "${data.song?.media_name || "Unknown"}"`;
-                if (box) box.innerHTML = `<div style="color: #4CAF50; font-weight: 600;">${msg}</div>`;
+                const msg =
+                    data.status === "ALREADY_EXISTS"
+                        ? `✓ Already in library as "${data.song?.media_name || "Unknown"}"`
+                        : `✓ Converted & Ingested as "${data.song?.media_name || "Unknown"}"`;
+                if (box)
+                    box.innerHTML = `<div style="color: #4CAF50; font-weight: 600;">${msg}</div>`;
             } else {
                 actionTarget.disabled = false;
                 actionTarget.textContent = originalText;
@@ -445,16 +572,21 @@ export class SongActionsHandler {
         actionTarget.textContent = "Processing...";
 
         try {
-            const res = await fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
-                method: "POST",
-            });
+            const res = await fetch(
+                `/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`,
+                {
+                    method: "POST",
+                },
+            );
             const data = await res.json();
             if (data.status === "INGESTED") {
                 const card = actionTarget.closest(".result-card");
                 if (card) {
                     card.style.background = "rgba(76, 175, 80, 0.1)";
                     card.style.borderLeft = "3px solid #4CAF50";
-                    const conflictBox = card.querySelector('[style*="rgba(255, 149, 0"]');
+                    const conflictBox = card.querySelector(
+                        '[style*="rgba(255, 149, 0"]',
+                    );
                     if (conflictBox) {
                         conflictBox.innerHTML = `
                             <div style="color: #4CAF50; font-weight: 600; margin-bottom: 0.5rem;">✓ Ghost Record Reactivated</div>
@@ -478,7 +610,12 @@ export class SongActionsHandler {
 
     async handleCleanupOriginal(actionTarget) {
         const { path } = actionTarget.dataset;
-        if (!await showConfirm(`Permanently delete the original file?\n\nPath: ${path}`, { title: "Delete Original File" })) {
+        if (
+            !(await showConfirm(
+                `Permanently delete the original file?\n\nPath: ${path}`,
+                { title: "Delete Original File" },
+            ))
+        ) {
             return;
         }
 
@@ -488,7 +625,10 @@ export class SongActionsHandler {
             await api.cleanupOriginalFile(path);
             this.ctx.refreshActiveDetail();
             if (this.ctx.showBanner) {
-                this.ctx.showBanner("Original file deleted successfully", "success");
+                this.ctx.showBanner(
+                    "Original file deleted successfully",
+                    "success",
+                );
             }
         } catch (err) {
             actionTarget.style.opacity = "1";
@@ -501,10 +641,13 @@ export class SongActionsHandler {
 
     async handleOpenSplitterModal(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
-        const { text, target, classification, removeType, removeId } = actionTarget.dataset;
+        const { text, target, classification, removeType, removeId } =
+            actionTarget.dataset;
         const state = this.ctx.getState();
-        const { openSplitterModal } = await import("../components/splitter_modal.js");
-        
+        const { openSplitterModal } = await import(
+            "../components/splitter_modal.js"
+        );
+
         openSplitterModal({
             songId: id,
             text,
@@ -513,8 +656,11 @@ export class SongActionsHandler {
             remove: { type: removeType, id: Number(removeId) },
             separators: state.validationRules?.credit_separators || [],
             onConfirm: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(id));
-                if (song && this.ctx.openSongDetail) this.ctx.openSongDetail(song, { reuseFileData: true });
+                const song = state.cachedSongs.find(
+                    (s) => String(s.id) === String(id),
+                );
+                if (song && this.ctx.openSongDetail)
+                    this.ctx.openSongDetail(song, { reuseFileData: true });
             },
         });
     }
@@ -522,15 +668,21 @@ export class SongActionsHandler {
     async handleOpenFilenameParserSingle(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         const { filename } = actionTarget.dataset;
-        const { openFilenameParserModal } = await import("../components/filename_parser_modal.js");
-        
+        const { openFilenameParserModal } = await import(
+            "../components/filename_parser_modal.js"
+        );
+
         openFilenameParserModal({
             entries: [{ id: Number(id), filename }],
             onApply: async () => {
                 const state = this.ctx.getState();
-                const song = state.cachedSongs.find(s => String(s.id) === String(id));
-                if (song && this.ctx.openSongDetail) this.ctx.openSongDetail(song, { reuseFileData: true });
-                if (this.ctx.showBanner) this.ctx.showBanner("Metadata applied", "success");
+                const song = state.cachedSongs.find(
+                    (s) => String(s.id) === String(id),
+                );
+                if (song && this.ctx.openSongDetail)
+                    this.ctx.openSongDetail(song, { reuseFileData: true });
+                if (this.ctx.showBanner)
+                    this.ctx.showBanner("Metadata applied", "success");
             },
             onError: (msg) => {
                 if (this.ctx.showBanner) this.ctx.showBanner(msg, "error");
@@ -540,7 +692,7 @@ export class SongActionsHandler {
     async handleStartEditAlbumScalar(actionTarget) {
         const { albumId, songId, field } = actionTarget.dataset;
         const state = this.ctx.getState();
-        
+
         activateInlineEdit(actionTarget, {
             field,
             validationRules: state.validationRules,
@@ -548,33 +700,51 @@ export class SongActionsHandler {
                 return await api.updateAlbum(albumId, { [field]: val });
             },
             onSave: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                if (song && this.ctx.openSongDetail) this.ctx.openSongDetail(song, { reuseFileData: true });
-            }
+                const song = state.cachedSongs.find(
+                    (s) => String(s.id) === String(songId),
+                );
+                if (song && this.ctx.openSongDetail)
+                    this.ctx.openSongDetail(song, { reuseFileData: true });
+            },
         });
     }
 
     async handleStartEditAlbumLink(actionTarget) {
         const { albumId, songId, field } = actionTarget.dataset;
         const state = this.ctx.getState();
-        
+
         activateInlineEdit(actionTarget, {
             field,
             validationRules: state.validationRules,
             onCommit: async (val) => {
                 const card = actionTarget.closest(".album-card-detail");
-                const otherField = field === "track_number" ? "disc_number" : "track_number";
-                const otherSpan = card?.querySelector(`[data-field="${otherField}"]`);
-                const otherVal = otherSpan ? (otherSpan.textContent === "-" ? null : Number(otherSpan.textContent)) : null;
+                const otherField =
+                    field === "track_number" ? "disc_number" : "track_number";
+                const otherSpan = card?.querySelector(
+                    `[data-field="${otherField}"]`,
+                );
+                const otherVal = otherSpan
+                    ? otherSpan.textContent === "-"
+                        ? null
+                        : Number(otherSpan.textContent)
+                    : null;
 
                 const track = field === "track_number" ? val : otherVal;
                 const disc = field === "disc_number" ? val : otherVal;
-                return await api.updateSongAlbumLink(songId, albumId, track, disc);
+                return await api.updateSongAlbumLink(
+                    songId,
+                    albumId,
+                    track,
+                    disc,
+                );
             },
             onSave: () => {
-                const song = state.cachedSongs.find(s => String(s.id) === String(songId));
-                if (song && this.ctx.openSongDetail) this.ctx.openSongDetail(song, { reuseFileData: true });
-            }
+                const song = state.cachedSongs.find(
+                    (s) => String(s.id) === String(songId),
+                );
+                if (song && this.ctx.openSongDetail)
+                    this.ctx.openSongDetail(song, { reuseFileData: true });
+            },
         });
     }
 
@@ -582,10 +752,12 @@ export class SongActionsHandler {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         const { title } = actionTarget.dataset;
         const state = this.ctx.getState();
-        const { openSpotifyModal } = await import("../components/spotify_modal.js");
-        
+        const { openSpotifyModal } = await import(
+            "../components/spotify_modal.js"
+        );
+
         // Truth-First: Use the hydrated active song if it matches, otherwise fallback to cache
-        let song = state.cachedSongs.find(s => String(s.id) === String(id));
+        let song = state.cachedSongs.find((s) => String(s.id) === String(id));
         if (state.activeSong && String(state.activeSong.id) === String(id)) {
             song = state.activeSong;
         }
@@ -596,12 +768,18 @@ export class SongActionsHandler {
             existingCredits: song?.credits || [],
             existingPublishers: song?.publishers || [],
             onClose: () => {
-                if (this.ctx.refreshActiveDetail) this.ctx.refreshActiveDetail();
+                if (this.ctx.refreshActiveDetail)
+                    this.ctx.refreshActiveDetail();
             },
             onComplete: () => {
-                if (this.ctx.refreshActiveDetail) this.ctx.refreshActiveDetail();
-                if (this.ctx.showBanner) this.ctx.showBanner("Spotify credits imported successfully", "success");
-            }
+                if (this.ctx.refreshActiveDetail)
+                    this.ctx.refreshActiveDetail();
+                if (this.ctx.showBanner)
+                    this.ctx.showBanner(
+                        "Spotify credits imported successfully",
+                        "success",
+                    );
+            },
         });
     }
 
@@ -624,22 +802,30 @@ export class SongActionsHandler {
     }
 
     async handleCloseSpotifyModal() {
-        const { closeSpotifyModal } = await import("../components/spotify_modal.js");
+        const { closeSpotifyModal } = await import(
+            "../components/spotify_modal.js"
+        );
         closeSpotifyModal();
     }
 
     async handleCloseSplitterModal() {
-        const { closeSplitterModal } = await import("../components/splitter_modal.js");
+        const { closeSplitterModal } = await import(
+            "../components/splitter_modal.js"
+        );
         closeSplitterModal();
     }
 
     async handleCloseFilenameParserModal() {
-        const { closeFilenameParserModal } = await import("../components/filename_parser_modal.js");
+        const { closeFilenameParserModal } = await import(
+            "../components/filename_parser_modal.js"
+        );
         closeFilenameParserModal();
     }
 
     async handleCloseScrubberModal() {
-        const { closeScrubberModal } = await import("../components/scrubber_modal.js");
+        const { closeScrubberModal } = await import(
+            "../components/scrubber_modal.js"
+        );
         closeScrubberModal();
     }
 
@@ -651,7 +837,11 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
-            if (this.ctx.showBanner) this.ctx.showBanner(`Failed to remove publisher: ${err.message}`, "error");
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(
+                    `Failed to remove publisher: ${err.message}`,
+                    "error",
+                );
         }
     }
 
@@ -663,7 +853,11 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
-            if (this.ctx.showBanner) this.ctx.showBanner(`Failed to remove album publisher: ${err.message}`, "error");
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(
+                    `Failed to remove album publisher: ${err.message}`,
+                    "error",
+                );
         }
     }
 
@@ -675,7 +869,11 @@ export class SongActionsHandler {
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
-            if (this.ctx.showBanner) this.ctx.showBanner(`Failed to remove album credit: ${err.message}`, "error");
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(
+                    `Failed to remove album credit: ${err.message}`,
+                    "error",
+                );
         }
     }
 
@@ -689,7 +887,8 @@ export class SongActionsHandler {
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = "↓ sync from song";
-            if (this.ctx.showBanner) this.ctx.showBanner(`Sync failed: ${err.message}`, "error");
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(`Sync failed: ${err.message}`, "error");
         }
     }
 
@@ -699,7 +898,8 @@ export class SongActionsHandler {
         try {
             await api.updateAlbum(albumId, { album_type: newType });
         } catch (err) {
-            if (this.ctx.showBanner) this.ctx.showBanner(`Update failed: ${err.message}`, "error");
+            if (this.ctx.showBanner)
+                this.ctx.showBanner(`Update failed: ${err.message}`, "error");
             this.ctx.refreshActiveDetail();
         }
     }

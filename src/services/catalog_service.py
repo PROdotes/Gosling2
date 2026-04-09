@@ -35,9 +35,11 @@ from src.engine.config import (
     RENAME_RULES_PATH,
     LIBRARY_ROOT,
     get_db_path,
+    AUTO_SAVE_ID3,
 )
 from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
+from src.services.metadata_writer import MetadataWriter
 from src.engine.models.spotify import SpotifyCredit
 
 
@@ -62,6 +64,21 @@ class CatalogService:
         self._metadata_service = MetadataService()
         self._metadata_parser = MetadataParser()
         self._filing_service = FilingService(RENAME_RULES_PATH)
+        self._metadata_writer = MetadataWriter()
+
+    def _sync_id3_if_enabled(self, song_id: int) -> None:
+        """Internal trigger for persistent ID3 writing."""
+        if not AUTO_SAVE_ID3:
+            return
+
+        try:
+            song = self.get_song(song_id)
+            if song:
+                self._metadata_writer.write_metadata(song)
+        except Exception as e:
+            logger.error(
+                f"[CatalogService] Background ID3 sync failed for song {song_id}: {e}"
+            )
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """
@@ -1982,7 +1999,7 @@ class CatalogService:
                     "tag_name and category are required when tag_id is not provided"
                 )
             tag_name = tag_name.strip()
-            category = category.strip()
+            category = category.strip().title()
 
         logger.debug(
             f"[CatalogService] -> add_song_tag(song_id={song_id}, tag='{tag_name}', category='{category}')"
@@ -2040,6 +2057,7 @@ class CatalogService:
         logger.debug(f"[CatalogService] -> update_tag(tag_id={tag_id})")
         if not new_name or not new_name.strip():
             raise ValueError("Tag name cannot be empty")
+        new_category = new_category.strip().title() if new_category else new_category
         conn = self._tag_repo.get_connection()
         try:
             self._tag_repo.update_tag(tag_id, new_name, new_category, conn)
@@ -2275,6 +2293,19 @@ class CatalogService:
                     f"[CatalogService] COULD NOT PURGE CLONE at {new_abs_path}: {unlink_err}"
                 )
             raise db_err
+
+        # 3b. Write ID3 tags to library copy before cleanup — mandatory, not gated by AUTO_SAVE_ID3
+        try:
+            shipped_song = self.get_song(song_id)
+            if shipped_song:
+                self._metadata_writer.write_metadata(shipped_song)
+                logger.info(
+                    f"[CatalogService] ID3 sync written to library copy for song {song_id}"
+                )
+        except Exception as id3_err:
+            logger.error(
+                f"[CatalogService] ID3 write failed for song {song_id} — file shipped with stale tags: {id3_err}"
+            )
 
         # 4. Stage 3: Cleanup (Remove source from staging now that DB is committed)
         try:

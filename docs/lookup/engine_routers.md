@@ -375,6 +375,20 @@ Used by `update_identity_legal_name`.
 - Returns 404 if publisher or parent not found.
 - Wraps `CatalogService.set_publisher_parent`.
 
+### async def get_sync_status(song_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `GET /api/v1/songs/{song_id}/sync-status`
+- Compares DB state against physical ID3 tags.
+- Returns `{"in_sync": bool, "mismatches": [field_name, ...]}`.
+- Returns `{"in_sync": false, "mismatches": ["file_not_found"]}` if file is missing.
+- Wraps `MetadataService.compare_songs` and `MetadataService.filter_sync_mismatches`.
+
+### async def sync_id3(song_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `GET /api/v1/songs/{song_id}/sync-id3`
+- Writes current DB state to the physical ID3 tags of the song file.
+- Returns `{"status": "ok", "song_id": song_id}` on success.
+- Raises `HTTPException(400)` if file not found, `HTTPException(500)` on write failure.
+- Wraps `CatalogService._metadata_writer.write_metadata`.
+
 ### async def move_song_to_library(song_id: int, service: CatalogService = Depends(_get_service)) -> str
 **HTTP**: `POST /api/v1/songs/{song_id}/move`
 - Moves a 'Reviewed' song from staging to the organized library.

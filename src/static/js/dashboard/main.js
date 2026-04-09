@@ -1,62 +1,91 @@
 import {
     ABORTED,
     abortAllSearches,
+    addIdentityAlias,
+    addSongCredit,
     addSongPublisher,
+    addSongTag,
+    fetchAppConfig,
+    fetchId3Frames,
+    fetchRoles,
     fetchValidationRules,
+    formatMetadataCase,
+    getAcceptedFormats,
     getAlbumDetail,
     getArtistSongs,
-    addIdentityAlias,
-    removeIdentityAlias,
     getArtistTree,
     getAuditHistory,
     getCatalogSong,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
+    getSongWebSearch,
+    getTagCategories,
     getTagDetail,
     getTagSongs,
     isAbortError,
     patchSongScalars,
+    removeIdentityAlias,
+    removeSongCredit,
     removeSongPublisher,
+    removeSongTag,
     searchAlbums,
     searchArtists,
     searchPublishers,
     searchSongs,
     searchTags,
-    updatePublisher,
-    setPublisherParent,
-    updateTag,
-    getTagCategories,
-    addSongTag,
-    removeSongTag,
-    fetchId3Frames,
-    addSongCredit,
-    removeSongCredit,
-    updateCreditName,
-    fetchRoles,
-    formatMetadataCase,
     setPrimarySongTag,
+    setPublisherParent,
+    updateCreditName,
+    updatePublisher,
+    updateTag,
     uploadFiles,
-    getAcceptedFormats,
-    fetchAppConfig,
-    getSongWebSearch,
 } from "./api.js";
-import { initToastSystem, showToast } from "./components/toast.js";
-import { collectFilesFromItems } from "./renderers/ingestion.js";
-import { openLinkModal, closeLinkModal } from "./components/link_modal.js";
-import { openEditModal, closeEditModal } from "./components/edit_modal.js";
-import { openScrubberModal, closeScrubberModal } from "./components/scrubber_modal.js";
-import { openSpotifyModal, closeSpotifyModal } from "./components/spotify_modal.js";
-import { openSplitterModal, closeSplitterModal } from "./components/splitter_modal.js";
-import * as orch from "./orchestrator.js";
+import { closeEditModal, openEditModal } from "./components/edit_modal.js";
 import { activateInlineEdit } from "./components/inline_editor.js";
-import { SongActionsHandler } from "./handlers/song_actions.js";
-import { renderAlbums, renderAlbumDetailComplete, renderAlbumDetailLoading } from "./renderers/albums.js";
-import { renderArtists, renderArtistDetailComplete, renderArtistDetailLoading } from "./renderers/artists.js";
-import { renderPublishers as renderPublisherResults, renderPublisherDetailComplete, renderPublisherDetailLoading } from "./renderers/publishers.js";
-import { renderTags, renderTagDetailComplete, renderTagDetailLoading } from "./renderers/tags.js";
-import { renderSongDetailComplete, renderSongDetailLoading, renderSongs } from "./renderers/songs.js";
+import { closeLinkModal, openLinkModal } from "./components/link_modal.js";
+import {
+    closeScrubberModal,
+    openScrubberModal,
+} from "./components/scrubber_modal.js";
+import {
+    closeSplitterModal,
+    openSplitterModal,
+} from "./components/splitter_modal.js";
+import {
+    closeSpotifyModal,
+    openSpotifyModal,
+} from "./components/spotify_modal.js";
+import { initToastSystem, showToast } from "./components/toast.js";
 import { formatCountLabel, renderEmptyState } from "./components/utils.js";
+import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
+import * as orch from "./orchestrator.js";
+import {
+    renderAlbumDetailComplete,
+    renderAlbumDetailLoading,
+    renderAlbums,
+} from "./renderers/albums.js";
+import {
+    renderArtistDetailComplete,
+    renderArtistDetailLoading,
+    renderArtists,
+} from "./renderers/artists.js";
+import { collectFilesFromItems } from "./renderers/ingestion.js";
+import {
+    renderPublisherDetailComplete,
+    renderPublisherDetailLoading,
+    renderPublishers as renderPublisherResults,
+} from "./renderers/publishers.js";
+import {
+    renderSongDetailComplete,
+    renderSongDetailLoading,
+    renderSongs,
+} from "./renderers/songs.js";
+import {
+    renderTagDetailComplete,
+    renderTagDetailLoading,
+    renderTags,
+} from "./renderers/tags.js";
 
 const elements = {
     searchInput: document.getElementById("searchInput"),
@@ -92,7 +121,7 @@ const state = {
     searchEngines: {},
     defaultSearchEngine: null,
 };
- 
+
 const modeConfig = {
     songs: {
         placeholder: "Search songs, artists, albums...",
@@ -129,7 +158,9 @@ const modeConfig = {
         noun: "ingestion task",
         fetcher: async () => [],
         renderer: (ctx) => {
-            import("./renderers/ingestion.js").then((m) => m.renderIngestionPanel(ctx));
+            import("./renderers/ingestion.js").then((m) =>
+                m.renderIngestionPanel(ctx),
+            );
         },
     },
 };
@@ -150,7 +181,8 @@ const ctx = {
         if (!state.currentQuery) {
             state.totalLibraryCount = count;
         }
-        const isFiltered = state.currentQuery && count !== state.totalLibraryCount;
+        const isFiltered =
+            state.currentQuery && count !== state.totalLibraryCount;
         elements.matchCount.textContent = String(count);
         elements.totalCount.textContent = String(state.totalLibraryCount);
         elements.totalLabel.textContent = `${singular.charAt(0).toUpperCase()}${singular.slice(1)}s`;
@@ -171,18 +203,18 @@ const ctx = {
         const banner = document.createElement("div");
         banner.className = `ui-banner ui-banner-${type}`;
         banner.textContent = msg;
-        
+
         // Find existing banner and remove it
         const existing = elements.detailPanel.querySelector(".ui-banner");
         if (existing) existing.remove();
-        
+
         elements.detailPanel.prepend(banner);
-        
+
         // Auto-remove if success
         if (type === "success") {
             setTimeout(() => banner.remove(), 4000);
         }
-    }
+    },
 };
 
 const songActions = new SongActionsHandler(ctx);
@@ -219,13 +251,19 @@ function setActiveCache(mode, items) {
 
 function syncModeUi() {
     document.querySelectorAll(".mode-tab").forEach((button) => {
-        button.classList.toggle("active", button.dataset.mode === state.currentMode);
+        button.classList.toggle(
+            "active",
+            button.dataset.mode === state.currentMode,
+        );
     });
-    elements.searchInput.placeholder = modeConfig[state.currentMode].placeholder;
+    elements.searchInput.placeholder =
+        modeConfig[state.currentMode].placeholder;
 }
 
 function updateSelection() {
-    const cards = elements.resultsContainer.querySelectorAll("[data-selectable='true']");
+    const cards = elements.resultsContainer.querySelectorAll(
+        "[data-selectable='true']",
+    );
     cards.forEach((card, index) => {
         card.classList.toggle("active", index === state.selectedIndex);
     });
@@ -260,7 +298,11 @@ async function performSearch(query = state.currentQuery) {
     state.currentQuery = query;
     try {
         const items = await fetcher(query, state.isDeep);
-        if (items === ABORTED || mode !== state.currentMode || query !== state.currentQuery) {
+        if (
+            items === ABORTED ||
+            mode !== state.currentMode ||
+            query !== state.currentQuery
+        ) {
             return;
         }
 
@@ -270,7 +312,9 @@ async function performSearch(query = state.currentQuery) {
         if (isAbortError(error)) {
             return;
         }
-        elements.resultsContainer.innerHTML = renderEmptyState(`Error: ${error.message}`);
+        elements.resultsContainer.innerHTML = renderEmptyState(
+            `Error: ${error.message}`,
+        );
         elements.totalCount.textContent = "0";
         elements.matchCount.textContent = "0";
     }
@@ -287,7 +331,7 @@ function switchMode(mode) {
     state.currentMode = mode;
     state.currentQuery = "";
     state.selectedIndex = -1;
-    
+
     // Aligned to Blueprint: Entering Ingest mode clears the action badge
     if (mode === "ingest") {
         state.actionCount = 0;
@@ -314,15 +358,17 @@ function navigate(mode, query = "") {
 }
 
 async function openSongDetail(song, { reuseFileData = false } = {}) {
-    const existingContent = elements.detailPanel.querySelector(".detail-content");
+    const existingContent =
+        elements.detailPanel.querySelector(".detail-content");
     const savedScroll = existingContent ? existingContent.scrollTop : 0;
     const request = beginDetailRequest("songs", song.id);
     const isSameSong = state.activeSong?.id === song.id;
     if (!isSameSong) renderSongDetailLoading(ctx, song);
 
-    const fetchFile = (!reuseFileData || cachedFileDataSongId !== String(song.id))
-        ? getSongDetail(song.id, { signal: request.signal })
-        : Promise.resolve(cachedFileData);
+    const fetchFile =
+        !reuseFileData || cachedFileDataSongId !== String(song.id)
+            ? getSongDetail(song.id, { signal: request.signal })
+            : Promise.resolve(cachedFileData);
 
     const [catalogResult, fileResult, auditResult] = await Promise.allSettled([
         getCatalogSong(song.id, { signal: request.signal }),
@@ -330,22 +376,42 @@ async function openSongDetail(song, { reuseFileData = false } = {}) {
         getAuditHistory("Songs", song.id, { signal: request.signal }),
     ]);
 
-    if ([catalogResult, fileResult, auditResult].some(r => r.status === "rejected" && isAbortError(r.reason))) {
+    if (
+        [catalogResult, fileResult, auditResult].some(
+            (r) => r.status === "rejected" && isAbortError(r.reason),
+        )
+    ) {
         return;
     }
     if (!isActiveDetail("songs", song.id)) {
         return;
     }
 
-    const catalogSong = catalogResult.status === "fulfilled" && catalogResult.value ? catalogResult.value : song;
-    const fileData = fileResult.status === "fulfilled" ? fileResult.value : null;
+    const catalogSong =
+        catalogResult.status === "fulfilled" && catalogResult.value
+            ? catalogResult.value
+            : song;
+    const fileData =
+        fileResult.status === "fulfilled" ? fileResult.value : null;
     cachedFileData = fileData;
     cachedFileDataSongId = String(song.id);
     state.activeSong = catalogSong;
-    const auditHistory = auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(ctx, catalogSong, fileData, auditHistory, state.id3Frames, state.allRoles, state.searchEngines, state.defaultSearchEngine);
+    const auditHistory =
+        auditResult.status === "fulfilled" ? auditResult.value : [];
+    renderSongDetailComplete(
+        ctx,
+        catalogSong,
+        fileData,
+        auditHistory,
+        state.id3Frames,
+        state.allRoles,
+        state.searchEngines,
+        state.defaultSearchEngine,
+    );
+    updateSyncLed(catalogSong.id);
     if (savedScroll) {
-        const newContent = elements.detailPanel.querySelector(".detail-content");
+        const newContent =
+            elements.detailPanel.querySelector(".detail-content");
         if (newContent) {
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => {
@@ -365,18 +431,28 @@ async function openAlbumDetail(album) {
         getAuditHistory("Albums", album.id, { signal: request.signal }),
     ]);
 
-    if ((albumResult.status === "rejected" && isAbortError(albumResult.reason)) || (auditResult.status === "rejected" && isAbortError(auditResult.reason))) {
+    if (
+        (albumResult.status === "rejected" &&
+            isAbortError(albumResult.reason)) ||
+        (auditResult.status === "rejected" && isAbortError(auditResult.reason))
+    ) {
         return;
     }
     if (!isActiveDetail("albums", album.id)) {
         return;
     }
     if (albumResult.status === "rejected") {
-        ctx.showDetailPanel('<div class="detail-content"><div class="file-status missing">Failed to load album details.</div></div>');
+        ctx.showDetailPanel(
+            '<div class="detail-content"><div class="file-status missing">Failed to load album details.</div></div>',
+        );
         return;
     }
 
-    renderAlbumDetailComplete(ctx, albumResult.value, auditResult.status === "fulfilled" ? auditResult.value : []);
+    renderAlbumDetailComplete(
+        ctx,
+        albumResult.value,
+        auditResult.status === "fulfilled" ? auditResult.value : [],
+    );
 }
 
 async function openArtistDetail(artist) {
@@ -391,7 +467,8 @@ async function openArtistDetail(artist) {
 
     if (
         (treeResult.status === "rejected" && isAbortError(treeResult.reason)) ||
-        (songsResult.status === "rejected" && isAbortError(songsResult.reason)) ||
+        (songsResult.status === "rejected" &&
+            isAbortError(songsResult.reason)) ||
         (auditResult.status === "rejected" && isAbortError(auditResult.reason))
     ) {
         return;
@@ -400,12 +477,19 @@ async function openArtistDetail(artist) {
         return;
     }
     if (songsResult.status === "rejected") {
-        ctx.showDetailPanel('<div class="detail-content"><div class="file-status missing">Failed to load artist details.</div></div>');
+        ctx.showDetailPanel(
+            '<div class="detail-content"><div class="file-status missing">Failed to load artist details.</div></div>',
+        );
         return;
     }
 
     const tree = treeResult.status === "fulfilled" ? treeResult.value : artist;
-    renderArtistDetailComplete(ctx, tree, songsResult.value, auditResult.status === "fulfilled" ? auditResult.value : []);
+    renderArtistDetailComplete(
+        ctx,
+        tree,
+        songsResult.value,
+        auditResult.status === "fulfilled" ? auditResult.value : [],
+    );
 }
 
 async function openPublisherDetail(publisher) {
@@ -417,18 +501,27 @@ async function openPublisherDetail(publisher) {
         getPublisherSongs(publisher.id, { signal: request.signal }),
     ]);
 
-    if ((publisherResult.status === "rejected" && isAbortError(publisherResult.reason)) || (songsResult.status === "rejected" && isAbortError(songsResult.reason))) {
+    if (
+        (publisherResult.status === "rejected" &&
+            isAbortError(publisherResult.reason)) ||
+        (songsResult.status === "rejected" && isAbortError(songsResult.reason))
+    ) {
         return;
     }
     if (!isActiveDetail("publishers", publisher.id)) {
         return;
     }
     if (songsResult.status === "rejected") {
-        ctx.showDetailPanel('<div class="detail-content"><div class="file-status missing">Failed to load repertoire.</div></div>');
+        ctx.showDetailPanel(
+            '<div class="detail-content"><div class="file-status missing">Failed to load repertoire.</div></div>',
+        );
         return;
     }
 
-    const fullPublisher = publisherResult.status === "fulfilled" ? publisherResult.value : publisher;
+    const fullPublisher =
+        publisherResult.status === "fulfilled"
+            ? publisherResult.value
+            : publisher;
     renderPublisherDetailComplete(ctx, fullPublisher, songsResult.value);
 }
 
@@ -441,14 +534,19 @@ async function openTagDetail(tag) {
         getTagSongs(tag.id, { signal: request.signal }),
     ]);
 
-    if ((tagResult.status === "rejected" && isAbortError(tagResult.reason)) || (songsResult.status === "rejected" && isAbortError(songsResult.reason))) {
+    if (
+        (tagResult.status === "rejected" && isAbortError(tagResult.reason)) ||
+        (songsResult.status === "rejected" && isAbortError(songsResult.reason))
+    ) {
         return;
     }
     if (!isActiveDetail("tags", tag.id)) {
         return;
     }
     if (songsResult.status === "rejected") {
-        ctx.showDetailPanel('<div class="detail-content"><div class="file-status missing">Failed to load songs.</div></div>');
+        ctx.showDetailPanel(
+            '<div class="detail-content"><div class="file-status missing">Failed to load songs.</div></div>',
+        );
         return;
     }
 
@@ -460,7 +558,7 @@ function refreshActiveDetail() {
     if (!activeDetailKey) return;
     const [mode, id] = activeDetailKey.split(":");
     const list = getActiveList();
-    const item = list.find(i => String(i.id) === id);
+    const item = list.find((i) => String(i.id) === id);
     if (!item) return;
     if (mode === "songs") openSongDetail(item, { reuseFileData: true });
     else if (mode === "albums") openAlbumDetail(item);
@@ -500,8 +598,11 @@ function isModalOpen() {
     if (spotifyModal && spotifyModal.style.display === "flex") return true;
     const splitterModal = document.getElementById("splitter-modal");
     if (splitterModal && splitterModal.style.display === "flex") return true;
-    const filenameParserModal = document.getElementById("filename-parser-modal");
-    if (filenameParserModal && filenameParserModal.style.display === "flex") return true;
+    const filenameParserModal = document.getElementById(
+        "filename-parser-modal",
+    );
+    if (filenameParserModal && filenameParserModal.style.display === "flex")
+        return true;
     return false;
 }
 
@@ -566,7 +667,10 @@ async function setupHeaderDropZone() {
         const items = e.dataTransfer?.items;
         if (!items || items.length === 0) return;
 
-        const allFiles = await collectFilesFromItems(items, state.allowedExtensions);
+        const allFiles = await collectFilesFromItems(
+            items,
+            state.allowedExtensions,
+        );
 
         if (allFiles.length === 0) {
             showToast("No valid audio files found in drop", "error", 3000);
@@ -579,8 +683,12 @@ async function setupHeaderDropZone() {
             let actions = 0;
 
             for (const fileResult of result.results) {
-                const title = fileResult.song?.media_name || fileResult.title || "Unknown";
-                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || title;
+                const title =
+                    fileResult.song?.media_name ||
+                    fileResult.title ||
+                    "Unknown";
+                const fileName =
+                    fileResult.song?.source_path?.split(/[/\\]/).pop() || title;
 
                 if (fileResult.status === "INGESTED") {
                     showToast(`Ingested: ${title}`, "success", 3000);
@@ -588,17 +696,33 @@ async function setupHeaderDropZone() {
                 } else if (fileResult.status === "ALREADY_EXISTS") {
                     showToast(`Duplicate: ${title}`, "warning", 5000);
                 } else if (fileResult.status === "CONFLICT") {
-                    showToast(`Ghost record: ${title} — action needed`, "error", 0, { 
-                        label: "Review", onClick: () => navigate("ingest") 
-                    });
+                    showToast(
+                        `Ghost record: ${title} — action needed`,
+                        "error",
+                        0,
+                        {
+                            label: "Review",
+                            onClick: () => navigate("ingest"),
+                        },
+                    );
                     actions++;
                 } else if (fileResult.status === "PENDING_CONVERT") {
-                    showToast(`Conversion required: ${fileName}`, "warning", 0, { 
-                        label: "Review", onClick: () => navigate("ingest") 
-                    });
+                    showToast(
+                        `Conversion required: ${fileName}`,
+                        "warning",
+                        0,
+                        {
+                            label: "Review",
+                            onClick: () => navigate("ingest"),
+                        },
+                    );
                     actions++;
                 } else if (fileResult.status === "ERROR") {
-                    showToast(`Error: ${fileResult.message || "Upload failed"}`, "error", 5000);
+                    showToast(
+                        `Error: ${fileResult.message || "Upload failed"}`,
+                        "error",
+                        5000,
+                    );
                 }
             }
             updateIngestBadges(successes, actions);
@@ -625,24 +749,35 @@ document.addEventListener("pointerdown", (event) => {
         // Show ALL engines (including current default) for one-time pick
         const songId = btn.dataset.songId;
         const engines = state.searchEngines;
-        dropdown.innerHTML = Object.entries(engines).map(([id, label]) =>
-            `<button class="web-search-option web-search-once" data-engine="${id}" data-song-id="${songId}">${label}</button>`
-        ).join("");
+        dropdown.innerHTML = Object.entries(engines)
+            .map(
+                ([id, label]) =>
+                    `<button class="web-search-option web-search-once" data-engine="${id}" data-song-id="${songId}">${label}</button>`,
+            )
+            .join("");
         dropdown.hidden = false;
 
-        dropdown.querySelectorAll(".web-search-once").forEach(opt => {
+        dropdown.querySelectorAll(".web-search-once").forEach((opt) => {
             opt.onclick = async (e) => {
                 e.stopPropagation();
                 dropdown.hidden = true;
                 dropdown.innerHTML = "";
                 // Restore normal set-engine options on next open
                 const activeEngine = btn.dataset.engine;
-                const otherEngines = Object.entries(engines).filter(([id]) => id !== activeEngine);
-                dropdown.innerHTML = otherEngines.map(([id, label]) =>
-                    `<button class="web-search-option" data-engine="${id}">${label}</button>`
-                ).join("");
+                const otherEngines = Object.entries(engines).filter(
+                    ([id]) => id !== activeEngine,
+                );
+                dropdown.innerHTML = otherEngines
+                    .map(
+                        ([id, label]) =>
+                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
+                    )
+                    .join("");
                 try {
-                    const data = await getSongWebSearch(songId, opt.dataset.engine);
+                    const data = await getSongWebSearch(
+                        songId,
+                        opt.dataset.engine,
+                    );
                     if (data && data.url) window.open(data.url, "_blank");
                 } catch (err) {
                     ctx.showBanner?.(`Search failed: ${err.message}`, "error");
@@ -655,10 +790,15 @@ document.addEventListener("pointerdown", (event) => {
                 dropdown.hidden = true;
                 // Restore normal options
                 const activeEngine = btn.dataset.engine;
-                const otherEngines = Object.entries(state.searchEngines).filter(([id]) => id !== activeEngine);
-                dropdown.innerHTML = otherEngines.map(([id, label]) =>
-                    `<button class="web-search-option" data-engine="${id}">${label}</button>`
-                ).join("");
+                const otherEngines = Object.entries(state.searchEngines).filter(
+                    ([id]) => id !== activeEngine,
+                );
+                dropdown.innerHTML = otherEngines
+                    .map(
+                        ([id, label]) =>
+                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
+                    )
+                    .join("");
                 document.removeEventListener("click", close, true);
             }
         };
@@ -671,12 +811,16 @@ document.addEventListener("pointerup", () => {
 document.addEventListener("pointercancel", () => {
     clearTimeout(_longPressTimer);
 });
-document.addEventListener("click", (event) => {
-    if (_longPressTriggered && event.target.closest(".web-search-main")) {
-        event.stopImmediatePropagation();
-        _longPressTriggered = false;
-    }
-}, true);
+document.addEventListener(
+    "click",
+    (event) => {
+        if (_longPressTriggered && event.target.closest(".web-search-main")) {
+            event.stopImmediatePropagation();
+            _longPressTriggered = false;
+        }
+    },
+    true,
+);
 
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
@@ -687,7 +831,12 @@ document.addEventListener("click", async (event) => {
     // or is a close-modal action.
     const { action } = actionTarget.dataset;
     const isModalComponent = actionTarget.closest(".link-modal");
-    const isCloseAction = action === "close-edit-modal" || action === "close-link-modal" || action === "close-spotify-modal" || action === "close-splitter-modal" || action === "close-filename-parser-modal";
+    const isCloseAction =
+        action === "close-edit-modal" ||
+        action === "close-link-modal" ||
+        action === "close-spotify-modal" ||
+        action === "close-splitter-modal" ||
+        action === "close-filename-parser-modal";
 
     if (isModalOpen() && !isModalComponent && !isCloseAction) {
         return;
@@ -709,7 +858,7 @@ document.addEventListener("click", async (event) => {
         actionTarget.classList.add("spinning");
         // Aligned to Blueprint: Refreshing the list clears the successful ingest badge
         state.successCount = 0;
-        updateIngestBadges(); 
+        updateIngestBadges();
         performSearch(state.currentQuery).finally(() => {
             actionTarget.classList.remove("spinning");
         });
@@ -726,7 +875,9 @@ document.addEventListener("click", async (event) => {
         const selected = state.displayedItems[index];
         if (selected) {
             const cachedList = getActiveList();
-            const actualIndex = cachedList.findIndex(item => item.id === selected.id);
+            const actualIndex = cachedList.findIndex(
+                (item) => item.id === selected.id,
+            );
             if (actualIndex >= 0) {
                 openSelectedResult(actualIndex);
             }
@@ -746,35 +897,53 @@ document.addEventListener("click", async (event) => {
 
         if (chipType === "publisher") {
             const publisherName = actionTarget.textContent.trim();
-            const publisherDetail = await getPublisherDetail(itemId).catch(() => null);
-            const childItems = publisherDetail && publisherDetail.sub_publishers
-                ? publisherDetail.sub_publishers.map(c => ({ id: c.id, label: c.name }))
-                : [];
+            const publisherDetail = await getPublisherDetail(itemId).catch(
+                () => null,
+            );
+            const childItems =
+                publisherDetail && publisherDetail.sub_publishers
+                    ? publisherDetail.sub_publishers.map((c) => ({
+                          id: c.id,
+                          label: c.name,
+                      }))
+                    : [];
 
-            openEditModal({
-                title: "Edit Publisher",
-                name: publisherDetail ? publisherDetail.name : publisherName,
-                onRename: async (newName) => { await updatePublisher(itemId, newName); },
-                onClose,
-                category: null,
-                children: {
-                    label: "Sub-publishers",
-                    items: childItems,
-                    onSearch: async (q) => {
-                        const results = await searchPublishers(q);
-                        return (results || []).map(p => ({ id: p.id, label: p.name }));
+            openEditModal(
+                {
+                    title: "Edit Publisher",
+                    name: publisherDetail
+                        ? publisherDetail.name
+                        : publisherName,
+                    onRename: async (newName) => {
+                        await updatePublisher(itemId, newName);
                     },
-                    onAdd: async (opt) => {
-                        await setPublisherParent(opt.id, Number(itemId));
-                        childItems.push({ id: opt.id, label: opt.label });
+                    onClose,
+                    category: null,
+                    children: {
+                        label: "Sub-publishers",
+                        items: childItems,
+                        onSearch: async (q) => {
+                            const results = await searchPublishers(q);
+                            return (results || []).map((p) => ({
+                                id: p.id,
+                                label: p.name,
+                            }));
+                        },
+                        onAdd: async (opt) => {
+                            await setPublisherParent(opt.id, Number(itemId));
+                            childItems.push({ id: opt.id, label: opt.label });
+                        },
+                        onRemove: async (item) => {
+                            await setPublisherParent(item.id, null);
+                        },
+                        onRenameChild: async (item, newName) => {
+                            await updatePublisher(item.id, newName);
+                        },
+                        createLabel: (q) => `Add "${q}" as sub-publisher`,
                     },
-                    onRemove: async (item) => {
-                        await setPublisherParent(item.id, null);
-                    },
-                    onRenameChild: async (item, newName) => { await updatePublisher(item.id, newName); },
-                    createLabel: (q) => `Add "${q}" as sub-publisher`,
                 },
-            }, actionTarget);
+                actionTarget,
+            );
         } else if (chipType === "tag") {
             const tagDetail = await getTagDetail(itemId).catch(() => null);
             if (!tagDetail) {
@@ -782,29 +951,34 @@ document.addEventListener("click", async (event) => {
                 return;
             }
 
-            openEditModal({
-                title: "Edit Tag",
-                name: tagDetail.name,
-                onRename: async (newName) => {
-                    await updateTag(itemId, newName, tagDetail.category);
-                    tagDetail.name = newName;
-                },
-                onClose,
-                category: {
-                    label: "Category",
-                    value: tagDetail.category,
-                    editable: true,
-                    onSave: async (val) => {
-                        await updateTag(itemId, tagDetail.name, val);
-                        tagDetail.category = val;
+            openEditModal(
+                {
+                    title: "Edit Tag",
+                    name: tagDetail.name,
+                    onRename: async (newName) => {
+                        await updateTag(itemId, newName, tagDetail.category);
+                        tagDetail.name = newName;
                     },
-                    onSearch: async (q) => {
-                        const all = await getTagCategories();
-                        return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+                    onClose,
+                    category: {
+                        label: "Category",
+                        value: tagDetail.category,
+                        editable: true,
+                        onSave: async (val) => {
+                            await updateTag(itemId, tagDetail.name, val);
+                            tagDetail.category = val;
+                        },
+                        onSearch: async (q) => {
+                            const all = await getTagCategories();
+                            return all.filter((c) =>
+                                c.toLowerCase().includes(q.toLowerCase()),
+                            );
+                        },
                     },
+                    children: null,
                 },
-                children: null,
-            }, actionTarget);
+                actionTarget,
+            );
         } else if (chipType === "credit") {
             const identityId = actionTarget.dataset.identityId;
             if (!identityId) return;
@@ -812,38 +986,58 @@ document.addEventListener("click", async (event) => {
             const identity = await getArtistTree(identityId).catch(() => null);
             if (!identity) return;
 
-            const primaryAlias = (identity.aliases || []).find(a => a.is_primary);
-            const aliases = (identity.aliases || []).filter(a => !a.is_primary);
-            const childItems = aliases.map(a => ({ id: a.id, label: a.display_name }));
+            const primaryAlias = (identity.aliases || []).find(
+                (a) => a.is_primary,
+            );
+            const aliases = (identity.aliases || []).filter(
+                (a) => !a.is_primary,
+            );
+            const childItems = aliases.map((a) => ({
+                id: a.id,
+                label: a.display_name,
+            }));
 
-            openEditModal({
-                title: "Edit Artist",
-                name: primaryAlias?.display_name || identity.display_name,
-                onRename: async (newName) => {
-                    await updateCreditName(0, primaryAlias.id, newName);
+            openEditModal(
+                {
+                    title: "Edit Artist",
+                    name: primaryAlias?.display_name || identity.display_name,
+                    onRename: async (newName) => {
+                        await updateCreditName(0, primaryAlias.id, newName);
+                    },
+                    onClose,
+                    category: null,
+                    children: {
+                        label: "Aliases",
+                        items: childItems,
+                        onSearch: async (q) => {
+                            const results = await searchArtists(q);
+                            return (results || []).map((i) => ({
+                                id: i.id,
+                                label: i.display_name,
+                            }));
+                        },
+                        onAdd: async (opt) => {
+                            const result = await addIdentityAlias(
+                                identityId,
+                                opt.rawInput || opt.label,
+                                opt.id,
+                            );
+                            childItems.push({
+                                id: result.name_id,
+                                label: result.display_name,
+                            });
+                        },
+                        onRemove: async (item) => {
+                            await removeIdentityAlias(identityId, item.id);
+                        },
+                        onRenameChild: async (item, newName) => {
+                            await updateCreditName(0, item.id, newName);
+                        },
+                        createLabel: (q) => `Add "${q}" as alias`,
+                    },
                 },
-                onClose,
-                category: null,
-                children: {
-                    label: "Aliases",
-                    items: childItems,
-                    onSearch: async (q) => {
-                        const results = await searchArtists(q);
-                        return (results || []).map(i => ({ id: i.id, label: i.display_name }));
-                    },
-                    onAdd: async (opt) => {
-                        const result = await addIdentityAlias(identityId, opt.rawInput || opt.label, opt.id);
-                        childItems.push({ id: result.name_id, label: result.display_name });
-                    },
-                    onRemove: async (item) => {
-                        await removeIdentityAlias(identityId, item.id);
-                    },
-                    onRenameChild: async (item, newName) => {
-                        await updateCreditName(0, item.id, newName);
-                    },
-                    createLabel: (q) => `Add "${q}" as alias`,
-                },
-            }, actionTarget);
+                actionTarget,
+            );
         }
         return;
     }
@@ -852,7 +1046,9 @@ document.addEventListener("click", async (event) => {
         const { modalType, songId } = actionTarget.dataset;
 
         if (modalType === "publishers") {
-            const currentPublishers = (state.activeSong?.publishers || []).map(p => ({ id: p.id, label: p.name }));
+            const currentPublishers = (state.activeSong?.publishers || []).map(
+                (p) => ({ id: p.id, label: p.name }),
+            );
             orch.manageSongPublishers(ctx, songId, currentPublishers);
         } else if (modalType === "tags") {
             const currentTags = state.activeSong?.tags || [];
@@ -861,34 +1057,65 @@ document.addEventListener("click", async (event) => {
         } else if (modalType === "credits") {
             const { role } = actionTarget.dataset;
             if (!role) throw new Error("credits button is missing data-role");
-            const currentCredits = (state.activeSong?.credits || []).filter(c => c.role_name === role);
+            const currentCredits = (state.activeSong?.credits || []).filter(
+                (c) => c.role_name === role,
+            );
             orch.manageSongCredits(ctx, songId, role, currentCredits);
         } else if (modalType === "album") {
             const { songTitle } = actionTarget.dataset;
             const section = actionTarget.closest(".detail-section");
             const libraryBox = section?.querySelector(".surface-box");
             const currentAlbums = Array.from(
-                libraryBox ? libraryBox.querySelectorAll(`[data-action="remove-album"][data-song-id="${songId}"]`) : []
-            ).map(btn => ({ id: btn.dataset.albumId, label: btn.closest(".album-card-detail")?.querySelector(".editable-scalar")?.textContent?.trim() ?? "" }));
+                libraryBox
+                    ? libraryBox.querySelectorAll(
+                          `[data-action="remove-album"][data-song-id="${songId}"]`,
+                      )
+                    : [],
+            ).map((btn) => ({
+                id: btn.dataset.albumId,
+                label:
+                    btn
+                        .closest(".album-card-detail")
+                        ?.querySelector(".editable-scalar")
+                        ?.textContent?.trim() ?? "",
+            }));
             orch.manageSongAlbums(ctx, songId, songTitle, currentAlbums);
         } else if (modalType === "album-publishers") {
             const { albumId } = actionTarget.dataset;
             const chips = Array.from(
-                actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-publisher']") || []
-            ).map(btn => ({ id: btn.dataset.publisherId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
+                actionTarget
+                    .closest(".album-card-detail")
+                    ?.querySelectorAll(
+                        "[data-action='remove-album-publisher']",
+                    ) || [],
+            ).map((btn) => ({
+                id: btn.dataset.publisherId,
+                label:
+                    btn
+                        .closest(".link-chip")
+                        ?.querySelector(".link-chip-label")
+                        ?.textContent.trim() ?? "",
+            }));
             orch.manageAlbumPublishers(ctx, albumId, songId, chips);
         } else if (modalType === "album-credits") {
             const { albumId } = actionTarget.dataset;
             const chips = Array.from(
-                actionTarget.closest(".album-card-detail")?.querySelectorAll("[data-action='remove-album-credit']") || []
-            ).map(btn => ({ id: btn.dataset.creditId, label: btn.closest(".link-chip")?.querySelector(".link-chip-label")?.textContent.trim() ?? "" }));
+                actionTarget
+                    .closest(".album-card-detail")
+                    ?.querySelectorAll("[data-action='remove-album-credit']") ||
+                    [],
+            ).map((btn) => ({
+                id: btn.dataset.creditId,
+                label:
+                    btn
+                        .closest(".link-chip")
+                        ?.querySelector(".link-chip-label")
+                        ?.textContent.trim() ?? "",
+            }));
             orch.manageAlbumCredits(ctx, albumId, songId, chips);
         }
         return;
     }
-
-
-
 });
 
 document.addEventListener("keydown", (event) => {
@@ -899,31 +1126,44 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && modalOpen) {
         // Universal modal drainage
         if (typeof songActions.handle === "function") {
-            const openModal = ["edit-modal", "link-modal", "scrubber-modal", "spotify-modal", "splitter-modal", "filename-parser-modal"]
-                .find(id => {
-                    const el = document.getElementById(id);
-                    return el && el.style.display === "flex";
-                });
-            
+            const openModal = [
+                "edit-modal",
+                "link-modal",
+                "scrubber-modal",
+                "spotify-modal",
+                "splitter-modal",
+                "filename-parser-modal",
+            ].find((id) => {
+                const el = document.getElementById(id);
+                return el && el.style.display === "flex";
+            });
+
             if (openModal) {
                 const action = `close-${openModal}`;
                 // Dispatch a virtual event to the handler to reuse closing logic
-                songActions.handle({ target: { dataset: { action } }, stopPropagation: () => {} });
+                songActions.handle({
+                    target: { dataset: { action } },
+                    stopPropagation: () => {},
+                });
             }
         }
         return;
     }
 
-    if (event.key === "Escape" && elements.detailPanel.style.display === "flex" && !modalOpen) {
+    if (
+        event.key === "Escape" &&
+        elements.detailPanel.style.display === "flex" &&
+        !modalOpen
+    ) {
         abortDetailRequest();
         ctx.hideDetailPanel();
-        
+
         // If we were resolving items in Ingest mode, clear the action badge
         if (state.currentMode === "ingest") {
             state.actionCount = 0;
             updateIngestBadges();
         }
-        
+
         state.selectedIndex = -1;
         updateSelection();
         return;
@@ -942,8 +1182,19 @@ document.addEventListener("keydown", (event) => {
 
     if (event.key === "ArrowDown") {
         event.preventDefault();
-        state.selectedIndex = Math.min(state.selectedIndex + 1, items.length - 1);
+        state.selectedIndex = Math.min(
+            state.selectedIndex + 1,
+            items.length - 1,
+        );
         updateSelection();
+        const cachedList = getActiveList();
+        const selected = items[state.selectedIndex];
+        if (selected) {
+            const actualIndex = cachedList.findIndex(
+                (item) => item.id === selected.id,
+            );
+            if (actualIndex >= 0) openSelectedResult(actualIndex);
+        }
         return;
     }
 
@@ -951,6 +1202,28 @@ document.addEventListener("keydown", (event) => {
         event.preventDefault();
         state.selectedIndex = Math.max(state.selectedIndex - 1, -1);
         updateSelection();
+        const cachedList = getActiveList();
+        const selected = items[state.selectedIndex];
+        if (selected) {
+            const actualIndex = cachedList.findIndex(
+                (item) => item.id === selected.id,
+            );
+            if (actualIndex >= 0) openSelectedResult(actualIndex);
+        }
+        return;
+    }
+
+    if (
+        event.key === "+" &&
+        event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
+    ) {
+        event.preventDefault();
+        if (state.currentMode === "songs" && state.activeSong) {
+            const btn = document.querySelector(
+                `[data-action="sync-id3"][data-song-id="${state.activeSong.id}"]`,
+            );
+            if (btn) btn.click();
+        }
         return;
     }
 
@@ -960,17 +1233,28 @@ document.addEventListener("keydown", (event) => {
         if (!selected) return;
 
         // Pattern: If detail panel is already open for this song, 'Enter' triggers the scrubber
-        const isSongDetailOpen = state.currentMode === "songs" && elements.detailPanel.style.display === "flex";
-        const isActiveSongDetail = isSongDetailOpen && state.activeSong && String(state.activeSong.id) === String(selected.id);
+        const isSongDetailOpen =
+            state.currentMode === "songs" &&
+            elements.detailPanel.style.display === "flex";
+        const isActiveSongDetail =
+            isSongDetailOpen &&
+            state.activeSong &&
+            String(state.activeSong.id) === String(selected.id);
 
         if (isActiveSongDetail) {
-            orch.orchestrateScrubber(ctx, state.activeSong.id, state.activeSong.media_name || state.activeSong.title);
+            orch.orchestrateScrubber(
+                ctx,
+                state.activeSong.id,
+                state.activeSong.media_name || state.activeSong.title,
+            );
             return;
         }
 
         // Otherwise open the detail panel
         const cachedList = getActiveList();
-        const actualIndex = cachedList.findIndex(item => item.id === selected.id);
+        const actualIndex = cachedList.findIndex(
+            (item) => item.id === selected.id,
+        );
         if (actualIndex >= 0) {
             openSelectedResult(actualIndex);
         }

@@ -321,7 +321,7 @@ Fetch all sub-publishers for a given parent. Supports optional shared connection
 
 Find all song IDs explicitly linked to this publisher (Master rights). Supports optional shared connection.
 
-### get_song_ids_by_publisher_batch(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[int]]
+### get_song_ids_by_publisher_batch(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[int]
 
 Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [SourceID]. Supports optional shared connection.
 

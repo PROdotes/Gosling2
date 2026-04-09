@@ -29,18 +29,12 @@ class TagRepository(BaseRepository):
             rows = conn.execute(query, song_ids).fetchall()
             return [(row["SourceID"], self._row_to_tag(row)) for row in rows]
 
-        try:
-            with self._get_connection() as new_conn:
-                new_conn.row_factory = sqlite3.Row
-                rows = new_conn.execute(query, song_ids).fetchall()
-                results = [(row["SourceID"], self._row_to_tag(row)) for row in rows]
-                logger.debug(
-                    f"[TagRepository] <- get_tags_for_songs() count={len(results)}"
-                )
-                return results
-        except Exception as e:
-            logger.error(f"[TagRepository] ERROR: Failed to fetch tags: {e}")
-            raise
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            rows = new_conn.execute(query, song_ids).fetchall()
+            results = [(row["SourceID"], self._row_to_tag(row)) for row in rows]
+            logger.debug(f"[TagRepository] <- get_tags_for_songs() count={len(results)}")
+            return results
 
     def insert_tags(
         self, source_id: int, tags: List[Tag], conn: sqlite3.Connection
@@ -171,7 +165,7 @@ class TagRepository(BaseRepository):
 
     def get_or_create_tag(self, name: str, category: str, cursor) -> int:
         """Get-or-create a Tag by name+category (case-insensitive). Reactivates soft-deleted. Returns tag_id."""
-        category = category.strip().title() if category else category
+        category = category.strip() if category else category
         row = cursor.execute(
             "SELECT TagID, IsDeleted FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ? COLLATE UTF8_NOCASE",
             (name, category),
@@ -242,7 +236,7 @@ class TagRepository(BaseRepository):
             f"[TagRepository] -> update_tag(tag_id={tag_id}, name='{name}', category='{category}')"
         )
         cursor = conn.cursor()
-        category = category.strip().title() if category else category
+        category = category.strip() if category else category
         cursor.execute(
             "UPDATE Tags SET TagName = ?, TagCategory = ? WHERE TagID = ?",
             (name, category, tag_id),

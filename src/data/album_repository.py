@@ -97,19 +97,7 @@ class AlbumRepository(BaseRepository):
     ) -> List[int]:
         """Fetch all song IDs linked to an album."""
         logger.debug(f"[AlbumRepository] -> get_song_ids_by_album(id={album_id})")
-        query = "SELECT SourceID FROM SongAlbums WHERE AlbumID = ? ORDER BY DiscNumber, TrackNumber, SourceID"
-
-        if conn:
-            rows = conn.execute(query, (album_id,)).fetchall()
-            return [row[0] for row in rows]
-
-        with self._get_connection() as new_conn:
-            rows = new_conn.execute(query, (album_id,)).fetchall()
-            result = [row[0] for row in rows]
-            logger.debug(
-                f"[AlbumRepository] <- get_song_ids_by_album() count={len(result)}"
-            )
-            return result
+        return self.get_song_ids_for_albums([album_id], conn).get(album_id, [])
 
     def get_song_ids_for_albums(
         self, album_ids: List[int], conn: Optional[sqlite3.Connection] = None

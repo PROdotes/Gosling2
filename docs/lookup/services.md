@@ -242,6 +242,33 @@ Copies physical file to library.
 ### extract_metadata(file_path: str) -> Dict[str, List[str]]
 Extracts raw tags from audio files via Mutagen.
 
+### compare_songs(db_song: Song, file_song: Song) -> dict
+Compares two Song objects field by field.
+Returns `{"in_sync": bool, "mismatches": [field_name, ...]}`.
+Mismatches are labelled `title`, `year`, `bpm`, `isrc`, `credit:{Role}`, `tag:{Category}`, `publishers`, `album_title`, `track`, `disc`.
+
+### filter_sync_mismatches(db_song: Song, mismatches: list) -> list
+Filters raw `compare_songs` mismatches to only those relevant to DB state.
+Removes `tag:*` mismatches for categories that exist only in the file (not in the DB).
+
+---
+
+## MetadataWriter
+*Location: `src/services/metadata_writer.py`*
+
+**Responsibility**: Stateless service that writes a Song domain object back to physical ID3 tags. DB is always source of truth; ID3 is a "backup save".
+
+### write_metadata(song: Song) -> None
+Writes current Song state to the file at `song.source_path`.
+- Skips non-.mp3 files silently. Raises `FileNotFoundError` if the file is missing.
+- Opens existing ID3 or creates a new container — **preserves non-owned frames** (APIC, TXXX from other tools, etc.).
+- Scalar fields (`media_name`, `year`, `bpm`, `isrc`) written via `field_to_tag` config map.
+- Credits written by role via `role_to_tag` map (Performer→TPE1, Composer→TCOM, etc.); unmapped roles fall back to `TXXX:RoleName`.
+- Tags written by category via `category_to_tag` map (Genre→TCON, Mood→TMOO, etc.); unmapped categories fall back to `TXXX:CategoryName`.
+- Only first album is written (TALB, TRCK, TPOS, TPE2).
+- Duplicate names within a role/category are deduplicated before writing.
+- Saves as ID3v2.4 (`v2_version=4`), converting any v2.3 aliases via `update_to_v24()`.
+
 ---
 
 ## MetadataParser
