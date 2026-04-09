@@ -1214,7 +1214,7 @@ document.addEventListener("keydown", (event) => {
     }
 
     if (
-        event.key === "+" &&
+        (event.key === "+" || event.key === "Add") &&
         event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
     ) {
         event.preventDefault();
