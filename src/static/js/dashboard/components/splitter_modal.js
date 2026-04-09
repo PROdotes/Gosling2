@@ -12,15 +12,15 @@
  *   });
  */
 
-import { splitterTokenize, splitterPreview, splitterConfirm } from "../api.js";
+import { splitterConfirm, splitterPreview, splitterTokenize } from "../api.js";
 import { wasMousedownInside } from "./utils.js";
 
-const overlay    = document.getElementById("splitter-modal");
-const tokenRow   = document.getElementById("splitter-token-row");
-const previewEl  = document.getElementById("splitter-preview");
+const overlay = document.getElementById("splitter-modal");
+const tokenRow = document.getElementById("splitter-token-row");
+const previewEl = document.getElementById("splitter-preview");
 const confirmBtn = document.getElementById("splitter-confirm-btn");
 const customInput = document.getElementById("splitter-custom-input");
-const addBtn     = document.getElementById("splitter-add-btn");
+const addBtn = document.getElementById("splitter-add-btn");
 
 let _config = null;
 let _tokens = [];
@@ -31,19 +31,21 @@ let _separators = [];
 // ---------------------------------------------------------------------------
 
 function renderTokenRow() {
-    tokenRow.innerHTML = _tokens.map((token, i) => {
-        if (token.type === "name") {
-            return `<span class="splitter-name-token">${escapeHtml(token.text)}</span>`;
-        }
-        const ignored = !!token.ignore;
-        return `
+    tokenRow.innerHTML = _tokens
+        .map((token, i) => {
+            if (token.type === "name") {
+                return `<span class="splitter-name-token">${escapeHtml(token.text)}</span>`;
+            }
+            const ignored = !!token.ignore;
+            return `
             <button class="splitter-sep-token ${ignored ? "splitter-sep--join" : "splitter-sep--split"}"
                     data-index="${i}" title="${ignored ? "Join (click to split)" : "Split (click to join)"}">
                 ${escapeHtml(token.text)}
             </button>`;
-    }).join("");
+        })
+        .join("");
 
-    tokenRow.querySelectorAll(".splitter-sep-token").forEach(btn => {
+    tokenRow.querySelectorAll(".splitter-sep-token").forEach((btn) => {
         btn.addEventListener("click", () => {
             const i = Number(btn.dataset.index);
             if (_tokens[i].ignore) {
@@ -59,22 +61,26 @@ function renderTokenRow() {
 
 async function updatePreview() {
     const names = resolveNames(_tokens);
-    previewEl.innerHTML = '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
+    previewEl.innerHTML =
+        '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
 
     let results;
     try {
         results = await splitterPreview(names, _config.target);
     } catch {
-        previewEl.innerHTML = '<span class="muted-note" style="font-size:0.8rem; color:red;">Preview failed</span>';
+        previewEl.innerHTML =
+            '<span class="muted-note" style="font-size:0.8rem; color:red;">Preview failed</span>';
         return;
     }
 
-    previewEl.innerHTML = results.map(r => {
-        const badge = r.exists
-            ? `<span class="splitter-preview-match">existing</span>`
-            : `<span class="splitter-preview-new">new</span>`;
-        return `<span class="splitter-preview-chip">${escapeHtml(r.name)} ${badge}</span>`;
-    }).join("");
+    previewEl.innerHTML = results
+        .map((r) => {
+            const badge = r.exists
+                ? `<span class="splitter-preview-match">existing</span>`
+                : `<span class="splitter-preview-new">new</span>`;
+            return `<span class="splitter-preview-chip">${escapeHtml(r.name)} ${badge}</span>`;
+        })
+        .join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +105,11 @@ function resolveNames(tokens) {
 }
 
 function escapeHtml(str) {
-    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +120,8 @@ export async function openSplitterModal(config) {
     _config = config;
     _separators = [...(config.separators || [])];
     _tokens = [];
-    tokenRow.innerHTML = '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
+    tokenRow.innerHTML =
+        '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
     previewEl.innerHTML = "";
     customInput.value = "";
     confirmBtn.disabled = false;
@@ -119,7 +130,8 @@ export async function openSplitterModal(config) {
     try {
         _tokens = await splitterTokenize(config.text, _separators);
     } catch {
-        tokenRow.innerHTML = '<span class="muted-note" style="color:red;">Tokenize failed</span>';
+        tokenRow.innerHTML =
+            '<span class="muted-note" style="color:red;">Tokenize failed</span>';
         return;
     }
 

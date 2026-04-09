@@ -124,7 +124,10 @@ export function getSongWebSearch(id, engine = null) {
 }
 
 export async function getSongDetail(id, options = {}) {
-    const response = await fetch(`/api/v1/metabolic/inspect-file/${id}`, options);
+    const response = await fetch(
+        `/api/v1/metabolic/inspect-file/${id}`,
+        options,
+    );
     if (response.ok) {
         return response.json();
     }
@@ -155,7 +158,9 @@ export function addIdentityAlias(identityId, displayName, nameId = null) {
 }
 
 export function removeIdentityAlias(identityId, nameId) {
-    return fetchVoid(`/api/v1/identities/${identityId}/aliases/${nameId}`, { method: "DELETE" });
+    return fetchVoid(`/api/v1/identities/${identityId}/aliases/${nameId}`, {
+        method: "DELETE",
+    });
 }
 
 export function updateIdentityLegalName(identityId, legalName) {
@@ -218,7 +223,10 @@ export function scanFolder(folderPath, recursive = true) {
 }
 
 export function addSongPublisher(songId, publisherName, publisherId = null) {
-    const body = publisherId !== null ? { publisher_id: publisherId } : { publisher_name: publisherName };
+    const body =
+        publisherId !== null
+            ? { publisher_id: publisherId }
+            : { publisher_name: publisherName };
     return fetchJson(`/api/v1/songs/${songId}/publishers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -236,7 +244,12 @@ export function fetchRoles() {
     return fetchJson("/api/v1/roles");
 }
 
-export function addSongCredit(songId, displayName, roleName, identityId = null) {
+export function addSongCredit(
+    songId,
+    displayName,
+    roleName,
+    identityId = null,
+) {
     const body = { display_name: displayName, role_name: roleName };
     if (identityId !== null) body.identity_id = identityId;
     return fetchJson(`/api/v1/songs/${songId}/credits`, {
@@ -285,6 +298,13 @@ export function moveSongToLibrary(id) {
     });
 }
 
+export function syncSongId3(id) {
+    return fetchJson(`/api/v1/songs/${id}/sync-id3`);
+}
+
+export function getSongSyncStatus(id) {
+    return fetchJson(`/api/v1/songs/${id}/sync-status`);
+}
 
 export function setPublisherParent(publisherId, parentId) {
     return fetchVoid(`/api/v1/publishers/${publisherId}/parent`, {
@@ -330,7 +350,8 @@ export function updateTag(tagId, name, category) {
 }
 
 export function addSongTag(songId, tagName, category, tagId = null) {
-    const body = tagId !== null ? { tag_id: tagId } : { tag_name: tagName, category };
+    const body =
+        tagId !== null ? { tag_id: tagId } : { tag_name: tagName, category };
     return fetchJson(`/api/v1/songs/${songId}/tags`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -371,7 +392,10 @@ export function updateSongAlbumLink(songId, albumId, trackNumber, discNumber) {
     return fetchVoid(`/api/v1/songs/${songId}/albums/${albumId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ track_number: trackNumber, disc_number: discNumber }),
+        body: JSON.stringify({
+            track_number: trackNumber,
+            disc_number: discNumber,
+        }),
     });
 }
 
@@ -383,7 +407,12 @@ export function updateAlbum(albumId, fields) {
     });
 }
 
-export function addAlbumCredit(albumId, displayName, roleName = "Performer", identityId = null) {
+export function addAlbumCredit(
+    albumId,
+    displayName,
+    roleName = "Performer",
+    identityId = null,
+) {
     const body = { display_name: displayName, role_name: roleName };
     if (identityId !== null) body.identity_id = identityId;
     return fetchJson(`/api/v1/albums/${albumId}/credits`, {
@@ -400,7 +429,10 @@ export function removeAlbumCredit(albumId, nameId) {
 }
 
 export function addAlbumPublisher(albumId, publisherName, publisherId = null) {
-    const body = publisherId !== null ? { publisher_id: publisherId } : { publisher_name: publisherName };
+    const body =
+        publisherId !== null
+            ? { publisher_id: publisherId }
+            : { publisher_name: publisherName };
     return fetchJson(`/api/v1/albums/${albumId}/publishers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -424,7 +456,10 @@ export function parseSpotifyCredits(rawText, referenceTitle) {
     return fetchJson("/api/v1/spotify/parse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ raw_text: rawText, reference_title: referenceTitle }),
+        body: JSON.stringify({
+            raw_text: rawText,
+            reference_title: referenceTitle,
+        }),
     });
 }
 
@@ -452,11 +487,23 @@ export function splitterPreview(names, target) {
     });
 }
 
-export function splitterConfirm(songId, tokens, target, classification, remove) {
+export function splitterConfirm(
+    songId,
+    tokens,
+    target,
+    classification,
+    remove,
+) {
     return fetchJson("/api/v1/tools/splitter/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ song_id: songId, tokens, target, classification, remove }),
+        body: JSON.stringify({
+            song_id: songId,
+            tokens,
+            target,
+            classification,
+            remove,
+        }),
     });
 }
 
@@ -497,7 +544,10 @@ export function getStagingOrphans() {
 }
 
 export function deleteStagingOrphan(filePath) {
-    return fetchJson(`/api/v1/ingest/staging-orphans?path=${encodeURIComponent(filePath)}`, {
-        method: "DELETE",
-    });
+    return fetchJson(
+        `/api/v1/ingest/staging-orphans?path=${encodeURIComponent(filePath)}`,
+        {
+            method: "DELETE",
+        },
+    );
 }

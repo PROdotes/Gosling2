@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 import mutagen
 import mutagen.easyid3
+from src.models.domain import Song
 
 try:
     from mutagen.id3 import (
@@ -67,6 +68,95 @@ class MetadataService:
             f"[MetadataService] Exit: extract_metadata - Found {len(metadata)} tags (including virtual TLEN)"
         )
         return metadata
+
+    def compare_songs(self, db_song: Song, file_song: Song) -> dict:
+        """
+        Compares two Song objects field by field.
+        Returns {in_sync: bool, mismatches: [field_name, ...]}
+        """
+        mismatches = []
+
+        def _check_scalar(label: str, db_val, file_val):
+            if str(db_val or "") != str(file_val or ""):
+                mismatches.append(label)
+
+        def _check_list(label: str, db_list: list, file_list: list):
+            if sorted(db_list) != sorted(file_list):
+                mismatches.append(label)
+
+        def _names_by_role(song: Song, role: str) -> list:
+            return sorted(
+                set(c.display_name for c in song.credits if c.role_name == role)
+            )
+
+        def _names_by_cat(song: Song, cat: str) -> list:
+            return sorted(set(t.name for t in song.tags if t.category == cat))
+
+        # Scalars
+        _check_scalar("title", db_song.media_name, file_song.media_name)
+        _check_scalar("year", db_song.year, file_song.year)
+        _check_scalar("bpm", db_song.bpm, file_song.bpm)
+        _check_scalar("isrc", db_song.isrc, file_song.isrc)
+
+        # Credits by role
+        all_roles = set(c.role_name for c in db_song.credits) | set(
+            c.role_name for c in file_song.credits
+        )
+        for role in all_roles:
+            _check_list(
+                f"credit:{role}",
+                _names_by_role(db_song, role),
+                _names_by_role(file_song, role),
+            )
+
+        # Tags by category
+        all_cats = set(t.category for t in db_song.tags) | set(
+            t.category for t in file_song.tags
+        )
+        for cat in all_cats:
+            _check_list(
+                f"tag:{cat}", _names_by_cat(db_song, cat), _names_by_cat(file_song, cat)
+            )
+
+        # Publishers
+        _check_list(
+            "publishers",
+            sorted(set(p.name for p in db_song.publishers)),
+            sorted(set(p.name for p in file_song.publishers)),
+        )
+
+        # Album
+        db_album = db_song.albums[0] if db_song.albums else None
+        file_album = file_song.albums[0] if file_song.albums else None
+        _check_scalar(
+            "album_title",
+            db_album.album_title if db_album else None,
+            file_album.album_title if file_album else None,
+        )
+        _check_scalar(
+            "track",
+            db_album.track_number if db_album else None,
+            file_album.track_number if file_album else None,
+        )
+        _check_scalar(
+            "disc",
+            db_album.disc_number if db_album else None,
+            file_album.disc_number if file_album else None,
+        )
+
+        return {"in_sync": len(mismatches) == 0, "mismatches": mismatches}
+
+    def filter_sync_mismatches(self, db_song: Song, mismatches: list) -> list:
+        """
+        Filters raw compare_songs mismatches to only those relevant to DB state.
+        Removes tag:* mismatches for categories that exist only in the file, not in the DB.
+        """
+        db_tag_categories = set(t.category for t in db_song.tags)
+        return [
+            m
+            for m in mismatches
+            if not m.startswith("tag:") or m[4:] in db_tag_categories
+        ]
 
     def _read_tags(self, tags: Any) -> Dict[str, List[str]]:
         """Extracts and cleans all tags from mutagen into a clean list-based dictionary."""

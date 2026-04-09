@@ -1,7 +1,7 @@
 import * as api from "./api.js";
-import { openScrubberModal } from "./components/scrubber_modal.js";
-import { openLinkModal } from "./components/link_modal.js";
 import { openEditModal } from "./components/edit_modal.js";
+import { openLinkModal } from "./components/link_modal.js";
+import { openScrubberModal } from "./components/scrubber_modal.js";
 import { syncAlbumWithSong } from "./handlers/song_actions.js";
 
 /**
@@ -22,7 +22,10 @@ export async function orchestrateScrubber(ctx, songId, title) {
             // Re-fetch or use state.activeSong to get freshest tags
             // If the song being scrubbed is the active one, use its tags
             let tags = [];
-            if (state.activeSong && String(state.activeSong.id) === String(id)) {
+            if (
+                state.activeSong &&
+                String(state.activeSong.id) === String(id)
+            ) {
                 tags = state.activeSong.tags || [];
             } else {
                 // Otherwise fetch them
@@ -30,7 +33,7 @@ export async function orchestrateScrubber(ctx, songId, title) {
                 tags = detail.tags || [];
             }
             manageSongTags(ctx, id, name, tags);
-        }
+        },
     });
 }
 
@@ -39,7 +42,9 @@ export async function orchestrateScrubber(ctx, songId, title) {
 function getUpdateCallback(ctx, songId) {
     return async () => {
         const state = ctx.getState();
-        const song = state.cachedSongs.find(s => String(s.id) === String(songId));
+        const song = state.cachedSongs.find(
+            (s) => String(s.id) === String(songId),
+        );
         if (song && ctx.openSongDetail) {
             ctx.openSongDetail(song, { reuseFileData: true });
         }
@@ -57,7 +62,8 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
     const nameFirst = format.toLowerCase().startsWith("tag");
 
     function parseTagInput(raw) {
-        if (!raw.includes(delimiter)) return { name: raw.trim(), category: defaultCategory };
+        if (!raw.includes(delimiter))
+            return { name: raw.trim(), category: defaultCategory };
         const idx = raw.indexOf(delimiter);
         const a = raw.slice(0, idx).trim();
         const b = raw.slice(idx + delimiter.length).trim();
@@ -69,13 +75,14 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
     openLinkModal({
         title: `Edit Tags: ${songTitle}`,
         placeholder: `Search or type (e.g. ${format})...`,
-        items: currentTags.map(t => ({ id: t.id, label: t.name })),
+        items: currentTags.map((t) => ({ id: t.id, label: t.name })),
         onSearch: async (q) => {
-            const { name: searchTerm, category: searchCategory } = parseTagInput(q);
+            const { name: searchTerm, category: searchCategory } =
+                parseTagInput(q);
             const hasCategory = q.includes(delimiter);
             const results = await api.searchTags(searchTerm);
             if (results === api.ABORTED) return [];
-            const mapped = (results || []).map(t => ({
+            const mapped = (results || []).map((t) => ({
                 id: t.id,
                 label: t.category ? `${t.name} (${t.category})` : t.name,
                 name: t.name,
@@ -84,8 +91,10 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             if (hasCategory) {
                 const catLower = searchCategory.toLowerCase();
                 mapped.sort((a, b) => {
-                    const aMatch = (a.category || "").toLowerCase() === catLower;
-                    const bMatch = (b.category || "").toLowerCase() === catLower;
+                    const aMatch =
+                        (a.category || "").toLowerCase() === catLower;
+                    const bMatch =
+                        (b.category || "").toLowerCase() === catLower;
                     return aMatch === bMatch ? 0 : aMatch ? -1 : 1;
                 });
             }
@@ -94,12 +103,21 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
         onAdd: async (opt) => {
             let name, category;
             if (opt.id != null) {
-                name = null; category = null;
+                name = null;
+                category = null;
             } else {
-                const parsed = parseTagInput(opt.rawInput || opt.name || opt.label);
-                name = parsed.name; category = parsed.category;
+                const parsed = parseTagInput(
+                    opt.rawInput || opt.name || opt.label,
+                );
+                name = parsed.name;
+                category = parsed.category;
             }
-            const tag = await api.addSongTag(songId, name, category, opt.id != null ? opt.id : null);
+            const tag = await api.addSongTag(
+                songId,
+                name,
+                category,
+                opt.id != null ? opt.id : null,
+            );
             opt.id = tag.id;
             opt.label = tag.name;
             await getUpdateCallback(ctx, songId)();
@@ -118,10 +136,12 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             if (!name) return false;
             const nameLower = name.toLowerCase();
             const categoryLower = category.toLowerCase();
-            return !results.some(r =>
-                r.name != null &&
-                r.name.toLowerCase() === nameLower &&
-                (r.category == null || r.category.toLowerCase() === categoryLower)
+            return !results.some(
+                (r) =>
+                    r.name != null &&
+                    r.name.toLowerCase() === nameLower &&
+                    (r.category == null ||
+                        r.category.toLowerCase() === categoryLower),
             );
         },
     });
@@ -133,14 +153,25 @@ export function manageSongCredits(ctx, songId, role, currentCredits) {
     openLinkModal({
         title: `Link ${role}`,
         placeholder: `Search for artist name...`,
-        items: currentCredits.map(c => ({ id: c.credit_id, label: c.display_name })),
+        items: currentCredits.map((c) => ({
+            id: c.credit_id,
+            label: c.display_name,
+        })),
         onSearch: async (q) => {
             const results = await api.searchArtists(q);
             if (results === api.ABORTED) return [];
-            return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+            return (results || []).map((a) => ({
+                id: a.id,
+                label: a.display_name || a.legal_name || a.name,
+            }));
         },
         onAdd: async (opt) => {
-            const credit = await api.addSongCredit(songId, opt.rawInput || opt.label, role, opt.id);
+            const credit = await api.addSongCredit(
+                songId,
+                opt.rawInput || opt.label,
+                role,
+                opt.id,
+            );
             opt.id = credit.credit_id;
             opt.label = credit.display_name;
             await getUpdateCallback(ctx, songId)();
@@ -161,14 +192,23 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
         onSearch: async (q) => {
             const results = await api.searchAlbums(q);
             if (results === api.ABORTED) return [];
-            return (results || []).map(a => ({ id: a.id, label: a.title }));
+            return (results || []).map((a) => ({ id: a.id, label: a.title }));
         },
         onAdd: async (opt) => {
             const isNew = !opt.id;
-            const res = await api.addSongAlbum(songId, opt.id ?? null, opt.rawInput || opt.label, null, null);
+            const res = await api.addSongAlbum(
+                songId,
+                opt.id ?? null,
+                opt.rawInput || opt.label,
+                null,
+                null,
+            );
             if (isNew && res?.album_id) {
-                try { await syncAlbumWithSong(res.album_id, songId); }
-                catch (err) { console.warn("Auto-sync failed:", err); }
+                try {
+                    await syncAlbumWithSong(res.album_id, songId);
+                } catch (err) {
+                    console.warn("Auto-sync failed:", err);
+                }
             }
             await getUpdateCallback(ctx, songId)();
         },
@@ -177,7 +217,9 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as new album`,
-        quickAdd: songTitle ? { label: `New album: "${songTitle}"`, rawInput: songTitle } : null,
+        quickAdd: songTitle
+            ? { label: `New album: "${songTitle}"`, rawInput: songTitle }
+            : null,
     });
 }
 
@@ -187,10 +229,14 @@ export function manageSongPublishers(ctx, songId, currentPublishers) {
         items: currentPublishers,
         onSearch: async (q) => {
             const results = await api.searchPublishers(q);
-            return (results || []).map(p => ({ id: p.id, label: p.name }));
+            return (results || []).map((p) => ({ id: p.id, label: p.name }));
         },
         onAdd: async (opt) => {
-            const publisher = await api.addSongPublisher(songId, opt.rawInput || opt.label, opt.id);
+            const publisher = await api.addSongPublisher(
+                songId,
+                opt.rawInput || opt.label,
+                opt.id,
+            );
             opt.id = publisher.id;
             opt.label = publisher.name;
             await getUpdateCallback(ctx, songId)();
@@ -211,10 +257,14 @@ export function manageAlbumPublishers(ctx, albumId, songId, currentChips) {
         items: currentChips,
         onSearch: async (q) => {
             const results = await api.searchPublishers(q);
-            return (results || []).map(p => ({ id: p.id, label: p.name }));
+            return (results || []).map((p) => ({ id: p.id, label: p.name }));
         },
         onAdd: async (opt) => {
-            const publisher = await api.addAlbumPublisher(albumId, opt.rawInput || opt.label, opt.id ? Number(opt.id) : null);
+            const publisher = await api.addAlbumPublisher(
+                albumId,
+                opt.rawInput || opt.label,
+                opt.id ? Number(opt.id) : null,
+            );
             opt.id = publisher.id;
             opt.label = publisher.name;
             await getUpdateCallback(ctx, songId)();
@@ -235,10 +285,18 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
         onSearch: async (q) => {
             const results = await api.searchArtists(q);
             if (results === api.ABORTED) return [];
-            return (results || []).map(a => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+            return (results || []).map((a) => ({
+                id: a.id,
+                label: a.display_name || a.legal_name || a.name,
+            }));
         },
         onAdd: async (opt) => {
-            const credit = await api.addAlbumCredit(albumId, opt.rawInput || opt.label, "Performer", opt.id);
+            const credit = await api.addAlbumCredit(
+                albumId,
+                opt.rawInput || opt.label,
+                "Performer",
+                opt.id,
+            );
             opt.id = credit.name_id;
             opt.label = credit.display_name;
             await getUpdateCallback(ctx, songId)();
@@ -258,8 +316,11 @@ export async function manageArtist(ctx, artistId, artistName) {
     if (!identity) return;
 
     const aliases = identity.aliases || [];
-    const primary = aliases.find(a => a.is_primary) || { id: artistId, display_name: artistName };
-    const otherAliases = aliases.filter(a => !a.is_primary);
+    const primary = aliases.find((a) => a.is_primary) || {
+        id: artistId,
+        display_name: artistName,
+    };
+    const otherAliases = aliases.filter((a) => !a.is_primary);
 
     openEditModal({
         title: `Edit Artist: ${primary.display_name}`,
@@ -271,13 +332,23 @@ export async function manageArtist(ctx, artistId, artistName) {
         category: null,
         children: {
             label: "Aliases",
-            items: otherAliases.map(a => ({ id: a.id, label: a.display_name })),
+            items: otherAliases.map((a) => ({
+                id: a.id,
+                label: a.display_name,
+            })),
             onSearch: async (q) => {
                 const results = await api.searchArtists(q);
-                return (results || []).map(a => ({ id: a.id, label: a.display_name || a.name }));
+                return (results || []).map((a) => ({
+                    id: a.id,
+                    label: a.display_name || a.name,
+                }));
             },
             onAdd: async (opt) => {
-                const result = await api.addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
+                const result = await api.addIdentityAlias(
+                    artistId,
+                    opt.rawInput || opt.label,
+                    opt.id,
+                );
                 return { id: result.name_id, label: result.display_name };
             },
             onRemove: async (item) => {
@@ -285,11 +356,11 @@ export async function manageArtist(ctx, artistId, artistName) {
             },
             onRenameChild: async (item, newName) => {
                 await api.updateCreditName(0, item.id, newName);
-            }
+            },
         },
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
-        }
+        },
     });
 }
 
@@ -300,14 +371,19 @@ export async function managePublisher(ctx, publisherId, publisherName) {
     openEditModal({
         title: "Edit Publisher",
         name: detail ? detail.name : publisherName,
-        onRename: async (newName) => { await api.updatePublisher(publisherId, newName); },
+        onRename: async (newName) => {
+            await api.updatePublisher(publisherId, newName);
+        },
         category: null,
         children: {
             label: "Sub-publishers",
-            items: subPubs.map(c => ({ id: c.id, label: c.name })),
+            items: subPubs.map((c) => ({ id: c.id, label: c.name })),
             onSearch: async (q) => {
                 const results = await api.searchPublishers(q);
-                return (results || []).map(p => ({ id: p.id, label: p.name }));
+                return (results || []).map((p) => ({
+                    id: p.id,
+                    label: p.name,
+                }));
             },
             onAdd: async (opt) => {
                 await api.setPublisherParent(opt.id, Number(publisherId));
@@ -322,7 +398,7 @@ export async function managePublisher(ctx, publisherId, publisherName) {
         },
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
-        }
+        },
     });
 }
 
@@ -347,12 +423,14 @@ export async function manageTag(ctx, tagId) {
             },
             onSearch: async (q) => {
                 const all = await api.getTagCategories();
-                return all.filter(c => c.toLowerCase().includes(q.toLowerCase()));
+                return all.filter((c) =>
+                    c.toLowerCase().includes(q.toLowerCase()),
+                );
             },
         },
         children: null,
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
-        }
+        },
     });
 }

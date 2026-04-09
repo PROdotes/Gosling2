@@ -32,11 +32,19 @@ body {
 
 body {
     background:
-        radial-gradient(circle at top left, rgba(249, 115, 22, 0.09), transparent 30%),
-        radial-gradient(circle at top right, rgba(125, 211, 252, 0.07), transparent 25%),
+        radial-gradient(
+            circle at top left,
+            rgba(249, 115, 22, 0.09),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at top right,
+            rgba(125, 211, 252, 0.07),
+            transparent 25%
+        ),
         var(--bg-deep);
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -91,7 +99,10 @@ header {
     font-weight: 500;
     border-radius: 8px;
     cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .mode-tab:hover {
@@ -129,7 +140,9 @@ header {
     border-radius: 12px;
     color: var(--text-primary);
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 #searchInput::placeholder {
@@ -230,12 +243,20 @@ main {
 }
 
 .result-card {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.02),
+        rgba(255, 255, 255, 0.01)
+    );
     border: 1px solid var(--border-subtle);
     border-radius: 14px;
     padding: 1rem 1.15rem;
     cursor: pointer;
-    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+    transition:
+        transform 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease,
+        box-shadow 0.16s ease;
     display: flex;
     gap: 1rem;
     align-items: flex-start;
@@ -250,17 +271,29 @@ main {
 
 .result-card.active {
     border-color: var(--accent);
-    background: linear-gradient(180deg, rgba(249, 115, 22, 0.16), rgba(249, 115, 22, 0.06));
+    background: linear-gradient(
+        180deg,
+        rgba(249, 115, 22, 0.16),
+        rgba(249, 115, 22, 0.06)
+    );
 }
 
 .artist-card.active {
     border-color: var(--artist-accent);
-    background: linear-gradient(180deg, rgba(125, 211, 252, 0.14), rgba(125, 211, 252, 0.05));
+    background: linear-gradient(
+        180deg,
+        rgba(125, 211, 252, 0.14),
+        rgba(125, 211, 252, 0.05)
+    );
 }
 
 .publisher-card.active {
     border-color: var(--publisher-accent);
-    background: linear-gradient(180deg, rgba(255, 184, 77, 0.14), rgba(255, 184, 77, 0.05));
+    background: linear-gradient(
+        180deg,
+        rgba(255, 184, 77, 0.14),
+        rgba(255, 184, 77, 0.05)
+    );
 }
 
 .card-icon {
@@ -278,22 +311,38 @@ main {
 
 .song-card .card-icon {
     color: var(--accent);
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(249, 115, 22, 0.04));
+    background: linear-gradient(
+        135deg,
+        rgba(249, 115, 22, 0.18),
+        rgba(249, 115, 22, 0.04)
+    );
 }
 
 .album-card .card-icon {
     color: var(--accent);
-    background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(125, 211, 252, 0.06));
+    background: linear-gradient(
+        135deg,
+        rgba(249, 115, 22, 0.15),
+        rgba(125, 211, 252, 0.06)
+    );
 }
 
 .artist-card .card-icon {
     color: var(--artist-accent);
-    background: linear-gradient(135deg, rgba(125, 211, 252, 0.18), rgba(125, 211, 252, 0.04));
+    background: linear-gradient(
+        135deg,
+        rgba(125, 211, 252, 0.18),
+        rgba(125, 211, 252, 0.04)
+    );
 }
 
 .publisher-card .card-icon {
     color: var(--publisher-accent);
-    background: linear-gradient(135deg, rgba(255, 184, 77, 0.18), rgba(255, 184, 77, 0.04));
+    background: linear-gradient(
+        135deg,
+        rgba(255, 184, 77, 0.18),
+        rgba(255, 184, 77, 0.04)
+    );
 }
 
 .card-body {
@@ -321,7 +370,7 @@ main {
 .timeline-time,
 .comparison-table,
 .pill.mono {
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
 }
 
 .card-subtitle {
@@ -434,7 +483,7 @@ main {
 }
 
 .section-title::after {
-    content: '';
+    content: "";
     flex: 1;
     height: 1px;
     background: var(--border-subtle);
@@ -536,7 +585,11 @@ main {
 .tag.link,
 .list-row.linkable {
     cursor: pointer;
-    transition: border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+    transition:
+        border-color 0.16s ease,
+        color 0.16s ease,
+        transform 0.16s ease,
+        background 0.16s ease;
 }
 
 .inline-link {
@@ -624,7 +677,7 @@ main {
 }
 
 .timeline::before {
-    content: '';
+    content: "";
     position: absolute;
     left: 7px;
     top: 0;
@@ -692,7 +745,7 @@ main {
     display: flex;
     gap: 0.5rem;
     align-items: center;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
     font-size: 0.72rem;
 }
 
@@ -836,7 +889,9 @@ main {
     border-radius: 16px;
     padding: 2rem;
     text-align: center;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease;
     background: rgba(255, 255, 255, 0.02);
 }
 
@@ -878,15 +933,17 @@ main {
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
     font-size: 0.82rem;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .ingest-input-row input::placeholder {
     color: var(--text-muted);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
 }
 
 .ingest-input-row input:focus {
@@ -902,7 +959,9 @@ main {
     border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.2s ease, transform 0.16s ease;
+    transition:
+        opacity 0.2s ease,
+        transform 0.16s ease;
     min-width: 110px;
 }
 
@@ -925,7 +984,9 @@ main {
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.16s ease;
+    transition:
+        background 0.2s ease,
+        transform 0.16s ease;
 }
 
 .ingest-btn-danger:hover {
@@ -942,7 +1003,9 @@ main {
     border-radius: 8px;
     font-size: 0.82rem;
     cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        color 0.2s ease;
 }
 
 .ingest-btn-secondary:hover {
@@ -1047,7 +1110,9 @@ main {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .ingest-drop-zone.uploading {

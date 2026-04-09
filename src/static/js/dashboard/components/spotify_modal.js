@@ -1,4 +1,8 @@
-import { parseSpotifyCredits, importSpotifyCredits, splitterPreview } from "../api.js";
+import {
+    importSpotifyCredits,
+    parseSpotifyCredits,
+    splitterPreview,
+} from "../api.js";
 import { escapeHtml, wasMousedownInside } from "./utils.js";
 
 const overlay = document.getElementById("spotify-modal");
@@ -33,7 +37,7 @@ function getStatusBadge(type) {
 function showResults(result) {
     _parseResult = result;
     resultsSect.style.display = "block";
-    
+
     // Title mismatch warning
     if (result.title_match) {
         warningEl.style.display = "none";
@@ -47,23 +51,26 @@ function showResults(result) {
     const publishers = result.publishers || [];
     const credExistence = _existence.credits || [];
     const pubExistence = _existence.publishers || [];
-    
+
     statusEl.textContent = `${credits.length} artists, ${publishers.length} publishers`;
 
-    const creditHtml = credits.map((c, i) => {
-        const exist = credExistence.find(e => e.name === c.name);
-        // Link Check: Case-insensitive match on name and exact match on role
-        const alreadyLinked = _existingCredits.some(ec => 
-             (ec.display_name?.toLowerCase() === c.name?.toLowerCase() || ec.name?.toLowerCase() === c.name?.toLowerCase()) && 
-             ec.role_name === c.role
-        );
-        
-        let type = "new";
-        if (alreadyLinked) type = "linked";
-        else if (exist?.exists) type = "found";
+    const creditHtml = credits
+        .map((c, i) => {
+            const exist = credExistence.find((e) => e.name === c.name);
+            // Link Check: Case-insensitive match on name and exact match on role
+            const alreadyLinked = _existingCredits.some(
+                (ec) =>
+                    (ec.display_name?.toLowerCase() === c.name?.toLowerCase() ||
+                        ec.name?.toLowerCase() === c.name?.toLowerCase()) &&
+                    ec.role_name === c.role,
+            );
 
-        return `
-            <div style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.3rem; display: flex; align-items: center; justify-content: space-between; ${alreadyLinked ? 'opacity: 0.5' : ''}">
+            let type = "new";
+            if (alreadyLinked) type = "linked";
+            else if (exist?.exists) type = "found";
+
+            return `
+            <div style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.3rem; display: flex; align-items: center; justify-content: space-between; ${alreadyLinked ? "opacity: 0.5" : ""}">
                 <div>
                     <span style="color: var(--accent); font-weight: 500;">${escapeHtml(c.name)}</span>
                     ${getStatusBadge(type)}
@@ -71,20 +78,22 @@ function showResults(result) {
                 </div>
             </div>
         `;
-    }).join("");
+        })
+        .join("");
 
-    const pubHtml = publishers.map((p, i) => {
-        const exist = pubExistence.find(e => e.name === p);
-        const alreadyLinked = _existingPublishers.some(ep => 
-            ep.name?.toLowerCase() === p?.toLowerCase()
-        );
+    const pubHtml = publishers
+        .map((p, i) => {
+            const exist = pubExistence.find((e) => e.name === p);
+            const alreadyLinked = _existingPublishers.some(
+                (ep) => ep.name?.toLowerCase() === p?.toLowerCase(),
+            );
 
-        let type = "new";
-        if (alreadyLinked) type = "linked";
-        else if (exist?.exists) type = "found";
+            let type = "new";
+            if (alreadyLinked) type = "linked";
+            else if (exist?.exists) type = "found";
 
-        return `
-            <div style="margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: space-between; ${alreadyLinked ? 'opacity: 0.5' : ''}">
+            return `
+            <div style="margin-bottom: 0.3rem; display: flex; align-items: center; justify-content: space-between; ${alreadyLinked ? "opacity: 0.5" : ""}">
                 <div style="display: flex; align-items: center;">
                     <span class="pill genre" style="font-size: 0.7rem; border-radius: 4px; flex-shrink: 0;">PUB</span>
                     <span style="margin-left: 0.4rem;">${escapeHtml(p)}</span>
@@ -92,45 +101,62 @@ function showResults(result) {
                 ${getStatusBadge(type)}
             </div>
         `;
-    }).join("");
+        })
+        .join("");
 
-    previewList.innerHTML = creditHtml + (credits.length && publishers.length ? '<hr style="opacity: 0.1; margin: 0.75rem 0;">' : '') + pubHtml;
+    previewList.innerHTML =
+        creditHtml +
+        (credits.length && publishers.length
+            ? '<hr style="opacity: 0.1; margin: 0.75rem 0;">'
+            : "") +
+        pubHtml;
 
     if (!credits.length && !publishers.length) {
-        previewList.innerHTML = '<div class="muted-note">No credits found in pasted text.</div>';
+        previewList.innerHTML =
+            '<div class="muted-note">No credits found in pasted text.</div>';
         importBtn.disabled = true;
         importBtn.textContent = "No Credits Found";
     } else {
         importBtn.disabled = false;
         const total = credits.length + publishers.length;
-        importBtn.textContent = `Import ${total} Credit${total === 1 ? '' : 's'}`;
+        importBtn.textContent = `Import ${total} Credit${total === 1 ? "" : "s"}`;
     }
 }
 
 async function handleImport() {
     if (!_parseResult || !_songId) return;
-    
+
     importBtn.disabled = true;
     importBtn.textContent = "Importing...";
-    
+
     try {
         // Enrich credits with resolved identity IDs.
-        const enrichedCredits = (_parseResult.credits || []).map(c => {
+        const enrichedCredits = (_parseResult.credits || []).map((c) => {
             // Priority 1: already linked on this song
-            const existing = _existingCredits.find(ec =>
-                (ec.display_name?.toLowerCase() === c.name?.toLowerCase() || ec.name?.toLowerCase() === c.name?.toLowerCase()) &&
-                ec.role_name === c.role
+            const existing = _existingCredits.find(
+                (ec) =>
+                    (ec.display_name?.toLowerCase() === c.name?.toLowerCase() ||
+                        ec.name?.toLowerCase() === c.name?.toLowerCase()) &&
+                    ec.role_name === c.role,
             );
-            if (existing?.identity_id) return { ...c, identity_id: existing.identity_id };
+            if (existing?.identity_id)
+                return { ...c, identity_id: existing.identity_id };
 
             // Priority 2: known in DB via preview with resolved identity
-            const found = (_existence.credits || []).find(e => e.name === c.name);
-            if (found?.identity_id) return { ...c, identity_id: found.identity_id };
+            const found = (_existence.credits || []).find(
+                (e) => e.name === c.name,
+            );
+            if (found?.identity_id)
+                return { ...c, identity_id: found.identity_id };
 
             return c;
         });
 
-        await importSpotifyCredits(_songId, enrichedCredits, _parseResult.publishers);
+        await importSpotifyCredits(
+            _songId,
+            enrichedCredits,
+            _parseResult.publishers,
+        );
         const onComplete = _onComplete;
         closeSpotifyModal();
         if (onComplete) onComplete();
@@ -153,16 +179,20 @@ async function runParse() {
 
     try {
         const result = await parseSpotifyCredits(text, _songTitle);
-        
+
         // Parallel checks for existence
-        const creditNames = (result.credits || []).map(c => c.name);
+        const creditNames = (result.credits || []).map((c) => c.name);
         const pubNames = result.publishers || [];
-        
+
         const [credCheck, pubCheck] = await Promise.all([
-            creditNames.length ? splitterPreview(creditNames, "credits") : Promise.resolve([]),
-            pubNames.length ? splitterPreview(pubNames, "publishers") : Promise.resolve([])
+            creditNames.length
+                ? splitterPreview(creditNames, "credits")
+                : Promise.resolve([]),
+            pubNames.length
+                ? splitterPreview(pubNames, "publishers")
+                : Promise.resolve([]),
         ]);
-        
+
         _existence = { credits: credCheck, publishers: pubCheck };
         showResults(result);
     } catch (err) {
@@ -178,7 +208,13 @@ textarea.addEventListener("input", () => {
 
 importBtn.addEventListener("click", handleImport);
 
-export function openSpotifyModal({ songId, title, existingCredits, existingPublishers, onComplete }) {
+export function openSpotifyModal({
+    songId,
+    title,
+    existingCredits,
+    existingPublishers,
+    onComplete,
+}) {
     _songId = songId;
     _songTitle = title;
     _onComplete = onComplete;
@@ -190,7 +226,7 @@ export function openSpotifyModal({ songId, title, existingCredits, existingPubli
     resultsSect.style.display = "none";
     importBtn.disabled = true;
     importBtn.textContent = "Import Credits";
-    
+
     overlay.style.display = "flex";
     _isSelecting = false;
     textarea.focus();

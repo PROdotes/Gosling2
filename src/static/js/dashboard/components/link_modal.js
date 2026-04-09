@@ -31,22 +31,28 @@ function renderItems() {
         itemsEl.innerHTML = '<span class="link-modal-empty">None linked</span>';
         return;
     }
-    itemsEl.innerHTML = _config.items.map((item) => `
+    itemsEl.innerHTML = _config.items
+        .map(
+            (item) => `
         <span class="link-chip">
             ${item.label}
             <button class="link-chip-remove" data-remove-id="${item.id}" title="Remove">✕</button>
         </span>
-    `).join("");
+    `,
+        )
+        .join("");
 
     itemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.dataset.removeId;
-            const item = _config.items.find(i => String(i.id) === String(id));
+            const item = _config.items.find((i) => String(i.id) === String(id));
             if (!item) return;
             btn.disabled = true;
             try {
                 await _config.onRemove(item);
-                _config.items = _config.items.filter(i => String(i.id) !== String(id));
+                _config.items = _config.items.filter(
+                    (i) => String(i.id) !== String(id),
+                );
                 renderItems();
             } catch (err) {
                 btn.disabled = false;
@@ -65,11 +71,15 @@ function renderDropdown(options) {
         return;
     }
 
-    dropdown.innerHTML = options.map((opt, i) => `
+    dropdown.innerHTML = options
+        .map(
+            (opt, i) => `
         <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
             ${opt.isCreate ? "✦ " : ""}${opt.label}
         </div>
-    `).join("");
+    `,
+        )
+        .join("");
 
     dropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
         el.addEventListener("mousedown", (e) => {
@@ -104,7 +114,7 @@ async function selectOption(index) {
     try {
         // Optimistic UI update before initiating long network/DOM work
         const newItem = { id: opt.id, label: opt.label };
-        if (!_config.items.some(i => String(i.id) === String(opt.id))) {
+        if (!_config.items.some((i) => String(i.id) === String(opt.id))) {
             _config.items.push(newItem);
         }
         renderItems();
@@ -143,24 +153,32 @@ async function runSearch(q) {
     const results = raw ? await _config.onSearch(raw) : [];
 
     // Filter out items already in the currentItems list
-    const filteredResults = results.filter(r => {
-        const alreadyLinked = _config.items.some(linked => {
-             const idMatch = r.id != null && String(linked.id) === String(r.id);
-             const labelMatch = linked.label.toLowerCase() === r.label.toLowerCase();
-             return idMatch || labelMatch;
+    const filteredResults = results.filter((r) => {
+        const alreadyLinked = _config.items.some((linked) => {
+            const idMatch = r.id != null && String(linked.id) === String(r.id);
+            const labelMatch =
+                linked.label.toLowerCase() === r.label.toLowerCase();
+            return idMatch || labelMatch;
         });
         return !alreadyLinked;
     });
 
-    const options = filteredResults.map(r => ({ id: r.id, label: r.label }));
+    const options = filteredResults.map((r) => ({ id: r.id, label: r.label }));
 
     // Add create-new option unless suppressed
-    const exactMatch = results.some(r => r.label.toLowerCase() === raw.toLowerCase());
+    const exactMatch = results.some(
+        (r) => r.label.toLowerCase() === raw.toLowerCase(),
+    );
     const showCreate = _config.shouldCreate
         ? _config.shouldCreate(raw, results)
         : !exactMatch;
     if (raw && showCreate) {
-        options.unshift({ id: null, label: _config.createLabel(raw), isCreate: true, rawInput: raw });
+        options.unshift({
+            id: null,
+            label: _config.createLabel(raw),
+            isCreate: true,
+            rawInput: raw,
+        });
     }
 
     renderDropdown(options);
@@ -186,9 +204,17 @@ export function openLinkModal(config) {
         btn.style.cssText = "width:100%; margin-top:0.5rem; font-size:0.8rem;";
         btn.addEventListener("click", async () => {
             btn.disabled = true;
-            const opt = { id: null, label: config.quickAdd.rawInput, isCreate: true, rawInput: config.quickAdd.rawInput };
+            const opt = {
+                id: null,
+                label: config.quickAdd.rawInput,
+                isCreate: true,
+                rawInput: config.quickAdd.rawInput,
+            };
             try {
-                _config.items.push({ id: null, label: config.quickAdd.rawInput });
+                _config.items.push({
+                    id: null,
+                    label: config.quickAdd.rawInput,
+                });
                 renderItems();
                 await _config.onAdd(opt);
             } catch (err) {
@@ -232,7 +258,10 @@ document.addEventListener("keydown", (e) => {
 input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowDown") {
         e.preventDefault();
-        _dropdownIndex = Math.min(_dropdownIndex + 1, _dropdownItems.length - 1);
+        _dropdownIndex = Math.min(
+            _dropdownIndex + 1,
+            _dropdownItems.length - 1,
+        );
         updateDropdownHighlight();
     } else if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -250,7 +279,9 @@ input.addEventListener("keydown", (e) => {
 
 input.addEventListener("blur", () => {
     // Small delay so mousedown on dropdown items fires first
-    setTimeout(() => { dropdown.style.display = "none"; }, 150);
+    setTimeout(() => {
+        dropdown.style.display = "none";
+    }, 150);
 });
 
 // Close on overlay click outside modal box

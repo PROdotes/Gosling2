@@ -1,9 +1,14 @@
-import { checkIngestion, getDownloadsFolder, uploadFiles, scanFolder, getAcceptedFormats, getStagingOrphans, deleteStagingOrphan } from "../api.js";
 import {
-    escapeHtml,
-    renderStatus,
-} from "../components/utils.js";
+    checkIngestion,
+    deleteStagingOrphan,
+    getAcceptedFormats,
+    getDownloadsFolder,
+    getStagingOrphans,
+    scanFolder,
+    uploadFiles,
+} from "../api.js";
 import { openFilenameParserModal } from "../components/filename_parser_modal.js";
+import { escapeHtml, renderStatus } from "../components/utils.js";
 
 const PATH_INPUT_ID = "ingest-path-input";
 const CHECK_BTN_ID = "ingest-check-btn";
@@ -16,7 +21,7 @@ const RESULTS_LIST_ID = "ingest-results";
 export async function collectFilesFromItems(items, allowedExtensions) {
     const files = [];
     const queue = [];
-    const exts = (allowedExtensions || []).map(e => e.toLowerCase());
+    const exts = (allowedExtensions || []).map((e) => e.toLowerCase());
 
     // Convert items to entries
     for (let i = 0; i < items.length; i++) {
@@ -34,10 +39,14 @@ export async function collectFilesFromItems(items, allowedExtensions) {
         const entry = queue.shift();
 
         if (entry.isFile) {
-            const isAllowed = exts.length === 0 || exts.some(ext => entry.name.toLowerCase().endsWith(ext));
+            const isAllowed =
+                exts.length === 0 ||
+                exts.some((ext) => entry.name.toLowerCase().endsWith(ext));
             if (isAllowed) {
                 // Get the actual File object
-                const file = await new Promise((resolve) => entry.file(resolve));
+                const file = await new Promise((resolve) =>
+                    entry.file(resolve),
+                );
                 files.push(file);
             }
         } else if (entry.isDirectory) {
@@ -45,7 +54,9 @@ export async function collectFilesFromItems(items, allowedExtensions) {
             const reader = entry.createReader();
             let batch;
             do {
-                batch = await new Promise((resolve) => reader.readEntries(resolve));
+                batch = await new Promise((resolve) =>
+                    reader.readEntries(resolve),
+                );
                 queue.push(...batch);
             } while (batch.length > 0);
         }
@@ -56,7 +67,7 @@ export async function collectFilesFromItems(items, allowedExtensions) {
 
 export async function renderIngestionPanel(ctx) {
     ctx.updateResultsSummary(0, "ingestion check");
-    
+
     // Initialize session state for this panel
     const state = ctx.getState();
     if (!state.ingestTasks) {
@@ -70,7 +81,7 @@ export async function renderIngestionPanel(ctx) {
     try {
         const [folder, exts] = await Promise.all([
             getDownloadsFolder(),
-            getAcceptedFormats()
+            getAcceptedFormats(),
         ]);
         downloadsFolder = folder;
         allowedExtensions = exts;
@@ -132,7 +143,12 @@ export async function renderIngestionPanel(ctx) {
     setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions, ctx);
     setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID);
     setupClearButton("ingest-clear-btn", RESULTS_LIST_ID);
-    setupScanFolderButton("ingest-scan-folder-btn", PATH_INPUT_ID, RESULTS_LIST_ID, ctx);
+    setupScanFolderButton(
+        "ingest-scan-folder-btn",
+        PATH_INPUT_ID,
+        RESULTS_LIST_ID,
+        ctx,
+    );
     setupManualIngestHandlers(RESULTS_LIST_ID);
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
     setupOrphanSection("ingest-orphan-section");
@@ -167,15 +183,19 @@ async function refreshOrphanList(body) {
             body.innerHTML = `<div class="muted-note" style="padding: 0.5rem 0;">No orphaned files found.</div>`;
             return;
         }
-        body.innerHTML = orphans.map(f => `
+        body.innerHTML = orphans
+            .map(
+                (f) => `
             <div class="orphan-row" data-path="${escapeHtml(f.path)}">
                 <span class="orphan-name mono">${escapeHtml(f.filename)}</span>
                 <span class="muted-note orphan-size">${(f.size_bytes / 1024).toFixed(0)} KB</span>
                 <button class="ingest-btn-danger orphan-delete-btn" data-path="${escapeHtml(f.path)}">Delete</button>
             </div>
-        `).join("");
+        `,
+            )
+            .join("");
 
-        body.querySelectorAll(".orphan-delete-btn").forEach(btn => {
+        body.querySelectorAll(".orphan-delete-btn").forEach((btn) => {
             btn.addEventListener("click", async () => {
                 const path = btn.dataset.path;
                 btn.disabled = true;
@@ -232,13 +252,20 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
         showLoading(true);
         try {
             // Recursively collect all files from dropped items (supports folders)
-            const allFiles = await collectFilesFromItems(items, allowedExtensions);
+            const allFiles = await collectFilesFromItems(
+                items,
+                allowedExtensions,
+            );
 
             if (allFiles.length === 0) {
-                appendResult(resultsId, {
-                    status: "ERROR",
-                    message: "No audio files found in dropped folder(s)"
-                }, "Drag and Drop");
+                appendResult(
+                    resultsId,
+                    {
+                        status: "ERROR",
+                        message: "No audio files found in dropped folder(s)",
+                    },
+                    "Drag and Drop",
+                );
                 showLoading(false);
                 return;
             }
@@ -252,13 +279,19 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
 
             // Show individual file results
             for (const fileResult of result.results) {
-                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
+                const fileName =
+                    fileResult.song?.source_path?.split(/[/\\]/).pop() ||
+                    "Unknown";
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
-
         } catch (error) {
             console.error("Drop error:", error);
-            appendResult(resultsId, { status: "ERROR", message: error.message }, "Batch Upload", ctx);
+            appendResult(
+                resultsId,
+                { status: "ERROR", message: error.message },
+                "Batch Upload",
+                ctx,
+            );
         } finally {
             showLoading(false);
         }
@@ -279,7 +312,12 @@ function setupInputHandlers(inputId, btnId, resultsId) {
             const result = await checkIngestion(path);
             appendResult(resultsId, result, path, ctx);
         } catch (error) {
-            appendResult(resultsId, { status: "ERROR", message: error.message }, path, ctx);
+            appendResult(
+                resultsId,
+                { status: "ERROR", message: error.message },
+                path,
+                ctx,
+            );
         } finally {
             setLoading(btn, false);
         }
@@ -312,7 +350,9 @@ function setupManualIngestHandlers(resultsId) {
 
         try {
             // For now, remind them to drop the file for instant ingestion.
-            throw new Error("Path-based ingestion restricted. Please drag and drop the physical file for instant ingestion.");
+            throw new Error(
+                "Path-based ingestion restricted. Please drag and drop the physical file for instant ingestion.",
+            );
         } catch (err) {
             alert(err.message);
             btn.disabled = false;
@@ -357,12 +397,18 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
 
             // Show individual file results
             for (const fileResult of result.results) {
-                const fileName = fileResult.song?.source_path?.split(/[/\\]/).pop() || "Unknown";
+                const fileName =
+                    fileResult.song?.source_path?.split(/[/\\]/).pop() ||
+                    "Unknown";
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
-
         } catch (error) {
-            appendResult(resultsId, { status: "ERROR", message: error.message }, folderPath, ctx);
+            appendResult(
+                resultsId,
+                { status: "ERROR", message: error.message },
+                folderPath,
+                ctx,
+            );
         } finally {
             btn.disabled = false;
             btn.textContent = "Scan Server Folder";
@@ -389,7 +435,7 @@ function appendResult(resultsId, result, path, ctx) {
             status: result.status,
             id: result.song?.id || result.ghost_id,
             filename: path.split(/[/\\]/).pop() || path,
-            path: path
+            path: path,
         });
     }
 
@@ -404,9 +450,10 @@ function appendBatchSummary(resultsId, batchReport, summary) {
     const card = document.createElement("article");
     card.className = "result-card batch-summary-card";
 
-    const successRate = batchReport.total_files > 0
-        ? Math.round((batchReport.ingested / batchReport.total_files) * 100)
-        : 0;
+    const successRate =
+        batchReport.total_files > 0
+            ? Math.round((batchReport.ingested / batchReport.total_files) * 100)
+            : 0;
 
     card.innerHTML = `
         <div class="card-icon ingest-icon">📦</div>
@@ -450,22 +497,39 @@ function createResultCard(result, path) {
     card.className = `result-card ingest-card ${status.toLowerCase()}`;
 
     const statusConfig = {
-        "NEW": { class: "found", icon: "&#10003;", text: "New File" },
-        "INGESTED": { class: "found", icon: "&#10003;", text: "Ingested" },
-        "CONVERTING": { class: "loading", icon: "&#8635;", text: "Converting (WAV→MP3)" },
-        "PENDING_CONVERT": { class: "loading", icon: "&#9654;", text: "WAV — Awaiting Conversion" },
-        "ALREADY_EXISTS": { class: "loading", icon: "&#9888;", text: `Exists (${result.match_type})` },
-        "CONFLICT": { class: "loading", icon: "&#9888;", text: `Ghost (${result.match_type})` },
-        "ERROR": { class: "missing", icon: "&#10007;", text: "Error" }
+        NEW: { class: "found", icon: "&#10003;", text: "New File" },
+        INGESTED: { class: "found", icon: "&#10003;", text: "Ingested" },
+        CONVERTING: {
+            class: "loading",
+            icon: "&#8635;",
+            text: "Converting (WAV→MP3)",
+        },
+        PENDING_CONVERT: {
+            class: "loading",
+            icon: "&#9654;",
+            text: "WAV — Awaiting Conversion",
+        },
+        ALREADY_EXISTS: {
+            class: "loading",
+            icon: "&#9888;",
+            text: `Exists (${result.match_type})`,
+        },
+        CONFLICT: {
+            class: "loading",
+            icon: "&#9888;",
+            text: `Ghost (${result.match_type})`,
+        },
+        ERROR: { class: "missing", icon: "&#10007;", text: "Error" },
     };
 
     const config = statusConfig[status] || statusConfig["ERROR"];
 
     // For CONFLICT status, use ghost record data
     const song = result.song;
-    const title = status === "CONFLICT" && result.title
-        ? result.title
-        : (song?.media_name || song?.title || "Unknown Title");
+    const title =
+        status === "CONFLICT" && result.title
+            ? result.title
+            : song?.media_name || song?.title || "Unknown Title";
     const artist = song?.display_artist || "-";
 
     // Helper to format duration (seconds to MM:SS)
@@ -473,7 +537,7 @@ function createResultCard(result, path) {
         if (!seconds) return "Unknown";
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+        return `${mins}:${secs.toString().padStart(2, "0")}`;
     };
 
     card.innerHTML = `
@@ -487,7 +551,9 @@ function createResultCard(result, path) {
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
 
-            ${status === "CONFLICT" ? `
+            ${
+                status === "CONFLICT"
+                    ? `
                 <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #ff9500; font-weight: 600;">EXISTING GHOST RECORD (Soft-Deleted)</div>
                     <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; font-size: 0.85rem;">
@@ -515,9 +581,13 @@ function createResultCard(result, path) {
                         </button>
                     </div>
                 </div>
-            ` : ""}
+            `
+                    : ""
+            }
 
-            ${status === "PENDING_CONVERT" ? `
+            ${
+                status === "PENDING_CONVERT"
+                    ? `
                 <div class="pending-convert-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
                         This WAV file needs to be converted to MP3 before ingestion.
@@ -526,30 +596,44 @@ function createResultCard(result, path) {
                         Convert & Ingest
                     </button>
                 </div>
-            ` : ""}
+            `
+                    : ""
+            }
 
-            ${status === "INGESTED" ? `
+            ${
+                status === "INGESTED"
+                    ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
                     </button>
                     <span class="muted-note">• UUID Staged</span>
                 </div>
-            ` : ""}
+            `
+                    : ""
+            }
 
-            ${status === "NEW" ? `
+            ${
+                status === "NEW"
+                    ? `
                 <div class="ingest-actions-row">
                     <span class="muted-note">Verified. Drop physical file to commit.</span>
                 </div>
-            ` : ""}
+            `
+                    : ""
+            }
         </div>
-        ${song ? `
+        ${
+            song
+                ? `
             <div class="ingest-meta">
                 ${song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
                 ${song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
                 ${song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
             </div>
-        ` : ""}
+        `
+                : ""
+        }
     `;
 
     return card;
@@ -568,10 +652,16 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
 
         // We only want songs that already exist in DB (INGESTED or CONFLICT/GHOST)
         const entries = state.ingestTasks
-            .filter(t => t.id && (t.status === "INGESTED" || t.status === "CONFLICT" || t.status === "CONVERTING"))
-            .map(t => ({
+            .filter(
+                (t) =>
+                    t.id &&
+                    (t.status === "INGESTED" ||
+                        t.status === "CONFLICT" ||
+                        t.status === "CONVERTING"),
+            )
+            .map((t) => ({
                 id: t.id,
-                filename: t.filename
+                filename: t.filename,
             }));
 
         if (entries.length === 0) {
@@ -583,7 +673,7 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
             entries,
             onApply: async () => {
                 // Refresh logic if needed
-            }
+            },
         });
     });
 }

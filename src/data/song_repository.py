@@ -369,25 +369,39 @@ class SongRepository(MediaSourceRepository):
     def get_by_hash(
         self, audio_hash: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[Song]:
-        """Fetch a Song by its audio-only hash, utilizing universal MediaSource lookup."""
+        """Fetch a Song by its audio-only hash using a single JOIN."""
         logger.debug(f"[SongRepository] -> get_by_hash(hash='{audio_hash}')")
-        base = super().get_by_hash(audio_hash, conn=conn)
-        if base and base.id is not None:
-            return self.get_by_id(base.id, conn=conn)
-        return None
+        query = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.AudioHash = ?"
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (audio_hash,)).fetchone()
+            return self._row_to_song(row) if row else None
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (audio_hash,)).fetchone()
+            return self._row_to_song(row) if row else None
 
     def get_by_path(
         self, path: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[Song]:
-        """Fetch a song by its absolute source path, utilizing universal MediaSource lookup."""
+        """Fetch a song by its absolute source path using a single JOIN."""
         if not path:
             return None
 
         logger.debug(f"[SongRepository] -> get_by_path(path='{path}')")
-        base = super().get_by_path(path, conn=conn)
-        if base and base.id is not None:
-            return self.get_by_id(base.id, conn=conn)
-        return None
+        query = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.SourcePath = ?"
+
+        if conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(query, (path,)).fetchone()
+            return self._row_to_song(row) if row else None
+
+        with self._get_connection() as new_conn:
+            new_conn.row_factory = sqlite3.Row
+            row = new_conn.execute(query, (path,)).fetchone()
+            return self._row_to_song(row) if row else None
 
     def find_by_metadata(
         self,

@@ -15,9 +15,13 @@ function renderSubPublishers(items) {
 
     return `
         <div class="tag-list">
-            ${publishers.map((publisher) => `
+            ${publishers
+                .map(
+                    (publisher) => `
                 <button class="tag publisher link" ${buildNavigateAttrs("publishers", publisher.name || "")}>${escapeHtml(publisher.name || "-")}</button>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -27,11 +31,15 @@ export function renderPublishers(ctx, publishers) {
     ctx.updateResultsSummary(publishers.length, "publisher");
 
     if (!publishers.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No publishers found");
+        ctx.elements.resultsContainer.innerHTML = renderEmptyState(
+            "No publishers found",
+        );
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = publishers.map((publisher, index) => `
+    ctx.elements.resultsContainer.innerHTML = publishers
+        .map(
+            (publisher, index) => `
         <article class="result-card publisher-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">PUB</div>
             <div class="card-body">
@@ -42,7 +50,9 @@ export function renderPublishers(ctx, publishers) {
                 <div class="card-subtitle">${escapeHtml(publisher.parent_name || "Independent / top level")}</div>
             </div>
         </article>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 export function renderPublisherDetailLoading(ctx, publisher) {

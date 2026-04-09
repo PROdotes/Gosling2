@@ -17,7 +17,9 @@ function renderAlbumCredits(credits, albumId) {
 
     return `
         <div class="link-chip-list">
-            ${items.map((credit) => `
+            ${items
+                .map(
+                    (credit) => `
                 <span class="link-chip">
                     <button class="link-chip-label"
                             data-action="open-edit-modal"
@@ -32,7 +34,9 @@ function renderAlbumCredits(credits, albumId) {
                             data-credit-id="${credit.name_id}"
                             title="Remove">✕</button>
                 </span>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -45,7 +49,9 @@ function renderAlbumPublishers(publishers, albumId) {
 
     return `
         <div class="link-chip-list">
-            ${items.map((publisher) => `
+            ${items
+                .map(
+                    (publisher) => `
                 <span class="link-chip tag publisher">
                     <button class="link-chip-label"
                             data-action="open-edit-modal"
@@ -59,7 +65,9 @@ function renderAlbumPublishers(publishers, albumId) {
                             data-publisher-id="${publisher.id}"
                             title="Remove">✕</button>
                 </span>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -69,11 +77,14 @@ export function renderAlbums(ctx, albums) {
     ctx.updateResultsSummary(albums.length, "album");
 
     if (!albums.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No albums found");
+        ctx.elements.resultsContainer.innerHTML =
+            renderEmptyState("No albums found");
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = albums.map((album, index) => `
+    ctx.elements.resultsContainer.innerHTML = albums
+        .map(
+            (album, index) => `
         <article class="result-card album-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">LP</div>
             <div class="card-body">
@@ -90,7 +101,9 @@ export function renderAlbums(ctx, albums) {
                 <span class="pill mono">#${escapeHtml(album.id || "-")}</span>
             </div>
         </article>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 export function renderAlbumDetailLoading(ctx, album) {

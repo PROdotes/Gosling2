@@ -28,13 +28,13 @@
     <header>
         <div class="logo">GOSLING<span>.</span></div>
         <nav class="mode-tabs" aria-label="Dashboard modes">
-            <button id="mode-songs" class="mode-tab active" data-action="switch-mode" data-mode="songs">Songs</button>
-            <button id="mode-albums" class="mode-tab" data-action="switch-mode" data-mode="albums">Albums</button>
-            <button id="mode-artists" class="mode-tab" data-action="switch-mode" data-mode="artists">Artists</button>
-            <button id="mode-publishers" class="mode-tab" data-action="switch-mode"
+            <button id="mode-songs" type="button" class="mode-tab active" data-action="switch-mode" data-mode="songs">Songs</button>
+            <button id="mode-albums" type="button" class="mode-tab" data-action="switch-mode" data-mode="albums">Albums</button>
+            <button id="mode-artists" type="button" class="mode-tab" data-action="switch-mode" data-mode="artists">Artists</button>
+            <button id="mode-publishers" type="button" class="mode-tab" data-action="switch-mode"
                 data-mode="publishers">Publishers</button>
-            <button id="mode-tags" class="mode-tab" data-action="switch-mode" data-mode="tags">Tags</button>
-            <button id="mode-ingest" class="mode-tab" data-action="switch-mode" data-mode="ingest">Ingest</button>
+            <button id="mode-tags" type="button" class="mode-tab" data-action="switch-mode" data-mode="tags">Tags</button>
+            <button id="mode-ingest" type="button" class="mode-tab" data-action="switch-mode" data-mode="ingest">Ingest</button>
         </nav>
         <div class="search-wrapper">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -73,11 +73,15 @@
             <div class="link-modal-header">
                 <span class="link-modal-title" id="scrubber-modal-title">Player</span>
                 <div style="display:flex; align-items:center; gap:0.5rem; margin-left:auto; margin-right:1rem;">
-                    <button id="scrubber-tags-btn" class="btn-icon" title="Manage Tags" style="color: var(--text-muted);">
-                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                    <button id="scrubber-tags-btn" type="button" class="btn-icon" title="Manage Tags" style="color: var(--text-muted);">
+                        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <title>Tags</title>
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                        </svg>
                     </button>
                 </div>
-                <button class="link-modal-close" data-action="close-scrubber-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-scrubber-modal">✕</button>
             </div>
             <div class="link-modal-body" style="padding: 1.25rem; display:flex; flex-direction:row; gap:1rem; align-items:center;">
                 <!-- waveform + controls -->
@@ -93,7 +97,7 @@
                     ">waveform coming soon</div>
                     <div style="display:flex; align-items:center; justify-content:space-between;">
                         <span id="scrubber-time-current" style="font-size:0.78rem; font-family:monospace; color:var(--text-muted, #888);">0:00</span>
-                        <button id="scrubber-play-pause" style="
+                        <button id="scrubber-play-pause" type="button" style="
                             width: 2.25rem; height: 2.25rem;
                             border-radius: 50%; border: none;
                             background: var(--accent, #7c6af7);
@@ -117,7 +121,7 @@
         <div class="link-modal">
             <div class="link-modal-header">
                 <span class="link-modal-title" id="link-modal-title"></span>
-                <button class="link-modal-close" data-action="close-link-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-link-modal">✕</button>
             </div>
             <div class="link-modal-body">
                 <div id="link-modal-items" class="link-modal-items"></div>
@@ -133,7 +137,7 @@
         <div class="link-modal" style="max-width:520px">
             <div class="link-modal-header">
                 <span class="link-modal-title" id="edit-modal-title"></span>
-                <button class="link-modal-close" data-action="close-edit-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-edit-modal">✕</button>
             </div>
             <div class="link-modal-body" id="edit-modal-body"></div>
         </div>
@@ -142,7 +146,7 @@
         <div class="link-modal" style="max-width:600px">
             <div class="link-modal-header">
                 <span class="link-modal-title">Import Spotify Credits</span>
-                <button class="link-modal-close" data-action="close-spotify-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-spotify-modal">✕</button>
             </div>
             <div class="link-modal-body" id="spotify-modal-body" style="padding: 1.25rem;">
                 <div class="muted-note" style="margin-bottom: 1rem; font-size: 0.88rem;">
@@ -164,8 +168,8 @@
                 </div>
 
                 <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
-                    <button class="ingest-btn-secondary" data-action="close-spotify-modal">Cancel</button>
-                    <button id="spotify-import-btn" class="ingest-btn-primary" disabled>Import Credits</button>
+                    <button type="button" class="ingest-btn-secondary" data-action="close-spotify-modal">Cancel</button>
+                    <button id="spotify-import-btn" type="button" class="ingest-btn-primary" disabled>Import Credits</button>
                 </div>
             </div>
         </div>
@@ -174,14 +178,14 @@
         <div class="link-modal" style="max-width:580px">
             <div class="link-modal-header">
                 <span class="link-modal-title">Split Artists</span>
-                <button class="link-modal-close" data-action="close-splitter-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-splitter-modal">✕</button>
             </div>
             <div class="link-modal-body" style="padding: 1.25rem;">
                 <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
                     <input type="text" id="splitter-custom-input" class="link-modal-input"
                            placeholder="Missing a split word? Type it here... (e.g. 'incl.')"
                            style="flex:1;" autocomplete="off">
-                    <button id="splitter-add-btn" class="ingest-btn-secondary" style="white-space:nowrap;">Add Split</button>
+                    <button id="splitter-add-btn" type="button" class="ingest-btn-secondary" style="white-space:nowrap;">Add Split</button>
                 </div>
                 <div class="muted-note" style="margin-bottom:1rem; font-size:0.8rem;">
                     Click on the tokens below to toggle Split (Red) or Join (Gray).
@@ -192,8 +196,8 @@
                     <div id="splitter-preview" style="display:flex; flex-wrap:wrap; gap:0.5rem;"></div>
                 </div>
                 <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
-                    <button class="ingest-btn-secondary" data-action="close-splitter-modal">Cancel</button>
-                    <button id="splitter-confirm-btn" class="ingest-btn-primary">OK</button>
+                    <button type="button" class="ingest-btn-secondary" data-action="close-splitter-modal">Cancel</button>
+                    <button id="splitter-confirm-btn" type="button" class="ingest-btn-primary">OK</button>
                 </div>
             </div>
         </div>
@@ -202,7 +206,7 @@
         <div class="link-modal" style="max-width:800px">
             <div class="link-modal-header">
                 <span class="link-modal-title">Bulk Parse Filenames</span>
-                <button class="link-modal-close" data-action="close-filename-parser-modal">✕</button>
+                <button type="button" class="link-modal-close" data-action="close-filename-parser-modal">✕</button>
             </div>
             <div class="link-modal-body" style="padding: 1.5rem;">
                 <div class="section-title" style="margin-bottom:0.75rem;">Pattern Builder</div>
@@ -242,8 +246,8 @@
                 </div>
 
                 <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2rem;">
-                    <button class="ingest-btn-secondary" data-action="close-filename-parser-modal">Cancel</button>
-                    <button id="filename-parser-apply-btn" class="ingest-btn-primary" disabled>Apply Metadata</button>
+                    <button type="button" class="ingest-btn-secondary" data-action="close-filename-parser-modal">Cancel</button>
+                    <button id="filename-parser-apply-btn" type="button" class="ingest-btn-primary" disabled>Apply Metadata</button>
                 </div>
             </div>
         </div>
@@ -256,8 +260,8 @@
             <div class="link-modal-body" style="padding: 1.25rem;">
                 <p id="confirm-modal-message" style="margin:0 0 1.25rem; color:var(--text-secondary); font-size:0.9rem; line-height:1.5;"></p>
                 <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
-                    <button id="confirm-modal-cancel" class="ingest-btn-secondary">Cancel</button>
-                    <button id="confirm-modal-ok" class="ingest-btn-danger">Delete</button>
+                    <button id="confirm-modal-cancel" type="button" class="ingest-btn-secondary">Cancel</button>
+                    <button id="confirm-modal-ok" type="button" class="ingest-btn-danger">Delete</button>
                 </div>
             </div>
         </div>

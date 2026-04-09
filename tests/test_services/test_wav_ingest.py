@@ -203,6 +203,7 @@ class TestFinalizeWavConversion:
         service.finalize_wav_conversion(song_id, mp3_path)
 
         db_song = service.get_song(song_id)
+        assert db_song is not None
         assert (
             db_song.source_path == mp3_path
         ), f"Expected source_path={mp3_path}, got {db_song.source_path}"
@@ -218,6 +219,7 @@ class TestFinalizeWavConversion:
         service.finalize_wav_conversion(song_id, mp3_path)
 
         db_song = service.get_song(song_id)
+        assert db_song is not None
         assert (
             db_song.processing_status == 1
         ), f"Expected processing_status=1 after finalize, got {db_song.processing_status}"
@@ -234,6 +236,7 @@ class TestFinalizeWavConversion:
         service.finalize_wav_conversion(song_id, mp3_path)
 
         db_song = service.get_song(song_id)
+        assert db_song is not None
         assert (
             db_song.media_name == original_title
         ), f"Expected title '{original_title}' to be unchanged, got '{db_song.media_name}'"

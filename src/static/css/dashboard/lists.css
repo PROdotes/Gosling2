@@ -33,7 +33,11 @@
 .tag.link,
 .list-row.linkable {
     cursor: pointer;
-    transition: border-color 0.16s ease, color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+    transition:
+        border-color 0.16s ease,
+        color 0.16s ease,
+        transform 0.16s ease,
+        background 0.16s ease;
 }
 
 .inline-link {
@@ -76,13 +80,19 @@
 }
 
 .comparison-table th:nth-child(1),
-.comparison-table td:nth-child(1) { width: 20%; }
+.comparison-table td:nth-child(1) {
+    width: 20%;
+}
 
 .comparison-table th:nth-child(2),
-.comparison-table td:nth-child(2) { width: 50%; }
+.comparison-table td:nth-child(2) {
+    width: 50%;
+}
 
 .comparison-table th:nth-child(3),
-.comparison-table td:nth-child(3) { width: 30%; }
+.comparison-table td:nth-child(3) {
+    width: 30%;
+}
 
 .comparison-table th {
     color: var(--text-secondary);
@@ -130,7 +140,7 @@
 }
 
 .timeline::before {
-    content: '';
+    content: "";
     position: absolute;
     left: 7px;
     top: 0;
@@ -198,7 +208,7 @@
     display: flex;
     gap: 0.5rem;
     align-items: center;
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
     font-size: 0.72rem;
 }
 

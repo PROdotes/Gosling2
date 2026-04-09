@@ -16,9 +16,13 @@ function renderIdentityTags(items) {
 
     return `
         <div class="tag-list">
-            ${identities.map((identity) => `
+            ${identities
+                .map(
+                    (identity) => `
                 <button class="tag link" ${buildNavigateAttrs("artists", identity.display_name || "")}>${escapeHtml(identity.display_name || "-")}</button>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -31,9 +35,13 @@ function renderAliasTags(items) {
 
     return `
         <div class="tag-list">
-            ${aliases.map((alias) => `
+            ${aliases
+                .map(
+                    (alias) => `
                 <button class="tag ${alias.is_primary ? "genre" : ""} link" ${buildNavigateAttrs("artists", alias.display_name || "")}>${escapeHtml(alias.display_name || "-")}</button>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -43,11 +51,14 @@ export function renderArtists(ctx, artists) {
     ctx.updateResultsSummary(artists.length, "artist");
 
     if (!artists.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No artists found");
+        ctx.elements.resultsContainer.innerHTML =
+            renderEmptyState("No artists found");
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = artists.map((artist, index) => `
+    ctx.elements.resultsContainer.innerHTML = artists
+        .map(
+            (artist, index) => `
         <article class="result-card artist-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">ID</div>
             <div class="card-body">
@@ -58,7 +69,9 @@ export function renderArtists(ctx, artists) {
                 <span class="pill artist-badge">${escapeHtml(artist.type || "identity")}</span>
             </div>
         </article>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 export function renderArtistDetailLoading(ctx, artist) {

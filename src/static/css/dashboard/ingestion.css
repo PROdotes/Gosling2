@@ -16,7 +16,9 @@
     border-radius: 16px;
     padding: 2rem;
     text-align: center;
-    transition: border-color 0.2s ease, background 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease;
     background: rgba(255, 255, 255, 0.02);
 }
 
@@ -58,15 +60,17 @@
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
+    font-family: "JetBrains Mono", monospace;
     font-size: 0.82rem;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .ingest-input-row input::placeholder {
     color: var(--text-muted);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
 }
 
 .ingest-input-row input:focus {
@@ -82,7 +86,9 @@
     border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
-    transition: opacity 0.2s ease, transform 0.16s ease;
+    transition:
+        opacity 0.2s ease,
+        transform 0.16s ease;
     min-width: 110px;
 }
 
@@ -105,7 +111,9 @@
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.16s ease;
+    transition:
+        background 0.2s ease,
+        transform 0.16s ease;
 }
 
 .ingest-btn-danger:hover {
@@ -142,7 +150,9 @@
     border-radius: 8px;
     font-size: 0.82rem;
     cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        color 0.2s ease;
 }
 
 .ingest-btn-secondary:hover {
@@ -190,7 +200,7 @@
 }
 
 .web-search-option:hover {
-    background: var(--bg-hover, rgba(255,255,255,0.05));
+    background: var(--bg-hover, rgba(255, 255, 255, 0.05));
     color: var(--text-primary);
 }
 

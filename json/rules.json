@@ -1,16 +1,11 @@
 {
     "routing_rules": [
         {
-            "match_genres": [
-                "patriotic",
-                "domoljubne"
-            ],
+            "match_genres": ["patriotic", "domoljubne"],
             "target_path": "Cro/Domoljubne/{artist} - {title}"
         },
         {
-            "match_genres": [
-                "pop"
-            ],
+            "match_genres": ["pop"],
             "target_path": "{year}/{artist} - {title}"
         },
         {
@@ -34,27 +29,19 @@
             "target_path": "{genre}/{artist} - {title}"
         },
         {
-            "match_genres": [
-                "acoustic"
-            ],
+            "match_genres": ["acoustic"],
             "target_path": "akustika/{artist} - {title}"
         },
         {
-            "match_genres": [
-                "club"
-            ],
+            "match_genres": ["club"],
             "target_path": "clubbing/{artist} - {title}"
         },
         {
-            "match_genres": [
-                "Zabavne"
-            ],
+            "match_genres": ["Zabavne"],
             "target_path": "Cro {genre}/{year}/{artist} - {title}"
         },
         {
-            "match_genres": [
-                "cro"
-            ],
+            "match_genres": ["cro"],
             "target_path": "{genre}/{year}/{artist} - {title}"
         }
     ]

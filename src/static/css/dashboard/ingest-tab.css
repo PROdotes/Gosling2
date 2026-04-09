@@ -6,7 +6,9 @@
 }
 
 .mode-tab[data-mode="ingest"].drop-target {
-    box-shadow: 0 0 0 2px var(--accent), 0 0 14px var(--accent-glow);
+    box-shadow:
+        0 0 0 2px var(--accent),
+        0 0 14px var(--accent-glow);
     color: var(--text-primary);
     background: var(--accent-glow);
 }
@@ -67,8 +69,12 @@
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* --- Orphaned Staging Files --- */
@@ -102,7 +108,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.4rem 0.5rem;
-    background: var(--surface-2, rgba(255,255,255,0.03));
+    background: var(--surface-2, rgba(255, 255, 255, 0.03));
     border-radius: 4px;
 }
 

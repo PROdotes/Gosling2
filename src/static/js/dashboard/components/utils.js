@@ -1,6 +1,12 @@
 // Track mousedown origin so overlay click handlers can ignore drag-outside events
 let _lastMousedownTarget = null;
-document.addEventListener("mousedown", (e) => { _lastMousedownTarget = e.target; }, true);
+document.addEventListener(
+    "mousedown",
+    (e) => {
+        _lastMousedownTarget = e.target;
+    },
+    true,
+);
 
 /**
  * Returns true if the most recent mousedown started inside the given element.
@@ -19,7 +25,7 @@ export function escapeHtml(value) {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
-        .replace(/\"/g, "&quot;")
+        .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 }
 
@@ -67,16 +73,18 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
 
     return `
         <div class="stack-list">
-            ${items.map((song) => `
+            ${items
+                .map(
+                    (song) => `
                 <div class="list-row linkable" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
-                         <label class="switch ${song.processing_status !== 0 ? 'disabled' : ''}" 
+                         <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}" 
                                 data-action="toggle-active" 
                                 data-id="${song.id}"
-                                title="${song.processing_status !== 0 ? 'Only reviewed songs can be active for airplay' : (song.is_active ? 'Deactivate' : 'Activate')}">
+                                title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
                              <input type="checkbox" 
-                                    ${song.is_active ? 'checked' : ''} 
-                                    ${song.processing_status !== 0 ? 'disabled' : ''}>
+                                    ${song.is_active ? "checked" : ""} 
+                                    ${song.processing_status !== 0 ? "disabled" : ""}>
                              <span class="slider"></span>
                         </label>
                         <div>
@@ -89,7 +97,9 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                         ${song.bpm ? `<div class="meta-label" style="margin: 0">${escapeHtml(song.bpm)} BPM</div>` : ""}
                     </div>
                 </div>
-            `).join("")}
+            `,
+                )
+                .join("")}
         </div>
     `;
 }
@@ -102,28 +112,37 @@ export function renderAuditTimeline(history) {
 
     return `
         <div class="timeline">
-            ${items.map((item) => {
-                const typeClass = escapeHtml((item.type || "ACTION").toUpperCase());
-                const details = escapeHtml(item.details || "");
-                let diffHtml = "";
+            ${items
+                .map((item) => {
+                    const typeClass = escapeHtml(
+                        (item.type || "ACTION").toUpperCase(),
+                    );
+                    const details = escapeHtml(item.details || "");
+                    let diffHtml = "";
 
-                if (item.type === "CHANGE" && item.new !== undefined) {
-                    const oldValue = item.old === null || item.old === "" ? "(empty)" : item.old;
-                    const newValue = item.new === null || item.new === "" ? "(empty)" : item.new;
-                    diffHtml = `
+                    if (item.type === "CHANGE" && item.new !== undefined) {
+                        const oldValue =
+                            item.old === null || item.old === ""
+                                ? "(empty)"
+                                : item.old;
+                        const newValue =
+                            item.new === null || item.new === ""
+                                ? "(empty)"
+                                : item.new;
+                        diffHtml = `
                         <div class="timeline-diff">
                             <span class="timeline-old">${escapeHtml(oldValue)}</span>
                             <span>→</span>
                             <span class="timeline-new">${escapeHtml(newValue)}</span>
                         </div>
                     `;
-                }
+                    }
 
-                if (item.type === "LIFECYCLE" && item.snapshot) {
-                    diffHtml = `<div class="snapshot-box">Snapshot: ${escapeHtml(item.snapshot)}</div>`;
-                }
+                    if (item.type === "LIFECYCLE" && item.snapshot) {
+                        diffHtml = `<div class="snapshot-box">Snapshot: ${escapeHtml(item.snapshot)}</div>`;
+                    }
 
-                return `
+                    return `
                     <div class="timeline-item ${typeClass}">
                         <div class="timeline-dot"></div>
                         <div class="timeline-content">
@@ -137,7 +156,8 @@ export function renderAuditTimeline(history) {
                         </div>
                     </div>
                 `;
-            }).join("")}
+                })
+                .join("")}
         </div>
     `;
 }

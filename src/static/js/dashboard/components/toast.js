@@ -22,7 +22,12 @@ export function initToastSystem() {
  * @param {{ label: string, onClick: () => void }|null} action - Optional action button.
  * @returns {HTMLElement|null} The toast DOM element, or null if container not found.
  */
-export function showToast(message, type = "success", durationMs = 3000, action = null) {
+export function showToast(
+    message,
+    type = "success",
+    durationMs = 3000,
+    action = null,
+) {
     const container = document.getElementById(CONTAINER_ID);
     if (!container) return null;
 
@@ -58,16 +63,22 @@ export function showToast(message, type = "success", durationMs = 3000, action =
         if (dismissed) return;
         dismissed = true;
         toast.classList.add("toast-exit");
-        toast.addEventListener("animationend", () => toast.remove(), { once: true });
+        toast.addEventListener("animationend", () => toast.remove(), {
+            once: true,
+        });
     };
 
-    toast.querySelector(".toast-dismiss-btn").addEventListener("click", dismiss);
+    toast
+        .querySelector(".toast-dismiss-btn")
+        .addEventListener("click", dismiss);
 
     if (action) {
-        toast.querySelector(".toast-action-btn").addEventListener("click", () => {
-            action.onClick();
-            dismiss();
-        });
+        toast
+            .querySelector(".toast-action-btn")
+            .addEventListener("click", () => {
+                action.onClick();
+                dismiss();
+            });
     }
 
     container.appendChild(toast);

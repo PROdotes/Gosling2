@@ -30,7 +30,7 @@ class TestParse:
 
     def test_basic_fields(self, parser):
         """parse() must populate media_name, year, bpm, duration_ms from raw ID3 frames."""
-        raw = {"TIT2": ["Fuze"], "TYER": ["2024"], "TBPM": ["128"], "TLEN": ["180"]}
+        raw = {"TIT2": ["Fuze"], "TDRC": ["2024"], "TBPM": ["128"], "TLEN": ["180"]}
         song = parser.parse(raw, "fake/path.mp3")
 
         assert (
@@ -53,7 +53,7 @@ class TestParse:
 
     def test_year_with_dash(self, parser):
         """parse() must split year on dash and cast the first segment to int."""
-        raw = {"TYER": ["2024-03-16"]}
+        raw = {"TDRC": ["2024-03-16"]}
         song = parser.parse(raw, "fake/path.mp3")
 
         assert song.year == 2024, f"Expected year=2024, got {song.year}"
@@ -67,7 +67,10 @@ class TestParse:
 
     def test_credits_deduplication(self, parser):
         """parse() must deduplicate credits while preserving first-seen order across TPE1 and TIPL."""
-        raw = {"TPE1": ["Skrillex", "ISOxo"], "TIPL": ["Skrillex", "Someone Else"]}
+        raw = {
+            "TPE1": ["Skrillex", "ISOxo"],
+            "TXXX:PRODUCER": ["Skrillex", "Someone Else"],
+        }
         song = parser.parse(raw, "fake/path.mp3")
 
         performers = [c for c in song.credits if c.role_name == "Performer"]

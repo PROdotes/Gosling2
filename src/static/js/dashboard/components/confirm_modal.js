@@ -31,11 +31,16 @@ document.addEventListener("keydown", (e) => {
  * @param {string} [options.okLabel]
  * @returns {Promise<boolean>}
  */
-export function showConfirm(message, { title = "Confirm", okLabel = "Delete" } = {}) {
+export function showConfirm(
+    message,
+    { title = "Confirm", okLabel = "Delete" } = {},
+) {
     titleEl.textContent = title;
     messageEl.textContent = message;
     okBtn.textContent = okLabel;
     overlay.style.display = "flex";
     okBtn.focus();
-    return new Promise((resolve) => { _resolve = resolve; });
+    return new Promise((resolve) => {
+        _resolve = resolve;
+    });
 }

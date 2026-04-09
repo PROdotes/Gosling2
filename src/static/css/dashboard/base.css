@@ -32,11 +32,19 @@ body {
 
 body {
     background:
-        radial-gradient(circle at top left, rgba(249, 115, 22, 0.09), transparent 30%),
-        radial-gradient(circle at top right, rgba(125, 211, 252, 0.07), transparent 25%),
+        radial-gradient(
+            circle at top left,
+            rgba(249, 115, 22, 0.09),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at top right,
+            rgba(125, 211, 252, 0.07),
+            transparent 25%
+        ),
         var(--bg-deep);
     color: var(--text-primary);
-    font-family: 'DM Sans', sans-serif;
+    font-family: "DM Sans", sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -91,7 +99,10 @@ header {
     font-weight: 500;
     border-radius: 8px;
     cursor: pointer;
-    transition: color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .mode-tab:hover {
@@ -114,7 +125,9 @@ header {
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     padding-right: 1rem;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
 }
 
 .search-wrapper:focus-within {
@@ -187,7 +200,7 @@ header {
     right: 0;
     bottom: 0;
     background-color: rgba(255, 255, 255, 0.08);
-    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 34px;
     border: 1px solid rgba(255, 255, 255, 0.06);
 }
@@ -200,7 +213,7 @@ header {
     left: 2px;
     bottom: 2px;
     background-color: #666;
-    transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     border-radius: 50%;
 }
 

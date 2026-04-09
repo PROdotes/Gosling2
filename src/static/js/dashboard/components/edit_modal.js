@@ -26,9 +26,9 @@ import { wasMousedownInside } from "./utils.js";
  *   });
  */
 
-const overlay   = document.getElementById("edit-modal");
-const titleEl   = document.getElementById("edit-modal-title");
-const bodyEl    = document.getElementById("edit-modal-body");
+const overlay = document.getElementById("edit-modal");
+const titleEl = document.getElementById("edit-modal-title");
+const bodyEl = document.getElementById("edit-modal-body");
 
 let _config = null;
 let _parentSnapshot = null; // saved state when drilling into a child edit
@@ -121,10 +121,16 @@ function attachHandlers() {
     if (nameInput) {
         nameInput.addEventListener("input", () => {
             const field = nameInput.closest(".edit-modal-field");
-            field.classList.toggle("edit-modal-field--dirty", nameInput.value.trim() !== _lastCommittedName);
+            field.classList.toggle(
+                "edit-modal-field--dirty",
+                nameInput.value.trim() !== _lastCommittedName,
+            );
         });
         nameInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); commitRename(nameInput); }
+            if (e.key === "Enter") {
+                e.preventDefault();
+                commitRename(nameInput);
+            }
         });
     }
 
@@ -136,12 +142,18 @@ function attachHandlers() {
 
         catInput.addEventListener("input", () => {
             const field = catInput.closest(".edit-modal-field");
-            field.classList.toggle("edit-modal-field--dirty", catInput.value.trim() !== _lastCommittedCategory);
+            field.classList.toggle(
+                "edit-modal-field--dirty",
+                catInput.value.trim() !== _lastCommittedCategory,
+            );
 
             if (hasSearch) {
                 clearTimeout(_catDebounce);
                 const q = catInput.value.trim();
-                if (!q) { hideCatDropdown(); return; }
+                if (!q) {
+                    hideCatDropdown();
+                    return;
+                }
                 _catDebounce = setTimeout(() => runCatSearch(q), 200);
             }
         });
@@ -150,7 +162,10 @@ function attachHandlers() {
             if (hasSearch) {
                 if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    _catDropdownIndex = Math.min(_catDropdownIndex + 1, _catDropdownItems.length - 1);
+                    _catDropdownIndex = Math.min(
+                        _catDropdownIndex + 1,
+                        _catDropdownItems.length - 1,
+                    );
                     updateCatDropdownHighlight();
                 } else if (e.key === "ArrowUp") {
                     e.preventDefault();
@@ -158,11 +173,15 @@ function attachHandlers() {
                     updateCatDropdownHighlight();
                 } else if (e.key === "Enter") {
                     e.preventDefault();
-                    if (_catDropdownIndex >= 0) selectCatOption(_catDropdownIndex);
+                    if (_catDropdownIndex >= 0)
+                        selectCatOption(_catDropdownIndex);
                     else commitCategory(catInput);
                 }
             } else {
-                if (e.key === "Enter") { e.preventDefault(); commitCategory(catInput); }
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitCategory(catInput);
+                }
             }
         });
 
@@ -171,7 +190,9 @@ function attachHandlers() {
         });
 
         if (hasSearch) {
-            _catDropdown = bodyEl.querySelector("#edit-modal-category-dropdown");
+            _catDropdown = bodyEl.querySelector(
+                "#edit-modal-category-dropdown",
+            );
         }
     }
 
@@ -187,14 +208,20 @@ function attachHandlers() {
         _childInput.addEventListener("input", () => {
             clearTimeout(_childDebounce);
             const q = _childInput.value.trim();
-            if (!q) { _childDropdown.style.display = "none"; return; }
+            if (!q) {
+                _childDropdown.style.display = "none";
+                return;
+            }
             _childDebounce = setTimeout(() => runChildSearch(q), 200);
         });
 
         _childInput.addEventListener("keydown", (e) => {
             if (e.key === "ArrowDown") {
                 e.preventDefault();
-                _childDropdownIndex = Math.min(_childDropdownIndex + 1, _childDropdownItems.length - 1);
+                _childDropdownIndex = Math.min(
+                    _childDropdownIndex + 1,
+                    _childDropdownItems.length - 1,
+                );
                 updateChildDropdownHighlight();
             } else if (e.key === "ArrowUp") {
                 e.preventDefault();
@@ -202,13 +229,16 @@ function attachHandlers() {
                 updateChildDropdownHighlight();
             } else if (e.key === "Enter") {
                 e.preventDefault();
-                if (_childDropdownIndex >= 0) selectChildOption(_childDropdownIndex);
+                if (_childDropdownIndex >= 0)
+                    selectChildOption(_childDropdownIndex);
                 else if (_childDropdownItems.length === 1) selectChildOption(0);
             }
         });
 
         _childInput.addEventListener("blur", () => {
-            setTimeout(() => { _childDropdown.style.display = "none"; }, 150);
+            setTimeout(() => {
+                _childDropdown.style.display = "none";
+            }, 150);
         });
     }
 }
@@ -226,8 +256,13 @@ async function commitRename(input) {
         await _config.onRename(newName);
         _config.name = newName;
         if (_config._triggerEl) _config._triggerEl.textContent = newName;
-        input.closest(".edit-modal-field")?.classList.remove("edit-modal-field--dirty");
-        if (_parentSnapshot) { closeEditModal(); return; }
+        input
+            .closest(".edit-modal-field")
+            ?.classList.remove("edit-modal-field--dirty");
+        if (_parentSnapshot) {
+            closeEditModal();
+            return;
+        }
     } catch (err) {
         showError(`Rename failed: ${err.message}`);
         input.value = _config.name;
@@ -249,7 +284,9 @@ async function commitCategory(input) {
     try {
         await _config.category.onSave(newVal);
         _config.category.value = newVal;
-        input.closest(".edit-modal-field")?.classList.remove("edit-modal-field--dirty");
+        input
+            .closest(".edit-modal-field")
+            ?.classList.remove("edit-modal-field--dirty");
     } catch (err) {
         showError(`Save failed: ${err.message}`);
         input.value = _config.category.value;
@@ -262,9 +299,13 @@ async function commitCategory(input) {
 async function runCatSearch(q) {
     const results = await _config.category.onSearch(q);
     // Filter to matching categories, case-insensitive
-    const filtered = results.filter(c => c.toLowerCase().includes(q.toLowerCase()));
-    const exactMatch = filtered.some(c => c.toLowerCase() === q.toLowerCase());
-    const options = filtered.map(c => ({ label: c }));
+    const filtered = results.filter((c) =>
+        c.toLowerCase().includes(q.toLowerCase()),
+    );
+    const exactMatch = filtered.some(
+        (c) => c.toLowerCase() === q.toLowerCase(),
+    );
+    const options = filtered.map((c) => ({ label: c }));
     if (!exactMatch) {
         options.unshift({ label: `Use "${q}"`, rawInput: q, isCreate: true });
     }
@@ -275,13 +316,20 @@ function renderCatDropdown(options) {
     _catDropdownItems = options;
     _catDropdownIndex = -1;
 
-    if (!options.length) { hideCatDropdown(); return; }
+    if (!options.length) {
+        hideCatDropdown();
+        return;
+    }
 
-    _catDropdown.innerHTML = options.map((opt, i) => `
+    _catDropdown.innerHTML = options
+        .map(
+            (opt, i) => `
         <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
             ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
         </div>
-    `).join("");
+    `,
+        )
+        .join("");
 
     _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
         el.addEventListener("mousedown", (e) => {
@@ -297,7 +345,10 @@ function renderCatDropdown(options) {
 
 function updateCatDropdownHighlight() {
     _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle("link-dropdown-item--active", i === _catDropdownIndex);
+        el.classList.toggle(
+            "link-dropdown-item--active",
+            i === _catDropdownIndex,
+        );
     });
 }
 
@@ -312,8 +363,13 @@ function selectCatOption(index) {
     hideCatDropdown();
     // Mark dirty if different from last committed
     const field = _catInput.closest(".edit-modal-field");
-    field.classList.toggle("edit-modal-field--dirty", value !== _lastCommittedCategory);
-    setTimeout(() => { _isSelecting = false; }, 150);
+    field.classList.toggle(
+        "edit-modal-field--dirty",
+        value !== _lastCommittedCategory,
+    );
+    setTimeout(() => {
+        _isSelecting = false;
+    }, 150);
 }
 
 function hideCatDropdown() {
@@ -326,20 +382,25 @@ function hideCatDropdown() {
 
 function renderChildItems() {
     if (!_childItems.length) {
-        _childItemsEl.innerHTML = '<span class="link-modal-empty">None linked</span>';
+        _childItemsEl.innerHTML =
+            '<span class="link-modal-empty">None linked</span>';
         return;
     }
-    _childItemsEl.innerHTML = _childItems.map((item) => `
+    _childItemsEl.innerHTML = _childItems
+        .map(
+            (item) => `
         <span class="link-chip">
             <button class="link-chip-label" data-edit-child-id="${item.id}">${escapeHtml(item.label)}</button>
             ${_config.children.onRemove ? `<button class="link-chip-remove" data-remove-child-id="${item.id}" title="Remove">✕</button>` : ""}
         </span>
-    `).join("");
+    `,
+        )
+        .join("");
 
     _childItemsEl.querySelectorAll("[data-edit-child-id]").forEach((btn) => {
         btn.addEventListener("click", () => {
             const id = btn.dataset.editChildId;
-            const item = _childItems.find(i => String(i.id) === String(id));
+            const item = _childItems.find((i) => String(i.id) === String(id));
             if (!item) return;
             openChildEdit(item);
         });
@@ -348,12 +409,14 @@ function renderChildItems() {
     _childItemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
         btn.addEventListener("click", async () => {
             const id = btn.dataset.removeChildId;
-            const item = _childItems.find(i => String(i.id) === String(id));
+            const item = _childItems.find((i) => String(i.id) === String(id));
             if (!item) return;
             btn.disabled = true;
             try {
                 await _config.children.onRemove(item);
-                const idx = _childItems.findIndex(i => String(i.id) === String(id));
+                const idx = _childItems.findIndex(
+                    (i) => String(i.id) === String(id),
+                );
                 if (idx >= 0) _childItems.splice(idx, 1);
                 renderChildItems();
             } catch (err) {
@@ -366,13 +429,20 @@ function renderChildItems() {
 
 async function runChildSearch(q) {
     const results = await _config.children.onSearch(q);
-    const linkedIds = new Set(_childItems.map(i => String(i.id)));
+    const linkedIds = new Set(_childItems.map((i) => String(i.id)));
     const options = results
-        .filter(r => !linkedIds.has(String(r.id)))
-        .map(r => ({ id: r.id, label: r.label }));
-    const exactMatch = results.some(r => r.label.toLowerCase() === q.toLowerCase());
+        .filter((r) => !linkedIds.has(String(r.id)))
+        .map((r) => ({ id: r.id, label: r.label }));
+    const exactMatch = results.some(
+        (r) => r.label.toLowerCase() === q.toLowerCase(),
+    );
     if (!exactMatch && _config.children.createLabel) {
-        options.unshift({ id: null, label: _config.children.createLabel(q), isCreate: true, rawInput: q });
+        options.unshift({
+            id: null,
+            label: _config.children.createLabel(q),
+            isCreate: true,
+            rawInput: q,
+        });
     }
     renderChildDropdown(options);
 }
@@ -381,13 +451,20 @@ function renderChildDropdown(options) {
     _childDropdownItems = options;
     _childDropdownIndex = -1;
 
-    if (!options.length) { _childDropdown.style.display = "none"; return; }
+    if (!options.length) {
+        _childDropdown.style.display = "none";
+        return;
+    }
 
-    _childDropdown.innerHTML = options.map((opt, i) => `
+    _childDropdown.innerHTML = options
+        .map(
+            (opt, i) => `
         <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
             ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
         </div>
-    `).join("");
+    `,
+        )
+        .join("");
 
     _childDropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
         el.addEventListener("mousedown", (e) => {
@@ -403,7 +480,10 @@ function renderChildDropdown(options) {
 
 function updateChildDropdownHighlight() {
     _childDropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle("link-dropdown-item--active", i === _childDropdownIndex);
+        el.classList.toggle(
+            "link-dropdown-item--active",
+            i === _childDropdownIndex,
+        );
     });
 }
 
@@ -428,7 +508,9 @@ async function selectChildOption(index) {
             _childInput.disabled = false;
             _childInput.focus();
         }
-        setTimeout(() => { _isSelecting = false; }, 150);
+        setTimeout(() => {
+            _isSelecting = false;
+        }, 150);
     }
 }
 
@@ -448,7 +530,6 @@ function showError(msg) {
 // ─── Child edit (drill one level, no further) ────────────────────────────────
 
 function openChildEdit(item) {
-
     _parentSnapshot = {
         config: _config,
         childItems: _childItems,
@@ -535,8 +616,8 @@ overlay.addEventListener("click", (e) => {
 
 // Escape from anywhere (even if nothing inside the modal has focus) closes it
 document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") { 
-        e.stopImmediatePropagation(); 
-        closeEditModal(); 
+    if (e.key === "Escape" && overlay.style.display === "flex") {
+        e.stopImmediatePropagation();
+        closeEditModal();
     }
 });

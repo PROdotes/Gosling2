@@ -19,11 +19,14 @@ export function renderTags(ctx, tags) {
     ctx.updateResultsSummary(tags.length, "tag");
 
     if (!tags.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState("No tags found");
+        ctx.elements.resultsContainer.innerHTML =
+            renderEmptyState("No tags found");
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = tags.map((tag, index) => `
+    ctx.elements.resultsContainer.innerHTML = tags
+        .map(
+            (tag, index) => `
         <article class="result-card tag-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">TAG</div>
             <div class="card-body">
@@ -34,7 +37,9 @@ export function renderTags(ctx, tags) {
                 <div class="card-subtitle">${renderCategoryBadge(tag.category)}</div>
             </div>
         </article>
-    `).join("");
+    `,
+        )
+        .join("");
 }
 
 export function renderTagDetailLoading(ctx, tag) {
