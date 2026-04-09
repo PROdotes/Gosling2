@@ -2,21 +2,7 @@ from typing import Any
 from pathlib import Path
 from mutagen.id3 import (
     ID3,
-    TIT2,
-    TPE1,
-    TDRC,
-    TBPM,
-    TSRC,
-    TCON,
-    TALB,
-    TPUB,
     TXXX,
-    TPE2,
-    TRCK,
-    TPOS,
-    TLAN,
-    TCOM,
-    TEXT,
     COMM,
 )
 from src.models.domain import Song
@@ -40,10 +26,12 @@ class MetadataWriter:
         if self.config:
             for tag_id, entry in self.config.items():
                 if isinstance(entry, ID3FrameConfig):
+                    if entry.skip_write:
+                        continue
                     if entry.field:
                         self.field_to_tag[entry.field] = tag_id
-                        # Roles are often field names in config (e.g. artist, composers)
-                        self.role_to_tag[self._normalize_role(entry.field)] = tag_id
+                    if entry.role:
+                        self.role_to_tag[entry.role] = tag_id
                     if entry.tag_category:
                         self.category_to_tag[entry.tag_category] = tag_id
 
@@ -73,13 +61,10 @@ class MetadataWriter:
                 tags = ID3()
 
             # 1. Map Scalars via Config Field Map
-            scalar_fields = ["media_name", "year", "bpm", "isrc", "processing_status"]
-            for field in scalar_fields:
+            for field, tag_id in self.field_to_tag.items():
                 val = getattr(song, field, None)
                 if val is not None:
-                    tag_id = self.field_to_tag.get(field)
-                    if tag_id:
-                        self._apply_frame(tags, tag_id, val)
+                    self._apply_frame(tags, tag_id, val)
 
             # Map Notes to Common Comments (COMM)
             if song.notes:
@@ -94,8 +79,7 @@ class MetadataWriter:
 
             for role, names in credits_by_role.items():
                 unique_names = list(dict.fromkeys(names))
-                norm_role = self._normalize_role(role)
-                tag_id = self.role_to_tag.get(norm_role)
+                tag_id = self.role_to_tag.get(role)
 
                 if tag_id:
                     self._apply_frame(tags, tag_id, unique_names)
@@ -173,40 +157,13 @@ class MetadataWriter:
             tags.add(COMM(encoding=3, lang="eng", desc="", text=value))
             return
 
-        # Frame Type Dispatch
-        frame_classes = {
-            "TIT2": TIT2,
-            "TPE1": TPE1,
-            "TDRC": TDRC,
-            "TYER": TDRC,
-            "TBPM": TBPM,
-            "TSRC": TSRC,
-            "TCON": TCON,
-            "TALB": TALB,
-            "TPUB": TPUB,
-            "TPE2": TPE2,
-            "TRCK": TRCK,
-            "TPOS": TPOS,
-            "TLAN": TLAN,
-            "TCOM": TCOM,
-            "TEXT": TEXT,
-        }
+        # Frame Type Dispatch via dynamic mutagen lookup
+        import mutagen.id3
 
-        cls = frame_classes.get(tag_id)
+        cls = getattr(mutagen.id3, tag_id, None)
         if cls:
             # Multi-string support via list
             tags[tag_id] = cls(encoding=3, text=value)
         else:
             # Fallback to TXXX if unknown mapping to prevent data loss
             tags.add(TXXX(encoding=3, desc=tag_id, text=value))
-
-    def _normalize_role(self, role: str) -> str:
-        """Normalizes role names to match config field names (lower case, plurals)."""
-        mapping = {
-            "Performer": "artist",
-            "Producer": "producers",
-            "Composer": "composers",
-            "Lyricist": "lyricists",
-            "Group": "groups",
-        }
-        return mapping.get(role, role.lower())

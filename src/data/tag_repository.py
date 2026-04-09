@@ -33,7 +33,9 @@ class TagRepository(BaseRepository):
             new_conn.row_factory = sqlite3.Row
             rows = new_conn.execute(query, song_ids).fetchall()
             results = [(row["SourceID"], self._row_to_tag(row)) for row in rows]
-            logger.debug(f"[TagRepository] <- get_tags_for_songs() count={len(results)}")
+            logger.debug(
+                f"[TagRepository] <- get_tags_for_songs() count={len(results)}"
+            )
             return results
 
     def insert_tags(

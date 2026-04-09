@@ -18,11 +18,14 @@ class MetadataParser:
         # Pre-process config for faster lookup
         self.field_map = {}
         self.tag_map = {}
+        self.role_map = {}  # field_name -> role_name
         assert self.config is not None, "Metadata configuration failed to load"
         for tag_id, entry in self.config.items():
             if isinstance(entry, ID3FrameConfig):
                 if entry.field:
                     self.field_map[tag_id] = entry
+                    if entry.role:
+                        self.role_map[entry.field] = entry.role
                 if entry.tag_category:
                     self.tag_map[tag_id] = entry
 
@@ -105,7 +108,12 @@ class MetadataParser:
                     elif field_name == "album_artist":
                         album_artists.extend([str(v) for v in values])
                     else:
-                        role_name = self._get_role_name(field_name)
+                        # Priority: 1. Config 'role' attribute, 2. Existing role_map lookup, 3. Capitalized field
+                        role_name = (
+                            entry.role
+                            if isinstance(entry, ID3FrameConfig) and entry.role
+                            else self.role_map.get(field_name, field_name.capitalize())
+                        )
                         if field_name in COMMA_SPLIT_FIELDS:
                             split_values = [
                                 part.strip()
@@ -223,14 +231,3 @@ class MetadataParser:
             return int(clean) if clean else None
         except (ValueError, TypeError):
             return None
-
-    def _get_role_name(self, field: str) -> str:
-        """Maps internal field names to human-readable Role names."""
-        mapping = {
-            "artist": "Performer",
-            "producers": "Producer",
-            "composers": "Composer",
-            "lyricists": "Lyricist",
-            "groups": "Group",
-        }
-        return mapping.get(field, field.capitalize())

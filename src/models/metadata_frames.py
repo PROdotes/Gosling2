@@ -15,6 +15,9 @@ class ID3FrameConfig(BaseModel):
     icon: Optional[str] = None
     color: Optional[str] = None
     internal_only: bool = False
+    skip_read: bool = False
+    skip_write: bool = False
+    role: Optional[str] = None
 
 
 # Root config: ID -> Union[LabelString, ConfigObject]

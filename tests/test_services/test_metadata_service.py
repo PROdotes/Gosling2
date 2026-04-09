@@ -241,3 +241,101 @@ class TestMetadataServiceExtractMetadata:
         assert metadata["TIT2"] == [
             "Clean Title"
         ], f"Expected TIT2=['Clean Title'], got {metadata['TIT2']}"
+
+    def test_extract_metadata_skips_descriptive_binary(self, silence_mp3):
+        """Binary frames with descriptors (e.g., APIC:Cover) must still be skipped if the base ID is in config."""
+        import mutagen.id3
+
+        tags = mutagen.id3.ID3()
+        # Add APIC with a description
+        tags.add(
+            mutagen.id3.APIC(
+                encoding=3,
+                mime="image/jpeg",
+                type=3,
+                desc="Cover",
+                data=b"fake_image_data",
+            )
+        )
+        tags.save(str(silence_mp3))
+
+        service = MetadataService()
+        metadata = service.extract_metadata(str(silence_mp3))
+
+        # We must check all keys because Mutagen might name it APIC:Cover
+        apic_keys = [k for k in metadata.keys() if k.startswith("APIC")]
+        assert (
+            not apic_keys
+        ), f"Expected all APIC variants to be skipped, got {apic_keys}"
+
+
+class TestMetadataServiceCompare:
+
+    def test_compare_songs_identifies_scalar_mismatches(self):
+        """compare_songs must detect differences in title, year, bpm, isrc, and notes."""
+        from src.models.domain import Song
+
+        def _s(title, year=2024, bpm=120, isrc="ISRC1", notes="N1"):
+            return Song(
+                media_name=title,
+                year=year,
+                bpm=bpm,
+                isrc=isrc,
+                notes=notes,
+                source_path="path",
+                duration_s=1.0,
+                processing_status=1,
+                credits=[],
+                tags=[],
+                albums=[],
+                publishers=[],
+            )
+
+        service = MetadataService()
+
+        # Test Title mismatch
+        res = service.compare_songs(_s("A"), _s("B"))
+        assert not res["in_sync"]
+        assert "title" in res["mismatches"]
+
+        # Test Year mismatch
+        res = service.compare_songs(_s("A", year=2020), _s("A", year=2021))
+        assert "year" in res["mismatches"]
+
+        # Test BPM mismatch
+        res = service.compare_songs(_s("A", bpm=120), _s("A", bpm=128))
+        assert "bpm" in res["mismatches"]
+
+        # Test Notes mismatch (Bugfix verification)
+        res = service.compare_songs(_s("A", notes="Fine"), _s("A", notes="Corrupt"))
+        assert "notes" in res["mismatches"]
+
+    def test_compare_songs_identifies_album_mismatches(self):
+        """compare_songs must detect differences in album title, track, and disc."""
+        from src.models.domain import Song, SongAlbum
+
+        def _s(album, track=1, disc=1):
+            return Song(
+                media_name="T",
+                year=2024,
+                bpm=120,
+                source_path="path",
+                duration_s=1.0,
+                processing_status=1,
+                credits=[],
+                tags=[],
+                publishers=[],
+                albums=[
+                    SongAlbum(album_title=album, track_number=track, disc_number=disc)
+                ],
+            )
+
+        service = MetadataService()
+
+        # Test Album mismatch
+        res = service.compare_songs(_s("Album A"), _s("Album B"))
+        assert "album_title" in res["mismatches"]
+
+        # Test Disc mismatch (Bugfix verification)
+        res = service.compare_songs(_s("A", disc=1), _s("A", disc=2))
+        assert "disc" in res["mismatches"]

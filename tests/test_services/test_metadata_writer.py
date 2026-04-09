@@ -6,7 +6,6 @@ from mutagen.id3 import ID3, APIC, TXXX
 from src.services.metadata_writer import MetadataWriter
 from src.models.domain import Song, SongCredit, Tag, SongAlbum, Publisher, AlbumCredit
 
-
 SILENCE_MP3 = Path(__file__).parent.parent / "fixtures" / "silence.mp3"
 
 
@@ -14,6 +13,7 @@ SILENCE_MP3 = Path(__file__).parent.parent / "fixtures" / "silence.mp3"
 def mp3(tmp_path):
     """Fresh copy of silence.mp3 with all ID3 tags stripped, for each test."""
     from mutagen.mp3 import MP3
+
     dst = tmp_path / "test.mp3"
     shutil.copy(SILENCE_MP3, dst)
     MP3(str(dst)).delete()
@@ -49,6 +49,7 @@ def _bare_song(path: Path, **kwargs) -> Song:
 # Scalars
 # ---------------------------------------------------------------------------
 
+
 class TestWriteMetadataScalars:
 
     def test_title_written(self, writer, mp3):
@@ -56,7 +57,9 @@ class TestWriteMetadataScalars:
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TIT2" in tags, "Expected TIT2 frame to be written"
-        assert str(tags["TIT2"]) == "Neon Pulse", f"Expected 'Neon Pulse', got '{tags['TIT2']}'"
+        assert (
+            str(tags["TIT2"]) == "Neon Pulse"
+        ), f"Expected 'Neon Pulse', got '{tags['TIT2']}'"
 
     def test_year_written(self, writer, mp3):
         song = _bare_song(mp3, year=2023)
@@ -77,7 +80,9 @@ class TestWriteMetadataScalars:
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TSRC" in tags, "Expected TSRC frame to be written"
-        assert str(tags["TSRC"]) == "GBABC1234567", f"Expected 'GBABC1234567', got '{tags['TSRC']}'"
+        assert (
+            str(tags["TSRC"]) == "GBABC1234567"
+        ), f"Expected 'GBABC1234567', got '{tags['TSRC']}'"
 
     def test_notes_written_as_comm(self, writer, mp3):
         song = _bare_song(mp3, notes="Some note")
@@ -111,50 +116,76 @@ class TestWriteMetadataScalars:
 # Credits
 # ---------------------------------------------------------------------------
 
+
 class TestWriteMetadataCredits:
 
     def test_performer_written_as_tpe1(self, writer, mp3):
-        song = _bare_song(mp3, credits=[SongCredit(role_name="Performer", display_name="Antigravity")])
+        song = _bare_song(
+            mp3, credits=[SongCredit(role_name="Performer", display_name="Antigravity")]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TPE1" in tags, "Expected TPE1 frame for Performer credit"
-        assert "Antigravity" in tags["TPE1"].text, f"Expected 'Antigravity' in TPE1, got {tags['TPE1'].text}"
+        assert (
+            "Antigravity" in tags["TPE1"].text
+        ), f"Expected 'Antigravity' in TPE1, got {tags['TPE1'].text}"
 
     def test_multiple_performers_in_single_frame(self, writer, mp3):
-        song = _bare_song(mp3, credits=[
-            SongCredit(role_name="Performer", display_name="Artist A"),
-            SongCredit(role_name="Performer", display_name="Artist B"),
-        ])
+        song = _bare_song(
+            mp3,
+            credits=[
+                SongCredit(role_name="Performer", display_name="Artist A"),
+                SongCredit(role_name="Performer", display_name="Artist B"),
+            ],
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TPE1" in tags, "Expected TPE1 frame"
-        assert "Artist A" in tags["TPE1"].text, f"Expected 'Artist A' in TPE1, got {tags['TPE1'].text}"
-        assert "Artist B" in tags["TPE1"].text, f"Expected 'Artist B' in TPE1, got {tags['TPE1'].text}"
+        assert (
+            "Artist A" in tags["TPE1"].text
+        ), f"Expected 'Artist A' in TPE1, got {tags['TPE1'].text}"
+        assert (
+            "Artist B" in tags["TPE1"].text
+        ), f"Expected 'Artist B' in TPE1, got {tags['TPE1'].text}"
 
     def test_composer_written_as_tcom(self, writer, mp3):
-        song = _bare_song(mp3, credits=[SongCredit(role_name="Composer", display_name="Bach")])
+        song = _bare_song(
+            mp3, credits=[SongCredit(role_name="Composer", display_name="Bach")]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TCOM" in tags, "Expected TCOM frame for Composer credit"
-        assert "Bach" in tags["TCOM"].text, f"Expected 'Bach' in TCOM, got {tags['TCOM'].text}"
+        assert (
+            "Bach" in tags["TCOM"].text
+        ), f"Expected 'Bach' in TCOM, got {tags['TCOM'].text}"
 
     def test_unmapped_role_written_as_txxx(self, writer, mp3):
-        song = _bare_song(mp3, credits=[SongCredit(role_name="Remixer", display_name="DJ X")])
+        song = _bare_song(
+            mp3, credits=[SongCredit(role_name="Remixer", display_name="DJ X")]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         txxx_frames = {f.desc: f.text for f in tags.getall("TXXX")}
-        assert "Remixer" in txxx_frames, f"Expected TXXX:Remixer, got keys: {list(txxx_frames.keys())}"
-        assert "DJ X" in txxx_frames["Remixer"], f"Expected 'DJ X' in TXXX:Remixer, got {txxx_frames['Remixer']}"
+        assert (
+            "Remixer" in txxx_frames
+        ), f"Expected TXXX:Remixer, got keys: {list(txxx_frames.keys())}"
+        assert (
+            "DJ X" in txxx_frames["Remixer"]
+        ), f"Expected 'DJ X' in TXXX:Remixer, got {txxx_frames['Remixer']}"
 
     def test_duplicate_performer_names_deduplicated(self, writer, mp3):
-        song = _bare_song(mp3, credits=[
-            SongCredit(role_name="Performer", display_name="Artist A"),
-            SongCredit(role_name="Performer", display_name="Artist A"),
-        ])
+        song = _bare_song(
+            mp3,
+            credits=[
+                SongCredit(role_name="Performer", display_name="Artist A"),
+                SongCredit(role_name="Performer", display_name="Artist A"),
+            ],
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
-        assert tags["TPE1"].text.count("Artist A") == 1, \
-            f"Expected 'Artist A' once in TPE1, got {tags['TPE1'].text}"
+        assert (
+            tags["TPE1"].text.count("Artist A") == 1
+        ), f"Expected 'Artist A' once in TPE1, got {tags['TPE1'].text}"
 
     def test_no_credits_no_tpe1(self, writer, mp3):
         song = _bare_song(mp3, credits=[])
@@ -167,6 +198,7 @@ class TestWriteMetadataCredits:
 # Tags (Genre, Mood, etc.)
 # ---------------------------------------------------------------------------
 
+
 class TestWriteMetadataTags:
 
     def test_genre_written_as_tcon(self, writer, mp3):
@@ -174,26 +206,39 @@ class TestWriteMetadataTags:
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TCON" in tags, "Expected TCON frame for Genre tag"
-        assert "Techno" in tags["TCON"].text, f"Expected 'Techno' in TCON, got {tags['TCON'].text}"
+        assert (
+            "Techno" in tags["TCON"].text
+        ), f"Expected 'Techno' in TCON, got {tags['TCON'].text}"
 
     def test_multiple_genres_in_single_frame(self, writer, mp3):
-        song = _bare_song(mp3, tags=[
-            Tag(name="Techno", category="Genre"),
-            Tag(name="House", category="Genre"),
-        ])
+        song = _bare_song(
+            mp3,
+            tags=[
+                Tag(name="Techno", category="Genre"),
+                Tag(name="House", category="Genre"),
+            ],
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TCON" in tags, "Expected TCON frame"
-        assert "Techno" in tags["TCON"].text, f"Expected 'Techno' in TCON, got {tags['TCON'].text}"
-        assert "House" in tags["TCON"].text, f"Expected 'House' in TCON, got {tags['TCON'].text}"
+        assert (
+            "Techno" in tags["TCON"].text
+        ), f"Expected 'Techno' in TCON, got {tags['TCON'].text}"
+        assert (
+            "House" in tags["TCON"].text
+        ), f"Expected 'House' in TCON, got {tags['TCON'].text}"
 
     def test_unmapped_category_written_as_txxx(self, writer, mp3):
         song = _bare_song(mp3, tags=[Tag(name="Ballad", category="Subgenre")])
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         txxx_frames = {f.desc: f.text for f in tags.getall("TXXX")}
-        assert "Subgenre" in txxx_frames, f"Expected TXXX:Subgenre, got keys: {list(txxx_frames.keys())}"
-        assert "Ballad" in txxx_frames["Subgenre"], f"Expected 'Ballad' in TXXX:Subgenre, got {txxx_frames['Subgenre']}"
+        assert (
+            "Subgenre" in txxx_frames
+        ), f"Expected TXXX:Subgenre, got keys: {list(txxx_frames.keys())}"
+        assert (
+            "Ballad" in txxx_frames["Subgenre"]
+        ), f"Expected 'Ballad' in TXXX:Subgenre, got {txxx_frames['Subgenre']}"
 
     def test_no_tags_no_tcon(self, writer, mp3):
         song = _bare_song(mp3, tags=[])
@@ -206,15 +251,19 @@ class TestWriteMetadataTags:
 # Albums
 # ---------------------------------------------------------------------------
 
+
 class TestWriteMetadataAlbums:
 
     def test_album_title_written_as_talb(self, writer, mp3):
-        song = _bare_song(mp3, albums=[SongAlbum(album_title="Artificial Intelligence")])
+        song = _bare_song(
+            mp3, albums=[SongAlbum(album_title="Artificial Intelligence")]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TALB" in tags, "Expected TALB frame"
-        assert str(tags["TALB"]) == "Artificial Intelligence", \
-            f"Expected 'Artificial Intelligence', got '{tags['TALB']}'"
+        assert (
+            str(tags["TALB"]) == "Artificial Intelligence"
+        ), f"Expected 'Artificial Intelligence', got '{tags['TALB']}'"
 
     def test_track_number_written_as_trck(self, writer, mp3):
         song = _bare_song(mp3, albums=[SongAlbum(album_title="Album", track_number=3)])
@@ -232,14 +281,20 @@ class TestWriteMetadataAlbums:
 
     def test_album_performer_written_as_tpe2(self, writer, mp3):
         album_credit = AlbumCredit(role_name="Performer", display_name="Band Name")
-        song = _bare_song(mp3, albums=[SongAlbum(album_title="Album", credits=[album_credit])])
+        song = _bare_song(
+            mp3, albums=[SongAlbum(album_title="Album", credits=[album_credit])]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TPE2" in tags, "Expected TPE2 frame for album Performer"
-        assert "Band Name" in tags["TPE2"].text, f"Expected 'Band Name' in TPE2, got {tags['TPE2'].text}"
+        assert (
+            "Band Name" in tags["TPE2"].text
+        ), f"Expected 'Band Name' in TPE2, got {tags['TPE2'].text}"
 
     def test_no_track_number_no_trck(self, writer, mp3):
-        song = _bare_song(mp3, albums=[SongAlbum(album_title="Album", track_number=None)])
+        song = _bare_song(
+            mp3, albums=[SongAlbum(album_title="Album", track_number=None)]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TRCK" not in tags, "Expected no TRCK frame when track_number is None"
@@ -251,19 +306,24 @@ class TestWriteMetadataAlbums:
         assert "TALB" not in tags, "Expected no TALB frame when albums list is empty"
 
     def test_only_first_album_written(self, writer, mp3):
-        song = _bare_song(mp3, albums=[
-            SongAlbum(album_title="First Album"),
-            SongAlbum(album_title="Second Album"),
-        ])
+        song = _bare_song(
+            mp3,
+            albums=[
+                SongAlbum(album_title="First Album"),
+                SongAlbum(album_title="Second Album"),
+            ],
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
-        assert str(tags["TALB"]) == "First Album", \
-            f"Expected only first album 'First Album', got '{tags['TALB']}'"
+        assert (
+            str(tags["TALB"]) == "First Album"
+        ), f"Expected only first album 'First Album', got '{tags['TALB']}'"
 
 
 # ---------------------------------------------------------------------------
 # Publishers
 # ---------------------------------------------------------------------------
+
 
 class TestWriteMetadataPublishers:
 
@@ -272,26 +332,37 @@ class TestWriteMetadataPublishers:
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TPUB" in tags, "Expected TPUB frame"
-        assert "ASCAP" in tags["TPUB"].text, f"Expected 'ASCAP' in TPUB, got {tags['TPUB'].text}"
+        assert (
+            "ASCAP" in tags["TPUB"].text
+        ), f"Expected 'ASCAP' in TPUB, got {tags['TPUB'].text}"
 
     def test_multiple_publishers(self, writer, mp3):
-        song = _bare_song(mp3, publishers=[Publisher(name="ASCAP"), Publisher(name="BMI")])
+        song = _bare_song(
+            mp3, publishers=[Publisher(name="ASCAP"), Publisher(name="BMI")]
+        )
         writer.write_metadata(song)
         tags = ID3(str(mp3))
         assert "TPUB" in tags, "Expected TPUB frame"
-        assert "ASCAP" in tags["TPUB"].text, f"Expected 'ASCAP' in TPUB, got {tags['TPUB'].text}"
-        assert "BMI" in tags["TPUB"].text, f"Expected 'BMI' in TPUB, got {tags['TPUB'].text}"
+        assert (
+            "ASCAP" in tags["TPUB"].text
+        ), f"Expected 'ASCAP' in TPUB, got {tags['TPUB'].text}"
+        assert (
+            "BMI" in tags["TPUB"].text
+        ), f"Expected 'BMI' in TPUB, got {tags['TPUB'].text}"
 
     def test_no_publishers_no_tpub(self, writer, mp3):
         song = _bare_song(mp3, publishers=[])
         writer.write_metadata(song)
         tags = ID3(str(mp3))
-        assert "TPUB" not in tags, "Expected no TPUB frame when publishers list is empty"
+        assert (
+            "TPUB" not in tags
+        ), "Expected no TPUB frame when publishers list is empty"
 
 
 # ---------------------------------------------------------------------------
 # Frame Preservation
 # ---------------------------------------------------------------------------
+
 
 class TestWriteMetadataPreservesFrames:
 
@@ -306,15 +377,19 @@ class TestWriteMetadataPreservesFrames:
 
         tags = ID3(str(mp3))
         txxx_frames = {f.desc: f.text for f in tags.getall("TXXX")}
-        assert "SomeOtherTool" in txxx_frames, \
-            f"Expected unrelated TXXX:SomeOtherTool to survive, got keys: {list(txxx_frames.keys())}"
-        assert txxx_frames["SomeOtherTool"] == ["external value"], \
-            f"Expected 'external value' unchanged, got {txxx_frames['SomeOtherTool']}"
+        assert (
+            "SomeOtherTool" in txxx_frames
+        ), f"Expected unrelated TXXX:SomeOtherTool to survive, got keys: {list(txxx_frames.keys())}"
+        assert txxx_frames["SomeOtherTool"] == [
+            "external value"
+        ], f"Expected 'external value' unchanged, got {txxx_frames['SomeOtherTool']}"
 
     def test_apic_preserved(self, writer, mp3):
         # Plant an APIC frame before writing
         existing = ID3()
-        existing["APIC:"] = APIC(encoding=3, mime="image/jpeg", type=3, desc="", data=b"\xff\xd8\xff")
+        existing["APIC:"] = APIC(
+            encoding=3, mime="image/jpeg", type=3, desc="", data=b"\xff\xd8\xff"
+        )
         existing.save(str(mp3), v2_version=4)
 
         song = _bare_song(mp3, media_name="Title")
@@ -323,12 +398,15 @@ class TestWriteMetadataPreservesFrames:
         tags = ID3(str(mp3))
         apic_frames = tags.getall("APIC")
         assert apic_frames, "Expected APIC frame to survive write_metadata"
-        assert apic_frames[0].data == b"\xff\xd8\xff", "Expected APIC data to be unchanged"
+        assert (
+            apic_frames[0].data == b"\xff\xd8\xff"
+        ), "Expected APIC data to be unchanged"
 
 
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
+
 
 class TestWriteMetadataErrors:
 

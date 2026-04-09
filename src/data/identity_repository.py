@@ -178,15 +178,27 @@ class IdentityRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[int, List[ArtistName]]:
         """Batch-fetch aliases for a list of identities."""
-        logger.debug(f"[IdentityRepository] -> get_aliases_batch(count={len(identity_ids)})")
+        logger.debug(
+            f"[IdentityRepository] -> get_aliases_batch(count={len(identity_ids)})"
+        )
         if not identity_ids:
             return {}
         placeholders = ",".join(["?" for _ in identity_ids])
         query = f"SELECT NameID, DisplayName, IsPrimaryName, OwnerIdentityID FROM ArtistNames WHERE OwnerIdentityID IN ({placeholders}) AND IsDeleted = 0"
         result: Dict[int, List[ArtistName]] = {iid: [] for iid in identity_ids}
-        return self._run_batch_query(query, identity_ids, result, lambda row: result[row["OwnerIdentityID"]].append(
-            ArtistName(id=row["NameID"], display_name=row["DisplayName"], is_primary=bool(row["IsPrimaryName"]))
-        ), conn)
+        return self._run_batch_query(
+            query,
+            identity_ids,
+            result,
+            lambda row: result[row["OwnerIdentityID"]].append(
+                ArtistName(
+                    id=row["NameID"],
+                    display_name=row["DisplayName"],
+                    is_primary=bool(row["IsPrimaryName"]),
+                )
+            ),
+            conn,
+        )
 
     def get_members_batch(
         self,
@@ -194,7 +206,9 @@ class IdentityRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[int, List[Identity]]:
         """Batch-fetch members for a list of group identities."""
-        logger.debug(f"[IdentityRepository] -> get_members_batch(count={len(identity_ids)})")
+        logger.debug(
+            f"[IdentityRepository] -> get_members_batch(count={len(identity_ids)})"
+        )
         if not identity_ids:
             return {}
         placeholders = ",".join(["?" for _ in identity_ids])
@@ -207,9 +221,15 @@ class IdentityRepository(BaseRepository):
             WHERE gm.GroupIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
-        return self._run_batch_query(query, identity_ids, result, lambda row: result[row["GroupIdentityID"]].append(
-            self._row_to_identity(row)
-        ), conn)
+        return self._run_batch_query(
+            query,
+            identity_ids,
+            result,
+            lambda row: result[row["GroupIdentityID"]].append(
+                self._row_to_identity(row)
+            ),
+            conn,
+        )
 
     def get_groups_batch(
         self,
@@ -217,7 +237,9 @@ class IdentityRepository(BaseRepository):
         conn: Optional[sqlite3.Connection] = None,
     ) -> Dict[int, List[Identity]]:
         """Batch-fetch groups for a list of person identities."""
-        logger.debug(f"[IdentityRepository] -> get_groups_batch(count={len(identity_ids)})")
+        logger.debug(
+            f"[IdentityRepository] -> get_groups_batch(count={len(identity_ids)})"
+        )
         if not identity_ids:
             return {}
         placeholders = ",".join(["?" for _ in identity_ids])
@@ -230,9 +252,15 @@ class IdentityRepository(BaseRepository):
             WHERE gm.MemberIdentityID IN ({placeholders}) AND i.IsDeleted = 0
         """
         result: Dict[int, List[Identity]] = {iid: [] for iid in identity_ids}
-        return self._run_batch_query(query, identity_ids, result, lambda row: result[row["MemberIdentityID"]].append(
-            self._row_to_identity(row)
-        ), conn)
+        return self._run_batch_query(
+            query,
+            identity_ids,
+            result,
+            lambda row: result[row["MemberIdentityID"]].append(
+                self._row_to_identity(row)
+            ),
+            conn,
+        )
 
     def add_alias(
         self,

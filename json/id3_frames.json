@@ -15,7 +15,8 @@
     "TXXX:PRODUCER": {
         "description": "Producer (custom TXXX frame)",
         "field": "producers",
-        "type": "list"
+        "type": "list",
+        "role": "Producer"
     },
     "TALB": {
         "description": "Album",
@@ -30,7 +31,8 @@
     "TCOM": {
         "description": "Composer",
         "field": "composers",
-        "type": "list"
+        "type": "list",
+        "role": "Composer"
     },
     "TCON": {
         "description": "Content type (Genre)",
@@ -46,14 +48,16 @@
     "TEXT": {
         "description": "Lyricist/Text writer",
         "field": "lyricists",
-        "type": "list"
+        "type": "list",
+        "role": "Lyricist"
     },
     "TFLT": "File type",
     "TIME": "Time",
     "TIT1": {
         "description": "Content group description (Groups)",
         "field": "groups",
-        "type": "list"
+        "type": "list",
+        "role": "Group"
     },
     "TIT2": {
         "description": "Title/songname/content description",
@@ -84,7 +88,8 @@
     "TPE1": {
         "description": "Lead performer(s)/Soloist(s)",
         "field": "artist",
-        "type": "list"
+        "type": "list",
+        "role": "Performer"
     },
     "TPE2": {
         "description": "Band/orchestra/accompaniment (Album Artist)",
@@ -131,10 +136,20 @@
     "TXXX": "User defined text information frame",
     "WXXX": "User defined URL link frame",
     "COMM": "Comments",
-    "APIC": "Attached picture",
+    "APIC": {
+        "description": "Attached picture",
+        "skip_read": true
+    },
     "USLT": "Unsynchronised lyric/text transcription",
     "SYLT": "Synchronised lyric/text",
-    "PRIV": "Private frame",
+    "PRIV": {
+        "description": "Private frame",
+        "skip_read": true
+    },
+    "GEOB": {
+        "description": "General encapsulated object",
+        "skip_read": true
+    },
     "UFID": "Unique file identifier",
     "MCDI": "Music CD identifier",
     "ETCO": "Event timing codes",
@@ -252,6 +267,7 @@
     "TXXX:STATUS": {
         "description": "Internal workflow status",
         "field": "processing_status",
-        "type": "integer"
+        "type": "integer",
+        "skip_write": true
     }
 }

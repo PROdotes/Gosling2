@@ -18,15 +18,18 @@ except ImportError:
     HeaderNotFoundError = Exception
     ID3HeaderError = Exception
     ID3TagError = Exception
+
 from src.services.logger import logger
+from src.services.metadata_frames_reader import load_id3_frames
+from src.models.metadata_frames import ID3FrameConfig
 
 
 class MetadataService:
     """Service for extracting high-fidelity metadata from audio files."""
 
-    def __init__(self):
-        """Initializes the pure reading service."""
-        pass
+    def __init__(self, json_path: str = "json/id3_frames.json"):
+        """Initializes the pure reading service with frame configuration."""
+        self.config = load_id3_frames(json_path)
 
     def extract_metadata(self, file_path: str) -> Dict[str, List[str]]:
         """Reads an audio file and returns a raw dictionary of all found tags."""
@@ -97,12 +100,16 @@ class MetadataService:
         _check_scalar("year", db_song.year, file_song.year)
         _check_scalar("bpm", db_song.bpm, file_song.bpm)
         _check_scalar("isrc", db_song.isrc, file_song.isrc)
+        _check_scalar("notes", db_song.notes, file_song.notes)
+        _check_scalar("duration", db_song.duration_s, file_song.duration_s)
 
         # Credits by role
-        all_roles = set(c.role_name for c in db_song.credits) | set(
-            c.role_name for c in file_song.credits
+        all_roles = set(c.role_name for c in db_song.credits if c.role_name) | set(
+            c.role_name for c in file_song.credits if c.role_name
         )
         for role in all_roles:
+            if not role:
+                continue
             _check_list(
                 f"credit:{role}",
                 _names_by_role(db_song, role),
@@ -110,10 +117,12 @@ class MetadataService:
             )
 
         # Tags by category
-        all_cats = set(t.category for t in db_song.tags) | set(
-            t.category for t in file_song.tags
+        all_cats = set(t.category for t in db_song.tags if t.category) | set(
+            t.category for t in file_song.tags if t.category
         )
         for cat in all_cats:
+            if not cat:
+                continue
             _check_list(
                 f"tag:{cat}", _names_by_cat(db_song, cat), _names_by_cat(file_song, cat)
             )
@@ -166,8 +175,11 @@ class MetadataService:
         tag_items = tags.items() if hasattr(tags, "items") else []
 
         for tag_id, value in tag_items:
-            # Data Fidelity: Skip binary/non-textual frames (APIC=Picture, GEOB=Object, PRIV=Private)
-            if tag_id.startswith(("APIC", "GEOB", "PRIV")):
+            # Data Fidelity: Honor skip_read flag from config (including prefix matching for descriptive tags)
+            base_tag = tag_id.split(":", 1)[0] if ":" in tag_id else tag_id
+            entry = self.config.get(tag_id) or self.config.get(base_tag)
+
+            if isinstance(entry, ID3FrameConfig) and entry.skip_read:
                 continue
 
             # Data Fidelity: Extract values from lists and complex mutagen objects
