@@ -28,7 +28,7 @@ function renderIdentityTags(items) {
 }
 
 function renderAliasTags(items) {
-    const aliases = asArray(items);
+    const aliases = asArray(items).filter((a) => !a.is_primary);
     if (!aliases.length) {
         return "";
     }

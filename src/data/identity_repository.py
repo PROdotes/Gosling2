@@ -385,6 +385,80 @@ class IdentityRepository(BaseRepository):
         count = row[0] if row else 0
         return count > 1
 
+    def set_type(self, identity_id: int, type_: str, conn: sqlite3.Connection) -> None:
+        """Set the IdentityType of an identity. Blocks group→person if members exist."""
+        logger.debug(
+            f"[IdentityRepository] -> set_type(id={identity_id}, type={type_!r})"
+        )
+        if type_ not in ("person", "group"):
+            raise ValueError(
+                f"Invalid identity type: {type_!r}. Must be 'person' or 'group'."
+            )
+        row = conn.execute(
+            "SELECT IdentityType FROM Identities WHERE IdentityID = ? AND IsDeleted = 0",
+            (identity_id,),
+        ).fetchone()
+        if not row:
+            raise LookupError(f"Identity {identity_id} not found")
+        if row[0] == "group" and type_ == "person":
+            member_count = conn.execute(
+                "SELECT COUNT(*) FROM GroupMemberships WHERE GroupIdentityID = ?",
+                (identity_id,),
+            ).fetchone()[0]
+            if member_count > 0:
+                raise ValueError(
+                    f"Cannot convert group to person: identity {identity_id} still has {member_count} member(s). Remove them first."
+                )
+        conn.execute(
+            "UPDATE Identities SET IdentityType = ? WHERE IdentityID = ?",
+            (type_, identity_id),
+        )
+
+    def add_member(self, group_id: int, member_id: int, cursor: sqlite3.Cursor) -> None:
+        """Add a person identity as a member of a group identity."""
+        logger.debug(
+            f"[IdentityRepository] -> add_member(group={group_id}, member={member_id})"
+        )
+        if group_id == member_id:
+            raise ValueError("An identity cannot be a member of itself.")
+        group_row = cursor.execute(
+            "SELECT IdentityType FROM Identities WHERE IdentityID = ? AND IsDeleted = 0",
+            (group_id,),
+        ).fetchone()
+        if not group_row:
+            raise LookupError(f"Identity {group_id} not found")
+        member_row = cursor.execute(
+            "SELECT IdentityType FROM Identities WHERE IdentityID = ? AND IsDeleted = 0",
+            (member_id,),
+        ).fetchone()
+        if not member_row:
+            raise LookupError(f"Identity {member_id} not found")
+        if member_row[0] == "group":
+            raise ValueError(
+                f"Identity {member_id} is a group and cannot be a member of another group."
+            )
+        existing = cursor.execute(
+            "SELECT 1 FROM GroupMemberships WHERE GroupIdentityID = ? AND MemberIdentityID = ?",
+            (group_id, member_id),
+        ).fetchone()
+        if not existing:
+            cursor.execute(
+                "INSERT INTO GroupMemberships (GroupIdentityID, MemberIdentityID) VALUES (?, ?)",
+                (group_id, member_id),
+            )
+
+    def remove_member(
+        self, group_id: int, member_id: int, cursor: sqlite3.Cursor
+    ) -> None:
+        """Remove a member from a group. Noop if not linked."""
+        logger.debug(
+            f"[IdentityRepository] -> remove_member(group={group_id}, member={member_id})"
+        )
+        cursor.execute(
+            "DELETE FROM GroupMemberships WHERE GroupIdentityID = ? AND MemberIdentityID = ?",
+            (group_id, member_id),
+        )
+
     def delete_alias(self, name_id: int, cursor: sqlite3.Cursor) -> None:
         """Remove an alias link. Guard: primary names cannot be deleted."""
         logger.debug(f"[IdentityRepository] -> delete_alias(name_id={name_id})")
@@ -401,18 +475,22 @@ class IdentityRepository(BaseRepository):
             "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (name_id,)
         )
 
-    def merge_orphan_into(self, source_name_id: int, target_name_id: int, cursor: sqlite3.Cursor) -> None:
+    def merge_orphan_into(
+        self, source_name_id: int, target_name_id: int, cursor: sqlite3.Cursor
+    ) -> None:
         """
         Merges a solo (orphan) identity into an existing one.
         Repoints all SongCredits and AlbumCredits from source to target,
         then soft-deletes the source ArtistName and its Identity.
         Guards: source identity must own exactly 1 name.
         """
-        logger.info(f"[IdentityRepository] -> merge_orphan_into(source={source_name_id}, target={target_name_id})")
+        logger.info(
+            f"[IdentityRepository] -> merge_orphan_into(source={source_name_id}, target={target_name_id})"
+        )
 
         source_row = cursor.execute(
             "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ? AND IsDeleted = 0",
-            (source_name_id,)
+            (source_name_id,),
         ).fetchone()
         if not source_row:
             raise LookupError(f"Source name {source_name_id} not found")
@@ -420,13 +498,16 @@ class IdentityRepository(BaseRepository):
 
         alias_count = cursor.execute(
             "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",
-            (source_identity_id,)
+            (source_identity_id,),
         ).fetchone()[0]
         if alias_count > 1:
-            raise ValueError(f"Source identity {source_identity_id} is not an orphan — merge aborted")
+            raise ValueError(
+                f"Source identity {source_identity_id} is not an orphan — merge aborted"
+            )
 
         # Repoint SongCredits from source → target, dropping duplicates where target already exists on that song+role
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM SongCredits
             WHERE CreditedNameID = ?
               AND EXISTS (
@@ -435,14 +516,17 @@ class IdentityRepository(BaseRepository):
                   AND sc2.CreditedNameID = ?
                   AND sc2.RoleID = SongCredits.RoleID
               )
-        """, (source_name_id, target_name_id))
+        """,
+            (source_name_id, target_name_id),
+        )
         cursor.execute(
             "UPDATE SongCredits SET CreditedNameID = ? WHERE CreditedNameID = ?",
             (target_name_id, source_name_id),
         )
 
         # Same for AlbumCredits
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM AlbumCredits
             WHERE CreditedNameID = ?
               AND EXISTS (
@@ -451,15 +535,24 @@ class IdentityRepository(BaseRepository):
                   AND ac2.CreditedNameID = ?
                   AND ac2.RoleID = AlbumCredits.RoleID
               )
-        """, (source_name_id, target_name_id))
+        """,
+            (source_name_id, target_name_id),
+        )
         cursor.execute(
             "UPDATE AlbumCredits SET CreditedNameID = ? WHERE CreditedNameID = ?",
             (target_name_id, source_name_id),
         )
-        cursor.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (source_name_id,))
-        cursor.execute("UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = ?", (source_identity_id,))
+        cursor.execute(
+            "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (source_name_id,)
+        )
+        cursor.execute(
+            "UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = ?",
+            (source_identity_id,),
+        )
 
-        logger.info(f"[IdentityRepository] <- merge_orphan_into OK — name {source_name_id} → {target_name_id}")
+        logger.info(
+            f"[IdentityRepository] <- merge_orphan_into OK — name {source_name_id} → {target_name_id}"
+        )
 
     def update_legal_name(
         self, identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection

@@ -414,6 +414,10 @@ Get-or-create a Tag by name+category. Reactivates soft-deleted. Returns tag_id.
 
 Update a Tag's name/category globally. Does NOT commit.
 
+### soft_delete(tag_id: int, conn: sqlite3.Connection) -> bool
+
+Set `IsDeleted = 1` for a tag. Returns `True` if a record was updated, `False` if not found or already deleted.
+
 ### _row_to_tag(row: sqlite3.Row) -> Tag
 
 **Internal**: Maps a physical database row to the strict Pydantic `Tag` model, preserving the `IsPrimary` flag from the link table.marker.
@@ -498,6 +502,22 @@ Batch-fetch member identities for multiple group identities. Supports optional s
 ### get_groups_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[Identity]]
 
 Batch-fetch group identities that multiple person identities belong to. Supports optional shared connection.
+
+### set_type(identity_id: int, type_: str, conn: sqlite3.Connection) -> None
+
+Set the `IdentityType` ('person' or 'group') for an identity. Blocks group→person conversion if members exist. Does NOT commit.
+
+### add_member(group_id: int, member_id: int, cursor: sqlite3.Cursor) -> None
+
+Link a person identity as a member of a group. Guarded against self-membership and nesting groups.
+
+### remove_member(group_id: int, member_id: int, cursor: sqlite3.Cursor) -> None
+
+Remove a membership link. No-op if not linked.
+
+### merge_orphan_into(source_name_id: int, target_name_id: int, cursor: sqlite3.Cursor) -> None
+
+Merges a solo (orphan) identity into another by repointing all credits and soft-deleting the source record.
 
 ### _row_to_identity(row: sqlite3.Row) -> Identity
 

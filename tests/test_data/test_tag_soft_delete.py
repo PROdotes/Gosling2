@@ -34,9 +34,7 @@ class TestSoftDelete:
             conn.commit()
 
         with repo._get_connection() as conn:
-            row = conn.execute(
-                "SELECT IsDeleted FROM Tags WHERE TagID = 1"
-            ).fetchone()
+            row = conn.execute("SELECT IsDeleted FROM Tags WHERE TagID = 1").fetchone()
         assert row[0] == 1, f"Expected IsDeleted=1, got {row[0]}"
 
     def test_soft_deleted_tag_hidden_from_get_by_id(self, populated_db):

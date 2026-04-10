@@ -292,6 +292,32 @@ Used by `update_identity_legal_name`.
 - Updates an `ArtistNames` record display name globally across all songs.
 - Wraps `CatalogService.update_credit_name`.
 
+### async def merge_identity(source_name_id: int, target_name_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `POST /api/v1/identities/merge`
+- Merges a solo identity into an existing one by repointing all credits.
+- Wraps `CatalogService.merge_identity_into`.
+
+### SetIdentityTypeBody
+`{ type: str }`
+
+### AddMemberBody
+`{ member_id: int }`
+
+### async def set_identity_type(identity_id: int, body: SetIdentityTypeBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `PATCH /api/v1/identities/{identity_id}/type`
+- Convert an identity between person and group.
+- Wraps `CatalogService.set_identity_type`.
+
+### async def add_identity_member(identity_id: int, body: AddMemberBody, service: CatalogService = Depends(_get_service))
+**HTTP**: `POST /api/v1/identities/{identity_id}/members`
+- Add a person identity as a member of a group.
+- Wraps `CatalogService.add_identity_member`.
+
+### async def remove_identity_member(identity_id: int, member_id: int, service: CatalogService = Depends(_get_service))
+**HTTP**: `DELETE /api/v1/identities/{identity_id}/members/{member_id}`
+- Remove a member from a group.
+- Wraps `CatalogService.remove_identity_member`.
+
 ### async def add_song_album(song_id: int, body: AddAlbumBody, service: CatalogService = Depends(_get_service)) -> SongAlbum
 **HTTP**: `POST /api/v1/songs/{song_id}/albums`
 - Links a song to an existing album or creates a new album record and links it.

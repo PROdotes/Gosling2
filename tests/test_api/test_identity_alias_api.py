@@ -114,12 +114,16 @@ class TestRemoveIdentityAliasApi:
 class TestUpdateCreditNameApi:
 
     def test_clean_rename_returns_204(self, api):
-        resp = api.patch("/api/v1/songs/0/credits/11", json={"display_name": "Grohlton Reloaded"})
+        resp = api.patch(
+            "/api/v1/songs/0/credits/11", json={"display_name": "Grohlton Reloaded"}
+        )
         assert resp.status_code == 204, resp.text
 
     def test_collision_with_orphan_returns_409_merge_required(self, api):
         """Renaming Grohlton (11) to Taylor Hawkins (solo identity) → 409 MERGE_REQUIRED."""
-        resp = api.patch("/api/v1/songs/0/credits/11", json={"display_name": "Taylor Hawkins"})
+        resp = api.patch(
+            "/api/v1/songs/0/credits/11", json={"display_name": "Taylor Hawkins"}
+        )
         assert resp.status_code == 409, resp.text
         body = resp.json()["detail"]
         assert body["code"] == "MERGE_REQUIRED"
@@ -128,7 +132,9 @@ class TestUpdateCreditNameApi:
 
     def test_collision_with_parent_returns_409_unsafe_merge(self, api):
         """Renaming Taylor (40) to Dave Grohl (multi-alias identity) → 409 UNSAFE_MERGE."""
-        resp = api.patch("/api/v1/songs/0/credits/40", json={"display_name": "Dave Grohl"})
+        resp = api.patch(
+            "/api/v1/songs/0/credits/40", json={"display_name": "Dave Grohl"}
+        )
         assert resp.status_code == 409, resp.text
         body = resp.json()["detail"]
         assert body["code"] == "UNSAFE_MERGE"
@@ -151,7 +157,9 @@ class TestMergeIdentityApi:
         assert resp.status_code == 204, resp.text
 
     def test_merge_source_not_found_returns_404(self, api):
-        resp = api.post("/api/v1/identities/merge?source_name_id=9999&target_name_id=10")
+        resp = api.post(
+            "/api/v1/identities/merge?source_name_id=9999&target_name_id=10"
+        )
         assert resp.status_code == 404, resp.text
 
     def test_merge_non_orphan_source_returns_400(self, api):

@@ -110,6 +110,18 @@ Fetch the full hydrated song repertoire linked to a specific tag.
 ### get_songs_by_identity(identity_id: int) -> List[Song]
 Reverse Credit lookup starting from a seed identity.
 
+### merge_identity_into(source_name_id: int, target_name_id: int) -> None
+Merges a solo identity into an existing one via IdentityRepository.
+
+### set_identity_type(identity_id: int, type_: str) -> None
+Convert an identity between 'person' and 'group'.
+
+### add_identity_member(group_id: int, member_id: int) -> None
+Add a person identity as a member of a group.
+
+### remove_identity_member(group_id: int, member_id: int) -> None
+Remove a member from a group.
+
 ### add_identity_alias(identity_id: int, display_name: str, name_id: Optional[int] = None) -> int
 Link a name to an identity.
 

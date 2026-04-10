@@ -22,8 +22,7 @@ Project protocols for architectural integrity.
 - Every method must have a strict Python signature.
 - Every entry must have a single, definitive file path.
 - **Constitution, Not Mirror**: The lookup docs are the prescriptive contract. Never "patch" the MD at the end of a session to match code you just wrote.
-- **Handling Integrity Failures**: If a test says a method is missing from the MD, do NOT blindly add it. Run an AST/grep check. **CRITICAL:** For Router endpoints, do not just search for the Python method name (`get_x`). You MUST verify if the corresponding HTTP route (e.g., `/api/v1/...`) is present in `src/static/js/dashboard/api.js`. If the route is unused by the frontend AND backend, it is Zombie Code: delete it. If it is used without authorization, refactor the caller. New features require updating the MD *first*.
-
+- **Handling Integrity Failures**: If a test says a method is missing from the MD, do NOT blindly add it. Run an AST/grep check. **CRITICAL:** For Router endpoints, do not just search for the Python method name (`get_x`). You MUST verify if the corresponding HTTP route (e.g., `/api/v1/...`) is present in `src/static/js/dashboard/api.js`. If the route is unused by the frontend AND backend, it is Zombie Code: delete it. If it is used without authorization, refactor the caller. New features require updating the MD _first_.
 
 ---
 
@@ -123,8 +122,16 @@ If in doubt, **ask**. The default is NO code.
 
 ## 11. Vertical Slice Blueprinting (VSB)
 
-- **The Contract**: Before any code, you MUST define the path from Repo -> Service -> API -> JS in a planning matrix. 
-- **The Outcome Matrix**: Map every meaningful [Input x State] permutation (Missing IDs, Nulls, Duplicates) to a hard-outcome. **NO SILENT FALLBACKS.** 
+- **The Contract**: Before any code, you MUST define the path from Repo -> Service -> API -> JS in a planning matrix.
+- **The Outcome Matrix**: Map every meaningful [Input x State] permutation (Missing IDs, Nulls, Duplicates) to a hard-outcome. **NO SILENT FALLBACKS.**
 - **Logic Integrity**: If an ID is missing, return a hard 404/LookupError. No "ghost" resolutions.
 - **Verification**: Every outcome in the Matrix MUST have a corresponding test case. Final verification must use `docs/testing/TDD_STANDARD.md` criteria.
 
+---
+
+## 12. Stop At First Findings (No Rabbit Holes)
+
+- Never perform deep autonomous research, extensive debugging chains, or write large plans without user approval.
+- As soon as you identify the root cause, a blocker, or the answer to the user's specific question, **STOP**.
+- Present the concise finding directly to the user.
+- Require explicit authorization to proceed with mapping or planning.

@@ -159,6 +159,12 @@ class TestRemoveSongAlbum:
 
 Service tests do **not** duplicate repo tests. If the repo is already tested, the service test focuses on the orchestration (hydration, merging, error mapping).
 
+**Passthroughs** (service methods that just delegate to the repo with a connection wrapper and no extra logic) only need:
+- One happy-path test confirming the data passes through correctly
+- One test per error type that the service is expected to surface (`LookupError`, `ValueError`, etc.)
+
+Do not re-test every guard or edge case already covered by repo tests.
+
 ---
 
 ## File Placement

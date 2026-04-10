@@ -15,7 +15,10 @@ async function fetchJson(url, options = {}) {
             const errorData = await response.json();
             if (errorData && errorData.detail) {
                 errorDetail = errorData.detail;
-                errorMsg = typeof errorDetail === "string" ? errorDetail : `Request failed: ${response.status}`;
+                errorMsg =
+                    typeof errorDetail === "string"
+                        ? errorDetail
+                        : `Request failed: ${response.status}`;
             }
         } catch (e) {
             // No JSON body
@@ -36,7 +39,10 @@ async function fetchVoid(url, options = {}) {
             const errorData = await response.json();
             if (errorData && errorData.detail) {
                 errorDetail = errorData.detail;
-                errorMsg = typeof errorDetail === "string" ? errorDetail : `Request failed: ${response.status}`;
+                errorMsg =
+                    typeof errorDetail === "string"
+                        ? errorDetail
+                        : `Request failed: ${response.status}`;
             }
         } catch (e) {
             // No JSON body
@@ -179,6 +185,28 @@ export function updateIdentityLegalName(identityId, legalName) {
     });
 }
 
+export function setIdentityType(identityId, type) {
+    return fetchVoid(`/api/v1/identities/${identityId}/type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+    });
+}
+
+export function addIdentityMember(groupId, memberId) {
+    return fetchVoid(`/api/v1/identities/${groupId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ member_id: memberId }),
+    });
+}
+
+export function removeIdentityMember(groupId, memberId) {
+    return fetchVoid(`/api/v1/identities/${groupId}/members/${memberId}`, {
+        method: "DELETE",
+    });
+}
+
 export function getPublisherDetail(id, options = {}) {
     return fetchJson(`/api/v1/publishers/${id}`, options);
 }
@@ -307,9 +335,12 @@ export function moveSongToLibrary(id) {
 }
 
 export function mergeIdentity(sourceNameId, targetNameId) {
-    return fetchVoid(`/api/v1/identities/merge?source_name_id=${sourceNameId}&target_name_id=${targetNameId}`, {
-        method: "POST",
-    });
+    return fetchVoid(
+        `/api/v1/identities/merge?source_name_id=${sourceNameId}&target_name_id=${targetNameId}`,
+        {
+            method: "POST",
+        },
+    );
 }
 
 export function syncSongId3(id) {

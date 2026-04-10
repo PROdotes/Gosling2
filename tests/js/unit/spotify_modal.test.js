@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { JSDOM } from "jsdom";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Note: We mock the api imports before they are used by the module
 vi.mock("../../../src/static/js/dashboard/api.js", () => ({
@@ -37,17 +37,19 @@ describe("SpotifyModal UI Sync", () => {
 
         // Reset the module state by re-importing
         vi.resetModules();
-        modalModule = await import("../../../src/static/js/dashboard/components/spotify_modal.js");
-        
+        modalModule = await import(
+            "../../../src/static/js/dashboard/components/spotify_modal.js"
+        );
+
         warningEl = document.getElementById("spotify-title-warning");
         parsedTitleEl = document.getElementById("spotify-parsed-title");
     });
 
     it("should hide warning when title matches", async () => {
-        // We need to bypass the private showResults by triggering the flow if possible, 
-        // but since we are testing UI sync, we can just check if the module was initialized 
+        // We need to bypass the private showResults by triggering the flow if possible,
+        // but since we are testing UI sync, we can just check if the module was initialized
         // with the elements correctly.
-        
+
         // Setup initial state: open modal
         modalModule.openSpotifyModal({ songId: 1, title: "Matching Title" });
 
@@ -58,11 +60,11 @@ describe("SpotifyModal UI Sync", () => {
     });
 
     it("should show warning and trigger animation when title mismatches", async () => {
-        // To test showResults (private), we would ideally export it for testing 
-        // or trigger the event that calls it. 
-        // For this task, I'll update the component to be more testable or 
+        // To test showResults (private), we would ideally export it for testing
+        // or trigger the event that calls it.
+        // For this task, I'll update the component to be more testable or
         // just verify the DOM selectors in the test match the implementation.
-        
+
         // For now, I'll verify the existence of the warning element in the DOM
         expect(warningEl).not.toBeNull();
         expect(warningEl.classList.contains("ui-banner-warning")).toBe(true);

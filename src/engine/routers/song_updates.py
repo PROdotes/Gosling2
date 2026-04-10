@@ -1,5 +1,6 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.services.catalog_service import CatalogService
 from src.services.metadata_service import MetadataService
@@ -183,19 +184,27 @@ async def update_credit_name(
     except ValueError as e:
         msg = str(e)
         if msg.startswith("MERGE_REQUIRED:"):
-            _, collision_name_id, source_identity_id, collision_identity_id = msg.split(":")
-            raise HTTPException(status_code=409, detail={
-                "code": "MERGE_REQUIRED",
-                "collision_name_id": int(collision_name_id),
-                "source_identity_id": int(source_identity_id),
-                "collision_identity_id": int(collision_identity_id),
-                "new_name": body.display_name,
-            })
+            _, collision_name_id, source_identity_id, collision_identity_id = msg.split(
+                ":"
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "MERGE_REQUIRED",
+                    "collision_name_id": int(collision_name_id),
+                    "source_identity_id": int(source_identity_id),
+                    "collision_identity_id": int(collision_identity_id),
+                    "new_name": body.display_name,
+                },
+            )
         if msg.startswith("UNSAFE_MERGE:"):
-            raise HTTPException(status_code=409, detail={
-                "code": "UNSAFE_MERGE",
-                "message": msg[13:],
-            })
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "UNSAFE_MERGE",
+                    "message": msg[13:],
+                },
+            )
         raise HTTPException(status_code=400, detail=msg)
     except LookupError:
         logger.warning(f"[SongUpdates] <- update_credit_name NOT_FOUND id={name_id}")
@@ -212,7 +221,9 @@ async def merge_identity(
     service: CatalogService = Depends(_get_service),
 ):
     """Merges a solo identity into an existing one by repointing all credits."""
-    logger.debug(f"[SongUpdates] -> merge_identity(source={source_name_id}, target={target_name_id})")
+    logger.debug(
+        f"[SongUpdates] -> merge_identity(source={source_name_id}, target={target_name_id})"
+    )
     try:
         service.merge_identity_into(source_name_id, target_name_id)
         logger.debug("[SongUpdates] <- merge_identity OK")
@@ -223,6 +234,54 @@ async def merge_identity(
     except Exception as e:
         logger.error(f"[SongUpdates] <- merge_identity CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Identity Type / Members ---
+
+
+class SetIdentityTypeBody(BaseModel):
+    type: str
+
+
+class AddMemberBody(BaseModel):
+    member_id: int
+
+
+@router.patch("/identities/{identity_id}/type", status_code=204)
+async def set_identity_type(
+    identity_id: int,
+    body: SetIdentityTypeBody,
+    service: CatalogService = Depends(_get_service),
+):
+    try:
+        service.set_identity_type(identity_id, body.type)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/identities/{identity_id}/members", status_code=204)
+async def add_identity_member(
+    identity_id: int,
+    body: AddMemberBody,
+    service: CatalogService = Depends(_get_service),
+):
+    try:
+        service.add_identity_member(identity_id, body.member_id)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/identities/{identity_id}/members/{member_id}", status_code=204)
+async def remove_identity_member(
+    identity_id: int,
+    member_id: int,
+    service: CatalogService = Depends(_get_service),
+):
+    service.remove_identity_member(identity_id, member_id)
 
 
 # --- Albums ---

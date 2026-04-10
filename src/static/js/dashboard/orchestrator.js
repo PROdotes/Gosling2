@@ -1,9 +1,9 @@
 import * as api from "./api.js";
+import { showConfirm } from "./components/confirm_modal.js";
 import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { syncAlbumWithSong } from "./handlers/song_actions.js";
-import { showConfirm } from "./components/confirm_modal.js";
 
 /**
  * GOSLING ORCHESTRATOR
@@ -322,20 +322,35 @@ export async function manageArtist(ctx, artistId, artistName) {
         display_name: artistName,
     };
     const otherAliases = aliases.filter((a) => !a.is_primary);
+    const members = identity.members || [];
+    const isGroup = identity.type === "group";
+    const hasMembers = members.length > 0;
 
     openEditModal({
         title: `Edit Artist: ${primary.display_name}`,
         name: primary.display_name,
+        toggle: {
+            value: identity.type,
+            options: ["person", "group"],
+            disabledReason: hasMembers
+                ? "Remove all members before converting to person"
+                : null,
+            onSave: async (newType) => {
+                await api.setIdentityType(artistId, newType);
+                if (ctx.refreshLayout) ctx.refreshLayout();
+            },
+        },
         onRename: async (newName) => {
             try {
                 await api.updateCreditName(0, primary.id, newName);
                 if (ctx.refreshLayout) ctx.refreshLayout();
             } catch (err) {
                 if (err.detail?.code === "MERGE_REQUIRED") {
-                    const { collision_name_id, source_identity_id: _sid } = err.detail;
+                    const { collision_name_id, source_identity_id: _sid } =
+                        err.detail;
                     const confirmed = await showConfirm(
                         `"${newName}" already exists. Merge into existing identity?`,
-                        { title: "Merge Identity", okLabel: "Merge" }
+                        { title: "Merge Identity", okLabel: "Merge" },
                     );
                     if (confirmed) {
                         await api.mergeIdentity(primary.id, collision_name_id);
@@ -381,7 +396,7 @@ export async function manageArtist(ctx, artistId, artistName) {
                         const { collision_name_id } = err.detail;
                         const confirmed = await showConfirm(
                             `"${newName}" already exists. Merge into existing identity?`,
-                            { title: "Merge Identity", okLabel: "Merge" }
+                            { title: "Merge Identity", okLabel: "Merge" },
                         );
                         if (confirmed) {
                             await api.mergeIdentity(item.id, collision_name_id);
@@ -395,6 +410,31 @@ export async function manageArtist(ctx, artistId, artistName) {
                 }
             },
         },
+        secondChildren: isGroup
+            ? {
+                  label: "Members",
+                  items: members.map((m) => ({
+                      id: m.id,
+                      label: m.display_name,
+                  })),
+                  onSearch: async (q) => {
+                      const results = await api.searchArtists(q);
+                      return (results || [])
+                          .filter((a) => a.type !== "group")
+                          .map((a) => ({
+                              id: a.id,
+                              label: a.display_name || a.name,
+                          }));
+                  },
+                  onAdd: async (opt) => {
+                      await api.addIdentityMember(artistId, opt.id);
+                      return { id: opt.id, label: opt.label };
+                  },
+                  onRemove: async (item) => {
+                      await api.removeIdentityMember(artistId, item.id);
+                  },
+              }
+            : null,
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
         },

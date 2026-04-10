@@ -8,6 +8,12 @@ import { wasMousedownInside } from "./utils.js";
  *     title: "Edit Publisher",
  *     name: "Sony Music",
  *     onRename: async (newName) => {},          // null = not renameable
+ *     toggle: {                                 // null = no toggle
+ *       value: "person",                        // current value
+ *       options: ["person", "group"],
+ *       onSave: async (val) => {},
+ *       disabledReason: "Remove members first", // optional tooltip when disabled
+ *     },
  *     category: {                               // null = no category section
  *       label: "Category",
  *       value: "major",
@@ -23,6 +29,7 @@ import { wasMousedownInside } from "./utils.js";
  *       onRemove: async (item) => {},
  *       createLabel: (q) => `Add "${q}"`,
  *     },
+ *     secondChildren: { ... },                  // null = no second children section (same shape as children)
  *   });
  */
 
@@ -34,14 +41,10 @@ let _config = null;
 let _parentSnapshot = null; // saved state when drilling into a child edit
 let _isSelecting = false;
 
-// ─── Children sub-section state ───────────────────────────────────────────────
-let _childItems = [];
-let _childDebounce = null;
-let _childDropdownItems = [];
-let _childDropdownIndex = -1;
-let _childInput = null;
-let _childDropdown = null;
-let _childItemsEl = null;
+// ─── Children slot state ──────────────────────────────────────────────────────
+// Each slot is keyed by config key ("children" | "secondChildren") and holds
+// { items, debounce, dropdownItems, dropdownIndex, inputEl, dropdownEl, itemsEl }
+const _slots = {};
 
 // ─── Category dropdown state ──────────────────────────────────────────────────
 let _catDebounce = null;
@@ -49,6 +52,224 @@ let _catDropdownItems = [];
 let _catDropdownIndex = -1;
 let _catInput = null;
 let _catDropdown = null;
+
+// ─── Children slot helpers ────────────────────────────────────────────────────
+
+function createSlot(key) {
+    const slot = {
+        key,
+        items: [],
+        debounce: null,
+        dropdownItems: [],
+        dropdownIndex: -1,
+        inputEl: null,
+        dropdownEl: null,
+        itemsEl: null,
+    };
+    _slots[key] = slot;
+    return slot;
+}
+
+function getSlotConfig(key) {
+    return _config[key];
+}
+
+// DOM id helpers — "children" → "child", "secondChildren" → "child2"
+const _domId = { children: "child", secondChildren: "child2" };
+const _dataAttr = { children: "editChildId", secondChildren: "editChild2Id" };
+const _removeAttr = {
+    children: "removeChildId",
+    secondChildren: "removeChild2Id",
+};
+
+function renderSlotItems(slot) {
+    const cfg = getSlotConfig(slot.key);
+    const editAttr = _dataAttr[slot.key];
+    const removeAttr = _removeAttr[slot.key];
+
+    if (!slot.items.length) {
+        slot.itemsEl.innerHTML =
+            '<span class="link-modal-empty">None linked</span>';
+        return;
+    }
+    slot.itemsEl.innerHTML = slot.items
+        .map(
+            (item) => `
+        <span class="link-chip">
+            <button class="link-chip-label" data-${camelToData(editAttr)}="${item.id}">${escapeHtml(item.label)}</button>
+            ${cfg.onRemove ? `<button class="link-chip-remove" data-${camelToData(removeAttr)}="${item.id}" title="Remove">✕</button>` : ""}
+        </span>
+    `,
+        )
+        .join("");
+
+    slot.itemsEl
+        .querySelectorAll(`[data-${camelToData(editAttr)}]`)
+        .forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const id = btn.dataset[editAttr];
+                const item = slot.items.find(
+                    (i) => String(i.id) === String(id),
+                );
+                if (item) openChildEdit(item, slot.key);
+            });
+        });
+
+    slot.itemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset[removeAttr];
+            const item = slot.items.find((i) => String(i.id) === String(id));
+            if (!item) return;
+            btn.disabled = true;
+            try {
+                await cfg.onRemove(item);
+                const idx = slot.items.findIndex(
+                    (i) => String(i.id) === String(id),
+                );
+                if (idx >= 0) slot.items.splice(idx, 1);
+                renderSlotItems(slot);
+            } catch (err) {
+                btn.disabled = false;
+                showError(`Remove failed: ${err.message}`);
+            }
+        });
+    });
+}
+
+async function runSlotSearch(slot, q) {
+    const cfg = getSlotConfig(slot.key);
+    const results = await cfg.onSearch(q);
+    const linkedIds = new Set(slot.items.map((i) => String(i.id)));
+    const options = results
+        .filter((r) => !linkedIds.has(String(r.id)))
+        .map((r) => ({ id: r.id, label: r.label }));
+    const exactMatch = results.some(
+        (r) => r.label.toLowerCase() === q.toLowerCase(),
+    );
+    if (!exactMatch && cfg.createLabel) {
+        options.unshift({
+            id: null,
+            label: cfg.createLabel(q),
+            isCreate: true,
+            rawInput: q,
+        });
+    }
+    renderSlotDropdown(slot, options);
+}
+
+function renderSlotDropdown(slot, options) {
+    slot.dropdownItems = options;
+    slot.dropdownIndex = -1;
+
+    if (!options.length) {
+        slot.dropdownEl.style.display = "none";
+        return;
+    }
+
+    slot.dropdownEl.innerHTML = options
+        .map(
+            (opt, i) => `
+        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
+            ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
+        </div>
+    `,
+        )
+        .join("");
+
+    slot.dropdownEl.querySelectorAll(".link-dropdown-item").forEach((el) => {
+        el.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            selectSlotOption(slot, Number(el.dataset.index));
+        });
+    });
+
+    slot.dropdownEl.style.display = "block";
+    updateSlotDropdownHighlight(slot);
+}
+
+function updateSlotDropdownHighlight(slot) {
+    slot.dropdownEl.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
+        el.classList.toggle(
+            "link-dropdown-item--active",
+            i === slot.dropdownIndex,
+        );
+    });
+}
+
+async function selectSlotOption(slot, index) {
+    const opt = slot.dropdownItems[index];
+    if (!opt) return;
+    const cfg = getSlotConfig(slot.key);
+
+    _isSelecting = true;
+    slot.inputEl.value = "";
+    slot.dropdownEl.style.display = "none";
+    slot.dropdownItems = [];
+    slot.dropdownIndex = -1;
+    slot.inputEl.disabled = true;
+
+    try {
+        const result = await cfg.onAdd(opt);
+        if (_config) {
+            if (result) slot.items.push(result);
+            renderSlotItems(slot);
+        }
+    } catch (err) {
+        if (_config) showError(`Add failed: ${err.message}`);
+    } finally {
+        if (slot.inputEl && _config) {
+            slot.inputEl.disabled = false;
+            slot.inputEl.focus();
+        }
+        setTimeout(() => {
+            _isSelecting = false;
+        }, 150);
+    }
+}
+
+function attachSlotHandlers(slot) {
+    slot.inputEl.addEventListener("input", () => {
+        clearTimeout(slot.debounce);
+        const q = slot.inputEl.value.trim();
+        if (!q) {
+            slot.dropdownEl.style.display = "none";
+            return;
+        }
+        slot.debounce = setTimeout(() => runSlotSearch(slot, q), 200);
+    });
+
+    slot.inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            slot.dropdownIndex = Math.min(
+                slot.dropdownIndex + 1,
+                slot.dropdownItems.length - 1,
+            );
+            updateSlotDropdownHighlight(slot);
+        } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            slot.dropdownIndex = Math.max(slot.dropdownIndex - 1, 0);
+            updateSlotDropdownHighlight(slot);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            if (slot.dropdownIndex >= 0)
+                selectSlotOption(slot, slot.dropdownIndex);
+            else if (slot.dropdownItems.length === 1) selectSlotOption(slot, 0);
+        }
+    });
+
+    slot.inputEl.addEventListener("blur", () => {
+        setTimeout(() => {
+            slot.dropdownEl.style.display = "none";
+        }, 150);
+    });
+}
+
+// Convert camelCase data attribute name to kebab-case for HTML
+function camelToData(str) {
+    return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
+}
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 
@@ -98,17 +319,44 @@ function renderBody() {
         }
     }
 
-    // Children section
-    if (_config.children) {
+    // Toggle field (e.g. person/group)
+    if (_config.toggle) {
+        const { value, options, disabledReason } = _config.toggle;
+        const disabled = !!disabledReason;
         sections.push(`
-            <div class="edit-modal-section-title">${escapeHtml(_config.children.label)}</div>
-            <div id="edit-modal-child-items" class="link-modal-items"></div>
-            <div class="link-modal-add">
-                <input type="text" id="edit-modal-child-input" class="link-modal-input"
-                    placeholder="Type to search or add..." autocomplete="off">
-                <div id="edit-modal-child-dropdown" class="link-modal-dropdown" style="display:none"></div>
+            <div class="edit-modal-field">
+                <label>Type</label>
+                <div class="edit-modal-toggle" ${disabled ? `title="${escapeHtml(disabledReason)}"` : ""}>
+                    ${options
+                        .map(
+                            (opt) => `
+                        <button class="edit-modal-toggle-btn ${opt === value ? "active" : ""} ${disabled && opt !== value ? "disabled" : ""}"
+                            data-toggle-value="${escapeHtml(opt)}"
+                            ${disabled && opt !== value ? "disabled" : ""}>
+                            ${escapeHtml(opt)}
+                        </button>
+                    `,
+                        )
+                        .join("")}
+                </div>
             </div>
         `);
+    }
+
+    // Children sections (generic — "children" then "secondChildren")
+    for (const key of ["children", "secondChildren"]) {
+        if (_config[key]) {
+            const domKey = _domId[key];
+            sections.push(`
+                <div class="edit-modal-section-title">${escapeHtml(_config[key].label)}</div>
+                <div id="edit-modal-${domKey}-items" class="link-modal-items"></div>
+                <div class="link-modal-add">
+                    <input type="text" id="edit-modal-${domKey}-input" class="link-modal-input"
+                        placeholder="Type to search or add..." autocomplete="off">
+                    <div id="edit-modal-${domKey}-dropdown" class="link-modal-dropdown" style="display:none"></div>
+                </div>
+            `);
+        }
     }
 
     bodyEl.innerHTML = sections.join("");
@@ -196,50 +444,47 @@ function attachHandlers() {
         }
     }
 
-    // Children section
-    if (_config.children) {
-        _childItems = _config.children.items;
-        _childItemsEl = bodyEl.querySelector("#edit-modal-child-items");
-        _childInput = bodyEl.querySelector("#edit-modal-child-input");
-        _childDropdown = bodyEl.querySelector("#edit-modal-child-dropdown");
-
-        renderChildItems();
-
-        _childInput.addEventListener("input", () => {
-            clearTimeout(_childDebounce);
-            const q = _childInput.value.trim();
-            if (!q) {
-                _childDropdown.style.display = "none";
-                return;
-            }
-            _childDebounce = setTimeout(() => runChildSearch(q), 200);
+    // Toggle buttons
+    if (_config.toggle) {
+        bodyEl.querySelectorAll("[data-toggle-value]").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const newVal = btn.dataset.toggleValue;
+                if (newVal === _config.toggle.value || btn.disabled) return;
+                btn.disabled = true;
+                try {
+                    await _config.toggle.onSave(newVal);
+                    _config.toggle.value = newVal;
+                    bodyEl
+                        .querySelectorAll("[data-toggle-value]")
+                        .forEach((b) => {
+                            b.classList.toggle(
+                                "active",
+                                b.dataset.toggleValue === newVal,
+                            );
+                        });
+                } catch (err) {
+                    showError(`Save failed: ${err.message}`);
+                } finally {
+                    btn.disabled = false;
+                }
+            });
         });
+    }
 
-        _childInput.addEventListener("keydown", (e) => {
-            if (e.key === "ArrowDown") {
-                e.preventDefault();
-                _childDropdownIndex = Math.min(
-                    _childDropdownIndex + 1,
-                    _childDropdownItems.length - 1,
-                );
-                updateChildDropdownHighlight();
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                _childDropdownIndex = Math.max(_childDropdownIndex - 1, 0);
-                updateChildDropdownHighlight();
-            } else if (e.key === "Enter") {
-                e.preventDefault();
-                if (_childDropdownIndex >= 0)
-                    selectChildOption(_childDropdownIndex);
-                else if (_childDropdownItems.length === 1) selectChildOption(0);
-            }
-        });
-
-        _childInput.addEventListener("blur", () => {
-            setTimeout(() => {
-                _childDropdown.style.display = "none";
-            }, 150);
-        });
+    // Children slots
+    for (const key of ["children", "secondChildren"]) {
+        if (_config[key]) {
+            const domKey = _domId[key];
+            const slot = createSlot(key);
+            slot.items = [..._config[key].items];
+            slot.itemsEl = bodyEl.querySelector(`#edit-modal-${domKey}-items`);
+            slot.inputEl = bodyEl.querySelector(`#edit-modal-${domKey}-input`);
+            slot.dropdownEl = bodyEl.querySelector(
+                `#edit-modal-${domKey}-dropdown`,
+            );
+            renderSlotItems(slot);
+            attachSlotHandlers(slot);
+        }
     }
 }
 
@@ -298,7 +543,6 @@ async function commitCategory(input) {
 
 async function runCatSearch(q) {
     const results = await _config.category.onSearch(q);
-    // Filter to matching categories, case-insensitive
     const filtered = results.filter((c) =>
         c.toLowerCase().includes(q.toLowerCase()),
     );
@@ -361,7 +605,6 @@ function selectCatOption(index) {
     _catInput.value = value;
 
     hideCatDropdown();
-    // Mark dirty if different from last committed
     const field = _catInput.closest(".edit-modal-field");
     field.classList.toggle(
         "edit-modal-field--dirty",
@@ -376,142 +619,6 @@ function hideCatDropdown() {
     if (_catDropdown) _catDropdown.style.display = "none";
     _catDropdownItems = [];
     _catDropdownIndex = -1;
-}
-
-// ─── Children ─────────────────────────────────────────────────────────────────
-
-function renderChildItems() {
-    if (!_childItems.length) {
-        _childItemsEl.innerHTML =
-            '<span class="link-modal-empty">None linked</span>';
-        return;
-    }
-    _childItemsEl.innerHTML = _childItems
-        .map(
-            (item) => `
-        <span class="link-chip">
-            <button class="link-chip-label" data-edit-child-id="${item.id}">${escapeHtml(item.label)}</button>
-            ${_config.children.onRemove ? `<button class="link-chip-remove" data-remove-child-id="${item.id}" title="Remove">✕</button>` : ""}
-        </span>
-    `,
-        )
-        .join("");
-
-    _childItemsEl.querySelectorAll("[data-edit-child-id]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const id = btn.dataset.editChildId;
-            const item = _childItems.find((i) => String(i.id) === String(id));
-            if (!item) return;
-            openChildEdit(item);
-        });
-    });
-
-    _childItemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-            const id = btn.dataset.removeChildId;
-            const item = _childItems.find((i) => String(i.id) === String(id));
-            if (!item) return;
-            btn.disabled = true;
-            try {
-                await _config.children.onRemove(item);
-                const idx = _childItems.findIndex(
-                    (i) => String(i.id) === String(id),
-                );
-                if (idx >= 0) _childItems.splice(idx, 1);
-                renderChildItems();
-            } catch (err) {
-                btn.disabled = false;
-                showError(`Remove failed: ${err.message}`);
-            }
-        });
-    });
-}
-
-async function runChildSearch(q) {
-    const results = await _config.children.onSearch(q);
-    const linkedIds = new Set(_childItems.map((i) => String(i.id)));
-    const options = results
-        .filter((r) => !linkedIds.has(String(r.id)))
-        .map((r) => ({ id: r.id, label: r.label }));
-    const exactMatch = results.some(
-        (r) => r.label.toLowerCase() === q.toLowerCase(),
-    );
-    if (!exactMatch && _config.children.createLabel) {
-        options.unshift({
-            id: null,
-            label: _config.children.createLabel(q),
-            isCreate: true,
-            rawInput: q,
-        });
-    }
-    renderChildDropdown(options);
-}
-
-function renderChildDropdown(options) {
-    _childDropdownItems = options;
-    _childDropdownIndex = -1;
-
-    if (!options.length) {
-        _childDropdown.style.display = "none";
-        return;
-    }
-
-    _childDropdown.innerHTML = options
-        .map(
-            (opt, i) => `
-        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
-            ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
-        </div>
-    `,
-        )
-        .join("");
-
-    _childDropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
-        el.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectChildOption(Number(el.dataset.index));
-        });
-    });
-
-    _childDropdown.style.display = "block";
-    updateChildDropdownHighlight();
-}
-
-function updateChildDropdownHighlight() {
-    _childDropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle(
-            "link-dropdown-item--active",
-            i === _childDropdownIndex,
-        );
-    });
-}
-
-async function selectChildOption(index) {
-    const opt = _childDropdownItems[index];
-    if (!opt) return;
-
-    _isSelecting = true;
-    _childInput.value = "";
-    _childDropdown.style.display = "none";
-    _childDropdownItems = [];
-    _childDropdownIndex = -1;
-    _childInput.disabled = true;
-
-    try {
-        await _config.children.onAdd(opt);
-        if (_config) renderChildItems();
-    } catch (err) {
-        if (_config) showError(`Add failed: ${err.message}`);
-    } finally {
-        if (_childInput && _config) {
-            _childInput.disabled = false;
-            _childInput.focus();
-        }
-        setTimeout(() => {
-            _isSelecting = false;
-        }, 150);
-    }
 }
 
 // ─── Error ────────────────────────────────────────────────────────────────────
@@ -529,10 +636,9 @@ function showError(msg) {
 
 // ─── Child edit (drill one level, no further) ────────────────────────────────
 
-function openChildEdit(item) {
+function openChildEdit(item, slotKey) {
     _parentSnapshot = {
         config: _config,
-        childItems: _childItems,
         lastCommittedName: _lastCommittedName,
         lastCommittedCategory: _lastCommittedCategory,
     };
@@ -541,10 +647,10 @@ function openChildEdit(item) {
         title: `Edit: ${item.label}`,
         name: item.label,
         onRename: async (newName) => {
-            await _parentSnapshot.config.children.onRenameChild(item, newName);
-            item.label = newName; // update the live item in parent's array
+            await _parentSnapshot.config[slotKey].onRenameChild(item, newName);
+            item.label = newName;
         },
-        onClose: null, // closing returns to parent, not refreshActiveDetail
+        onClose: null,
         category: null,
         children: null,
     });
@@ -567,12 +673,10 @@ export function openEditModal(config, triggerEl = null) {
     _config = { ...config, _triggerEl: triggerEl };
     _lastCommittedName = config.name;
     _lastCommittedCategory = config.category ? config.category.value : null;
-    _childItems = [];
-    _childDropdownItems = [];
-    _childDropdownIndex = -1;
-    _childInput = null;
-    _childDropdown = null;
-    _childItemsEl = null;
+
+    // Clear all slot state
+    for (const key of Object.keys(_slots)) delete _slots[key];
+
     _catDropdownItems = [];
     _catDropdownIndex = -1;
     _catInput = null;
@@ -582,7 +686,6 @@ export function openEditModal(config, triggerEl = null) {
     renderBody();
     overlay.style.display = "flex";
 
-    // Focus name input if present
     const nameInput = bodyEl.querySelector("#edit-modal-name-input");
     if (nameInput) {
         nameInput.focus();
@@ -594,7 +697,6 @@ export function closeEditModal() {
     const onClose = _config && _config.onClose;
 
     if (_parentSnapshot) {
-        // Restore parent modal instead of fully closing
         const snap = _parentSnapshot;
         _parentSnapshot = null;
         openEditModal(snap.config, snap.config._triggerEl);
@@ -614,7 +716,7 @@ overlay.addEventListener("click", (e) => {
     if (e.target === overlay) closeEditModal();
 });
 
-// Escape from anywhere (even if nothing inside the modal has focus) closes it
+// Escape from anywhere closes it
 document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && overlay.style.display === "flex") {
         e.stopImmediatePropagation();

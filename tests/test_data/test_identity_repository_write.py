@@ -230,7 +230,8 @@ class TestMergeOrphanInto:
             conn.commit()
 
             row = cursor.execute(
-                "SELECT IsDeleted FROM Identities WHERE IdentityID = ?", (source_identity_id,)
+                "SELECT IsDeleted FROM Identities WHERE IdentityID = ?",
+                (source_identity_id,),
             ).fetchone()
             assert row[0] == 1
 

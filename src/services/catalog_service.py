@@ -1691,7 +1691,7 @@ class CatalogService:
             cursor = conn.cursor()
             collision = cursor.execute(
                 "SELECT NameID, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
-                (new_name.strip(),)
+                (new_name.strip(),),
             ).fetchone()
 
             if collision:
@@ -1702,19 +1702,23 @@ class CatalogService:
                 # Check if the colliding identity is an orphan (safe to merge)
                 alias_count = cursor.execute(
                     "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",
-                    (collision_identity_id,)
+                    (collision_identity_id,),
                 ).fetchone()[0]
                 if alias_count > 1:
-                    raise ValueError(f"UNSAFE_MERGE: '{new_name}' already exists and has multiple aliases — cannot auto-merge.")
+                    raise ValueError(
+                        f"UNSAFE_MERGE: '{new_name}' already exists and has multiple aliases — cannot auto-merge."
+                    )
                 # Get the source identity for the name being renamed
                 source_row = cursor.execute(
                     "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ? AND IsDeleted = 0",
-                    (name_id,)
+                    (name_id,),
                 ).fetchone()
                 if not source_row:
                     raise LookupError(f"Artist name {name_id} not found")
                 source_identity_id = source_row[0]
-                raise ValueError(f"MERGE_REQUIRED:{collision_name_id}:{source_identity_id}:{collision_identity_id}")
+                raise ValueError(
+                    f"MERGE_REQUIRED:{collision_name_id}:{source_identity_id}:{collision_identity_id}"
+                )
 
             self._credit_repo.update_credit_name(name_id, new_name, conn)
             conn.commit()
@@ -1731,19 +1735,73 @@ class CatalogService:
 
     def merge_identity_into(self, source_name_id: int, target_name_id: int) -> None:
         """Merges a solo identity into an existing one. Delegates to IdentityRepository."""
-        logger.info(f"[CatalogService] -> merge_identity_into(source={source_name_id}, target={target_name_id})")
+        logger.info(
+            f"[CatalogService] -> merge_identity_into(source={source_name_id}, target={target_name_id})"
+        )
         conn = self._identity_repo.get_connection()
         try:
             cursor = conn.cursor()
-            self._identity_repo.merge_orphan_into(source_name_id, target_name_id, cursor)
+            self._identity_repo.merge_orphan_into(
+                source_name_id, target_name_id, cursor
+            )
             conn.commit()
-            logger.info(f"[CatalogService] <- merge_identity_into OK")
+            logger.info("[CatalogService] <- merge_identity_into OK")
         except Exception as e:
             conn.rollback()
             logger.error(f"[CatalogService] <- merge_identity_into FAILED: {e}")
             raise
         finally:
             conn.close()
+
+    def set_identity_type(self, identity_id: int, type_: str) -> None:
+        """Convert an identity between person and group."""
+        logger.debug(
+            f"[CatalogService] -> set_identity_type(id={identity_id}, type={type_!r})"
+        )
+        with self._identity_repo.get_connection() as conn:
+            try:
+                self._identity_repo.set_type(identity_id, type_, conn)
+                conn.commit()
+            except (LookupError, ValueError):
+                conn.rollback()
+                raise
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] set_identity_type failed: {e}")
+                raise
+
+    def add_identity_member(self, group_id: int, member_id: int) -> None:
+        """Add a person identity as a member of a group."""
+        logger.debug(
+            f"[CatalogService] -> add_identity_member(group={group_id}, member={member_id})"
+        )
+        with self._identity_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                self._identity_repo.add_member(group_id, member_id, cursor)
+                conn.commit()
+            except (LookupError, ValueError):
+                conn.rollback()
+                raise
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] add_identity_member failed: {e}")
+                raise
+
+    def remove_identity_member(self, group_id: int, member_id: int) -> None:
+        """Remove a member from a group. Noop if not linked."""
+        logger.debug(
+            f"[CatalogService] -> remove_identity_member(group={group_id}, member={member_id})"
+        )
+        with self._identity_repo.get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                self._identity_repo.remove_member(group_id, member_id, cursor)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                logger.error(f"[CatalogService] remove_identity_member failed: {e}")
+                raise
 
     # --- Albums ---
 

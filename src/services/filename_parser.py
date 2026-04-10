@@ -16,7 +16,9 @@ def parse_with_pattern(filename: str, pattern: str) -> Dict[str, str]:
     stem = Path(filename).stem
 
     # Strip leading UUID prefix (e.g. from staging: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx_original.mp3")
-    stem = re.sub(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_", "", stem)
+    stem = re.sub(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_", "", stem
+    )
 
     # 2. Extract tokens from the pattern (e.g., ["Artist", "Title"])
     tokens = re.findall(r"\{(.*?)\}", pattern)

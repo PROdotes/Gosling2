@@ -175,9 +175,13 @@ class TagRepository(BaseRepository):
         )
         updated = cursor.rowcount > 0
         if updated:
-            logger.debug(f"[TagRepository] <- soft_delete(tag_id={tag_id}) SOFT_DELETED")
+            logger.debug(
+                f"[TagRepository] <- soft_delete(tag_id={tag_id}) SOFT_DELETED"
+            )
         else:
-            logger.debug(f"[TagRepository] <- soft_delete(tag_id={tag_id}) NOT_FOUND_OR_ALREADY_DELETED")
+            logger.debug(
+                f"[TagRepository] <- soft_delete(tag_id={tag_id}) NOT_FOUND_OR_ALREADY_DELETED"
+            )
         return updated
 
     def get_or_create_tag(self, name: str, category: str, cursor) -> int:

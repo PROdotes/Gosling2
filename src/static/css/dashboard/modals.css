@@ -361,6 +361,40 @@
     vertical-align: middle;
 }
 
+.edit-modal-toggle {
+    display: flex;
+    gap: 0.375rem;
+}
+
+.edit-modal-toggle-btn {
+    flex: 1;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border-accent);
+    background: var(--bg-card-raised);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-transform: capitalize;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        color 0.15s,
+        border-color 0.15s;
+}
+
+.edit-modal-toggle-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+}
+
+.edit-modal-toggle-btn.disabled,
+.edit-modal-toggle-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
 .edit-modal-section-title {
     font-size: 0.78rem;
     font-weight: 600;

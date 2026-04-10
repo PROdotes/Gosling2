@@ -1,7 +1,6 @@
 import {
     ABORTED,
     abortAllSearches,
-    addIdentityAlias,
     addSongCredit,
     addSongPublisher,
     addSongTag,
@@ -25,7 +24,6 @@ import {
     getTagSongs,
     isAbortError,
     patchSongScalars,
-    removeIdentityAlias,
     removeSongCredit,
     removeSongPublisher,
     removeSongTag,
@@ -36,14 +34,11 @@ import {
     searchTags,
     setPrimarySongTag,
     setPublisherParent,
-    updateCreditName,
-    mergeIdentity,
     updatePublisher,
     updateTag,
     uploadFiles,
 } from "./api.js";
-import { closeEditModal, openEditModal } from "./components/edit_modal.js";
-import { showConfirm } from "./components/confirm_modal.js";
+import { openEditModal } from "./components/edit_modal.js";
 import { activateInlineEdit } from "./components/inline_editor.js";
 import { closeLinkModal, openLinkModal } from "./components/link_modal.js";
 import {
@@ -984,95 +979,10 @@ document.addEventListener("click", async (event) => {
         } else if (chipType === "credit") {
             const identityId = actionTarget.dataset.identityId;
             if (!identityId) return;
-
-            const identity = await getArtistTree(identityId).catch(() => null);
-            if (!identity) return;
-
-            const primaryAlias = (identity.aliases || []).find(
-                (a) => a.is_primary,
-            );
-            const aliases = (identity.aliases || []).filter(
-                (a) => !a.is_primary,
-            );
-            const childItems = aliases.map((a) => ({
-                id: a.id,
-                label: a.display_name,
-            }));
-
-            openEditModal(
-                {
-                    title: "Edit Artist",
-                    name: primaryAlias?.display_name || identity.display_name,
-                    onRename: async (newName) => {
-                        try {
-                            await updateCreditName(0, primaryAlias.id, newName);
-                        } catch (err) {
-                            if (err.detail?.code === "MERGE_REQUIRED") {
-                                const confirmed = await showConfirm(
-                                    `"${newName}" already exists. Merge into existing identity?`,
-                                    { title: "Merge Identity", okLabel: "Merge" }
-                                );
-                                if (confirmed) {
-                                    await mergeIdentity(primaryAlias.id, err.detail.collision_name_id);
-                                    refreshActiveDetail();
-                                }
-                            } else if (err.detail?.code === "UNSAFE_MERGE") {
-                                throw new Error(err.detail.message);
-                            } else {
-                                throw err;
-                            }
-                        }
-                    },
-                    onClose,
-                    category: null,
-                    children: {
-                        label: "Aliases",
-                        items: childItems,
-                        onSearch: async (q) => {
-                            const results = await searchArtists(q);
-                            return (results || []).map((i) => ({
-                                id: i.id,
-                                label: i.display_name,
-                            }));
-                        },
-                        onAdd: async (opt) => {
-                            const result = await addIdentityAlias(
-                                identityId,
-                                opt.rawInput || opt.label,
-                                opt.id,
-                            );
-                            childItems.push({
-                                id: result.name_id,
-                                label: result.display_name,
-                            });
-                        },
-                        onRemove: async (item) => {
-                            await removeIdentityAlias(identityId, item.id);
-                        },
-                        onRenameChild: async (item, newName) => {
-                            try {
-                                await updateCreditName(0, item.id, newName);
-                            } catch (err) {
-                                if (err.detail?.code === "MERGE_REQUIRED") {
-                                    const confirmed = await showConfirm(
-                                        `"${newName}" already exists. Merge into existing identity?`,
-                                        { title: "Merge Identity", okLabel: "Merge" }
-                                    );
-                                    if (confirmed) {
-                                        await mergeIdentity(item.id, err.detail.collision_name_id);
-                                        refreshActiveDetail();
-                                    }
-                                } else if (err.detail?.code === "UNSAFE_MERGE") {
-                                    throw new Error(err.detail.message);
-                                } else {
-                                    throw err;
-                                }
-                            }
-                        },
-                        createLabel: (q) => `Add "${q}" as alias`,
-                    },
-                },
-                actionTarget,
+            await orch.manageArtist(
+                ctx,
+                identityId,
+                actionTarget.textContent.trim(),
             );
         }
         return;
