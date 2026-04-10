@@ -596,3 +596,19 @@ export function deleteStagingOrphan(filePath) {
         },
     );
 }
+
+export function getFilterValues() {
+    return fetchJson("/api/v1/songs/filter-values");
+}
+
+export function filterSongs(filters, mode = "ALL", liveOnly = false) {
+    const params = new URLSearchParams();
+    params.set("mode", mode);
+    if (liveOnly) params.set("live_only", "true");
+    for (const [key, values] of Object.entries(filters)) {
+        for (const v of values) {
+            params.append(key, v);
+        }
+    }
+    return runSearch("songs", `/api/v1/songs/filter?${params.toString()}`);
+}

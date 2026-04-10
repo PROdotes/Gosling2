@@ -486,6 +486,389 @@ class SongRepository(MediaSourceRepository):
         )
         return found_matches
 
+    def get_filter_values(self, conn: Optional[sqlite3.Connection] = None) -> dict:
+        """
+        Returns all distinct values for each filter category.
+        Used to populate the filter sidebar on app load or after a DB write.
+        """
+        queries = {
+            "artists": """
+                SELECT DISTINCT an.DisplayName AS val
+                FROM ArtistNames an
+                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                JOIN Roles r ON sc.RoleID = r.RoleID
+                JOIN MediaSources m ON sc.SourceID = m.SourceID
+                WHERE r.RoleName = 'Performer' AND an.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY an.DisplayName
+            """,
+            "contributors": """
+                SELECT DISTINCT an.DisplayName AS val
+                FROM ArtistNames an
+                JOIN SongCredits sc ON an.NameID = sc.CreditedNameID
+                JOIN MediaSources m ON sc.SourceID = m.SourceID
+                WHERE an.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY an.DisplayName
+            """,
+            "years": """
+                SELECT DISTINCT s.RecordingYear AS val
+                FROM Songs s
+                JOIN MediaSources m ON s.SourceID = m.SourceID
+                WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                ORDER BY s.RecordingYear DESC
+            """,
+            "decades": """
+                SELECT DISTINCT (s.RecordingYear / 10) * 10 AS val
+                FROM Songs s
+                JOIN MediaSources m ON s.SourceID = m.SourceID
+                WHERE s.RecordingYear IS NOT NULL AND m.IsDeleted = 0
+                ORDER BY val DESC
+            """,
+            "genres": """
+                SELECT DISTINCT t.TagName AS val
+                FROM Tags t
+                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                JOIN MediaSources m ON mst.SourceID = m.SourceID
+                WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY t.TagName
+            """,
+            "albums": """
+                SELECT DISTINCT a.AlbumTitle AS val
+                FROM Albums a
+                JOIN SongAlbums sa ON a.AlbumID = sa.AlbumID
+                JOIN MediaSources m ON sa.SourceID = m.SourceID
+                WHERE a.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY a.AlbumTitle
+            """,
+            "publishers": """
+                SELECT DISTINCT p.PublisherName AS val
+                FROM Publishers p
+                JOIN RecordingPublishers rp ON p.PublisherID = rp.PublisherID
+                JOIN MediaSources m ON rp.SourceID = m.SourceID
+                WHERE p.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY p.PublisherName
+            """,
+        }
+
+        def _run(c):
+            c.row_factory = sqlite3.Row
+            result = {
+                key: [row["val"] for row in c.execute(sql).fetchall()]
+                for key, sql in queries.items()
+            }
+            # Dynamic tag categories (all except Genre, which is promoted above)
+            other_tags_rows = c.execute("""
+                SELECT DISTINCT t.TagCategory AS cat, t.TagName AS val
+                FROM Tags t
+                JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+                JOIN MediaSources m ON mst.SourceID = m.SourceID
+                WHERE t.TagCategory IS NOT NULL
+                  AND LOWER(t.TagCategory) != 'genre'
+                  AND t.IsDeleted = 0 AND m.IsDeleted = 0
+                ORDER BY t.TagCategory, t.TagName
+            """).fetchall()
+            tag_categories: Dict[str, List[str]] = {}
+            for row in other_tags_rows:
+                tag_categories.setdefault(row["cat"], []).append(row["val"])
+            result["tag_categories"] = tag_categories
+            return result
+
+        if conn:
+            return _run(conn)
+        with self._get_connection() as new_conn:
+            return _run(new_conn)
+
+    def filter_slim(
+        self,
+        artists: Optional[List[str]] = None,
+        contributors: Optional[List[str]] = None,
+        years: Optional[List[int]] = None,
+        decades: Optional[List[int]] = None,
+        genres: Optional[List[str]] = None,
+        albums: Optional[List[str]] = None,
+        publishers: Optional[List[str]] = None,
+        statuses: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        live_only: bool = False,
+        mode: str = "ALL",
+        conn: Optional[sqlite3.Connection] = None,
+    ) -> List[dict]:
+        """
+        Returns slim song rows matching the given filter criteria.
+        mode='ALL' = AND logic (intersection), mode='ANY' = OR logic (union).
+        statuses: list of 'not_done', 'ready_to_finalize', 'missing_data', 'done'
+        """
+        logger.debug(f"[SongRepository] -> filter_slim(mode={mode})")
+
+        # In ANY mode: one subquery per filter type using IN (union within type).
+        # In ALL mode: one subquery per individual value (intersection of all).
+        subqueries = []
+        params: List[Any] = []
+        is_all = mode.upper() == "ALL"
+
+        def _add(sq, vals):
+            subqueries.append(sq)
+            params.extend(vals)
+
+        if artists:
+            if is_all:
+                for a in artists:
+                    _add(
+                        """
+                        SELECT sc.SourceID FROM SongCredits sc
+                        JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                        JOIN Roles r ON sc.RoleID = r.RoleID
+                        WHERE an.DisplayName = ? AND r.RoleName = 'Performer' AND an.IsDeleted = 0
+                    """,
+                        [a],
+                    )
+            else:
+                ph = ",".join(["?"] * len(artists))
+                _add(
+                    f"""
+                    SELECT sc.SourceID FROM SongCredits sc
+                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                    JOIN Roles r ON sc.RoleID = r.RoleID
+                    WHERE an.DisplayName IN ({ph}) AND r.RoleName = 'Performer' AND an.IsDeleted = 0
+                """,
+                    artists,
+                )
+
+        if contributors:
+            if is_all:
+                for c in contributors:
+                    _add(
+                        """
+                        SELECT sc.SourceID FROM SongCredits sc
+                        JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                        WHERE an.DisplayName = ? AND an.IsDeleted = 0
+                    """,
+                        [c],
+                    )
+            else:
+                ph = ",".join(["?"] * len(contributors))
+                _add(
+                    f"""
+                    SELECT sc.SourceID FROM SongCredits sc
+                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+                    WHERE an.DisplayName IN ({ph}) AND an.IsDeleted = 0
+                """,
+                    contributors,
+                )
+
+        if years:
+            if is_all:
+                for y in years:
+                    _add(
+                        "SELECT s.SourceID FROM Songs s WHERE s.RecordingYear = ?", [y]
+                    )
+            else:
+                ph = ",".join(["?"] * len(years))
+                _add(
+                    f"SELECT s.SourceID FROM Songs s WHERE s.RecordingYear IN ({ph})",
+                    years,
+                )
+
+        if decades:
+            if is_all:
+                for d in decades:
+                    _add(
+                        """
+                        SELECT s.SourceID FROM Songs s
+                        WHERE s.RecordingYear >= ? AND s.RecordingYear < ?
+                    """,
+                        [d, d + 10],
+                    )
+            else:
+                decade_clauses = " OR ".join(
+                    ["(s.RecordingYear >= ? AND s.RecordingYear < ?)"] * len(decades)
+                )
+                sq = f"SELECT s.SourceID FROM Songs s WHERE {decade_clauses}"
+                vals = []
+                for d in decades:
+                    vals.extend([d, d + 10])
+                _add(sq, vals)
+
+        if genres:
+            if is_all:
+                for g in genres:
+                    _add(
+                        """
+                        SELECT mst.SourceID FROM MediaSourceTags mst
+                        JOIN Tags t ON mst.TagID = t.TagID
+                        WHERE t.TagName = ? AND t.TagCategory = 'Genre' AND t.IsDeleted = 0
+                    """,
+                        [g],
+                    )
+            else:
+                ph = ",".join(["?"] * len(genres))
+                _add(
+                    f"""
+                    SELECT mst.SourceID FROM MediaSourceTags mst
+                    JOIN Tags t ON mst.TagID = t.TagID
+                    WHERE t.TagName IN ({ph}) AND t.TagCategory = 'Genre' AND t.IsDeleted = 0
+                """,
+                    genres,
+                )
+
+        if albums:
+            if is_all:
+                for a in albums:
+                    _add(
+                        """
+                        SELECT sa.SourceID FROM SongAlbums sa
+                        JOIN Albums a ON sa.AlbumID = a.AlbumID
+                        WHERE a.AlbumTitle = ? AND a.IsDeleted = 0
+                    """,
+                        [a],
+                    )
+            else:
+                ph = ",".join(["?"] * len(albums))
+                _add(
+                    f"""
+                    SELECT sa.SourceID FROM SongAlbums sa
+                    JOIN Albums a ON sa.AlbumID = a.AlbumID
+                    WHERE a.AlbumTitle IN ({ph}) AND a.IsDeleted = 0
+                """,
+                    albums,
+                )
+
+        if publishers:
+            if is_all:
+                for p in publishers:
+                    _add(
+                        """
+                        SELECT rp.SourceID FROM RecordingPublishers rp
+                        JOIN Publishers p ON rp.PublisherID = p.PublisherID
+                        WHERE p.PublisherName = ? AND p.IsDeleted = 0
+                    """,
+                        [p],
+                    )
+            else:
+                ph = ",".join(["?"] * len(publishers))
+                _add(
+                    f"""
+                    SELECT rp.SourceID FROM RecordingPublishers rp
+                    JOIN Publishers p ON rp.PublisherID = p.PublisherID
+                    WHERE p.PublisherName IN ({ph}) AND p.IsDeleted = 0
+                """,
+                    publishers,
+                )
+
+        if tags:
+            # tags are "category:value" strings
+            parsed = [t.split(":", 1) for t in tags if ":" in t]
+            if is_all:
+                for cat, val in parsed:
+                    _add(
+                        """
+                        SELECT mst.SourceID FROM MediaSourceTags mst
+                        JOIN Tags t ON mst.TagID = t.TagID
+                        WHERE t.TagName = ? AND t.TagCategory = ? AND t.IsDeleted = 0
+                    """,
+                        [val, cat],
+                    )
+            else:
+                if parsed:
+                    clauses = " OR ".join(
+                        ["(t.TagName = ? AND t.TagCategory = ?)"] * len(parsed)
+                    )
+                    vals = [v for pair in parsed for v in (pair[1], pair[0])]
+                    _add(
+                        f"""
+                        SELECT mst.SourceID FROM MediaSourceTags mst
+                        JOIN Tags t ON mst.TagID = t.TagID
+                        WHERE ({clauses}) AND t.IsDeleted = 0
+                    """,
+                        vals,
+                    )
+
+        _BLOCKERS = """
+                            m.MediaName IS NULL OR m.MediaName = ''
+                            OR s.RecordingYear IS NULL
+                            OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
+                            OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
+                            OR NOT EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
+                            OR NOT EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+        """
+        _NO_BLOCKERS = """
+                            m.MediaName IS NOT NULL AND m.MediaName != ''
+                            AND s.RecordingYear IS NOT NULL
+                            AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
+                            AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
+                            AND EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
+                            AND EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+        """
+
+        if statuses:
+            status_parts = []
+            for s in statuses:
+                if s == "done":
+                    status_parts.append(
+                        "SELECT m.SourceID FROM MediaSources m WHERE m.ProcessingStatus = 0 AND m.IsDeleted = 0"
+                    )
+                elif s == "not_done":
+                    # Any song not yet reviewed (ProcessingStatus != 0)
+                    status_parts.append(
+                        "SELECT m.SourceID FROM MediaSources m WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0"
+                    )
+                elif s == "missing_data":
+                    # Not reviewed AND has blockers
+                    status_parts.append(f"""
+                        SELECT m.SourceID FROM MediaSources m
+                        JOIN Songs s ON m.SourceID = s.SourceID
+                        WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
+                          AND ({_BLOCKERS})
+                    """)
+                elif s == "ready_to_finalize":
+                    # Not reviewed AND no blockers
+                    status_parts.append(f"""
+                        SELECT m.SourceID FROM MediaSources m
+                        JOIN Songs s ON m.SourceID = s.SourceID
+                        WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
+                          AND {_NO_BLOCKERS}
+                    """)
+            if status_parts:
+                subqueries.append(" UNION ".join(status_parts))
+
+        if not subqueries:
+            id_filter = "1=1"
+        elif mode.upper() == "ANY":
+            id_filter = "m.SourceID IN (" + " UNION ".join(subqueries) + ")"
+        else:  # ALL (default)
+            id_filter = " AND ".join([f"m.SourceID IN ({sq})" for sq in subqueries])
+
+        live_clause = "AND m.IsActive = 1" if live_only else ""
+
+        query_sql = f"""
+            SELECT
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
+                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
+                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre
+            FROM MediaSources m
+            JOIN Songs s ON m.SourceID = s.SourceID
+                AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
+                AND m.IsDeleted = 0
+            LEFT JOIN SongCredits sc ON m.SourceID = sc.SourceID
+            LEFT JOIN ArtistNames an ON sc.CreditedNameID = an.NameID AND an.IsDeleted = 0
+            LEFT JOIN Roles r ON sc.RoleID = r.RoleID
+            LEFT JOIN MediaSourceTags mst ON m.SourceID = mst.SourceID
+            LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
+            WHERE {id_filter} {live_clause}
+            GROUP BY m.SourceID
+        """
+
+        def _run(c):
+            c.row_factory = sqlite3.Row
+            rows = c.execute(query_sql, params).fetchall()
+            logger.debug(f"[SongRepository] <- filter_slim() found {len(rows)}")
+            return [dict(row) for row in rows]
+
+        if conn:
+            return _run(conn)
+        with self._get_connection() as new_conn:
+            return _run(new_conn)
+
     def _row_to_song(self, row: Mapping[str, Any]) -> Song:
         """Map a database row to a Song Pydantic model."""
         return Song(

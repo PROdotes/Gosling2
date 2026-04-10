@@ -76,6 +76,9 @@ export function renderAlbums(ctx, albums) {
     ctx.setState({ selectedIndex: -1, displayedItems: albums });
     ctx.updateResultsSummary(albums.length, "album");
 
+    ctx.elements.sortControlsBox.innerHTML =
+        '<span class="sort-label">Sort:</span><span class="muted-note" style="font-size:0.75rem; margin-left:0.5rem;">(Not available for albums)</span>';
+
     if (!albums.length) {
         ctx.elements.resultsContainer.innerHTML =
             renderEmptyState("No albums found");

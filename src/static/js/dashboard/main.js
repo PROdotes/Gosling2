@@ -54,8 +54,15 @@ import {
     openSpotifyModal,
 } from "./components/spotify_modal.js";
 import { initToastSystem, showToast } from "./components/toast.js";
-import { formatCountLabel, renderEmptyState } from "./components/utils.js";
+import {
+    formatCountLabel,
+    isModalOpen,
+    renderEmptyState,
+} from "./components/utils.js";
+import { FilterSidebarHandler } from "./handlers/filter_sidebar.js";
+import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
+import { WebSearchHandler } from "./handlers/web_search.js";
 import * as orch from "./orchestrator.js";
 import {
     renderAlbumDetailComplete,
@@ -93,6 +100,7 @@ const elements = {
     matchCount: document.getElementById("match-count"),
     statSep: document.getElementById("stat-sep"),
     deepSearchToggle: document.getElementById("deepSearchToggle"),
+    sortControlsBox: document.getElementById("sort-controls-box"),
 };
 
 const state = {
@@ -175,11 +183,22 @@ const ctx = {
     },
     refreshActiveDetail,
     updateResultsSummary(count, singular) {
-        if (!state.currentQuery) {
+        if (!state.currentQuery && !filterSidebar.hasActiveFilters()) {
             state.totalLibraryCount = count;
+        } else if (state.totalLibraryCount === 0) {
+            // Filters active on load — fetch unfiltered total in background
+            searchSongs("").then((items) => {
+                if (Array.isArray(items)) {
+                    state.totalLibraryCount = items.length;
+                    elements.totalCount.textContent = String(items.length);
+                    elements.totalCount.style.display = "";
+                    elements.statSep.style.display = "";
+                }
+            }).catch(() => {});
         }
         const isFiltered =
-            state.currentQuery && count !== state.totalLibraryCount;
+            (state.currentQuery || filterSidebar.hasActiveFilters()) &&
+            count !== state.totalLibraryCount;
         elements.matchCount.textContent = String(count);
         elements.totalCount.textContent = String(state.totalLibraryCount);
         elements.totalLabel.textContent = `${singular.charAt(0).toUpperCase()}${singular.slice(1)}s`;
@@ -212,9 +231,42 @@ const ctx = {
             setTimeout(() => banner.remove(), 4000);
         }
     },
+    switchMode,
+    navigate,
+    getActiveList,
+    openSelectedResult,
+    updateSelection,
+    updateIngestBadges,
+    abortDetailRequest,
 };
 
 const songActions = new SongActionsHandler(ctx);
+const navigationHandler = new NavigationHandler(
+    ctx,
+    elements,
+    elements.searchInput,
+);
+navigationHandler.setupKeyboardHandler(songActions);
+const webSearchHandler = new WebSearchHandler(ctx);
+webSearchHandler.setupListeners();
+
+const filterSidebar = new FilterSidebarHandler({
+    ...ctx,
+    onFilterResults: async (resultPromise) => {
+        try {
+            const items = await resultPromise;
+            setActiveCache("songs", items);
+            renderSongs(ctx, items);
+        } catch (err) {
+            elements.resultsContainer.innerHTML = renderEmptyState(
+                `Filter error: ${err.message}`,
+            );
+        }
+    },
+    onFilterCleared: () => performSearch(state.currentQuery),
+});
+filterSidebar.setupListeners();
+filterSidebar.load();
 
 function getActiveList() {
     if (state.currentMode === "songs") {
@@ -584,25 +636,6 @@ async function openSelectedResult(index) {
     }
 }
 
-function isModalOpen() {
-    const editModal = document.getElementById("edit-modal");
-    if (editModal && editModal.style.display === "flex") return true;
-    const linkModal = document.getElementById("link-modal");
-    if (linkModal && linkModal.style.display === "flex") return true;
-    const scrubberModal = document.getElementById("scrubber-modal");
-    if (scrubberModal && scrubberModal.style.display === "flex") return true;
-    const spotifyModal = document.getElementById("spotify-modal");
-    if (spotifyModal && spotifyModal.style.display === "flex") return true;
-    const splitterModal = document.getElementById("splitter-modal");
-    if (splitterModal && splitterModal.style.display === "flex") return true;
-    const filenameParserModal = document.getElementById(
-        "filename-parser-modal",
-    );
-    if (filenameParserModal && filenameParserModal.style.display === "flex")
-        return true;
-    return false;
-}
-
 function updateIngestBadges(successDelta = 0, actionDelta = 0) {
     const tab = document.querySelector(".mode-tab[data-mode='ingest']");
     if (!tab) return;
@@ -729,96 +762,6 @@ async function setupHeaderDropZone() {
     });
 }
 
-// Long-press on the web-search main button → one-time engine picker
-let _longPressTimer = null;
-let _longPressTriggered = false;
-document.addEventListener("pointerdown", (event) => {
-    const btn = event.target.closest(".web-search-main");
-    if (!btn) return;
-    _longPressTriggered = false;
-    _longPressTimer = setTimeout(() => {
-        _longPressTriggered = true;
-        const splitEl = btn.closest(".web-search-split");
-        if (!splitEl) return;
-        const dropdown = splitEl.querySelector(".web-search-dropdown");
-        if (!dropdown) return;
-
-        // Show ALL engines (including current default) for one-time pick
-        const songId = btn.dataset.songId;
-        const engines = state.searchEngines;
-        dropdown.innerHTML = Object.entries(engines)
-            .map(
-                ([id, label]) =>
-                    `<button class="web-search-option web-search-once" data-engine="${id}" data-song-id="${songId}">${label}</button>`,
-            )
-            .join("");
-        dropdown.hidden = false;
-
-        dropdown.querySelectorAll(".web-search-once").forEach((opt) => {
-            opt.onclick = async (e) => {
-                e.stopPropagation();
-                dropdown.hidden = true;
-                dropdown.innerHTML = "";
-                // Restore normal set-engine options on next open
-                const activeEngine = btn.dataset.engine;
-                const otherEngines = Object.entries(engines).filter(
-                    ([id]) => id !== activeEngine,
-                );
-                dropdown.innerHTML = otherEngines
-                    .map(
-                        ([id, label]) =>
-                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
-                    )
-                    .join("");
-                try {
-                    const data = await getSongWebSearch(
-                        songId,
-                        opt.dataset.engine,
-                    );
-                    if (data && data.url) window.open(data.url, "_blank");
-                } catch (err) {
-                    ctx.showBanner?.(`Search failed: ${err.message}`, "error");
-                }
-            };
-        });
-
-        const close = (e) => {
-            if (!splitEl.contains(e.target)) {
-                dropdown.hidden = true;
-                // Restore normal options
-                const activeEngine = btn.dataset.engine;
-                const otherEngines = Object.entries(state.searchEngines).filter(
-                    ([id]) => id !== activeEngine,
-                );
-                dropdown.innerHTML = otherEngines
-                    .map(
-                        ([id, label]) =>
-                            `<button class="web-search-option" data-engine="${id}">${label}</button>`,
-                    )
-                    .join("");
-                document.removeEventListener("click", close, true);
-            }
-        };
-        document.addEventListener("click", close, true);
-    }, 500);
-});
-document.addEventListener("pointerup", () => {
-    clearTimeout(_longPressTimer);
-});
-document.addEventListener("pointercancel", () => {
-    clearTimeout(_longPressTimer);
-});
-document.addEventListener(
-    "click",
-    (event) => {
-        if (_longPressTriggered && event.target.closest(".web-search-main")) {
-            event.stopImmediatePropagation();
-            _longPressTriggered = false;
-        }
-    },
-    true,
-);
-
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");
     if (!actionTarget) return;
@@ -846,370 +789,24 @@ document.addEventListener("click", async (event) => {
         console.error(`[Main] SongActionsHandler CRASHED: ${err.message}`, err);
     }
 
-    if (action === "switch-mode") {
-        switchMode(actionTarget.dataset.mode);
+    // Navigation actions
+    if (await navigationHandler.handle(event, songActions)) {
         return;
     }
 
-    if (action === "refresh-results") {
-        actionTarget.classList.add("spinning");
-        // Aligned to Blueprint: Refreshing the list clears the successful ingest badge
-        state.successCount = 0;
-        updateIngestBadges();
-        performSearch(state.currentQuery).finally(() => {
-            actionTarget.classList.remove("spinning");
-        });
+    if (action === "toggle-filter-sidebar") {
+        filterSidebar.toggle();
+        document
+            .getElementById("filter-toggle-btn")
+            ?.classList.toggle("active", filterSidebar._sidebarVisible);
         return;
-    }
-
-    if (action === "select-result") {
-        event.preventDefault(); // Prevent focus change to keep keyboard nav working
-        const index = Number(actionTarget.dataset.index);
-        state.selectedIndex = Number.isNaN(index) ? -1 : index;
-        updateSelection();
-
-        // Use displayedItems + ID lookup to handle sorting correctly
-        const selected = state.displayedItems[index];
-        if (selected) {
-            const cachedList = getActiveList();
-            const actualIndex = cachedList.findIndex(
-                (item) => item.id === selected.id,
-            );
-            if (actualIndex >= 0) {
-                openSelectedResult(actualIndex);
-            }
-        }
-        return;
-    }
-
-    if (action === "navigate-search") {
-        navigate(actionTarget.dataset.mode, actionTarget.dataset.query || "");
-        return;
-    }
-
-    if (action === "open-edit-modal") {
-        const { chipType, itemId } = actionTarget.dataset;
-
-        const onClose = refreshActiveDetail;
-
-        if (chipType === "publisher") {
-            const publisherName = actionTarget.textContent.trim();
-            const publisherDetail = await getPublisherDetail(itemId).catch(
-                () => null,
-            );
-            const childItems =
-                publisherDetail && publisherDetail.sub_publishers
-                    ? publisherDetail.sub_publishers.map((c) => ({
-                          id: c.id,
-                          label: c.name,
-                      }))
-                    : [];
-
-            openEditModal(
-                {
-                    title: "Edit Publisher",
-                    name: publisherDetail
-                        ? publisherDetail.name
-                        : publisherName,
-                    onRename: async (newName) => {
-                        await updatePublisher(itemId, newName);
-                    },
-                    onClose,
-                    category: null,
-                    children: {
-                        label: "Sub-publishers",
-                        items: childItems,
-                        onSearch: async (q) => {
-                            const results = await searchPublishers(q);
-                            return (results || []).map((p) => ({
-                                id: p.id,
-                                label: p.name,
-                            }));
-                        },
-                        onAdd: async (opt) => {
-                            await setPublisherParent(opt.id, Number(itemId));
-                            childItems.push({ id: opt.id, label: opt.label });
-                        },
-                        onRemove: async (item) => {
-                            await setPublisherParent(item.id, null);
-                        },
-                        onRenameChild: async (item, newName) => {
-                            await updatePublisher(item.id, newName);
-                        },
-                        createLabel: (q) => `Add "${q}" as sub-publisher`,
-                    },
-                },
-                actionTarget,
-            );
-        } else if (chipType === "tag") {
-            const tagDetail = await getTagDetail(itemId).catch(() => null);
-            if (!tagDetail) {
-                console.error(`Tag ${itemId} not found`);
-                return;
-            }
-
-            openEditModal(
-                {
-                    title: "Edit Tag",
-                    name: tagDetail.name,
-                    onRename: async (newName) => {
-                        await updateTag(itemId, newName, tagDetail.category);
-                        tagDetail.name = newName;
-                    },
-                    onClose,
-                    category: {
-                        label: "Category",
-                        value: tagDetail.category,
-                        editable: true,
-                        onSave: async (val) => {
-                            await updateTag(itemId, tagDetail.name, val);
-                            tagDetail.category = val;
-                        },
-                        onSearch: async (q) => {
-                            const all = await getTagCategories();
-                            return all.filter((c) =>
-                                c.toLowerCase().includes(q.toLowerCase()),
-                            );
-                        },
-                    },
-                    children: null,
-                },
-                actionTarget,
-            );
-        } else if (chipType === "credit") {
-            const identityId = actionTarget.dataset.identityId;
-            if (!identityId) return;
-            await orch.manageArtist(
-                ctx,
-                identityId,
-                actionTarget.textContent.trim(),
-            );
-        }
-        return;
-    }
-
-    if (action === "open-link-modal") {
-        const { modalType, songId } = actionTarget.dataset;
-
-        if (modalType === "publishers") {
-            const currentPublishers = (state.activeSong?.publishers || []).map(
-                (p) => ({ id: p.id, label: p.name }),
-            );
-            orch.manageSongPublishers(ctx, songId, currentPublishers);
-        } else if (modalType === "tags") {
-            const currentTags = state.activeSong?.tags || [];
-            const songTitle = state.activeSong?.title || "Song";
-            orch.manageSongTags(ctx, songId, songTitle, currentTags);
-        } else if (modalType === "credits") {
-            const { role } = actionTarget.dataset;
-            if (!role) throw new Error("credits button is missing data-role");
-            const currentCredits = (state.activeSong?.credits || []).filter(
-                (c) => c.role_name === role,
-            );
-            orch.manageSongCredits(ctx, songId, role, currentCredits);
-        } else if (modalType === "album") {
-            const { songTitle } = actionTarget.dataset;
-            const section = actionTarget.closest(".detail-section");
-            const libraryBox = section?.querySelector(".surface-box");
-            const currentAlbums = Array.from(
-                libraryBox
-                    ? libraryBox.querySelectorAll(
-                          `[data-action="remove-album"][data-song-id="${songId}"]`,
-                      )
-                    : [],
-            ).map((btn) => ({
-                id: btn.dataset.albumId,
-                label:
-                    btn
-                        .closest(".album-card-detail")
-                        ?.querySelector(".editable-scalar")
-                        ?.textContent?.trim() ?? "",
-            }));
-            orch.manageSongAlbums(ctx, songId, songTitle, currentAlbums);
-        } else if (modalType === "album-publishers") {
-            const { albumId } = actionTarget.dataset;
-            const chips = Array.from(
-                actionTarget
-                    .closest(".album-card-detail")
-                    ?.querySelectorAll(
-                        "[data-action='remove-album-publisher']",
-                    ) || [],
-            ).map((btn) => ({
-                id: btn.dataset.publisherId,
-                label:
-                    btn
-                        .closest(".link-chip")
-                        ?.querySelector(".link-chip-label")
-                        ?.textContent.trim() ?? "",
-            }));
-            orch.manageAlbumPublishers(ctx, albumId, songId, chips);
-        } else if (modalType === "album-credits") {
-            const { albumId } = actionTarget.dataset;
-            const chips = Array.from(
-                actionTarget
-                    .closest(".album-card-detail")
-                    ?.querySelectorAll("[data-action='remove-album-credit']") ||
-                    [],
-            ).map((btn) => ({
-                id: btn.dataset.creditId,
-                label:
-                    btn
-                        .closest(".link-chip")
-                        ?.querySelector(".link-chip-label")
-                        ?.textContent.trim() ?? "",
-            }));
-            orch.manageAlbumCredits(ctx, albumId, songId, chips);
-        }
-        return;
-    }
-});
-
-document.addEventListener("keydown", (event) => {
-    // Protocol: Modals are top-level. Block global keyboard navigation if any modal is open.
-    // (Local Escape handling for detail-panel should only fire if no modal is active)
-    const modalOpen = isModalOpen();
-
-    if (event.key === "Escape" && modalOpen) {
-        // Universal modal drainage
-        if (typeof songActions.handle === "function") {
-            const openModal = [
-                "edit-modal",
-                "link-modal",
-                "scrubber-modal",
-                "spotify-modal",
-                "splitter-modal",
-                "filename-parser-modal",
-            ].find((id) => {
-                const el = document.getElementById(id);
-                return el && el.style.display === "flex";
-            });
-
-            if (openModal) {
-                const action = `close-${openModal}`;
-                // Dispatch a virtual event to the handler to reuse closing logic
-                songActions.handle({
-                    target: { dataset: { action } },
-                    stopPropagation: () => {},
-                });
-            }
-        }
-        return;
-    }
-
-    if (
-        event.key === "Escape" &&
-        elements.detailPanel.style.display === "flex" &&
-        !modalOpen
-    ) {
-        abortDetailRequest();
-        ctx.hideDetailPanel();
-
-        // If we were resolving items in Ingest mode, clear the action badge
-        if (state.currentMode === "ingest") {
-            state.actionCount = 0;
-            updateIngestBadges();
-        }
-
-        state.selectedIndex = -1;
-        updateSelection();
-        return;
-    }
-
-    // Don't intercept arrow keys when a modal is open or when typing in search
-    if (modalOpen || document.activeElement === elements.searchInput) {
-        return;
-    }
-
-    // Arrow key navigation works globally (even after clicking buttons)
-    const items = state.displayedItems;
-    if (!items.length) {
-        return;
-    }
-
-    if (event.key === "ArrowDown") {
-        event.preventDefault();
-        state.selectedIndex = Math.min(
-            state.selectedIndex + 1,
-            items.length - 1,
-        );
-        updateSelection();
-        const cachedList = getActiveList();
-        const selected = items[state.selectedIndex];
-        if (selected) {
-            const actualIndex = cachedList.findIndex(
-                (item) => item.id === selected.id,
-            );
-            if (actualIndex >= 0) openSelectedResult(actualIndex);
-        }
-        return;
-    }
-
-    if (event.key === "ArrowUp") {
-        event.preventDefault();
-        state.selectedIndex = Math.max(state.selectedIndex - 1, -1);
-        updateSelection();
-        const cachedList = getActiveList();
-        const selected = items[state.selectedIndex];
-        if (selected) {
-            const actualIndex = cachedList.findIndex(
-                (item) => item.id === selected.id,
-            );
-            if (actualIndex >= 0) openSelectedResult(actualIndex);
-        }
-        return;
-    }
-
-    if (
-        (event.key === "+" || event.key === "Add") &&
-        event.location === KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
-    ) {
-        event.preventDefault();
-        if (state.currentMode === "songs" && state.activeSong) {
-            const btn = document.querySelector(
-                `[data-action="sync-id3"][data-song-id="${state.activeSong.id}"]`,
-            );
-            if (btn) btn.click();
-        }
-        return;
-    }
-
-    if (event.key === "Enter" && state.selectedIndex >= 0) {
-        event.preventDefault();
-        const selected = items[state.selectedIndex];
-        if (!selected) return;
-
-        // Pattern: If detail panel is already open for this song, 'Enter' triggers the scrubber
-        const isSongDetailOpen =
-            state.currentMode === "songs" &&
-            elements.detailPanel.style.display === "flex";
-        const isActiveSongDetail =
-            isSongDetailOpen &&
-            state.activeSong &&
-            String(state.activeSong.id) === String(selected.id);
-
-        if (isActiveSongDetail) {
-            orch.orchestrateScrubber(
-                ctx,
-                state.activeSong.id,
-                state.activeSong.media_name || state.activeSong.title,
-            );
-            return;
-        }
-
-        // Otherwise open the detail panel
-        const cachedList = getActiveList();
-        const actualIndex = cachedList.findIndex(
-            (item) => item.id === selected.id,
-        );
-        if (actualIndex >= 0) {
-            openSelectedResult(actualIndex);
-        }
     }
 });
 
 elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
+    filterSidebar.setSearchText(state.currentQuery);
     state.debounceTimer = setTimeout(() => {
         performSearch(state.currentQuery);
     }, 250);

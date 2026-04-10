@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import List, Optional
 from src.models.view_models import (
@@ -32,6 +32,44 @@ router = APIRouter(prefix="/api/v1", tags=["catalog"])
 def _get_service() -> CatalogService:
     """Centralized service factory for the router."""
     return CatalogService()
+
+
+@router.get("/songs/filter-values")
+async def get_filter_values(service: CatalogService = Depends(_get_service)) -> dict:
+    """Returns all distinct values for the filter sidebar."""
+    return service.get_filter_values()
+
+
+@router.get("/songs/filter", response_model=List[SongSlimView])
+async def filter_songs(
+    artists: Optional[List[str]] = Query(default=None),
+    contributors: Optional[List[str]] = Query(default=None),
+    years: Optional[List[int]] = Query(default=None),
+    decades: Optional[List[int]] = Query(default=None),
+    genres: Optional[List[str]] = Query(default=None),
+    albums: Optional[List[str]] = Query(default=None),
+    publishers: Optional[List[str]] = Query(default=None),
+    statuses: Optional[List[str]] = Query(default=None),
+    tags: Optional[List[str]] = Query(default=None),
+    live_only: bool = False,
+    mode: str = "ALL",
+    service: CatalogService = Depends(_get_service),
+) -> List[SongSlimView]:
+    """Filter songs by sidebar criteria. Returns slim list-view models."""
+    rows = service.filter_songs_slim(
+        artists=artists,
+        contributors=contributors,
+        years=years,
+        decades=decades,
+        genres=genres,
+        albums=albums,
+        publishers=publishers,
+        statuses=statuses,
+        tags=tags,
+        live_only=live_only,
+        mode=mode,
+    )
+    return [SongSlimView.from_row(r) for r in rows]
 
 
 @router.get("/songs/search", response_model=List[SongSlimView])

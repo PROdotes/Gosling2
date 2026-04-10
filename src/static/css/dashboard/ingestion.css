@@ -236,11 +236,6 @@
     background: rgba(34, 197, 94, 0.15);
 }
 
-.ingest-card.already_exists .ingest-icon {
-    color: var(--warning);
-    background: rgba(234, 179, 8, 0.15);
-}
-
 .ingest-card.ingested .ingest-icon {
     color: var(--success);
     background: rgba(34, 197, 94, 0.2);

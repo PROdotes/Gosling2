@@ -50,6 +50,9 @@ export function renderArtists(ctx, artists) {
     ctx.setState({ selectedIndex: -1, displayedItems: artists });
     ctx.updateResultsSummary(artists.length, "artist");
 
+    ctx.elements.sortControlsBox.innerHTML =
+        '<span class="sort-label">Sort:</span><span class="muted-note" style="font-size:0.75rem; margin-left:0.5rem;">(Not available for artists)</span>';
+
     if (!artists.length) {
         ctx.elements.resultsContainer.innerHTML =
             renderEmptyState("No artists found");

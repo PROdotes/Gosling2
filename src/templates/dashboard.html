@@ -28,13 +28,17 @@
     <header>
         <div class="logo">GOSLING<span>.</span></div>
         <nav class="mode-tabs" aria-label="Dashboard modes">
-            <button id="mode-songs" type="button" class="mode-tab active" data-action="switch-mode" data-mode="songs">Songs</button>
-            <button id="mode-albums" type="button" class="mode-tab" data-action="switch-mode" data-mode="albums">Albums</button>
-            <button id="mode-artists" type="button" class="mode-tab" data-action="switch-mode" data-mode="artists">Artists</button>
+            <button id="mode-songs" type="button" class="mode-tab active" data-action="switch-mode"
+                data-mode="songs">Songs</button>
+            <button id="mode-albums" type="button" class="mode-tab" data-action="switch-mode"
+                data-mode="albums">Albums</button>
+            <button id="mode-artists" type="button" class="mode-tab" data-action="switch-mode"
+                data-mode="artists">Artists</button>
             <button id="mode-publishers" type="button" class="mode-tab" data-action="switch-mode"
                 data-mode="publishers">Publishers</button>
             <button id="mode-tags" type="button" class="mode-tab" data-action="switch-mode" data-mode="tags">Tags</button>
-            <button id="mode-ingest" type="button" class="mode-tab" data-action="switch-mode" data-mode="ingest">Ingest</button>
+            <button id="mode-ingest" type="button" class="mode-tab" data-action="switch-mode"
+                data-mode="ingest">Ingest</button>
         </nav>
         <div class="search-wrapper">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -60,10 +64,14 @@
     </header>
     <main>
         <section class="results-panel">
-            <div id="results-container">
-                <div class="empty-state">
-                    <div class="empty-glyph">♪</div>
-                    <p>Start typing to discover music</p>
+            <div id="sort-controls-box" class="sort-controls"></div>
+            <div class="results-main-layout">
+                <div id="filter-sidebar" class="filter-sidebar" style="display:none"></div>
+                <div id="results-container">
+                    <div class="empty-state">
+                        <div class="empty-glyph">♪</div>
+                        <p>Start typing to discover music</p>
+                    </div>
                 </div>
             </div>
         </section>

@@ -65,6 +65,22 @@ export function buildNavigateAttrs(mode, query) {
     return `data-action="navigate-search" data-mode="${escapeHtml(mode)}" data-query="${escapeHtml(String(query || "").trim())}"`;
 }
 
+export function renderModuleToolbar(ctx, sortControlsHtml = "") {
+    const filterVisible = ctx.handlers?.filterSidebar?._sidebarVisible || false;
+    const filterActiveClass = filterVisible ? " active" : "";
+    const separator = sortControlsHtml
+        ? '<div class="toolbar-separator"></div>'
+        : "";
+
+    return `
+        <div class="sort-controls">
+            <button id="filter-toggle-btn" class="filter-toggle-btn${filterActiveClass}" data-action="toggle-filter-sidebar">Filter</button>
+            ${separator}
+            ${sortControlsHtml}
+        </div>
+    `;
+}
+
 export function renderSongList(songs, emptyMessage = "No songs linked yet") {
     const items = asArray(songs);
     if (!items.length) {
@@ -102,6 +118,21 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                 .join("")}
         </div>
     `;
+}
+
+export function isModalOpen() {
+    const modals = [
+        "edit-modal",
+        "link-modal",
+        "scrubber-modal",
+        "spotify-modal",
+        "splitter-modal",
+        "filename-parser-modal",
+    ];
+    return modals.some((id) => {
+        const el = document.getElementById(id);
+        return el && el.style.display === "flex";
+    });
 }
 
 export function renderAuditTimeline(history) {

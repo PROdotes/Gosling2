@@ -3,10 +3,8 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
-    margin-bottom: 1rem;
-    background: var(--bg-card);
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-subtle);
 }
 
 .sort-label {
@@ -57,21 +55,6 @@
     color: white;
     border-color: var(--accent);
     box-shadow: 0 0 12px var(--accent-glow);
-}
-
-.sort-btn.accent-ghost {
-    background: rgba(249, 115, 22, 0.08);
-    border: 1px solid rgba(249, 115, 22, 0.45);
-    color: var(--accent);
-    box-shadow: 0 0 10px rgba(249, 115, 22, 0.1);
-}
-
-.sort-btn.accent-ghost:hover {
-    background: var(--accent);
-    color: #fff;
-    border-color: var(--accent);
-    box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
-    transform: translateY(-1px);
 }
 
 /* --- Section title row (title + add button) --- */

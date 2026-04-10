@@ -1033,6 +1033,39 @@ class CatalogService:
             logger.debug(f"[CatalogService] <- Return count={len(result)}")
             return result
 
+    def get_filter_values(self) -> dict:
+        """Returns all distinct filter sidebar values."""
+        return self._song_repo.get_filter_values()
+
+    def filter_songs_slim(
+        self,
+        artists: Optional[List[str]] = None,
+        contributors: Optional[List[str]] = None,
+        years: Optional[List[int]] = None,
+        decades: Optional[List[int]] = None,
+        genres: Optional[List[str]] = None,
+        albums: Optional[List[str]] = None,
+        publishers: Optional[List[str]] = None,
+        statuses: Optional[List[str]] = None,
+        tags: Optional[List[str]] = None,
+        live_only: bool = False,
+        mode: str = "ALL",
+    ) -> List[dict]:
+        """Filter songs by sidebar criteria. Returns slim list-view rows."""
+        return self._song_repo.filter_slim(
+            artists=artists,
+            contributors=contributors,
+            years=years,
+            decades=decades,
+            genres=genres,
+            albums=albums,
+            publishers=publishers,
+            statuses=statuses,
+            tags=tags,
+            live_only=live_only,
+            mode=mode,
+        )
+
     def search_songs_slim(self, query: str) -> List[dict]:
         """Slim list-view search. Returns raw dicts for SongSlimView — no hydration."""
         logger.debug(f"[CatalogService] -> search_songs_slim(q='{query}')")

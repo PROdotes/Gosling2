@@ -4,6 +4,7 @@
  */
 
 import * as api from "../api.js";
+import { isModalOpen } from "../components/utils.js";
 
 export async function updateSyncLed(songId) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
@@ -138,11 +139,7 @@ export class SongActionsHandler {
         const isInsideModal =
             typeof actionTarget.closest === "function" &&
             actionTarget.closest(".link-modal");
-        if (
-            this.isModalOpen() &&
-            !isInsideModal &&
-            !action.startsWith("close-")
-        ) {
+        if (isModalOpen() && !isInsideModal && !action.startsWith("close-")) {
             return false;
         }
 
@@ -166,25 +163,6 @@ export class SongActionsHandler {
         }
 
         return false;
-    }
-
-    /**
-     * Checks if any dashboard modal is currently open into the DOM.
-     * Replicates logic from main.js:isModalOpen()
-     */
-    isModalOpen() {
-        const modals = [
-            "edit-modal",
-            "link-modal",
-            "scrubber-modal",
-            "spotify-modal",
-            "splitter-modal",
-            "filename-parser-modal",
-        ];
-        return modals.some((id) => {
-            const el = document.getElementById(id);
-            return el && el.style.display === "flex";
-        });
     }
 
     // ─── ACTION HANDLERS ───────────────────────────────────────────────────────

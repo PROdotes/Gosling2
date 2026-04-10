@@ -1,11 +1,9 @@
-.credits-list,
 .stack-list {
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
 }
 
-.credit-item,
 .list-row {
     display: flex;
     justify-content: space-between;

@@ -178,6 +178,14 @@ header {
     user-select: none;
 }
 
+.toolbar-separator {
+    width: 1px;
+    height: 1.25rem;
+    background: var(--border-subtle);
+    margin: 0 1rem;
+    flex-shrink: 0;
+}
+
 /* Switch Styles */
 .switch {
     position: relative;
@@ -241,13 +249,6 @@ input:checked + .slider:before {
 
 .switch.disabled .slider:before {
     background-color: #444;
-}
-
-.card-title-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    flex-shrink: 0;
 }
 
 .stats-bar {

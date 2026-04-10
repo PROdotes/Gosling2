@@ -463,7 +463,7 @@ function clearSort(ctx) {
     renderSongsCards(ctx, currentSongs);
 }
 
-function renderSortControls(ctx) {
+function renderSortControls() {
     const fields = [
         { field: "media_name", label: "Title" },
         { field: "display_artist", label: "Artist" },
@@ -484,7 +484,12 @@ function renderSortControls(ctx) {
     const clearBtn = currentSort.field
         ? `<button class="sort-clear-btn" data-action="clear-sort">Clear</button>`
         : "";
-    return `<div class="sort-controls"><span class="sort-label">Sort:</span>${buttons}${clearBtn}</div>`;
+
+    const filterActiveClass =
+        document.getElementById("filter-sidebar")?.style.display !== "none"
+            ? " active"
+            : "";
+    return `<button id="filter-toggle-btn" class="sort-btn${filterActiveClass}" data-action="toggle-filter-sidebar">Filter</button><div class="toolbar-separator"></div><span class="sort-label">Sort:</span>${buttons}${clearBtn}`;
 }
 
 function renderSongsCards(ctx, songs) {
@@ -519,11 +524,11 @@ function renderSongsCards(ctx, songs) {
         )
         .join("");
 
-    ctx.elements.resultsContainer.innerHTML =
-        renderSortControls(ctx) + cardsHtml;
+    ctx.elements.sortControlsBox.innerHTML = renderSortControls();
+    ctx.elements.resultsContainer.innerHTML = cardsHtml;
 
     // Attach event handlers
-    ctx.elements.resultsContainer
+    ctx.elements.sortControlsBox
         .querySelectorAll("[data-action='toggle-sort']")
         .forEach((btn) => {
             btn.addEventListener("click", (e) => {
@@ -538,7 +543,7 @@ function renderSongsCards(ctx, songs) {
             });
         });
 
-    ctx.elements.resultsContainer
+    ctx.elements.sortControlsBox
         .querySelector("[data-action='clear-sort']")
         ?.addEventListener("click", (e) => {
             e.stopPropagation();
