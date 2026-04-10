@@ -157,3 +157,97 @@ def test_add_alias_rollback(populated_db):
     aliases = repo.get_aliases_batch([identity_id])
     names = {a.display_name for a in aliases[identity_id]}
     assert "Temp Alias" not in names
+
+
+# ---------------------------------------------------------------------------
+# merge_orphan_into
+# ---------------------------------------------------------------------------
+
+
+class TestMergeOrphanInto:
+
+    def test_song_credits_repointed(self, populated_db):
+        """SongCredits for the source name should point to the target name after merge."""
+        repo = IdentityRepository(populated_db)
+        # Taylor Hawkins (NameID=40, IdentityID=4) is a solo identity — one alias only.
+        # Merge him as an alias under Dave Grohl (NameID=10).
+        source_name_id = 40  # Taylor Hawkins
+        target_name_id = 10  # Dave Grohl
+
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            repo.merge_orphan_into(source_name_id, target_name_id, cursor)
+            conn.commit()
+
+            # Song 3 credited Taylor (40) — should now credit Dave (10)
+            row = cursor.execute(
+                "SELECT CreditedNameID FROM SongCredits WHERE SourceID = 3"
+            ).fetchone()
+            assert row[0] == target_name_id
+
+    def test_album_credits_repointed(self, populated_db):
+        """AlbumCredits for the source name should point to the target name after merge."""
+        repo = IdentityRepository(populated_db)
+        # Nirvana (NameID=20, IdentityID=2) — sole alias, so it's a valid orphan.
+        # Merge Nirvana into Foo Fighters (NameID=30).
+        source_name_id = 20  # Nirvana
+        target_name_id = 30  # Foo Fighters
+
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            repo.merge_orphan_into(source_name_id, target_name_id, cursor)
+            conn.commit()
+
+            # Album 100 credited Nirvana (20) — should now credit Foo Fighters (30)
+            row = cursor.execute(
+                "SELECT CreditedNameID FROM AlbumCredits WHERE AlbumID = 100"
+            ).fetchone()
+            assert row[0] == target_name_id
+
+    def test_source_name_soft_deleted(self, populated_db):
+        """The source ArtistName should be soft-deleted after the merge."""
+        repo = IdentityRepository(populated_db)
+        source_name_id = 40  # Taylor Hawkins
+
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            repo.merge_orphan_into(source_name_id, 10, cursor)
+            conn.commit()
+
+            row = cursor.execute(
+                "SELECT IsDeleted FROM ArtistNames WHERE NameID = ?", (source_name_id,)
+            ).fetchone()
+            assert row[0] == 1
+
+    def test_source_identity_soft_deleted(self, populated_db):
+        """The source Identity should be soft-deleted after the merge."""
+        repo = IdentityRepository(populated_db)
+        source_identity_id = 4  # Taylor Hawkins
+
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            repo.merge_orphan_into(40, 10, cursor)
+            conn.commit()
+
+            row = cursor.execute(
+                "SELECT IsDeleted FROM Identities WHERE IdentityID = ?", (source_identity_id,)
+            ).fetchone()
+            assert row[0] == 1
+
+    def test_raises_if_source_not_found(self, populated_db):
+        """Should raise LookupError if the source NameID does not exist."""
+        repo = IdentityRepository(populated_db)
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            with pytest.raises(LookupError):
+                repo.merge_orphan_into(9999, 10, cursor)
+
+    def test_raises_if_source_identity_has_multiple_aliases(self, populated_db):
+        """Should raise ValueError if the source identity owns more than one alias."""
+        repo = IdentityRepository(populated_db)
+        # Dave Grohl (IdentityID=1) has multiple aliases — not an orphan.
+        # Try to merge his primary name (NameID=10) into Taylor (40).
+        with repo._get_connection() as conn:
+            cursor = conn.cursor()
+            with pytest.raises(ValueError, match="not an orphan"):
+                repo.merge_orphan_into(10, 40, cursor)

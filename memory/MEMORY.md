@@ -10,6 +10,11 @@ Before exploring the codebase or launching agents to search files, **always chec
 
 Only launch Explore agents or perform deep file searches if the lookup docs don't answer your question.
 
+### Testing Standards
+Before writing any tests, **check `docs/testing/` first**:
+- `TDD_STANDARD.md` - Python test conventions, fixture usage, what to test
+- `JS_TESTING_STANDARD.md` - JS/Vitest conventions
+
 ---
 
 ## Search Performance Optimization

@@ -180,11 +180,48 @@ async def update_credit_name(
     try:
         service.update_credit_name(name_id, body.display_name)
         logger.debug("[SongUpdates] <- update_credit_name OK")
+    except ValueError as e:
+        msg = str(e)
+        if msg.startswith("MERGE_REQUIRED:"):
+            _, collision_name_id, source_identity_id, collision_identity_id = msg.split(":")
+            raise HTTPException(status_code=409, detail={
+                "code": "MERGE_REQUIRED",
+                "collision_name_id": int(collision_name_id),
+                "source_identity_id": int(source_identity_id),
+                "collision_identity_id": int(collision_identity_id),
+                "new_name": body.display_name,
+            })
+        if msg.startswith("UNSAFE_MERGE:"):
+            raise HTTPException(status_code=409, detail={
+                "code": "UNSAFE_MERGE",
+                "message": msg[13:],
+            })
+        raise HTTPException(status_code=400, detail=msg)
     except LookupError:
         logger.warning(f"[SongUpdates] <- update_credit_name NOT_FOUND id={name_id}")
         raise HTTPException(status_code=404, detail="Credit name not found")
     except Exception as e:
         logger.error(f"[SongUpdates] <- update_credit_name CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/identities/merge", status_code=204)
+async def merge_identity(
+    source_name_id: int,
+    target_name_id: int,
+    service: CatalogService = Depends(_get_service),
+):
+    """Merges a solo identity into an existing one by repointing all credits."""
+    logger.debug(f"[SongUpdates] -> merge_identity(source={source_name_id}, target={target_name_id})")
+    try:
+        service.merge_identity_into(source_name_id, target_name_id)
+        logger.debug("[SongUpdates] <- merge_identity OK")
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- merge_identity CRITICAL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

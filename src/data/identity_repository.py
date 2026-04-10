@@ -401,6 +401,66 @@ class IdentityRepository(BaseRepository):
             "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (name_id,)
         )
 
+    def merge_orphan_into(self, source_name_id: int, target_name_id: int, cursor: sqlite3.Cursor) -> None:
+        """
+        Merges a solo (orphan) identity into an existing one.
+        Repoints all SongCredits and AlbumCredits from source to target,
+        then soft-deletes the source ArtistName and its Identity.
+        Guards: source identity must own exactly 1 name.
+        """
+        logger.info(f"[IdentityRepository] -> merge_orphan_into(source={source_name_id}, target={target_name_id})")
+
+        source_row = cursor.execute(
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ? AND IsDeleted = 0",
+            (source_name_id,)
+        ).fetchone()
+        if not source_row:
+            raise LookupError(f"Source name {source_name_id} not found")
+        source_identity_id = source_row[0]
+
+        alias_count = cursor.execute(
+            "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",
+            (source_identity_id,)
+        ).fetchone()[0]
+        if alias_count > 1:
+            raise ValueError(f"Source identity {source_identity_id} is not an orphan — merge aborted")
+
+        # Repoint SongCredits from source → target, dropping duplicates where target already exists on that song+role
+        cursor.execute("""
+            DELETE FROM SongCredits
+            WHERE CreditedNameID = ?
+              AND EXISTS (
+                SELECT 1 FROM SongCredits sc2
+                WHERE sc2.SourceID = SongCredits.SourceID
+                  AND sc2.CreditedNameID = ?
+                  AND sc2.RoleID = SongCredits.RoleID
+              )
+        """, (source_name_id, target_name_id))
+        cursor.execute(
+            "UPDATE SongCredits SET CreditedNameID = ? WHERE CreditedNameID = ?",
+            (target_name_id, source_name_id),
+        )
+
+        # Same for AlbumCredits
+        cursor.execute("""
+            DELETE FROM AlbumCredits
+            WHERE CreditedNameID = ?
+              AND EXISTS (
+                SELECT 1 FROM AlbumCredits ac2
+                WHERE ac2.AlbumID = AlbumCredits.AlbumID
+                  AND ac2.CreditedNameID = ?
+                  AND ac2.RoleID = AlbumCredits.RoleID
+              )
+        """, (source_name_id, target_name_id))
+        cursor.execute(
+            "UPDATE AlbumCredits SET CreditedNameID = ? WHERE CreditedNameID = ?",
+            (target_name_id, source_name_id),
+        )
+        cursor.execute("UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (source_name_id,))
+        cursor.execute("UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = ?", (source_identity_id,))
+
+        logger.info(f"[IdentityRepository] <- merge_orphan_into OK — name {source_name_id} → {target_name_id}")
+
     def update_legal_name(
         self, identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection
     ) -> None:

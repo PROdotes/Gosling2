@@ -3,6 +3,7 @@ import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { syncAlbumWithSong } from "./handlers/song_actions.js";
+import { showConfirm } from "./components/confirm_modal.js";
 
 /**
  * GOSLING ORCHESTRATOR
@@ -326,8 +327,26 @@ export async function manageArtist(ctx, artistId, artistName) {
         title: `Edit Artist: ${primary.display_name}`,
         name: primary.display_name,
         onRename: async (newName) => {
-            await api.updateCreditName(0, primary.id, newName);
-            if (ctx.refreshLayout) ctx.refreshLayout();
+            try {
+                await api.updateCreditName(0, primary.id, newName);
+                if (ctx.refreshLayout) ctx.refreshLayout();
+            } catch (err) {
+                if (err.detail?.code === "MERGE_REQUIRED") {
+                    const { collision_name_id, source_identity_id: _sid } = err.detail;
+                    const confirmed = await showConfirm(
+                        `"${newName}" already exists. Merge into existing identity?`,
+                        { title: "Merge Identity", okLabel: "Merge" }
+                    );
+                    if (confirmed) {
+                        await api.mergeIdentity(primary.id, collision_name_id);
+                        if (ctx.refreshLayout) ctx.refreshLayout();
+                    }
+                } else if (err.detail?.code === "UNSAFE_MERGE") {
+                    throw new Error(err.detail.message);
+                } else {
+                    throw err;
+                }
+            }
         },
         category: null,
         children: {
@@ -355,7 +374,25 @@ export async function manageArtist(ctx, artistId, artistName) {
                 await api.removeIdentityAlias(artistId, item.id);
             },
             onRenameChild: async (item, newName) => {
-                await api.updateCreditName(0, item.id, newName);
+                try {
+                    await api.updateCreditName(0, item.id, newName);
+                } catch (err) {
+                    if (err.detail?.code === "MERGE_REQUIRED") {
+                        const { collision_name_id } = err.detail;
+                        const confirmed = await showConfirm(
+                            `"${newName}" already exists. Merge into existing identity?`,
+                            { title: "Merge Identity", okLabel: "Merge" }
+                        );
+                        if (confirmed) {
+                            await api.mergeIdentity(item.id, collision_name_id);
+                            if (ctx.refreshLayout) ctx.refreshLayout();
+                        }
+                    } else if (err.detail?.code === "UNSAFE_MERGE") {
+                        throw new Error(err.detail.message);
+                    } else {
+                        throw err;
+                    }
+                }
             },
         },
         onClose: () => {

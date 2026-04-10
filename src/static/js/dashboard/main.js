@@ -37,11 +37,13 @@ import {
     setPrimarySongTag,
     setPublisherParent,
     updateCreditName,
+    mergeIdentity,
     updatePublisher,
     updateTag,
     uploadFiles,
 } from "./api.js";
 import { closeEditModal, openEditModal } from "./components/edit_modal.js";
+import { showConfirm } from "./components/confirm_modal.js";
 import { activateInlineEdit } from "./components/inline_editor.js";
 import { closeLinkModal, openLinkModal } from "./components/link_modal.js";
 import {
@@ -1002,7 +1004,24 @@ document.addEventListener("click", async (event) => {
                     title: "Edit Artist",
                     name: primaryAlias?.display_name || identity.display_name,
                     onRename: async (newName) => {
-                        await updateCreditName(0, primaryAlias.id, newName);
+                        try {
+                            await updateCreditName(0, primaryAlias.id, newName);
+                        } catch (err) {
+                            if (err.detail?.code === "MERGE_REQUIRED") {
+                                const confirmed = await showConfirm(
+                                    `"${newName}" already exists. Merge into existing identity?`,
+                                    { title: "Merge Identity", okLabel: "Merge" }
+                                );
+                                if (confirmed) {
+                                    await mergeIdentity(primaryAlias.id, err.detail.collision_name_id);
+                                    refreshActiveDetail();
+                                }
+                            } else if (err.detail?.code === "UNSAFE_MERGE") {
+                                throw new Error(err.detail.message);
+                            } else {
+                                throw err;
+                            }
+                        }
                     },
                     onClose,
                     category: null,
@@ -1031,7 +1050,24 @@ document.addEventListener("click", async (event) => {
                             await removeIdentityAlias(identityId, item.id);
                         },
                         onRenameChild: async (item, newName) => {
-                            await updateCreditName(0, item.id, newName);
+                            try {
+                                await updateCreditName(0, item.id, newName);
+                            } catch (err) {
+                                if (err.detail?.code === "MERGE_REQUIRED") {
+                                    const confirmed = await showConfirm(
+                                        `"${newName}" already exists. Merge into existing identity?`,
+                                        { title: "Merge Identity", okLabel: "Merge" }
+                                    );
+                                    if (confirmed) {
+                                        await mergeIdentity(item.id, err.detail.collision_name_id);
+                                        refreshActiveDetail();
+                                    }
+                                } else if (err.detail?.code === "UNSAFE_MERGE") {
+                                    throw new Error(err.detail.message);
+                                } else {
+                                    throw err;
+                                }
+                            }
                         },
                         createLabel: (q) => `Add "${q}" as alias`,
                     },

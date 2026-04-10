@@ -1687,8 +1687,40 @@ class CatalogService:
             raise ValueError("Artist name cannot be empty")
         conn = self._credit_repo.get_connection()
         try:
+            # Check for name collision before attempting write
+            cursor = conn.cursor()
+            collision = cursor.execute(
+                "SELECT NameID, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0",
+                (new_name.strip(),)
+            ).fetchone()
+
+            if collision:
+                collision_name_id, collision_identity_id = collision
+                if collision_name_id == name_id:
+                    # Same name, nothing to do
+                    return
+                # Check if the colliding identity is an orphan (safe to merge)
+                alias_count = cursor.execute(
+                    "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",
+                    (collision_identity_id,)
+                ).fetchone()[0]
+                if alias_count > 1:
+                    raise ValueError(f"UNSAFE_MERGE: '{new_name}' already exists and has multiple aliases — cannot auto-merge.")
+                # Get the source identity for the name being renamed
+                source_row = cursor.execute(
+                    "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ? AND IsDeleted = 0",
+                    (name_id,)
+                ).fetchone()
+                if not source_row:
+                    raise LookupError(f"Artist name {name_id} not found")
+                source_identity_id = source_row[0]
+                raise ValueError(f"MERGE_REQUIRED:{collision_name_id}:{source_identity_id}:{collision_identity_id}")
+
             self._credit_repo.update_credit_name(name_id, new_name, conn)
             conn.commit()
+        except (ValueError, LookupError):
+            conn.rollback()
+            raise
         except Exception as e:
             conn.rollback()
             logger.error(f"[CatalogService] <- update_credit_name FAILED: {e}")
@@ -1696,6 +1728,22 @@ class CatalogService:
         finally:
             conn.close()
         logger.debug("[CatalogService] <- update_credit_name OK")
+
+    def merge_identity_into(self, source_name_id: int, target_name_id: int) -> None:
+        """Merges a solo identity into an existing one. Delegates to IdentityRepository."""
+        logger.info(f"[CatalogService] -> merge_identity_into(source={source_name_id}, target={target_name_id})")
+        conn = self._identity_repo.get_connection()
+        try:
+            cursor = conn.cursor()
+            self._identity_repo.merge_orphan_into(source_name_id, target_name_id, cursor)
+            conn.commit()
+            logger.info(f"[CatalogService] <- merge_identity_into OK")
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- merge_identity_into FAILED: {e}")
+            raise
+        finally:
+            conn.close()
 
     # --- Albums ---
 

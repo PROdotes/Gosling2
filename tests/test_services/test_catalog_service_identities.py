@@ -140,3 +140,73 @@ class TestUpdateIdentityLegalName:
         """Non-existent identity_id should raise LookupError."""
         with pytest.raises(LookupError):
             catalog_service.update_identity_legal_name(9999, "Ghost")
+
+
+# ---------------------------------------------------------------------------
+# update_credit_name (rename collision detection)
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateCreditName:
+
+    def test_clean_rename_succeeds(self, catalog_service):
+        """Renaming to a brand-new name should work without errors."""
+        catalog_service.update_credit_name(11, "Grohlton Reloaded")
+        assert catalog_service.resolve_identity_by_name("Grohlton Reloaded") == 1
+
+    def test_rename_to_same_name_is_noop(self, catalog_service):
+        """Renaming to the current value should not raise."""
+        catalog_service.update_credit_name(11, "Grohlton")  # already "Grohlton"
+
+    def test_collision_with_orphan_raises_merge_required(self, catalog_service):
+        """Renaming to a name owned by a solo identity should raise MERGE_REQUIRED."""
+        # Taylor Hawkins (NameID=40, IdentityID=4) is a solo identity.
+        # Renaming Grohlton (NameID=11) to "Taylor Hawkins" should signal MERGE_REQUIRED.
+        with pytest.raises(ValueError, match="MERGE_REQUIRED"):
+            catalog_service.update_credit_name(11, "Taylor Hawkins")
+
+    def test_collision_with_parent_raises_unsafe_merge(self, catalog_service):
+        """Renaming to a name owned by an identity with multiple aliases should raise UNSAFE_MERGE."""
+        # Dave Grohl (NameID=10, IdentityID=1) has multiple aliases.
+        # Renaming Taylor's name (NameID=40) to "Dave Grohl" should be blocked.
+        with pytest.raises(ValueError, match="UNSAFE_MERGE"):
+            catalog_service.update_credit_name(40, "Dave Grohl")
+
+    def test_collision_with_own_other_alias_is_blocked(self, catalog_service):
+        """Renaming to another alias of the same identity is still a collision (different NameID)."""
+        # Renaming Late! (NameID=12) to "Grohlton" (NameID=11, same identity=1).
+        # Same identity, different NameID — collision_name_id != name_id, but alias_count > 1.
+        with pytest.raises(ValueError, match="UNSAFE_MERGE"):
+            catalog_service.update_credit_name(12, "Grohlton")
+
+
+# ---------------------------------------------------------------------------
+# merge_identity_into
+# ---------------------------------------------------------------------------
+
+
+class TestMergeIdentityInto:
+
+    def test_merge_succeeds_and_credits_repointed(self, catalog_service):
+        """After merge, songs credited to Taylor should resolve under Dave's identity."""
+        # Taylor (NameID=40, IdentityID=4) is a solo orphan.
+        catalog_service.merge_identity_into(40, 10)
+
+        # Taylor's identity should be gone
+        assert catalog_service.get_identity(4) is None
+
+        # Song 3 was credited to Taylor — now credited to Dave (NameID=10)
+        song = catalog_service.get_song(3)
+        credit_name_ids = {c.name_id for c in song.credits}
+        assert 10 in credit_name_ids
+        assert 40 not in credit_name_ids
+
+    def test_merge_source_not_found_raises(self, catalog_service):
+        with pytest.raises(LookupError):
+            catalog_service.merge_identity_into(9999, 10)
+
+    def test_merge_non_orphan_source_raises(self, catalog_service):
+        """Merging a source identity with multiple aliases should be blocked."""
+        # Dave Grohl (NameID=10, IdentityID=1) has multiple aliases — not an orphan.
+        with pytest.raises(ValueError, match="not an orphan"):
+            catalog_service.merge_identity_into(10, 40)

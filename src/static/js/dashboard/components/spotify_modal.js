@@ -41,9 +41,15 @@ function showResults(result) {
     // Title mismatch warning
     if (result.title_match) {
         warningEl.style.display = "none";
+        warningEl.classList.remove("has-attention");
     } else {
         parsedTitleEl.textContent = result.parsed_title || "Unknown";
-        warningEl.style.display = "block";
+        warningEl.style.display = "flex";
+
+        // Trigger animation by resetting the class
+        warningEl.classList.remove("has-attention");
+        void warningEl.offsetWidth; // Force reflow
+        warningEl.classList.add("has-attention");
     }
 
     // Preview list
@@ -55,7 +61,7 @@ function showResults(result) {
     statusEl.textContent = `${credits.length} artists, ${publishers.length} publishers`;
 
     const creditHtml = credits
-        .map((c, i) => {
+        .map((c, _i) => {
             const exist = credExistence.find((e) => e.name === c.name);
             // Link Check: Case-insensitive match on name and exact match on role
             const alreadyLinked = _existingCredits.some(
@@ -82,7 +88,7 @@ function showResults(result) {
         .join("");
 
     const pubHtml = publishers
-        .map((p, i) => {
+        .map((p, _i) => {
             const exist = pubExistence.find((e) => e.name === p);
             const alreadyLinked = _existingPublishers.some(
                 (ep) => ep.name?.toLowerCase() === p?.toLowerCase(),

@@ -10,15 +10,19 @@ async function fetchJson(url, options = {}) {
     const response = await fetch(url, options);
     if (!response.ok) {
         let errorMsg = `Request failed: ${response.status}`;
+        let errorDetail = null;
         try {
             const errorData = await response.json();
             if (errorData && errorData.detail) {
-                errorMsg = errorData.detail;
+                errorDetail = errorData.detail;
+                errorMsg = typeof errorDetail === "string" ? errorDetail : `Request failed: ${response.status}`;
             }
         } catch (e) {
             // No JSON body
         }
-        throw new Error(errorMsg);
+        const err = new Error(errorMsg);
+        err.detail = errorDetail;
+        throw err;
     }
     return response.json();
 }
@@ -27,15 +31,19 @@ async function fetchVoid(url, options = {}) {
     const response = await fetch(url, options);
     if (!response.ok) {
         let errorMsg = `Request failed: ${response.status}`;
+        let errorDetail = null;
         try {
             const errorData = await response.json();
             if (errorData && errorData.detail) {
-                errorMsg = errorData.detail;
+                errorDetail = errorData.detail;
+                errorMsg = typeof errorDetail === "string" ? errorDetail : `Request failed: ${response.status}`;
             }
         } catch (e) {
             // No JSON body
         }
-        throw new Error(errorMsg);
+        const err = new Error(errorMsg);
+        err.detail = errorDetail;
+        throw err;
     }
 }
 
@@ -294,6 +302,12 @@ export function deleteSong(id) {
 
 export function moveSongToLibrary(id) {
     return fetchJson(`/api/v1/songs/${id}/move`, {
+        method: "POST",
+    });
+}
+
+export function mergeIdentity(sourceNameId, targetNameId) {
+    return fetchVoid(`/api/v1/identities/merge?source_name_id=${sourceNameId}&target_name_id=${targetNameId}`, {
         method: "POST",
     });
 }
