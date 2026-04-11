@@ -383,6 +383,14 @@ class SongRepository(MediaSourceRepository):
             row = new_conn.execute(query, (audio_hash,)).fetchone()
             return self._row_to_song(row) if row else None
 
+    def get_by_processing_status(self, status: int) -> List["Song"]:
+        """Fetch all non-deleted songs with a given processing status."""
+        query = f"SELECT {self._COLUMNS} {self._JOIN} WHERE m.ProcessingStatus = ?"
+        with self._get_connection() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, (status,)).fetchall()
+            return [self._row_to_song(row) for row in rows if row]
+
     def get_by_path(
         self, path: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[Song]:

@@ -46,6 +46,20 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Raises `HTTPException(404)` if the identity is not found.
 - Wraps `CatalogService.get_songs_by_identity`.
 
+### async def get_filter_values() -> dict
+**HTTP**: `GET /api/v1/songs/filter-values`
+- Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags, statuses).
+- Used to populate the filter sidebar on load.
+- Wraps `CatalogService.get_filter_values`.
+
+### async def filter_songs() -> List[SongSlimView]
+**HTTP**: `GET /api/v1/songs/filter?artists=...&years=...&genres=...&mode=ALL`
+- Filters songs by sidebar criteria. Accepts repeated query params for each category.
+- `mode=ALL` (default) = AND logic; `mode=ANY` = OR logic.
+- `statuses` accepts: `not_done`, `ready_to_finalize`, `missing_data`, `done`.
+- Returns `List[SongSlimView]`.
+- Wraps `CatalogService.filter_songs_slim`.
+
 ### async def get_all_publishers() -> List[Publisher]
 **HTTP**: `GET /api/v1/publishers`
 - Fetches the directory of all active music publishers.
@@ -175,6 +189,12 @@ Used by `update_identity_legal_name`.
 **HTTP**: `GET /api/v1/ingest/formats`
 - Returns the list of supported file extensions for ingestion as defined in `ACCEPTED_EXTENSIONS`.
 
+### async def get_pending_convert() -> JSONResponse
+**HTTP**: `GET /api/v1/ingest/pending-convert`
+- Returns all songs with `processing_status=3` (WAV staged, awaiting conversion).
+- Used by the ingest page on mount to restore unconverted WAV cards.
+- Returns list of `{status: "PENDING_CONVERT", staged_path, song: SongView}`.
+
 ### async def get_staging_orphans() -> JSONResponse
 **HTTP**: `GET /api/v1/ingest/staging-orphans`
 - List files in the staging folder that have no matching DB record.
@@ -191,7 +211,8 @@ Used by `update_identity_legal_name`.
 - Batch file ingestion entry point (supports single or multiple files).
 - Browser automatically flattens folder drag-and-drop into file list.
 - Validates extensions and stages all files to `STAGING_DIR` with UUID filenames.
-- Orchestrates batch ingestion via `CatalogService.ingest_batch()`.
+- WAVs are always ingested immediately as status=3 (`PENDING_CONVERT`) via `CatalogService.ingest_wav_as_converting`. Conversion is confirmed separately via `/convert-wav`.
+- Non-WAVs are ingested via `CatalogService.ingest_batch()`.
 - Returns `BatchIngestReport` with aggregate stats and per-file results.
 
 ### async def scan_folder(request: FolderScanRequest) -> BatchIngestReport
@@ -215,8 +236,9 @@ Used by `update_identity_legal_name`.
 
 ### async def convert_wav(staged_path: str) -> dict
 **HTTP**: `POST /api/v1/ingest/convert-wav?staged_path={path}`
-- Converts a staged WAV to MP3 and ingests.
-- Wraps `CatalogService.ingest_file` after conversion.
+- Converts a staged WAV to MP3 and finalizes the existing status-3 DB record.
+- WAV must already be in the DB (ingested via `/upload` as status=3).
+- Wraps `convert_to_mp3` then `CatalogService.finalize_wav_conversion`.
 
 ### async def cleanup_original_file(request: CleanupOriginalRequest) -> dict
 **HTTP**: `POST /api/v1/ingest/cleanup-original`

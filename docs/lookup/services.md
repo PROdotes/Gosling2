@@ -39,8 +39,27 @@ Atomic batch ingestion entry point using parallel threads.
 ### delete_song(song_id: int) -> bool
 Soft-delete a single song by SourceID. Handles physical cleanup if in staging.
 
+### get_filter_values() -> dict
+(-> `SongRepository.get_filter_values`)
+
+### filter_songs_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode) -> List[dict]
+Filter songs by sidebar criteria. Returns slim list-view rows.
+(-> `SongRepository.filter_slim`)
+
+### ingest_wav_as_converting(staged_path: str) -> Dict[str, Any]
+Ingest a WAV file immediately with `processing_status=3`. Returns `{"status": "CONVERTING", "song": Song}`.
+- Runs `check_ingestion` first — returns early with `CONFLICT`/`ALREADY_EXISTS` if not NEW.
+- Does NOT convert. Caller is responsible for triggering conversion via `/convert-wav`.
+
+### finalize_wav_conversion(song_id: int, mp3_path: str) -> int
+Called after WAV→MP3 conversion completes. Updates the status-3 DB record with the MP3 path and hash.
+- Handles ghost reactivation and active duplicate dedup.
+- Returns the surviving `song_id` (may differ from input if a ghost was reactivated or a duplicate was found).
+
 ### resolve_conflict(ghost_id: int, staged_path: str) -> Dict[str, Any]
 Resolve a ghost conflict by re-activating the soft-deleted record with new file metadata.
+- If `staged_path` is a WAV, reactivates at `processing_status=3` and returns `PENDING_CONVERT`.
+- If `staged_path` is an MP3, reactivates at `processing_status=1` and returns `INGESTED`.
 
 
 ### get_song(song_id: int) -> Optional[Song]
@@ -200,11 +219,6 @@ Atomic import of Spotify credits and publishers.
 ### get_id3_frames_config() -> Dict[str, Any]
 Returns the consolidated ID3 frame mapping.
 
-### ingest_wav_as_converting(staged_path: str) -> Dict[str, Any]
-Ingest a WAV file immediately with processing_status=3 (Converting).
-
-### finalize_wav_conversion(song_id: int, mp3_path: str) -> None
-After background WAV→MP3 conversion succeeds, update the DB record to the new MP3 path and status.
 
 ### move_song_to_library(song_id: int) -> str
 Calculates the target routing, moves the physical file, and updates the database records.

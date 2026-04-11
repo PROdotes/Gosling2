@@ -574,6 +574,24 @@ export class SongActionsHandler {
                         `;
                     }
                 }
+            } else if (data.status === "PENDING_CONVERT") {
+                const card = actionTarget.closest(".result-card");
+                if (card) {
+                    const conflictBox = card.querySelector(
+                        '[style*="rgba(255, 149, 0"]',
+                    );
+                    if (conflictBox) {
+                        conflictBox.className = "pending-convert-box";
+                        conflictBox.innerHTML = `
+                            <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
+                                This WAV file needs to be converted to MP3 before ingestion.
+                            </div>
+                            <button style="padding: 0.5rem 1rem; background: #ff9500; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;" data-action="convert-wav" data-staged-path="${stagedPath}">
+                                Convert & Ingest
+                            </button>
+                        `;
+                    }
+                }
             } else {
                 actionTarget.disabled = false;
                 actionTarget.textContent = originalText;

@@ -102,18 +102,16 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
     wav_results = []
 
     if wav_paths:
-        if WAV_AUTO_CONVERT:
-            # Synchronous conversion: convert then ingest normally
-            for wav in wav_paths:
-                try:
-                    mp3 = convert_to_mp3(Path(wav))
-                    ingest_paths.append(str(mp3))
-                except RuntimeError as e:
-                    logger.error(f"[IngestRouter] WAV conversion failed for {wav}: {e}")
-        else:
-            # Prompt mode: return PENDING_CONVERT cards, user confirms conversion manually
-            for wav in wav_paths:
-                wav_results.append({"status": "PENDING_CONVERT", "staged_path": wav})
+        # Always ingest WAVs as status=3 (Converting) immediately so the DB record exists.
+        # The frontend will show a PENDING_CONVERT card; the user confirms conversion via /convert-wav.
+        for wav in wav_paths:
+            result = service.ingest_wav_as_converting(wav)
+            if result["status"] == "CONVERTING":
+                result["status"] = "PENDING_CONVERT"
+            if result.get("song"):
+                result["song"] = SongView.from_domain(result["song"])
+            result["staged_path"] = wav
+            wav_results.append(result)
 
     # 4. Batch ingest non-WAVs
     if not ingest_paths and not wav_results:
@@ -133,7 +131,7 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 
         total = len(combined_results)
         ingested = sum(
-            1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING")
+            1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
         )
         duplicates = sum(
             1
@@ -157,39 +155,25 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
         )
 
 
-def _run_wav_conversions(wav_paths: list[str], service: CatalogService) -> None:
-    """
-    Background task: convert each staged WAV to MP3 and finalize the DB record.
-    Each WAV was already ingested with processing_status=3; this moves it to status=1.
-    """
-    for wav in wav_paths:
-        song_id = None
-        try:
-            # Look up the song_id by path before conversion deletes the WAV
-            existing = service._song_repo.get_by_path(wav)
-            if existing:
-                song_id = existing.id
-            mp3 = convert_to_mp3(Path(wav))
-            if song_id is not None:
-                service.finalize_wav_conversion(song_id, str(mp3))
-            else:
-                logger.warning(
-                    f"[IngestRouter] No DB record found for {wav}, skipping finalize"
-                )
-        except RuntimeError as e:
-            logger.error(f"[IngestRouter] Background conversion failed for {wav}: {e}")
-
 
 @router.post("/convert-wav")
 async def convert_wav(staged_path: str) -> dict:
-    """Convert a staged WAV to MP3 and ingest. Called when user confirms a PENDING_CONVERT card."""
+    """Convert a staged WAV to MP3. Called when user confirms a PENDING_CONVERT card.
+    The WAV was already ingested with status=3; this converts it and finalizes the DB record."""
     logger.info(f"[IngestRouter] -> convert_wav(staged_path='{staged_path}')")
     service = _get_service()
     try:
+        existing = service._song_repo.get_by_path(staged_path)
+        if existing is None:
+            logger.error(f"[IngestRouter] convert_wav: no DB record for '{staged_path}'")
+            return {"status": "ERROR", "message": "No DB record found for this WAV. Try re-uploading."}
         mp3 = convert_to_mp3(Path(staged_path))
-        result = service.ingest_file(str(mp3))
-        if result.get("song"):
-            result["song"] = SongView.from_domain(result["song"])
+        surviving_id = service.finalize_wav_conversion(existing.id, str(mp3))
+        hydrated = service.get_song(surviving_id)
+        status = "INGESTED" if surviving_id == existing.id else "ALREADY_EXISTS"
+        result = {"status": status}
+        if hydrated:
+            result["song"] = SongView.from_domain(hydrated)
         return result
     except RuntimeError as e:
         logger.error(f"[IngestRouter] convert_wav failed: {e}")
@@ -280,20 +264,48 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
             status_code=500, detail="Failed to stage any files for ingestion"
         )
 
-    # 4. Batch ingest
+    # 4. Split WAVs and non-WAVs
+    wav_paths = [p for p in staged_paths if Path(p).suffix.lower() == ".wav"]
+    ingest_paths = [p for p in staged_paths if Path(p).suffix.lower() != ".wav"]
+    combined_results = []
+
+    if wav_paths:
+        if WAV_AUTO_CONVERT:
+            # Convert inline and ingest as normal
+            for wav in wav_paths:
+                try:
+                    mp3 = convert_to_mp3(Path(wav))
+                    ingest_paths.append(str(mp3))
+                except RuntimeError as e:
+                    logger.error(f"[IngestRouter] scan_folder WAV conversion failed for {wav}: {e}")
+                    combined_results.append({"status": "ERROR", "message": str(e)})
+        else:
+            # Ingest as status=3, await manual conversion
+            for wav in wav_paths:
+                result = service.ingest_wav_as_converting(wav)
+                if result["status"] == "CONVERTING":
+                    result["status"] = "PENDING_CONVERT"
+                if result.get("song"):
+                    result["song"] = SongView.from_domain(result["song"])
+                result["staged_path"] = wav
+                combined_results.append(result)
+
+    # 5. Batch ingest non-WAVs
     try:
-        batch_report = service.ingest_batch(staged_paths)
+        if ingest_paths:
+            batch_report = service.ingest_batch(ingest_paths)
+            for result in batch_report["results"]:
+                if "song" in result and result["song"]:
+                    result["song"] = SongView.from_domain(result["song"])
+            combined_results.extend(batch_report["results"])
 
-        # 5. Convert Domain Songs to SongViews
-        for result in batch_report["results"]:
-            if "song" in result and result["song"]:
-                result["song"] = SongView.from_domain(result["song"])
+        total = len(combined_results)
+        ingested = sum(1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT"))
+        duplicates = sum(1 for r in combined_results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH"))
+        errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
 
-        logger.info(
-            f"[IngestRouter] <- scan_folder() "
-            f"found={len(audio_files)} ingested={batch_report['ingested']}"
-        )
-        return BatchIngestReport(**batch_report)
+        logger.info(f"[IngestRouter] <- scan_folder() found={len(audio_files)} ingested={ingested}")
+        return BatchIngestReport(total_files=total, ingested=ingested, duplicates=duplicates, errors=errors, results=combined_results)
 
     except Exception as e:
         logger.error(f"[IngestRouter] Folder scan ingestion error: {e}")
@@ -361,6 +373,23 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
     except Exception as e:
         logger.error(f"[IngestRouter] Cleanup failed for {real_target}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
+@router.get("/pending-convert")
+async def get_pending_convert():
+    """List songs with processing_status=3 (WAV staged, awaiting conversion)."""
+    service = _get_service()
+    songs = service._song_repo.get_by_processing_status(3)
+    results = []
+    for s in songs:
+        hydrated = service.get_song(s.id)
+        if hydrated:
+            results.append({
+                "status": "PENDING_CONVERT",
+                "staged_path": s.source_path,
+                "song": SongView.from_domain(hydrated).model_dump(),
+            })
+    return JSONResponse(results)
 
 
 @router.get("/staging-orphans")

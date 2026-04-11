@@ -251,7 +251,7 @@ class CatalogService:
         finally:
             conn.close()
 
-    def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> None:
+    def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> int:
         """
         After background WAV→MP3 conversion succeeds, update the DB record:
         swap SourcePath to the new MP3 path and set ProcessingStatus to 2 (Virgin).
@@ -285,11 +285,13 @@ class CatalogService:
                     self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
                     self._song_repo.hard_delete(song_id, conn)
                     conn.commit()
+                    return existing["id"]
                 except Exception as ex:
                     conn.rollback()
                     logger.error(
                         f"[CatalogService] <- finalize_wav_conversion() reactivate failed: {ex}"
                     )
+                    return song_id
                 finally:
                     conn.close()
             else:
@@ -310,7 +312,7 @@ class CatalogService:
                     conn.close()
                 if os.path.exists(mp3_path):
                     os.remove(mp3_path)
-            return
+                return existing["id"]
 
         conn = self._song_repo.get_connection()
         try:
@@ -328,6 +330,7 @@ class CatalogService:
             logger.info(
                 f"[CatalogService] <- finalize_wav_conversion(id={song_id}) Status now 1"
             )
+            return song_id
         except Exception as e:
             conn.rollback()
             logger.error(f"[CatalogService] <- finalize_wav_conversion() FAILED: {e}")
@@ -690,21 +693,23 @@ class CatalogService:
             )
 
             # 2. Create updated song model with ghost_id and staged path
+            is_wav = Path(staged_path).suffix.lower() == ".wav"
             reactivated_song = parsed_song.model_copy(
                 update={
                     "id": ghost_id,
                     "source_path": staged_path,
                     "audio_hash": audio_hash,
                     "is_active": False,  # Stay inactive until library move/publish
-                    "processing_status": 1,  # Ready for Review
+                    "processing_status": 3 if is_wav else 1,  # WAV needs conversion
                 }
             )
 
             # 3. Update the ghost record
             self._song_repo.reactivate_ghost(ghost_id, reactivated_song, conn)
 
-            # 4. Enrich metadata (Simulated enrichment moves 2 -> 1 in DB)
-            self._enrich_metadata(ghost_id, conn)
+            # 4. Enrich metadata (only for non-WAV; WAVs stay at status=3 until converted)
+            if not is_wav:
+                self._enrich_metadata(ghost_id, conn)
 
             conn.commit()
             logger.info(
@@ -714,7 +719,7 @@ class CatalogService:
             # 4. Return the reactivated song with full hydration
             hydrated_songs = self._hydrate_songs([reactivated_song])
             return {
-                "status": "INGESTED",
+                "status": "PENDING_CONVERT" if is_wav else "INGESTED",
                 "message": "Ghost record reactivated with new metadata",
                 "song": hydrated_songs[0] if hydrated_songs else reactivated_song,
             }

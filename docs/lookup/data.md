@@ -101,6 +101,18 @@ Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `s
 
 Retrieves songs where any given Identity ID is credited. Forms the base of the \"Grohlton Check\". Supports optional shared connection.
 
+### get_filter_values(conn: Optional[sqlite3.Connection] = None) -> dict
+
+Returns all distinct values for each filter category (artists, years, decades, genres, albums, publishers, tags, statuses). Used to populate the filter sidebar.
+
+### filter_slim(artists, contributors, years, decades, genres, albums, publishers, statuses, tags, live_only, mode, conn) -> List[dict]
+
+Returns slim song rows matching the given filter criteria. `mode='ALL'` = AND logic, `mode='ANY'` = OR logic. `statuses` accepts: `not_done`, `ready_to_finalize`, `missing_data`, `done`. Same column set as `search_slim`.
+
+### get_by_processing_status(status: int) -> List[Song]
+
+Fetches all non-deleted songs with a given `ProcessingStatus` value. Used to load status-3 (Converting) WAVs on the ingest page.
+
 ### get_by_path(file_path: str, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]
 
 Returns a Song record by its exact physical path. Supports optional shared connection.

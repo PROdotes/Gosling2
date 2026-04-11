@@ -3,6 +3,7 @@ import {
     deleteStagingOrphan,
     getAcceptedFormats,
     getDownloadsFolder,
+    getPendingConvert,
     getStagingOrphans,
     scanFolder,
     uploadFiles,
@@ -152,6 +153,16 @@ export async function renderIngestionPanel(ctx) {
     setupManualIngestHandlers(RESULTS_LIST_ID);
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
     setupOrphanSection("ingest-orphan-section");
+
+    // Load any WAVs that were uploaded but not yet converted (status=3)
+    getPendingConvert().then((pending) => {
+        if (!pending || pending.length === 0) return;
+        const list = document.getElementById(RESULTS_LIST_ID);
+        if (!list) return;
+        pending.forEach((result) => {
+            list.prepend(createResultCard(result));
+        });
+    }).catch(() => {});  // silently ignore on load failure
 }
 
 function setupOrphanSection(sectionId) {

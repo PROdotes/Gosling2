@@ -568,20 +568,16 @@ export function applyFilenameParsing(items, pattern) {
     });
 }
 
-export function convertAndIngest(stagedPaths) {
-    return fetchJson("/api/v1/ingest/convert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ staged_paths: stagedPaths }),
-    });
-}
-
 export function cleanupOriginalFile(filePath) {
     return fetchJson("/api/v1/ingest/cleanup-original", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_path: filePath }),
     });
+}
+
+export function getPendingConvert() {
+    return fetchJson("/api/v1/ingest/pending-convert");
 }
 
 export function getStagingOrphans() {
