@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, AlbumCredit
 from src.models.metadata_frames import ID3FrameConfig
 from src.services.logger import logger
-from src.services.metadata_frames_reader import load_id3_frames
+from src.services.metadata_frames_reader import load_id3_frames, load_tag_categories
 from src.engine.config import COMMA_SPLIT_FIELDS, SONG_DEFAULT_YEAR
 
 
@@ -19,6 +19,7 @@ class MetadataParser:
         self.field_map = {}
         self.tag_map = {}
         self.role_map = {}  # field_name -> role_name
+        self.tag_categories = set(load_tag_categories())
         assert self.config is not None, "Metadata configuration failed to load"
         for tag_id, entry in self.config.items():
             if isinstance(entry, ID3FrameConfig):
@@ -131,30 +132,23 @@ class MetadataParser:
             if category:
                 tags_dict.setdefault(category, []).extend([str(v) for v in values])
 
-            # 4. Fallback: Create dynamic tags for unknown descriptor-based frames (e.g. TXXX:STATUS)
-            if not category and (not field_name or isinstance(entry, str)):
+            # 4. Fallback: promote unknown colon-frames to tags only if their descriptor
+            # is a registered category. Everything else goes to raw_tags.
+            # To add a new custom tag category, add it to tag_categories in id3_frames.json.
+            if not category and not field_name:
                 if ":" in tag_id:
-                    # Treat as a dynamic Tag: Category is the descriptor, values are the names
-                    prefix, desc = tag_id.split(":", 1)
-                    # Normalize category name (e.g. FESTIVAL -> Festival)
+                    _, desc = tag_id.split(":", 1)
                     cat_name = desc.capitalize()
-                    for i, v in enumerate(values):
-                        song_data["tags"].append(
-                            Tag(name=str(v), category=cat_name, is_primary=(i == 0))
-                        )
-                        if i == 0:
-                            primary_tag_categories.add(cat_name)
-                elif not field_name:
-                    # Genuine raw tag (no descriptor), keep in raw_tags
-                    entry_description = (
-                        entry.description if isinstance(entry, ID3FrameConfig) else None
-                    )
-                    if not entry_description and not tag_id:
-                        logger.error(
-                            f"[MetadataParser] CRITICAL: Unidentifiable tag found on song_id={song_data.get('id')}"
-                        )
-                        continue
-
+                    if cat_name in self.tag_categories:
+                        for i, v in enumerate(values):
+                            song_data["tags"].append(
+                                Tag(name=str(v), category=cat_name, is_primary=(i == 0))
+                            )
+                            if i == 0:
+                                primary_tag_categories.add(cat_name)
+                    else:
+                        song_data["raw_tags"][tag_id] = values
+                else:
                     label = (
                         entry.description
                         if isinstance(entry, ID3FrameConfig)

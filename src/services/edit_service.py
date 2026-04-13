@@ -1,6 +1,7 @@
 import os
 import re
 import sqlite3
+from src.services.metadata_frames_reader import register_tag_category, unregister_tag_category, load_tag_categories
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -485,6 +486,8 @@ class EditService:
         try:
             tag = self._tag_repo.add_tag(song_id, tag_name, category, conn, is_primary=is_primary)
             conn.commit()
+            if category not in load_tag_categories():
+                register_tag_category(category)
             self._sync_id3_if_enabled(song_id)
             return tag
         except Exception as e:
@@ -495,10 +498,22 @@ class EditService:
 
     def remove_song_tag(self, song_id: int, tag_id: int) -> None:
         """Remove a tag link from a song."""
+        existing = self._tag_repo.get_by_id(tag_id)
+        category = existing.category if existing else None
+
         conn = self._tag_repo.get_connection()
         try:
             self._tag_repo.remove_tag(song_id, tag_id, conn)
             conn.commit()
+            if category:
+                remaining = conn.execute(
+                    """SELECT COUNT(*) FROM MediaSourceTags st
+                       JOIN Tags t ON t.TagID = st.TagID
+                       WHERE t.TagCategory = ? AND t.IsDeleted = 0""",
+                    (category,)
+                ).fetchone()[0]
+                if remaining == 0:
+                    unregister_tag_category(category)
             self._sync_id3_if_enabled(song_id)
         except Exception as e:
             conn.rollback()
