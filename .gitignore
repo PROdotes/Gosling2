@@ -68,6 +68,7 @@ sqldb/
 # Application specific
 *.log
 settings.ini
+gosling2.exe
 
 .idea/workspace.xml
 tests/unit/tools/bin/ffmpeg.exe
