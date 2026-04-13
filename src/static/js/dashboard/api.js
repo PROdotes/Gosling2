@@ -394,6 +394,14 @@ export function updateTag(tagId, name, category) {
     });
 }
 
+export function deleteTag(tagId) {
+    return fetchVoid(`/api/v1/tags/${tagId}`, { method: "DELETE" });
+}
+
+export function bulkDeleteUnlinkedTags() {
+    return fetchJson("/api/v1/tags?unlinked=true", { method: "DELETE" });
+}
+
 export function addSongTag(songId, tagName, category, tagId = null) {
     const body =
         tagId !== null ? { tag_id: tagId } : { tag_name: tagName, category };

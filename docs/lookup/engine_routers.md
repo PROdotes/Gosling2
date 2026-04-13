@@ -122,6 +122,17 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Wraps `CatalogService.get_songs_by_tag`.
 - Returns `List[SongView]`.
 
+### async def delete_tag(tag_id: int) -> None
+**HTTP**: `DELETE /api/v1/tags/{tag_id}`
+- Soft-delete a single tag. 404 if not found, 403 if linked to active songs.
+- Wraps `CatalogService.get_tag` + `CatalogService.delete_unlinked_tags`.
+
+### async def bulk_delete_unlinked_tags(unlinked: bool = False) -> dict
+**HTTP**: `DELETE /api/v1/tags?unlinked=true`
+- Soft-delete all unlinked tags in one transaction. Requires `?unlinked=true` as a safety flag (400 without it).
+- Returns `{"deleted": N}`.
+- Wraps `CatalogService.get_all_tags` + `CatalogService.delete_unlinked_tags`.
+
 ### async def get_song_web_search(song_id: int, engine: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> dict
 **HTTP**: `GET /api/v1/songs/{song_id}/web-search`
 - Generates an external search URL for a song.

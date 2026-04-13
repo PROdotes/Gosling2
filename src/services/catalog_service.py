@@ -2214,6 +2214,33 @@ class CatalogService:
             conn.close()
         logger.debug("[CatalogService] <- update_tag OK")
 
+    def delete_unlinked_tags(self, tag_ids: List[int]) -> int:
+        """
+        Soft-delete tags from the given list that have zero active song links.
+        All deletes run in one transaction. Returns count of tags deleted.
+        Single delete: pass [tag_id] — returns 0 if linked or not found, 1 if deleted.
+        """
+        logger.debug(f"[CatalogService] -> delete_unlinked_tags(count={len(tag_ids)})")
+        if not tag_ids:
+            return 0
+
+        conn = self._tag_repo.get_connection()
+        try:
+            deleted = 0
+            for tag_id in tag_ids:
+                if not self._tag_repo.get_song_ids_by_tag(tag_id, conn):
+                    if self._tag_repo.soft_delete(tag_id, conn):
+                        deleted += 1
+            conn.commit()
+            logger.info(f"[CatalogService] <- delete_unlinked_tags() deleted={deleted}")
+            return deleted
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[CatalogService] <- delete_unlinked_tags FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+
     def set_primary_song_tag(self, song_id: int, tag_id: int) -> Tag:
         """Promote a specific tag to primary (Genre only)."""
         logger.debug(

@@ -1,6 +1,6 @@
 # Unlinked Entity Cleanup Feature
 
-**Status:** Phase 1 complete ✅ | Phase 2 pending
+**Status:** Phase 1 complete ✅ | Phase 2 in progress (Tags ✅ done, Albums/Publishers/Identities pending)
 **Deletion Strategy:** Soft delete (see [SOFT_DELETE_PIVOT.md](SOFT_DELETE_PIVOT.md))
 
 ## Overview

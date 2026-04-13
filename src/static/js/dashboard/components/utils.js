@@ -128,6 +128,7 @@ export function isModalOpen() {
         "spotify-modal",
         "splitter-modal",
         "filename-parser-modal",
+        "confirm-modal",
     ];
     return modals.some((id) => {
         const el = document.getElementById(id);

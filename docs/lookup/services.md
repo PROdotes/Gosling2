@@ -196,6 +196,9 @@ Remove a tag from a song.
 ### update_tag(tag_id: int, name: str, category: str) -> None
 Global tag update.
 
+### delete_unlinked_tags(tag_ids: List[int]) -> int
+Soft-delete tags from the given list that have zero active song links. All deletes run in one transaction. Returns count of tags deleted. For single delete pass `[tag_id]` — returns 0 if linked or not found, 1 if deleted.
+
 ### set_primary_song_tag(song_id: int, tag_id: int) -> Tag
 Promote a specific genre tag to primary status for a song. 
 - **Strictly for Genres**: Only tags with category 'Genre' (case-insensitive) are allowed.

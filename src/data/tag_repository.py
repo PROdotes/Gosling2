@@ -62,9 +62,18 @@ class TagRepository(BaseRepository):
         )
 
     def get_all(self, conn: Optional[sqlite3.Connection] = None) -> List[Tag]:
-        """Fetch all tags."""
+        """Fetch all tags with active song counts."""
         logger.debug("[TagRepository] -> get_all()")
-        query = "SELECT TagID, TagName, TagCategory FROM Tags WHERE IsDeleted = 0 ORDER BY TagName COLLATE NOCASE"
+        query = """
+            SELECT t.TagID, t.TagName, t.TagCategory,
+                   COUNT(ms.SourceID) AS SongCount
+            FROM Tags t
+            LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+            LEFT JOIN MediaSources ms ON mst.SourceID = ms.SourceID AND ms.IsDeleted = 0
+            WHERE t.IsDeleted = 0
+            GROUP BY t.TagID
+            ORDER BY t.TagName COLLATE NOCASE
+        """
 
         if conn:
             conn.row_factory = sqlite3.Row
@@ -88,10 +97,14 @@ class TagRepository(BaseRepository):
         """Search tags by name."""
         logger.debug(f"[TagRepository] -> search(q='{query}')")
         sql = """
-            SELECT TagID, TagName, TagCategory
-            FROM Tags
-            WHERE TagName LIKE ? COLLATE NOCASE AND IsDeleted = 0
-            ORDER BY TagName COLLATE NOCASE
+            SELECT t.TagID, t.TagName, t.TagCategory,
+                   COUNT(ms.SourceID) AS SongCount
+            FROM Tags t
+            LEFT JOIN MediaSourceTags mst ON t.TagID = mst.TagID
+            LEFT JOIN MediaSources ms ON mst.SourceID = ms.SourceID AND ms.IsDeleted = 0
+            WHERE t.TagName LIKE ? COLLATE NOCASE AND t.IsDeleted = 0
+            GROUP BY t.TagID
+            ORDER BY t.TagName COLLATE NOCASE
         """
 
         if conn:
@@ -145,9 +158,13 @@ class TagRepository(BaseRepository):
     def get_song_ids_by_tag(
         self, tag_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:
-        """Get all song IDs linked to this tag."""
+        """Get all active (non-deleted) song IDs linked to this tag."""
         logger.debug(f"[TagRepository] -> get_song_ids_by_tag(tag_id={tag_id})")
-        query = "SELECT SourceID FROM MediaSourceTags WHERE TagID = ?"
+        query = """
+            SELECT mst.SourceID FROM MediaSourceTags mst
+            JOIN MediaSources ms ON mst.SourceID = ms.SourceID
+            WHERE mst.TagID = ? AND ms.IsDeleted = 0
+        """
 
         if conn:
             rows = conn.execute(query, (tag_id,)).fetchall()
@@ -336,4 +353,5 @@ class TagRepository(BaseRepository):
             name=row["TagName"],
             category=row["TagCategory"],
             is_primary=bool(row["IsPrimary"]) if "IsPrimary" in row.keys() else False,
+            song_count=row["SongCount"] if "SongCount" in row.keys() else 0,
         )

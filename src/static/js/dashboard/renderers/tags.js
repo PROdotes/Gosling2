@@ -24,9 +24,17 @@ export function renderTags(ctx, tags) {
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = tags
-        .map(
-            (tag, index) => `
+    const unlinkedCount = tags.filter((t) => t.song_count === 0).length;
+    const bulkBtn =
+        unlinkedCount > 0
+            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-tags">Delete ${unlinkedCount} unlinked</button></div>`
+            : "";
+
+    ctx.elements.resultsContainer.innerHTML =
+        bulkBtn +
+        tags
+            .map(
+                (tag, index) => `
         <article class="result-card tag-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">TAG</div>
             <div class="card-body">
@@ -36,10 +44,13 @@ export function renderTags(ctx, tags) {
                 </div>
                 <div class="card-subtitle">${renderCategoryBadge(tag.category)}</div>
             </div>
+            <div class="card-meta">
+                ${tag.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${tag.song_count}</span>`}
+            </div>
         </article>
     `,
-        )
-        .join("");
+            )
+            .join("");
 }
 
 export function renderTagDetailLoading(ctx, tag) {
@@ -55,6 +66,8 @@ export function renderTagDetailLoading(ctx, tag) {
 }
 
 export function renderTagDetailComplete(ctx, tag, songs) {
+    const songCount = asArray(songs).length;
+    const isUnlinked = songCount === 0;
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(tag.name || "Unnamed Tag")} <span class="pill mono">#${escapeHtml(tag.id || "-")}</span></div>
@@ -70,8 +83,17 @@ export function renderTagDetailComplete(ctx, tag, songs) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Songs (${asArray(songs).length})</div>
+                <div class="section-title">Songs (${songCount})</div>
                 ${renderSongList(songs, "No songs linked to this tag")}
+            </div>
+
+            <div class="detail-section">
+                <button
+                    class="btn-danger"
+                    data-action="delete-tag"
+                    data-tag-id="${tag.id}"
+                    ${!isUnlinked ? 'disabled title="Cannot delete — tag is linked to songs"' : ""}
+                >Delete Tag</button>
             </div>
         </div>
     `);

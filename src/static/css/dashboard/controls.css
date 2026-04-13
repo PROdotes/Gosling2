@@ -104,3 +104,27 @@
     color: var(--accent);
     background: var(--accent-glow);
 }
+
+.btn-danger {
+    padding: 0.45rem 1rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.16s ease;
+}
+
+.btn-danger:hover {
+    background: var(--danger);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.btn-danger:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+}

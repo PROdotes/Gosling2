@@ -367,6 +367,30 @@ async def get_songs_by_tag(tag_id: int) -> List[SongView]:
     return [SongView.from_domain(s) for s in songs]
 
 
+@router.delete("/tags/{tag_id:int}", status_code=204)
+async def delete_tag(tag_id: int) -> None:
+    """Soft-delete a single tag. 404 if not found, 403 if linked to active songs."""
+    logger.debug(f"[CatalogRouter] delete_tag(id={tag_id})")
+    service = _get_service()
+    if not service.get_tag(tag_id):
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    deleted = service.delete_unlinked_tags([tag_id])
+    if deleted == 0:
+        raise HTTPException(status_code=403, detail=f"Tag {tag_id} is linked to active songs")
+
+
+@router.delete("/tags", response_model=dict)
+async def bulk_delete_unlinked_tags(unlinked: bool = False) -> dict:
+    """Soft-delete all unlinked tags. Requires ?unlinked=true as a safety flag."""
+    logger.debug(f"[CatalogRouter] bulk_delete_unlinked_tags(unlinked={unlinked})")
+    if not unlinked:
+        raise HTTPException(status_code=400, detail="Pass ?unlinked=true to confirm bulk delete")
+    service = _get_service()
+    all_tags = service.get_all_tags()
+    deleted = service.delete_unlinked_tags([t.id for t in all_tags if t.id is not None])
+    return {"deleted": deleted}
+
+
 @router.get("/songs/{song_id:int}/web-search")
 async def get_song_web_search(
     song_id: int,

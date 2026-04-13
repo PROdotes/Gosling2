@@ -379,6 +379,7 @@ class TagView(BaseModel):
     id: Optional[int] = None
     name: str
     category: Optional[str] = None
+    song_count: int = 0
 
 
 class PublisherView(BaseModel):

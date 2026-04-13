@@ -7,6 +7,7 @@ import * as api from "../api.js";
 import { openEditModal } from "../components/edit_modal.js";
 import { isModalOpen } from "../components/utils.js";
 import * as orch from "../orchestrator.js";
+import { showConfirm } from "../components/confirm_modal.js";
 
 export class NavigationHandler {
     constructor(ctx, elements, searchInput) {
@@ -20,6 +21,8 @@ export class NavigationHandler {
             "navigate-search",
             "open-edit-modal",
             "open-link-modal",
+            "delete-tag",
+            "bulk-delete-unlinked-tags",
         ]);
     }
 
@@ -387,5 +390,27 @@ export class NavigationHandler {
                     this.ctx.openSelectedResult?.(actualIndex);
             }
         });
+    }
+
+    async handleDeleteTag(actionTarget) {
+        const tagId = actionTarget.dataset.tagId;
+        if (!await showConfirm("Delete this tag? This cannot be undone.")) return;
+        try {
+            await api.deleteTag(tagId);
+            this.ctx.closeDetailPanel?.();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleBulkDeleteUnlinkedTags() {
+        if (!await showConfirm("Delete all unlinked tags? This cannot be undone.")) return;
+        try {
+            const result = await api.bulkDeleteUnlinkedTags();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
     }
 }

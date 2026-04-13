@@ -69,6 +69,7 @@ class Tag(DomainModel):
     name: str
     category: Optional[str] = None
     is_primary: bool = False
+    song_count: int = 0
 
 
 class SongAlbum(DomainModel):
