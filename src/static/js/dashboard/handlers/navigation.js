@@ -23,6 +23,12 @@ export class NavigationHandler {
             "open-link-modal",
             "delete-tag",
             "bulk-delete-unlinked-tags",
+            "delete-album",
+            "bulk-delete-unlinked-albums",
+            "delete-publisher",
+            "bulk-delete-unlinked-publishers",
+            "delete-identity",
+            "bulk-delete-unlinked-identities",
         ]);
     }
 
@@ -408,6 +414,72 @@ export class NavigationHandler {
         if (!await showConfirm("Delete all unlinked tags? This cannot be undone.")) return;
         try {
             const result = await api.bulkDeleteUnlinkedTags();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleDeleteAlbum(actionTarget) {
+        const albumId = actionTarget.dataset.albumId;
+        if (!await showConfirm("Delete this album? This cannot be undone.")) return;
+        try {
+            await api.deleteAlbum(albumId);
+            this.ctx.closeDetailPanel?.();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleBulkDeleteUnlinkedAlbums() {
+        if (!await showConfirm("Delete all unlinked albums? This cannot be undone.")) return;
+        try {
+            await api.bulkDeleteUnlinkedAlbums();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleDeletePublisher(actionTarget) {
+        const publisherId = actionTarget.dataset.publisherId;
+        if (!await showConfirm("Delete this publisher? This cannot be undone.")) return;
+        try {
+            await api.deletePublisher(publisherId);
+            this.ctx.closeDetailPanel?.();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleBulkDeleteUnlinkedPublishers() {
+        if (!await showConfirm("Delete all unlinked publishers? This cannot be undone.")) return;
+        try {
+            await api.bulkDeleteUnlinkedPublishers();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleDeleteIdentity(actionTarget) {
+        const identityId = actionTarget.dataset.identityId;
+        if (!await showConfirm("Delete this identity? This cannot be undone.")) return;
+        try {
+            await api.deleteIdentity(identityId);
+            this.ctx.closeDetailPanel?.();
+            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+        } catch (err) {
+            await showConfirm(`Delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
+        }
+    }
+
+    async handleBulkDeleteUnlinkedIdentities() {
+        if (!await showConfirm("Delete all unlinked identities? This cannot be undone.")) return;
+        try {
+            await api.bulkDeleteUnlinkedIdentities();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });

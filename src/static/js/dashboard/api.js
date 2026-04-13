@@ -402,6 +402,30 @@ export function bulkDeleteUnlinkedTags() {
     return fetchJson("/api/v1/tags?unlinked=true", { method: "DELETE" });
 }
 
+export function deleteAlbum(albumId) {
+    return fetchVoid(`/api/v1/albums/${albumId}`, { method: "DELETE" });
+}
+
+export function bulkDeleteUnlinkedAlbums() {
+    return fetchJson("/api/v1/albums?unlinked=true", { method: "DELETE" });
+}
+
+export function deletePublisher(publisherId) {
+    return fetchVoid(`/api/v1/publishers/${publisherId}`, { method: "DELETE" });
+}
+
+export function bulkDeleteUnlinkedPublishers() {
+    return fetchJson("/api/v1/publishers?unlinked=true", { method: "DELETE" });
+}
+
+export function deleteIdentity(identityId) {
+    return fetchVoid(`/api/v1/identities/${identityId}`, { method: "DELETE" });
+}
+
+export function bulkDeleteUnlinkedIdentities() {
+    return fetchJson("/api/v1/identities?unlinked=true", { method: "DELETE" });
+}
+
 export function addSongTag(songId, tagName, category, tagId = null) {
     const body =
         tagId !== null ? { tag_id: tagId } : { tag_name: tagName, category };

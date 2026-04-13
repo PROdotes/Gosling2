@@ -168,16 +168,26 @@ async def get_identity(identity_id: int) -> IdentityView:
 async def get_all_identities() -> List[IdentityView]:
     """Fetch a list of active artists/identities."""
     logger.debug("[CatalogRouter] get_all_identities()")
-    identities = _get_service().get_all_identities()
-    return [IdentityView.from_domain(i) for i in identities]
+    service = _get_service()
+    identities = service.get_all_identities()
+    counts = service.get_identity_song_counts([i.id for i in identities if i.id is not None])
+    views = [IdentityView.from_domain(i) for i in identities]
+    for v in views:
+        v.song_count = counts.get(v.id, 0)
+    return views
 
 
 @router.get("/identities/search", response_model=List[IdentityView])
 async def search_identities(q: str) -> List[IdentityView]:
     """Search for identities by name or alias."""
     logger.debug(f"[CatalogRouter] search_identities(q='{q}')")
-    identities = _get_service().search_identities(q)
-    return [IdentityView.from_domain(i) for i in identities]
+    service = _get_service()
+    identities = service.search_identities(q)
+    counts = service.get_identity_song_counts([i.id for i in identities if i.id is not None])
+    views = [IdentityView.from_domain(i) for i in identities]
+    for v in views:
+        v.song_count = counts.get(v.id, 0)
+    return views
 
 
 class AddAliasBody(BaseModel):
@@ -243,24 +253,60 @@ async def get_songs_by_identity(identity_id: int) -> List[SongView]:
     return [SongView.from_domain(s) for s in songs]
 
 
+@router.delete("/identities/{identity_id:int}", status_code=204)
+async def delete_identity(identity_id: int) -> None:
+    """Soft-delete a single identity. 404 if not found, 403 if linked to active songs or albums."""
+    logger.debug(f"[CatalogRouter] delete_identity(id={identity_id})")
+    service = _get_service()
+    if not service.get_identity(identity_id):
+        raise HTTPException(status_code=404, detail=f"Identity {identity_id} not found")
+    deleted = service.delete_unlinked_identities([identity_id])
+    if deleted == 0:
+        raise HTTPException(status_code=403, detail=f"Identity {identity_id} is linked to active songs or albums")
+
+
+@router.delete("/identities", response_model=dict)
+async def bulk_delete_unlinked_identities(unlinked: bool = False) -> dict:
+    """Soft-delete all unlinked identities. Requires ?unlinked=true as a safety flag."""
+    logger.debug(f"[CatalogRouter] bulk_delete_unlinked_identities(unlinked={unlinked})")
+    if not unlinked:
+        raise HTTPException(status_code=400, detail="Pass ?unlinked=true to confirm bulk delete")
+    service = _get_service()
+    all_identities = service.get_all_identities()
+    deleted = service.delete_unlinked_identities([i.id for i in all_identities if i.id is not None])
+    return {"deleted": deleted}
+
+
 @router.get("/publishers", response_model=List[PublisherView])
 async def get_all_publishers() -> List[PublisherView]:
     """Fetch a list of all active music publishers."""
     logger.debug("[CatalogRouter] get_all_publishers()")
-    return [
-        PublisherView.model_validate(p.model_dump())
-        for p in _get_service().get_all_publishers()
-    ]
+    service = _get_service()
+    publishers = service.get_all_publishers()
+    ids = [p.id for p in publishers if p.id is not None]
+    counts = service.get_publisher_link_counts(ids)
+    views = [PublisherView.model_validate(p.model_dump()) for p in publishers]
+    for v in views:
+        if v.id is not None:
+            v.song_count = counts.get(v.id, {}).get("song_count", 0)
+            v.album_count = counts.get(v.id, {}).get("album_count", 0)
+    return views
 
 
 @router.get("/publishers/search", response_model=List[PublisherView])
 async def search_publishers(q: str) -> List[PublisherView]:
     """Search for publishers by name."""
     logger.debug(f"[CatalogRouter] search_publishers(q='{q}')")
-    return [
-        PublisherView.model_validate(p.model_dump())
-        for p in _get_service().search_publishers(q)
-    ]
+    service = _get_service()
+    publishers = service.search_publishers(q)
+    ids = [p.id for p in publishers if p.id is not None]
+    counts = service.get_publisher_link_counts(ids)
+    views = [PublisherView.model_validate(p.model_dump()) for p in publishers]
+    for v in views:
+        if v.id is not None:
+            v.song_count = counts.get(v.id, {}).get("song_count", 0)
+            v.album_count = counts.get(v.id, {}).get("album_count", 0)
+    return views
 
 
 @router.get("/publishers/{publisher_id:int}", response_model=PublisherView)
@@ -287,6 +333,30 @@ async def get_songs_by_publisher(publisher_id: int) -> List[SongView]:
 
     songs = _get_service().get_songs_by_publisher(publisher_id)
     return [SongView.from_domain(s) for s in songs]
+
+
+@router.delete("/publishers/{publisher_id:int}", status_code=204)
+async def delete_publisher(publisher_id: int) -> None:
+    """Soft-delete a single publisher. 404 if not found, 403 if linked to active songs or albums."""
+    logger.debug(f"[CatalogRouter] delete_publisher(id={publisher_id})")
+    service = _get_service()
+    if not service.get_publisher(publisher_id):
+        raise HTTPException(status_code=404, detail=f"Publisher {publisher_id} not found")
+    deleted = service.delete_unlinked_publishers([publisher_id])
+    if deleted == 0:
+        raise HTTPException(status_code=403, detail=f"Publisher {publisher_id} is linked to active songs or albums")
+
+
+@router.delete("/publishers", response_model=dict)
+async def bulk_delete_unlinked_publishers(unlinked: bool = False) -> dict:
+    """Soft-delete all unlinked publishers. Requires ?unlinked=true as a safety flag."""
+    logger.debug(f"[CatalogRouter] bulk_delete_unlinked_publishers(unlinked={unlinked})")
+    if not unlinked:
+        raise HTTPException(status_code=400, detail="Pass ?unlinked=true to confirm bulk delete")
+    service = _get_service()
+    all_publishers = service.get_all_publishers()
+    deleted = service.delete_unlinked_publishers([p.id for p in all_publishers if p.id is not None])
+    return {"deleted": deleted}
 
 
 @router.get("/albums", response_model=List[AlbumSlimView])
@@ -316,6 +386,30 @@ async def get_album(album_id: int) -> AlbumView:
 
     # Satisfaction for Pyright: proven non-None by raising above
     return AlbumView.from_domain(album)
+
+
+@router.delete("/albums/{album_id:int}", status_code=204)
+async def delete_album(album_id: int) -> None:
+    """Soft-delete a single album. 404 if not found, 403 if linked to active songs."""
+    logger.debug(f"[CatalogRouter] delete_album(id={album_id})")
+    service = _get_service()
+    if not service.get_album(album_id):
+        raise HTTPException(status_code=404, detail=f"Album {album_id} not found")
+    deleted = service.delete_unlinked_albums([album_id])
+    if deleted == 0:
+        raise HTTPException(status_code=403, detail=f"Album {album_id} is linked to active songs")
+
+
+@router.delete("/albums", response_model=dict)
+async def bulk_delete_unlinked_albums(unlinked: bool = False) -> dict:
+    """Soft-delete all unlinked albums. Requires ?unlinked=true as a safety flag."""
+    logger.debug(f"[CatalogRouter] bulk_delete_unlinked_albums(unlinked={unlinked})")
+    if not unlinked:
+        raise HTTPException(status_code=400, detail="Pass ?unlinked=true to confirm bulk delete")
+    service = _get_service()
+    all_albums = service.get_all_albums()
+    deleted = service.delete_unlinked_albums([a.id for a in all_albums if a.id is not None])
+    return {"deleted": deleted}
 
 
 @router.get("/tags", response_model=List[TagView])

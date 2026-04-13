@@ -389,6 +389,8 @@ class PublisherView(BaseModel):
     name: str
     parent_name: Optional[str] = None
     sub_publishers: List["PublisherView"] = []
+    song_count: int = 0
+    album_count: int = 0
 
 
 class IdentityView(BaseModel):
@@ -401,6 +403,7 @@ class IdentityView(BaseModel):
     display_name: Optional[str] = None
     legal_name: Optional[str] = None
     aliases: List[ArtistName] = []  # Can reuse domain model here as it's simple
+    song_count: int = 0
 
     # Recursive connections
     members: List["IdentityView"] = []

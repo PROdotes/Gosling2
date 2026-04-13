@@ -37,9 +37,19 @@ export function renderPublishers(ctx, publishers) {
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = publishers
-        .map(
-            (publisher, index) => `
+    const unlinkedCount = publishers.filter(
+        (p) => p.song_count === 0 && p.album_count === 0,
+    ).length;
+    const bulkBtn =
+        unlinkedCount > 0
+            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-publishers">Delete ${unlinkedCount} unlinked</button></div>`
+            : "";
+
+    ctx.elements.resultsContainer.innerHTML =
+        bulkBtn +
+        publishers
+            .map(
+                (publisher, index) => `
         <article class="result-card publisher-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">PUB</div>
             <div class="card-body">
@@ -49,10 +59,13 @@ export function renderPublishers(ctx, publishers) {
                 </div>
                 <div class="card-subtitle">${escapeHtml(publisher.parent_name || "Independent / top level")}</div>
             </div>
+            <div class="card-meta">
+                ${publisher.song_count === 0 && publisher.album_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${publisher.song_count} song${publisher.song_count === 1 ? "" : "s"} · ${publisher.album_count} album${publisher.album_count === 1 ? "" : "s"}</span>`}
+            </div>
         </article>
     `,
-        )
-        .join("");
+            )
+            .join("");
 }
 
 export function renderPublisherDetailLoading(ctx, publisher) {
@@ -68,6 +81,7 @@ export function renderPublisherDetailLoading(ctx, publisher) {
 }
 
 export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
+    const isUnlinked = publisher.song_count === 0 && publisher.album_count === 0;
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>
@@ -90,6 +104,15 @@ export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
             <div class="detail-section">
                 <div class="section-title">Repertoire (${asArray(repertoire).length})</div>
                 ${renderSongList(repertoire, "No songs explicitly linked as master")}
+            </div>
+
+            <div class="detail-section">
+                <button
+                    class="btn-danger"
+                    data-action="delete-publisher"
+                    data-publisher-id="${publisher.id}"
+                    ${!isUnlinked ? 'disabled title="Cannot delete — publisher is linked to songs or albums"' : ""}
+                >Delete Publisher</button>
             </div>
         </div>
     `);

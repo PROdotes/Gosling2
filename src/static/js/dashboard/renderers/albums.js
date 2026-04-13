@@ -85,19 +85,26 @@ export function renderAlbums(ctx, albums) {
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = albums
+    const unlinkedCount = albums.filter((a) => a.song_count === 0).length;
+    const bulkBtn =
+        unlinkedCount > 0
+            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-albums">Delete ${unlinkedCount} unlinked</button></div>`
+            : "";
+
+    ctx.elements.resultsContainer.innerHTML =
+        bulkBtn +
+        albums
         .map(
             (album, index) => `
         <article class="result-card album-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">LP</div>
             <div class="card-body">
                 <div class="card-title">${escapeHtml(album.title || "Untitled Album")}</div>
-                <div class="card-subtitle">${escapeHtml(album.display_artist || "Unknown Artist")}</div>
+                <div class="card-subtitle">${escapeHtml(album.display_artist || "Unknown Artist")}${album.album_type ? ` · ${escapeHtml(album.album_type)}` : ""}</div>
             </div>
             <div class="card-meta">
-                ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : ""}
                 <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
-                ${album.song_count ? `<span class="pill mono">${escapeHtml(album.song_count)} track${album.song_count === 1 ? "" : "s"}</span>` : ""}
+                ${album.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count} track${album.song_count === 1 ? "" : "s"}</span>`}
                 ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
             </div>
             <div class="card-actions">
@@ -126,6 +133,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
     const songs = asArray(album.songs);
     const publishers = asArray(album.publishers);
     const albumId = album.id;
+    const isUnlinked = songs.length === 0;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -171,6 +179,15 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
             <div class="detail-section">
                 <div class="section-title">Lifecycle & History</div>
                 ${renderAuditTimeline(auditHistory)}
+            </div>
+
+            <div class="detail-section">
+                <button
+                    class="btn-danger"
+                    data-action="delete-album"
+                    data-album-id="${albumId}"
+                    ${!isUnlinked ? 'disabled title="Cannot delete — album has songs"' : ""}
+                >Delete Album</button>
             </div>
         </div>
     `);

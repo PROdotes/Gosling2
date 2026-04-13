@@ -110,7 +110,13 @@ class AlbumRepository(BaseRepository):
             f"[AlbumRepository] -> get_song_ids_for_albums(count={len(album_ids)})"
         )
         placeholders = ",".join(["?"] * len(album_ids))
-        query = f"SELECT AlbumID, SourceID FROM SongAlbums WHERE AlbumID IN ({placeholders}) ORDER BY DiscNumber, TrackNumber, SourceID"
+        query = f"""
+            SELECT sa.AlbumID, sa.SourceID
+            FROM SongAlbums sa
+            JOIN MediaSources ms ON sa.SourceID = ms.SourceID
+            WHERE sa.AlbumID IN ({placeholders}) AND ms.IsDeleted = 0
+            ORDER BY sa.DiscNumber, sa.TrackNumber, sa.SourceID
+        """
 
         results: Dict[int, List[int]] = {}
         if conn:
@@ -189,6 +195,25 @@ class AlbumRepository(BaseRepository):
             (*valid.values(), album_id),
         )
         logger.debug("[AlbumRepository] <- update_album() done")
+
+    def soft_delete(self, album_id: int, conn: sqlite3.Connection) -> bool:
+        """Set IsDeleted = 1 for an album. Returns True if a record was updated."""
+        logger.debug(f"[AlbumRepository] -> soft_delete(id={album_id})")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Albums SET IsDeleted = 1 WHERE AlbumID = ? AND IsDeleted = 0",
+            (album_id,),
+        )
+        updated = cursor.rowcount > 0
+        logger.debug(f"[AlbumRepository] <- soft_delete(id={album_id}) updated={updated}")
+        return updated
+
+    def delete_album_links(self, album_id: int, conn: sqlite3.Connection) -> None:
+        """Hard-delete AlbumCredits and AlbumPublishers rows for this album. Does NOT commit."""
+        logger.debug(f"[AlbumRepository] -> delete_album_links(id={album_id})")
+        conn.execute("DELETE FROM AlbumCredits WHERE AlbumID = ?", (album_id,))
+        conn.execute("DELETE FROM AlbumPublishers WHERE AlbumID = ?", (album_id,))
+        logger.debug(f"[AlbumRepository] <- delete_album_links(id={album_id}) done")
 
     def _row_to_album(self, row: Mapping[str, Any]) -> Album:
         return Album(

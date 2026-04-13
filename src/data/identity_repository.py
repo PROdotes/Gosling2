@@ -596,6 +596,94 @@ class IdentityRepository(BaseRepository):
             logger.debug("[IdentityRepository] <- find_identity_by_name() NOT_FOUND")
             return None
 
+    def get_song_counts_batch(
+        self, identity_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, int]:
+        """Batch-fetch active song counts for a list of identities (across all aliases).
+        Returns {identity_id: song_count}."""
+        if not identity_ids:
+            return {}
+        placeholders = ",".join(["?" for _ in identity_ids])
+        query = f"""
+            SELECT an.OwnerIdentityID, COUNT(DISTINCT sc.SourceID)
+            FROM ArtistNames an
+            JOIN SongCredits sc ON sc.CreditedNameID = an.NameID
+            JOIN MediaSources ms ON sc.SourceID = ms.SourceID
+            WHERE an.OwnerIdentityID IN ({placeholders}) AND ms.IsDeleted = 0 AND an.IsDeleted = 0
+            GROUP BY an.OwnerIdentityID
+        """
+        result: Dict[int, int] = {iid: 0 for iid in identity_ids}
+
+        def _run(conn_: sqlite3.Connection) -> None:
+            for iid, count in conn_.execute(query, identity_ids).fetchall():
+                result[iid] = count
+
+        if conn:
+            _run(conn)
+            return result
+        with self._get_connection() as new_conn:
+            _run(new_conn)
+            return result
+
+    def soft_delete(self, identity_id: int, conn: sqlite3.Connection) -> bool:
+        """Soft-delete an Identity and all its ArtistNames. Returns True if the Identity row was updated."""
+        logger.debug(f"[IdentityRepository] -> soft_delete(id={identity_id})")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Identities SET IsDeleted = 1 WHERE IdentityID = ? AND IsDeleted = 0",
+            (identity_id,),
+        )
+        updated = cursor.rowcount > 0
+        if updated:
+            cursor.execute(
+                "UPDATE ArtistNames SET IsDeleted = 1 WHERE OwnerIdentityID = ? AND IsDeleted = 0",
+                (identity_id,),
+            )
+        logger.debug(f"[IdentityRepository] <- soft_delete(id={identity_id}) updated={updated}")
+        return updated
+
+    def get_song_ids_by_identity(
+        self, identity_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
+        """Active songs credited to ANY alias of this identity."""
+        logger.debug(f"[IdentityRepository] -> get_song_ids_by_identity(id={identity_id})")
+        query = """
+            SELECT DISTINCT sc.SourceID FROM SongCredits sc
+            JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
+            JOIN MediaSources ms ON sc.SourceID = ms.SourceID
+            WHERE an.OwnerIdentityID = ? AND ms.IsDeleted = 0
+        """
+        if conn:
+            rows = conn.execute(query, (identity_id,)).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, (identity_id,)).fetchall()
+            result = [row[0] for row in rows]
+            logger.debug(f"[IdentityRepository] <- get_song_ids_by_identity() count={len(result)}")
+            return result
+
+    def get_album_ids_by_identity(
+        self, identity_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
+        """Active albums credited to ANY alias of this identity."""
+        logger.debug(f"[IdentityRepository] -> get_album_ids_by_identity(id={identity_id})")
+        query = """
+            SELECT DISTINCT ac.AlbumID FROM AlbumCredits ac
+            JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
+            JOIN Albums a ON ac.AlbumID = a.AlbumID
+            WHERE an.OwnerIdentityID = ? AND a.IsDeleted = 0
+        """
+        if conn:
+            rows = conn.execute(query, (identity_id,)).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, (identity_id,)).fetchall()
+            result = [row[0] for row in rows]
+            logger.debug(f"[IdentityRepository] <- get_album_ids_by_identity() count={len(result)}")
+            return result
+
     def _row_to_identity(self, row: Mapping[str, Any]) -> Identity:
         return Identity(
             id=row["IdentityID"],

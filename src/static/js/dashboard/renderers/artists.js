@@ -59,9 +59,17 @@ export function renderArtists(ctx, artists) {
         return;
     }
 
-    ctx.elements.resultsContainer.innerHTML = artists
-        .map(
-            (artist, index) => `
+    const unlinkedCount = artists.filter((a) => a.song_count === 0).length;
+    const bulkBtn =
+        unlinkedCount > 0
+            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-identities">Delete ${unlinkedCount} unlinked</button></div>`
+            : "";
+
+    ctx.elements.resultsContainer.innerHTML =
+        bulkBtn +
+        artists
+            .map(
+                (artist, index) => `
         <article class="result-card artist-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">ID</div>
             <div class="card-body">
@@ -70,11 +78,12 @@ export function renderArtists(ctx, artists) {
             </div>
             <div class="card-meta">
                 <span class="pill artist-badge">${escapeHtml(artist.type || "identity")}</span>
+                ${artist.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
             </div>
         </article>
     `,
-        )
-        .join("");
+            )
+            .join("");
 }
 
 export function renderArtistDetailLoading(ctx, artist) {
@@ -94,6 +103,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
     const members = renderIdentityTags(tree.members);
     const groups = renderIdentityTags(tree.groups);
     const catalogHtml = renderSongList(songs, "No songs mapped yet");
+    const isUnlinked = asArray(songs).length === 0;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -113,6 +123,15 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
             <div class="detail-section">
                 <div class="section-title">Lifecycle & History</div>
                 ${renderAuditTimeline(auditHistory)}
+            </div>
+
+            <div class="detail-section">
+                <button
+                    class="btn-danger"
+                    data-action="delete-identity"
+                    data-identity-id="${tree.id}"
+                    ${!isUnlinked ? 'disabled title="Cannot delete — identity is linked to songs or albums"' : ""}
+                >Delete Identity</button>
             </div>
         </div>
     `);

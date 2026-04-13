@@ -296,11 +296,15 @@ class PublisherRepository(BaseRepository):
     def get_song_ids_by_publisher(
         self, publisher_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:
-        """Find all song IDs explicitly linked to this publisher (Master)."""
+        """Find all active song IDs explicitly linked to this publisher (Master)."""
         logger.debug(
             f"[PublisherRepository] -> get_song_ids_by_publisher(id={publisher_id})"
         )
-        query = "SELECT SourceID FROM RecordingPublishers WHERE PublisherID = ?"
+        query = """
+            SELECT rp.SourceID FROM RecordingPublishers rp
+            JOIN MediaSources ms ON rp.SourceID = ms.SourceID
+            WHERE rp.PublisherID = ? AND ms.IsDeleted = 0
+        """
 
         if conn:
             rows = conn.execute(query, (publisher_id,)).fetchall()
@@ -313,6 +317,80 @@ class PublisherRepository(BaseRepository):
                 f"[PublisherRepository] <- get_song_ids_by_publisher() count={len(result)}"
             )
             return result
+
+    def get_album_ids_by_publisher(
+        self, publisher_id: int, conn: Optional[sqlite3.Connection] = None
+    ) -> List[int]:
+        """Find all active album IDs explicitly linked to this publisher."""
+        logger.debug(
+            f"[PublisherRepository] -> get_album_ids_by_publisher(id={publisher_id})"
+        )
+        query = """
+            SELECT ap.AlbumID FROM AlbumPublishers ap
+            JOIN Albums a ON ap.AlbumID = a.AlbumID
+            WHERE ap.PublisherID = ? AND a.IsDeleted = 0
+        """
+
+        if conn:
+            rows = conn.execute(query, (publisher_id,)).fetchall()
+            return [row[0] for row in rows]
+
+        with self._get_connection() as new_conn:
+            rows = new_conn.execute(query, (publisher_id,)).fetchall()
+            result = [row[0] for row in rows]
+            logger.debug(
+                f"[PublisherRepository] <- get_album_ids_by_publisher() count={len(result)}"
+            )
+            return result
+
+    def get_link_counts_batch(
+        self, publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None
+    ) -> Dict[int, Dict[str, int]]:
+        """Batch-fetch active song and album counts for a list of publishers.
+        Returns {publisher_id: {"song_count": N, "album_count": N}}."""
+        if not publisher_ids:
+            return {}
+        placeholders = ",".join(["?" for _ in publisher_ids])
+        song_query = f"""
+            SELECT rp.PublisherID, COUNT(*) FROM RecordingPublishers rp
+            JOIN MediaSources ms ON rp.SourceID = ms.SourceID
+            WHERE rp.PublisherID IN ({placeholders}) AND ms.IsDeleted = 0
+            GROUP BY rp.PublisherID
+        """
+        album_query = f"""
+            SELECT ap.PublisherID, COUNT(*) FROM AlbumPublishers ap
+            JOIN Albums a ON ap.AlbumID = a.AlbumID
+            WHERE ap.PublisherID IN ({placeholders}) AND a.IsDeleted = 0
+            GROUP BY ap.PublisherID
+        """
+        result: Dict[int, Dict[str, int]] = {
+            pid: {"song_count": 0, "album_count": 0} for pid in publisher_ids
+        }
+
+        def _run(conn_: sqlite3.Connection) -> None:
+            for pid, count in conn_.execute(song_query, publisher_ids).fetchall():
+                result[pid]["song_count"] = count
+            for pid, count in conn_.execute(album_query, publisher_ids).fetchall():
+                result[pid]["album_count"] = count
+
+        if conn:
+            _run(conn)
+            return result
+        with self._get_connection() as new_conn:
+            _run(new_conn)
+            return result
+
+    def soft_delete(self, publisher_id: int, conn: sqlite3.Connection) -> bool:
+        """Set IsDeleted = 1 for a publisher. Returns True if a record was updated."""
+        logger.debug(f"[PublisherRepository] -> soft_delete(id={publisher_id})")
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE Publishers SET IsDeleted = 1 WHERE PublisherID = ? AND IsDeleted = 0",
+            (publisher_id,),
+        )
+        updated = cursor.rowcount > 0
+        logger.debug(f"[PublisherRepository] <- soft_delete(id={publisher_id}) updated={updated}")
+        return updated
 
     def get_song_ids_by_publisher_batch(
         self, publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None
