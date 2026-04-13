@@ -45,7 +45,7 @@ class TestCatalogIngestionConflicts:
 
         # 3. Execution
         with patch(
-            "src.services.catalog_service.calculate_audio_hash", return_value="hash_1"
+            "src.services.ingestion_service.calculate_audio_hash", return_value="hash_1"
         ):
             with pytest.raises(ReingestionConflictError) as exc_info:
                 service.ingest_file(staged_path)
@@ -105,7 +105,7 @@ class TestCatalogIngestionConflicts:
         from unittest.mock import patch
 
         with patch(
-            "src.services.catalog_service.calculate_audio_hash", return_value="hash_1"
+            "src.services.ingestion_service.calculate_audio_hash", return_value="hash_1"
         ):
             with pytest.raises(ReingestionConflictError) as exc_info:
                 service.ingest_file(new_staged_path)

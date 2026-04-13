@@ -397,7 +397,7 @@ class TestFinalizeWavConversionGhostReactivation:
 
         # Patch hash so the "converted MP3" appears to match the ghost
         monkeypatch.setattr(
-            "src.services.catalog_service.calculate_audio_hash",
+            "src.services.ingestion_service.calculate_audio_hash",
             lambda path: "FAKE_GHOST_HASH",
         )
 
@@ -432,7 +432,7 @@ class TestFinalizeWavConversionGhostReactivation:
         conn.close()
 
         monkeypatch.setattr(
-            "src.services.catalog_service.calculate_audio_hash",
+            "src.services.ingestion_service.calculate_audio_hash",
             lambda path: "FAKE_GHOST_HASH",
         )
 
@@ -470,7 +470,7 @@ class TestFinalizeWavConversionGhostReactivation:
         conn.close()
 
         monkeypatch.setattr(
-            "src.services.catalog_service.calculate_audio_hash",
+            "src.services.ingestion_service.calculate_audio_hash",
             lambda path: "FAKE_GHOST_HASH",
         )
 

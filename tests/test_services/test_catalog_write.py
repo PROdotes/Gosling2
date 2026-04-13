@@ -178,7 +178,7 @@ class TestCatalogServiceIngestFile:
         service = CatalogService(populated_db)
         # Mock calculate_audio_hash to return Song 1's hash "hash_1"
         monkeypatch.setattr(
-            "src.services.catalog_service.calculate_audio_hash", lambda x: "hash_1"
+            "src.services.ingestion_service.calculate_audio_hash", lambda x: "hash_1"
         )
 
         report = service.ingest_file(test_mp3)
