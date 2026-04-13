@@ -1,6 +1,9 @@
 {
     "tag_categories": [
-        "Festival"
+        "Category",
+        "Festival",
+        "Genre",
+        "Type"
     ],
     "Status": {
         "icon": "­ƒÅü",

@@ -92,9 +92,8 @@ class TestCatalogWriteApi:
             song["isrc"] == "USCGJ2326543"
         ), f"Expected ISRC USCGJ2326543, got {song['isrc']}"
         assert song["notes"] is None, f"Expected notes None, got {song['notes']}"
-        assert (
-            song["raw_tags"] == {}
-        ), f"Expected empty raw_tags, got {song['raw_tags']}"
+        # raw_tags may contain unrecognized frames (e.g. UFID from promo services) — that's expected
+        assert isinstance(song["raw_tags"], dict), f"Expected raw_tags to be a dict, got {type(song['raw_tags'])}"
 
         # Verification of relations
         assert (
@@ -123,12 +122,10 @@ class TestCatalogWriteApi:
         assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
         assert song["albums"][0]["album_title"] == "Mayor of Crazy Town"
 
-        # Tags (Genre: Folk and raw iPluggers tag)
-        assert len(song["tags"]) == 2, f"Expected 2 tags, got {len(song['tags'])}"
-        # Dynamic tags from Step 4 go first in the current parser implementation
-        assert song["tags"][0]["category"] == "Ipluggers"
-        assert song["tags"][1]["name"] == "Folk"
-        assert song["tags"][1]["category"] == "Genre"
+        # Tags (Genre: Folk only — UFID:iPluggers is unrecognized and goes to raw_tags)
+        assert len(song["tags"]) == 1, f"Expected 1 tag, got {len(song['tags'])}"
+        assert song["tags"][0]["name"] == "Folk"
+        assert song["tags"][0]["category"] == "Genre"
 
     def test_upload_rejected_extension(self, api_client, tmp_path):
         """POST /upload: Reject non-MP3 files with 400."""

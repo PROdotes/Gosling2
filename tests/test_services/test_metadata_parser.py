@@ -233,11 +233,12 @@ class TestParse:
             ), f"Expected empty sub_publishers, got {pub.sub_publishers}"
 
     def test_dynamic_tags(self, parser):
-        """parse() must turn unknown TXXX:Descriptor frames into dynamic Tags and keep UNKNOWN as raw_tags."""
+        """parse() must promote TXXX:Descriptor to tags only if the category is registered.
+        Unregistered descriptors and non-colon unknowns go to raw_tags."""
         raw = {
-            "TXXX:Festival": ["Dora"],
-            "TXXX:Dog": ["Labrador"],
-            "UNKNOWN": ["Some Value"],
+            "TXXX:Festival": ["Dora"],   # registered category -> tag
+            "TXXX:Dog": ["Labrador"],    # unregistered -> raw_tags
+            "UNKNOWN": ["Some Value"],   # no colon, no field -> raw_tags
         }
         song = parser.parse(raw, "fake/path.mp3")
 
@@ -248,14 +249,10 @@ class TestParse:
         assert (
             festivals[0].name == "Dora"
         ), f"Expected festival name='Dora', got '{festivals[0].name}'"
-        assert len(dogs) == 1, f"Expected 1 Dog tag, got {len(dogs)}"
-        assert (
-            dogs[0].name == "Labrador"
-        ), f"Expected dog name='Labrador', got '{dogs[0].name}'"
+        assert len(dogs) == 0, f"Expected 0 Dog tags (unregistered category), got {len(dogs)}"
 
-        assert song.raw_tags == {
-            "UNKNOWN": ["Some Value"]
-        }, f"Expected raw_tags={{'UNKNOWN': ['Some Value']}}, got {song.raw_tags}"
+        assert "TXXX:Dog" in song.raw_tags, f"Expected TXXX:Dog in raw_tags, got {list(song.raw_tags.keys())}"
+        assert "UNKNOWN" in song.raw_tags, f"Expected UNKNOWN in raw_tags, got {list(song.raw_tags.keys())}"
 
     def test_empty_fields_strict(self, parser):
         """parse() with empty metadata must fall back to filename stem and SONG_DEFAULT_YEAR."""
@@ -288,16 +285,15 @@ class TestParse:
         ), f"Expected year={SONG_DEFAULT_YEAR}, got {song.year}"
 
     def test_no_txxx_config_borrowing(self, parser):
-        """parse() must treat TXXX:DESCRIPTOR as dynamic Tag, not borrow base TXXX config."""
+        """parse() must not borrow the base TXXX config for unknown descriptors.
+        Unregistered TXXX:DESCRIPTOR frames go to raw_tags, not tags."""
         raw = {"TXXX:Pure": ["Strict"]}
         song = parser.parse(raw, "fake/path.mp3")
 
         pures = [t for t in song.tags if t.category == "Pure"]
-        assert len(pures) == 1, f"Expected 1 Pure tag, got {len(pures)}"
-        assert (
-            pures[0].name == "Strict"
-        ), f"Expected Pure tag name='Strict', got '{pures[0].name}'"
+        assert len(pures) == 0, f"Expected 0 Pure tags (unregistered category), got {len(pures)}"
 
+        assert "TXXX:Pure" in song.raw_tags, f"Expected TXXX:Pure in raw_tags, got {list(song.raw_tags.keys())}"
         assert (
             "User defined text information frame" not in song.raw_tags
         ), f"Expected 'User defined text information frame' absent from raw_tags, got keys {list(song.raw_tags.keys())}"

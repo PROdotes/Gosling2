@@ -601,6 +601,15 @@ Collapses tokens into resolved name strings.
 ### load_id3_frames(path: str = "json/id3_frames.json") -> ID3FrameMapping
 The single source of truth for ID3 frame mapping.
 
+### load_tag_categories(path: str = "json/id3_frames.json") -> List[str]
+Returns the live registry of known user-defined tag categories from `id3_frames.json`.
+
+### register_tag_category(category: str, path: str = "json/id3_frames.json") -> None
+Adds a category to the registry if not already present. Clears the lru_cache.
+
+### unregister_tag_category(category: str, path: str = "json/id3_frames.json") -> None
+Removes a category from the registry. Clears the lru_cache.
+
 ---
 
 ## Logger
