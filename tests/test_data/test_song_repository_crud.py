@@ -137,3 +137,66 @@ class TestUpdateScalars:
         assert (
             after_song2.bpm == before_song2.bpm
         ), f"Song 2 bpm should not change, got {after_song2.bpm}"
+
+
+# ---------------------------------------------------------------------------
+# SongRepository.get_by_processing_status
+# ---------------------------------------------------------------------------
+
+
+class TestGetByProcessingStatus:
+    """Group 1: new repo method for WAV ingest (status=3 = Converting)."""
+
+    def test_returns_song_with_matching_status(self, populated_db):
+        """A song manually set to status=3 is returned."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        repo = SongRepository(populated_db)
+        results = repo.get_by_processing_status(3)
+        ids = [s.id for s in results]
+        assert 1 in ids, f"Expected song 1 in status=3 results, got ids={ids}"
+
+    def test_returns_empty_when_no_match(self, populated_db):
+        """No songs with status=3 → returns empty list."""
+        repo = SongRepository(populated_db)
+        # populated_db songs are all status 1/2 by default — no status=3
+        results = repo.get_by_processing_status(3)
+        assert results == [], f"Expected [], got {results}"
+
+    def test_soft_deleted_song_is_excluded(self, populated_db):
+        """A soft-deleted song with status=3 must NOT appear in results."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET ProcessingStatus = 3, IsDeleted = 1 WHERE SourceID = 2"
+        )
+        conn.commit()
+        conn.close()
+
+        repo = SongRepository(populated_db)
+        results = repo.get_by_processing_status(3)
+        ids = [s.id for s in results]
+        assert (
+            2 not in ids
+        ), f"Soft-deleted song 2 should not appear in status=3 results, got ids={ids}"
+
+    def test_returns_all_matching_songs(self, populated_db):
+        """All non-deleted songs with matching status are returned, not just the first."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID IN (1, 2)")
+        conn.commit()
+        conn.close()
+
+        repo = SongRepository(populated_db)
+        results = repo.get_by_processing_status(3)
+        ids = [s.id for s in results]
+        assert 1 in ids, f"Expected song 1 in results, got {ids}"
+        assert 2 in ids, f"Expected song 2 in results, got {ids}"

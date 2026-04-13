@@ -375,3 +375,125 @@ class TestScanFolderApi:
         assert (
             data["total_files"] == 2
         ), f"Expected 2 files (recursive), got {data['total_files']}"
+
+
+# ========================================
+# PENDING CONVERT TESTS
+# ========================================
+
+
+class TestPendingConvertApi:
+    """Group 4: GET /api/v1/ingest/pending-convert."""
+
+    def test_empty_db_returns_empty_list(self, client):
+        """No status=3 songs → 200 with empty list."""
+        resp = client.get("/api/v1/ingest/pending-convert")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert isinstance(data, list), f"Expected list, got {type(data)}"
+        # populated_db has no status=3 songs by default
+        wav_items = [item for item in data if item.get("status") == "PENDING_CONVERT"]
+        assert wav_items == [], f"Expected no PENDING_CONVERT items, got {wav_items}"
+
+    def test_status3_song_appears_in_results(self, client, populated_db):
+        """A song manually set to status=3 must appear in the results."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.get("/api/v1/ingest/pending-convert")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert isinstance(data, list), f"Expected list, got {type(data)}"
+        assert len(data) >= 1, f"Expected at least one item for status=3 song, got {data}"
+
+    def test_each_item_has_pending_convert_status(self, client, populated_db):
+        """Every item returned must have status='PENDING_CONVERT'."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.get("/api/v1/ingest/pending-convert")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        for item in data:
+            assert item.get("status") == "PENDING_CONVERT", (
+                f"Expected status='PENDING_CONVERT', got '{item.get('status')}'"
+            )
+
+    def test_each_item_has_required_shape(self, client, populated_db):
+        """Each result item must have status, staged_path, and song keys."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
+        conn.commit()
+        conn.close()
+
+        resp = client.get("/api/v1/ingest/pending-convert")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        assert len(data) >= 1, "Need at least one item to check shape"
+        for item in data:
+            assert "status" in item, f"Missing 'status' key in item: {item}"
+            assert "staged_path" in item, f"Missing 'staged_path' key in item: {item}"
+            assert "song" in item, f"Missing 'song' key in item: {item}"
+
+    def test_soft_deleted_status3_song_excluded(self, client, populated_db):
+        """A soft-deleted song with status=3 must NOT appear in pending-convert results."""
+        import sqlite3
+
+        conn = sqlite3.connect(populated_db)
+        conn.execute(
+            "UPDATE MediaSources SET ProcessingStatus = 3, IsDeleted = 1 WHERE SourceID = 1"
+        )
+        conn.commit()
+        conn.close()
+
+        resp = client.get("/api/v1/ingest/pending-convert")
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = resp.json()
+        song_ids = [item["song"]["id"] for item in data if item.get("song")]
+        assert 1 not in song_ids, (
+            f"Soft-deleted song 1 should not appear in pending-convert, got ids={song_ids}"
+        )
+
+
+# ========================================
+# CONVERT WAV TESTS
+# ========================================
+
+
+class TestConvertWavApi:
+    """Group 5: POST /api/v1/ingest/convert-wav — no-DB-record error case."""
+
+    def test_staged_path_not_in_db_returns_error(self, client, tmp_path):
+        """A staged_path with no DB record must return status=ERROR with a clear message."""
+        # Create a real WAV file so the router doesn't fail on file I/O before the DB check
+        import wave
+
+        wav_path = tmp_path / "phantom.wav"
+        with wave.open(str(wav_path), "w") as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(44100)
+            f.writeframes(b"\x00\x00" * 4410)
+
+        resp = client.post(
+            f"/api/v1/ingest/convert-wav?staged_path={wav_path}"
+        )
+        assert resp.status_code == 200, f"Expected 200 envelope, got {resp.status_code}"
+        data = resp.json()
+        assert data.get("status") == "ERROR", (
+            f"Expected status='ERROR' for unknown path, got '{data.get('status')}'"
+        )
+        assert "message" in data, f"Expected 'message' key in error response, got {data}"
+        assert "No DB record" in data["message"], (
+            f"Expected 'No DB record' in message, got '{data['message']}'"
+        )

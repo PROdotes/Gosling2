@@ -240,3 +240,244 @@ class TestFinalizeWavConversion:
         assert (
             db_song.media_name == original_title
         ), f"Expected title '{original_title}' to be unchanged, got '{db_song.media_name}'"
+
+    def test_finalize_returns_song_id(self, ingest_db, staged_wav):
+        """finalize_wav_conversion must return the same song_id (int), not None or a dict."""
+        service = CatalogService(ingest_db)
+        result = service.ingest_wav_as_converting(str(staged_wav))
+        song_id = result["song"].id
+
+        mp3_path_obj = staged_wav.with_suffix(".mp3")
+        mp3_path_obj.write_text("fake mp3 content")
+        surviving_id = service.finalize_wav_conversion(song_id, str(mp3_path_obj))
+
+        assert isinstance(surviving_id, int), (
+            f"Expected finalize_wav_conversion to return int, got {type(surviving_id)}"
+        )
+        assert surviving_id == song_id, (
+            f"Expected surviving_id={song_id}, got {surviving_id}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CatalogService.resolve_conflict — WAV branch
+# ---------------------------------------------------------------------------
+
+
+class TestResolveConflictWav:
+    """Group 3: resolve_conflict with a WAV staged file reactivates ghost at status=3."""
+
+    @pytest.fixture
+    def ghost_id(self, populated_db):
+        """Soft-delete song 1 so it becomes a ghost, return its ID."""
+        service = CatalogService(populated_db)
+        with service._song_repo.get_connection() as conn:
+            conn.execute(
+                "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = 1"
+            )
+            conn.commit()
+        return 1
+
+    def test_wav_resolve_sets_processing_status_3(
+        self, populated_db, ghost_id, staged_wav
+    ):
+        """WAV conflict resolution must set processing_status=3 on the reactivated song."""
+        service = CatalogService(populated_db)
+        service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute(
+            "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
+        ).fetchone()
+        conn.close()
+        assert row is not None
+        assert row[0] == 3, (
+            f"Expected ProcessingStatus=3 after WAV resolve, got {row[0]}"
+        )
+
+    def test_wav_resolve_returns_pending_convert_status(
+        self, populated_db, ghost_id, staged_wav
+    ):
+        """WAV conflict resolution must return status='PENDING_CONVERT'."""
+        service = CatalogService(populated_db)
+        result = service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
+        assert result.get("status") == "PENDING_CONVERT", (
+            f"Expected status='PENDING_CONVERT', got '{result.get('status')}'"
+        )
+
+    def test_wav_resolve_no_metadata_enrichment(
+        self, populated_db, ghost_id, staged_wav
+    ):
+        """WAV resolve must not enrich metadata — processing_status stays at 3, not 2 or 1."""
+        service = CatalogService(populated_db)
+        service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute(
+            "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
+        ).fetchone()
+        conn.close()
+        assert row[0] not in (1, 2), (
+            f"WAV resolve must not enrich; expected status=3 not {row[0]}"
+        )
+
+    def test_wav_resolve_undeletes_ghost(self, populated_db, ghost_id, staged_wav):
+        """resolve_conflict must set IsDeleted=0 on the ghost record."""
+        service = CatalogService(populated_db)
+        service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
+
+        import sqlite3
+        conn = sqlite3.connect(populated_db)
+        row = conn.execute(
+            "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (ghost_id,)
+        ).fetchone()
+        conn.close()
+        assert row is not None
+        assert row[0] == 0, (
+            f"Expected IsDeleted=0 after WAV resolve, got {row[0]}"
+        )
+
+    def test_mp3_resolve_returns_ingested_status(self, populated_db, ghost_id, tmp_path):
+        """Regression: MP3 conflict resolution must still return status='INGESTED', not PENDING_CONVERT."""
+        mp3 = tmp_path / "legit_song.mp3"
+        mp3.write_bytes(b"fake mp3 bytes")
+
+        service = CatalogService(populated_db)
+        result = service.resolve_conflict(ghost_id=ghost_id, staged_path=str(mp3))
+        assert result.get("status") == "INGESTED", (
+            f"MP3 resolve should return 'INGESTED', got '{result.get('status')}'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CatalogService.finalize_wav_conversion — ghost reactivation branch
+# ---------------------------------------------------------------------------
+
+
+class TestFinalizeWavConversionGhostReactivation:
+    """
+    The converted MP3 hash collides with a different soft-deleted record.
+    finalize_wav_conversion must reactivate that ghost and hard-delete the
+    WAV placeholder, returning the ghost's ID (not the original song_id).
+
+    calculate_audio_hash is monkeypatched because we have no real ffmpeg.
+    The fake hash is pre-seeded into the ghost record so the collision fires.
+    """
+
+    def test_ghost_hash_collision_returns_ghost_id(self, ingest_db, staged_wav, monkeypatch):
+        """When MP3 hash matches a deleted record, the ghost's ID is returned."""
+        import sqlite3
+
+        service = CatalogService(ingest_db)
+
+        # Stage and ingest the WAV so we have a status=3 placeholder
+        result = service.ingest_wav_as_converting(str(staged_wav))
+        wav_song_id = result["song"].id
+
+        # Create a ghost: insert a second song and soft-delete it
+        conn = sqlite3.connect(ingest_db)
+        conn.execute(
+            "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
+            "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
+        )
+        conn.execute(
+            "INSERT INTO Songs (SourceID) VALUES ((SELECT MAX(SourceID) FROM MediaSources))"
+        )
+        ghost_id = conn.execute("SELECT MAX(SourceID) FROM MediaSources").fetchone()[0]
+        conn.commit()
+        conn.close()
+
+        # Patch hash so the "converted MP3" appears to match the ghost
+        monkeypatch.setattr(
+            "src.services.catalog_service.calculate_audio_hash",
+            lambda path: "FAKE_GHOST_HASH",
+        )
+
+        mp3_path = staged_wav.with_suffix(".mp3")
+        mp3_path.write_bytes(b"fake mp3")
+
+        surviving_id = service.finalize_wav_conversion(wav_song_id, str(mp3_path))
+        assert surviving_id == ghost_id, (
+            f"Expected ghost_id={ghost_id} to be returned, got {surviving_id}"
+        )
+
+    def test_ghost_hash_collision_undeletes_ghost(self, ingest_db, staged_wav, monkeypatch):
+        """The reactivated ghost must have IsDeleted=0 after finalize."""
+        import sqlite3
+
+        service = CatalogService(ingest_db)
+        result = service.ingest_wav_as_converting(str(staged_wav))
+        wav_song_id = result["song"].id
+
+        conn = sqlite3.connect(ingest_db)
+        conn.execute(
+            "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
+            "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
+        )
+        conn.execute(
+            "INSERT INTO Songs (SourceID) VALUES ((SELECT MAX(SourceID) FROM MediaSources))"
+        )
+        ghost_id = conn.execute("SELECT MAX(SourceID) FROM MediaSources").fetchone()[0]
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(
+            "src.services.catalog_service.calculate_audio_hash",
+            lambda path: "FAKE_GHOST_HASH",
+        )
+
+        mp3_path = staged_wav.with_suffix(".mp3")
+        mp3_path.write_bytes(b"fake mp3")
+
+        service.finalize_wav_conversion(wav_song_id, str(mp3_path))
+
+        conn = sqlite3.connect(ingest_db)
+        row = conn.execute(
+            "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (ghost_id,)
+        ).fetchone()
+        conn.close()
+        assert row[0] == 0, (
+            f"Expected IsDeleted=0 on reactivated ghost, got {row[0]}"
+        )
+
+    def test_ghost_hash_collision_hard_deletes_wav_placeholder(
+        self, ingest_db, staged_wav, monkeypatch
+    ):
+        """The original WAV placeholder must be hard-deleted after ghost reactivation."""
+        import sqlite3
+
+        service = CatalogService(ingest_db)
+        result = service.ingest_wav_as_converting(str(staged_wav))
+        wav_song_id = result["song"].id
+
+        conn = sqlite3.connect(ingest_db)
+        conn.execute(
+            "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
+            "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
+        )
+        conn.execute(
+            "INSERT INTO Songs (SourceID) VALUES ((SELECT MAX(SourceID) FROM MediaSources))"
+        )
+        conn.commit()
+        conn.close()
+
+        monkeypatch.setattr(
+            "src.services.catalog_service.calculate_audio_hash",
+            lambda path: "FAKE_GHOST_HASH",
+        )
+
+        mp3_path = staged_wav.with_suffix(".mp3")
+        mp3_path.write_bytes(b"fake mp3")
+
+        service.finalize_wav_conversion(wav_song_id, str(mp3_path))
+
+        conn = sqlite3.connect(ingest_db)
+        row = conn.execute(
+            "SELECT SourceID FROM MediaSources WHERE SourceID = ?", (wav_song_id,)
+        ).fetchone()
+        conn.close()
+        assert row is None, (
+            f"WAV placeholder (id={wav_song_id}) should be hard-deleted after ghost reactivation"
+        )
