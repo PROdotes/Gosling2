@@ -133,6 +133,36 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns `{"deleted": N}`.
 - Wraps `CatalogService.get_all_tags` + `CatalogService.delete_unlinked_tags`.
 
+### async def delete_identity(identity_id: int) -> None
+**HTTP**: `DELETE /api/v1/identities/{identity_id}`
+- Soft-delete a single identity. 404 if not found, 403 if linked to active songs or albums.
+- Wraps `CatalogService.get_identity` + `CatalogService.delete_unlinked_identities`.
+
+### async def bulk_delete_unlinked_identities(unlinked: bool = False) -> dict
+**HTTP**: `DELETE /api/v1/identities?unlinked=true`
+- Soft-delete all unlinked identities in one transaction. Requires `?unlinked=true` as a safety flag.
+- Wraps `CatalogService.get_all_identities` + `CatalogService.delete_unlinked_identities`.
+
+### async def delete_publisher(publisher_id: int) -> None
+**HTTP**: `DELETE /api/v1/publishers/{publisher_id}`
+- Soft-delete a single publisher. 404 if not found, 403 if linked to active songs or albums.
+- Wraps `CatalogService.get_publisher` + `CatalogService.delete_unlinked_publishers`.
+
+### async def bulk_delete_unlinked_publishers(unlinked: bool = False) -> dict
+**HTTP**: `DELETE /api/v1/publishers?unlinked=true`
+- Soft-delete all unlinked publishers in one transaction. Requires `?unlinked=true` as a safety flag.
+- Wraps `CatalogService.get_all_publishers` + `CatalogService.delete_unlinked_publishers`.
+
+### async def delete_album(album_id: int) -> None
+**HTTP**: `DELETE /api/v1/albums/{album_id}`
+- Soft-delete a single album. 404 if not found, 403 if linked to active songs.
+- Wraps `CatalogService.get_album` + `CatalogService.delete_unlinked_albums`.
+
+### async def bulk_delete_unlinked_albums(unlinked: bool = False) -> dict
+**HTTP**: `DELETE /api/v1/albums?unlinked=true`
+- Soft-delete all unlinked albums in one transaction. Requires `?unlinked=true` as a safety flag.
+- Wraps `CatalogService.get_all_albums` + `CatalogService.delete_unlinked_albums`.
+
 ### async def get_song_web_search(song_id: int, engine: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> dict
 **HTTP**: `GET /api/v1/songs/{song_id}/web-search`
 - Generates an external search URL for a song.

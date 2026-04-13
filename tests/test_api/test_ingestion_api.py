@@ -408,7 +408,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert isinstance(data, list), f"Expected list, got {type(data)}"
-        assert len(data) >= 1, f"Expected at least one item for status=3 song, got {data}"
+        assert (
+            len(data) >= 1
+        ), f"Expected at least one item for status=3 song, got {data}"
 
     def test_each_item_has_pending_convert_status(self, client, populated_db):
         """Every item returned must have status='PENDING_CONVERT'."""
@@ -423,9 +425,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         for item in data:
-            assert item.get("status") == "PENDING_CONVERT", (
-                f"Expected status='PENDING_CONVERT', got '{item.get('status')}'"
-            )
+            assert (
+                item.get("status") == "PENDING_CONVERT"
+            ), f"Expected status='PENDING_CONVERT', got '{item.get('status')}'"
 
     def test_each_item_has_required_shape(self, client, populated_db):
         """Each result item must have status, staged_path, and song keys."""
@@ -460,9 +462,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         song_ids = [item["song"]["id"] for item in data if item.get("song")]
-        assert 1 not in song_ids, (
-            f"Soft-deleted song 1 should not appear in pending-convert, got ids={song_ids}"
-        )
+        assert (
+            1 not in song_ids
+        ), f"Soft-deleted song 1 should not appear in pending-convert, got ids={song_ids}"
 
 
 # ========================================
@@ -485,15 +487,15 @@ class TestConvertWavApi:
             f.setframerate(44100)
             f.writeframes(b"\x00\x00" * 4410)
 
-        resp = client.post(
-            f"/api/v1/ingest/convert-wav?staged_path={wav_path}"
-        )
+        resp = client.post(f"/api/v1/ingest/convert-wav?staged_path={wav_path}")
         assert resp.status_code == 200, f"Expected 200 envelope, got {resp.status_code}"
         data = resp.json()
-        assert data.get("status") == "ERROR", (
-            f"Expected status='ERROR' for unknown path, got '{data.get('status')}'"
-        )
-        assert "message" in data, f"Expected 'message' key in error response, got {data}"
-        assert "No DB record" in data["message"], (
-            f"Expected 'No DB record' in message, got '{data['message']}'"
-        )
+        assert (
+            data.get("status") == "ERROR"
+        ), f"Expected status='ERROR' for unknown path, got '{data.get('status')}'"
+        assert (
+            "message" in data
+        ), f"Expected 'message' key in error response, got {data}"
+        assert (
+            "No DB record" in data["message"]
+        ), f"Expected 'No DB record' in message, got '{data['message']}'"

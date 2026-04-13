@@ -199,6 +199,21 @@ Global tag update.
 ### delete_unlinked_tags(tag_ids: List[int]) -> int
 Soft-delete tags from the given list that have zero active song links. All deletes run in one transaction. Returns count of tags deleted. For single delete pass `[tag_id]` — returns 0 if linked or not found, 1 if deleted.
 
+### delete_unlinked_albums(album_ids: List[int]) -> int
+Soft-delete albums from the given list that have zero active song links. Cleans up `AlbumCredits` + `AlbumPublishers` before soft-deleting. Returns count of albums deleted.
+
+### delete_unlinked_publishers(publisher_ids: List[int]) -> int
+Soft-delete publishers from the given list that have zero active songs AND zero active albums. Returns count of publishers deleted.
+
+### delete_unlinked_identities(identity_ids: List[int]) -> int
+Soft-delete identities from the given list that have zero active songs/albums across ALL aliases. Marks Identity + all `ArtistNames` rows as deleted. Returns count of identities deleted.
+
+### get_publisher_link_counts(publisher_ids: List[int]) -> Dict[int, Dict[str, int]]
+Batch fetch link counts (songs and albums) for a list of publishers. Returns `ID -> {"songs": N, "albums": M}`.
+
+### get_identity_song_counts(identity_ids: List[int]) -> Dict[int, int]
+Batch fetch active song counts for multiple identities.
+
 ### set_primary_song_tag(song_id: int, tag_id: int) -> Tag
 Promote a specific genre tag to primary status for a song. 
 - **Strictly for Genres**: Only tags with category 'Genre' (case-insensitive) are allowed.

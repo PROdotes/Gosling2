@@ -389,7 +389,9 @@ class PublisherRepository(BaseRepository):
             (publisher_id,),
         )
         updated = cursor.rowcount > 0
-        logger.debug(f"[PublisherRepository] <- soft_delete(id={publisher_id}) updated={updated}")
+        logger.debug(
+            f"[PublisherRepository] <- soft_delete(id={publisher_id}) updated={updated}"
+        )
         return updated
 
     def get_song_ids_by_publisher_batch(

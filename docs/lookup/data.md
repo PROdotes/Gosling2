@@ -270,6 +270,14 @@ Get-or-create an Album by title+year. Reactivates soft-deleted. Returns album_id
 
 Update editable Album fields (title, album_type, release_year). Partial updates. Does NOT commit.
 
+### soft_delete(album_id: int, conn: sqlite3.Connection) -> bool
+
+Set `IsDeleted = 1` for an album. Returns `True` if a record was updated, `False` if not found or already deleted.
+
+### delete_album_links(album_id: int, conn: sqlite3.Connection) -> None
+
+Hard-delete `AlbumCredits` and `AlbumPublishers` rows for this album. Called before `soft_delete`.
+
 ### _row_to_album(row: sqlite3.Row) -> Album
 
 **Internal**: Maps a physical database row to the strict Pydantic `Album` model.
@@ -340,6 +348,18 @@ Batch fetch song IDs for a set of publishers. Returns a map of PublisherID -> [S
 ### get_or_create_publisher(name: str, cursor) -> int
 
 Get-or-create a Publisher by name. Reactivates soft-deleted. Returns publisher_id.
+
+### get_album_ids_by_publisher(publisher_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
+
+Find all album IDs linked to this publisher via `AlbumPublishers`. Supports optional shared connection.
+
+### get_link_counts_batch(publisher_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, Dict[str, int]]
+
+Batch fetch song and album link counts for multiple publishers. Returns a map of `ID -> {"songs": N, "albums": M}`.
+
+### soft_delete(publisher_id: int, conn: sqlite3.Connection) -> bool
+
+Set `IsDeleted = 1` for a publisher. Returns `True` if updated.
 
 ### add_song_publisher(source_id: int, name: str, conn: sqlite3.Connection) -> Publisher
 
@@ -502,6 +522,22 @@ Soft-delete an alias link. Guard: primary names cannot be deleted.
 ### update_legal_name(identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection) -> None
 
 Update the LegalName field on an Identity record. Raises LookupError if not found. Does NOT commit.
+
+### get_song_counts_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, int]
+
+Batch fetch active song counts for multiple identities. Returns a map of `IdentityID -> count`.
+
+### soft_delete(identity_id: int, conn: sqlite3.Connection) -> bool
+
+Soft-delete an Identity and ALL its ArtistNames rows. Returns `True` if updated.
+
+### get_song_ids_by_identity(identity_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
+
+Find all active song IDs credited to ANY alias belonging to this identity. Supports optional shared connection.
+
+### get_album_ids_by_identity(identity_id: int, conn: Optional[sqlite3.Connection] = None) -> List[int]
+
+Find all active album IDs credited to ANY alias belonging to this identity. Supports optional shared connection.
 
 ### get_aliases_batch(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> Dict[int, List[ArtistName]]
 

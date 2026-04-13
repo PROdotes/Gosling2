@@ -23,6 +23,7 @@ from src.services.catalog_service import CatalogService
 def _insert_orphan_tag(db_path: str, tag_id: int, name: str, category: str) -> None:
     """Insert a tag with no MediaSourceTags links."""
     from src.data.tag_repository import TagRepository
+
     repo = TagRepository(db_path)
     with repo._get_connection() as conn:
         conn.execute(
@@ -51,7 +52,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         service.delete_unlinked_tags([100])
 
-        assert service.get_tag(100) is None, "Expected get_tag to return None after deletion"
+        assert (
+            service.get_tag(100) is None
+        ), "Expected get_tag to return None after deletion"
 
     def test_linked_tag_is_not_deleted(self, populated_db):
         """A tag with active song links returns 0 — not deleted."""
@@ -88,7 +91,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         result = service.delete_unlinked_tags([3])
 
-        assert result == 1, f"Expected 1 (tag unlinked after song deleted), got {result}"
+        assert (
+            result == 1
+        ), f"Expected 1 (tag unlinked after song deleted), got {result}"
 
 
 class TestDeleteUnlinkedTagsBulk:
@@ -148,6 +153,7 @@ class TestDeleteUnlinkedTagsBulk:
 def _insert_orphan_album(db_path: str, album_id: int, title: str) -> None:
     """Insert an album with no SongAlbums links."""
     from src.data.album_repository import AlbumRepository
+
     repo = AlbumRepository(db_path)
     with repo._get_connection() as conn:
         conn.execute(
@@ -197,6 +203,7 @@ class TestDeleteUnlinkedAlbums:
 
     def test_delete_album_purges_album_credits(self, populated_db):
         from src.data.album_repository import AlbumRepository
+
         service = CatalogService(populated_db)
         service.delete_song(1)
         service.delete_unlinked_albums([100])
@@ -209,6 +216,7 @@ class TestDeleteUnlinkedAlbums:
 
     def test_delete_album_purges_album_publishers(self, populated_db):
         from src.data.album_repository import AlbumRepository
+
         service = CatalogService(populated_db)
         service.delete_song(1)
         service.delete_unlinked_albums([100])
@@ -256,6 +264,7 @@ class TestDeleteUnlinkedAlbums:
 def _insert_orphan_publisher(db_path: str, publisher_id: int, name: str) -> None:
     """Insert a publisher with no song or album links."""
     from src.data.publisher_repository import PublisherRepository
+
     repo = PublisherRepository(db_path)
     with repo._get_connection() as conn:
         conn.execute(
@@ -290,7 +299,9 @@ class TestDeleteUnlinkedPublishers:
         result = service.delete_unlinked_publishers([4])  # Roswell -> album 200
         assert result == 0
 
-    def test_publisher_linked_to_deleted_song_and_deleted_album_is_deletable(self, populated_db):
+    def test_publisher_linked_to_deleted_song_and_deleted_album_is_deletable(
+        self, populated_db
+    ):
         # DGC (10) is on song 1 and album 100. Delete both, then publisher should be deletable.
         service = CatalogService(populated_db)
         service.delete_song(1)
@@ -347,6 +358,7 @@ class TestDeleteUnlinkedPublishers:
 def _insert_orphan_identity(db_path: str, identity_id: int) -> None:
     """Insert an identity with no credits."""
     from src.data.identity_repository import IdentityRepository
+
     repo = IdentityRepository(db_path)
     with repo._get_connection() as conn:
         conn.execute(
@@ -376,13 +388,17 @@ class TestDeleteUnlinkedIdentities:
         service.delete_unlinked_identities([999])
         assert service.get_identity(999) is None
 
-    def test_identity_with_active_song_via_primary_alias_is_rejected(self, populated_db):
+    def test_identity_with_active_song_via_primary_alias_is_rejected(
+        self, populated_db
+    ):
         # Nirvana (2) is credited on song 1 via NameID=20
         service = CatalogService(populated_db)
         result = service.delete_unlinked_identities([2])
         assert result == 0
 
-    def test_identity_with_active_song_via_secondary_alias_is_rejected(self, populated_db):
+    def test_identity_with_active_song_via_secondary_alias_is_rejected(
+        self, populated_db
+    ):
         # Dave Grohl (1) credited on song 4 via Grohlton alias (NameID=11)
         service = CatalogService(populated_db)
         result = service.delete_unlinked_identities([1])
@@ -407,6 +423,7 @@ class TestDeleteUnlinkedIdentities:
 
     def test_delete_identity_soft_deletes_all_aliases(self, populated_db):
         from src.data.identity_repository import IdentityRepository
+
         _insert_orphan_identity(populated_db, 999)
         service = CatalogService(populated_db)
         service.delete_unlinked_identities([999])

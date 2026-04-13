@@ -639,14 +639,18 @@ class IdentityRepository(BaseRepository):
                 "UPDATE ArtistNames SET IsDeleted = 1 WHERE OwnerIdentityID = ? AND IsDeleted = 0",
                 (identity_id,),
             )
-        logger.debug(f"[IdentityRepository] <- soft_delete(id={identity_id}) updated={updated}")
+        logger.debug(
+            f"[IdentityRepository] <- soft_delete(id={identity_id}) updated={updated}"
+        )
         return updated
 
     def get_song_ids_by_identity(
         self, identity_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:
         """Active songs credited to ANY alias of this identity."""
-        logger.debug(f"[IdentityRepository] -> get_song_ids_by_identity(id={identity_id})")
+        logger.debug(
+            f"[IdentityRepository] -> get_song_ids_by_identity(id={identity_id})"
+        )
         query = """
             SELECT DISTINCT sc.SourceID FROM SongCredits sc
             JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
@@ -660,14 +664,18 @@ class IdentityRepository(BaseRepository):
         with self._get_connection() as new_conn:
             rows = new_conn.execute(query, (identity_id,)).fetchall()
             result = [row[0] for row in rows]
-            logger.debug(f"[IdentityRepository] <- get_song_ids_by_identity() count={len(result)}")
+            logger.debug(
+                f"[IdentityRepository] <- get_song_ids_by_identity() count={len(result)}"
+            )
             return result
 
     def get_album_ids_by_identity(
         self, identity_id: int, conn: Optional[sqlite3.Connection] = None
     ) -> List[int]:
         """Active albums credited to ANY alias of this identity."""
-        logger.debug(f"[IdentityRepository] -> get_album_ids_by_identity(id={identity_id})")
+        logger.debug(
+            f"[IdentityRepository] -> get_album_ids_by_identity(id={identity_id})"
+        )
         query = """
             SELECT DISTINCT ac.AlbumID FROM AlbumCredits ac
             JOIN ArtistNames an ON ac.CreditedNameID = an.NameID
@@ -681,7 +689,9 @@ class IdentityRepository(BaseRepository):
         with self._get_connection() as new_conn:
             rows = new_conn.execute(query, (identity_id,)).fetchall()
             result = [row[0] for row in rows]
-            logger.debug(f"[IdentityRepository] <- get_album_ids_by_identity() count={len(result)}")
+            logger.debug(
+                f"[IdentityRepository] <- get_album_ids_by_identity() count={len(result)}"
+            )
             return result
 
     def _row_to_identity(self, row: Mapping[str, Any]) -> Identity:

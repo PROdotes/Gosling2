@@ -205,7 +205,9 @@ class AlbumRepository(BaseRepository):
             (album_id,),
         )
         updated = cursor.rowcount > 0
-        logger.debug(f"[AlbumRepository] <- soft_delete(id={album_id}) updated={updated}")
+        logger.debug(
+            f"[AlbumRepository] <- soft_delete(id={album_id}) updated={updated}"
+        )
         return updated
 
     def delete_album_links(self, album_id: int, conn: sqlite3.Connection) -> None:

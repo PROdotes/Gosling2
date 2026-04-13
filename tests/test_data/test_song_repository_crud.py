@@ -191,7 +191,9 @@ class TestGetByProcessingStatus:
         import sqlite3
 
         conn = sqlite3.connect(populated_db)
-        conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID IN (1, 2)")
+        conn.execute(
+            "UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID IN (1, 2)"
+        )
         conn.commit()
         conn.close()
 

@@ -131,7 +131,9 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
 
         total = len(combined_results)
         ingested = sum(
-            1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
+            1
+            for r in combined_results
+            if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
         )
         duplicates = sum(
             1
@@ -155,18 +157,23 @@ async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
         )
 
 
-
 @router.post("/convert-wav")
 async def convert_wav(staged_path: str) -> dict:
     """Convert a staged WAV to MP3. Called when user confirms a PENDING_CONVERT card.
-    The WAV was already ingested with status=3; this converts it and finalizes the DB record."""
+    The WAV was already ingested with status=3; this converts it and finalizes the DB record.
+    """
     logger.info(f"[IngestRouter] -> convert_wav(staged_path='{staged_path}')")
     service = _get_service()
     try:
         existing = service._song_repo.get_by_path(staged_path)
         if existing is None:
-            logger.error(f"[IngestRouter] convert_wav: no DB record for '{staged_path}'")
-            return {"status": "ERROR", "message": "No DB record found for this WAV. Try re-uploading."}
+            logger.error(
+                f"[IngestRouter] convert_wav: no DB record for '{staged_path}'"
+            )
+            return {
+                "status": "ERROR",
+                "message": "No DB record found for this WAV. Try re-uploading.",
+            }
         mp3 = convert_to_mp3(Path(staged_path))
         surviving_id = service.finalize_wav_conversion(existing.id, str(mp3))
         hydrated = service.get_song(surviving_id)
@@ -277,7 +284,9 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
                     mp3 = convert_to_mp3(Path(wav))
                     ingest_paths.append(str(mp3))
                 except RuntimeError as e:
-                    logger.error(f"[IngestRouter] scan_folder WAV conversion failed for {wav}: {e}")
+                    logger.error(
+                        f"[IngestRouter] scan_folder WAV conversion failed for {wav}: {e}"
+                    )
                     combined_results.append({"status": "ERROR", "message": str(e)})
         else:
             # Ingest as status=3, await manual conversion
@@ -300,12 +309,28 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
             combined_results.extend(batch_report["results"])
 
         total = len(combined_results)
-        ingested = sum(1 for r in combined_results if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT"))
-        duplicates = sum(1 for r in combined_results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH"))
+        ingested = sum(
+            1
+            for r in combined_results
+            if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
+        )
+        duplicates = sum(
+            1
+            for r in combined_results
+            if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")
+        )
         errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
 
-        logger.info(f"[IngestRouter] <- scan_folder() found={len(audio_files)} ingested={ingested}")
-        return BatchIngestReport(total_files=total, ingested=ingested, duplicates=duplicates, errors=errors, results=combined_results)
+        logger.info(
+            f"[IngestRouter] <- scan_folder() found={len(audio_files)} ingested={ingested}"
+        )
+        return BatchIngestReport(
+            total_files=total,
+            ingested=ingested,
+            duplicates=duplicates,
+            errors=errors,
+            results=combined_results,
+        )
 
     except Exception as e:
         logger.error(f"[IngestRouter] Folder scan ingestion error: {e}")
@@ -384,11 +409,13 @@ async def get_pending_convert():
     for s in songs:
         hydrated = service.get_song(s.id)
         if hydrated:
-            results.append({
-                "status": "PENDING_CONVERT",
-                "staged_path": s.source_path,
-                "song": SongView.from_domain(hydrated).model_dump(),
-            })
+            results.append(
+                {
+                    "status": "PENDING_CONVERT",
+                    "staged_path": s.source_path,
+                    "song": SongView.from_domain(hydrated).model_dump(),
+                }
+            )
     return JSONResponse(results)
 
 

@@ -2228,7 +2228,9 @@ class CatalogService:
         Cleans up AlbumCredits + AlbumPublishers before soft-deleting.
         Single delete: pass [album_id] — returns 0 if linked or not found, 1 if deleted.
         """
-        logger.debug(f"[CatalogService] -> delete_unlinked_albums(count={len(album_ids)})")
+        logger.debug(
+            f"[CatalogService] -> delete_unlinked_albums(count={len(album_ids)})"
+        )
         if not album_ids:
             return 0
 
@@ -2241,7 +2243,9 @@ class CatalogService:
                     if self._album_repo_dir.soft_delete(album_id, conn):
                         deleted += 1
             conn.commit()
-            logger.info(f"[CatalogService] <- delete_unlinked_albums() deleted={deleted}")
+            logger.info(
+                f"[CatalogService] <- delete_unlinked_albums() deleted={deleted}"
+            )
             return deleted
         except Exception as e:
             conn.rollback()
@@ -2255,7 +2259,9 @@ class CatalogService:
         Soft-delete publishers from the given list that have zero active songs AND zero active albums.
         Single delete: pass [publisher_id] — returns 0 if linked or not found, 1 if deleted.
         """
-        logger.debug(f"[CatalogService] -> delete_unlinked_publishers(count={len(publisher_ids)})")
+        logger.debug(
+            f"[CatalogService] -> delete_unlinked_publishers(count={len(publisher_ids)})"
+        )
         if not publisher_ids:
             return 0
 
@@ -2263,14 +2269,15 @@ class CatalogService:
         try:
             deleted = 0
             for publisher_id in publisher_ids:
-                if (
-                    not self._pub_repo.get_song_ids_by_publisher(publisher_id, conn)
-                    and not self._pub_repo.get_album_ids_by_publisher(publisher_id, conn)
-                ):
+                if not self._pub_repo.get_song_ids_by_publisher(
+                    publisher_id, conn
+                ) and not self._pub_repo.get_album_ids_by_publisher(publisher_id, conn):
                     if self._pub_repo.soft_delete(publisher_id, conn):
                         deleted += 1
             conn.commit()
-            logger.info(f"[CatalogService] <- delete_unlinked_publishers() deleted={deleted}")
+            logger.info(
+                f"[CatalogService] <- delete_unlinked_publishers() deleted={deleted}"
+            )
             return deleted
         except Exception as e:
             conn.rollback()
@@ -2285,7 +2292,9 @@ class CatalogService:
         Marks Identity + all ArtistNames rows as deleted.
         Single delete: pass [identity_id] — returns 0 if linked or not found, 1 if deleted.
         """
-        logger.debug(f"[CatalogService] -> delete_unlinked_identities(count={len(identity_ids)})")
+        logger.debug(
+            f"[CatalogService] -> delete_unlinked_identities(count={len(identity_ids)})"
+        )
         if not identity_ids:
             return 0
 
@@ -2293,14 +2302,17 @@ class CatalogService:
         try:
             deleted = 0
             for identity_id in identity_ids:
-                if (
-                    not self._identity_repo.get_song_ids_by_identity(identity_id, conn)
-                    and not self._identity_repo.get_album_ids_by_identity(identity_id, conn)
+                if not self._identity_repo.get_song_ids_by_identity(
+                    identity_id, conn
+                ) and not self._identity_repo.get_album_ids_by_identity(
+                    identity_id, conn
                 ):
                     if self._identity_repo.soft_delete(identity_id, conn):
                         deleted += 1
             conn.commit()
-            logger.info(f"[CatalogService] <- delete_unlinked_identities() deleted={deleted}")
+            logger.info(
+                f"[CatalogService] <- delete_unlinked_identities() deleted={deleted}"
+            )
             return deleted
         except Exception as e:
             conn.rollback()
