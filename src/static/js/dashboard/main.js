@@ -389,7 +389,11 @@ function switchMode(mode) {
     elements.searchInput.value = "";
     syncModeUi();
     ctx.hideDetailPanel();
-    performSearch("");
+    if (mode === "songs" && filterSidebar.hasActiveFilters()) {
+        filterSidebar.reapply();
+    } else {
+        performSearch("");
+    }
 }
 
 function navigate(mode, query = "") {

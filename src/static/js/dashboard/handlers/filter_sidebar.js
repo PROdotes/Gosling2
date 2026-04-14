@@ -105,6 +105,12 @@ export class FilterSidebarHandler {
         this._sidebarVisible ? this.hide() : this.show();
     }
 
+    reapply() {
+        if (this.hasActiveFilters()) {
+            this._applyFilters();
+        }
+    }
+
     hasActiveFilters() {
         return (
             this._active.artists.length > 0 ||

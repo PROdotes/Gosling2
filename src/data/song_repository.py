@@ -797,6 +797,7 @@ class SongRepository(MediaSourceRepository):
                             OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
                             OR NOT EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
                             OR NOT EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+                            OR NOT EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
         """
         _NO_BLOCKERS = """
                             m.MediaName IS NOT NULL AND m.MediaName != ''
@@ -805,6 +806,7 @@ class SongRepository(MediaSourceRepository):
                             AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
                             AND EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
                             AND EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+                            AND EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
         """
 
         if statuses:
