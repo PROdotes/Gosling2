@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gosling 2.5 - Data Entry Editor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-master: #030407; /* Global Header */
+            --bg-window: #0A0D14; /* Sidebar & List */
+            --bg-panel: #12151E;  /* Editor workspace */
+            --bg-element: #1D2230; /* Inputs & Modals */
+            --bg-hover: #2A3041;
+            --bg-active: #4F46E5; /* Indigo anchor */
+            --bg-danger: #E11D48;
+            
+            --border-subtle: #2A3041;
+            --border-focus: #818CF8;
+            
+            --text-pure: #FFFFFF;
+            --text-sec: #94A3B8;
+            --text-mut: #64748B;
+            
+            --accent-blue: #818CF8;
+            --accent-green: #10B981;
+            --accent-red: #F43F5E;
+            --font-ui: 'Inter', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body { 
+            font-family: var(--font-ui); 
+            background: var(--bg-window); color: var(--text-sec); 
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden; 
+            font-size: 13px; -webkit-font-smoothing: antialiased;
+        }
+
+        button { font-family: inherit; cursor: pointer; border: none; background: transparent;}
+        input { font-family: inherit; }
+
+        /* HEADER */
+        header { 
+            height: 48px; background: var(--bg-master); border-bottom: 1px solid var(--border-subtle); 
+            display: flex; align-items: center; padding: 0 16px; justify-content: space-between; flex-shrink: 0; gap: 24px;
+        }
+        .header-logo { font-weight: 700; color: var(--text-pure); letter-spacing: 1px; font-size: 14px; }
+        .header-tabs { display: flex; align-items: center; height: 100%; gap: 8px; }
+        .header-tabs a { 
+            color: var(--text-sec); text-decoration: none; font-weight: 600; font-size: 12px; 
+            padding: 4px 12px; border-radius: 4px; transition: 0.1s;
+        }
+        .header-tabs a:hover { background: var(--bg-hover); color: var(--text-pure); }
+        .header-tabs a.active { background: var(--bg-hover); color: var(--text-pure); }
+
+        .header-search { flex: 1; max-width: 480px; display: flex; gap: 8px; padding: 0 24px;}
+        .search-input-wrapper { flex: 1; position: relative; }
+        .search-input-wrapper input { 
+            width: 100%; background: var(--bg-window); border: 1px solid var(--border-subtle); 
+            color: var(--text-pure); padding: 6px 12px 6px 32px; border-radius: 6px; font-size: 13px; outline:none;
+        }
+        .search-input-wrapper input:focus { border-color: var(--border-focus); }
+        .search-input-wrapper svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-mut); width: 14px; height: 14px;}
+        
+        .btn-filter-toggle { background: var(--bg-active); border: 1px solid rgba(255,255,255,0.1); color: var(--text-pure); border-radius: 6px; padding: 0 12px; font-size: 12px; font-weight: 600;}
+
+        /* LAYOUT */
+        .workspace { display: flex; flex: 1; overflow: hidden; }
+
+        /* PANE 1: FILTER */
+        .filter-sidebar { width: 220px; border-right: 1px solid var(--border-subtle); background: var(--bg-window); display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; transition: width 0.15s ease;}
+        .filter-sidebar.hidden { width: 0; border-right: none; }
+        .filter-header { display: flex; padding: 12px; gap: 4px; border-bottom: 1px solid var(--border-subtle); }
+        .filter-ctrl-btn { flex: 1; background: transparent; color: var(--text-sec); padding: 4px; font-size: 10px; font-weight: 700; border-radius: 4px; border: 1px solid transparent;}
+        .filter-ctrl-btn:hover { background: var(--bg-hover); color: var(--text-pure); }
+        .filter-ctrl-btn.active { background: var(--bg-hover); color: var(--text-pure); border-color: var(--border-subtle);}
+        .filter-sections { flex: 1; overflow-y: auto; padding: 0 12px; }
+        .filter-section { border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; margin-top: 12px; }
+        .filter-section-header { font-size: 11px; font-weight: 700; color: var(--text-sec); text-transform: uppercase; margin-bottom: 8px;}
+        .filter-value { width: 100%; text-align: left; padding: 4px 8px; border-radius: 4px; color: var(--text-sec); font-size: 12px;}
+        .filter-value:hover { background: var(--bg-hover); color: var(--text-pure);}
+        .filter-value.active { background: rgba(79, 70, 229, 0.15); color: var(--accent-blue); font-weight: 600;}
+        
+        .filter-active-chips { padding: 12px; border-top: 1px solid var(--border-subtle); display: flex; flex-wrap: wrap; gap: 6px; background: rgba(0,0,0,0.2);}
+        .filter-chip { background: var(--bg-element); border: 1px solid var(--border-subtle); color: var(--text-pure); font-size: 11px; padding: 4px 8px; border-radius: 4px; display: flex; align-items: center; gap: 6px; font-weight: 500;}
+        .filter-chip-remove { background: transparent; border: none; color: var(--text-mut); cursor: pointer; font-size: 10px; display: flex; align-items: center;}
+        .filter-chip-remove:hover { color: var(--accent-red);}
+        
+        /* PANE 2: LIST */
+        .left-pane { width: 560px; flex-shrink: 0; display: flex; overflow: hidden; }
+        .list-panel { flex: 1; border-right: 1px solid var(--border-subtle); background: var(--bg-window); display: flex; flex-direction: column; }
+        .list-header { display: flex; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); font-size: 10px; font-weight: 700; color: var(--text-mut); text-transform: uppercase;}
+        .song-list { flex: 1; overflow-y: auto; }
+        .song-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); cursor: pointer;}
+        .song-row:hover { background: var(--bg-panel); }
+        .song-row.selected { background: var(--bg-panel); box-shadow: inset 3px 0 0 var(--bg-active); border-bottom: 1px solid transparent; }
+        .song-row.selected .title { color: var(--text-pure); font-weight: 700;}
+        .col-check input { accent-color: var(--bg-active); }
+        .col-info { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; flex-direction: column; gap: 2px;}
+        .col-info .title { font-weight: 600; color: var(--text-pure); font-size: 13px;}
+        .col-info .artist { color: var(--text-sec); font-size: 11px; }
+        .col-missing { display: flex; gap: 4px; }
+        .pill { background: var(--bg-element); padding: 2px 4px; border-radius: 4px; font-size: 9px; font-weight: 700; color: var(--text-sec); font-family: var(--font-mono);}
+        .pill.miss { background: rgba(244, 63, 94, 0.1); color: var(--accent-red); border: 1px solid rgba(244, 63, 94, 0.3);}
+        .pill.done { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3);}
+
+        /* PANE 3: EDITOR */
+        .editor-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg-panel); overflow: hidden; box-shadow: -4px 0 24px rgba(0,0,0,0.4); z-index: 10;}
+
+        .btn-group { display: flex; gap: 1px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-subtle); background: var(--border-subtle); box-shadow: 0 2px 4px rgba(0,0,0,0.2);}
+        .btn-tool { background: var(--bg-element); color: var(--text-pure); padding: 5px 12px; font-size: 11px; font-weight: 700; transition: 0.1s; text-transform: uppercase; letter-spacing: 0.5px;}
+        .btn-tool:hover { background: var(--bg-hover); }
+        .btn-tool.primary { background: linear-gradient(180deg, #4F46E5 0%, #3730A3 100%); color: #fff; box-shadow: inset 0 1px 1px rgba(255,255,255,0.2); }
+        .btn-tool.primary:hover { filter: brightness(1.1); }
+        .btn-tool.zamp { color: var(--accent-blue); }
+        .btn-tool.spotify { color: #1DB954; font-weight: 800; }
+        .btn-tool.engine-picker { background: var(--bg-hover); padding: 5px 10px; color: var(--text-sec); border-left: 1px solid var(--border-subtle); }
+        .btn-tool.engine-picker:hover { color: var(--text-pure); }
+        .btn-tool.play { color: var(--text-pure); padding: 5px 12px; }
+
+        /* The Form + Sidebar layout */
+        .editor-body { flex: 1; display: flex; overflow: hidden; }
+        .editor-scroll { flex: 1; overflow-y: auto; padding: 24px 32px 32px 32px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--bg-hover) transparent; }
+
+        /* Action Sidebar */
+        .action-sidebar {
+            width: 160px; flex-shrink: 0; border-left: 1px solid var(--border-subtle);
+            background: var(--bg-window); display: flex; flex-direction: column; padding: 16px 12px; gap: 8px;
+        }
+        .sidebar-btn {
+            width: 100%; padding: 8px 10px; border-radius: 5px; font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.5px; text-align: center;
+            border: 1px solid var(--border-subtle); color: var(--text-sec); background: var(--bg-element);
+            cursor: pointer; transition: 0.1s;
+        }
+        .sidebar-btn:hover { background: var(--bg-hover); color: var(--text-pure); }
+        .sidebar-btn.organize {
+            background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+            color: #fff; border-color: transparent; font-size: 12px; padding: 10px;
+            box-shadow: 0 2px 8px rgba(16,185,129,0.3);
+        }
+        .sidebar-btn.organize:hover { filter: brightness(1.1); }
+        .sidebar-btn.organize.blocked {
+            background: var(--bg-element); color: var(--text-mut); box-shadow: none; cursor: not-allowed;
+        }
+        .sidebar-btn.write-id3 { color: var(--accent-blue); border-color: rgba(129,140,248,0.3); }
+        .sidebar-btn.write-id3:hover { background: rgba(129,140,248,0.1); color: var(--accent-blue); }
+        .sidebar-btn.delete-original {
+            color: #F59E0B; border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.05);
+        }
+        .sidebar-btn.delete-original:hover { background: rgba(245,158,11,0.12); }
+        .sidebar-btn.danger { color: var(--accent-red); border-color: rgba(244,63,94,0.2); margin-top: auto; }
+        .sidebar-btn.spotify { color: #1DB954; font-weight: 800; }
+        .sidebar-group-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-mut); padding: 2px 2px; }
+        .sidebar-btn.danger:hover { background: rgba(244,63,94,0.1); color: var(--accent-red); }
+        .sidebar-divider { height: 1px; background: var(--border-subtle); margin: 4px 0; }
+        .sidebar-path {
+            font-family: var(--font-mono); font-size: 10px; color: var(--text-mut); line-height: 1.4;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 0;
+        }
+        
+        .grid-section { margin-bottom: 40px; max-width: 960px; background: rgba(0,0,0,0.15); padding: 24px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03); box-shadow: inset 0 2px 10px rgba(0,0,0,0.2);}
+        .grid-title { font-size: 12px; font-weight: 700; color: var(--text-pure); text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 12px;}
+        .grid-title::after { content: ''; flex: 1; height: 1px; background: var(--border-subtle); }
+        
+        .data-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; row-gap: 20px; }
+        .col-12 { grid-column: span 12; } .col-8 { grid-column: span 8; } .col-6 { grid-column: span 6; } .col-4 { grid-column: span 4; } .col-3 { grid-column: span 3; }
+        
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        label { font-size: 12px; font-weight: 600; color: var(--text-sec); text-transform: uppercase; display: flex; align-items: center; gap: 4px; height: 16px; line-height: 1;}
+        .req-mark { color: var(--accent-red); margin-left: 1px;}
+        
+        .input-wrap { 
+            display: flex; background: #040508; border: 1px solid var(--border-subtle); border-radius: 4px; 
+            overflow: visible; box-shadow: inset 0 1px 2px rgba(0,0,0,0.4); transition: border-color 0.1s;
+            min-height: 36px; position: relative; z-index: 1;
+        }
+        .input-wrap:focus-within { border-color: var(--border-focus); z-index: 10; }
+        .input-wrap.error { border-color: var(--accent-red); font-style: italic;}
+        .input-wrap input { flex: 1; background: transparent; border: none; color: #F1F5F9; padding: 6px 12px; font-size: 14px; outline: none; width: 100%;}
+        
+        .autocomplete-dropdown {
+            position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--bg-element);
+            border: 1px solid var(--border-subtle); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            max-height: 200px; overflow-y: auto; z-index: 100;
+        }
+        .ac-item { padding: 8px 12px; font-size: 12px; color: var(--text-pure); cursor: pointer; display: flex; align-items: center; gap: 8px;}
+        .ac-item:hover { background: var(--bg-active); }
+        .ac-item.create-new { color: var(--accent-blue); font-weight: 600; border-top: 1px solid var(--border-subtle);}
+        .ac-item.create-new:hover { color: #fff; }
+        
+        .inline-btn { background: transparent; color: var(--text-sec); border-left: 1px solid var(--border-subtle); padding: 0 10px; font-size: 11px; font-weight: 600; }
+        .inline-btn:hover { background: var(--bg-hover); color: var(--text-pure); }
+        
+        .chip-area { 
+            display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 8px; flex: 1; align-items: start;
+            max-height: 100px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--bg-hover) transparent;
+            padding-right: 12px;
+        }
+        /* Custom scrollbar for Chrome/Webkit */
+        .chip-area::-webkit-scrollbar { width: 4px; }
+        .chip-area::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
+
+        .chip { 
+            background: var(--bg-element); border: 1px solid var(--border-subtle); padding: 4px 10px; border-radius: 4px; 
+            font-size: 12px; color: #F1F5F9; display: flex; gap: 8px; align-items: center; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2); white-space: nowrap;
+        }
+        .chip-actions { display: flex; align-items: center; gap: 8px; border-left: 1px solid var(--border-subtle); padding-left: 8px; margin-left: 4px; opacity: 0.8;}
+        .chip-action { color: var(--text-sec); cursor: pointer; font-size: 12px; line-height: 1; transition: color 0.1s; font-weight: bold;}
+        .chip-action:hover { color: #FFFFFF; }
+        .chip-action.split { color: #818CF8; } /* Indigo blue */
+        .chip-action.remove { color: #F43F5E; } /* Rose red */
+        .chip-area input { padding: 4px 0!important; min-width: 60px; font-size: 13px; height: 22px;}
+        
+        .tag-cat { font-size: 9px; font-weight: 800; opacity: 0.8; margin-right: 4px; padding-right: 6px; border-right: 1px solid var(--border-subtle); display: flex; align-items: center; text-transform: uppercase; letter-spacing: 0.5px;}
+        .tag-cat.genre { color: #818CF8; } /* Indigo */
+        .tag-cat.lang { color: #10B981; } /* Emerald */
+        .tag-cat.mood { color: #F59E0B; } /* Amber */
+    </style>
+
+</head>
+<body>
+    <header>
+        <div class="header-logo">GOSLING.</div>
+        <div class="header-tabs">
+            <a href="#" class="active">Songs</a>
+            <a href="#">Albums</a>
+            <a href="#">Artists</a>
+            <a href="#">Ingest</a>
+        </div>
+        <div class="header-search">
+            <div class="search-input-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <input type="text" placeholder="Search library...">
+            </div>
+            <button class="btn-filter-toggle">Filter ▼</button>
+        </div>
+        <div style="font-size:12px; color:var(--text-sec); font-weight:600;"><span style="color:var(--text-pure)">456</span> IN QUEUE</div>
+    </header>
+
+    <div class="workspace">
+        
+        <div class="left-pane">
+        <!-- PANE 1: FILTER -->
+        <div id="filter-sidebar" class="filter-sidebar">
+            <div class="filter-header">
+                <button class="filter-ctrl-btn">ALL +</button>
+                <button class="filter-ctrl-btn">ALL -</button>
+                <button class="filter-ctrl-btn active">ALL</button>
+                <button class="filter-ctrl-btn">ANY</button>
+            </div>
+            <div class="filter-sections">
+                <div class="filter-section">
+                    <div class="filter-section-header">Status ▼</div>
+                    <button class="filter-value">Not Done</button>
+                    <button class="filter-value">Missing Data</button>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-section-header">Artist ▼</div>
+                    <button class="filter-value active">ABBA</button>
+                    <button class="filter-value">Aphex Twin</button>
+                    <button class="filter-value">HOME</button>
+                </div>
+                <div class="filter-section">
+                    <div class="filter-section-header">Year ▼</div>
+                    <button class="filter-value active">1972</button>
+                </div>
+            </div>
+            
+            <!-- Restored Filter Chips -->
+            <div class="filter-active-chips">
+                <span class="filter-chip">ABBA <button class="filter-chip-remove">✕</button></span>
+                <span class="filter-chip">1972 <button class="filter-chip-remove">✕</button></span>
+            </div>
+        </div>
+
+        <div class="list-panel">
+            <div class="list-header">
+                <div class="col-check"><input type="checkbox"></div>
+                <div style="flex:1">Audio Track</div>
+                <div style="width:70px; text-align:right">Missing</div>
+            </div>
+            <div class="song-list">
+                <div class="song-row selected">
+                    <div class="col-check"><input type="checkbox" checked></div>
+                    <div class="col-info"><div class="title">Resonance</div><div class="artist">HOME</div></div>
+                    <div class="col-missing"><span class="pill miss">PUB</span><span class="pill miss">ALB</span></div>
+                </div>
+                <div class="song-row">
+                    <div class="col-check"><input type="checkbox"></div>
+                    <div class="col-info"><div class="title">Vordhosbn</div><div class="artist">Aphex Twin</div></div>
+                    <div class="col-missing"><span class="pill miss">PUB</span></div>
+                </div>
+                <div class="song-row">
+                    <div class="col-check"><input type="checkbox"></div>
+                    <div class="col-info"><div class="title">Nightcall</div><div class="artist">Kavinsky</div></div>
+                    <div class="col-missing"><span class="pill done">DONE</span></div>
+                </div>
+            </div>
+        </div>
+
+        </div><!-- end left-pane -->
+        <!-- PANE 3: EDITOR -->
+        <div class="editor-panel">
+
+
+            <!-- Form + Action Sidebar -->
+            <div class="editor-body">
+
+            <!-- Grid Form Area -->
+            <div class="editor-scroll">
+                
+                <div class="grid-section">
+                    <div class="grid-title">Required Metadata</div>
+                    <div class="data-grid">
+                        <div class="form-group col-8">
+                            <label>Title (Media Name)</label>
+                            <div class="input-wrap">
+                                <input type="text" value="Resonance">
+                                <button class="inline-btn">S</button>
+                                <button class="inline-btn">T</button>
+                            </div>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Year</label>
+                            <div class="input-wrap"><input type="number" value="2014"></div>
+                        </div>
+
+                        <div class="form-group col-6">
+                            <label>Artist (Performer)</label>
+                            <div class="input-wrap">
+                                <div class="chip-area">
+                                    <div class="chip">HOME 
+                                        <div class="chip-actions">
+                                            <span class="chip-action split" title="Split Entity">✂</span>
+                                            <span class="chip-action remove" title="Remove">✕</span>
+                                        </div>
+                                    </div>
+                                    <div class="chip">Daft Punk 
+                                        <div class="chip-actions">
+                                            <span class="chip-action split" title="Split Entity">✂</span>
+                                            <span class="chip-action remove" title="Remove">✕</span>
+                                        </div>
+                                    </div>
+                                    <input type="text" value="Da"> <!-- Mocked Typing inside chip-area -->
+                                </div>
+                                <!-- Mocked Dropdown inside input-wrap -->
+                                <div class="autocomplete-dropdown" style="display:none;">
+                                    <div class="ac-item" style="background: rgba(255,255,255,0.05);">Daft Punk <span style="font-size: 10px; color: var(--text-mut);">ID: 481</span></div>
+                                    <div class="ac-item">David Bowie <span style="font-size: 10px; color: var(--text-mut);">ID: 102</span></div>
+                                    <div class="ac-item">Daniel Avery <span style="font-size: 10px; color: var(--text-mut);">ID: 994</span></div>
+                                    <div class="ac-item create-new">+ Create new artist "Da"</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Composer (Credit)</label>
+                            <div class="input-wrap">
+                                <div class="chip-area">
+                                    <div class="chip">Max Martin <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Shellback <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Savan Kotecha <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Ilya Salmanzadeh <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Oscar Holter <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Rickard Göransson <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Fat Max Gsus <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Ludwig Göransson <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Tove Lo <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip">Ali Payami <div class="chip-actions"><span class="chip-action split">✂</span><span class="chip-action remove">✕</span></div></div>
+                                    <input type="text" placeholder="Add...">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group col-12">
+                            <label>Tags (Combined Triage)</label>
+                            <div style="display:flex; gap:8px; align-items:flex-start; margin-top: 0px;">
+                            <div class="input-wrap" style="flex:1;">
+                                <div class="chip-area">
+                                    <div class="chip"><span class="tag-cat genre">Genre</span> Pop <div class="chip-actions"><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip"><span class="tag-cat lang">Lang</span> French <div class="chip-actions"><span class="chip-action remove">✕</span></div></div>
+                                    <div class="chip"><span class="tag-cat mood">Mood</span> Upbeat <div class="chip-actions"><span class="chip-action remove">✕</span></div></div>
+                                    <input type="text" value="Da">
+                                </div>
+                                
+                                <!-- Mocked Dropdown for Tags -->
+                                <div class="autocomplete-dropdown" style="display:none;">
+                                    <div class="ac-item"><span class="tag-cat genre" style="border:none;">Genre</span> Dance-Pop <span style="font-size: 10px; color: var(--text-mut);">ID: 881</span></div>
+                                    <div class="ac-item" style="background: rgba(255,255,255,0.05);"><span class="tag-cat lang" style="border:none;">Lang</span> Danish <span style="font-size: 10px; color: var(--text-mut);">ID: 45</span></div>
+                                    <div class="ac-item"><span class="tag-cat mood" style="border:none;">Mood</span> Dark <span style="font-size: 10px; color: var(--text-mut);">ID: 92</span></div>
+                                </div>
+                            </div>
+                            <button class="inline-btn" style="border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-sec); padding: 0 12px; font-size: 11px; font-weight:700; height: 36px; background: var(--bg-element); flex-shrink:0; align-self:flex-start;">▶ Play</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group col-6">
+                            <label>Publisher <span class="req-mark">*</span></label>
+                            <div class="input-wrap error">
+                                <div class="chip-area">
+                                    <input type="text" placeholder="Search/link publisher...">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group col-6">
+                            <label>Album / Release <span class="req-mark">*</span></label>
+                            <div class="input-wrap">
+                                <div class="chip-area">
+                                    <div class="chip">Odyssey <div class="chip-actions"><span class="chip-action remove">✕</span></div></div>
+                                    <input type="text" placeholder="Add...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-section" style="opacity: 0.8;">
+                    <div class="grid-title" style="color:var(--text-mut)">Additional Data</div>
+                    <div class="data-grid">
+                        <div class="form-group col-4">
+                            <label>BPM</label><div class="input-wrap"><input type="text" placeholder="120"></div>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>ISRC</label><div class="input-wrap"><input type="text" placeholder="US-AAA..."></div>
+                        </div>
+                        <div class="form-group col-4">
+                            <label>Track No</label><div class="input-wrap"><input type="text" placeholder="1/12"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid-section" style="opacity: 0.6; margin-bottom: 60px;">
+                    <div class="grid-title" style="color:var(--text-mut)">Extraneous / Raw Metadata</div>
+                    <div class="data-grid">
+                        <div class="form-group col-12">
+                            <label>Comments / Description</label>
+                            <div class="input-wrap"><input type="text" placeholder="..."></div>
+                        </div>
+                        <div class="form-group col-12">
+                            <label>Raw ID3 Block</label>
+                            <div style="background:var(--bg-window); border:1px solid var(--border-subtle); padding:12px; border-radius:6px; font-family:var(--font-mono); font-size:11px; color:var(--text-sec); line-height: 1.5;">
+                                <span style="color:var(--accent-blue)">TPE1</span>: <span style="color:var(--accent-green)">HOME</span><br>
+                                <span style="color:var(--accent-blue)">TIT2</span>: <span style="color:var(--accent-green)">Resonance</span><br>
+                                <span style="color:var(--accent-blue)">COMM</span>: <span style="color:var(--accent-green)">Downloaded via ZAMP internal relay #01</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- end editor-scroll -->
+
+            <!-- Action Sidebar -->
+            <div class="action-sidebar">
+                <!-- GROUP 1: Research -->
+                <div class="sidebar-group-label">Research</div>
+                <button class="sidebar-btn">Parse</button>
+                <button class="sidebar-btn spotify">Spotify ⇅</button>
+                <div style="display:flex; gap:1px; border:1px solid var(--border-subtle); border-radius:5px; overflow:hidden; background:var(--border-subtle);">
+                    <button class="sidebar-btn" style="flex:1; border:none; border-radius:0; color:var(--accent-blue); margin:0;">Search</button>
+                    <button class="sidebar-btn" style="border:none; border-radius:0; border-left:1px solid var(--border-subtle); padding:8px 6px; color:var(--text-sec); margin:0; width:24px; flex-shrink:0;">▾</button>
+                </div>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- GROUP 2: Finalize -->
+                <div class="sidebar-group-label">Finalize</div>
+                <button class="sidebar-btn write-id3">↑ Write ID3</button>
+                <button class="sidebar-btn organize">Organize to Library</button>
+                <div class="sidebar-path">→ Z:\Music\Incoming\F...\HOME - Resonance.flac</div>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- GROUP 4: Danger zone -->
+                <button class="sidebar-btn delete-original">⚠ Delete Original</button>
+                <div class="sidebar-path" style="color: rgba(245,158,11,0.5);">C:\Users\glazb\Downloads\HOME - Resonance.wav</div>
+                <button class="sidebar-btn danger" style="margin-top:4px;">🗑 Delete Record</button>
+            </div>
+
+            </div><!-- end editor-body -->
+        </div><!-- end editor-panel -->
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const filterToggleBtn = document.querySelector('.btn-filter-toggle');
+            const filterSidebar = document.getElementById('filter-sidebar');
+
+            if(filterToggleBtn && filterSidebar) {
+                filterToggleBtn.addEventListener('click', () => {
+                    filterSidebar.classList.toggle('hidden');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
