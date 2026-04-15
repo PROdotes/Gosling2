@@ -62,6 +62,15 @@ Soft-delete identities that have zero active songs/albums across ALL aliases.
 ## IngestionService
 *Location: `src/services/ingestion_service.py`*
 
+### get_session_status() -> Dict[str, int]
+Returns the current session-wide ingestion counters: `{pending, success, action}`. Derived from class-level `_active_tasks`, `_session_success`, `_session_action`.
+
+### register_task(task_id: str, total: int) -> None
+Register a new ingestion batch task in `_active_tasks`. Call before streaming begins.
+
+### reset_session_status() -> None  *(classmethod)*
+Reset `_session_success` and `_session_action` to zero. Does not clear active tasks.
+
 ### check_ingestion(file_path: str) -> Dict[str, Any]
 Performs a multi-tiered collision check for a new file (Path, Hash, Metadata).
 

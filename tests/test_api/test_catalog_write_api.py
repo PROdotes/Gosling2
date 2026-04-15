@@ -1,9 +1,25 @@
+import json
 import os
 import pytest
 from pathlib import Path
 from fastapi.testclient import TestClient
 from src.engine_server import app
 from src.engine.config import SONG_DEFAULT_YEAR
+
+
+def collect_upload_stream(resp):
+    """Parse NDJSON upload stream into a BatchIngestReport-shaped dict."""
+    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+    frames = [json.loads(l) for l in lines]
+    results = [f["last_result"] for f in frames if f.get("last_result")]
+    return {
+        "total_files": len(results),
+        "ingested": sum(1 for r in results if r.get("status") in ("INGESTED", "PENDING_CONVERT", "CONVERTING")),
+        "duplicates": sum(1 for r in results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")),
+        "conflicts": sum(1 for r in results if r.get("status") == "CONFLICT"),
+        "errors": sum(1 for r in results if r.get("status") == "ERROR"),
+        "results": results,
+    }
 
 
 @pytest.fixture
@@ -41,9 +57,9 @@ class TestCatalogWriteApi:
         assert (
             resp.status_code == 200
         ), f"Expected 200, got {resp.status_code}: {resp.text}"
-        data = resp.json()
+        data = collect_upload_stream(resp)
 
-        # 1. Batch Report Structure (now returns BatchIngestReport)
+        # 1. Batch Report Structure
         assert data["total_files"] == 1, f"Expected 1 file, got {data['total_files']}"
         assert data["ingested"] == 1, f"Expected 1 ingested, got {data['ingested']}"
         assert (
@@ -60,8 +76,8 @@ class TestCatalogWriteApi:
             result["status"] == "INGESTED"
         ), f"Expected 'INGESTED', got '{result['status']}'"
         assert (
-            result["match_type"] is None
-        ), f"Expected None match_type for new ingest, got {result['match_type']}"
+            result.get("match_type") is None
+        ), f"Expected None match_type for new ingest, got {result.get('match_type')}"
 
         # 3. EXHAUSTIVE SONGVIEW ASSERTIONS
         song = result["song"]
@@ -160,7 +176,7 @@ class TestCatalogWriteApi:
                 "/api/v1/ingest/upload",
                 files=[("files", (sample_mp3.name, f, "audio/mpeg"))],
             )
-        batch_result = up_resp.json()
+        batch_result = collect_upload_stream(up_resp)
         song_id = batch_result["results"][0]["song"]["id"]
         source_path = batch_result["results"][0]["song"]["source_path"]
 

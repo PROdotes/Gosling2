@@ -230,6 +230,16 @@ Used by `update_identity_legal_name`.
 **HTTP**: `GET /api/v1/ingest/formats`
 - Returns the list of supported file extensions for ingestion as defined in `ACCEPTED_EXTENSIONS`.
 
+### async def get_ingest_status() -> IngestStatusModel
+**HTTP**: `GET /api/v1/ingest/status`
+- Returns the session-wide ingestion status: `{pending, success, action}`.
+- Used by the frontend to restore badge state on page reload and tab switch.
+
+### async def reset_ingest_status() -> dict
+**HTTP**: `POST /api/v1/ingest/reset-status`
+- Resets the session-wide success/action counters to zero.
+- Returns `{"status": "RESET"}`.
+
 ### async def get_pending_convert() -> JSONResponse
 **HTTP**: `GET /api/v1/ingest/pending-convert`
 - Returns all songs with `processing_status=3` (WAV staged, awaiting conversion).
@@ -247,14 +257,13 @@ Used by `update_identity_legal_name`.
 - Safety: Path must be within `STAGING_DIR`.
 - Returns `{"status": "DELETED", "path": path}`.
 
-### async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport
+### async def upload_files(files: list[UploadFile] = File(...)) -> StreamingResponse
 **HTTP**: `POST /api/v1/ingest/upload`
 - Batch file ingestion entry point (supports single or multiple files).
-- Browser automatically flattens folder drag-and-drop into file list.
 - Validates extensions and stages all files to `STAGING_DIR` with UUID filenames.
-- WAVs are always ingested immediately as status=3 (`PENDING_CONVERT`) via `CatalogService.ingest_wav_as_converting`. Conversion is confirmed separately via `/convert-wav`.
-- Non-WAVs are ingested via `CatalogService.ingest_batch()`.
-- Returns `BatchIngestReport` with aggregate stats and per-file results.
+- Streams results as newline-delimited JSON (`application/x-ndjson`). Each line is the current session status `{pending, success, action}` plus `last_result` for the file just processed.
+- WAVs are ingested as `PENDING_CONVERT` via `CatalogService.ingest_wav_as_converting`. Conversion is confirmed separately via `/convert-wav`.
+- Non-WAVs are ingested via `IngestionService._ingest_single`.
 
 ### async def scan_folder(request: FolderScanRequest) -> BatchIngestReport
 **HTTP**: `POST /api/v1/ingest/scan-folder`

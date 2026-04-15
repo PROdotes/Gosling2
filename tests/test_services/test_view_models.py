@@ -547,6 +547,7 @@ class TestSongViewReviewWorkflow:
             ],
             "tags": [Tag(name="Rock", category="Genre")],
             "publishers": [Publisher(name="Pub A")],
+            "albums": [SongAlbumView(album_title="Default Album")],
             "processing_status": 1,
         }
         defaults.update(overrides)

@@ -37,6 +37,10 @@ export function formatCountLabel(count, singular, plural) {
     return `${count} ${pluralize(count, singular, plural)}`;
 }
 
+export function basename(path) {
+    return path?.split(/[/\\]/).pop() ?? "";
+}
+
 export function textOrDash(value) {
     if (value === null || value === undefined || value === "") {
         return "-";

@@ -5,11 +5,14 @@ import {
     getDownloadsFolder,
     getPendingConvert,
     getStagingOrphans,
+    readNdjsonStream,
+    resolveConflict,
     scanFolder,
     uploadFiles,
 } from "../api.js";
 import { openFilenameParserModal } from "../components/filename_parser_modal.js";
-import { escapeHtml, renderStatus } from "../components/utils.js";
+import { showToast } from "../components/toast.js";
+import { basename, escapeHtml, renderStatus } from "../components/utils.js";
 
 const PATH_INPUT_ID = "ingest-path-input";
 const CHECK_BTN_ID = "ingest-check-btn";
@@ -142,17 +145,32 @@ export async function renderIngestionPanel(ctx) {
     `;
 
     setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions, ctx);
-    setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID);
-    setupClearButton("ingest-clear-btn", RESULTS_LIST_ID);
+    setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID, ctx);
+    setupClearButton("ingest-clear-btn", RESULTS_LIST_ID, ctx);
     setupScanFolderButton(
         "ingest-scan-folder-btn",
         PATH_INPUT_ID,
         RESULTS_LIST_ID,
         ctx,
     );
-    setupManualIngestHandlers(RESULTS_LIST_ID);
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
     setupOrphanSection("ingest-orphan-section");
+    setupResultsListDelegation(RESULTS_LIST_ID, ctx);
+
+    // Restore cached tasks/results
+    if (state.cachedIngestResults && state.cachedIngestResults.length > 0) {
+        const list = document.getElementById(RESULTS_LIST_ID);
+        if (list) {
+            // Cache is newest-first, so appendChild maintains that visual order
+            state.cachedIngestResults.forEach(cached => {
+                if (cached.isBatch) {
+                    _appendBatchToDom(list, cached.report, cached.summary, true);
+                } else {
+                    _appendResultToDom(list, cached.result, cached.path, true);
+                }
+            });
+        }
+    }
 
     // Load any WAVs that were uploaded but not yet converted (status=3)
     getPendingConvert().then((pending) => {
@@ -160,9 +178,10 @@ export async function renderIngestionPanel(ctx) {
         const list = document.getElementById(RESULTS_LIST_ID);
         if (!list) return;
         pending.forEach((result) => {
-            list.prepend(createResultCard(result));
+            const path = result.staged_path || result.source_path;
+            list.prepend(createResultCard(result, path));
         });
-    }).catch(() => {});  // silently ignore on load failure
+    }).catch(() => { });  // silently ignore on load failure
 }
 
 function setupOrphanSection(sectionId) {
@@ -200,11 +219,31 @@ async function refreshOrphanList(body) {
             <div class="orphan-row" data-path="${escapeHtml(f.path)}">
                 <span class="orphan-name mono">${escapeHtml(f.filename)}</span>
                 <span class="muted-note orphan-size">${(f.size_bytes / 1024).toFixed(0)} KB</span>
-                <button class="ingest-btn-danger orphan-delete-btn" data-path="${escapeHtml(f.path)}">Delete</button>
+                <div class="row-actions">
+                    ${f.is_ghost ? `<button class="ingest-btn-primary orphan-reactivate-btn" data-path="${escapeHtml(f.path)}" data-ghost-id="${f.ghost_id}">Re-activate</button>` : ""}
+                    <button class="ingest-btn-danger orphan-delete-btn" data-path="${escapeHtml(f.path)}">Delete</button>
+                </div>
             </div>
         `,
             )
             .join("");
+
+        body.querySelectorAll(".orphan-reactivate-btn").forEach((btn) => {
+            btn.addEventListener("click", async () => {
+                const { path, ghostId } = btn.dataset;
+                btn.disabled = true;
+                btn.textContent = "Reactivating...";
+                try {
+                    await resolveConflict(ghostId, path);
+                    btn.closest(".orphan-row").remove();
+                    showToast("Song reactivated successfully!", "success");
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.textContent = "Re-activate";
+                    showToast(`Error: ${err.message}`, "error");
+                }
+            });
+        });
 
         body.querySelectorAll(".orphan-delete-btn").forEach((btn) => {
             btn.addEventListener("click", async () => {
@@ -282,19 +321,19 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
             }
 
             // Upload all collected files
-            const result = await uploadFiles(allFiles);
+            const response = await uploadFiles(allFiles);
+            if (!response.ok) throw new Error("Upload failed");
 
-            // Result is now BatchIngestReport
-            const summary = `Processed ${result.total_files} files: ${result.ingested} ingested, ${result.duplicates} duplicates, ${result.conflicts || 0} conflicts, ${result.errors} errors`;
-            appendBatchSummary(resultsId, result, summary);
+            await readNdjsonStream(response, (update) => {
+                if (update.error) { showToast(update.error, "error"); return; }
+                ctx.updateIngestBadges?.({ success: update.success, action: update.action, pending: update.pending });
+                const res = update.last_result;
+                if (res) {
+                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
+                    appendResult(resultsId, res, fileName, ctx);
+                }
+            });
 
-            // Show individual file results
-            for (const fileResult of result.results) {
-                const fileName =
-                    fileResult.song?.source_path?.split(/[/\\]/).pop() ||
-                    "Unknown";
-                appendResult(resultsId, fileResult, fileName, ctx);
-            }
         } catch (error) {
             console.error("Drop error:", error);
             appendResult(
@@ -309,7 +348,7 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
     });
 }
 
-function setupInputHandlers(inputId, btnId, resultsId) {
+function setupInputHandlers(inputId, btnId, resultsId, ctx) {
     const input = document.getElementById(inputId);
     const btn = document.getElementById(btnId);
     if (!input || !btn) return;
@@ -343,36 +382,9 @@ function setupInputHandlers(inputId, btnId, resultsId) {
     });
 }
 
-function setupManualIngestHandlers(resultsId) {
-    const container = document.getElementById(resultsId);
-    if (!container) return;
 
-    container.addEventListener("click", async (e) => {
-        const btn = e.target.closest(".manual-ingest-btn");
-        if (!btn) return;
 
-        const path = btn.dataset.path;
-        // In this MVP, we actually don't have a POST /ingest-by-path endpoint.
-        // The API only has POST /upload (binary).
-        // Since the user is on the same machine (host), we COULD implement /ingest-by-path.
-        // But for now, I'll alert that manual path ingestion requires server-side file access.
-        btn.disabled = true;
-        btn.textContent = "Uploading...";
-
-        try {
-            // For now, remind them to drop the file for instant ingestion.
-            throw new Error(
-                "Path-based ingestion restricted. Please drag and drop the physical file for instant ingestion.",
-            );
-        } catch (err) {
-            alert(err.message);
-            btn.disabled = false;
-            btn.textContent = "Ingest (Beta)";
-        }
-    });
-}
-
-function setupClearButton(btnId, resultsId) {
+function setupClearButton(btnId, resultsId, ctx) {
     const btn = document.getElementById(btnId);
     const list = document.getElementById(resultsId);
     if (!btn || !list) return;
@@ -381,6 +393,7 @@ function setupClearButton(btnId, resultsId) {
         list.innerHTML = "";
         const state = ctx.getState();
         if (state.ingestTasks) state.ingestTasks = [];
+        if (state.cachedIngestResults) state.cachedIngestResults = [];
     });
 }
 
@@ -408,9 +421,7 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
 
             // Show individual file results
             for (const fileResult of result.results) {
-                const fileName =
-                    fileResult.song?.source_path?.split(/[/\\]/).pop() ||
-                    "Unknown";
+                const fileName = basename(fileResult.song?.source_path) || basename(fileResult.staged_path) || "Unknown";
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
         } catch (error) {
@@ -445,19 +456,42 @@ function appendResult(resultsId, result, path, ctx) {
         state.ingestTasks.push({
             status: result.status,
             id: result.song?.id || result.ghost_id,
-            filename: path.split(/[/\\]/).pop() || path,
+            filename: basename(path) || path,
             path: path,
         });
     }
 
-    const item = createResultCard(result, path);
-    list.insertBefore(item, list.firstChild);
+    // Persist to cache
+    if (state.cachedIngestResults) {
+        state.cachedIngestResults.unshift({ isBatch: false, result, path });
+    }
+
+    _appendResultToDom(list, result, path, false);
 }
 
-function appendBatchSummary(resultsId, batchReport, summary) {
+function _appendResultToDom(list, result, path, appendAtEnd = false) {
+    const item = createResultCard(result, path);
+    if (appendAtEnd) {
+        list.appendChild(item);
+    } else {
+        list.insertBefore(item, list.firstChild);
+    }
+}
+
+function appendBatchSummary(resultsId, batchReport, summary, ctx) {
     const list = document.getElementById(resultsId);
     if (!list) return;
 
+    // Persist to cache
+    const state = ctx.getState();
+    if (state.cachedIngestResults) {
+        state.cachedIngestResults.unshift({ isBatch: true, report: batchReport, summary });
+    }
+
+    _appendBatchToDom(list, batchReport, summary, false);
+}
+
+function _appendBatchToDom(list, batchReport, summary, appendAtEnd = false) {
     const card = document.createElement("article");
     card.className = "result-card batch-summary-card";
 
@@ -499,7 +533,11 @@ function appendBatchSummary(resultsId, batchReport, summary) {
         </div>
     `;
 
-    list.insertBefore(card, list.firstChild);
+    if (appendAtEnd) {
+        list.appendChild(card);
+    } else {
+        list.insertBefore(card, list.firstChild);
+    }
 }
 
 function createResultCard(result, path) {
@@ -540,7 +578,7 @@ function createResultCard(result, path) {
     const title =
         status === "CONFLICT" && result.title
             ? result.title
-            : song?.media_name || song?.title || "Unknown Title";
+            : song?.media_name || song?.title || basename(result.staged_path) || "Unknown Title";
     const artist = song?.display_artist || "-";
 
     // Helper to format duration (seconds to MM:SS)
@@ -562,9 +600,8 @@ function createResultCard(result, path) {
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
 
-            ${
-                status === "CONFLICT"
-                    ? `
+            ${status === "CONFLICT"
+            ? `
                 <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #ff9500; font-weight: 600;">EXISTING GHOST RECORD (Soft-Deleted)</div>
                     <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; font-size: 0.85rem;">
@@ -593,12 +630,11 @@ function createResultCard(result, path) {
                     </div>
                 </div>
             `
-                    : ""
-            }
+            : ""
+        }
 
-            ${
-                status === "PENDING_CONVERT"
-                    ? `
+            ${status === "PENDING_CONVERT"
+            ? `
                 <div class="pending-convert-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
                         This WAV file needs to be converted to MP3 before ingestion.
@@ -608,12 +644,11 @@ function createResultCard(result, path) {
                     </button>
                 </div>
             `
-                    : ""
-            }
+            : ""
+        }
 
-            ${
-                status === "INGESTED"
-                    ? `
+            ${status === "INGESTED"
+            ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
@@ -621,29 +656,27 @@ function createResultCard(result, path) {
                     <span class="muted-note">• UUID Staged</span>
                 </div>
             `
-                    : ""
-            }
+            : ""
+        }
 
-            ${
-                status === "NEW"
-                    ? `
+            ${status === "NEW"
+            ? `
                 <div class="ingest-actions-row">
                     <span class="muted-note">Verified. Drop physical file to commit.</span>
                 </div>
             `
-                    : ""
-            }
+            : ""
+        }
         </div>
-        ${
-            song
-                ? `
+        ${song
+            ? `
             <div class="ingest-meta">
                 ${song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
                 ${song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
                 ${song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
             </div>
         `
-                : ""
+            : ""
         }
     `;
 
@@ -686,5 +719,81 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
                 // Refresh logic if needed
             },
         });
+    });
+}
+
+/**
+ * Handles clicks on the results list via delegation for performance and stability.
+ */
+function setupResultsListDelegation(resultsId, ctx) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+
+    list.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button");
+        if (!btn || !btn.dataset.action) return;
+
+        const action = btn.dataset.action;
+        const path = btn.dataset.stagedPath;
+
+        if (action === "resolve-conflict") {
+            const ghostId = btn.dataset.ghostId;
+            btn.disabled = true;
+            btn.textContent = "Reactivating...";
+            try {
+                const res = await fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(path)}`, {
+                    method: "POST"
+                });
+                if (!res.ok) throw new Error("Reactivation failed");
+                const data = await res.json();
+                
+                // Update the card UI and state
+                const card = btn.closest(".result-card");
+                if (card) {
+                    // Re-render the specific card or just update it
+                    const newResult = { ...data, status: "INGESTED" };
+                    card.replaceWith(createResultCard(newResult, path));
+                    
+                    // Update cache
+                    ctx.updateCachedIngestResult?.(path, newResult);
+                }
+                showToast("Song reactivated successfully!", "success");
+                
+                // Sync badges
+                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = "Re-ingest & Activate";
+                showToast(`Error: ${err.message}`, "error");
+            }
+        } else if (action === "convert-wav") {
+            btn.disabled = true;
+            btn.textContent = "Converting...";
+            try {
+                const res = await fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(path)}`, {
+                    method: "POST"
+                });
+                if (!res.ok) throw new Error("Conversion failed");
+                const data = await res.json();
+
+                const card = btn.closest(".result-card");
+                if (card) {
+                    card.replaceWith(createResultCard(data, path));
+                    ctx.updateCachedIngestResult?.(path, data);
+                }
+                showToast("WAV converted and ingested!", "success");
+                
+                // Sync badges
+                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = "Convert & Ingest";
+                showToast(`Error: ${err.message}`, "error");
+            }
+        } else if (action === "navigate-search") {
+            const mode = btn.dataset.mode || "songs";
+            const query = btn.dataset.query || "";
+            ctx.navigate(mode, query);
+        }
     });
 }

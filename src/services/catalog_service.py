@@ -1,7 +1,4 @@
 # TODO: Split this class into IngestionService, QueryService, EditService — it's 1594 lines
-import os
-import re
-from pathlib import Path
 import sqlite3
 from typing import Optional, List, Dict, Any
 from src.data.album_repository import AlbumRepository
@@ -20,20 +17,15 @@ from src.models.domain import (
     Identity,
     Publisher,
     SongCredit,
-    AlbumCredit,
     Tag,
 )
-from src.utils.audio_hash import calculate_audio_hash
-from src.models.exceptions import ReingestionConflictError
 
-from src.services.logger import logger
 from src.services.metadata_parser import MetadataParser
 from src.engine.config import (
     STAGING_DIR,
     SCALAR_VALIDATION,
     LIBRARY_ROOT,
     get_db_path,
-    AUTO_SAVE_ID3,
 )
 from src.services.identity_service import IdentityService
 from src.services.library_service import LibraryService
@@ -71,21 +63,12 @@ class CatalogService:
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
         self._audit_repo = AuditRepository(db_path)
-        self._identity_service = IdentityService(db_path, identity_repo=self._identity_repo)
+        self._identity_service = IdentityService(
+            db_path, identity_repo=self._identity_repo
+        )
         self._library_service = LibraryService(db_path)
         self._ingestion_service = IngestionService(
-            db_path, 
-            self._library_service,
-            song_repo=self._song_repo,
-            album_repo_dir=self._album_repo_dir,
-            credit_repo=self._credit_repo,
-            album_repo=self._album_repo,
-            pub_repo=self._pub_repo,
-            tag_repo=self._tag_repo,
-            identity_repo=self._identity_repo
-        )
-        self._edit_service = EditService(
-            db_path, 
+            db_path,
             self._library_service,
             song_repo=self._song_repo,
             album_repo_dir=self._album_repo_dir,
@@ -94,7 +77,18 @@ class CatalogService:
             pub_repo=self._pub_repo,
             tag_repo=self._tag_repo,
             identity_repo=self._identity_repo,
-            album_credit_repo=self._album_credit_repo
+        )
+        self._edit_service = EditService(
+            db_path,
+            self._library_service,
+            song_repo=self._song_repo,
+            album_repo_dir=self._album_repo_dir,
+            credit_repo=self._credit_repo,
+            album_repo=self._album_repo,
+            pub_repo=self._pub_repo,
+            tag_repo=self._tag_repo,
+            identity_repo=self._identity_repo,
+            album_credit_repo=self._album_credit_repo,
         )
 
         self._metadata_parser = MetadataParser()
@@ -141,7 +135,6 @@ class CatalogService:
         """Soft-delete a single song. Handles physical cleanup if in staging."""
         return self._edit_service.delete_song(song_id, staging_dir=STAGING_DIR)
 
-
     def resolve_conflict(self, ghost_id: int, staged_path: str) -> Dict[str, Any]:
         """Resolve a ghost conflict by re-activating the soft-deleted record."""
         return self._ingestion_service.resolve_conflict(ghost_id, staged_path)
@@ -166,7 +159,9 @@ class CatalogService:
         self, identity_id: int, display_name: str, name_id: Optional[int] = None
     ) -> int:
         """Link a new or existing alias name to an identity (Truth-First mapping)."""
-        return self._identity_service.add_identity_alias(identity_id, display_name, name_id)
+        return self._identity_service.add_identity_alias(
+            identity_id, display_name, name_id
+        )
 
     def remove_identity_alias(self, name_id: int) -> None:
         """Remove an alias from an identity."""
@@ -176,7 +171,9 @@ class CatalogService:
         self, identity_id: int, legal_name: Optional[str]
     ) -> None:
         """Update the LegalName on an Identity."""
-        return self._identity_service.update_identity_legal_name(identity_id, legal_name)
+        return self._identity_service.update_identity_legal_name(
+            identity_id, legal_name
+        )
 
     def publisher_exists(self, name: str) -> bool:
         """Return True if a Publisher with this exact name exists."""
@@ -328,9 +325,10 @@ class CatalogService:
 
     def update_song_scalars(self, song_id: int, fields: Dict[str, Any]) -> Song:
         """Delegate scalar updates to EditService."""
-        self._edit_service.update_song_scalars(song_id, fields, scalar_rules=SCALAR_VALIDATION)
+        self._edit_service.update_song_scalars(
+            song_id, fields, scalar_rules=SCALAR_VALIDATION
+        )
         return self.get_song(song_id)
-
 
     def get_all_roles(self) -> list[str]:
         return self._credit_repo.get_all_roles()
@@ -343,7 +341,9 @@ class CatalogService:
         identity_id: Optional[int] = None,
     ) -> SongCredit:
         """Add artist credit via EditService."""
-        return self._edit_service.add_song_credit(song_id, display_name, role_name, identity_id)
+        return self._edit_service.add_song_credit(
+            song_id, display_name, role_name, identity_id
+        )
 
     def remove_song_credit(self, song_id: int, credit_id: int) -> None:
         """Remove a credit link via EditService."""
@@ -355,7 +355,9 @@ class CatalogService:
 
     def merge_identity_into(self, source_name_id: int, target_name_id: int) -> None:
         """Merges a solo identity via IdentityService."""
-        return self._identity_service.merge_identity_into(source_name_id, target_name_id)
+        return self._identity_service.merge_identity_into(
+            source_name_id, target_name_id
+        )
 
     def set_identity_type(self, identity_id: int, type_: str) -> None:
         """Convert an identity between person and group."""
@@ -377,7 +379,9 @@ class CatalogService:
         disc_number: Optional[int] = None,
     ) -> SongAlbum:
         """Link an existing album via EditService."""
-        return self._edit_service.add_song_album(song_id, album_id, track_number, disc_number)
+        return self._edit_service.add_song_album(
+            song_id, album_id, track_number, disc_number
+        )
 
     def create_and_link_album(
         self,
@@ -387,7 +391,9 @@ class CatalogService:
         disc_number: Optional[int] = None,
     ) -> SongAlbum:
         """Create and link album via EditService."""
-        return self._edit_service.create_and_link_album(song_id, album_data, track_number, disc_number)
+        return self._edit_service.create_and_link_album(
+            song_id, album_data, track_number, disc_number
+        )
 
     def remove_song_album(self, song_id: int, album_id: int) -> None:
         """Unlink album via EditService."""
@@ -401,7 +407,9 @@ class CatalogService:
         disc_number: Optional[int] = None,
     ) -> None:
         """Update link metadata via EditService."""
-        return self._edit_service.update_song_album_link(song_id, album_id, track_number, disc_number)
+        return self._edit_service.update_song_album_link(
+            song_id, album_id, track_number, disc_number
+        )
 
     def update_album(self, album_id: int, album_data: dict) -> Album:
         """Update album record via EditService."""
@@ -415,7 +423,9 @@ class CatalogService:
         identity_id: Optional[int] = None,
     ) -> int:
         """Add album credit via EditService."""
-        return self._edit_service.add_album_credit(album_id, display_name, role_name, identity_id)
+        return self._edit_service.add_album_credit(
+            album_id, display_name, role_name, identity_id
+        )
 
     def remove_album_credit(self, album_id: int, artist_name_id: int) -> None:
         """Remove album credit via EditService."""
@@ -428,7 +438,9 @@ class CatalogService:
         publisher_id: Optional[int] = None,
     ) -> Publisher:
         """Add album publisher via EditService."""
-        return self._edit_service.add_album_publisher(album_id, publisher_name, publisher_id)
+        return self._edit_service.add_album_publisher(
+            album_id, publisher_name, publisher_id
+        )
 
     def remove_album_publisher(self, album_id: int, publisher_id: int) -> None:
         """Remove album publisher via EditService."""
@@ -479,7 +491,9 @@ class CatalogService:
         publisher_id: Optional[int] = None,
     ) -> Publisher:
         """Add song publisher via EditService."""
-        return self._edit_service.add_song_publisher(song_id, publisher_name, publisher_id)
+        return self._edit_service.add_song_publisher(
+            song_id, publisher_name, publisher_id
+        )
 
     def remove_song_publisher(self, song_id: int, publisher_id: int) -> None:
         """Remove song publisher via EditService."""
@@ -505,5 +519,6 @@ class CatalogService:
 
     def move_song_to_library(self, song_id: int) -> str:
         """Organize library via EditService."""
-        return self._edit_service.move_song_to_library(song_id, library_root_path=LIBRARY_ROOT)
-
+        return self._edit_service.move_song_to_library(
+            song_id, library_root_path=LIBRARY_ROOT
+        )

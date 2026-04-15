@@ -3,7 +3,11 @@ import shutil
 from uuid import uuid4
 from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.encoders import jsonable_encoder
+import json
+import asyncio
 
 from src.models.view_models import (
     SongView,
@@ -11,6 +15,7 @@ from src.models.view_models import (
     BatchIngestReport,
     IngestionReportView,
     CleanupOriginalRequest,
+    IngestStatusModel,
 )
 from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
@@ -21,6 +26,7 @@ from src.engine.config import (
     WAV_AUTO_CONVERT,
     get_downloads_folder,
 )
+from src.utils.audio_hash import calculate_audio_hash
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 
@@ -42,119 +48,83 @@ async def get_accepted_formats():
     return JSONResponse({"extensions": ACCEPTED_EXTENSIONS})
 
 
-@router.post("/upload", response_model=BatchIngestReport)
-async def upload_files(files: list[UploadFile] = File(...)) -> BatchIngestReport:
-    """
-    Physical file ingestion entry point (supports batch uploads).
-    Browser automatically flattens folders into individual files.
+@router.get("/status", response_model=IngestStatusModel)
+async def get_ingest_status():
+    """Returns the 'Whole Model' (pending/success/action) for the active session."""
+    service = _get_service()
+    status = service._ingestion_service.get_session_status()
+    return status
 
-    1. Validate extensions
-    2. Save all files to STAGING_DIR with UUID filenames
-    3. Orchestrate batch ingestion via CatalogService
-    4. Return BatchIngestReport with aggregate stats and per-file results.
+
+@router.post("/reset-status")
+async def reset_ingest_status():
+    """Resets the session-wide success/action counters."""
+    _get_service()._ingestion_service.reset_session_status()
+    return {"status": "RESET"}
+
+
+@router.post("/upload")
+async def upload_files(files: list[UploadFile] = File(...)):
+    """
+    Refactored to stream the 'Whole Model' status.
+    Uses SSE-style newline-delimited JSON chunks.
     """
     logger.info(f"[IngestRouter] -> upload_files(count={len(files)})")
 
-    # 1. Ensure staging exists
-    if not os.path.exists(STAGING_DIR):
-        os.makedirs(STAGING_DIR, exist_ok=True)
+    os.makedirs(STAGING_DIR, exist_ok=True)
 
-    # 2. Stage all valid files
     staged_paths = []
     for file in files:
-        # Validate filename
         if not file.filename:
-            logger.warning("[IngestRouter] Skipping file with no filename")
             continue
-
-        # Validate extension
-        file_ext = Path(file.filename).suffix.lower()
-        if file_ext not in ACCEPTED_EXTENSIONS:
-            logger.warning(
-                f"[IngestRouter] Skipping file with invalid extension '{file_ext}': {file.filename}"
-            )
+        if Path(file.filename).suffix.lower() not in ACCEPTED_EXTENSIONS:
             continue
-
-        # Save to staging with UUID filename to prevent collisions
-        uuid_filename = f"{uuid4()}_{file.filename}"
-        staged_path = os.path.join(STAGING_DIR, uuid_filename)
-
+        staged_path = os.path.join(STAGING_DIR, f"{uuid4()}_{file.filename}")
         try:
             with open(staged_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             staged_paths.append(staged_path)
-            logger.debug(f"[IngestRouter] Staged: {file.filename} -> {staged_path}")
         except Exception as e:
             logger.error(f"[IngestRouter] Failed to stage {file.filename}: {e}")
-            # Continue with other files instead of failing the entire batch
 
     if not staged_paths:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
-        )
-
-    # 3. Split WAVs from non-WAVs
-    wav_paths = [p for p in staged_paths if Path(p).suffix.lower() == ".wav"]
-    ingest_paths = [p for p in staged_paths if Path(p).suffix.lower() != ".wav"]
+        raise HTTPException(status_code=400, detail="No valid audio files found.")
 
     service = _get_service()
-    wav_results = []
+    task_id = str(uuid4())
+    service._ingestion_service.register_task(task_id, len(staged_paths))
 
-    if wav_paths:
-        # Always ingest WAVs as status=3 (Converting) immediately so the DB record exists.
-        # The frontend will show a PENDING_CONVERT card; the user confirms conversion via /convert-wav.
-        for wav in wav_paths:
-            result = service.ingest_wav_as_converting(wav)
-            if result["status"] == "CONVERTING":
-                result["status"] = "PENDING_CONVERT"
-            if result.get("song"):
-                result["song"] = SongView.from_domain(result["song"])
-            result["staged_path"] = wav
-            wav_results.append(result)
+    async def _stream_ingest():
+        try:
+            yield f"{json.dumps(jsonable_encoder(service._ingestion_service.get_session_status()))}\n"
+            await asyncio.sleep(0)
 
-    # 4. Batch ingest non-WAVs
-    if not ingest_paths and not wav_results:
-        raise HTTPException(
-            status_code=400,
-            detail=f"No valid audio files found. Accepted extensions: {ACCEPTED_EXTENSIONS}",
-        )
+            for p in staged_paths:
+                if Path(p).suffix.lower() == ".wav":
+                    res = await run_in_threadpool(service.ingest_wav_as_converting, p)
+                    if res["status"] == "CONVERTING":
+                        res["status"] = "PENDING_CONVERT"
+                    if res.get("song"):
+                        res["song"] = SongView.from_domain(res["song"])
+                    res["staged_path"] = p
+                else:
+                    res = await run_in_threadpool(
+                        service._ingestion_service._ingest_single, p
+                    )
+                    if res.get("song"):
+                        res["song"] = SongView.from_domain(res["song"])
 
-    try:
-        combined_results = list(wav_results)
-        if ingest_paths:
-            batch_report = service.ingest_batch(ingest_paths)
-            for result in batch_report["results"]:
-                if "song" in result and result["song"]:
-                    result["song"] = SongView.from_domain(result["song"])
-            combined_results.extend(batch_report["results"])
+                service._ingestion_service._update_task(task_id, res["status"])
 
-        total = len(combined_results)
-        ingested = sum(
-            1
-            for r in combined_results
-            if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
-        )
-        duplicates = sum(
-            1
-            for r in combined_results
-            if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")
-        )
-        errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
+                status = service._ingestion_service.get_session_status()
+                yield f"{json.dumps(jsonable_encoder({**status, 'last_result': res}))}\n"
+                await asyncio.sleep(0)
 
-        return BatchIngestReport(
-            total_files=total,
-            ingested=ingested,
-            duplicates=duplicates,
-            errors=errors,
-            results=combined_results,
-        )
+        except Exception as e:
+            logger.error(f"[IngestRouter] Stream error: {e}")
+            yield f"{json.dumps({'error': str(e)})}\n"
 
-    except Exception as e:
-        logger.error(f"[IngestRouter] Batch ingestion error: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
-        )
+    return StreamingResponse(_stream_ingest(), media_type="application/x-ndjson")
 
 
 @router.post("/convert-wav")
@@ -249,9 +219,7 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
             detail=f"No audio files found in {request.folder_path}. Accepted extensions: {ACCEPTED_EXTENSIONS}",
         )
 
-    # 2. Ensure staging exists
-    if not os.path.exists(STAGING_DIR):
-        os.makedirs(STAGING_DIR, exist_ok=True)
+    os.makedirs(STAGING_DIR, exist_ok=True)
 
     # 3. Copy files to staging
     staged_paths = []
@@ -434,13 +402,19 @@ async def get_staging_orphans():
         fpath = os.path.join(STAGING_DIR, fname)
         if not os.path.isfile(fpath):
             continue
-        song = service._song_repo.get_by_path(fpath)
-        if song is None:
+        # Ghost check: Hash discovery (No new methods, reusing MediaSourceRepository logic)
+        audio_hash = calculate_audio_hash(fpath)
+        existing = service._song_repo.get_source_metadata_by_hash(audio_hash)
+
+        # If no record exists, OR if it's a soft-deleted ghost, it belongs in the Orphans section
+        if not existing or existing["is_deleted"]:
             orphans.append(
                 {
                     "filename": fname,
                     "path": fpath,
                     "size_bytes": os.path.getsize(fpath),
+                    "is_ghost": bool(existing and existing["is_deleted"]),
+                    "ghost_id": existing["id"] if existing else None,
                 }
             )
 

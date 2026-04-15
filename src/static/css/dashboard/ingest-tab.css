@@ -13,34 +13,45 @@
     background: var(--accent-glow);
 }
 
-.ingest-badge {
+.ingest-badge-container {
     position: absolute;
     top: -10px;
-    right: -12px;
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 700;
-    height: 22px;
-    border-radius: 999px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    pointer-events: none;
+}
+
+.ingest-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 8px;
-    line-height: 1;
+    height: 22px;
+    min-width: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     white-space: nowrap;
+    line-height: 1;
+    cursor: pointer;
+    pointer-events: all;
 }
 
-.ingest-badge[data-badge-type="success"] {
-    background: var(--success);
+
+.ingest-badge.pending {
+    background: #f97316; /* Orange */
 }
 
-.ingest-badge[data-badge-type="success"]:hover {
-    filter: brightness(1.15);
+.ingest-badge.success {
+    background: #22c55e; /* Green */
 }
 
-.ingest-badge[data-badge-type="action"] {
-    background: var(--danger);
+.ingest-badge.danger {
+    background: #ef4444; /* Red */
 }
 
 @keyframes spin {

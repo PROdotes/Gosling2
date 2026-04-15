@@ -19,6 +19,7 @@ from src.models.domain import (
 )
 from src.services.logger import logger
 
+
 class LibraryService:
     """Specialized orchestrator for Reading and Hydrating the music catalog."""
 
@@ -65,7 +66,9 @@ class LibraryService:
         with self._album_repo_dir.get_connection() as conn:
             album = self._album_repo_dir.get_by_id(album_id, conn=conn)
             if not album:
-                logger.warning(f"[LibraryService] <- get_album(id={album_id}) NOT_FOUND")
+                logger.warning(
+                    f"[LibraryService] <- get_album(id={album_id}) NOT_FOUND"
+                )
                 return None
 
             hydrated = self._hydrate_albums([album], conn=conn)
@@ -73,7 +76,9 @@ class LibraryService:
                 return None
 
             result = hydrated[0]
-            logger.debug(f"[LibraryService] <- get_album(id={album_id}) '{result.title}'")
+            logger.debug(
+                f"[LibraryService] <- get_album(id={album_id}) '{result.title}'"
+            )
             return result
 
     def search_albums_slim(self, query: str) -> List[dict]:

@@ -62,7 +62,7 @@ export class NavigationHandler {
 
     async handleSwitchMode(actionTarget) {
         const { mode } = actionTarget.dataset;
-        this.ctx.switchMode?.(mode);
+        await this.ctx.switchMode?.(mode);
     }
 
     async handleRefreshResults(actionTarget) {
@@ -413,7 +413,7 @@ export class NavigationHandler {
     async handleBulkDeleteUnlinkedTags() {
         if (!await showConfirm("Delete all unlinked tags? This cannot be undone.")) return;
         try {
-            const result = await api.bulkDeleteUnlinkedTags();
+            await api.bulkDeleteUnlinkedTags();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });

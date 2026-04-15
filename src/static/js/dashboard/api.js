@@ -239,15 +239,46 @@ export async function getAcceptedFormats() {
 
 export function uploadFiles(files) {
     const formData = new FormData();
-    // Support both single file and array of files
     const fileArray = Array.isArray(files) ? files : [files];
     for (const file of fileArray) {
         formData.append("files", file);
     }
-    return fetchJson("/api/v1/ingest/upload", {
+    return fetch("/api/v1/ingest/upload", { method: "POST", body: formData });
+}
+
+export function getIngestStatus() {
+    return fetchJson("/api/v1/ingest/status");
+}
+
+export function resolveConflict(ghostId, stagedPath) {
+    return fetchJson(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
         method: "POST",
-        body: formData,
     });
+}
+
+/**
+ * Reads a streaming NDJSON response line-by-line, calling onUpdate for each parsed object.
+ * Handles chunked delivery and partial-line buffering.
+ */
+export async function readNdjsonStream(response, onUpdate) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+                onUpdate(JSON.parse(line));
+            } catch (e) {
+                console.error("NDJSON parse error:", line, e);
+            }
+        }
+    }
 }
 
 export function scanFolder(folderPath, recursive = true) {

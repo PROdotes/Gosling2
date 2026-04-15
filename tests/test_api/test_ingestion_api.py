@@ -11,9 +11,26 @@ is fully covered in tests/test_services/test_ingestion_service.py
 against the real repository with zero mocking.
 """
 
+import json
 import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app
+
+
+def collect_upload_stream(resp):
+    """Parse NDJSON upload stream into a BatchIngestReport-shaped dict."""
+    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+    frames = [json.loads(l) for l in lines]
+    results = [f["last_result"] for f in frames if f.get("last_result")]
+    return {
+        "total_files": len(results),
+        "ingested": sum(1 for r in results if r.get("status") in ("INGESTED", "PENDING_CONVERT", "CONVERTING")),
+        "duplicates": sum(1 for r in results if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")),
+        "conflicts": sum(1 for r in results if r.get("status") == "CONFLICT"),
+        "errors": sum(1 for r in results if r.get("status") == "ERROR"),
+        "pending_conversion": sum(1 for r in results if r.get("status") == "PENDING_CONVERT"),
+        "results": results,
+    }
 
 EXPECTED_INGESTION_FIELDS = {
     "status",
@@ -201,32 +218,15 @@ class TestBatchUploadApi:
         # Should get 200 even if ingestion logic fails (batch report still returned)
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
-        data = resp.json()
-        assert (
-            set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS
-        ), f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
-
-        # Verify all fields have correct types
-        assert isinstance(
-            data["total_files"], int
-        ), f"Expected total_files to be int, got {type(data['total_files'])}"
-        assert isinstance(
-            data["ingested"], int
-        ), f"Expected ingested to be int, got {type(data['ingested'])}"
-        assert isinstance(
-            data["duplicates"], int
-        ), f"Expected duplicates to be int, got {type(data['duplicates'])}"
-        assert isinstance(
-            data["errors"], int
-        ), f"Expected errors to be int, got {type(data['errors'])}"
-        assert isinstance(
-            data["results"], list
-        ), f"Expected results to be list, got {type(data['results'])}"
-
-        # Total should be at least 1 (the file we uploaded)
-        assert (
-            data["total_files"] >= 1
-        ), f"Expected at least 1 total_file, got {data['total_files']}"
+        data = collect_upload_stream(resp)
+        assert set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS, \
+            f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
+        assert isinstance(data["total_files"], int)
+        assert isinstance(data["ingested"], int)
+        assert isinstance(data["duplicates"], int)
+        assert isinstance(data["errors"], int)
+        assert isinstance(data["results"], list)
+        assert data["total_files"] >= 1, f"Expected at least 1 total_file, got {data['total_files']}"
 
     def test_mixed_valid_invalid_files_filters_correctly(self, client, tmp_path):
         """Mix of .mp3 and .txt files only processes .mp3 files."""
@@ -253,11 +253,8 @@ class TestBatchUploadApi:
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
-        data = resp.json()
-        # Should process 2 mp3 files (txt skipped)
-        assert (
-            data["total_files"] == 2
-        ), f"Expected 2 files processed, got {data['total_files']}"
+        data = collect_upload_stream(resp)
+        assert data["total_files"] == 2, f"Expected 2 files processed, got {data['total_files']}"
 
 
 class TestScanFolderApi:

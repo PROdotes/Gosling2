@@ -36,6 +36,8 @@ import {
     setPublisherParent,
     updatePublisher,
     updateTag,
+    getIngestStatus,
+    readNdjsonStream,
     uploadFiles,
 } from "./api.js";
 import { openEditModal } from "./components/edit_modal.js";
@@ -55,6 +57,7 @@ import {
 } from "./components/spotify_modal.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {
+    basename,
     formatCountLabel,
     isModalOpen,
     renderEmptyState,
@@ -110,6 +113,7 @@ const state = {
     cachedAlbums: [],
     cachedPublishers: [],
     cachedTags: [],
+    cachedIngestResults: [], // Persistent storage for ingestion results
     displayedItems: [], // Track currently displayed items in visual order (for keyboard nav)
     debounceTimer: null,
     currentQuery: "",
@@ -120,9 +124,12 @@ const state = {
     id3Frames: null,
     allRoles: [],
     activeSong: null,
-    allowedExtensions: [],
+    currentMode: "songs", // Renaming activeView to currentMode for consistency
     successCount: 0,
     actionCount: 0,
+    pendingCount: 0,
+    lastSearch: "",
+    allowedExtensions: [],
     searchEngines: {},
     defaultSearchEngine: null,
 };
@@ -194,7 +201,7 @@ const ctx = {
                     elements.totalCount.style.display = "";
                     elements.statSep.style.display = "";
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
         const isFiltered =
             (state.currentQuery || filterSidebar.hasActiveFilters()) &&
@@ -237,6 +244,16 @@ const ctx = {
     openSelectedResult,
     updateSelection,
     updateIngestBadges,
+    updateCachedIngestResult(path, patch) {
+        const state = getState();
+        const idx = state.cachedIngestResults.findIndex(r => r.path === path);
+        if (idx >= 0) {
+            state.cachedIngestResults[idx].result = {
+                ...state.cachedIngestResults[idx].result,
+                ...patch
+            };
+        }
+    },
     abortDetailRequest,
 };
 
@@ -369,7 +386,7 @@ async function performSearch(query = state.currentQuery) {
     }
 }
 
-function switchMode(mode) {
+async function switchMode(mode) {
     if (!modeConfig[mode]) {
         return;
     }
@@ -381,10 +398,14 @@ function switchMode(mode) {
     state.currentQuery = "";
     state.selectedIndex = -1;
 
-    // Aligned to Blueprint: Entering Ingest mode clears the action badge
-    if (mode === "ingest") {
-        state.actionCount = 0;
-        updateIngestBadges();
+    // Aligned to Blueprint: Entering Ingest mode clears the session counters
+    if (mode === "ingest" && state.pendingCount > 0) {
+        try {
+            const status = await getIngestStatus();
+            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+        } catch (e) {
+            console.error("Failed to sync ingest status:", e);
+        }
     }
     elements.searchInput.value = "";
     syncModeUi();
@@ -640,42 +661,55 @@ async function openSelectedResult(index) {
     }
 }
 
-function updateIngestBadges(successDelta = 0, actionDelta = 0) {
+/**
+ * Updates the Triple-Badge system on the Ingest tab.
+ * @param {Object} counts - {success?, action?, pending?} deltas or absolute values
+ * @param {boolean} replace - If true, replaces the counts instead of adding
+ */
+function updateIngestBadges(counts = {}) {
     const tab = document.querySelector(".mode-tab[data-mode='ingest']");
     if (!tab) return;
 
-    state.successCount += successDelta;
-    state.actionCount += actionDelta;
+    // Sync state (Absolute only, NO MATH)
+    state.successCount = counts.success ?? state.successCount;
+    state.actionCount = counts.action ?? state.actionCount;
+    state.pendingCount = counts.pending ?? state.pendingCount;
 
-    let badge = tab.querySelector(".ingest-badge");
+    // Remove old badge container
+    tab.querySelector(".ingest-badge-container")?.remove();
 
-    const total = state.actionCount + state.successCount;
-    if (total <= 0) {
-        if (badge) badge.remove();
-        return;
+    const total = state.pendingCount + state.successCount + state.actionCount;
+    if (total === 0) return;
+
+    const container = document.createElement("div");
+    container.className = "ingest-badge-container";
+
+    if (state.pendingCount > 0) {
+        const b = document.createElement("span");
+        b.className = "ingest-badge pending";
+        b.title = `${state.pendingCount} files currently processing`;
+        b.textContent = String(state.pendingCount);
+        container.appendChild(b);
     }
 
-    if (!badge) {
-        badge = document.createElement("span");
-        badge.className = "ingest-badge";
-        tab.appendChild(badge);
+    if (state.successCount > 0) {
+        const b = document.createElement("span");
+        b.className = "ingest-badge success";
+        b.title = `${state.successCount} songs newly ingested — click to refresh library`;
+        b.dataset.action = "refresh-results";
+        b.textContent = `↺ ${state.successCount}`;
+        container.appendChild(b);
     }
 
-    const isSuccess = state.actionCount === 0;
-    // Red (action) trumps Green (success)
-    badge.dataset.badgeType = isSuccess ? "success" : "action";
-
-    if (isSuccess) {
-        badge.textContent = `↺ ${total}`;
-        badge.title = "New songs ingested — click to refresh library";
-        badge.style.cursor = "pointer";
-        badge.dataset.action = "refresh-results";
-    } else {
-        badge.textContent = String(total);
-        badge.title = "";
-        badge.style.cursor = "default";
-        badge.removeAttribute("data-action");
+    if (state.actionCount > 0) {
+        const b = document.createElement("span");
+        b.className = "ingest-badge danger";
+        b.title = `${state.actionCount} songs need review (Conflicts/Errors)`;
+        b.textContent = String(state.actionCount);
+        container.appendChild(b);
     }
+
+    tab.appendChild(container);
 }
 
 async function setupHeaderDropZone() {
@@ -701,67 +735,37 @@ async function setupHeaderDropZone() {
         const items = e.dataTransfer?.items;
         if (!items || items.length === 0) return;
 
-        const allFiles = await collectFilesFromItems(
-            items,
-            state.allowedExtensions,
-        );
-
+        const allFiles = await collectFilesFromItems(items, state.allowedExtensions);
         if (allFiles.length === 0) {
             showToast("No valid audio files found in drop", "error", 3000);
             return;
         }
 
+        const formData = new FormData();
+        allFiles.forEach(f => formData.append("files", f));
+
         try {
-            const result = await uploadFiles(allFiles);
-            let successes = 0;
-            let actions = 0;
+            const response = await uploadFiles(allFiles);
+            if (!response.ok) throw new Error("Upload failed");
 
-            for (const fileResult of result.results) {
-                const title =
-                    fileResult.song?.media_name ||
-                    fileResult.title ||
-                    "Unknown";
-                const fileName =
-                    fileResult.song?.source_path?.split(/[/\\]/).pop() || title;
+            await readNdjsonStream(response, (update) => {
+                if (update.error) { showToast(update.error, "error"); return; }
 
-                if (fileResult.status === "INGESTED") {
-                    showToast(`Ingested: ${title}`, "success", 3000);
-                    successes++;
-                } else if (fileResult.status === "ALREADY_EXISTS") {
-                    showToast(`Duplicate: ${title}`, "warning", 5000);
-                } else if (fileResult.status === "CONFLICT") {
-                    showToast(
-                        `Ghost record: ${title} — action needed`,
-                        "error",
-                        0,
-                        {
-                            label: "Review",
-                            onClick: () => navigate("ingest"),
-                        },
-                    );
-                    actions++;
-                } else if (fileResult.status === "PENDING_CONVERT") {
-                    showToast(
-                        `Conversion required: ${fileName}`,
-                        "warning",
-                        0,
-                        {
-                            label: "Review",
-                            onClick: () => navigate("ingest"),
-                        },
-                    );
-                    actions++;
-                } else if (fileResult.status === "ERROR") {
-                    showToast(
-                        `Error: ${fileResult.message || "Upload failed"}`,
-                        "error",
-                        5000,
-                    );
+                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending });
+
+                const res = update.last_result;
+                if (res) {
+                    const title = res.song?.media_name || res.title || basename(res.staged_path) || "Unknown File";
+                    if (res.status === "INGESTED") showToast(`Ingested: ${title}`, "success", 2000);
+                    else if (res.status === "ALREADY_EXISTS") showToast(`Already exists: ${title}`, "info", 2000);
+                    else if (res.status === "CONFLICT") showToast(`Conflict: ${title}`, "error", 5000);
+                    else if (res.status === "ERROR") showToast(`Error: ${res.message || title}`, "error", 5000);
+                    else if (res.status === "PENDING_CONVERT") showToast(`WAV Staged: ${title}`, "info", 3000);
                 }
-            }
-            updateIngestBadges(successes, actions);
+            });
         } catch (error) {
-            showToast(`Upload failed: ${error.message}`, "error", 5000);
+            console.error("Ingestion failed:", error);
+            showToast("Ingestion failed: " + error.message, "error", 5000);
         }
     });
 }
@@ -841,3 +845,15 @@ Promise.all([
 });
 setupHeaderDropZone();
 performSearch("");
+
+// Restore in-progress badges on page reload
+(async () => {
+    try {
+        const status = await getIngestStatus();
+        if (status.pending > 0) {
+            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+        }
+    } catch (e) {
+        console.error("Initial ingest sync failed", e);
+    }
+})();

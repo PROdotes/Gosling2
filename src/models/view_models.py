@@ -539,6 +539,16 @@ class FolderScanRequest(BaseModel):
     recursive: bool = True
 
 
+class IngestStatusModel(BaseModel):
+    """The 'Whole Model' for the triple-badge system (Orange/Green/Red)."""
+
+    pending: int = 0
+    success: int = 0
+    action: int = 0
+    # Optional list of recent results to hydrate the UI results list
+    results: List[IngestionReportView] = []
+
+
 class BatchIngestReport(BaseModel):
     """The result of a batch ingestion operation."""
 
@@ -564,3 +574,4 @@ SongView.model_rebuild()
 AlbumView.model_rebuild()
 IngestionReportView.model_rebuild()
 BatchIngestReport.model_rebuild()
+IngestStatusModel.model_rebuild()

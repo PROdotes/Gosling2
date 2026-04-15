@@ -4,6 +4,7 @@
  */
 
 import * as api from "../api.js";
+import { showToast } from "../components/toast.js";
 import { isModalOpen } from "../components/utils.js";
 
 export async function updateSyncLed(songId) {
@@ -515,31 +516,15 @@ export class SongActionsHandler {
                 `/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`,
                 { method: "POST" },
             );
-            const data = await res.json();
-            const card = actionTarget.closest(".result-card");
-            if (
-                (data.status === "INGESTED" ||
-                    data.status === "ALREADY_EXISTS") &&
-                card
-            ) {
-                card.style.background = "rgba(76, 175, 80, 0.1)";
-                card.style.borderLeft = "3px solid #4CAF50";
-                const box = card.querySelector(".pending-convert-box");
-                const msg =
-                    data.status === "ALREADY_EXISTS"
-                        ? `✓ Already in library as "${data.song?.media_name || "Unknown"}"`
-                        : `✓ Converted & Ingested as "${data.song?.media_name || "Unknown"}"`;
-                if (box)
-                    box.innerHTML = `<div style="color: #4CAF50; font-weight: 600;">${msg}</div>`;
-            } else {
-                actionTarget.disabled = false;
-                actionTarget.textContent = originalText;
-                console.error("Conversion failed:", data.message);
+            if (!res.ok) throw new Error("Conversion failed");
+            showToast("Conversion started...", "info");
+            if (this.ctx.updateCachedIngestResult) {
+                this.ctx.updateCachedIngestResult(stagedPath, { status: "CONVERTING" });
             }
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
-            console.error("Error:", err.message);
+            showToast(`Error: ${err.message}`, "error");
         }
     }
 
@@ -550,29 +535,33 @@ export class SongActionsHandler {
         actionTarget.textContent = "Processing...";
 
         try {
-            const res = await fetch(
-                `/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`,
-                {
-                    method: "POST",
-                },
-            );
-            const data = await res.json();
+            const data = await api.resolveConflict(ghostId, stagedPath);
+
+            showToast("Song reactivated successfully!", "success");
+
             if (data.status === "INGESTED") {
                 const card = actionTarget.closest(".result-card");
                 if (card) {
-                    card.style.background = "rgba(76, 175, 80, 0.1)";
-                    card.style.borderLeft = "3px solid #4CAF50";
-                    const conflictBox = card.querySelector(
-                        '[style*="rgba(255, 149, 0"]',
-                    );
-                    if (conflictBox) {
-                        conflictBox.innerHTML = `
-                            <div style="color: #4CAF50; font-weight: 600; margin-bottom: 0.5rem;">✓ Ghost Record Reactivated</div>
-                            <div class="muted-note" style="font-size: 0.85rem;">
-                                Song "${data.song?.media_name || "Unknown"}" has been restored with new metadata.
+                    card.classList.remove("conflict");
+                    card.classList.add("ingested");
+                    card.innerHTML = `
+                        <div class="card-icon ingest-icon">&#10003;</div>
+                        <div class="card-body">
+                            <div class="card-title-row">
+                                <div class="card-title">Reactivated (Success)</div>
+                                <div class="file-status found">Ingested</div>
                             </div>
-                        `;
-                    }
+                            <div class="muted-note">Record restored with new file mapping.</div>
+                        </div>
+                    `;
+                }
+
+                if (this.ctx.updateIngestBadges) {
+                    const status = await api.getIngestStatus();
+                    this.ctx.updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+                }
+                if (this.ctx.updateCachedIngestResult) {
+                    this.ctx.updateCachedIngestResult(stagedPath, { status: "INGESTED", song: data.song });
                 }
             } else if (data.status === "PENDING_CONVERT") {
                 const card = actionTarget.closest(".result-card");
@@ -592,15 +581,11 @@ export class SongActionsHandler {
                         `;
                     }
                 }
-            } else {
-                actionTarget.disabled = false;
-                actionTarget.textContent = originalText;
-                console.error("Failed to reactivate:", data.message);
             }
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
-            console.error("Error:", err.message);
+            showToast(`Error: ${err.message}`, "error");
         }
     }
 

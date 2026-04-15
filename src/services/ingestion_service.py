@@ -1,5 +1,4 @@
 import os
-import re
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -12,15 +11,6 @@ from src.data.song_album_repository import SongAlbumRepository
 from src.data.publisher_repository import PublisherRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
-from src.models.domain import (
-    Song,
-    Album,
-    SongAlbum,
-    Identity,
-    Publisher,
-    SongCredit,
-    Tag,
-)
 from src.models.exceptions import ReingestionConflictError
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
@@ -34,12 +24,18 @@ from src.engine.config import (
     get_db_path,
 )
 
+
 class IngestionService:
     """Specialized orchestrator for checking, writing, and batching audio file ingestion."""
 
+    # Class-level state to ensure persistence across CatalogService re-instantiation
+    _active_tasks: Dict[str, Dict[str, Any]] = {}
+    _session_success: int = 0
+    _session_action: int = 0
+
     def __init__(
-        self, 
-        db_path: Optional[str] = None, 
+        self,
+        db_path: Optional[str] = None,
         library_service: Optional[LibraryService] = None,
         song_repo: Optional[SongRepository] = None,
         album_repo_dir: Optional[AlbumRepository] = None,
@@ -47,7 +43,7 @@ class IngestionService:
         album_repo: Optional[SongAlbumRepository] = None,
         pub_repo: Optional[PublisherRepository] = None,
         tag_repo: Optional[TagRepository] = None,
-        identity_repo: Optional[IdentityRepository] = None
+        identity_repo: Optional[IdentityRepository] = None,
     ):
         if db_path is None:
             db_path = get_db_path()
@@ -59,16 +55,70 @@ class IngestionService:
         self._pub_repo = pub_repo or PublisherRepository(db_path)
         self._tag_repo = tag_repo or TagRepository(db_path)
         self._identity_repo = identity_repo or IdentityRepository(db_path)
-        
+
         # Cross-service dependencies
         self._library_service = library_service or LibraryService(db_path)
-        
+
         # Ingestion Helpers
         self._metadata_service = MetadataService()
         self._metadata_parser = MetadataParser()
         self._filing_service = FilingService(RENAME_RULES_PATH)
         self._metadata_writer = MetadataWriter()
 
+    def get_session_status(self) -> Dict[str, int]:
+        """Return the 'Whole Model' for the UI: {pending, success, action}."""
+        pending = sum(
+            t["total"] - t["processed"] for t in IngestionService._active_tasks.values()
+        )
+        return {
+            "pending": max(0, pending),
+            "success": IngestionService._session_success,
+            "action": IngestionService._session_action,
+        }
+
+    def register_task(self, task_id: str, total: int) -> None:
+        """Register a new ingestion batch task."""
+        IngestionService._active_tasks[task_id] = {
+            "total": total,
+            "processed": 0,
+            "ingested": 0,
+            "duplicates": 0,
+            "conflicts": 0,
+            "errors": 0,
+            "results": [],
+        }
+
+    def _update_task(self, task_id: str, status_delta: str):
+        """Update the internal counters."""
+        if task_id not in IngestionService._active_tasks:
+            return
+
+        task = IngestionService._active_tasks[task_id]
+        if status_delta == "INGESTED":
+            task["ingested"] += 1
+            IngestionService._session_success += 1
+        elif status_delta == "ALREADY_EXISTS":
+            task["duplicates"] += 1
+            IngestionService._session_action += 1
+        elif status_delta == "CONFLICT":
+            task["conflicts"] += 1
+            IngestionService._session_action += 1
+        elif status_delta == "ERROR":
+            task["errors"] += 1
+            IngestionService._session_action += 1
+        elif status_delta == "PENDING_CONVERT":
+            IngestionService._session_action += 1
+
+        task["processed"] += 1
+        if task["processed"] >= task["total"]:
+            logger.info(f"[IngestionService] Task {task_id} completed: {task}")
+            del IngestionService._active_tasks[task_id]
+
+    @classmethod
+    def reset_session_status(cls):
+        """Reset the session counters."""
+        cls._session_success = 0
+        cls._session_action = 0
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """
@@ -126,14 +176,12 @@ class IngestionService:
 
         ghost_by_hash = self._song_repo.get_source_metadata_by_hash(audio_hash)
         if ghost_by_hash and ghost_by_hash.get("is_deleted"):
-            logger.info(
-                f"[IngestionService] <- check_ingestion(file_path='{file_path}') HASH_GHOST"
-            )
             return {
                 "status": "CONFLICT",
                 "match_type": "HASH",
                 "ghost_id": ghost_by_hash["id"],
                 "staged_path": file_path,
+                "title": ghost_by_hash.get("title", "Unknown"),
                 "ghost_song": ghost_by_hash,
                 "new_song": None,
             }
@@ -158,7 +206,6 @@ class IngestionService:
             year = parsed_song.year
 
             if title and performers:
-                # find_by_metadata now handles multiple artists to avoid "Single-Match" false duplicates
                 matches = self._song_repo.find_by_metadata(title, performers, year)
                 if matches:
                     logger.info(
@@ -179,28 +226,7 @@ class IngestionService:
             )
             return {"status": "NEW", "song": parsed_song}
         except Exception as e:
-            # Re-signal 409 CONFLICT if the error is a collision that happened during write
-            # (Ensures the UI sees the specific Ghost that blocked the commit)
-            if "UNIQUE constraint failed" in str(
-                e
-            ) or "ReingestionConflictError" in str(e):
-                if isinstance(e, ReingestionConflictError):
-                    ghost_id = e.ghost_id
-                    ghost_data = self._song_repo.get_source_metadata_by_hash(
-                        parsed_song.audio_hash
-                    )
-                    return {
-                        "status": "CONFLICT",
-                        "match_type": "HASH" if "audio_hash" in str(e) else "METADATA",
-                        "ghost_id": ghost_id,
-                        "staged_path": file_path,
-                        "ghost_song": ghost_data,
-                        "new_song": parsed_song,  # Show the metadata of the file we dropped
-                    }
-
-            logger.error(
-                f"[IngestionService] <- check_ingestion(file_path='{file_path}') ERROR: {e}"
-            )
+            logger.error(f"[IngestionService] check_ingestion internal error: {e}")
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
     def ingest_wav_as_converting(self, staged_path: str) -> Dict[str, Any]:
@@ -233,7 +259,9 @@ class IngestionService:
             return {"status": "CONVERTING", "song": hydrated_song}
         except Exception as e:
             conn.rollback()
-            logger.error(f"[IngestionService] <- ingest_wav_as_converting() FAILED: {e}")
+            logger.error(
+                f"[IngestionService] <- ingest_wav_as_converting() FAILED: {e}"
+            )
             if os.path.exists(staged_path):
                 os.remove(staged_path)
             return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
@@ -349,7 +377,10 @@ class IngestionService:
                     isrc=check["ghost_song"].get("isrc"),
                 )
 
-            if os.path.exists(staged_path):
+            if os.path.exists(staged_path) and check["status"] not in (
+                "CONFLICT",
+                "PENDING_CONVERT",
+            ):
                 os.remove(staged_path)
             return check
 
@@ -378,10 +409,14 @@ class IngestionService:
                     year=ghost_meta.get("year"),
                     isrc=ghost_meta.get("isrc"),
                 )
-            
+
             if os.path.exists(staged_path):
                 os.remove(staged_path)
-            return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
+            return {
+                "status": "ERROR",
+                "message": f"Ingestion failed: {str(e)}",
+                "staged_path": staged_path,
+            }
         finally:
             conn.close()
 
@@ -389,10 +424,14 @@ class IngestionService:
         """
         Resolve a ghost conflict by re-activating the soft-deleted record.
         """
-        logger.info(f"[IngestionService] -> resolve_conflict(ghost={ghost_id}, path='{staged_path}')")
+        logger.info(
+            f"[IngestionService] -> resolve_conflict(ghost={ghost_id}, path='{staged_path}')"
+        )
 
         if not os.path.exists(staged_path):
-            logger.error(f"[IngestionService] <- resolve_conflict FAILED: File not found: {staged_path}")
+            logger.error(
+                f"[IngestionService] <- resolve_conflict FAILED: File not found: {staged_path}"
+            )
             return {"status": "ERROR", "message": "Staged file not found"}
 
         is_wav = Path(staged_path).suffix.lower() == ".wav"
@@ -436,6 +475,7 @@ class IngestionService:
             return []
 
         from src.engine.config import ACCEPTED_EXTENSIONS
+
         audio_files = []
         if recursive:
             for root, _, files in os.walk(folder_path):
@@ -450,7 +490,9 @@ class IngestionService:
                         audio_files.append(file_path)
         return audio_files
 
-    def ingest_batch(self, file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]:
+    def ingest_batch(
+        self, file_paths: List[str], max_workers: int = 10
+    ) -> Dict[str, Any]:
         """
         Ingest multiple files in parallel.
         """
@@ -498,7 +540,12 @@ class IngestionService:
                 "song": None,
             }
         except Exception as e:
-            return {"status": "ERROR", "message": str(e), "song": None}
+            return {
+                "status": "ERROR",
+                "message": str(e),
+                "song": None,
+                "staged_path": file_path,
+            }
 
     def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (SIMULATED)."""

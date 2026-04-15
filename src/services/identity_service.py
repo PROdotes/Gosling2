@@ -1,16 +1,17 @@
-import sqlite3
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from src.data.identity_repository import IdentityRepository
 from src.models.domain import Identity
 from src.services.logger import logger
 
+
 class IdentityService:
     """Specialized orchestrator for Identity-domain logic (Persons, Groups, Aliases)."""
 
-    def __init__(self, db_path: str, identity_repo: Optional[IdentityRepository] = None):
+    def __init__(
+        self, db_path: str, identity_repo: Optional[IdentityRepository] = None
+    ):
         self._db_path = db_path
         self._identity_repo = identity_repo or IdentityRepository(db_path)
-
 
     def get_identity(self, identity_id: int) -> Optional[Identity]:
         """Fetch a full identity tree (Aliases/Members/Groups)."""
@@ -107,7 +108,9 @@ class IdentityService:
                 raise
             except Exception as e:
                 conn.rollback()
-                logger.error(f"[IdentityService] update_identity_legal_name failed: {e}")
+                logger.error(
+                    f"[IdentityService] update_identity_legal_name failed: {e}"
+                )
                 raise
 
     def search_identities(self, query: str) -> List[Identity]:
