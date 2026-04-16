@@ -4,6 +4,7 @@ import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
 import { syncAlbumWithSong } from "./handlers/song_actions.js";
+import { parseTagInput } from "./utils/tag_input.js";
 
 /**
  * GOSLING ORCHESTRATOR
@@ -57,29 +58,15 @@ function getUpdateCallback(ctx, songId) {
 export function manageSongTags(ctx, songId, songTitle, currentTags) {
     const state = ctx.getState();
     const rules = state.validationRules?.tags || {};
-    const defaultCategory = rules.default_category || "Genre";
     const delimiter = rules.delimiter || ":";
     const format = rules.input_format || "tag:category";
-    const nameFirst = format.toLowerCase().startsWith("tag");
-
-    function parseTagInput(raw) {
-        if (!raw.includes(delimiter))
-            return { name: raw.trim(), category: defaultCategory };
-        const idx = raw.indexOf(delimiter);
-        const a = raw.slice(0, idx).trim();
-        const b = raw.slice(idx + delimiter.length).trim();
-        const name = nameFirst ? a : b;
-        const category = nameFirst ? b : a;
-        return { name, category };
-    }
-
     openLinkModal({
         title: `Edit Tags: ${songTitle}`,
         placeholder: `Search or type (e.g. ${format})...`,
         items: currentTags.map((t) => ({ id: t.id, label: t.name })),
         onSearch: async (q) => {
             const { name: searchTerm, category: searchCategory } =
-                parseTagInput(q);
+                parseTagInput(q, rules);
             const hasCategory = q.includes(delimiter);
             const results = await api.searchTags(searchTerm);
             if (results === api.ABORTED) return [];
@@ -109,6 +96,7 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             } else {
                 const parsed = parseTagInput(
                     opt.rawInput || opt.name || opt.label,
+                    rules,
                 );
                 name = parsed.name;
                 category = parsed.category;
@@ -128,12 +116,12 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => {
-            const { name, category } = parseTagInput(q);
+            const { name, category } = parseTagInput(q, rules);
             if (!name) return `Add tag (missing name)`;
             return `Add "${name}" in "${category}"`;
         },
         shouldCreate: (q, results) => {
-            const { name, category } = parseTagInput(q);
+            const { name, category } = parseTagInput(q, rules);
             if (!name) return false;
             const nameLower = name.toLowerCase();
             const categoryLower = category.toLowerCase();

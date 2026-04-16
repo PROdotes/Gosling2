@@ -566,6 +566,22 @@ def get_config():
     }
 
 
+def _load_tag_category_colors() -> dict:
+    import json, os
+    path = os.path.join(os.path.dirname(__file__), "../../../json/id3_frames.json")
+    try:
+        frames = json.load(open(os.path.normpath(path)))
+        colors = {}
+        for v in frames.values():
+            if isinstance(v, dict) and "tag_category" in v and "color" in v:
+                cat = v["tag_category"]
+                if cat not in colors:
+                    colors[cat] = v["color"]
+        return colors
+    except Exception:
+        return {}
+
+
 @router.get("/validation-rules")
 def get_validation_rules():
     """Returns scalar field validation rules for frontend use."""
@@ -586,6 +602,7 @@ def get_validation_rules():
             "default_category": TAG_DEFAULT_CATEGORY,
             "delimiter": TAG_CATEGORY_DELIMITER,
             "input_format": TAG_INPUT_FORMAT,
+            "category_colors": _load_tag_category_colors(),
         },
         "default_search_engine": DEFAULT_SEARCH_ENGINE,
         "search_engines": SearchService.ENGINES,

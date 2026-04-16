@@ -554,6 +554,16 @@
     border-color: var(--border-focus);
 }
 
+#songs-workspace .editor-input--error {
+    border-color: var(--color-error, #e05);
+}
+
+#songs-workspace .editor-input-error:not(:empty) {
+    color: var(--color-error, #e05);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
 #songs-workspace .editor-chip-row {
     display: flex;
     flex-wrap: wrap;
@@ -578,6 +588,112 @@
     color: var(--accent-red);
     font-style: italic;
 }
+
+/* ── CHIP INPUT COMPONENT ───────────────────────────────────────────────── */
+
+#songs-workspace .chip-input {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    min-height: 28px;
+}
+
+#songs-workspace .chip-input__chips {
+    display: contents; /* chips flow inline with the text input */
+}
+
+#songs-workspace .chip-input__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-pure);
+    font-size: 12px;
+    padding: 3px 6px;
+    font-weight: 500;
+}
+
+#songs-workspace .chip-input__chip-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+#songs-workspace .chip-input__chip-btn:hover {
+    color: var(--text-pure);
+}
+
+#songs-workspace .chip-input__chip-split {
+    font-size: 11px;
+}
+
+#songs-workspace .chip-input__text {
+    background: transparent;
+    border: none;
+    color: var(--text-pure);
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    min-width: 80px;
+    flex: 1;
+    padding: 3px 4px;
+}
+
+#songs-workspace .chip-input__text::placeholder {
+    color: var(--text-muted);
+}
+
+#songs-workspace .chip-input__dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 220px;
+    background: var(--bg-window);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    z-index: 200;
+    overflow: hidden;
+}
+
+#songs-workspace .chip-input__option {
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--text-pure);
+    cursor: pointer;
+}
+
+#songs-workspace .chip-input__option:hover,
+#songs-workspace .chip-input__option--active {
+    background: var(--bg-element);
+}
+
+#songs-workspace .chip-input__option--create {
+    color: var(--accent-blue, #4fa3e0);
+    font-style: italic;
+}
+
+#songs-workspace .chip-input__tag-cat {
+    font-size: 9px;
+    font-weight: 800;
+    opacity: 0.85;
+    margin-right: 5px;
+    padding-right: 6px;
+    border-right: 1px solid var(--border-subtle);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+}
+
 
 /* ── CSS CUSTOM PROPERTIES (songs-workspace local overrides) ────────────── */
 /*

@@ -67,7 +67,7 @@ import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
 import { WebSearchHandler } from "./handlers/web_search.js";
 import * as orch from "./orchestrator.js";
-import { renderSongEditorEmpty, renderSongEditorV2 } from "./renderers/song_editor.js";
+import { renderSongEditorEmpty, renderSongEditorV2, wireScalarInputs, wireChipInputs } from "./renderers/song_editor.js";
 import {
     renderAlbumDetailComplete,
     renderAlbumDetailLoading,
@@ -680,6 +680,32 @@ async function openSelectedResult(index) {
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
         renderSongEditorV2(result);
+        wireScalarInputs(result, state.validationRules, (fresh) => {
+            state.activeSong = fresh;
+        });
+        wireChipInputs(
+            result,
+            (fresh) => { state.activeSong = fresh; },
+            async ({ songId, text, role, creditId }) => {
+                const { openSplitterModal } = await import("./components/splitter_modal.js");
+                openSplitterModal({
+                    songId,
+                    text,
+                    target: role,
+                    classification: null,
+                    remove: { type: "credit", id: creditId },
+                    separators: state.validationRules?.credit_separators || [],
+                    onConfirm: async () => {
+                        const fresh = await getCatalogSong(songId);
+                        state.activeSong = fresh;
+                        renderSongEditorV2(fresh);
+                        wireScalarInputs(fresh, state.validationRules, (f) => { state.activeSong = f; });
+                        wireChipInputs(fresh, (f) => { state.activeSong = f; }, null, state.validationRules);
+                    },
+                });
+            },
+            state.validationRules,
+        );
     } else if (state.currentMode === "songs") {
         await openSongDetail(selected);
     } else if (state.currentMode === "albums") {
