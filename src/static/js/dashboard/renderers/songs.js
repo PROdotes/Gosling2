@@ -583,9 +583,17 @@ function renderSongRows(ctx, songs) {
             panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
                 cb.checked = e.target.checked;
             });
+            panel.dispatchEvent(new CustomEvent("checkchange", { bubbles: true }));
         };
         selectAll.addEventListener("change", selectAll._v2Handler);
     }
+
+    // Wire individual checkboxes to fire checkchange
+    panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
+        cb.addEventListener("change", () => {
+            panel.dispatchEvent(new CustomEvent("checkchange", { bubbles: true }));
+        });
+    });
 }
 
 function renderSongsCards(ctx, songs) {

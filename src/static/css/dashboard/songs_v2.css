@@ -537,6 +537,18 @@
     color: var(--accent-red);
 }
 
+#songs-workspace .drift-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #F59E0B;
+    margin-left: 5px;
+    vertical-align: middle;
+    cursor: help;
+    flex-shrink: 0;
+}
+
 #songs-workspace .editor-input {
     background: var(--bg-element);
     border: 1px solid var(--border-subtle);
@@ -552,6 +564,116 @@
 
 #songs-workspace .editor-input:focus {
     border-color: var(--border-focus);
+}
+
+#songs-workspace .editor-textarea {
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+    line-height: 1.5;
+}
+
+#songs-workspace .editor-raw-tags {
+    font-size: 11px;
+    font-family: monospace;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg-master, #030407);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#songs-workspace .raw-tag-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px;
+    align-items: baseline;
+}
+
+#songs-workspace .raw-tag-key {
+    color: var(--text-mut);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#songs-workspace .raw-tag-val {
+    color: var(--text-pure);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+#songs-workspace .editor-audit-details {
+    margin-top: 8px;
+}
+
+#songs-workspace .editor-audit-summary {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-mut);
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 0;
+    list-style: none;
+}
+
+#songs-workspace .editor-audit-summary::-webkit-details-marker { display: none; }
+
+#songs-workspace .editor-audit-summary::before {
+    content: "▶ ";
+    font-size: 8px;
+}
+
+#songs-workspace .editor-audit-details[open] .editor-audit-summary::before {
+    content: "▼ ";
+}
+
+#songs-workspace .editor-audit-body {
+    margin-top: 6px;
+    font-size: 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#songs-workspace .audit-entry {
+    display: grid;
+    grid-template-columns: 120px 50px 1fr;
+    gap: 6px;
+    align-items: baseline;
+    color: var(--text-sec);
+    font-size: 11px;
+}
+
+#songs-workspace .audit-ts {
+    color: var(--text-mut);
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+#songs-workspace .audit-action {
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--accent-blue);
+}
+
+#songs-workspace .audit-details {
+    color: var(--text-sec);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+#songs-workspace .audit-empty {
+    color: var(--text-mut);
+    font-style: italic;
 }
 
 #songs-workspace .editor-input--error {
@@ -694,6 +816,153 @@
     align-items: center;
 }
 
+
+/* ── ACTION SIDEBAR ─────────────────────────────────────────────────────── */
+
+#songs-workspace .action-sidebar {
+    width: 160px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border-subtle);
+    background: var(--bg-window);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    gap: 6px;
+    overflow-y: auto;
+}
+
+#songs-workspace .sidebar-group-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-mut);
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+#songs-workspace .sidebar-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 4px 0;
+}
+
+#songs-workspace .sidebar-btn {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-sec);
+    background: var(--bg-element);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+}
+
+#songs-workspace .sidebar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#songs-workspace .sidebar-btn.organize {
+    background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+    color: #fff;
+    border-color: transparent;
+    font-size: 12px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(16,185,129,0.3);
+}
+
+#songs-workspace .sidebar-btn.organize:hover {
+    filter: brightness(1.1);
+}
+
+#songs-workspace .sidebar-btn.organize.blocked,
+#songs-workspace .sidebar-btn.organize:disabled {
+    background: var(--bg-element);
+    color: var(--text-mut);
+    box-shadow: none;
+    cursor: not-allowed;
+    filter: none;
+}
+
+#songs-workspace .sidebar-btn--id3 {
+    color: var(--accent-blue);
+    border-color: rgba(129,140,248,0.3);
+}
+
+#songs-workspace .sidebar-btn--id3:hover {
+    background: rgba(129,140,248,0.1);
+    color: var(--accent-blue);
+}
+
+#songs-workspace .sidebar-btn.delete-original {
+    color: #F59E0B;
+    border-color: rgba(245,158,11,0.3);
+    background: rgba(245,158,11,0.05);
+}
+
+#songs-workspace .sidebar-btn.delete-original:hover {
+    background: rgba(245,158,11,0.12);
+}
+
+#songs-workspace .sidebar-btn--danger {
+    color: var(--accent-red);
+    border-color: rgba(244,63,94,0.2);
+}
+
+#songs-workspace .sidebar-path {
+    font-size: 10px;
+    color: var(--text-mut);
+    word-break: break-all;
+    line-height: 1.4;
+    padding: 0 2px;
+}
+
+#songs-workspace .web-search-split {
+    display: flex;
+    position: relative;
+}
+
+#songs-workspace .web-search-split .sidebar-btn {
+    width: auto;
+}
+
+#songs-workspace .web-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-window);
+    border: 1px solid var(--border-subtle);
+    border-radius: 5px;
+    z-index: 200;
+    overflow: hidden;
+}
+
+#songs-workspace .web-search-option {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-sec);
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+#songs-workspace .web-search-option:hover {
+    background: var(--bg-element);
+    color: var(--text-pure);
+}
 
 /* ── CSS CUSTOM PROPERTIES (songs-workspace local overrides) ────────────── */
 /*

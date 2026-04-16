@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.services.catalog_service import CatalogService
+from src.services.edit_service import EditService
 from src.services.metadata_service import MetadataService
 from src.services.metadata_parser import MetadataParser
 from src.services.logger import logger
@@ -777,17 +778,15 @@ async def get_sync_status(
 
 
 @router.get("/songs/{song_id}/sync-id3", status_code=200)
-async def sync_id3(
-    song_id: int,
-    service: CatalogService = Depends(_get_service),
-):
+async def sync_id3(song_id: int):
     """Writes current DB state to the physical ID3 tags of the song file."""
     logger.debug(f"[SongUpdates] -> sync_id3(id={song_id})")
-    song = service.get_song(song_id)
+    edit_service = EditService()
+    song = edit_service._library_service.get_song(song_id)
     if not song:
         raise HTTPException(status_code=404, detail=f"Song {song_id} not found")
     try:
-        service._metadata_writer.write_metadata(song)
+        edit_service._metadata_writer.write_metadata(song)
         logger.debug(f"[SongUpdates] <- sync_id3(id={song_id}) OK")
         return {"status": "ok", "song_id": song_id}
     except FileNotFoundError as e:

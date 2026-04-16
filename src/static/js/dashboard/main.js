@@ -67,7 +67,7 @@ import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
 import { WebSearchHandler } from "./handlers/web_search.js";
 import * as orch from "./orchestrator.js";
-import { renderSongEditorEmpty, renderSongEditorV2, wireScalarInputs, wireChipInputs } from "./renderers/song_editor.js";
+import { renderSongEditorEmpty, renderSongEditorV2, renderSongEditorMultiSelect, renderActionSidebar, wireScalarInputs, wireChipInputs, wireDriftIndicators, wireAuditHistory } from "./renderers/song_editor.js";
 import {
     renderAlbumDetailComplete,
     renderAlbumDetailLoading,
@@ -216,6 +216,21 @@ const ctx = {
         elements.statSep.style.display = isFiltered ? "" : "none";
     },
     openSongDetail: (...args) => openSongDetail(...args),
+    clearSongEditorV2() {
+        state.activeSong = null;
+        renderSongEditorEmpty();
+    },
+    async refreshActiveSongV2(songId) {
+        const fresh = await getCatalogSong(songId);
+        state.activeSong = fresh;
+        renderSongEditorV2(fresh);
+        renderActionSidebar(fresh, {
+            searchEngines: state.searchEngines,
+            defaultSearchEngine: state.defaultSearchEngine,
+        });
+        wireScalarInputs(fresh, state.validationRules, (f) => { state.activeSong = f; });
+        wireChipInputs(fresh, (f) => { state.activeSong = f; }, null, state.validationRules);
+    },
     performSearch: (query) => performSearch(query),
     showDetailPanel(html) {
         elements.detailPanel.innerHTML = html;
@@ -673,19 +688,29 @@ async function openSelectedResult(index) {
 
     if (state.currentMode === "songs" && document.getElementById("songs-workspace")?.classList.contains("active")) {
         const request = beginDetailRequest("songs", selected.id);
-        const result = await getCatalogSong(selected.id, { signal: request.signal }).catch((e) => {
-            if (!isAbortError(e)) throw e;
-            return null;
-        });
+        const [result, fileData] = await Promise.all([
+            getCatalogSong(selected.id, { signal: request.signal }).catch((e) => { if (!isAbortError(e)) throw e; return null; }),
+            getSongDetail(selected.id, { signal: request.signal }).catch(() => null),
+        ]);
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
-        renderSongEditorV2(result);
+        renderSongEditorV2(result, fileData);
+        wireDriftIndicators(result, fileData);
+        wireAuditHistory(result.id, () => getAuditHistory("Songs", result.id));
+        renderActionSidebar(result, {
+            searchEngines: state.searchEngines,
+            defaultSearchEngine: state.defaultSearchEngine,
+        });
         wireScalarInputs(result, state.validationRules, (fresh) => {
             state.activeSong = fresh;
+            renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
         });
         wireChipInputs(
             result,
-            (fresh) => { state.activeSong = fresh; },
+            (fresh) => {
+                state.activeSong = fresh;
+                renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
+            },
             async ({ songId, text, role, creditId }) => {
                 const { openSplitterModal } = await import("./components/splitter_modal.js");
                 openSplitterModal({
@@ -699,6 +724,10 @@ async function openSelectedResult(index) {
                         const fresh = await getCatalogSong(songId);
                         state.activeSong = fresh;
                         renderSongEditorV2(fresh);
+                        renderActionSidebar(fresh, {
+                            searchEngines: state.searchEngines,
+                            defaultSearchEngine: state.defaultSearchEngine,
+                        });
                         wireScalarInputs(fresh, state.validationRules, (f) => { state.activeSong = f; });
                         wireChipInputs(fresh, (f) => { state.activeSong = f; }, null, state.validationRules);
                     },
@@ -827,6 +856,20 @@ async function setupHeaderDropZone() {
         }
     });
 }
+
+document.addEventListener("checkchange", () => {
+    if (state.currentMode !== "songs") return;
+    const panel = document.getElementById("song-list-panel");
+    if (!panel) return;
+    const checked = panel.querySelectorAll(".col-check input[type=checkbox]:checked");
+    if (checked.length > 1) {
+        renderSongEditorMultiSelect(checked.length);
+    } else if (checked.length === 0) {
+        renderSongEditorEmpty();
+        state.activeSong = null;
+    }
+    // If exactly 1 checked, the row click already opened the editor — do nothing
+});
 
 document.addEventListener("click", async (event) => {
     const actionTarget = event.target.closest("[data-action]");

@@ -50,6 +50,7 @@ const SCALAR_FIELDS = [
     { inputId: "ef-year",  field: "year",       numeric: true  },
     { inputId: "ef-bpm",   field: "bpm",        numeric: true  },
     { inputId: "ef-isrc",  field: "isrc",       numeric: false },
+    { inputId: "ef-notes", field: "notes",      numeric: false },
 ];
 
 const BLOCKER_LABELS = {
@@ -149,7 +150,7 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
         });
 
         input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") { e.preventDefault(); commit(); }
+            if (e.key === "Enter" && input.tagName !== "TEXTAREA") { e.preventDefault(); commit(); }
             if (e.key === "Escape") { e.preventDefault(); revert(); }
         });
 
@@ -170,6 +171,38 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
  * @param {function} onSplit - ({songId, text, role, creditId}) => void — null to disable
  * @param {object} validationRules - state.validationRules (for tag parsing)
  */
+/**
+ * Adds drift indicator dots to scalar field labels when DB value ≠ file value.
+ * Must be called after renderSongEditorV2.
+ *
+ * @param {object} dbSong - from getCatalogSong
+ * @param {object} fileSong - from getSongDetail (inspect-file)
+ */
+export function wireDriftIndicators(dbSong, fileSong) {
+    if (!fileSong) return;
+    const DRIFT_FIELDS = [
+        { inputId: "ef-title", dbField: "media_name", fileField: "media_name" },
+        { inputId: "ef-year",  dbField: "year",        fileField: "year"       },
+        { inputId: "ef-bpm",   dbField: "bpm",         fileField: "bpm"        },
+        { inputId: "ef-isrc",  dbField: "isrc",        fileField: "isrc"       },
+    ];
+    for (const { inputId, dbField, fileField } of DRIFT_FIELDS) {
+        const input = document.getElementById(inputId);
+        if (!input) continue;
+        const dbVal = dbSong[dbField] ?? null;
+        const fileVal = fileSong[fileField] ?? null;
+        if (String(dbVal ?? "") === String(fileVal ?? "")) continue;
+
+        const labelEl = input.closest(".editor-field")?.querySelector(".editor-label");
+        if (!labelEl) continue;
+
+        const dot = document.createElement("span");
+        dot.className = "drift-dot";
+        dot.title = `File value: ${fileVal ?? "(empty)"}`;
+        labelEl.appendChild(dot);
+    }
+}
+
 export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     async function refresh() {
         const fresh = await getCatalogSong(song.id);
@@ -311,15 +344,125 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     }
 }
 
+/**
+ * Renders the action sidebar for a song.
+ * Must be called after renderSongEditorV2.
+ *
+ * @param {object} song - from getCatalogSong
+ * @param {object} opts - { searchEngines, defaultSearchEngine }
+ */
+export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEngine = null } = {}) {
+    const panel = document.getElementById("editor-panel");
+    if (!panel) return;
+    const sidebar = panel.querySelector(".action-sidebar");
+    if (!sidebar) return;
+
+    const status = song.processing_status ?? 1;
+    const blockers = song.review_blockers || [];
+    const isInStaging = (song.source_path || "").toLowerCase().includes("staging");
+
+    // ── Organize / Mark as Done button ────────────────────────────────────────
+    let organizeBtn = "";
+    let unreviweBtn = "";
+    if (status === 1) {
+        const blocked = blockers.length > 0;
+        organizeBtn = `<button class="sidebar-btn organize${blocked ? " blocked" : ""}"
+            data-action="mark-reviewed" data-id="${song.id}"
+            ${blocked ? "disabled title=\"Missing required fields\"" : ""}>Mark as Done</button>`;
+    } else if (status === 0 && isInStaging) {
+        organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
+        unreviweBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
+    }
+
+    const targetPath = isInStaging && song.organized_path_preview
+        ? `<div class="sidebar-path">→ ${escapeHtml(song.organized_path_preview)}</div>` : "";
+
+    // ── Web search split button ────────────────────────────────────────────────
+    const engine = defaultSearchEngine || Object.keys(searchEngines)[0] || "spotify";
+    const engineLabel = searchEngines[engine] || engine;
+    const otherEngines = Object.entries(searchEngines)
+        .filter(([k]) => k !== engine)
+        .map(([k, v]) => `<button class="web-search-option" data-engine="${escapeHtml(k)}">${escapeHtml(v)}</button>`)
+        .join("");
+    const searchSplitBtn = `
+<div class="web-search-split sidebar-split-btn">
+    <button class="sidebar-btn web-search-main" data-action="web-search" data-song-id="${song.id}" data-engine="${escapeHtml(engine)}" style="flex:1;border-right:none;border-radius:5px 0 0 5px">${escapeHtml(engineLabel)}</button><button class="sidebar-btn" data-action="web-search-set-engine" style="border-radius:0 5px 5px 0;padding:8px 6px;width:22px;flex-shrink:0">▾</button>
+    <div class="web-search-dropdown" hidden>${otherEngines}</div>
+</div>`;
+
+    // ── Delete Original ────────────────────────────────────────────────────────
+    const hasOriginal = song.original_exists && isInStaging && song.estimated_original_path;
+    const deleteOriginalBtn = hasOriginal
+        ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-path="${escapeHtml(song.estimated_original_path)}">⚠ Delete Original</button>
+           <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
+        : "";
+
+    sidebar.innerHTML = `
+<div class="sidebar-group-label">Research</div>
+<button class="sidebar-btn" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop())}">Parse</button>
+<button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
+${searchSplitBtn}
+
+<div class="sidebar-divider"></div>
+
+<div class="sidebar-group-label">Finalize</div>
+<button class="sidebar-btn sidebar-btn--id3" data-action="sync-id3" data-song-id="${song.id}">↑ Write ID3</button>
+${organizeBtn}
+${unreviweBtn}
+${targetPath}
+
+<div class="sidebar-divider"></div>
+
+${deleteOriginalBtn}
+<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}" style="margin-top:auto">🗑 Delete Record</button>
+`;
+}
+
+export function renderSongEditorMultiSelect(count) {
+    const panel = document.getElementById("editor-panel");
+    if (!panel) return;
+    const scroll = panel.querySelector(".editor-scroll");
+    if (scroll) scroll.innerHTML = `<div class="editor-empty-state">${count} songs selected</div>`;
+    const sidebar = panel.querySelector(".action-sidebar");
+    if (sidebar) sidebar.innerHTML = "";
+}
+
+export function wireAuditHistory(songId, fetchAuditHistory) {
+    const details = document.querySelector(`.editor-audit-details[data-song-id="${songId}"]`);
+    if (!details) return;
+    let loaded = false;
+    details.addEventListener("toggle", async () => {
+        if (!details.open || loaded) return;
+        loaded = true;
+        const body = details.querySelector(".editor-audit-body");
+        try {
+            const history = await fetchAuditHistory();
+            if (!history || history.length === 0) {
+                body.innerHTML = `<div class="audit-empty">No history found.</div>`;
+                return;
+            }
+            body.innerHTML = history.map((entry) => `
+<div class="audit-entry">
+  <span class="audit-ts">${escapeHtml(entry.timestamp || "")}</span>
+  <span class="audit-action">${escapeHtml(entry.type || "")}</span>
+  <span class="audit-details">${escapeHtml(entry.label || "")}${entry.old != null ? ` (${escapeHtml(String(entry.old))} → ${escapeHtml(String(entry.new ?? ""))})` : ""}</span>
+</div>`).join("");
+        } catch {
+            body.innerHTML = `<div class="audit-empty">Failed to load history.</div>`;
+        }
+    });
+}
+
 export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
-    if (!scroll) return;
-    scroll.innerHTML = `<div class="editor-empty-state">Select a song to edit</div>`;
+    if (scroll) scroll.innerHTML = `<div class="editor-empty-state">Select a song to edit</div>`;
+    const sidebar = panel.querySelector(".action-sidebar");
+    if (sidebar) sidebar.innerHTML = "";
 }
 
-export function renderSongEditorV2(song) {
+export function renderSongEditorV2(song, fileData = null) {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
@@ -368,6 +511,29 @@ export function renderSongEditorV2(song) {
       ${renderScalarField("ISRC", song.isrc, "ef-isrc")}
     </div>
   </div>
+</div>
+
+<div class="editor-section">
+  <div class="editor-section-title">Raw / File Data</div>
+  <div class="editor-field">
+    <label class="editor-label" for="ef-notes">Comments</label>
+    <textarea class="editor-input editor-textarea" id="ef-notes" rows="3">${escapeHtml(song.notes ?? "")}</textarea>
+  </div>
+  ${fileData && fileData.raw_tags && Object.keys(fileData.raw_tags).length > 0 ? `
+  <div class="editor-field">
+    <label class="editor-label">Raw ID3 Tags</label>
+    <div class="editor-raw-tags">
+      ${Object.entries(fileData.raw_tags).map(([k, vals]) => `
+      <div class="raw-tag-row">
+        <span class="raw-tag-key">${escapeHtml(k)}</span>
+        <span class="raw-tag-val">${escapeHtml(Array.isArray(vals) ? vals.join(", ") : String(vals))}</span>
+      </div>`).join("")}
+    </div>
+  </div>` : ""}
+  <details class="editor-audit-details" data-song-id="${escapeHtml(String(song.id))}">
+    <summary class="editor-audit-summary">Audit History</summary>
+    <div class="editor-audit-body">Loading…</div>
+  </details>
 </div>
 `;
 }

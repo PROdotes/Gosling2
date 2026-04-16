@@ -197,8 +197,11 @@ export class SongActionsHandler {
 
         try {
             await api.deleteSong(id);
-            // Integration: Call the search refresh passed via context
-            if (this.ctx.hideDetailPanel) this.ctx.hideDetailPanel();
+            if (this.ctx.getState().currentMode === "songs" && this.ctx.clearSongEditorV2) {
+                this.ctx.clearSongEditorV2();
+            } else if (this.ctx.hideDetailPanel) {
+                this.ctx.hideDetailPanel();
+            }
 
             // Allow main.js or other systems to refresh the list
             // In Gosling v3, we prefer performSearch()
@@ -272,11 +275,11 @@ export class SongActionsHandler {
     async _handleReviewStatus(actionTarget, newStatus) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            const updatedSong = await api.patchSongScalars(id, {
-                processing_status: newStatus,
-            });
-            if (this.ctx.openSongDetail) {
-                this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
+            await api.patchSongScalars(id, { processing_status: newStatus });
+            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                await this.ctx.refreshActiveSongV2(id);
+            } else if (this.ctx.openSongDetail) {
+                this.ctx.openSongDetail({ id }, { reuseFileData: true });
             }
         } catch (err) {
             if (this.ctx.showBanner) {
@@ -299,7 +302,9 @@ export class SongActionsHandler {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner("Organized successfully!", "success");
             }
-            if (this.ctx.openSongDetail) {
+            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                await this.ctx.refreshActiveSongV2(id);
+            } else if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail({ id }, { reuseFileData: false });
             }
         } catch (err) {
@@ -452,7 +457,9 @@ export class SongActionsHandler {
     }
 
     async handleWebSearch(actionTarget) {
-        const { songId, engine } = actionTarget.dataset;
+        const { engine } = actionTarget.dataset;
+        const songId = actionTarget.dataset.songId
+            || actionTarget.closest(".web-search-split")?.querySelector(".web-search-main")?.dataset.songId;
         try {
             const data = await api.getSongWebSearch(songId, engine || null);
             if (data && data.url) {
@@ -491,13 +498,14 @@ export class SongActionsHandler {
                 const oldEngine = mainBtn.dataset.engine;
                 const oldLabel = mainBtn.textContent.trim();
 
-                // Swap main button
+                // Swap main button (preserve songId)
                 mainBtn.dataset.engine = newEngine;
                 mainBtn.textContent = newLabel;
 
                 // Swap this option to show the old engine
                 btn.dataset.engine = oldEngine;
                 btn.textContent = oldLabel;
+                btn.dataset.songId = mainBtn.dataset.songId;
 
                 dropdown.hidden = true;
                 document.removeEventListener("click", close, true);
@@ -656,14 +664,16 @@ export class SongActionsHandler {
         openFilenameParserModal({
             entries: [{ id: Number(id), filename }],
             onApply: async () => {
-                const state = this.ctx.getState();
-                const song = state.cachedSongs.find(
-                    (s) => String(s.id) === String(id),
-                );
-                if (song && this.ctx.openSongDetail)
-                    this.ctx.openSongDetail(song, { reuseFileData: true });
                 if (this.ctx.showBanner)
                     this.ctx.showBanner("Metadata applied", "success");
+                if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                    await this.ctx.refreshActiveSongV2(id);
+                } else {
+                    const state = this.ctx.getState();
+                    const song = state.cachedSongs.find((s) => String(s.id) === String(id));
+                    if (song && this.ctx.openSongDetail)
+                        this.ctx.openSongDetail(song, { reuseFileData: true });
+                }
             },
             onError: (msg) => {
                 if (this.ctx.showBanner) this.ctx.showBanner(msg, "error");
@@ -748,18 +758,14 @@ export class SongActionsHandler {
             title,
             existingCredits: song?.credits || [],
             existingPublishers: song?.publishers || [],
-            onClose: () => {
-                if (this.ctx.refreshActiveDetail)
-                    this.ctx.refreshActiveDetail();
-            },
-            onComplete: () => {
-                if (this.ctx.refreshActiveDetail)
-                    this.ctx.refreshActiveDetail();
+            onComplete: async () => {
                 if (this.ctx.showBanner)
-                    this.ctx.showBanner(
-                        "Spotify credits imported successfully",
-                        "success",
-                    );
+                    this.ctx.showBanner("Spotify credits imported successfully", "success");
+                if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                    await this.ctx.refreshActiveSongV2(id);
+                } else if (this.ctx.refreshActiveDetail) {
+                    this.ctx.refreshActiveDetail();
+                }
             },
         });
     }

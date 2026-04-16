@@ -205,6 +205,16 @@ export function openFilenameParserModal(config) {
     applyBtn.disabled = true;
     applyBtn.textContent = "Apply Metadata";
 
+    // Show filename immediately before any pattern is typed
+    const firstEntry = config.entries?.[0];
+    if (firstEntry?.filename) {
+        previewThead.innerHTML = `<tr><th colspan="2" class="preview-filename" title="${escapeHtml(firstEntry.filename)}">${escapeHtml(firstEntry.filename)}</th></tr>`;
+        previewTbody.innerHTML = "";
+    } else {
+        previewThead.innerHTML = "";
+        previewTbody.innerHTML = "";
+    }
+
     // Default pattern from storage or simple default
     const saved = localStorage.getItem("gosling_last_pattern");
     patternInput.value = saved || "{Artist} - {Title}";
