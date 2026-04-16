@@ -372,6 +372,45 @@ class TestSearchSlimByIds:
         assert "IsActive" in row, "Row missing 'IsActive'"
         assert "DisplayArtist" in row, "Row missing 'DisplayArtist'"
         assert "PrimaryGenre" in row, "Row missing 'PrimaryGenre'"
+        assert "has_publisher" in row, "Row missing 'has_publisher'"
+        assert "has_album" in row, "Row missing 'has_album'"
+
+
+class TestSearchSlimHasPublisherHasAlbum:
+    """search_slim and search_slim_by_ids: has_publisher / has_album flag contracts."""
+
+    def test_search_slim_song_with_publisher_and_album(self, populated_db):
+        # Song 1 (SLTS): has DGC Records publisher + Nevermind album
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim("Smells Like Teen Spirit")
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["has_publisher"] == 1, "Song 1 should have has_publisher=1"
+        assert row["has_album"] == 1, "Song 1 should have has_album=1"
+
+    def test_search_slim_song_without_publisher(self, populated_db):
+        # Song 2 (Everlong): no RecordingPublishers link
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim("Everlong")
+        assert len(rows) == 1
+        assert rows[0]["has_publisher"] == 0, "Song 2 should have has_publisher=0"
+
+    def test_search_slim_song_without_album(self, populated_db):
+        # Song 7 (Hollow Song): no SongAlbums link
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim("Hollow Song")
+        assert len(rows) == 1
+        assert rows[0]["has_album"] == 0, "Song 7 should have has_album=0"
+
+    def test_search_slim_by_ids_flags(self, populated_db):
+        # Song 1: publisher + album; Song 7: neither
+        repo = SongRepository(populated_db)
+        rows = repo.search_slim_by_ids([1, 7])
+        by_id = {r["SourceID"]: r for r in rows}
+        assert by_id[1]["has_publisher"] == 1
+        assert by_id[1]["has_album"] == 1
+        assert by_id[7]["has_publisher"] == 0
+        assert by_id[7]["has_album"] == 0
 
 
 class TestGetByHash:

@@ -22,6 +22,7 @@ from src.engine.config import (
     DEFAULT_SEARCH_ENGINE,
     DEFAULT_CREDIT_SEPARATORS,
     SCRUBBER_AUTO_PLAY,
+    BLUR_SAVES_SCALARS,
 )
 from fastapi import Depends
 from src.services.search_service import SearchService
@@ -590,4 +591,5 @@ def get_validation_rules():
         "search_engines": SearchService.ENGINES,
         "credit_separators": DEFAULT_CREDIT_SEPARATORS,
         "scrubber_auto_play": SCRUBBER_AUTO_PLAY,
+        "blur_saves_scalars": BLUR_SAVES_SCALARS,
     }

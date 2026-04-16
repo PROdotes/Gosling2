@@ -320,3 +320,36 @@ class TestFilterSlimNoFilters:
         rows = repo.filter_slim()
         # No subqueries → id_filter = "1=1" → all 9 songs
         assert len(rows) == 9, f"Expected 9 rows with no filters, got {len(rows)}"
+
+
+# ---------------------------------------------------------------------------
+# filter_slim – has_publisher / has_album flags
+# ---------------------------------------------------------------------------
+
+
+class TestFilterSlimHasPublisherHasAlbum:
+    def test_flags_present_in_rows(self, repo):
+        rows = repo.filter_slim(artists=["Nirvana"])
+        assert len(rows) == 1
+        row = rows[0]
+        assert "has_publisher" in row, "Row missing 'has_publisher'"
+        assert "has_album" in row, "Row missing 'has_album'"
+
+    def test_song_with_publisher_and_album(self, repo):
+        # Song 1 (SLTS): DGC Records publisher + Nevermind album
+        rows = repo.filter_slim(artists=["Nirvana"])
+        row = rows[0]
+        assert row["has_publisher"] == 1, "Song 1 should have has_publisher=1"
+        assert row["has_album"] == 1, "Song 1 should have has_album=1"
+
+    def test_song_without_publisher(self, repo):
+        # Song 2 (Everlong): no RecordingPublishers link
+        rows = repo.filter_slim(artists=["Foo Fighters"])
+        assert len(rows) == 1
+        assert rows[0]["has_publisher"] == 0, "Song 2 should have has_publisher=0"
+
+    def test_song_without_album(self, repo):
+        # Song 7 (Hollow Song): no SongAlbums link
+        rows = repo.filter_slim(statuses=["not_done"])
+        by_id = {r["SourceID"]: r for r in rows}
+        assert by_id[7]["has_album"] == 0, "Song 7 should have has_album=0"

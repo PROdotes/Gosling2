@@ -65,6 +65,9 @@ SCALAR_VALIDATION = {
     },
 }
 
+# Blur-saves scalars: if True, blurring a scalar input saves the value; if False, it reverts.
+BLUR_SAVES_SCALARS = True
+
 # FFmpeg
 FFMPEG_PATH = Path("ffmpeg/ffmpeg.exe")
 WAV_AUTO_CONVERT = True
