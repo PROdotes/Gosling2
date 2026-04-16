@@ -77,9 +77,11 @@ async def upload_files(files: list[UploadFile] = File(...)):
     for file in files:
         if not file.filename:
             continue
-        if Path(file.filename).suffix.lower() not in ACCEPTED_EXTENSIONS:
+        # Security: sanitize filename to prevent path traversal
+        safe_filename = Path(file.filename).name
+        if Path(safe_filename).suffix.lower() not in ACCEPTED_EXTENSIONS:
             continue
-        staged_path = os.path.join(STAGING_DIR, f"{uuid4()}_{file.filename}")
+        staged_path = os.path.join(STAGING_DIR, f"{uuid4()}_{safe_filename}")
         try:
             with open(staged_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
@@ -339,12 +341,12 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
             status_code=500, detail="Downloads folder not identified on this platform."
         )
 
-    # Security: Ensure the path starts with the Downloads folder
+    # Security: Ensure the path is within the Downloads folder
     # Need realpath to prevent '..' traversal or tricky symlinks
-    real_downloads = os.path.realpath(downloads)
-    real_target = os.path.realpath(request.file_path)
+    real_downloads = Path(downloads).resolve()
+    real_target = Path(request.file_path).resolve()
 
-    if not real_target.startswith(real_downloads):
+    if not real_target.is_relative_to(real_downloads):
         logger.warning(
             f"[IngestRouter] Security: Blocked deletion of file outside Downloads: {request.file_path}"
         )
@@ -427,10 +429,10 @@ async def delete_staging_orphan(path: str):
     Delete a specific file from staging, only if it has no DB record.
     Safety: Path must be within STAGING_DIR.
     """
-    real_staging = os.path.realpath(STAGING_DIR)
-    real_target = os.path.realpath(path)
+    real_staging = Path(STAGING_DIR).resolve()
+    real_target = Path(path).resolve()
 
-    if not real_target.startswith(real_staging):
+    if not real_target.is_relative_to(real_staging):
         raise HTTPException(
             status_code=403, detail="Path must be within the staging folder."
         )
