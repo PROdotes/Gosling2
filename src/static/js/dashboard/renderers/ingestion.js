@@ -162,9 +162,14 @@ export async function renderIngestionPanel(ctx) {
         const list = document.getElementById(RESULTS_LIST_ID);
         if (list) {
             // Cache is newest-first, so appendChild maintains that visual order
-            state.cachedIngestResults.forEach(cached => {
+            state.cachedIngestResults.forEach((cached) => {
                 if (cached.isBatch) {
-                    _appendBatchToDom(list, cached.report, cached.summary, true);
+                    _appendBatchToDom(
+                        list,
+                        cached.report,
+                        cached.summary,
+                        true,
+                    );
                 } else {
                     _appendResultToDom(list, cached.result, cached.path, true);
                 }
@@ -173,15 +178,17 @@ export async function renderIngestionPanel(ctx) {
     }
 
     // Load any WAVs that were uploaded but not yet converted (status=3)
-    getPendingConvert().then((pending) => {
-        if (!pending || pending.length === 0) return;
-        const list = document.getElementById(RESULTS_LIST_ID);
-        if (!list) return;
-        pending.forEach((result) => {
-            const path = result.staged_path || result.source_path;
-            list.prepend(createResultCard(result, path));
-        });
-    }).catch(() => { });  // silently ignore on load failure
+    getPendingConvert()
+        .then((pending) => {
+            if (!pending || pending.length === 0) return;
+            const list = document.getElementById(RESULTS_LIST_ID);
+            if (!list) return;
+            pending.forEach((result) => {
+                const path = result.staged_path || result.source_path;
+                list.prepend(createResultCard(result, path));
+            });
+        })
+        .catch(() => {}); // silently ignore on load failure
 }
 
 function setupOrphanSection(sectionId) {
@@ -325,15 +332,24 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
             if (!response.ok) throw new Error("Upload failed");
 
             await readNdjsonStream(response, (update) => {
-                if (update.error) { showToast(update.error, "error"); return; }
-                ctx.updateIngestBadges?.({ success: update.success, action: update.action, pending: update.pending });
+                if (update.error) {
+                    showToast(update.error, "error");
+                    return;
+                }
+                ctx.updateIngestBadges?.({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                });
                 const res = update.last_result;
                 if (res) {
-                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
+                    const fileName =
+                        basename(res.song?.source_path) ||
+                        basename(res.staged_path) ||
+                        "Unknown";
                     appendResult(resultsId, res, fileName, ctx);
                 }
             });
-
         } catch (error) {
             console.error("Drop error:", error);
             appendResult(
@@ -382,8 +398,6 @@ function setupInputHandlers(inputId, btnId, resultsId, ctx) {
     });
 }
 
-
-
 function setupClearButton(btnId, resultsId, ctx) {
     const btn = document.getElementById(btnId);
     const list = document.getElementById(resultsId);
@@ -421,7 +435,10 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
 
             // Show individual file results
             for (const fileResult of result.results) {
-                const fileName = basename(fileResult.song?.source_path) || basename(fileResult.staged_path) || "Unknown";
+                const fileName =
+                    basename(fileResult.song?.source_path) ||
+                    basename(fileResult.staged_path) ||
+                    "Unknown";
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
         } catch (error) {
@@ -485,7 +502,11 @@ function appendBatchSummary(resultsId, batchReport, summary, ctx) {
     // Persist to cache
     const state = ctx.getState();
     if (state.cachedIngestResults) {
-        state.cachedIngestResults.unshift({ isBatch: true, report: batchReport, summary });
+        state.cachedIngestResults.unshift({
+            isBatch: true,
+            report: batchReport,
+            summary,
+        });
     }
 
     _appendBatchToDom(list, batchReport, summary, false);
@@ -571,14 +592,17 @@ function createResultCard(result, path) {
         ERROR: { class: "missing", icon: "&#10007;", text: "Error" },
     };
 
-    const config = statusConfig[status] || statusConfig["ERROR"];
+    const config = statusConfig[status] || statusConfig.ERROR;
 
     // For CONFLICT status, use ghost record data
     const song = result.song;
     const title =
         status === "CONFLICT" && result.title
             ? result.title
-            : song?.media_name || song?.title || basename(result.staged_path) || "Unknown Title";
+            : song?.media_name ||
+              song?.title ||
+              basename(result.staged_path) ||
+              "Unknown Title";
     const artist = song?.display_artist || "-";
 
     // Helper to format duration (seconds to MM:SS)
@@ -600,8 +624,9 @@ function createResultCard(result, path) {
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
 
-            ${status === "CONFLICT"
-            ? `
+            ${
+                status === "CONFLICT"
+                    ? `
                 <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #ff9500; font-weight: 600;">EXISTING GHOST RECORD (Soft-Deleted)</div>
                     <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; font-size: 0.85rem;">
@@ -630,11 +655,12 @@ function createResultCard(result, path) {
                     </div>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "PENDING_CONVERT"
-            ? `
+            ${
+                status === "PENDING_CONVERT"
+                    ? `
                 <div class="pending-convert-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
                     <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
                         This WAV file needs to be converted to MP3 before ingestion.
@@ -644,11 +670,12 @@ function createResultCard(result, path) {
                     </button>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "INGESTED"
-            ? `
+            ${
+                status === "INGESTED"
+                    ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
@@ -656,34 +683,36 @@ function createResultCard(result, path) {
                     <span class="muted-note">• UUID Staged</span>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "NEW"
-            ? `
+            ${
+                status === "NEW"
+                    ? `
                 <div class="ingest-actions-row">
                     <span class="muted-note">Verified. Drop physical file to commit.</span>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
         </div>
-        ${song
-            ? `
+        ${
+            song
+                ? `
             <div class="ingest-meta">
                 ${song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
                 ${song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
                 ${song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
             </div>
         `
-            : ""
+                : ""
         }
     `;
 
     return card;
 }
 
-function setupBulkParseButton(btnId, resultsId, ctx) {
+function setupBulkParseButton(btnId, _resultsId, ctx) {
     const btn = document.getElementById(btnId);
     if (!btn) return;
 
@@ -731,7 +760,7 @@ function setupResultsListDelegation(resultsId, ctx) {
 
     list.addEventListener("click", async (e) => {
         const btn = e.target.closest("button");
-        if (!btn || !btn.dataset.action) return;
+        if (!btn?.dataset.action) return;
 
         const action = btn.dataset.action;
         const path = btn.dataset.stagedPath;
@@ -741,26 +770,31 @@ function setupResultsListDelegation(resultsId, ctx) {
             btn.disabled = true;
             btn.textContent = "Reactivating...";
             try {
-                const res = await fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(path)}`, {
-                    method: "POST"
-                });
+                const res = await fetch(
+                    `/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(path)}`,
+                    {
+                        method: "POST",
+                    },
+                );
                 if (!res.ok) throw new Error("Reactivation failed");
                 const data = await res.json();
-                
+
                 // Update the card UI and state
                 const card = btn.closest(".result-card");
                 if (card) {
                     // Re-render the specific card or just update it
                     const newResult = { ...data, status: "INGESTED" };
                     card.replaceWith(createResultCard(newResult, path));
-                    
+
                     // Update cache
                     ctx.updateCachedIngestResult?.(path, newResult);
                 }
                 showToast("Song reactivated successfully!", "success");
-                
+
                 // Sync badges
-                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
+                fetch("/api/v1/ingest/status")
+                    .then((r) => r.json())
+                    .then((s) => ctx.updateIngestBadges?.(s));
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = "Re-ingest & Activate";
@@ -770,9 +804,12 @@ function setupResultsListDelegation(resultsId, ctx) {
             btn.disabled = true;
             btn.textContent = "Converting...";
             try {
-                const res = await fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(path)}`, {
-                    method: "POST"
-                });
+                const res = await fetch(
+                    `/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(path)}`,
+                    {
+                        method: "POST",
+                    },
+                );
                 if (!res.ok) throw new Error("Conversion failed");
                 const data = await res.json();
 
@@ -782,9 +819,11 @@ function setupResultsListDelegation(resultsId, ctx) {
                     ctx.updateCachedIngestResult?.(path, data);
                 }
                 showToast("WAV converted and ingested!", "success");
-                
+
                 // Sync badges
-                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
+                fetch("/api/v1/ingest/status")
+                    .then((r) => r.json())
+                    .then((s) => ctx.updateIngestBadges?.(s));
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = "Convert & Ingest";

@@ -9,8 +9,8 @@ from src.engine.config import SONG_DEFAULT_YEAR
 
 def collect_upload_stream(resp):
     """Parse NDJSON upload stream into a BatchIngestReport-shaped dict."""
-    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-    frames = [json.loads(l) for l in lines]
+    lines = [line for line in resp.text.strip().split("\n") if line.strip()]
+    frames = [json.loads(line) for line in lines]
     results = [f["last_result"] for f in frames if f.get("last_result")]
     return {
         "total_files": len(results),

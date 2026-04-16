@@ -112,7 +112,7 @@ export class WebSearchHandler {
                         songId,
                         opt.dataset.engine,
                     );
-                    if (data && data.url) {
+                    if (data?.url) {
                         this._window.open(data.url, "_blank");
                     }
                 } catch (err) {

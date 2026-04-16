@@ -96,11 +96,11 @@
         .song-list { flex: 1; overflow-y: auto; }
         .song-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--border-subtle); cursor: pointer;}
         .song-row:hover { background: var(--bg-panel); }
+        .col-info .title { font-weight: 600; color: var(--text-pure); font-size: 13px;}
         .song-row.selected { background: var(--bg-panel); box-shadow: inset 3px 0 0 var(--bg-active); border-bottom: 1px solid transparent; }
         .song-row.selected .title { color: var(--text-pure); font-weight: 700;}
         .col-check input { accent-color: var(--bg-active); }
         .col-info { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: flex; flex-direction: column; gap: 2px;}
-        .col-info .title { font-weight: 600; color: var(--text-pure); font-size: 13px;}
         .col-info .artist { color: var(--text-sec); font-size: 11px; }
         .col-missing { display: flex; gap: 4px; }
         .pill { background: var(--bg-element); padding: 2px 4px; border-radius: 4px; font-size: 9px; font-weight: 700; color: var(--text-sec); font-family: var(--font-mono);}
@@ -214,7 +214,7 @@
         .chip-action:hover { color: #FFFFFF; }
         .chip-action.split { color: #818CF8; } /* Indigo blue */
         .chip-action.remove { color: #F43F5E; } /* Rose red */
-        .chip-area input { padding: 4px 0!important; min-width: 60px; font-size: 13px; height: 22px;}
+        .chip-area input { padding: 4px 0; min-width: 60px; font-size: 13px; height: 22px;}
         
         .tag-cat { font-size: 9px; font-weight: 800; opacity: 0.8; margin-right: 4px; padding-right: 6px; border-right: 1px solid var(--border-subtle); display: flex; align-items: center; text-transform: uppercase; letter-spacing: 0.5px;}
         .tag-cat.genre { color: #818CF8; } /* Indigo */
@@ -234,10 +234,10 @@
         </div>
         <div class="header-search">
             <div class="search-input-wrapper">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><title>Search</title><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 <input type="text" placeholder="Search library...">
             </div>
-            <button class="btn-filter-toggle">Filter ▼</button>
+            <button type="button" class="btn-filter-toggle">Filter ▼</button>
         </div>
         <div style="font-size:12px; color:var(--text-sec); font-weight:600;"><span style="color:var(--text-pure)">456</span> IN QUEUE</div>
     </header>
@@ -248,33 +248,33 @@
         <!-- PANE 1: FILTER -->
         <div id="filter-sidebar" class="filter-sidebar">
             <div class="filter-header">
-                <button class="filter-ctrl-btn">ALL +</button>
-                <button class="filter-ctrl-btn">ALL -</button>
-                <button class="filter-ctrl-btn active">ALL</button>
-                <button class="filter-ctrl-btn">ANY</button>
+                <button type="button" class="filter-ctrl-btn">ALL +</button>
+                <button type="button" class="filter-ctrl-btn">ALL -</button>
+                <button type="button" class="filter-ctrl-btn active">ALL</button>
+                <button type="button" class="filter-ctrl-btn">ANY</button>
             </div>
             <div class="filter-sections">
                 <div class="filter-section">
                     <div class="filter-section-header">Status ▼</div>
-                    <button class="filter-value">Not Done</button>
-                    <button class="filter-value">Missing Data</button>
+                    <button type="button" class="filter-value">Not Done</button>
+                    <button type="button" class="filter-value">Missing Data</button>
                 </div>
                 <div class="filter-section">
                     <div class="filter-section-header">Artist ▼</div>
-                    <button class="filter-value active">ABBA</button>
-                    <button class="filter-value">Aphex Twin</button>
-                    <button class="filter-value">HOME</button>
+                    <button type="button" class="filter-value active">ABBA</button>
+                    <button type="button" class="filter-value">Aphex Twin</button>
+                    <button type="button" class="filter-value">HOME</button>
                 </div>
                 <div class="filter-section">
                     <div class="filter-section-header">Year ▼</div>
-                    <button class="filter-value active">1972</button>
+                    <button type="button" class="filter-value active">1972</button>
                 </div>
             </div>
             
             <!-- Restored Filter Chips -->
             <div class="filter-active-chips">
-                <span class="filter-chip">ABBA <button class="filter-chip-remove">✕</button></span>
-                <span class="filter-chip">1972 <button class="filter-chip-remove">✕</button></span>
+                <span class="filter-chip">ABBA <button type="button" class="filter-chip-remove">✕</button></span>
+                <span class="filter-chip">1972 <button type="button" class="filter-chip-remove">✕</button></span>
             </div>
         </div>
 
@@ -321,8 +321,8 @@
                             <label>Title (Media Name)</label>
                             <div class="input-wrap">
                                 <input type="text" value="Resonance">
-                                <button class="inline-btn">S</button>
-                                <button class="inline-btn">T</button>
+                                <button type="button" class="inline-btn">S</button>
+                                <button type="button" class="inline-btn">T</button>
                             </div>
                         </div>
                         <div class="form-group col-4">
@@ -394,7 +394,7 @@
                                     <div class="ac-item"><span class="tag-cat mood" style="border:none;">Mood</span> Dark <span style="font-size: 10px; color: var(--text-mut);">ID: 92</span></div>
                                 </div>
                             </div>
-                            <button class="inline-btn" style="border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-sec); padding: 0 12px; font-size: 11px; font-weight:700; height: 36px; background: var(--bg-element); flex-shrink:0; align-self:flex-start;">▶ Play</button>
+                            <button type="button" class="inline-btn" style="border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-sec); padding: 0 12px; font-size: 11px; font-weight:700; height: 36px; background: var(--bg-element); flex-shrink:0; align-self:flex-start;">▶ Play</button>
                             </div>
                         </div>
 
@@ -457,27 +457,27 @@
             <div class="action-sidebar">
                 <!-- GROUP 1: Research -->
                 <div class="sidebar-group-label">Research</div>
-                <button class="sidebar-btn">Parse</button>
-                <button class="sidebar-btn spotify">Spotify ⇅</button>
+                <button type="button" class="sidebar-btn">Parse</button>
+                <button type="button" class="sidebar-btn spotify">Spotify ⇅</button>
                 <div style="display:flex; gap:1px; border:1px solid var(--border-subtle); border-radius:5px; overflow:hidden; background:var(--border-subtle);">
-                    <button class="sidebar-btn" style="flex:1; border:none; border-radius:0; color:var(--accent-blue); margin:0;">Search</button>
-                    <button class="sidebar-btn" style="border:none; border-radius:0; border-left:1px solid var(--border-subtle); padding:8px 6px; color:var(--text-sec); margin:0; width:24px; flex-shrink:0;">▾</button>
+                    <button type="button" class="sidebar-btn" style="flex:1; border:none; border-radius:0; color:var(--accent-blue); margin:0;">Search</button>
+                    <button type="button" class="sidebar-btn" style="border:none; border-radius:0; border-left:1px solid var(--border-subtle); padding:8px 6px; color:var(--text-sec); margin:0; width:24px; flex-shrink:0;">▾</button>
                 </div>
 
                 <div class="sidebar-divider"></div>
 
                 <!-- GROUP 2: Finalize -->
                 <div class="sidebar-group-label">Finalize</div>
-                <button class="sidebar-btn write-id3">↑ Write ID3</button>
-                <button class="sidebar-btn organize">Organize to Library</button>
+                <button type="button" class="sidebar-btn write-id3">↑ Write ID3</button>
+                <button type="button" class="sidebar-btn organize">Organize to Library</button>
                 <div class="sidebar-path">→ Z:\Music\Incoming\F...\HOME - Resonance.flac</div>
 
                 <div class="sidebar-divider"></div>
 
                 <!-- GROUP 4: Danger zone -->
-                <button class="sidebar-btn delete-original">⚠ Delete Original</button>
+                <button type="button" class="sidebar-btn delete-original">⚠ Delete Original</button>
                 <div class="sidebar-path" style="color: rgba(245,158,11,0.5);">C:\Users\glazb\Downloads\HOME - Resonance.wav</div>
-                <button class="sidebar-btn danger" style="margin-top:4px;">🗑 Delete Record</button>
+                <button type="button" class="sidebar-btn danger" style="margin-top:4px;">🗑 Delete Record</button>
             </div>
 
             </div><!-- end editor-body -->

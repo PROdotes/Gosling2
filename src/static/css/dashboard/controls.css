@@ -114,7 +114,9 @@
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s ease, transform 0.16s ease;
+    transition:
+        background 0.2s ease,
+        transform 0.16s ease;
 }
 
 .btn-danger:hover {

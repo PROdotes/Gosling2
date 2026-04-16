@@ -694,7 +694,7 @@ export function openEditModal(config, triggerEl = null) {
 }
 
 export function closeEditModal() {
-    const onClose = _config && _config.onClose;
+    const onClose = _config?.onClose;
 
     if (_parentSnapshot) {
         const snap = _parentSnapshot;
