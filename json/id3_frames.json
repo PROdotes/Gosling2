@@ -60,10 +60,10 @@
     "TFLT": "File type",
     "TIME": "Time",
     "TIT1": {
-        "description": "Content group description (Groups)",
-        "field": "groups",
+        "description": "Content group description",
+        "field": "performers",
         "type": "list",
-        "role": "Group"
+        "role": "Performer"
     },
     "TIT2": {
         "description": "Title/songname/content description",

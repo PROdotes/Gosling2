@@ -9,6 +9,31 @@ from src.data.song_credit_repository import SongCreditRepository
 from src.services.logger import logger
 
 
+# ── Review blocker SQL fragments ─────────────────────────────────────────────
+# These mirror compute_review_blockers() in view_models.py.
+# If you add/remove a blocker, update BOTH places.
+BLOCKER_SQL = """
+    m.MediaName IS NULL OR m.MediaName = ''
+    OR s.RecordingYear IS NULL
+    OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
+    OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
+    OR NOT EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
+    OR NOT EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+    OR NOT EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
+"""
+
+NO_BLOCKER_SQL = """
+    m.MediaName IS NOT NULL AND m.MediaName != ''
+    AND s.RecordingYear IS NOT NULL
+    AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
+    AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
+    AND EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
+    AND EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
+    AND EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
+"""
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 class SongRepository(MediaSourceRepository):
     """Repository for loading Song domain models from the SQLite database."""
 
@@ -248,7 +273,9 @@ class SongRepository(MediaSourceRepository):
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
                 EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
-                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album
+                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Performer') > 0 AS has_performer,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Composer') > 0 AS has_composer
             FROM MediaSources m
             JOIN Songs s ON m.SourceID = s.SourceID
                 AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
@@ -316,7 +343,9 @@ class SongRepository(MediaSourceRepository):
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
                 EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
-                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album
+                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Performer') > 0 AS has_performer,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Composer') > 0 AS has_composer
             FROM MediaSources m
             JOIN Songs s ON m.SourceID = s.SourceID
                 AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
@@ -794,25 +823,6 @@ class SongRepository(MediaSourceRepository):
                         vals,
                     )
 
-        _BLOCKERS = """
-                            m.MediaName IS NULL OR m.MediaName = ''
-                            OR s.RecordingYear IS NULL
-                            OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
-                            OR NOT EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
-                            OR NOT EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
-                            OR NOT EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
-                            OR NOT EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
-        """
-        _NO_BLOCKERS = """
-                            m.MediaName IS NOT NULL AND m.MediaName != ''
-                            AND s.RecordingYear IS NOT NULL
-                            AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Performer')
-                            AND EXISTS (SELECT 1 FROM SongCredits sc JOIN Roles r ON sc.RoleID = r.RoleID WHERE sc.SourceID = m.SourceID AND r.RoleName = 'Composer')
-                            AND EXISTS (SELECT 1 FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE mst.SourceID = m.SourceID AND t.TagCategory = 'Genre' AND t.IsDeleted = 0)
-                            AND EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID)
-                            AND EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID)
-        """
-
         if statuses:
             status_parts = []
             for s in statuses:
@@ -831,7 +841,7 @@ class SongRepository(MediaSourceRepository):
                         SELECT m.SourceID FROM MediaSources m
                         JOIN Songs s ON m.SourceID = s.SourceID
                         WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
-                          AND ({_BLOCKERS})
+                          AND ({BLOCKER_SQL})
                     """)
                 elif s == "ready_to_finalize":
                     # Not reviewed AND no blockers
@@ -839,7 +849,7 @@ class SongRepository(MediaSourceRepository):
                         SELECT m.SourceID FROM MediaSources m
                         JOIN Songs s ON m.SourceID = s.SourceID
                         WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
-                          AND {_NO_BLOCKERS}
+                          AND {NO_BLOCKER_SQL}
                     """)
             if status_parts:
                 subqueries.append(" UNION ".join(status_parts))
@@ -860,7 +870,9 @@ class SongRepository(MediaSourceRepository):
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
                 EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
-                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album
+                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Performer') > 0 AS has_performer,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Composer') > 0 AS has_composer
             FROM MediaSources m
             JOIN Songs s ON m.SourceID = s.SourceID
                 AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')

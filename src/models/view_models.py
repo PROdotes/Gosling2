@@ -12,6 +12,40 @@ from src.models.domain import (
 )
 
 
+def compute_review_blockers(
+    media_name: Optional[str],
+    year: Optional[int],
+    has_performer: bool,
+    has_composer: bool,
+    has_genre: bool,
+    has_publisher: bool,
+    has_album: bool,
+    duration_s: float,
+) -> list[str]:
+    """
+    Single source of truth for review blockers.
+    Add/remove blockers here only — both SongView and SongSlimView call this.
+    """
+    blockers = []
+    if not media_name:
+        blockers.append("media_name")
+    if not year:
+        blockers.append("year")
+    if not has_performer:
+        blockers.append("performers")
+    if not has_composer:
+        blockers.append("composers")
+    if not has_genre:
+        blockers.append("genres")
+    if not has_publisher:
+        blockers.append("publishers")
+    if not has_album:
+        blockers.append("albums")
+    if (duration_s or 0) <= 0:
+        blockers.append("duration")
+    return blockers
+
+
 class SongAlbumView(BaseModel):
     """View-model for Album associations."""
 
@@ -72,6 +106,25 @@ class SongSlimView(BaseModel):
     processing_status: int
     display_artist: Optional[str] = None
     primary_genre: Optional[str] = None
+    has_performer: bool = False
+    has_composer: bool = False
+    has_genre: bool = False
+    has_publisher: bool = False
+    has_album: bool = False
+
+    @computed_field
+    @property
+    def review_blockers(self) -> list[str]:
+        return compute_review_blockers(
+            media_name=self.media_name,
+            year=self.year,
+            has_performer=self.has_performer,
+            has_composer=self.has_composer,
+            has_genre=self.has_genre,
+            has_publisher=self.has_publisher,
+            has_album=self.has_album,
+            duration_s=self.duration_s,
+        )
 
     @computed_field
     @property
@@ -98,6 +151,11 @@ class SongSlimView(BaseModel):
             processing_status=row["ProcessingStatus"],
             display_artist=row["DisplayArtist"],
             primary_genre=row["PrimaryGenre"],
+            has_performer=bool(row.get("has_performer", 0)),
+            has_composer=bool(row.get("has_composer", 0)),
+            has_genre=bool(row["PrimaryGenre"]),
+            has_publisher=bool(row.get("has_publisher", 0)),
+            has_album=bool(row.get("has_album", 0)),
         )
 
 
@@ -262,28 +320,16 @@ class SongView(BaseModel):
     @computed_field
     @property
     def review_blockers(self) -> list[str]:
-        """
-        Returns field names that must be filled before processing_status can be set to 0.
-        Empty list means the song is ready for review.
-        """
-        blockers = []
-        if not self.media_name:
-            blockers.append("media_name")
-        if not self.year:
-            blockers.append("year")
-        if not any(c.role_name == "Performer" for c in self.credits):
-            blockers.append("performers")
-        if not any(c.role_name == "Composer" for c in self.credits):
-            blockers.append("composers")
-        if not any(t.category and t.category.lower() == "genre" for t in self.tags):
-            blockers.append("genres")
-        if not self.publishers:
-            blockers.append("publishers")
-        if not self.albums:
-            blockers.append("albums")
-        if (self.duration_s or 0) <= 0:
-            blockers.append("duration")
-        return blockers
+        return compute_review_blockers(
+            media_name=self.media_name,
+            year=self.year,
+            has_performer=any(c.role_name == "Performer" for c in self.credits),
+            has_composer=any(c.role_name == "Composer" for c in self.credits),
+            has_genre=any(t.category and t.category.lower() == "genre" for t in self.tags),
+            has_publisher=bool(self.publishers),
+            has_album=bool(self.albums),
+            duration_s=self.duration_s,
+        )
 
 
 class AlbumSlimView(BaseModel):

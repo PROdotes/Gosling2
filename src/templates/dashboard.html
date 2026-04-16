@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="/static/css/dashboard/tokens-preview.css">
     <link rel="stylesheet" href="/static/css/dashboard/toasts.css">
     <link rel="stylesheet" href="/static/css/dashboard/ingest-tab.css">
+    <link rel="stylesheet" href="/static/css/dashboard/songs_v2.css">
 </head>
 
 <body>
@@ -62,11 +63,69 @@
             </div>
         </div>
     </header>
-    <main>
+    <!-- Songs V2: 3-pane workspace (filter sidebar | song list | editor + action sidebar) -->
+    <!-- Shown only when Songs tab is active; <main> is hidden while this is visible -->
+    <div id="songs-workspace" class="active">
+        <!-- Pane 1: Filter Sidebar -->
+        <div id="filter-sidebar" class="filter-sidebar">
+            <div class="filter-header">
+                <!-- Filter control buttons rendered by filter_sidebar.js -->
+            </div>
+            <div class="filter-sections">
+                <!-- Filter sections rendered by filter_sidebar.js -->
+            </div>
+            <div class="filter-active-chips">
+                <!-- Active filter chips rendered by filter_sidebar.js -->
+            </div>
+        </div>
+
+        <!-- Pane 2: Song List -->
+        <div class="left-pane">
+            <div class="list-panel">
+                <div class="list-header">
+                    <div class="col-check">
+                        <input type="checkbox" id="song-list-select-all" title="Select all">
+                    </div>
+                    <div class="col-label">
+                        <span>Audio Track</span>
+                        <select class="sort-select" id="song-sort-select" title="Sort order">
+                            <option value="default">Default</option>
+                            <option value="title-asc">Title ↑</option>
+                            <option value="title-desc">Title ↓</option>
+                            <option value="artist-asc">Artist ↑</option>
+                            <option value="artist-desc">Artist ↓</option>
+                            <option value="id-asc">ID ↑</option>
+                            <option value="id-desc">ID ↓</option>
+                        </select>
+                        <button class="btn-filter-toggle" type="button" data-action="toggle-filter-sidebar" title="Toggle filter sidebar">Filter</button>
+                    </div>
+                    <div class="col-missing">Missing</div>
+                </div>
+                <div id="song-list-panel">
+                    <!-- Song rows rendered by renderSongRows() -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Pane 3: Editor + Action Sidebar -->
+        <div id="editor-panel">
+            <div class="editor-body">
+                <div class="editor-scroll">
+                    <div class="editor-empty-state">Select a song to edit</div>
+                </div>
+                <div class="action-sidebar">
+                    <!-- Action buttons rendered by renderActionSidebar() -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legacy main: hidden when Songs tab is active (songs-workspace takes its place) -->
+    <main style="display:none">
         <section class="results-panel">
             <div id="sort-controls-box" class="sort-controls"></div>
             <div class="results-main-layout">
-                <div id="filter-sidebar" class="filter-sidebar" style="display:none"></div>
+                <div id="filter-sidebar-legacy" class="filter-sidebar" style="display:none"></div>
                 <div id="results-container">
                     <div class="empty-state">
                         <div class="empty-glyph">♪</div>

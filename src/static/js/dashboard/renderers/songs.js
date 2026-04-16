@@ -453,14 +453,24 @@ function applySortAndRender(ctx, field, direction) {
         ? sortSongs(currentSongs, field, direction)
         : currentSongs;
     ctx.setState({ displayedItems: sorted });
-    renderSongsCards(ctx, sorted);
+    const songListPanel = document.getElementById("song-list-panel");
+    if (songListPanel) {
+        renderSongRows(ctx, sorted);
+    } else {
+        renderSongsCards(ctx, sorted);
+    }
 }
 
 function clearSort(ctx) {
     currentSort = { field: null, direction: null };
     saveSort(null, null);
     ctx.setState({ displayedItems: currentSongs });
-    renderSongsCards(ctx, currentSongs);
+    const songListPanel = document.getElementById("song-list-panel");
+    if (songListPanel) {
+        renderSongRows(ctx, currentSongs);
+    } else {
+        renderSongsCards(ctx, currentSongs);
+    }
 }
 
 function renderSortControls() {
@@ -490,6 +500,92 @@ function renderSortControls() {
             ? " active"
             : "";
     return `<button id="filter-toggle-btn" class="sort-btn${filterActiveClass}" data-action="toggle-filter-sidebar">Filter</button><div class="toolbar-separator"></div><span class="sort-label">Sort:</span>${buttons}${clearBtn}`;
+}
+
+function renderSongRows(ctx, songs) {
+    const panel = document.getElementById("song-list-panel");
+    if (!panel) return;
+
+    const state = ctx.getState();
+    const selectedId = state.displayedItems?.[state.selectedIndex]?.id ?? null;
+
+    panel.innerHTML = songs
+        .map((song, index) => {
+            const title = escapeHtml(song.title || song.media_name || "Untitled");
+            const artist = escapeHtml(song.display_artist || "Unknown Artist");
+            const blockerLabels = {
+                media_name: "TTL", year: "YR", performers: "ART",
+                composers: "COMP", genres: "GNR", publishers: "PUB",
+                albums: "ALB", duration: "DUR",
+            };
+            const pills = (song.review_blockers || [])
+                .map((b) => `<span class="pill miss" title="Missing: ${b}">${blockerLabels[b] || b}</span>`)
+                .join("");
+            const selectedClass = song.id === selectedId ? " selected" : "";
+            return `<div class="song-row${selectedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
+  <div class="col-check"><input type="checkbox" data-song-id="${song.id}" title="Select"></div>
+  <div class="col-info">
+    <div class="row-title">${title}<span class="row-id"> #${song.id}</span></div>
+    <div class="row-artist">${artist}</div>
+  </div>
+  <div class="col-missing">${pills}</div>
+</div>`;
+        })
+        .join("");
+
+    // Wire sort dropdown
+    const sortSelect = document.getElementById("song-sort-select");
+    if (sortSelect) {
+        sortSelect.removeEventListener("change", sortSelect._v2Handler);
+        sortSelect._v2Handler = (e) => {
+            const val = e.target.value;
+            if (val === "default") {
+                currentSort = { field: null, direction: null };
+                saveSort(null, null);
+                ctx.setState({ displayedItems: currentSongs });
+                renderSongRows(ctx, currentSongs);
+            } else {
+                const [field, dir] = val.split("-");
+                const fieldMap = {
+                    title: "media_name",
+                    artist: "display_artist",
+                    id: "id",
+                };
+                const sortField = fieldMap[field] || field;
+                currentSort = { field: sortField, direction: dir };
+                saveSort(sortField, dir);
+                const sorted = sortSongs(currentSongs, sortField, dir);
+                ctx.setState({ displayedItems: sorted });
+                renderSongRows(ctx, sorted);
+            }
+        };
+        sortSelect.addEventListener("change", sortSelect._v2Handler);
+
+        // Sync dropdown to current sort state
+        const reverseFieldMap = {
+            media_name: "title",
+            display_artist: "artist",
+            id: "id",
+        };
+        if (currentSort.field) {
+            const shortField = reverseFieldMap[currentSort.field] || currentSort.field;
+            sortSelect.value = `${shortField}-${currentSort.direction}`;
+        } else {
+            sortSelect.value = "default";
+        }
+    }
+
+    // Wire select-all checkbox
+    const selectAll = document.getElementById("song-list-select-all");
+    if (selectAll) {
+        selectAll.removeEventListener("change", selectAll._v2Handler);
+        selectAll._v2Handler = (e) => {
+            panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
+                cb.checked = e.target.checked;
+            });
+        };
+        selectAll.addEventListener("change", selectAll._v2Handler);
+    }
 }
 
 function renderSongsCards(ctx, songs) {
@@ -578,10 +674,15 @@ export function renderSongs(ctx, songs) {
 
     currentSongs = songs;
 
+    const songListPanel = document.getElementById("song-list-panel");
+
     if (!songs.length) {
         ctx.setState({ selectedIndex: -1, displayedItems: [] });
-        ctx.elements.resultsContainer.innerHTML =
-            renderEmptyState("No songs found");
+        if (songListPanel) {
+            songListPanel.innerHTML = `<div class="editor-empty-state">No songs found</div>`;
+        } else {
+            ctx.elements.resultsContainer.innerHTML = renderEmptyState("No songs found");
+        }
         return;
     }
 
@@ -590,7 +691,12 @@ export function renderSongs(ctx, songs) {
         ? sortSongs(songs, currentSort.field, currentSort.direction)
         : songs;
     ctx.setState({ selectedIndex: -1, displayedItems: displaySongs });
-    renderSongsCards(ctx, displaySongs);
+
+    if (songListPanel) {
+        renderSongRows(ctx, displaySongs);
+    } else {
+        renderSongsCards(ctx, displaySongs);
+    }
 }
 
 export function renderSongDetailLoading(ctx, song) {

@@ -67,6 +67,7 @@ import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
 import { WebSearchHandler } from "./handlers/web_search.js";
 import * as orch from "./orchestrator.js";
+import { renderSongEditorEmpty, renderSongEditorV2 } from "./renderers/song_editor.js";
 import {
     renderAlbumDetailComplete,
     renderAlbumDetailLoading,
@@ -104,6 +105,8 @@ const elements = {
     statSep: document.getElementById("stat-sep"),
     deepSearchToggle: document.getElementById("deepSearchToggle"),
     sortControlsBox: document.getElementById("sort-controls-box"),
+    songsWorkspace: document.getElementById("songs-workspace"),
+    legacyMain: document.querySelector("main"),
 };
 
 const state = {
@@ -324,9 +327,29 @@ function syncModeUi() {
     });
     elements.searchInput.placeholder =
         modeConfig[state.currentMode].placeholder;
+
+    const isSongs = state.currentMode === "songs";
+    elements.songsWorkspace?.classList.toggle("active", isSongs);
+    if (elements.legacyMain) {
+        elements.legacyMain.style.display = isSongs ? "none" : "";
+    }
+    if (isSongs) renderSongEditorEmpty();
 }
 
 function updateSelection() {
+    const songListPanel = document.getElementById("song-list-panel");
+    const songsWorkspaceActive = document.getElementById("songs-workspace")?.classList.contains("active");
+    if (songListPanel && songsWorkspaceActive) {
+        const rows = songListPanel.querySelectorAll("[data-selectable='true']");
+        rows.forEach((row, index) => {
+            row.classList.toggle("selected", index === state.selectedIndex);
+        });
+        if (state.selectedIndex >= 0 && state.selectedIndex < rows.length) {
+            rows[state.selectedIndex].scrollIntoView({ block: "nearest" });
+        }
+        return;
+    }
+
     const cards = elements.resultsContainer.querySelectorAll(
         "[data-selectable='true']",
     );
@@ -648,7 +671,16 @@ async function openSelectedResult(index) {
         return;
     }
 
-    if (state.currentMode === "songs") {
+    if (state.currentMode === "songs" && document.getElementById("songs-workspace")?.classList.contains("active")) {
+        const request = beginDetailRequest("songs", selected.id);
+        const result = await getCatalogSong(selected.id, { signal: request.signal }).catch((e) => {
+            if (!isAbortError(e)) throw e;
+            return null;
+        });
+        if (!result || !isActiveDetail("songs", selected.id)) return;
+        state.activeSong = result;
+        renderSongEditorV2(result);
+    } else if (state.currentMode === "songs") {
         await openSongDetail(selected);
     } else if (state.currentMode === "albums") {
         await openAlbumDetail(selected);

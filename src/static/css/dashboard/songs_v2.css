@@ -1,0 +1,605 @@
+/*
+ * Songs Tab V2 Layout — scoped to #songs-workspace
+ * Source of truth: edit-design-poc.html
+ * All selectors prefixed with #songs-workspace to avoid bleeding into other tabs.
+ */
+
+#songs-workspace {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+}
+
+#songs-workspace.active {
+    display: flex;
+}
+
+/* ── PANE 1: FILTER SIDEBAR ─────────────────────────────────────────────── */
+
+#songs-workspace #filter-sidebar {
+    width: 220px;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-window);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: width 0.15s ease;
+}
+
+#songs-workspace #filter-sidebar.hidden {
+    width: 0;
+    border-right: none;
+}
+
+#songs-workspace .filter-header {
+    display: flex;
+    padding: 12px;
+    gap: 4px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+#songs-workspace .filter-ctrl-btn {
+    flex: 1;
+    background: transparent;
+    color: var(--text-sec);
+    padding: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#songs-workspace .filter-ctrl-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#songs-workspace .filter-ctrl-btn.active {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+    border-color: var(--border-subtle);
+}
+
+#songs-workspace .filter-sections {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 12px;
+}
+
+#songs-workspace .filter-section {
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 12px;
+    margin-top: 12px;
+}
+
+#songs-workspace .filter-section-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-sec);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+#songs-workspace .filter-value {
+    width: 100%;
+    text-align: left;
+    padding: 4px 8px;
+    border-radius: 4px;
+    color: var(--text-sec);
+    font-size: 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+#songs-workspace .filter-value:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#songs-workspace .filter-value.active {
+    background: rgba(79, 70, 229, 0.15);
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+
+#songs-workspace .filter-active-chips {
+    padding: 12px;
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#songs-workspace .filter-chip {
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-pure);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+#songs-workspace .filter-chip-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-mut);
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    font-family: inherit;
+}
+
+#songs-workspace .filter-chip-remove:hover {
+    color: var(--accent-red);
+}
+
+/* ── PANE 2: SONG LIST ──────────────────────────────────────────────────── */
+
+#songs-workspace .left-pane {
+    width: 560px;
+    flex-shrink: 0;
+    display: flex;
+    overflow: hidden;
+}
+
+#songs-workspace .list-panel {
+    flex: 1;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-window);
+    display: flex;
+    flex-direction: column;
+}
+
+#songs-workspace .list-header {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-mut);
+    text-transform: uppercase;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+#songs-workspace .list-header .col-check {
+    flex-shrink: 0;
+}
+
+#songs-workspace .list-header .col-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#songs-workspace .list-header .col-missing {
+    margin-left: auto;
+}
+
+#songs-workspace .sort-select {
+    background: transparent;
+    border: none;
+    color: var(--text-mut);
+    font-size: 10px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+}
+
+#songs-workspace .sort-select option {
+    background: var(--bg-element);
+    color: var(--text-pure);
+}
+
+#songs-workspace .btn-filter-toggle {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-sec);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+}
+
+#songs-workspace .btn-filter-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#songs-workspace #song-list-panel {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#songs-workspace .song-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+}
+
+#songs-workspace .song-row:hover {
+    background: var(--bg-panel);
+}
+
+#songs-workspace .song-row.selected {
+    background: var(--bg-panel);
+    box-shadow: inset 3px 0 0 var(--bg-active);
+    border-bottom: 1px solid transparent;
+}
+
+#songs-workspace .song-row.selected .row-title {
+    color: var(--text-pure);
+    font-weight: 700;
+}
+
+#songs-workspace .col-check input {
+    accent-color: var(--bg-active);
+}
+
+#songs-workspace .col-info {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#songs-workspace .row-title {
+    font-weight: 600;
+    color: var(--text-pure);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#songs-workspace .row-artist {
+    color: var(--text-sec);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#songs-workspace .row-id {
+    margin-left: 6px;
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    color: var(--text-mut, #64748B);
+}
+
+#songs-workspace .col-missing {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+#songs-workspace .pill {
+    background: var(--bg-element);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-sec);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#songs-workspace .pill.miss {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-red);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+#songs-workspace .pill.done {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* ── PANE 3: EDITOR ─────────────────────────────────────────────────────── */
+
+#songs-workspace #editor-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-panel);
+    overflow: hidden;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+}
+
+#songs-workspace .editor-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+#songs-workspace .editor-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px 32px 32px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-hover) transparent;
+}
+
+#songs-workspace .editor-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    color: var(--text-mut);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── ACTION SIDEBAR ─────────────────────────────────────────────────────── */
+
+#songs-workspace .action-sidebar {
+    width: 160px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border-subtle);
+    background: var(--bg-window);
+    display: flex;
+    flex-direction: column;
+    padding: 16px 12px;
+    gap: 8px;
+}
+
+#songs-workspace .sidebar-btn {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-sec);
+    background: var(--bg-element);
+    cursor: pointer;
+    transition: 0.1s;
+    font-family: inherit;
+}
+
+#songs-workspace .sidebar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#songs-workspace .sidebar-btn.organize {
+    background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+    color: #fff;
+    border-color: transparent;
+    font-size: 12px;
+    padding: 10px;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+#songs-workspace .sidebar-btn.organize:hover {
+    filter: brightness(1.1);
+}
+
+#songs-workspace .sidebar-btn.organize.blocked {
+    background: var(--bg-element);
+    color: var(--text-mut);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+#songs-workspace .sidebar-btn.write-id3 {
+    color: var(--accent-blue);
+    border-color: rgba(129, 140, 248, 0.3);
+}
+
+#songs-workspace .sidebar-btn.write-id3:hover {
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-blue);
+}
+
+#songs-workspace .sidebar-btn.delete-original {
+    color: #F59E0B;
+    border-color: rgba(245, 158, 11, 0.3);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+#songs-workspace .sidebar-btn.delete-original:hover {
+    background: rgba(245, 158, 11, 0.12);
+}
+
+#songs-workspace .sidebar-btn.danger {
+    color: var(--accent-red);
+    border-color: rgba(244, 63, 94, 0.2);
+    margin-top: auto;
+}
+
+#songs-workspace .sidebar-btn.danger:hover {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-red);
+}
+
+#songs-workspace .sidebar-btn.spotify {
+    color: #1DB954;
+    font-weight: 800;
+}
+
+#songs-workspace .sidebar-group-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    padding: 2px 2px;
+}
+
+#songs-workspace .sidebar-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 4px 0;
+}
+
+#songs-workspace .sidebar-path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-mut);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 4px 0;
+}
+
+/* ── EDITOR FORM ────────────────────────────────────────────────────────── */
+
+#songs-workspace .editor-song-id {
+    font-family: var(--font-mono, monospace);
+    font-size: 10px;
+    color: var(--text-mut, #64748B);
+    margin-bottom: 16px;
+}
+
+#songs-workspace .editor-section {
+    margin-bottom: 28px;
+}
+
+#songs-workspace .editor-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+#songs-workspace .editor-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+#songs-workspace .editor-col {
+    display: flex;
+    flex-direction: column;
+}
+
+#songs-workspace .editor-col.col-4 { flex: 4; }
+#songs-workspace .editor-col.col-6 { flex: 6; }
+#songs-workspace .editor-col.col-8 { flex: 8; }
+#songs-workspace .editor-col.col-12 { flex: 12; }
+
+#songs-workspace .editor-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 12px;
+}
+
+#songs-workspace .editor-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-mut);
+}
+
+#songs-workspace .editor-field.missing .editor-label {
+    color: var(--accent-red);
+}
+
+#songs-workspace .editor-input {
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-pure);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 6px 10px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#songs-workspace .editor-input:focus {
+    border-color: var(--border-focus);
+}
+
+#songs-workspace .editor-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 28px;
+    align-items: center;
+}
+
+#songs-workspace .editor-chip {
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-pure);
+    font-size: 12px;
+    padding: 3px 8px;
+    font-weight: 500;
+}
+
+#songs-workspace .editor-chip.miss {
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.3);
+    color: var(--accent-red);
+    font-style: italic;
+}
+
+/* ── CSS CUSTOM PROPERTIES (songs-workspace local overrides) ────────────── */
+/*
+ * The POC uses its own variable names. We map them here so the POC-derived
+ * selectors above work without touching the global base.css variables.
+ * Where the names match (--border-subtle, --bg-panel, etc.) they already
+ * resolve from base.css. New names are declared below.
+ */
+#songs-workspace {
+    --bg-master:   #030407;
+    --bg-window:   #0A0D14;
+    --bg-panel:    #12151E;
+    --bg-element:  #1D2230;
+    --bg-hover:    #2A3041;
+    --bg-active:   #4F46E5;
+    --bg-danger:   #E11D48;
+    --border-subtle: #2A3041;
+    --border-focus:  #818CF8;
+    --text-pure:   #FFFFFF;
+    --text-sec:    #94A3B8;
+    --text-mut:    #64748B;
+    --accent-blue:  #818CF8;
+    --accent-green: #10B981;
+    --accent-red:   #F43F5E;
+}
