@@ -94,8 +94,8 @@ export function renderAlbums(ctx, albums) {
     ctx.elements.resultsContainer.innerHTML =
         bulkBtn +
         albums
-            .map(
-                (album, index) => `
+        .map(
+            (album, index) => `
         <article class="result-card album-card" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="card-icon">LP</div>
             <div class="card-body">
@@ -112,8 +112,8 @@ export function renderAlbums(ctx, albums) {
             </div>
         </article>
     `,
-            )
-            .join("");
+        )
+        .join("");
 }
 
 export function renderAlbumDetailLoading(ctx, album) {

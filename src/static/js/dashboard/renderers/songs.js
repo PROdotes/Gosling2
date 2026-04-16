@@ -348,9 +348,10 @@ function renderTagGroups(tags, songId, id3Frames) {
                                     typeof f === "object" &&
                                     f.tag_category === cat,
                             );
-                            const variant = frameDef?.variant
-                                ? frameDef.variant
-                                : "";
+                            const variant =
+                                frameDef && frameDef.variant
+                                    ? frameDef.variant
+                                    : "";
                             const chipClass = variant
                                 ? `link-chip tag ${variant}`
                                 : "link-chip tag";
@@ -693,18 +694,19 @@ export function renderSongDetailComplete(
     defaultSearchEngine = null,
 ) {
     const dbCredits = asArray(song.credits);
-    const fileCredits = asArray(fileData?.credits);
+    const fileCredits = asArray(fileData && fileData.credits);
     const dbAlbums = asArray(song.albums);
-    const fileAlbums = asArray(fileData?.albums);
+    const fileAlbums = asArray(fileData && fileData.albums);
     const dbTags = asArray(song.tags);
-    const fileTags = asArray(fileData?.tags);
+    const fileTags = asArray(fileData && fileData.tags);
     const dbPublishers = asArray(song.publishers);
-    const filePublishers = asArray(fileData?.publishers);
+    const filePublishers = asArray(fileData && fileData.publishers);
     const statusHtml = fileData
         ? ""
         : renderStatus("missing", "File not found");
-    const rawTags = fileData?.raw_tags ? Object.entries(fileData.raw_tags) : [];
-    const _artistValue = song.display_artist
+    const rawTags =
+        fileData && fileData.raw_tags ? Object.entries(fileData.raw_tags) : [];
+    const artistValue = song.display_artist
         ? `<button class="inline-link" ${buildNavigateAttrs("artists", song.display_artist)}>${escapeHtml(song.display_artist)}</button>`
         : "-";
 
@@ -774,12 +776,12 @@ export function renderSongDetailComplete(
                             </tr>
                         </thead>
                         <tbody>
-                            ${editableScalarRow("Title", "media_name", song.media_name, fileData?.media_name, song.id)}
-                            ${editableScalarRow("Year", "year", song.year, fileData?.year, song.id)}
-                            ${clickableM2MRow("Artist", song.display_artist, fileData?.display_artist, song.id, "credits", "Performer")}
-                            ${clickableM2MRow("Composer", song.display_composer, fileData?.display_composer, song.id, "credits", "Composer")}
-                            ${clickableM2MRow("Genre", song.display_genres, fileData?.display_genres, song.id, "tags")}
-                            ${clickableM2MRow("Publisher (Master)", song.display_master_publisher, fileData?.display_master_publisher, song.id, "publishers")}
+                            ${editableScalarRow("Title", "media_name", song.media_name, fileData && fileData.media_name, song.id)}
+                            ${editableScalarRow("Year", "year", song.year, fileData && fileData.year, song.id)}
+                            ${clickableM2MRow("Artist", song.display_artist, fileData && fileData.display_artist, song.id, "credits", "Performer")}
+                            ${clickableM2MRow("Composer", song.display_composer, fileData && fileData.display_composer, song.id, "credits", "Composer")}
+                            ${clickableM2MRow("Genre", song.display_genres, fileData && fileData.display_genres, song.id, "tags")}
+                            ${clickableM2MRow("Publisher (Master)", song.display_master_publisher, fileData && fileData.display_master_publisher, song.id, "publishers")}
                         </tbody>
                     </table>
                 </div>
@@ -790,9 +792,9 @@ export function renderSongDetailComplete(
                 <div class="surface-box">
                     <table class="comparison-table">
                         <tbody>
-                            ${compareRow("Duration", song.formatted_duration, fileData?.formatted_duration)}
-                            ${editableScalarRow("BPM", "bpm", song.bpm, fileData?.bpm, song.id)}
-                            ${editableScalarRow("ISRC", "isrc", song.isrc, fileData?.isrc, song.id)}
+                            ${compareRow("Duration", song.formatted_duration, fileData && fileData.formatted_duration)}
+                            ${editableScalarRow("BPM", "bpm", song.bpm, fileData && fileData.bpm, song.id)}
+                            ${editableScalarRow("ISRC", "isrc", song.isrc, fileData && fileData.isrc, song.id)}
                         </tbody>
                     </table>
                 </div>

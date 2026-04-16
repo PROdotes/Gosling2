@@ -13,14 +13,14 @@ async function fetchJson(url, options = {}) {
         let errorDetail = null;
         try {
             const errorData = await response.json();
-            if (errorData?.detail) {
+            if (errorData && errorData.detail) {
                 errorDetail = errorData.detail;
                 errorMsg =
                     typeof errorDetail === "string"
                         ? errorDetail
                         : `Request failed: ${response.status}`;
             }
-        } catch (_e) {
+        } catch (e) {
             // No JSON body
         }
         const err = new Error(errorMsg);
@@ -37,14 +37,14 @@ async function fetchVoid(url, options = {}) {
         let errorDetail = null;
         try {
             const errorData = await response.json();
-            if (errorData?.detail) {
+            if (errorData && errorData.detail) {
                 errorDetail = errorData.detail;
                 errorMsg =
                     typeof errorDetail === "string"
                         ? errorDetail
                         : `Request failed: ${response.status}`;
             }
-        } catch (_e) {
+        } catch (e) {
             // No JSON body
         }
         const err = new Error(errorMsg);
@@ -251,12 +251,9 @@ export function getIngestStatus() {
 }
 
 export function resolveConflict(ghostId, stagedPath) {
-    return fetchJson(
-        `/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`,
-        {
-            method: "POST",
-        },
-    );
+    return fetchJson(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
+        method: "POST",
+    });
 }
 
 /**

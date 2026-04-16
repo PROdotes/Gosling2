@@ -41,6 +41,7 @@
     pointer-events: all;
 }
 
+
 .ingest-badge.pending {
     background: #f97316; /* Orange */
 }

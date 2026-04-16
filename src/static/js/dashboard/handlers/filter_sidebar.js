@@ -18,10 +18,7 @@ function loadSavedFilterState() {
 
 function saveFilterState(active, liveOnly, mode, sidebarVisible) {
     try {
-        localStorage.setItem(
-            FILTER_STORAGE_KEY,
-            JSON.stringify({ active, liveOnly, mode, sidebarVisible }),
-        );
+        localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ active, liveOnly, mode, sidebarVisible }));
     } catch {}
 }
 
@@ -258,12 +255,7 @@ export class FilterSidebarHandler {
     // ─── APPLY ────────────────────────────────────────────────────────────────
 
     _applyFilters() {
-        saveFilterState(
-            this._active,
-            this._liveOnly,
-            this._mode,
-            this._sidebarVisible,
-        );
+        saveFilterState(this._active, this._liveOnly, this._mode, this._sidebarVisible);
         if (!this.hasActiveFilters()) {
             // No filters — hand back to normal search
             this.ctx.onFilterCleared?.();
@@ -286,7 +278,7 @@ export class FilterSidebarHandler {
         for (const [cat, vals] of Object.entries(this._active.tag_categories)) {
             for (const v of vals) tagPairs.push(`${cat}:${v}`);
         }
-        if (tagPairs.length) filters.tags = tagPairs;
+        if (tagPairs.length) filters["tags"] = tagPairs;
 
         const result = api.filterSongs(filters, this._mode, this._liveOnly);
         this.ctx.onFilterResults?.(result);
@@ -365,7 +357,7 @@ export class FilterSidebarHandler {
         );
         const liveMatches = !q || "live only".includes(q.toLowerCase());
         if (!q || statusFiltered.length || liveMatches) {
-            const isCollapsed = this._collapsed.statuses;
+            const isCollapsed = this._collapsed["statuses"];
             sectionsHtml += `
                 <div class="filter-section" data-filter-section="statuses">
                     <div class="filter-section-header">

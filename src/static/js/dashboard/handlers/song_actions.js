@@ -170,6 +170,7 @@ export class SongActionsHandler {
 
     async handleDeleteSong(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
+        const { title } = actionTarget.dataset;
 
         // Two-stage confirmation
         if (!actionTarget.classList.contains("confirming")) {
@@ -423,7 +424,7 @@ export class SongActionsHandler {
 
     async handleOpenScrubber(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
-
+        const { title } = actionTarget.dataset;
         const orch = await import("../orchestrator.js");
         orch.orchestrateScrubber(this.ctx, id, title);
     }
@@ -454,7 +455,7 @@ export class SongActionsHandler {
         const { songId, engine } = actionTarget.dataset;
         try {
             const data = await api.getSongWebSearch(songId, engine || null);
-            if (data?.url) {
+            if (data && data.url) {
                 this._window.open(data.url, "_blank");
             }
         } catch (err) {
@@ -518,9 +519,7 @@ export class SongActionsHandler {
             if (!res.ok) throw new Error("Conversion failed");
             showToast("Conversion started...", "info");
             if (this.ctx.updateCachedIngestResult) {
-                this.ctx.updateCachedIngestResult(stagedPath, {
-                    status: "CONVERTING",
-                });
+                this.ctx.updateCachedIngestResult(stagedPath, { status: "CONVERTING" });
             }
         } catch (err) {
             actionTarget.disabled = false;
@@ -559,17 +558,10 @@ export class SongActionsHandler {
 
                 if (this.ctx.updateIngestBadges) {
                     const status = await api.getIngestStatus();
-                    this.ctx.updateIngestBadges({
-                        success: status.success,
-                        action: status.action,
-                        pending: status.pending,
-                    });
+                    this.ctx.updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
                 }
                 if (this.ctx.updateCachedIngestResult) {
-                    this.ctx.updateCachedIngestResult(stagedPath, {
-                        status: "INGESTED",
-                        song: data.song,
-                    });
+                    this.ctx.updateCachedIngestResult(stagedPath, { status: "INGESTED", song: data.song });
                 }
             } else if (data.status === "PENDING_CONVERT") {
                 const card = actionTarget.closest(".result-card");
@@ -739,7 +731,7 @@ export class SongActionsHandler {
 
     async handleOpenSpotifyModal(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
-
+        const { title } = actionTarget.dataset;
         const state = this.ctx.getState();
         const { openSpotifyModal } = await import(
             "../components/spotify_modal.js"

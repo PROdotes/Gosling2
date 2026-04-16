@@ -124,7 +124,7 @@
 
 .ingest-btn-danger.confirming {
     background: var(--danger);
-    color: #fff;
+    color: #fff !important;
     border-color: var(--danger);
     animation: pulse-danger 0.8s infinite alternate;
     box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);

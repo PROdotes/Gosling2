@@ -81,8 +81,7 @@ export function renderPublisherDetailLoading(ctx, publisher) {
 }
 
 export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
-    const isUnlinked =
-        publisher.song_count === 0 && publisher.album_count === 0;
+    const isUnlinked = publisher.song_count === 0 && publisher.album_count === 0;
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>

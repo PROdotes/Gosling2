@@ -11,7 +11,7 @@ vi.mock("../../../src/static/js/dashboard/api.js", () => ({
 describe("SpotifyModal UI Sync", () => {
     let modalModule;
     let warningEl;
-    let _parsedTitleEl;
+    let parsedTitleEl;
 
     beforeEach(async () => {
         const dom = new JSDOM(`
@@ -42,7 +42,7 @@ describe("SpotifyModal UI Sync", () => {
         );
 
         warningEl = document.getElementById("spotify-title-warning");
-        _parsedTitleEl = document.getElementById("spotify-parsed-title");
+        parsedTitleEl = document.getElementById("spotify-parsed-title");
     });
 
     it("should hide warning when title matches", async () => {

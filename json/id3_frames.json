@@ -1,5 +1,10 @@
 {
-    "tag_categories": ["Category", "Festival", "Genre", "Type"],
+    "tag_categories": [
+        "Category",
+        "Festival",
+        "Genre",
+        "Type"
+    ],
     "Status": {
         "icon": "­ƒÅü",
         "color": "#9E9E9E",

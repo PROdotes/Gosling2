@@ -16,10 +16,9 @@ function close(result) {
 
 if (okBtn) okBtn.addEventListener("click", () => close(true));
 if (cancelBtn) cancelBtn.addEventListener("click", () => close(false));
-if (overlay)
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) close(false);
-    });
+if (overlay) overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close(false);
+});
 document.addEventListener("keydown", (e) => {
     if (overlay.style.display !== "none" && e.key === "Escape") close(false);
 });
