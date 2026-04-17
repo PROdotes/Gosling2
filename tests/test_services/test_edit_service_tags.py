@@ -69,7 +69,9 @@ class TestSetPrimarySongTag:
         # Verify state unchanged
         song = lib_service.get_song(4)
         electronic = next((t for t in song.tags if t.id == 4), None)
-        assert electronic.is_primary is False, "Expected Electronic to remain non-primary"
+        assert electronic.is_primary is False, (
+            "Expected Electronic to remain non-primary"
+        )
 
     def test_unlinked_genre_tag_raises_lookup_error(self, populated_db):
         """Should raise LookupError when tag exists but is not linked to the song."""

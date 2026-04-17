@@ -55,7 +55,9 @@ class SongCreditRepository(BaseRepository):
         values_to_insert = []
         for credit in credits:
             role_id = self.get_or_create_role(credit.role_name, cursor)
-            name_id = self.get_or_create_credit_name(credit.display_name, cursor, identity_id=credit.identity_id)
+            name_id = self.get_or_create_credit_name(
+                credit.display_name, cursor, identity_id=credit.identity_id
+            )
             values_to_insert.append((source_id, name_id, role_id))
 
         if values_to_insert:

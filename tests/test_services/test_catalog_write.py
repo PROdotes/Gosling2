@@ -75,30 +75,30 @@ class TestCatalogServiceIngestFile:
         # 1. Ingest
         report = service.ingest_file(test_mp3)
 
-        assert (
-            report["status"] == "INGESTED"
-        ), f"Ingestion failed: {report.get('message')}"
+        assert report["status"] == "INGESTED", (
+            f"Ingestion failed: {report.get('message')}"
+        )
         song = report["song"]
 
         # EXHAUSTIVE ASSERTIONS (Every field in Song model)
         assert song.id is not None, "Expected DB-assigned ID"
-        assert (
-            song.title == "Unique Ingest Title"
-        ), f"Expected 'Unique Ingest Title', got {song.title}"
-        assert (
-            song.source_path == test_mp3
-        ), f"Expected {test_mp3}, got {song.source_path}"
+        assert song.title == "Unique Ingest Title", (
+            f"Expected 'Unique Ingest Title', got {song.title}"
+        )
+        assert song.source_path == test_mp3, (
+            f"Expected {test_mp3}, got {song.source_path}"
+        )
         # silence.mp3 is ~2.27s
         assert 2.0 < song.duration_s < 3.0, f"Expected ~2.27s, got {song.duration_s}"
         assert song.audio_hash is not None, "Expected audio hash to be calculated"
         assert song.year == 2024, f"Expected 2024, got {song.year}"
         assert song.bpm == 120, f"Expected 120, got {song.bpm}"
-        assert (
-            song.is_active is False
-        ), f"Expected default is_active=False, got {song.is_active}"
-        assert (
-            song.processing_status == 1
-        ), f"Expected processing_status=1 after enrichment, got {song.processing_status}"
+        assert song.is_active is False, (
+            f"Expected default is_active=False, got {song.is_active}"
+        )
+        assert song.processing_status == 1, (
+            f"Expected processing_status=1 after enrichment, got {song.processing_status}"
+        )
 
         # Verify in DB via a fresh read
         db_song = service.get_song(song.id)
@@ -121,9 +121,9 @@ class TestCatalogServiceIngestFile:
         assert db_song is not None
         assert len(db_song.albums) == 1
         album = db_song.albums[0]
-        assert (
-            album.album_type == "Single"
-        ), f"Expected default 'Single', got {album.album_type}"
+        assert album.album_type == "Single", (
+            f"Expected default 'Single', got {album.album_type}"
+        )
 
     def test_ingest_path_collision_returns_already_exists(self, populated_db, tmp_path):
         service = CatalogService(populated_db)
@@ -143,34 +143,34 @@ class TestCatalogServiceIngestFile:
         report = service.ingest_file(str(real_path))
 
         # Report structure
-        assert (
-            report["status"] == "ALREADY_EXISTS"
-        ), f"Expected ALREADY_EXISTS, got {report['status']} (msg: {report.get('message')})"
+        assert report["status"] == "ALREADY_EXISTS", (
+            f"Expected ALREADY_EXISTS, got {report['status']} (msg: {report.get('message')})"
+        )
         assert report["match_type"] == "PATH"
 
         # Exhaustive song assertions
         song = report["song"]
         assert song.id == 1, f"Expected collision with Song 1, got {song.id}"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got {song.title}"
-        assert song.source_path == str(
-            real_path
-        ), f"Expected {real_path}, got {song.source_path}"
+        assert song.title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got {song.title}"
+        )
+        assert song.source_path == str(real_path), (
+            f"Expected {real_path}, got {song.source_path}"
+        )
         assert song.duration_s == 200, f"Expected 200s, got {song.duration_s}"
         assert song.audio_hash == "hash_1", f"Expected 'hash_1', got {song.audio_hash}"
         assert song.year == 1991, f"Expected 1991, got {song.year}"
         assert song.bpm is None, f"Expected None for bpm, got {song.bpm}"
         assert song.isrc is None, f"Expected None for isrc, got {song.isrc}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0 (fixture default), got {song.processing_status}"
+        assert song.processing_status == 0, (
+            f"Expected 0 (fixture default), got {song.processing_status}"
+        )
 
         # SIDE EFFECT: File should be deleted to prevent orphans
-        assert not os.path.exists(
-            str(real_path)
-        ), "Staged file should be deleted on path collision"
+        assert not os.path.exists(str(real_path)), (
+            "Staged file should be deleted on path collision"
+        )
 
     def test_ingest_hash_collision_returns_already_exists(
         self, populated_db, test_mp3, monkeypatch
@@ -184,36 +184,36 @@ class TestCatalogServiceIngestFile:
         report = service.ingest_file(test_mp3)
 
         # Report structure
-        assert (
-            report["status"] == "ALREADY_EXISTS"
-        ), f"Expected ALREADY_EXISTS, got {report['status']}"
-        assert (
-            report["match_type"] == "HASH"
-        ), f"Expected HASH, got {report['match_type']}"
+        assert report["status"] == "ALREADY_EXISTS", (
+            f"Expected ALREADY_EXISTS, got {report['status']}"
+        )
+        assert report["match_type"] == "HASH", (
+            f"Expected HASH, got {report['match_type']}"
+        )
 
         # Exhaustive song assertions
         song = report["song"]
         assert song.id == 1, f"Expected collision with Song 1, got {song.id}"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got {song.title}"
-        assert (
-            song.source_path == "/path/1"
-        ), f"Expected '/path/1', got {song.source_path}"
+        assert song.title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got {song.title}"
+        )
+        assert song.source_path == "/path/1", (
+            f"Expected '/path/1', got {song.source_path}"
+        )
         assert song.duration_s == 200, f"Expected 200s, got {song.duration_s}"
         assert song.audio_hash == "hash_1", f"Expected 'hash_1', got {song.audio_hash}"
         assert song.year == 1991, f"Expected 1991, got {song.year}"
         assert song.bpm is None, f"Expected None for bpm, got {song.bpm}"
         assert song.isrc is None, f"Expected None for isrc, got {song.isrc}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0 (fixture default), got {song.processing_status}"
+        assert song.processing_status == 0, (
+            f"Expected 0 (fixture default), got {song.processing_status}"
+        )
 
         # SIDE EFFECT: File should be deleted to prevent orphans
-        assert not os.path.exists(
-            test_mp3
-        ), "Staged file should be deleted on hash collision"
+        assert not os.path.exists(test_mp3), (
+            "Staged file should be deleted on hash collision"
+        )
 
     def test_ingest_missing_file_returns_error(self, ingest_db):
         service = CatalogService(ingest_db)
@@ -225,34 +225,34 @@ class TestCatalogServiceIngestFile:
         service = CatalogService(ingest_db)
         report = service.ingest_file(unicode_mp3)
 
-        assert (
-            report["status"] == "INGESTED"
-        ), f"Expected INGESTED, got {report['status']}"
+        assert report["status"] == "INGESTED", (
+            f"Expected INGESTED, got {report['status']}"
+        )
 
         # Exhaustive song assertions
         song = report["song"]
         assert song.id is not None, "Expected DB-assigned ID"
-        assert (
-            song.title == "日本語タイトル"
-        ), f"Expected '日本語タイトル', got {song.title}"
-        assert (
-            song.source_path == unicode_mp3
-        ), f"Expected {unicode_mp3}, got {song.source_path}"
+        assert song.title == "日本語タイトル", (
+            f"Expected '日本語タイトル', got {song.title}"
+        )
+        assert song.source_path == unicode_mp3, (
+            f"Expected {unicode_mp3}, got {song.source_path}"
+        )
         assert 2.0 < song.duration_s < 3.0, f"Expected ~2.27s, got {song.duration_s}"
         assert song.audio_hash is not None, "Expected audio hash to be calculated"
-        assert (
-            song.year == SONG_DEFAULT_YEAR
-        ), f"Expected {SONG_DEFAULT_YEAR} for year, got {song.year}"
+        assert song.year == SONG_DEFAULT_YEAR, (
+            f"Expected {SONG_DEFAULT_YEAR} for year, got {song.year}"
+        )
         assert song.bpm is None, f"Expected None for bpm, got {song.bpm}"
-        assert (
-            song.isrc == "USCGJ2326543"
-        ), f"Expected 'USCGJ2326543' (inherited from fixture file), got {song.isrc}"
-        assert (
-            song.is_active is False
-        ), f"Expected default is_active=False, got {song.is_active}"
-        assert (
-            song.processing_status == 1
-        ), f"Expected processing_status=1 after enrichment, got {song.processing_status}"
+        assert song.isrc == "USCGJ2326543", (
+            f"Expected 'USCGJ2326543' (inherited from fixture file), got {song.isrc}"
+        )
+        assert song.is_active is False, (
+            f"Expected default is_active=False, got {song.is_active}"
+        )
+        assert song.processing_status == 1, (
+            f"Expected processing_status=1 after enrichment, got {song.processing_status}"
+        )
 
     def test_ingest_failure_rolls_back_and_deletes_staged_file(
         self, ingest_db, test_mp3, monkeypatch
@@ -273,9 +273,9 @@ class TestCatalogServiceIngestFile:
         assert "DATABASE ATOMIC FAILURE" in report["message"]
 
         # SIDE EFFECT: File should be deleted to prevent orphans
-        assert not os.path.exists(
-            test_mp3
-        ), "Staged file should be deleted on ingestion failure"
+        assert not os.path.exists(test_mp3), (
+            "Staged file should be deleted on ingestion failure"
+        )
 
         # SIDE EFFECT: DB should be empty (rolled back)
         all_songs = service._song_repo.get_by_title("Unique Ingest Title")
@@ -290,9 +290,9 @@ class TestCatalogServiceDeleteSong:
     ):
         service = CatalogService(ingest_db)
         report = service.ingest_file(test_mp3)
-        assert (
-            report["status"] == "INGESTED"
-        ), f"Setup ingestion failed: {report.get('message')}"
+        assert report["status"] == "INGESTED", (
+            f"Setup ingestion failed: {report.get('message')}"
+        )
         song_id = report["song"].id
 
         # Mock STAGING_DIR to the parent of test_mp3 so implementation thinks it's in staging
@@ -343,16 +343,16 @@ class TestCatalogServiceDeleteSong:
         assert service.get_song(1) is None
 
         # 3. Side Effect: Physical file PRESERVED (since not in staging)
-        assert os.path.exists(
-            real_temp_path
-        ), "File OUTSIDE staging should NOT be deleted"
+        assert os.path.exists(real_temp_path), (
+            "File OUTSIDE staging should NOT be deleted"
+        )
 
     def test_delete_nonexistent_id_returns_false(self, ingest_db):
         service = CatalogService(ingest_db)
         success = service.delete_song(999)
-        assert (
-            success is False
-        ), "Expected delete_song to return False for nonexistent ID"
+        assert success is False, (
+            "Expected delete_song to return False for nonexistent ID"
+        )
 
     def test_delete_cascades_work_correctly(self, populated_db):
         """Deleting a song must cascade to SongCredits, SongAlbums, etc."""
@@ -397,9 +397,9 @@ class TestCatalogServiceDeleteSong:
         assert album.title == "Nevermind", f"Expected 'Nevermind', got {album.title}"
 
         identity = service.get_identity(2)  # Nirvana (ID=2 per conftest.py line 111)
-        assert (
-            identity is not None
-        ), "Identity should NOT be deleted when song is removed"
-        assert (
-            identity.display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got {identity.display_name}"
+        assert identity is not None, (
+            "Identity should NOT be deleted when song is removed"
+        )
+        assert identity.display_name == "Nirvana", (
+            f"Expected 'Nirvana', got {identity.display_name}"
+        )

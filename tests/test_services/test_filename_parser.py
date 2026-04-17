@@ -2,7 +2,6 @@ from src.services.filename_parser import parse_with_pattern
 
 
 class TestFilenameParserPattern:
-
     def test_basic_dash_separator(self):
         filename = "Oliver - Cezanj.mp3"
         pattern = "{Artist} - {Title}"

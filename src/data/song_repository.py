@@ -640,219 +640,103 @@ class SongRepository(MediaSourceRepository):
         """
         logger.debug(f"[SongRepository] -> filter_slim(mode={mode})")
 
-        # In ANY mode: one subquery per filter type using IN (union within type).
-        # In ALL mode: one subquery per individual value (intersection of all).
-        subqueries = []
+        subqueries: List[str] = []
         params: List[Any] = []
         is_all = mode.upper() == "ALL"
 
-        def _add(sq, vals):
+        def _add(sq: str, vals: List[Any]):
             subqueries.append(sq)
             params.extend(vals)
 
-        if artists:
+        def _add_standard_filter(values: Optional[List[Any]], base_sq: str, col: str):
+            if not values:
+                return
             if is_all:
-                for a in artists:
-                    _add(
-                        """
-                        SELECT sc.SourceID FROM SongCredits sc
-                        JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                        JOIN Roles r ON sc.RoleID = r.RoleID
-                        WHERE an.DisplayName = ? AND r.RoleName = 'Performer' AND an.IsDeleted = 0
-                    """,
-                        [a],
-                    )
+                for v in values:
+                    _add(f"{base_sq} AND {col} = ?", [v])
             else:
-                ph = ",".join(["?"] * len(artists))
-                _add(
-                    f"""
-                    SELECT sc.SourceID FROM SongCredits sc
-                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                    JOIN Roles r ON sc.RoleID = r.RoleID
-                    WHERE an.DisplayName IN ({ph}) AND r.RoleName = 'Performer' AND an.IsDeleted = 0
-                """,
-                    artists,
-                )
+                ph = ",".join(["?"] * len(values))
+                _add(f"{base_sq} AND {col} IN ({ph})", values)
 
-        if contributors:
-            if is_all:
-                for c in contributors:
-                    _add(
-                        """
-                        SELECT sc.SourceID FROM SongCredits sc
-                        JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                        WHERE an.DisplayName = ? AND an.IsDeleted = 0
-                    """,
-                        [c],
-                    )
-            else:
-                ph = ",".join(["?"] * len(contributors))
-                _add(
-                    f"""
-                    SELECT sc.SourceID FROM SongCredits sc
-                    JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                    WHERE an.DisplayName IN ({ph}) AND an.IsDeleted = 0
-                """,
-                    contributors,
-                )
+        # 1. Standard matching fields
+        _add_standard_filter(
+            artists,
+            "SELECT sc.SourceID FROM SongCredits sc JOIN ArtistNames an ON sc.CreditedNameID = an.NameID JOIN Roles r ON sc.RoleID = r.RoleID WHERE an.IsDeleted = 0 AND r.RoleName = 'Performer'",
+            "an.DisplayName",
+        )
+        _add_standard_filter(
+            contributors,
+            "SELECT sc.SourceID FROM SongCredits sc JOIN ArtistNames an ON sc.CreditedNameID = an.NameID WHERE an.IsDeleted = 0",
+            "an.DisplayName",
+        )
+        _add_standard_filter(
+            years,
+            "SELECT s.SourceID FROM Songs s WHERE 1=1",
+            "s.RecordingYear",
+        )
+        _add_standard_filter(
+            genres,
+            "SELECT mst.SourceID FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE t.TagCategory = 'Genre' AND t.IsDeleted = 0",
+            "t.TagName",
+        )
+        _add_standard_filter(
+            albums,
+            "SELECT sa.SourceID FROM SongAlbums sa JOIN Albums a ON sa.AlbumID = a.AlbumID WHERE a.IsDeleted = 0",
+            "a.AlbumTitle",
+        )
+        _add_standard_filter(
+            publishers,
+            "SELECT rp.SourceID FROM RecordingPublishers rp JOIN Publishers p ON rp.PublisherID = p.PublisherID WHERE p.IsDeleted = 0",
+            "p.PublisherName",
+        )
 
-        if years:
-            if is_all:
-                for y in years:
-                    _add(
-                        "SELECT s.SourceID FROM Songs s WHERE s.RecordingYear = ?", [y]
-                    )
-            else:
-                ph = ",".join(["?"] * len(years))
-                _add(
-                    f"SELECT s.SourceID FROM Songs s WHERE s.RecordingYear IN ({ph})",
-                    years,
-                )
-
+        # 2. Decades
         if decades:
+            base = "SELECT s.SourceID FROM Songs s WHERE"
             if is_all:
                 for d in decades:
                     _add(
-                        """
-                        SELECT s.SourceID FROM Songs s
-                        WHERE s.RecordingYear >= ? AND s.RecordingYear < ?
-                    """,
+                        f"{base} s.RecordingYear >= ? AND s.RecordingYear < ?",
                         [d, d + 10],
                     )
             else:
-                decade_clauses = " OR ".join(
+                clauses = " OR ".join(
                     ["(s.RecordingYear >= ? AND s.RecordingYear < ?)"] * len(decades)
                 )
-                sq = f"SELECT s.SourceID FROM Songs s WHERE {decade_clauses}"
-                vals = []
-                for d in decades:
-                    vals.extend([d, d + 10])
-                _add(sq, vals)
+                _add(f"{base} {clauses}", [val for d in decades for val in (d, d + 10)])
 
-        if genres:
-            if is_all:
-                for g in genres:
-                    _add(
-                        """
-                        SELECT mst.SourceID FROM MediaSourceTags mst
-                        JOIN Tags t ON mst.TagID = t.TagID
-                        WHERE t.TagName = ? AND t.TagCategory = 'Genre' AND t.IsDeleted = 0
-                    """,
-                        [g],
-                    )
-            else:
-                ph = ",".join(["?"] * len(genres))
-                _add(
-                    f"""
-                    SELECT mst.SourceID FROM MediaSourceTags mst
-                    JOIN Tags t ON mst.TagID = t.TagID
-                    WHERE t.TagName IN ({ph}) AND t.TagCategory = 'Genre' AND t.IsDeleted = 0
-                """,
-                    genres,
-                )
-
-        if albums:
-            if is_all:
-                for a in albums:
-                    _add(
-                        """
-                        SELECT sa.SourceID FROM SongAlbums sa
-                        JOIN Albums a ON sa.AlbumID = a.AlbumID
-                        WHERE a.AlbumTitle = ? AND a.IsDeleted = 0
-                    """,
-                        [a],
-                    )
-            else:
-                ph = ",".join(["?"] * len(albums))
-                _add(
-                    f"""
-                    SELECT sa.SourceID FROM SongAlbums sa
-                    JOIN Albums a ON sa.AlbumID = a.AlbumID
-                    WHERE a.AlbumTitle IN ({ph}) AND a.IsDeleted = 0
-                """,
-                    albums,
-                )
-
-        if publishers:
-            if is_all:
-                for p in publishers:
-                    _add(
-                        """
-                        SELECT rp.SourceID FROM RecordingPublishers rp
-                        JOIN Publishers p ON rp.PublisherID = p.PublisherID
-                        WHERE p.PublisherName = ? AND p.IsDeleted = 0
-                    """,
-                        [p],
-                    )
-            else:
-                ph = ",".join(["?"] * len(publishers))
-                _add(
-                    f"""
-                    SELECT rp.SourceID FROM RecordingPublishers rp
-                    JOIN Publishers p ON rp.PublisherID = p.PublisherID
-                    WHERE p.PublisherName IN ({ph}) AND p.IsDeleted = 0
-                """,
-                    publishers,
-                )
-
+        # 3. Tags (category:value)
         if tags:
-            # tags are "category:value" strings
             parsed = [t.split(":", 1) for t in tags if ":" in t]
-            if is_all:
-                for cat, val in parsed:
-                    _add(
-                        """
-                        SELECT mst.SourceID FROM MediaSourceTags mst
-                        JOIN Tags t ON mst.TagID = t.TagID
-                        WHERE t.TagName = ? AND t.TagCategory = ? AND t.IsDeleted = 0
-                    """,
-                        [val, cat],
-                    )
-            else:
-                if parsed:
+            if parsed:
+                base = "SELECT mst.SourceID FROM MediaSourceTags mst JOIN Tags t ON mst.TagID = t.TagID WHERE t.IsDeleted = 0 AND"
+                if is_all:
+                    for cat, val in parsed:
+                        _add(f"{base} t.TagName = ? AND t.TagCategory = ?", [val, cat])
+                else:
                     clauses = " OR ".join(
                         ["(t.TagName = ? AND t.TagCategory = ?)"] * len(parsed)
                     )
-                    vals = [v for pair in parsed for v in (pair[1], pair[0])]
                     _add(
-                        f"""
-                        SELECT mst.SourceID FROM MediaSourceTags mst
-                        JOIN Tags t ON mst.TagID = t.TagID
-                        WHERE ({clauses}) AND t.IsDeleted = 0
-                    """,
-                        vals,
+                        f"{base} ({clauses})",
+                        [v for pair in parsed for v in (pair[1], pair[0])],
                     )
 
+        # 4. Statuses
         if statuses:
-            status_parts = []
-            for s in statuses:
-                if s == "done":
-                    status_parts.append(
-                        "SELECT m.SourceID FROM MediaSources m WHERE m.ProcessingStatus = 0 AND m.IsDeleted = 0"
-                    )
-                elif s == "not_done":
-                    # Any song not yet reviewed (ProcessingStatus != 0)
-                    status_parts.append(
-                        "SELECT m.SourceID FROM MediaSources m WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0"
-                    )
-                elif s == "missing_data":
-                    # Not reviewed AND has blockers
-                    status_parts.append(f"""
-                        SELECT m.SourceID FROM MediaSources m
-                        JOIN Songs s ON m.SourceID = s.SourceID
-                        WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
-                          AND ({BLOCKER_SQL})
-                    """)
-                elif s == "ready_to_finalize":
-                    # Not reviewed AND no blockers
-                    status_parts.append(f"""
-                        SELECT m.SourceID FROM MediaSources m
-                        JOIN Songs s ON m.SourceID = s.SourceID
-                        WHERE m.ProcessingStatus != 0 AND m.IsDeleted = 0
-                          AND {NO_BLOCKER_SQL}
-                    """)
-            if status_parts:
-                subqueries.append(" UNION ".join(status_parts))
+            status_map = {
+                "done": "m.ProcessingStatus = 0",
+                "not_done": "m.ProcessingStatus != 0",
+                "missing_data": f"m.ProcessingStatus != 0 AND ({BLOCKER_SQL})",
+                "ready_to_finalize": f"m.ProcessingStatus != 0 AND {NO_BLOCKER_SQL}",
+            }
+            parts = [
+                f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE m.IsDeleted = 0 AND {status_map[s]}"
+                for s in statuses
+                if s in status_map
+            ]
+            if parts:
+                subqueries.append(" UNION ".join(parts))
 
         if not subqueries:
             id_filter = "1=1"

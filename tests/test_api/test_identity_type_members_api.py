@@ -29,7 +29,6 @@ def api(populated_db, monkeypatch):
 
 
 class TestSetIdentityTypeApi:
-
     def test_person_to_group_returns_204(self, api):
         resp = api.patch("/api/v1/identities/4/type", json={"type": "group"})
         assert resp.status_code == 204, resp.text
@@ -59,7 +58,6 @@ class TestSetIdentityTypeApi:
 
 
 class TestAddIdentityMemberApi:
-
     def test_add_member_returns_204(self, api):
         resp = api.post("/api/v1/identities/2/members", json={"member_id": 4})
         assert resp.status_code == 204, resp.text
@@ -87,7 +85,6 @@ class TestAddIdentityMemberApi:
 
 
 class TestRemoveIdentityMemberApi:
-
     def test_remove_member_returns_204(self, api):
         resp = api.delete("/api/v1/identities/2/members/1")
         assert resp.status_code == 204, resp.text

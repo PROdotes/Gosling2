@@ -19,38 +19,38 @@ class TestGetHistoryWithData:
 
         # Verify the ACTION entry
         action = next(h for h in history if h["type"] == "ACTION")
-        assert (
-            action["timestamp"] is not None
-        ), f"Expected timestamp not None, got {action['timestamp']}"
-        assert (
-            action["type"] == "ACTION"
-        ), f"Expected type='ACTION', got '{action['type']}'"
-        assert (
-            action["label"] == "RENAME"
-        ), f"Expected label='RENAME', got '{action['label']}'"
-        assert (
-            action["details"] == "User updated artist name"
-        ), f"Expected details='User updated artist name', got '{action['details']}'"
+        assert action["timestamp"] is not None, (
+            f"Expected timestamp not None, got {action['timestamp']}"
+        )
+        assert action["type"] == "ACTION", (
+            f"Expected type='ACTION', got '{action['type']}'"
+        )
+        assert action["label"] == "RENAME", (
+            f"Expected label='RENAME', got '{action['label']}'"
+        )
+        assert action["details"] == "User updated artist name", (
+            f"Expected details='User updated artist name', got '{action['details']}'"
+        )
         assert action["user"] is None, f"Expected user=None, got {action['user']}"
         assert action["batch"] is None, f"Expected batch=None, got {action['batch']}"
 
         # Verify the CHANGE entry
         change = next(h for h in history if h["type"] == "CHANGE")
-        assert (
-            change["timestamp"] is not None
-        ), f"Expected timestamp not None, got {change['timestamp']}"
-        assert (
-            change["type"] == "CHANGE"
-        ), f"Expected type='CHANGE', got '{change['type']}'"
-        assert (
-            change["label"] == "Updated DisplayName"
-        ), f"Expected label='Updated DisplayName', got '{change['label']}'"
-        assert (
-            change["old"] == "PinkPantheress"
-        ), f"Expected old='PinkPantheress', got '{change['old']}'"
-        assert (
-            change["new"] == "Ines Prajo"
-        ), f"Expected new='Ines Prajo', got '{change['new']}'"
+        assert change["timestamp"] is not None, (
+            f"Expected timestamp not None, got {change['timestamp']}"
+        )
+        assert change["type"] == "CHANGE", (
+            f"Expected type='CHANGE', got '{change['type']}'"
+        )
+        assert change["label"] == "Updated DisplayName", (
+            f"Expected label='Updated DisplayName', got '{change['label']}'"
+        )
+        assert change["old"] == "PinkPantheress", (
+            f"Expected old='PinkPantheress', got '{change['old']}'"
+        )
+        assert change["new"] == "Ines Prajo", (
+            f"Expected new='Ines Prajo', got '{change['new']}'"
+        )
         assert change["batch"] is None, f"Expected batch=None, got {change['batch']}"
 
     def test_deleted_record_timeline(self, audit_service):
@@ -61,18 +61,18 @@ class TestGetHistoryWithData:
         assert len(history) == 1, f"Expected 1 timeline entry, got {len(history)}"
 
         entry = history[0]
-        assert (
-            entry["timestamp"] is not None
-        ), f"Expected timestamp not None, got {entry['timestamp']}"
-        assert (
-            entry["type"] == "LIFECYCLE"
-        ), f"Expected type='LIFECYCLE', got '{entry['type']}'"
-        assert (
-            entry["label"] == "RECORD DELETED"
-        ), f"Expected label='RECORD DELETED', got '{entry['label']}'"
-        assert (
-            entry["snapshot"] == '{"Title": "Deleted Song", "Type": "Song"}'
-        ), f"Expected snapshot with deleted song JSON, got '{entry['snapshot']}'"
+        assert entry["timestamp"] is not None, (
+            f"Expected timestamp not None, got {entry['timestamp']}"
+        )
+        assert entry["type"] == "LIFECYCLE", (
+            f"Expected type='LIFECYCLE', got '{entry['type']}'"
+        )
+        assert entry["label"] == "RECORD DELETED", (
+            f"Expected label='RECORD DELETED', got '{entry['label']}'"
+        )
+        assert entry["snapshot"] == '{"Title": "Deleted Song", "Type": "Song"}', (
+            f"Expected snapshot with deleted song JSON, got '{entry['snapshot']}'"
+        )
         assert entry["batch"] is None, f"Expected batch=None, got {entry['batch']}"
 
     def test_timeline_is_sorted_descending(self, audit_service):
@@ -81,9 +81,9 @@ class TestGetHistoryWithData:
 
         assert len(history) >= 1, f"Expected at least 1 entry, got {len(history)}"
         timestamps = [h["timestamp"] for h in history]
-        assert timestamps == sorted(
-            timestamps, reverse=True
-        ), f"Expected descending timestamps, got {timestamps}"
+        assert timestamps == sorted(timestamps, reverse=True), (
+            f"Expected descending timestamps, got {timestamps}"
+        )
 
 
 class TestGetHistoryEmpty:
@@ -127,9 +127,9 @@ class TestGetHistoryChangeLabeling:
 
         assert len(history) == 2, f"Expected 2 entries, got {len(history)}"
         change = next(h for h in history if h["type"] == "CHANGE")
-        assert (
-            change["label"] == "Updated DisplayName"
-        ), f"Expected label='Updated DisplayName', got '{change['label']}'"
+        assert change["label"] == "Updated DisplayName", (
+            f"Expected label='Updated DisplayName', got '{change['label']}'"
+        )
 
     def test_cross_table_change_gets_prefix(self, populated_db):
         """When change is from a related table, label should be '[RelatedTable] Updated {field}'."""
@@ -151,16 +151,16 @@ class TestGetHistoryChangeLabeling:
         history = service.get_history(1, "Songs")
 
         assert isinstance(history, list), f"Expected list, got {type(history)}"
-        assert (
-            len(history) == 1
-        ), f"Expected 1 cross-table change entry, got {len(history)}"
+        assert len(history) == 1, (
+            f"Expected 1 cross-table change entry, got {len(history)}"
+        )
         change = history[0]
-        assert (
-            change["type"] == "CHANGE"
-        ), f"Expected type='CHANGE', got '{change['type']}'"
-        assert (
-            change["label"] == "[SongCredits] Updated CreditedNameID"
-        ), f"Expected label='[SongCredits] Updated CreditedNameID', got '{change['label']}'"
+        assert change["type"] == "CHANGE", (
+            f"Expected type='CHANGE', got '{change['type']}'"
+        )
+        assert change["label"] == "[SongCredits] Updated CreditedNameID", (
+            f"Expected label='[SongCredits] Updated CreditedNameID', got '{change['label']}'"
+        )
 
 
 class TestGetHistoryTimelineStructure:
@@ -177,7 +177,9 @@ class TestGetHistoryTimelineStructure:
             "details",
             "user",
             "batch",
-        }, f"Expected keys {{timestamp,type,label,details,user,batch}}, got {set(action.keys())}"
+        }, (
+            f"Expected keys {{timestamp,type,label,details,user,batch}}, got {set(action.keys())}"
+        )
 
     def test_change_entry_keys(self, audit_service):
         """CHANGE entries must have exactly: timestamp, type, label, old, new, batch."""
@@ -190,7 +192,9 @@ class TestGetHistoryTimelineStructure:
             "old",
             "new",
             "batch",
-        }, f"Expected keys {{timestamp,type,label,old,new,batch}}, got {set(change.keys())}"
+        }, (
+            f"Expected keys {{timestamp,type,label,old,new,batch}}, got {set(change.keys())}"
+        )
 
     def test_lifecycle_entry_keys(self, audit_service):
         """LIFECYCLE entries must have exactly: timestamp, type, label, snapshot, batch."""
@@ -203,4 +207,6 @@ class TestGetHistoryTimelineStructure:
             "label",
             "snapshot",
             "batch",
-        }, f"Expected keys {{timestamp,type,label,snapshot,batch}}, got {set(lifecycle.keys())}"
+        }, (
+            f"Expected keys {{timestamp,type,label,snapshot,batch}}, got {set(lifecycle.keys())}"
+        )

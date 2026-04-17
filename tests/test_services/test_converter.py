@@ -38,9 +38,9 @@ class TestConvertToMp3:
         with patch("src.services.converter.subprocess.run", side_effect=fake_run):
             convert_to_mp3(wav)
 
-        assert (
-            not wav.exists()
-        ), "Source WAV should be deleted after successful conversion"
+        assert not wav.exists(), (
+            "Source WAV should be deleted after successful conversion"
+        )
 
     def test_success_output_file_exists(self, tmp_path):
         wav = tmp_path / "track.wav"
@@ -54,9 +54,9 @@ class TestConvertToMp3:
         with patch("src.services.converter.subprocess.run", side_effect=fake_run):
             result = convert_to_mp3(wav)
 
-        assert (
-            result.exists()
-        ), "Output MP3 file should exist after successful conversion"
+        assert result.exists(), (
+            "Output MP3 file should exist after successful conversion"
+        )
 
     def test_nonzero_exit_raises_runtime_error(self, tmp_path):
         wav = tmp_path / "track.wav"
@@ -84,9 +84,9 @@ class TestConvertToMp3:
             with pytest.raises(RuntimeError):
                 convert_to_mp3(wav)
 
-        assert (
-            not mp3.exists()
-        ), "Partial MP3 output should be deleted on ffmpeg failure"
+        assert not mp3.exists(), (
+            "Partial MP3 output should be deleted on ffmpeg failure"
+        )
 
     def test_nonzero_exit_leaves_source_wav(self, tmp_path):
         wav = tmp_path / "track.wav"
@@ -123,9 +123,9 @@ class TestConvertToMp3:
             with pytest.raises(RuntimeError):
                 convert_to_mp3(wav)
 
-        assert (
-            wav.exists()
-        ), "Source WAV should be untouched when ffmpeg binary is missing"
+        assert wav.exists(), (
+            "Source WAV should be untouched when ffmpeg binary is missing"
+        )
 
     def test_output_missing_after_zero_exit_raises_runtime_error(self, tmp_path):
         wav = tmp_path / "track.wav"
@@ -149,6 +149,6 @@ class TestConvertToMp3:
             with pytest.raises(RuntimeError):
                 convert_to_mp3(wav)
 
-        assert (
-            wav.exists()
-        ), "Source WAV should be untouched when output file is missing after conversion"
+        assert wav.exists(), (
+            "Source WAV should be untouched when output file is missing after conversion"
+        )

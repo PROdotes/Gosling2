@@ -567,7 +567,9 @@ def get_config():
 
 
 def _load_tag_category_colors() -> dict:
-    import json, os
+    import json
+    import os
+
     path = os.path.join(os.path.dirname(__file__), "../../../json/id3_frames.json")
     try:
         frames = json.load(open(os.path.normpath(path)))
