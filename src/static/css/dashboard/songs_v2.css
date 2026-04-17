@@ -1101,14 +1101,34 @@
 
 #songs-workspace .album-sub-header {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
+}
+
+#songs-workspace .album-sub-title-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
 }
 
 #songs-workspace .album-sub-title {
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
+}
+
+#songs-workspace .album-sub-artist {
+    font-size: 11px;
+    color: var(--text-sec);
+    margin-top: 1px;
+    opacity: 0.85;
+}
+
+#songs-workspace .album-sub-btns {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    align-items: center;
 }
 
 #songs-workspace .album-sub-remove {
@@ -1119,8 +1139,6 @@
     font-size: 13px;
     padding: 0 4px;
     line-height: 1;
-    flex-shrink: 0;
-    margin-left: auto;
 }
 
 #songs-workspace .album-sub-remove:hover {
@@ -1130,6 +1148,7 @@
 #songs-workspace .album-sub-meta-row {
     display: flex;
     gap: 8px;
+    margin-top: 4px;
 }
 
 #songs-workspace .album-sub-meta-item {
@@ -1145,9 +1164,27 @@
     font-size: 12px;
 }
 
+#songs-workspace .album-sub-info-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+}
+
+#songs-workspace .album-sub-publisher {
+    font-size: 11px;
+    color: var(--text-mut);
+    font-family: var(--font-mono, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-right: 12px;
+}
+
 #songs-workspace .album-sub-actions {
     display: flex;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 #songs-workspace .album-sub-sync-btn {
@@ -1166,7 +1203,19 @@
 }
 
 
-/* Search-to-add input inherits chip-input styles; add a small top margin */
+#songs-workspace .album-sub-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+}
+
+#songs-workspace .album-sub-row .editor-label {
+    margin-bottom: 2px;
+}
+
 #songs-workspace .album-search-wrap {
-    margin-top: 4px;
+    margin-top: 10px;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 8px;
 }

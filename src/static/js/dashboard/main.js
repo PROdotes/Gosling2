@@ -85,8 +85,6 @@ import {
     renderPublishers as renderPublisherResults,
 } from "./renderers/publishers.js";
 import {
-    renderSongDetailComplete,
-    renderSongDetailLoading,
     renderSongs,
 } from "./renderers/songs.js";
 import {
@@ -137,6 +135,7 @@ const state = {
     searchEngines: {},
     defaultSearchEngine: null,
     chipHandles: null,
+    scalarHandles: null,
 };
 
 const modeConfig = {
@@ -236,10 +235,17 @@ const ctx = {
         // Fix: Refresh drift indicators to reflect changes (e.g. after confirmation)
         wireDriftIndicators(fresh, state.activeSongFile);
 
-        // Aligned to V2 Audit: Sync chip inputs for properties changed via global actions (like primary tag)
+        // Sync chip inputs for properties changed via global actions
         if (state.chipHandles?.updateField) {
             for (const field of ["performer", "composer", "lyricist", "producer", "publisher", "tags", "album"]) {
                 state.chipHandles.updateField(field, fresh);
+            }
+        }
+
+        // Sync scalar inputs (Title, Year, etc.)
+        if (state.scalarHandles?.updateField) {
+            for (const field of ["media_name", "year", "bpm", "isrc", "notes"]) {
+                state.scalarHandles.updateField(field, fresh[field]);
             }
         }
     },
@@ -358,7 +364,6 @@ function syncModeUi() {
     const isSongs = state.currentMode === "songs";
     elements.songsWorkspace?.classList.toggle("active", isSongs);
     if (elements.legacyMain) {
-        // Aligned to V2 Audit: Other modes still use legacy card results container
         elements.legacyMain.style.display = isSongs ? "none" : "block";
     }
     if (isSongs) renderSongEditorEmpty();
@@ -716,17 +721,13 @@ async function openSelectedResult(index) {
             defaultSearchEngine: state.defaultSearchEngine,
         });
         updateSyncLed(result.id);
-        wireScalarInputs(result, state.validationRules, (fresh) => {
-            state.activeSong = fresh;
-            wireDriftIndicators(fresh, state.activeSongFile);
-            renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
+        state.scalarHandles = wireScalarInputs(result, state.validationRules, () => {
+            ctx.refreshActiveSongV2(result.id);
         });
         state.chipHandles = wireChipInputs(
             result,
-            (fresh) => {
-                state.activeSong = fresh;
-                wireDriftIndicators(fresh, state.activeSongFile);
-                renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
+            () => {
+                ctx.refreshActiveSongV2(result.id);
             },
             async ({ songId, text, role, creditId }) => {
                 const { openSplitterModal } = await import("./components/splitter_modal.js");
@@ -753,8 +754,6 @@ async function openSelectedResult(index) {
             },
             state.validationRules,
         );
-    } else if (state.currentMode === "songs") {
-        await openSongDetail(selected);
     } else if (state.currentMode === "albums") {
         await openAlbumDetail(selected);
     } else if (state.currentMode === "artists") {

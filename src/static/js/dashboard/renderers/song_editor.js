@@ -4,7 +4,7 @@
  */
 import { validators } from "../utils/validators.js";
 import { parseTagInput } from "../utils/tag_input.js";
-import { patchSongScalars, getCatalogSong, searchArtists, searchTags, searchPublishers, searchAlbums, addSongCredit, removeSongCredit, addSongTag, removeSongTag, addSongPublisher, removeSongPublisher, addSongAlbum, removeSongAlbum, ABORTED } from "../api.js";
+import { patchSongScalars, getCatalogSong, searchArtists, searchTags, searchPublishers, searchAlbums, addSongCredit, removeSongCredit, addSongTag, removeSongTag, addSongPublisher, removeSongPublisher, addSongAlbum, removeSongAlbum, addAlbumCredit, removeAlbumCredit, addAlbumPublisher, removeAlbumPublisher, ABORTED } from "../api.js";
 import { createChipInput } from "../components/chip_input.js";
 
 function escapeHtml(str) {
@@ -69,16 +69,30 @@ function renderAlbumSubCards(albums, songId) {
         const typeOptions = ALBUM_TYPES.map(
             (t) => `<option value="${t}" ${album.album_type === t ? "selected" : ""}>${t}</option>`
         ).join("");
+
         return `
 <div class="album-sub-card" data-album-id="${albumId}">
   <div class="album-sub-header">
     <div class="editor-input-row" style="flex:1">
       <span class="editable-scalar editor-input album-sub-title" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>
+    </div>
+    <div class="album-sub-btns">
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
+      <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
     </div>
-    <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
   </div>
+
+  <div class="album-sub-row">
+    <div class="editor-label">Artist</div>
+    <div class="album-sub-chips" data-album-chips="artist" data-album-id="${albumId}"></div>
+  </div>
+
+  <div class="album-sub-row">
+    <div class="editor-label">Publisher</div>
+    <div class="album-sub-chips" data-album-chips="publisher" data-album-id="${albumId}"></div>
+  </div>
+
   <div class="album-sub-meta-row">
     <div class="album-sub-meta-item">
       <span class="editor-label">Type</span>
@@ -97,19 +111,95 @@ function renderAlbumSubCards(albums, songId) {
       <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
     </div>
   </div>
-  <div class="album-sub-actions">
-    <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync from song</button>
+  <div class="album-sub-info-row">
+    <div class="album-sub-actions">
+      <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync metadata from song</button>
+    </div>
   </div>
 </div>`;
     }).join("");
 }
 
-function updateAlbumSubSection(freshSong) {
+function updateAlbumSubSection(freshSong, refreshCallback) {
     const el = document.querySelector(`[data-album-sub-song="${freshSong.id}"]`);
-    if (el) el.innerHTML = renderAlbumSubCards(freshSong.albums, freshSong.id);
+    if (el) {
+        el.innerHTML = renderAlbumSubCards(freshSong.albums, freshSong.id);
+        wireAlbumSubChips(freshSong, refreshCallback);
+    }
     // Sync missing state on the field
     const field = document.querySelector(`[data-chip-field="album"]`);
     if (field) field.classList.toggle("missing", (freshSong.albums || []).length === 0);
+}
+
+function wireAlbumSubChips(song, refresh) {
+    const containers = document.querySelectorAll(`[data-album-id][data-album-chips]`);
+    containers.forEach((container) => {
+        const { albumId, albumChips: field } = container.dataset;
+        const album = (song.albums || []).find((a) => String(a.album_id || a.id) === String(albumId));
+        if (!album) return;
+
+        if (field === "artist") {
+            const getItems = (a) => {
+                console.log(`[DEBUG] Album artist credits for ${albumId}:`, a.credits);
+                return (a.credits || [])
+                    .filter((c) => c.role_name === "Performer")
+                    .map((c) => ({ id: c.name_id || c.credit_id || c.id, label: c.display_name }));
+            };
+
+            createChipInput({
+                container,
+                items: getItems(album),
+                onSearch: async (q) => {
+                    const r = await searchArtists(q);
+                    return (r || []).map((i) => ({ id: i.id, label: i.display_name }));
+                },
+                onAdd: async (opt) => {
+                    console.log(`[DEBUG] Adding album artist:`, opt);
+                    await addAlbumCredit(albumId, opt.label, "Performer", opt.id);
+                    await refresh();
+                },
+                onRemove: async (nameId) => {
+                    console.log(`[DEBUG] Removing album artist ID:`, nameId);
+                    await removeAlbumCredit(albumId, nameId);
+                    await refresh();
+                },
+                allowCreate: true,
+                labelAttrs: (item) => ({
+                    "data-action": "open-edit-modal",
+                    "data-chip-type": "artist",
+                    "data-item-id": item.id,
+                }),
+            });
+        } else if (field === "publisher") {
+            const getItems = (a) =>
+                (a.album_publishers || []).map((p) => ({ id: p.id, label: p.name }));
+
+            createChipInput({
+                container,
+                items: getItems(album),
+                onSearch: async (q) => {
+                    const r = await searchPublishers(q);
+                    return (r || []).map((p) => ({ id: p.id, label: p.name }));
+                },
+                onAdd: async (opt) => {
+                    console.log(`[DEBUG] Adding album publisher:`, opt);
+                    await addAlbumPublisher(albumId, opt.label, opt.id);
+                    await refresh();
+                },
+                onRemove: async (pubId) => {
+                    console.log(`[DEBUG] Removing album publisher ID:`, pubId);
+                    await removeAlbumPublisher(albumId, pubId);
+                    await refresh();
+                },
+                allowCreate: true,
+                labelAttrs: (item) => ({
+                    "data-action": "open-edit-modal",
+                    "data-chip-type": "publisher",
+                    "data-item-id": item.id,
+                }),
+            });
+        }
+    });
 }
 
 const BLOCKER_LABELS = {
@@ -476,7 +566,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 onAdd: async (opt) => {
                     await addSongAlbum(song.id, opt.id ?? null, opt.id ? null : opt.label, null, null);
                     const fresh = await refresh();
-                    updateAlbumSubSection(fresh);
+                    updateAlbumSubSection(fresh, refresh);
                 },
                 onRemove: async () => {}, // removal handled by card × buttons
                 allowCreate: true,
@@ -485,11 +575,14 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
         }
     }
 
+    // Wire nested chips for existing albums
+    wireAlbumSubChips(song, refresh);
+
     return {
         updateField(fieldKey, freshSong) {
             const key = String(fieldKey).toLowerCase();
             if (key === "album") {
-                updateAlbumSubSection(freshSong);
+                updateAlbumSubSection(freshSong, refresh);
                 updateListRowBlockers(freshSong.id, freshSong.review_blockers);
                 return;
             }
