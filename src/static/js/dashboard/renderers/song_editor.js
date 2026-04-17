@@ -2,10 +2,25 @@
  * Song Editor V2 — form renderer + scalar interactivity.
  * Renders into #editor-panel .editor-scroll from getCatalogSong data.
  */
-import { validators } from "../utils/validators.js";
-import { parseTagInput } from "../utils/tag_input.js";
-import { patchSongScalars, getCatalogSong, searchArtists, searchTags, searchPublishers, searchAlbums, addSongCredit, removeSongCredit, addSongTag, removeSongTag, addSongPublisher, removeSongPublisher, addSongAlbum, removeSongAlbum, ABORTED } from "../api.js";
+
+import {
+    ABORTED,
+    addSongCredit,
+    addSongPublisher,
+    addSongTag,
+    getCatalogSong,
+    patchSongScalars,
+    removeSongCredit,
+    removeSongPublisher,
+    removeSongTag,
+    searchArtists,
+    searchPublishers,
+    searchTags,
+} from "../api.js";
 import { createChipInput } from "../components/chip_input.js";
+import { asArray, buildNavigateAttrs } from "../components/utils.js";
+import { parseTagInput } from "../utils/tag_input.js";
+import { validators } from "../utils/validators.js";
 
 function escapeHtml(str) {
     if (str == null) return "";
@@ -25,7 +40,13 @@ function renderChips(items, emptyLabel) {
         .join("");
 }
 
-function renderScalarField(label, value, inputId, type = "text", extraButtons = "") {
+function renderScalarField(
+    label,
+    value,
+    inputId,
+    type = "text",
+    extraButtons = "",
+) {
     const missing = value == null || value === "";
     return `
 <div class="editor-field${missing ? " missing" : ""}">
@@ -41,7 +62,13 @@ function renderCaseButtons(songId, field) {
     return `<button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="sentence" title="Sentence case" type="button">S</button><button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="title" title="Title Case" type="button">T</button>`;
 }
 
-function renderChipField(label, chips, emptyLabel, canMiss = true, fieldKey = null) {
+function renderChipField(
+    label,
+    chips,
+    emptyLabel,
+    canMiss = true,
+    fieldKey = null,
+) {
     const missing = canMiss && (!chips || chips.length === 0);
     const dataAttr = fieldKey ? ` data-chip-field="${fieldKey}"` : "";
     return `
@@ -53,16 +80,152 @@ function renderChipField(label, chips, emptyLabel, canMiss = true, fieldKey = nu
 
 const SCALAR_FIELDS = [
     { inputId: "ef-title", field: "media_name", numeric: false },
-    { inputId: "ef-year",  field: "year",       numeric: true  },
-    { inputId: "ef-bpm",   field: "bpm",        numeric: true  },
-    { inputId: "ef-isrc",  field: "isrc",       numeric: false },
-    { inputId: "ef-notes", field: "notes",      numeric: false },
+    { inputId: "ef-year", field: "year", numeric: true },
+    { inputId: "ef-bpm", field: "bpm", numeric: true },
+    { inputId: "ef-isrc", field: "isrc", numeric: false },
+    { inputId: "ef-notes", field: "notes", numeric: false },
 ];
 
+const ALBUM_TYPES = ["Album", "EP", "Single", "Compilation", "Anthology"];
+
+function renderAlbumCards(albums, songId) {
+    const items = asArray(albums);
+    if (!items.length) {
+        return '<div class="muted-note">No albums linked</div>';
+    }
+
+    return items
+        .map((album) => {
+            const title =
+                album.album_title || album.display_title || "Unknown Album";
+            const albumCredits = asArray(album.credits);
+            const albumPublishers = asArray(album.album_publishers);
+            const albumId = album.album_id || album.id;
+            const isEditable = !!songId;
+
+            const typeOptions = ALBUM_TYPES.map(
+                (t) =>
+                    `<option value="${t}" ${album.album_type === t ? "selected" : ""}>${t}</option>`,
+            ).join("");
+
+            return `
+            <div class="album-card-detail">
+                <div class="card-title-row">
+                    ${
+                        isEditable
+                            ? `<span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title" style="flex:1">${escapeHtml(title)}</span>
+                           <div class="case-actions">
+                               <button class="btn-case" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence Case">S</button>
+                               <button class="btn-case" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title Case">T</button>
+                           </div>`
+                            : `<button class="inline-link" ${buildNavigateAttrs("albums", title)}>${escapeHtml(title)}</button>`
+                    }
+                    ${isEditable ? `<button class="link-chip-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Remove album">✕</button>` : ""}
+                </div>
+                <div class="stack-list">
+                    <button class="mini-label mini-label--clickable" data-action="open-link-modal" data-modal-type="album-credits" data-album-id="${albumId}" data-song-id="${songId}" title="Add artist">Performer +</button>
+                    <div class="link-chip-list">
+                        ${
+                            isEditable
+                                ? albumCredits
+                                      .map(
+                                          (credit) => `
+                            <span class="link-chip">
+                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="credit" data-album-id="${albumId}" data-item-id="${credit.name_id}" data-identity-id="${credit.identity_id || ""}">${escapeHtml(credit.display_name || credit.name || "-")}</button>
+                                <button class="link-chip-remove" data-action="remove-album-credit" data-album-id="${albumId}" data-song-id="${songId}" data-credit-id="${credit.name_id}" title="Remove">✕</button>
+                            </span>
+                        `,
+                                      )
+                                      .join("")
+                                : albumCredits.length
+                                  ? albumCredits
+                                        .map(
+                                            (credit) =>
+                                                `<span class="link-chip"><button class="link-chip-label">${escapeHtml(credit.display_name || credit.name || "-")}</button></span>`,
+                                        )
+                                        .join("")
+                                  : '<span class="muted-note">-</span>'
+                        }
+                    </div>
+                </div>
+                <div class="stack-list">
+                    <button class="mini-label mini-label--clickable" data-action="open-link-modal" data-modal-type="album-publishers" data-album-id="${albumId}" data-song-id="${songId}" title="Add publisher">Publisher +</button>
+                    <div class="link-chip-list">
+                        ${
+                            isEditable
+                                ? albumPublishers
+                                      .map(
+                                          (p) => `
+                            <span class="link-chip tag publisher">
+                                <button class="link-chip-label" data-action="open-edit-modal" data-chip-type="publisher" data-item-id="${p.id}">${escapeHtml(p.name)}</button>
+                                <button class="link-chip-remove" data-action="remove-album-publisher" data-album-id="${albumId}" data-song-id="${songId}" data-publisher-id="${p.id}" title="Remove">✕</button>
+                            </span>
+                        `,
+                                      )
+                                      .join("")
+                                : albumPublishers.length
+                                  ? albumPublishers
+                                        .map(
+                                            (p) =>
+                                                `<span class="link-chip tag publisher">${escapeHtml(p.name)}</span>`,
+                                        )
+                                        .join("")
+                                  : '<span class="muted-note">-</span>'
+                        }
+                    </div>
+                </div>
+                ${
+                    isEditable
+                        ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Type</span>
+                    <select class="album-type-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
+                </div>`
+                        : `<div class="album-field-row"><span class="mini-label">Type</span> ${album.album_type ? `<span class="pill">${escapeHtml(album.album_type)}</span>` : `<span class="pill">-</span>`}</div>`
+                }
+                ${
+                    isEditable
+                        ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Year</span>
+                    <span class="editable-scalar" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>
+                </div>`
+                        : `<div class="album-field-row"><span class="mini-label">Year</span> ${album.release_year ? `<span class="pill mono">${escapeHtml(album.release_year)}</span>` : `<span class="pill mono">-</span>`}</div>`
+                }
+                ${
+                    isEditable
+                        ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Disc</span>
+                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
+                </div>`
+                        : `<div class="album-field-row"><span class="mini-label">Disc</span> <span class="pill mono">${album.disc_number ?? "-"}</span></div>`
+                }
+                ${
+                    isEditable
+                        ? `
+                <div class="album-field-row">
+                    <span class="mini-label">Track</span>
+                    <span class="editable-scalar" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
+                </div>`
+                        : `<div class="album-field-row"><span class="mini-label">Track</span> <span class="pill mono">${album.track_number ?? "-"}</span></div>`
+                }
+                ${isEditable ? `<button class="section-add-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" style="margin-top:0.5rem">↓ sync from song</button>` : ""}
+            </div>
+        `;
+        })
+        .join("");
+}
+
 const BLOCKER_LABELS = {
-    media_name: "TTL", year: "YR", performers: "ART",
-    composers: "COMP", genres: "GNR", publishers: "PUB",
-    albums: "ALB", duration: "DUR",
+    media_name: "TTL",
+    year: "YR",
+    performers: "ART",
+    composers: "COMP",
+    genres: "GNR",
+    publishers: "PUB",
+    albums: "ALB",
+    duration: "DUR",
 };
 
 function updateListRowBlockers(songId, reviewBlockers) {
@@ -71,7 +234,10 @@ function updateListRowBlockers(songId, reviewBlockers) {
     const colMissing = row.querySelector(".col-missing");
     if (!colMissing) return;
     colMissing.innerHTML = (reviewBlockers || [])
-        .map((b) => `<span class="pill miss" title="Missing: ${b}">${BLOCKER_LABELS[b] || b}</span>`)
+        .map(
+            (b) =>
+                `<span class="pill miss" title="Missing: ${b}">${BLOCKER_LABELS[b] || b}</span>`,
+        )
         .join("");
 }
 
@@ -124,11 +290,20 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
 
             const validate = validators[field];
             const error = validate ? validate(raw, validationRules) : null;
-            if (error) { showError(error); return; }
+            if (error) {
+                showError(error);
+                return;
+            }
 
             if (raw === committedValue) return;
 
-            const payload = numeric ? (raw === "" ? null : Number(raw)) : (raw === "" ? null : raw);
+            const payload = numeric
+                ? raw === ""
+                    ? null
+                    : Number(raw)
+                : raw === ""
+                  ? null
+                  : raw;
 
             saving = true;
             input.disabled = true;
@@ -156,12 +331,21 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
         });
 
         input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && input.tagName !== "TEXTAREA") { e.preventDefault(); commit(); }
-            if (e.key === "Escape") { e.preventDefault(); revert(); }
+            if (e.key === "Enter" && input.tagName !== "TEXTAREA") {
+                e.preventDefault();
+                commit();
+            }
+            if (e.key === "Escape") {
+                e.preventDefault();
+                revert();
+            }
         });
 
         input.addEventListener("blur", () => {
-            if (hasError) { revert(); return; }
+            if (hasError) {
+                revert();
+                return;
+            }
             if (blurSaves) commit();
             else revert();
         });
@@ -185,14 +369,16 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
  * @param {object} fileSong - from getSongDetail (inspect-file)
  */
 export function wireDriftIndicators(dbSong, fileSong) {
-    document.querySelectorAll("#editor-panel .drift-dot").forEach((el) => el.remove());
+    document.querySelectorAll("#editor-panel .drift-dot").forEach((el) => {
+        el.remove();
+    });
     if (!fileSong) return;
 
     const SCALAR_FIELDS = [
         { inputId: "ef-title", dbField: "media_name", fileField: "media_name" },
-        { inputId: "ef-year",  dbField: "year",        fileField: "year"       },
-        { inputId: "ef-bpm",   dbField: "bpm",         fileField: "bpm"        },
-        { inputId: "ef-isrc",  dbField: "isrc",        fileField: "isrc"       },
+        { inputId: "ef-year", dbField: "year", fileField: "year" },
+        { inputId: "ef-bpm", dbField: "bpm", fileField: "bpm" },
+        { inputId: "ef-isrc", dbField: "isrc", fileField: "isrc" },
     ];
     for (const { inputId, dbField, fileField } of SCALAR_FIELDS) {
         const input = document.getElementById(inputId);
@@ -200,24 +386,56 @@ export function wireDriftIndicators(dbSong, fileSong) {
         const dbVal = dbSong[dbField] ?? null;
         const fileVal = fileSong[fileField] ?? null;
         if (String(dbVal ?? "") === String(fileVal ?? "")) continue;
-        appendDot(input.closest(".editor-field")?.querySelector(".editor-label"),
-            `DB: ${dbVal ?? "(empty)"}\nFile: ${fileVal ?? "(empty)"}`);
+        appendDot(
+            input.closest(".editor-field")?.querySelector(".editor-label"),
+            `DB: ${dbVal ?? "(empty)"}\nFile: ${fileVal ?? "(empty)"}`,
+        );
     }
 
-    const norm = (s) => String(s ?? "").trim().toLowerCase();
-    const keySet = (arr) => new Set((arr || []).map(norm).filter((x) => x !== ""));
+    const norm = (s) =>
+        String(s ?? "")
+            .trim()
+            .toLowerCase();
+    const keySet = (arr) =>
+        new Set((arr || []).map(norm).filter((x) => x !== ""));
     const eqSet = (a, b) => a.size === b.size && [...a].every((v) => b.has(v));
 
     const creditsByRole = (song, role) =>
-        (song.credits || []).filter((c) => c.role_name === role).map((c) => c.display_name);
+        (song.credits || [])
+            .filter((c) => c.role_name === role)
+            .map((c) => c.display_name);
 
     const CHIP_FIELDS = [
-        { fieldKey: "performer", getDb: (s) => creditsByRole(s, "Performer"), getFile: (s) => creditsByRole(s, "Performer") },
-        { fieldKey: "composer",  getDb: (s) => creditsByRole(s, "Composer"),  getFile: (s) => creditsByRole(s, "Composer")  },
-        { fieldKey: "lyricist",  getDb: (s) => creditsByRole(s, "Lyricist"),  getFile: (s) => creditsByRole(s, "Lyricist")  },
-        { fieldKey: "producer",  getDb: (s) => creditsByRole(s, "Producer"),  getFile: (s) => creditsByRole(s, "Producer")  },
-        { fieldKey: "publisher", getDb: (s) => (s.publishers || []).map((p) => p.name), getFile: (s) => (s.publishers || []).map((p) => p.name) },
-        { fieldKey: "album",     getDb: (s) => (s.albums || []).map((a) => a.album_title), getFile: (s) => (s.albums || []).map((a) => a.album_title) },
+        {
+            fieldKey: "performer",
+            getDb: (s) => creditsByRole(s, "Performer"),
+            getFile: (s) => creditsByRole(s, "Performer"),
+        },
+        {
+            fieldKey: "composer",
+            getDb: (s) => creditsByRole(s, "Composer"),
+            getFile: (s) => creditsByRole(s, "Composer"),
+        },
+        {
+            fieldKey: "lyricist",
+            getDb: (s) => creditsByRole(s, "Lyricist"),
+            getFile: (s) => creditsByRole(s, "Lyricist"),
+        },
+        {
+            fieldKey: "producer",
+            getDb: (s) => creditsByRole(s, "Producer"),
+            getFile: (s) => creditsByRole(s, "Producer"),
+        },
+        {
+            fieldKey: "publisher",
+            getDb: (s) => (s.publishers || []).map((p) => p.name),
+            getFile: (s) => (s.publishers || []).map((p) => p.name),
+        },
+        {
+            fieldKey: "album",
+            getDb: (s) => (s.albums || []).map((a) => a.album_title),
+            getFile: (s) => (s.albums || []).map((a) => a.album_title),
+        },
     ];
     for (const { fieldKey, getDb, getFile } of CHIP_FIELDS) {
         const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
@@ -225,8 +443,10 @@ export function wireDriftIndicators(dbSong, fileSong) {
         const dbItems = getDb(dbSong);
         const fileItems = getFile(fileSong);
         if (eqSet(keySet(dbItems), keySet(fileItems))) continue;
-        appendDot(field.querySelector(".editor-label"),
-            `DB: ${dbItems.join(", ") || "(empty)"}\nFile: ${fileItems.join(", ") || "(empty)"}`);
+        appendDot(
+            field.querySelector(".editor-label"),
+            `DB: ${dbItems.join(", ") || "(empty)"}\nFile: ${fileItems.join(", ") || "(empty)"}`,
+        );
     }
 }
 
@@ -273,9 +493,15 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     function wireCreditRole(role) {
         const wrap = getContainer(role.toLowerCase());
         if (!wrap) return;
-        const getItems = (s) => s.credits
-            .filter((c) => c.role_name === role)
-            .map((c) => ({ id: c.credit_id, label: c.display_name, _identityId: c.identity_id, _nameId: c.name_id }));
+        const getItems = (s) =>
+            s.credits
+                .filter((c) => c.role_name === role)
+                .map((c) => ({
+                    id: c.credit_id,
+                    label: c.display_name,
+                    _identityId: c.identity_id,
+                    _nameId: c.name_id,
+                }));
 
         const handle = createChipInput({
             container: wrap,
@@ -283,7 +509,10 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
             onSearch: async (q) => {
                 const r = await searchArtists(q);
                 if (r === ABORTED || !r) return [];
-                return r.map((a) => ({ id: a.id, label: a.display_name || a.legal_name || a.name }));
+                return r.map((a) => ({
+                    id: a.id,
+                    label: a.display_name || a.legal_name || a.name,
+                }));
             },
             onAdd: async (opt) => {
                 await addSongCredit(song.id, opt.label, role, opt.id);
@@ -294,15 +523,26 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 await removeSongCredit(song.id, creditId);
                 await refresh();
             },
-            onSplit: onSplit ? (item) => onSplit({ songId: song.id, text: item.label, role, creditId: item.id }) : null,
+            onSplit: onSplit
+                ? (item) =>
+                      onSplit({
+                          songId: song.id,
+                          text: item.label,
+                          role,
+                          creditId: item.id,
+                      })
+                : null,
             allowCreate: true,
-            labelAttrs: (item) => item._identityId ? {
-                "data-action": "open-edit-modal",
-                "data-chip-type": "credit",
-                "data-song-id": song.id,
-                "data-item-id": item._nameId ?? "",
-                "data-identity-id": item._identityId,
-            } : null,
+            labelAttrs: (item) =>
+                item._identityId
+                    ? {
+                          "data-action": "open-edit-modal",
+                          "data-chip-type": "credit",
+                          "data-song-id": song.id,
+                          "data-item-id": item._nameId ?? "",
+                          "data-identity-id": item._identityId,
+                      }
+                    : null,
         });
         handles[role.toLowerCase()] = handle;
         getItemsByField[role.toLowerCase()] = getItems;
@@ -318,7 +558,13 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     if (tagsWrap) {
         const tagRules = validationRules?.tags || {};
         const categoryColors = tagRules.category_colors || {};
-        const getItems = (s) => s.tags.map((t) => ({ id: t.id, label: t.name, category: t.category, _isPrimary: !!t.is_primary }));
+        const getItems = (s) =>
+            s.tags.map((t) => ({
+                id: t.id,
+                label: t.name,
+                category: t.category,
+                _isPrimary: !!t.is_primary,
+            }));
         const handle = createChipInput({
             container: tagsWrap,
             items: getItems(song),
@@ -326,11 +572,22 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 const { name } = parseTagInput(q, tagRules);
                 const r = await searchTags(name);
                 if (r === ABORTED || !r) return [];
-                return r.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+                return r.map((t) => ({
+                    id: t.id,
+                    label: t.name,
+                    category: t.category,
+                }));
             },
             onAdd: async (opt) => {
-                const { name, category } = opt.id ? opt : parseTagInput(opt.label, tagRules);
-                await addSongTag(song.id, name, category ?? null, opt.id ?? null);
+                const { name, category } = opt.id
+                    ? opt
+                    : parseTagInput(opt.label, tagRules);
+                await addSongTag(
+                    song.id,
+                    name,
+                    category ?? null,
+                    opt.id ?? null,
+                );
                 const fresh = await refresh();
                 handle.setItems(getItems(fresh));
             },
@@ -352,16 +609,20 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
             }),
             extraChipButtons: (item) => {
                 if (item.category !== "Genre") return [];
-                return [{
-                    className: `chip-input__chip-btn chip-input__chip-star${item._isPrimary ? " is-primary" : ""}`,
-                    html: "★",
-                    title: item._isPrimary ? "Primary genre" : "Set as primary genre",
-                    dataset: {
-                        action: "set-primary-tag",
-                        songId: String(song.id),
-                        tagId: String(item.id),
+                return [
+                    {
+                        className: `chip-input__chip-btn chip-input__chip-star${item._isPrimary ? " is-primary" : ""}`,
+                        html: "★",
+                        title: item._isPrimary
+                            ? "Primary genre"
+                            : "Set as primary genre",
+                        dataset: {
+                            action: "set-primary-tag",
+                            songId: String(song.id),
+                            tagId: String(item.id),
+                        },
                     },
-                }];
+                ];
             },
         });
         handles.tags = handle;
@@ -371,7 +632,8 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     // ── Publisher ──────────────────────────────────────────────────────────────
     const pubWrap = getContainer("publisher");
     if (pubWrap) {
-        const getItems = (s) => s.publishers.map((p) => ({ id: p.id, label: p.name }));
+        const getItems = (s) =>
+            s.publishers.map((p) => ({ id: p.id, label: p.name }));
         const handle = createChipInput({
             container: pubWrap,
             items: getItems(song),
@@ -404,28 +666,15 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     // ── Album ──────────────────────────────────────────────────────────────────
     const albumWrap = getContainer("album");
     if (albumWrap) {
-        const getItems = (s) => s.albums.map((a) => ({ id: a.album_id, label: a.display_title }));
-        const handle = createChipInput({
-            container: albumWrap,
-            items: getItems(song),
-            onSearch: async (q) => {
-                const r = await searchAlbums(q);
-                if (r === ABORTED || !r) return [];
-                return r.map((a) => ({ id: a.id, label: a.title }));
+        // Albums use renderAlbumCards now instead of chip inputs.
+        // We still provide an updater so that `refresh()` logic re-renders them
+        // correctly after scalar edits or link operations.
+        handles.album = {
+            setItems: (items) => {
+                albumWrap.innerHTML = renderAlbumCards(items, song.id);
             },
-            onAdd: async (opt) => {
-                await addSongAlbum(song.id, opt.id ?? null, opt.label, null, null);
-                const fresh = await refresh();
-                handle.setItems(getItems(fresh));
-            },
-            onRemove: async (albumId) => {
-                await removeSongAlbum(song.id, albumId);
-                await refresh();
-            },
-            allowCreate: true,
-        });
-        handles.album = handle;
-        getItemsByField.album = getItems;
+        };
+        getItemsByField.album = (s) => s.albums;
     }
 
     return {
@@ -449,7 +698,10 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
  * @param {object} song - from getCatalogSong
  * @param {object} opts - { searchEngines, defaultSearchEngine }
  */
-export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEngine = null } = {}) {
+export function renderActionSidebar(
+    song,
+    { searchEngines = {}, defaultSearchEngine = null } = {},
+) {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const sidebar = panel.querySelector(".action-sidebar");
@@ -457,7 +709,9 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
 
     const status = song.processing_status ?? 1;
     const blockers = song.review_blockers || [];
-    const isInStaging = (song.source_path || "").toLowerCase().includes("staging");
+    const isInStaging = (song.source_path || "")
+        .toLowerCase()
+        .includes("staging");
 
     // ── Organize / Mark as Done button ────────────────────────────────────────
     let organizeBtn = "";
@@ -466,21 +720,27 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
         const blocked = blockers.length > 0;
         organizeBtn = `<button class="sidebar-btn organize${blocked ? " blocked" : ""}"
             data-action="mark-reviewed" data-id="${song.id}"
-            ${blocked ? "disabled title=\"Missing required fields\"" : ""}>Mark as Done</button>`;
+            ${blocked ? 'disabled title="Missing required fields"' : ""}>Mark as Done</button>`;
     } else if (status === 0 && isInStaging) {
         organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
         unreviewBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
     }
 
-    const targetPath = isInStaging && song.organized_path_preview
-        ? `<div class="sidebar-path">→ ${escapeHtml(song.organized_path_preview)}</div>` : "";
+    const targetPath =
+        isInStaging && song.organized_path_preview
+            ? `<div class="sidebar-path">→ ${escapeHtml(song.organized_path_preview)}</div>`
+            : "";
 
     // ── Web search split button ────────────────────────────────────────────────
-    const engine = defaultSearchEngine || Object.keys(searchEngines)[0] || "spotify";
+    const engine =
+        defaultSearchEngine || Object.keys(searchEngines)[0] || "spotify";
     const engineLabel = searchEngines[engine] || engine;
     const otherEngines = Object.entries(searchEngines)
         .filter(([k]) => k !== engine)
-        .map(([k, v]) => `<button class="web-search-option" data-engine="${escapeHtml(k)}">${escapeHtml(v)}</button>`)
+        .map(
+            ([k, v]) =>
+                `<button class="web-search-option" data-engine="${escapeHtml(k)}">${escapeHtml(v)}</button>`,
+        )
         .join("");
     const searchSplitBtn = `
 <div class="web-search-split sidebar-split-btn">
@@ -489,7 +749,8 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
 </div>`;
 
     // ── Delete Original ────────────────────────────────────────────────────────
-    const hasOriginal = song.original_exists && isInStaging && song.estimated_original_path;
+    const hasOriginal =
+        song.original_exists && isInStaging && song.estimated_original_path;
     const deleteOriginalBtn = hasOriginal
         ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-path="${escapeHtml(song.estimated_original_path)}">⚠ Delete Original</button>
            <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
@@ -530,13 +791,16 @@ export function renderSongEditorMultiSelect(count) {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
-    if (scroll) scroll.innerHTML = `<div class="editor-empty-state">${count} songs selected</div>`;
+    if (scroll)
+        scroll.innerHTML = `<div class="editor-empty-state">${count} songs selected</div>`;
     const sidebar = panel.querySelector(".action-sidebar");
     if (sidebar) sidebar.innerHTML = "";
 }
 
 export function wireAuditHistory(songId, fetchAuditHistory) {
-    const details = document.querySelector(`.editor-audit-details[data-song-id="${songId}"]`);
+    const details = document.querySelector(
+        `.editor-audit-details[data-song-id="${songId}"]`,
+    );
     if (!details) return;
     let loaded = false;
     details.addEventListener("toggle", async () => {
@@ -549,12 +813,16 @@ export function wireAuditHistory(songId, fetchAuditHistory) {
                 body.innerHTML = `<div class="audit-empty">No history found.</div>`;
                 return;
             }
-            body.innerHTML = history.map((entry) => `
+            body.innerHTML = history
+                .map(
+                    (entry) => `
 <div class="audit-entry">
   <span class="audit-ts">${escapeHtml(entry.timestamp || "")}</span>
   <span class="audit-action">${escapeHtml(entry.type || "")}</span>
   <span class="audit-details">${escapeHtml(entry.label || "")}${entry.old != null ? ` (${escapeHtml(String(entry.old))} → ${escapeHtml(String(entry.new ?? ""))})` : ""}</span>
-</div>`).join("");
+</div>`,
+                )
+                .join("");
         } catch {
             body.innerHTML = `<div class="audit-empty">Failed to load history.</div>`;
         }
@@ -565,7 +833,8 @@ export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;
     const scroll = panel.querySelector(".editor-scroll");
-    if (scroll) scroll.innerHTML = `<div class="editor-empty-state">Select a song to edit</div>`;
+    if (scroll)
+        scroll.innerHTML = `<div class="editor-empty-state">Select a song to edit</div>`;
     const sidebar = panel.querySelector(".action-sidebar");
     if (sidebar) sidebar.innerHTML = "";
 }
@@ -585,9 +854,9 @@ export function renderSongEditorV2(song, fileData = null) {
             .map((c) => c.display_name);
     }
     const publishers = song.publishers.map((p) => p.name);
-    const albums = song.albums.map((a) => a.display_title);
+    const _albums = song.albums.map((a) => a.display_title);
     const tags = song.tags.map((t) =>
-        t.category ? `${t.category}::${t.name}` : t.name
+        t.category ? `${t.category}::${t.name}` : t.name,
     );
 
     scroll.innerHTML = `
@@ -605,7 +874,16 @@ export function renderSongEditorV2(song, fileData = null) {
   ${REQUIRED_ROLES.map((role) => renderChipField(role, creditsByRole[role], `No ${role.toLowerCase()}s`, true, role.toLowerCase())).join("")}
   ${renderChipField("Tags", tags, "No tags", true, "tags")}
   ${renderChipField("Publisher", publishers, "No publisher", true, "publisher")}
-  ${renderChipField("Album / Release", albums, "No album", true, "album")}
+</div>
+
+<div class="editor-section">
+  <div class="editor-section-title-row" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="editor-section-title" style="margin:0;">Albums</div>
+    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album" data-song-id="${song.id}" data-song-title="${escapeHtml(song.media_name || song.title || "")}">+ Add</button>
+  </div>
+  <div class="stack-list" data-chip-field="album">
+    ${renderAlbumCards(song.albums || [], song.id)}
+  </div>
 </div>
 
 <div class="editor-section">
@@ -633,17 +911,25 @@ export function renderSongEditorV2(song, fileData = null) {
     <label class="editor-label" for="ef-notes">Comments</label>
     <textarea class="editor-input editor-textarea" id="ef-notes" rows="3">${escapeHtml(song.notes ?? "")}</textarea>
   </div>
-  ${fileData && fileData.raw_tags && Object.keys(fileData.raw_tags).length > 0 ? `
+  ${
+      fileData?.raw_tags && Object.keys(fileData.raw_tags).length > 0
+          ? `
   <div class="editor-field">
     <label class="editor-label">Raw ID3 Tags</label>
     <div class="editor-raw-tags">
-      ${Object.entries(fileData.raw_tags).map(([k, vals]) => `
+      ${Object.entries(fileData.raw_tags)
+          .map(
+              ([k, vals]) => `
       <div class="raw-tag-row">
         <span class="raw-tag-key">${escapeHtml(k)}</span>
         <span class="raw-tag-val">${escapeHtml(Array.isArray(vals) ? vals.join(", ") : String(vals))}</span>
-      </div>`).join("")}
+      </div>`,
+          )
+          .join("")}
     </div>
-  </div>` : ""}
+  </div>`
+          : ""
+  }
   <details class="editor-audit-details" data-song-id="${escapeHtml(String(song.id))}">
     <summary class="editor-audit-summary">Audit History</summary>
     <div class="editor-audit-body">Loading…</div>
