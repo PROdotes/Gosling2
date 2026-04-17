@@ -588,8 +588,9 @@ function renderSongRows(ctx, songs) {
         selectAll.addEventListener("change", selectAll._v2Handler);
     }
 
-    // Wire individual checkboxes to fire checkchange
+    // Wire individual checkboxes to fire checkchange without triggering row select
     panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
+        cb.addEventListener("click", (e) => e.stopPropagation());
         cb.addEventListener("change", () => {
             panel.dispatchEvent(new CustomEvent("checkchange", { bubbles: true }));
         });
