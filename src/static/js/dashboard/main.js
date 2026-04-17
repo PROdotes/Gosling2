@@ -238,7 +238,9 @@ const ctx = {
 
         // Aligned to V2 Audit: Sync chip inputs for properties changed via global actions (like primary tag)
         if (state.chipHandles?.updateField) {
-            state.chipHandles.updateField("tags", fresh);
+            for (const field of ["performer", "composer", "lyricist", "producer", "publisher", "tags", "album"]) {
+                state.chipHandles.updateField(field, fresh);
+            }
         }
     },
     performSearch: (query) => performSearch(query),

@@ -13,6 +13,7 @@ const tagsBtn = document.getElementById("scrubber-tags-btn");
 let _currentId = null;
 let _currentTitle = null;
 let _onTagsClick = null;
+let _onClose = null;
 
 // Playhead indicator inside the waveform box
 const playhead = document.createElement("div");
@@ -113,11 +114,12 @@ tagsBtn?.addEventListener("click", () => {
 export function openScrubberModal(
     songId,
     title,
-    { autoPlay = false, onTagsClick = null } = {},
+    { autoPlay = false, onTagsClick = null, onClose = null } = {},
 ) {
     _currentId = songId;
     _currentTitle = title;
     _onTagsClick = onTagsClick;
+    _onClose = onClose;
 
     audio.pause();
     audio.src = `/api/v1/songs/${songId}/audio`;
@@ -141,7 +143,10 @@ export function closeScrubberModal() {
     _currentId = null;
     _currentTitle = null;
     _onTagsClick = null;
+    const cb = _onClose;
+    _onClose = null;
     overlay.style.display = "none";
+    if (cb) cb();
 }
 
 // Close on overlay click outside modal box

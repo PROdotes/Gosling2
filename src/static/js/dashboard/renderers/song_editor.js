@@ -59,6 +59,59 @@ const SCALAR_FIELDS = [
     { inputId: "ef-notes", field: "notes",      numeric: false },
 ];
 
+const ALBUM_TYPES = ["Album", "EP", "Single", "Compilation", "Anthology"];
+
+function renderAlbumSubCards(albums, songId) {
+    if (!albums || !albums.length) return "";
+    return albums.map((album) => {
+        const title = album.album_title || album.display_title || "Unknown Album";
+        const albumId = album.album_id || album.id;
+        const typeOptions = ALBUM_TYPES.map(
+            (t) => `<option value="${t}" ${album.album_type === t ? "selected" : ""}>${t}</option>`
+        ).join("");
+        return `
+<div class="album-sub-card" data-album-id="${albumId}">
+  <div class="album-sub-header">
+    <div class="editor-input-row" style="flex:1">
+      <span class="editable-scalar editor-input album-sub-title" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>
+      <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
+      <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
+    </div>
+    <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
+  </div>
+  <div class="album-sub-meta-row">
+    <div class="album-sub-meta-item">
+      <span class="editor-label">Type</span>
+      <select class="editor-input album-sub-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
+    </div>
+    <div class="album-sub-meta-item">
+      <span class="editor-label">Year</span>
+      <span class="editable-scalar editor-input" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>
+    </div>
+    <div class="album-sub-meta-item">
+      <span class="editor-label">Disc</span>
+      <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
+    </div>
+    <div class="album-sub-meta-item">
+      <span class="editor-label">Track</span>
+      <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
+    </div>
+  </div>
+  <div class="album-sub-actions">
+    <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync from song</button>
+  </div>
+</div>`;
+    }).join("");
+}
+
+function updateAlbumSubSection(freshSong) {
+    const el = document.querySelector(`[data-album-sub-song="${freshSong.id}"]`);
+    if (el) el.innerHTML = renderAlbumSubCards(freshSong.albums, freshSong.id);
+    // Sync missing state on the field
+    const field = document.querySelector(`[data-chip-field="album"]`);
+    if (field) field.classList.toggle("missing", (freshSong.albums || []).length === 0);
+}
+
 const BLOCKER_LABELS = {
     media_name: "TTL", year: "YR", performers: "ART",
     composers: "COMP", genres: "GNR", publishers: "PUB",
@@ -402,35 +455,44 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     }
 
     // ── Album ──────────────────────────────────────────────────────────────────
-    const albumWrap = getContainer("album");
-    if (albumWrap) {
-        const getItems = (s) => s.albums.map((a) => ({ id: a.album_id, label: a.display_title }));
-        const handle = createChipInput({
-            container: albumWrap,
-            items: getItems(song),
-            onSearch: async (q) => {
-                const r = await searchAlbums(q);
-                if (r === ABORTED || !r) return [];
-                return r.map((a) => ({ id: a.id, label: a.title }));
-            },
-            onAdd: async (opt) => {
-                await addSongAlbum(song.id, opt.id ?? null, opt.label, null, null);
-                const fresh = await refresh();
-                handle.setItems(getItems(fresh));
-            },
-            onRemove: async (albumId) => {
-                await removeSongAlbum(song.id, albumId);
-                await refresh();
-            },
-            allowCreate: true,
-        });
-        handles.album = handle;
-        getItemsByField.album = getItems;
+    // Albums render as sub-cards (not chips). We only wire the search-to-add
+    // input here. The cards themselves are rendered by renderAlbumSubCards and
+    // refreshed via updateAlbumSubSection.
+    const albumField = document.querySelector(`[data-chip-field="album"]`);
+    if (albumField) {
+        const searchWrap = albumField.querySelector(".album-search-wrap");
+        if (searchWrap) {
+            // Re-use createChipInput with no initial items — it gives us a
+            // search input + dropdown for free. We suppress chip rendering
+            // (items always stays empty; cards are the display).
+            createChipInput({
+                container: searchWrap,
+                items: [],
+                onSearch: async (q) => {
+                    const r = await searchAlbums(q);
+                    if (r === ABORTED || !r) return [];
+                    return r.map((a) => ({ id: a.id, label: a.display_title || a.title || a.name }));
+                },
+                onAdd: async (opt) => {
+                    await addSongAlbum(song.id, opt.id ?? null, opt.id ? null : opt.label, null, null);
+                    const fresh = await refresh();
+                    updateAlbumSubSection(fresh);
+                },
+                onRemove: async () => {}, // removal handled by card × buttons
+                allowCreate: true,
+                getCreateLabel: (q) => `+ Create "${q}"`,
+            });
+        }
     }
 
     return {
         updateField(fieldKey, freshSong) {
             const key = String(fieldKey).toLowerCase();
+            if (key === "album") {
+                updateAlbumSubSection(freshSong);
+                updateListRowBlockers(freshSong.id, freshSong.review_blockers);
+                return;
+            }
             const handle = handles[key];
             const getItems = getItemsByField[key];
             if (!handle || !getItems) return;
@@ -605,7 +667,11 @@ export function renderSongEditorV2(song, fileData = null) {
   ${REQUIRED_ROLES.map((role) => renderChipField(role, creditsByRole[role], `No ${role.toLowerCase()}s`, true, role.toLowerCase())).join("")}
   ${renderChipField("Tags", tags, "No tags", true, "tags")}
   ${renderChipField("Publisher", publishers, "No publisher", true, "publisher")}
-  ${renderChipField("Album / Release", albums, "No album", true, "album")}
+  <div class="editor-field${song.albums.length === 0 ? " missing" : ""}" data-chip-field="album">
+    <label class="editor-label">Album / Release</label>
+    <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
+    <div class="album-search-wrap"></div>
+  </div>
 </div>
 
 <div class="editor-section">

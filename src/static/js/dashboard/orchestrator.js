@@ -20,6 +20,12 @@ export async function orchestrateScrubber(ctx, songId, title) {
 
     openScrubberModal(songId, title, {
         autoPlay,
+        onClose: () => {
+            const s = ctx.getState();
+            if (s.activeSong && s.currentMode === "songs" && ctx.refreshActiveSongV2) {
+                ctx.refreshActiveSongV2(s.activeSong.id);
+            }
+        },
         onTagsClick: async (id, name) => {
             // Re-fetch or use state.activeSong to get freshest tags
             // If the song being scrubbed is the active one, use its tags
@@ -206,9 +212,6 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as new album`,
-        quickAdd: songTitle
-            ? { label: `New album: "${songTitle}"`, rawInput: songTitle }
-            : null,
     });
 }
 

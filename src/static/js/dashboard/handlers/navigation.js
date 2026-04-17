@@ -428,12 +428,16 @@ export class NavigationHandler {
     }
 
     async handleDeleteAlbum(actionTarget) {
-        const albumId = actionTarget.dataset.albumId;
+        const { albumId, songId } = actionTarget.dataset;
         if (!await showConfirm("Delete this album? This cannot be undone.")) return;
         try {
             await api.deleteAlbum(albumId);
-            this.ctx.closeDetailPanel?.();
-            this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+            if (songId && this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                await this.ctx.refreshActiveSongV2(songId);
+            } else {
+                this.ctx.closeDetailPanel?.();
+                this.ctx.performSearch?.(this.ctx.getState().currentQuery);
+            }
         } catch (err) {
             await showConfirm(`Delete failed: ${err.message}`, { title: "Error", okLabel: "OK" });
         }
