@@ -52,12 +52,16 @@ class SongCreditRepository(BaseRepository):
             return
 
         cursor = conn.cursor()
+        values_to_insert = []
         for credit in credits:
             role_id = self.get_or_create_role(credit.role_name, cursor)
-            name_id = self.get_or_create_credit_name(credit.display_name, cursor)
-            cursor.execute(
+            name_id = self.get_or_create_credit_name(credit.display_name, cursor, identity_id=credit.identity_id)
+            values_to_insert.append((source_id, name_id, role_id))
+
+        if values_to_insert:
+            cursor.executemany(
                 "INSERT OR IGNORE INTO SongCredits (SourceID, CreditedNameID, RoleID) VALUES (?, ?, ?)",
-                (source_id, name_id, role_id),
+                values_to_insert,
             )
 
         logger.info(

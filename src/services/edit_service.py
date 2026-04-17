@@ -683,16 +683,19 @@ class EditService:
             raise LookupError(f"Song {song_id} not found")
         conn = self._song_repo.get_connection()
         try:
-            for credit in credits:
-                self._credit_repo.add_credit(
-                    song_id,
-                    credit.name,
-                    credit.role,
-                    conn=conn,
-                    identity_id=credit.identity_id,
+            domain_credits = [
+                SongCredit(
+                    display_name=c.name, role_name=c.role, identity_id=c.identity_id
                 )
-            for pub_name in publishers:
-                self._pub_repo.add_song_publisher(song_id, pub_name, conn=conn)
+                for c in credits
+            ]
+            if domain_credits:
+                self._credit_repo.insert_credits(song_id, domain_credits, conn=conn)
+
+            domain_pubs = [Publisher(name=p) for p in publishers]
+            if domain_pubs:
+                self._pub_repo.insert_song_publishers(song_id, domain_pubs, conn=conn)
+
             conn.commit()
             self._sync_id3_if_enabled(song_id)
         except Exception:

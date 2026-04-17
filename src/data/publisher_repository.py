@@ -433,11 +433,15 @@ class PublisherRepository(BaseRepository):
             return
 
         cursor = conn.cursor()
+        values_to_insert = []
         for pub in publishers:
             pub_id = self.get_or_create_publisher(pub.name, cursor)
-            cursor.execute(
-                "INSERT INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)",
-                (source_id, pub_id),
+            values_to_insert.append((source_id, pub_id))
+
+        if values_to_insert:
+            cursor.executemany(
+                "INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)",
+                values_to_insert,
             )
 
         logger.info(
