@@ -77,8 +77,8 @@ async def upload_files(files: list[UploadFile] = File(...)):
     for file in files:
         if not file.filename:
             continue
-        # Security: sanitize filename to prevent path traversal
-        safe_filename = Path(file.filename).name
+        # Replace backslashes with forward slashes to handle Windows-style paths on Unix
+        safe_filename = Path(file.filename.replace("\\", "/")).name
         if Path(safe_filename).suffix.lower() not in ACCEPTED_EXTENSIONS:
             continue
         staged_path = os.path.join(STAGING_DIR, f"{uuid4()}_{safe_filename}")
