@@ -106,7 +106,6 @@ def get_actual_members(path: str):
 
 
 class TestLookupJunkDetector:
-
     def test_lookup_junk_detection(self):
         """
         JUNK DETECTION: Every signature documented in docs/lookup/
@@ -168,9 +167,9 @@ class TestLookupJunkDetector:
                         f"[GHOST SIGNATURE] '{name}' documented in {rel_md}:{line_num} not found in `{py_file_path}`"
                     )
 
-        assert (
-            len(file_missing_errors) == 0
-        ), "Junk Detector -- Missing Files:\n" + "\n".join(file_missing_errors)
-        assert (
-            len(ghost_errors) == 0
-        ), "Junk Detector -- Ghost Signatures:\n" + "\n".join(ghost_errors)
+        assert len(file_missing_errors) == 0, (
+            "Junk Detector -- Missing Files:\n" + "\n".join(file_missing_errors)
+        )
+        assert len(ghost_errors) == 0, (
+            "Junk Detector -- Ghost Signatures:\n" + "\n".join(ghost_errors)
+        )

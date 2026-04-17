@@ -53,12 +53,12 @@ class TestTagReconnection:
         conn.close()
 
         assert len(rows) == 1, f"Expected 1 Grunge/Genre row (reused), got {len(rows)}"
-        assert (
-            rows[0]["TagID"] == 1
-        ), f"Expected TagID=1 (original), got {rows[0]['TagID']}"
-        assert (
-            rows[0]["IsDeleted"] == 0
-        ), f"Expected IsDeleted=0 (woken up), got {rows[0]['IsDeleted']}"
+        assert rows[0]["TagID"] == 1, (
+            f"Expected TagID=1 (original), got {rows[0]['TagID']}"
+        )
+        assert rows[0]["IsDeleted"] == 0, (
+            f"Expected IsDeleted=0 (woken up), got {rows[0]['IsDeleted']}"
+        )
 
     def test_soft_deleted_tag_case_insensitive_reconnection(self, populated_db):
         """
@@ -84,9 +84,9 @@ class TestTagReconnection:
         ).fetchall()
         conn.close()
 
-        assert (
-            len(rows) == 1
-        ), f"Expected 1 row (case-insensitive reuse), got {len(rows)}"
+        assert len(rows) == 1, (
+            f"Expected 1 row (case-insensitive reuse), got {len(rows)}"
+        )
         assert rows[0]["TagID"] == 1
         assert rows[0]["IsDeleted"] == 0
 
@@ -316,9 +316,9 @@ class TestArtistNameReconnection:
         conn.close()
 
         assert identity_row["IsDeleted"] == 0, "Identity should be reactivated"
-        assert (
-            name_row["OwnerIdentityID"] == 99
-        ), "ArtistName should link to reactivated Identity"
+        assert name_row["OwnerIdentityID"] == 99, (
+            "ArtistName should link to reactivated Identity"
+        )
         assert name_row["IsPrimaryName"] == 1
         assert identity_count == 1, "Should reuse, not duplicate"
 

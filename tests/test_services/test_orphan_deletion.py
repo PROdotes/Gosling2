@@ -52,9 +52,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         service.delete_unlinked_tags([100])
 
-        assert (
-            service.get_tag(100) is None
-        ), "Expected get_tag to return None after deletion"
+        assert service.get_tag(100) is None, (
+            "Expected get_tag to return None after deletion"
+        )
 
     def test_linked_tag_is_not_deleted(self, populated_db):
         """A tag with active song links returns 0 — not deleted."""
@@ -91,9 +91,9 @@ class TestDeleteUnlinkedTagsSingle:
 
         result = service.delete_unlinked_tags([3])
 
-        assert (
-            result == 1
-        ), f"Expected 1 (tag unlinked after song deleted), got {result}"
+        assert result == 1, (
+            f"Expected 1 (tag unlinked after song deleted), got {result}"
+        )
 
 
 class TestDeleteUnlinkedTagsBulk:

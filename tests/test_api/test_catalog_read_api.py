@@ -50,9 +50,9 @@ class TestGetAllTags:
         tag = next(t for t in data if t["id"] == 1)
         assert tag["id"] == 1, f"Expected id=1, got {tag['id']}"
         assert tag["name"] == "Grunge", f"Expected name='Grunge', got {tag['name']}"
-        assert (
-            tag["category"] == "Genre"
-        ), f"Expected category='Genre', got {tag['category']}"
+        assert tag["category"] == "Genre", (
+            f"Expected category='Genre', got {tag['category']}"
+        )
         # Verify no domain-only fields leak through
         assert "is_primary" not in tag, "TagView must not expose is_primary on list"
 
@@ -61,9 +61,9 @@ class TestGetAllTags:
         data = resp.json()
         ids = [t["id"] for t in data]
         for expected_id in [1, 2, 3, 4, 5, 6]:
-            assert (
-                expected_id in ids
-            ), f"Expected tag_id={expected_id} in list, got {ids}"
+            assert expected_id in ids, (
+                f"Expected tag_id={expected_id} in list, got {ids}"
+            )
 
     def test_empty_db_returns_empty_list(self, empty_db, monkeypatch):
         monkeypatch.setenv("GOSLING_DB_PATH", empty_db)
@@ -81,18 +81,18 @@ class TestSearchTags:
         assert len(data) == 1, f"Expected 1 result, got {len(data)}"
         assert data[0]["id"] == 1, f"Expected id=1, got {data[0]['id']}"
         assert data[0]["name"] == "Grunge", f"Expected 'Grunge', got {data[0]['name']}"
-        assert (
-            data[0]["category"] == "Genre"
-        ), f"Expected 'Genre', got {data[0]['category']}"
+        assert data[0]["category"] == "Genre", (
+            f"Expected 'Genre', got {data[0]['category']}"
+        )
 
     def test_search_excludes_non_matching(self, api):
         resp = api.get("/api/v1/tags/search?q=Grunge")
         data = resp.json()
         ids = [t["id"] for t in data]
         for excluded in [2, 3, 4, 5, 6]:
-            assert (
-                excluded not in ids
-            ), f"Tag {excluded} should not match 'Grunge', got {ids}"
+            assert excluded not in ids, (
+                f"Tag {excluded} should not match 'Grunge', got {ids}"
+            )
 
     def test_search_no_results_returns_empty_list(self, api):
         resp = api.get("/api/v1/tags/search?q=ZZZNoMatch")
@@ -107,9 +107,9 @@ class TestGetTagById:
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
         assert data["name"] == "Grunge", f"Expected name='Grunge', got {data['name']}"
-        assert (
-            data["category"] == "Genre"
-        ), f"Expected category='Genre', got {data['category']}"
+        assert data["category"] == "Genre", (
+            f"Expected category='Genre', got {data['category']}"
+        )
 
     def test_tag_with_null_category_returns_none(self, api):
         # Tag 2 has category "Mood" — test a tag with a real category
@@ -139,9 +139,9 @@ class TestGetTagCategories:
         data = resp.json()
         assert isinstance(data, list), f"Expected list, got {type(data)}"
         for expected in ["Genre", "Mood", "Era", "Style", "Jezik"]:
-            assert (
-                expected in data
-            ), f"Expected category '{expected}' in list, got {data}"
+            assert expected in data, (
+                f"Expected category '{expected}' in list, got {data}"
+            )
 
     def test_no_duplicates_in_categories(self, api):
         resp = api.get("/api/v1/tags/categories")
@@ -167,12 +167,12 @@ class TestGetAllPublishers:
         data = resp.json()
         pub = next(p for p in data if p["id"] == 10)
         assert pub["id"] == 10, f"Expected id=10, got {pub['id']}"
-        assert (
-            pub["name"] == "DGC Records"
-        ), f"Expected name='DGC Records', got {pub['name']}"
-        assert (
-            pub["parent_name"] == "Universal Music Group"
-        ), f"Expected parent_name='Universal Music Group', got {pub['parent_name']}"
+        assert pub["name"] == "DGC Records", (
+            f"Expected name='DGC Records', got {pub['name']}"
+        )
+        assert pub["parent_name"] == "Universal Music Group", (
+            f"Expected parent_name='Universal Music Group', got {pub['parent_name']}"
+        )
         assert "sub_publishers" in pub, "PublisherView must include sub_publishers"
         # Verify no domain-only fields leak through
         assert "parent_id" not in pub, "PublisherView must not expose parent_id"
@@ -181,18 +181,18 @@ class TestGetAllPublishers:
         resp = api.get("/api/v1/publishers")
         data = resp.json()
         umg = next(p for p in data if p["id"] == 1)
-        assert (
-            umg["parent_name"] is None
-        ), f"Expected parent_name=None for UMG, got {umg['parent_name']}"
+        assert umg["parent_name"] is None, (
+            f"Expected parent_name=None for UMG, got {umg['parent_name']}"
+        )
 
     def test_all_publishers_present(self, api):
         resp = api.get("/api/v1/publishers")
         data = resp.json()
         ids = [p["id"] for p in data]
         for expected_id in [1, 2, 3, 4, 5, 10]:
-            assert (
-                expected_id in ids
-            ), f"Expected pub_id={expected_id} in list, got {ids}"
+            assert expected_id in ids, (
+                f"Expected pub_id={expected_id} in list, got {ids}"
+            )
 
     def test_empty_db_returns_empty_list(self, empty_db, monkeypatch):
         monkeypatch.setenv("GOSLING_DB_PATH", empty_db)
@@ -209,18 +209,18 @@ class TestSearchPublishers:
         data = resp.json()
         assert len(data) == 1, f"Expected 1 result, got {len(data)}"
         assert data[0]["id"] == 5, f"Expected id=5, got {data[0]['id']}"
-        assert (
-            data[0]["name"] == "Sub Pop"
-        ), f"Expected 'Sub Pop', got {data[0]['name']}"
+        assert data[0]["name"] == "Sub Pop", (
+            f"Expected 'Sub Pop', got {data[0]['name']}"
+        )
 
     def test_search_excludes_non_matching(self, api):
         resp = api.get("/api/v1/publishers/search?q=Sub Pop")
         data = resp.json()
         ids = [p["id"] for p in data]
         for excluded in [1, 2, 3, 4, 10]:
-            assert (
-                excluded not in ids
-            ), f"Publisher {excluded} should not match 'Sub Pop', got {ids}"
+            assert excluded not in ids, (
+                f"Publisher {excluded} should not match 'Sub Pop', got {ids}"
+            )
 
     def test_search_no_results_returns_empty_list(self, api):
         resp = api.get("/api/v1/publishers/search?q=ZZZNoMatch")
@@ -234,42 +234,42 @@ class TestGetPublisherById:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["id"] == 10, f"Expected id=10, got {data['id']}"
-        assert (
-            data["name"] == "DGC Records"
-        ), f"Expected name='DGC Records', got {data['name']}"
-        assert (
-            data["parent_name"] == "Universal Music Group"
-        ), f"Expected parent_name='Universal Music Group', got {data['parent_name']}"
-        assert isinstance(
-            data["sub_publishers"], list
-        ), f"Expected sub_publishers list, got {type(data['sub_publishers'])}"
+        assert data["name"] == "DGC Records", (
+            f"Expected name='DGC Records', got {data['name']}"
+        )
+        assert data["parent_name"] == "Universal Music Group", (
+            f"Expected parent_name='Universal Music Group', got {data['parent_name']}"
+        )
+        assert isinstance(data["sub_publishers"], list), (
+            f"Expected sub_publishers list, got {type(data['sub_publishers'])}"
+        )
 
     def test_publisher_with_sub_publishers_includes_them(self, api):
         # Universal Music Group (id=1) has children: Island Records(2), DGC Records(10)
         resp = api.get("/api/v1/publishers/1")
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
-        assert (
-            data["name"] == "Universal Music Group"
-        ), f"Expected 'Universal Music Group', got {data['name']}"
-        assert (
-            data["parent_name"] is None
-        ), f"Expected parent_name=None, got {data['parent_name']}"
+        assert data["name"] == "Universal Music Group", (
+            f"Expected 'Universal Music Group', got {data['name']}"
+        )
+        assert data["parent_name"] is None, (
+            f"Expected parent_name=None, got {data['parent_name']}"
+        )
         sub_ids = [s["id"] for s in data["sub_publishers"]]
-        assert (
-            2 in sub_ids
-        ), f"Expected Island Records (id=2) in sub_publishers, got {sub_ids}"
-        assert (
-            10 in sub_ids
-        ), f"Expected DGC Records (id=10) in sub_publishers, got {sub_ids}"
+        assert 2 in sub_ids, (
+            f"Expected Island Records (id=2) in sub_publishers, got {sub_ids}"
+        )
+        assert 10 in sub_ids, (
+            f"Expected DGC Records (id=10) in sub_publishers, got {sub_ids}"
+        )
 
     def test_publisher_no_sub_publishers_returns_empty_list(self, api):
         # Sub Pop (id=5) has no children
         resp = api.get("/api/v1/publishers/5")
         data = resp.json()
-        assert (
-            data["sub_publishers"] == []
-        ), f"Expected empty sub_publishers for Sub Pop, got {data['sub_publishers']}"
+        assert data["sub_publishers"] == [], (
+            f"Expected empty sub_publishers for Sub Pop, got {data['sub_publishers']}"
+        )
 
     def test_domain_fields_not_exposed(self, api):
         resp = api.get("/api/v1/publishers/10")

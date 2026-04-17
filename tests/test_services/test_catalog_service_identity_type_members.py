@@ -14,7 +14,6 @@ import pytest
 
 
 class TestSetIdentityType:
-
     def test_happy_path(self, catalog_service):
         catalog_service.set_identity_type(4, "group")
         assert catalog_service.get_identity(4).type == "group"
@@ -29,7 +28,6 @@ class TestSetIdentityType:
 
 
 class TestAddIdentityMember:
-
     def test_happy_path(self, catalog_service):
         catalog_service.add_identity_member(2, 4)
         member_ids = {m.id for m in catalog_service.get_identity(2).members}
@@ -45,7 +43,6 @@ class TestAddIdentityMember:
 
 
 class TestRemoveIdentityMember:
-
     def test_happy_path(self, catalog_service):
         catalog_service.remove_identity_member(2, 1)
         member_ids = {m.id for m in catalog_service.get_identity(2).members}

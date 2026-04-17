@@ -44,14 +44,14 @@ class TestGetAll:
         # After deleting 100, only 101 should remain.
         assert len(albums) == 1, f"Expected 1 active album, got {len(albums)}"
         assert albums[0].id == 200, f"Expected Album 200, got {albums[0].id}"
-        assert (
-            albums[0].title == "The Colour and the Shape"
-        ), f"Expected 'The Colour and the Shape', got '{albums[0].title}'"
+        assert albums[0].title == "The Colour and the Shape", (
+            f"Expected 'The Colour and the Shape', got '{albums[0].title}'"
+        )
 
         album_ids = [a.id for a in albums]
-        assert (
-            100 not in album_ids
-        ), f"Soft-deleted Album 100 should be excluded, but was found in {album_ids}"
+        assert 100 not in album_ids, (
+            f"Soft-deleted Album 100 should be excluded, but was found in {album_ids}"
+        )
 
 
 class TestItems:
@@ -72,9 +72,9 @@ class TestItems:
 
         # 3. Search again
         results = repo.search_slim("Never")
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for 'Never' after soft-delete, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for 'Never' after soft-delete, got {len(results)}"
+        )
 
     def test_get_by_id_returns_none_for_soft_deleted(self, populated_db):
         """get_by_id(100) should return None if 100 is soft-deleted."""
@@ -107,9 +107,9 @@ class TestTagVisibility:
         # 2. get_all
         tags = repo.get_all()
         tag_ids = [t.id for t in tags]
-        assert (
-            1 not in tag_ids
-        ), f"Soft-deleted Tag 1 should be excluded, but was found in {tag_ids}"
+        assert 1 not in tag_ids, (
+            f"Soft-deleted Tag 1 should be excluded, but was found in {tag_ids}"
+        )
 
     def test_search_excludes_soft_deleted_tags(self, populated_db):
         """Search 'Grunge' should find nothing if it's soft-deleted."""
@@ -123,9 +123,9 @@ class TestTagVisibility:
 
         # 2. search
         results = repo.search("Grunge")
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for 'Grunge' after soft-delete, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for 'Grunge' after soft-delete, got {len(results)}"
+        )
 
     def test_get_by_id_returns_none_for_soft_deleted(self, populated_db):
         """get_by_id(1) should return None if 1 is soft-deleted."""
@@ -158,9 +158,9 @@ class TestPublisherVisibility:
         # 2. get_all
         pubs = repo.get_all()
         pub_ids = [p.id for p in pubs]
-        assert (
-            10 not in pub_ids
-        ), f"Soft-deleted Publisher 10 should be excluded, but was found in {pub_ids}"
+        assert 10 not in pub_ids, (
+            f"Soft-deleted Publisher 10 should be excluded, but was found in {pub_ids}"
+        )
 
     def test_search_excludes_soft_deleted_publishers(self, populated_db):
         """Search 'DGC' should find nothing if it's soft-deleted."""
@@ -174,9 +174,9 @@ class TestPublisherVisibility:
 
         # 2. search
         results = repo.search("DGC")
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for 'DGC' after soft-delete, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for 'DGC' after soft-delete, got {len(results)}"
+        )
 
     def test_get_by_id_returns_none_for_soft_deleted(self, populated_db):
         """get_by_id(10) should return None if 10 is soft-deleted."""
@@ -209,9 +209,9 @@ class TestIdentityVisibility:
         # 2. get_all
         identities = repo.get_all_identities()
         ids = [i.id for i in identities]
-        assert (
-            1 not in ids
-        ), f"Soft-deleted Identity 1 should be excluded, but was found in {ids}"
+        assert 1 not in ids, (
+            f"Soft-deleted Identity 1 should be excluded, but was found in {ids}"
+        )
 
     def test_search_excludes_soft_deleted_identities(self, populated_db):
         """Search 'Grohl' should find nothing if it's soft-deleted."""
@@ -225,9 +225,9 @@ class TestIdentityVisibility:
 
         # 2. search
         results = repo.search_identities("Grohl")
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for 'Grohl' after soft-delete, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for 'Grohl' after soft-delete, got {len(results)}"
+        )
 
     def test_get_by_id_returns_none_for_soft_deleted(self, populated_db):
         """get_by_id(1) should return None if 1 is soft-deleted."""
@@ -241,9 +241,9 @@ class TestIdentityVisibility:
 
         # 2. get_by_id
         identity = repo.get_by_id(1)
-        assert (
-            identity is None
-        ), f"Expected None for soft-deleted identity 1, got {identity}"
+        assert identity is None, (
+            f"Expected None for soft-deleted identity 1, got {identity}"
+        )
 
     def test_get_members_excludes_soft_deleted(self, populated_db):
         """If a member is soft-deleted, it should not appear in get_members_batch."""
@@ -259,9 +259,9 @@ class TestIdentityVisibility:
         # Fetch members for Nirvana
         results = repo.get_members_batch([2])
         members = results.get(2, [])
-        assert (
-            len(members) == 0
-        ), f"Expected 0 members for Nirvana after Dave was soft-deleted, got {len(members)}"
+        assert len(members) == 0, (
+            f"Expected 0 members for Nirvana after Dave was soft-deleted, got {len(members)}"
+        )
 
 
 class TestJunctionVisibility:
@@ -281,9 +281,9 @@ class TestJunctionVisibility:
         results = repo.get_tags_for_songs([1])
         # results is List[Tuple[int, Tag]]
         tag_ids = [t.id for sid, t in results]
-        assert (
-            1 not in tag_ids
-        ), f"Soft-deleted Tag 1 should be excluded from song tags, but was found: {tag_ids}"
+        assert 1 not in tag_ids, (
+            f"Soft-deleted Tag 1 should be excluded from song tags, but was found: {tag_ids}"
+        )
 
     def test_get_credits_for_songs_excludes_soft_deleted_artist_names(
         self, populated_db
@@ -305,9 +305,9 @@ class TestJunctionVisibility:
         # 2. Fetch credits for song 1
         results = repo.get_credits_for_songs([1])
         name_ids = [c.name_id for c in results]
-        assert (
-            20 not in name_ids
-        ), f"Soft-deleted ArtistName 20 should be excluded from credits, but was found: {name_ids}"
+        assert 20 not in name_ids, (
+            f"Soft-deleted ArtistName 20 should be excluded from credits, but was found: {name_ids}"
+        )
 
     def test_get_publishers_for_songs_excludes_soft_deleted_publishers(
         self, populated_db
@@ -327,6 +327,6 @@ class TestJunctionVisibility:
         # 2. Fetch publishers for song 1
         results = repo.get_publishers_for_songs([1])
         pub_ids = [p.id for sid, p in results]
-        assert (
-            10 not in pub_ids
-        ), f"Soft-deleted Publisher 10 should be excluded from song publishers, but was found: {pub_ids}"
+        assert 10 not in pub_ids, (
+            f"Soft-deleted Publisher 10 should be excluded from song publishers, but was found: {pub_ids}"
+        )

@@ -16,38 +16,38 @@ class TestGetById:
 
         assert song is not None, f"Expected song object, got {song}"
         assert song.id == 1, f"Expected 1, got {song.id}"
-        assert (
-            song.media_name == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{song.media_name}'"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
-        assert (
-            song.source_path == "/path/1"
-        ), f"Expected '/path/1', got '{song.source_path}'"
+        assert song.media_name == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{song.media_name}'"
+        )
+        assert song.title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
+        )
+        assert song.source_path == "/path/1", (
+            f"Expected '/path/1', got '{song.source_path}'"
+        )
         assert song.duration_s == 200.0, f"Expected 200000, got {song.duration_ms}"
         assert song.is_active is True, f"Expected True, got {song.is_active}"
         assert song.type_id == 1, f"Expected 1, got {song.type_id}"
-        assert (
-            song.audio_hash == "hash_1"
-        ), f"Expected 'hash_1', got '{song.audio_hash}'"
+        assert song.audio_hash == "hash_1", (
+            f"Expected 'hash_1', got '{song.audio_hash}'"
+        )
         assert song.year == 1991, f"Expected 1991, got {song.year}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0 for processing_status, got {song.processing_status}"
-        assert (
-            song.credits == []
-        ), f"Expected empty list for credits, got {song.credits}"
+        assert song.processing_status == 0, (
+            f"Expected 0 for processing_status, got {song.processing_status}"
+        )
+        assert song.credits == [], (
+            f"Expected empty list for credits, got {song.credits}"
+        )
         assert song.albums == [], f"Expected empty list for albums, got {song.albums}"
         assert song.bpm is None, f"Expected None for BPM, got {song.bpm}"
         assert song.isrc is None, f"Expected None for ISRC, got {song.isrc}"
         assert song.notes is None, f"Expected None for notes, got {song.notes}"
-        assert (
-            song.raw_tags == {}
-        ), f"Expected empty dict for raw_tags, got {song.raw_tags}"
-        assert (
-            song.publishers == []
-        ), f"Expected empty list for publishers, got {song.publishers}"
+        assert song.raw_tags == {}, (
+            f"Expected empty dict for raw_tags, got {song.raw_tags}"
+        )
+        assert song.publishers == [], (
+            f"Expected empty list for publishers, got {song.publishers}"
+        )
         assert song.tags == [], f"Expected empty list for tags, got {song.tags}"
 
     def test_nonexistent_id_returns_none(self, populated_db):
@@ -81,52 +81,52 @@ class TestGetByIds:
 
         # Song 1: exhaustive assertions
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
-        assert (
-            songs[0].duration_ms == 200000
-        ), f"Expected 200000, got {songs[0].duration_ms}"
-        assert (
-            songs[0].source_path == "/path/1"
-        ), f"Expected '/path/1', got '{songs[0].source_path}'"
-        assert (
-            songs[0].audio_hash == "hash_1"
-        ), f"Expected 'hash_1', got '{songs[0].audio_hash}'"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
+        assert songs[0].duration_ms == 200000, (
+            f"Expected 200000, got {songs[0].duration_ms}"
+        )
+        assert songs[0].source_path == "/path/1", (
+            f"Expected '/path/1', got '{songs[0].source_path}'"
+        )
+        assert songs[0].audio_hash == "hash_1", (
+            f"Expected 'hash_1', got '{songs[0].audio_hash}'"
+        )
         assert songs[0].year == 1991, f"Expected 1991, got {songs[0].year}"
         assert songs[0].is_active is True, f"Expected True, got {songs[0].is_active}"
 
         # Song 2: exhaustive assertions (audio_hash is None)
         assert songs[1].id == 2, f"Expected 2, got {songs[1].id}"
-        assert (
-            songs[1].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[1].title}'"
-        assert (
-            songs[1].duration_ms == 240000
-        ), f"Expected 240000, got {songs[1].duration_ms}"
-        assert (
-            songs[1].source_path == "/path/2"
-        ), f"Expected '/path/2', got '{songs[1].source_path}'"
-        assert (
-            songs[1].audio_hash is None
-        ), f"Expected None for audio_hash, got '{songs[1].audio_hash}'"
+        assert songs[1].title == "Everlong", (
+            f"Expected 'Everlong', got '{songs[1].title}'"
+        )
+        assert songs[1].duration_ms == 240000, (
+            f"Expected 240000, got {songs[1].duration_ms}"
+        )
+        assert songs[1].source_path == "/path/2", (
+            f"Expected '/path/2', got '{songs[1].source_path}'"
+        )
+        assert songs[1].audio_hash is None, (
+            f"Expected None for audio_hash, got '{songs[1].audio_hash}'"
+        )
         assert songs[1].year == 1997, f"Expected 1997, got {songs[1].year}"
         assert songs[1].is_active is True, f"Expected True, got {songs[1].is_active}"
 
         # Song 3: exhaustive assertions (audio_hash is None, year is 2016)
         assert songs[2].id == 3, f"Expected 3, got {songs[2].id}"
-        assert (
-            songs[2].title == "Range Rover Bitch"
-        ), f"Expected 'Range Rover Bitch', got '{songs[2].title}'"
-        assert (
-            songs[2].duration_ms == 180000
-        ), f"Expected 180000, got {songs[2].duration_ms}"
-        assert (
-            songs[2].source_path == "/path/3"
-        ), f"Expected '/path/3', got '{songs[2].source_path}'"
-        assert (
-            songs[2].audio_hash is None
-        ), f"Expected None for audio_hash, got '{songs[2].audio_hash}'"
+        assert songs[2].title == "Range Rover Bitch", (
+            f"Expected 'Range Rover Bitch', got '{songs[2].title}'"
+        )
+        assert songs[2].duration_ms == 180000, (
+            f"Expected 180000, got {songs[2].duration_ms}"
+        )
+        assert songs[2].source_path == "/path/3", (
+            f"Expected '/path/3', got '{songs[2].source_path}'"
+        )
+        assert songs[2].audio_hash is None, (
+            f"Expected None for audio_hash, got '{songs[2].audio_hash}'"
+        )
         assert songs[2].year == 2016, f"Expected 2016, got {songs[2].year}"
         assert songs[2].is_active is True, f"Expected True, got {songs[2].is_active}"
 
@@ -145,21 +145,21 @@ class TestGetByIds:
 
         # Assert all fields for song 1
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
-        assert (
-            songs[0].duration_ms == 200000
-        ), f"Expected 200000, got {songs[0].duration_ms}"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
+        assert songs[0].duration_ms == 200000, (
+            f"Expected 200000, got {songs[0].duration_ms}"
+        )
 
         # Assert all fields for song 2
         assert songs[1].id == 2, f"Expected 2, got {songs[1].id}"
-        assert (
-            songs[1].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[1].title}'"
-        assert (
-            songs[1].duration_ms == 240000
-        ), f"Expected 240000, got {songs[1].duration_ms}"
+        assert songs[1].title == "Everlong", (
+            f"Expected 'Everlong', got '{songs[1].title}'"
+        )
+        assert songs[1].duration_ms == 240000, (
+            f"Expected 240000, got {songs[1].duration_ms}"
+        )
 
     def test_duplicate_ids_behavior(self, populated_db):
         """Duplicate IDs in input should not produce duplicate songs."""
@@ -167,9 +167,9 @@ class TestGetByIds:
         songs = repo.get_by_ids([1, 1, 1])
         assert len(songs) == 1, f"Expected 1 unique song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
 
 
 class TestGetByTitle:
@@ -182,12 +182,12 @@ class TestGetByTitle:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
-        assert (
-            songs[0].duration_ms == 200000
-        ), f"Expected 200000, got {songs[0].duration_ms}"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
+        assert songs[0].duration_ms == 200000, (
+            f"Expected 200000, got {songs[0].duration_ms}"
+        )
 
     def test_partial_match(self, populated_db):
         """Test partial title match works with LIKE query."""
@@ -196,9 +196,9 @@ class TestGetByTitle:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
 
     def test_case_insensitive(self, populated_db):
         """SQLite LIKE is case-insensitive for ASCII by default."""
@@ -207,9 +207,9 @@ class TestGetByTitle:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
-        assert (
-            songs[0].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[0].title}'"
+        assert songs[0].title == "Everlong", (
+            f"Expected 'Everlong', got '{songs[0].title}'"
+        )
 
     def test_no_match_returns_empty(self, populated_db):
         """Test that get_by_title returns [] for no matches."""
@@ -224,9 +224,9 @@ class TestGetByTitle:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 8, f"Expected 8, got {songs[0].id}"
-        assert (
-            songs[0].title == "Joint Venture"
-        ), f"Expected 'Joint Venture', got '{songs[0].title}'"
+        assert songs[0].title == "Joint Venture", (
+            f"Expected 'Joint Venture', got '{songs[0].title}'"
+        )
 
     def test_empty_on_empty_db(self, empty_db):
         """Test get_by_title on empty database returns empty."""
@@ -246,15 +246,15 @@ class TestSearchSlim:
         assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
         row = rows[0]
         assert row["SourceID"] == 2, f"Expected SourceID=2, got {row['SourceID']}"
-        assert (
-            row["MediaName"] == "Everlong"
-        ), f"Expected 'Everlong', got '{row['MediaName']}'"
-        assert (
-            row["SourceDuration"] == 240
-        ), f"Expected 240s, got {row['SourceDuration']}"
-        assert (
-            row["SourcePath"] == "/path/2"
-        ), f"Expected '/path/2', got '{row['SourcePath']}'"
+        assert row["MediaName"] == "Everlong", (
+            f"Expected 'Everlong', got '{row['MediaName']}'"
+        )
+        assert row["SourceDuration"] == 240, (
+            f"Expected 240s, got {row['SourceDuration']}"
+        )
+        assert row["SourcePath"] == "/path/2", (
+            f"Expected '/path/2', got '{row['SourcePath']}'"
+        )
 
     def test_album_title_match(self, populated_db):
         """search_slim('Nevermind') should find Song 1 via album linkage."""
@@ -262,12 +262,12 @@ class TestSearchSlim:
         rows = repo.search_slim("Nevermind")
 
         assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
-        assert (
-            rows[0]["MediaName"] == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        )
 
     def test_album_title_match_colour(self, populated_db):
         """search_slim('Colour') should find Song 2 via album 'The Colour and the Shape'."""
@@ -275,12 +275,12 @@ class TestSearchSlim:
         rows = repo.search_slim("Colour")
 
         assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 2
-        ), f"Expected SourceID=2, got {rows[0]['SourceID']}"
-        assert (
-            rows[0]["MediaName"] == "Everlong"
-        ), f"Expected 'Everlong', got '{rows[0]['MediaName']}'"
+        assert rows[0]["SourceID"] == 2, (
+            f"Expected SourceID=2, got {rows[0]['SourceID']}"
+        )
+        assert rows[0]["MediaName"] == "Everlong", (
+            f"Expected 'Everlong', got '{rows[0]['MediaName']}'"
+        )
 
     def test_no_match_returns_empty_list(self, populated_db):
         """search_slim('ZZZZZZZZZ') returns [] for no matches."""
@@ -293,15 +293,15 @@ class TestSearchSlim:
         repo = SongRepository(populated_db)
         rows = repo.search_slim("Nirvana")
         assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1 (SLTS), got {rows[0]['SourceID']}"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1 (SLTS), got {rows[0]['SourceID']}"
+        )
 
         # Negative isolation: Foo Fighters songs should NOT appear
         returned_ids = {r["SourceID"] for r in rows}
-        assert (
-            2 not in returned_ids
-        ), "Everlong (Foo Fighters) should not match 'Nirvana'"
+        assert 2 not in returned_ids, (
+            "Everlong (Foo Fighters) should not match 'Nirvana'"
+        )
 
     def test_empty_query_returns_all(self, populated_db):
         """Empty string in LIKE '%...%' matches all songs."""
@@ -317,9 +317,9 @@ class TestSearchSlim:
         assert len(rows) == 1, f"Expected 1 row, got {len(rows)}"
         row = rows[0]
         assert "DisplayArtist" in row, "Row missing 'DisplayArtist' field"
-        assert (
-            row["DisplayArtist"] is not None
-        ), "Expected a performer name, got None for SLTS"
+        assert row["DisplayArtist"] is not None, (
+            "Expected a performer name, got None for SLTS"
+        )
 
     def test_returns_primary_genre_field(self, populated_db):
         """search_slim row must include PrimaryGenre from MediaSourceTags."""
@@ -348,9 +348,9 @@ class TestSearchSlimByIds:
         rows = repo.search_slim_by_ids([1, 999])
 
         assert len(rows) == 1, f"Expected 1 row (999 doesn't exist), got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
 
     def test_empty_ids_returns_empty_list(self, populated_db):
         """search_slim_by_ids([]) should return [] immediately."""
@@ -423,12 +423,12 @@ class TestGetByHash:
 
         assert song is not None, f"Expected song object, got {song}"
         assert song.id == 1, f"Expected 1, got {song.id}"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
-        assert (
-            song.audio_hash == "hash_1"
-        ), f"Expected 'hash_1', got '{song.audio_hash}'"
+        assert song.title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
+        )
+        assert song.audio_hash == "hash_1", (
+            f"Expected 'hash_1', got '{song.audio_hash}'"
+        )
         assert song.duration_s == 200.0, f"Expected 200000, got {song.duration_ms}"
 
     def test_nonexistent_hash_returns_none(self, populated_db):
@@ -454,12 +454,12 @@ class TestGetByPath:
 
         assert song is not None, f"Expected song object, got {song}"
         assert song.id == 1, f"Expected 1, got {song.id}"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
-        assert (
-            song.source_path == "/path/1"
-        ), f"Expected '/path/1', got '{song.source_path}'"
+        assert song.title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{song.title}'"
+        )
+        assert song.source_path == "/path/1", (
+            f"Expected '/path/1', got '{song.source_path}'"
+        )
 
     def test_invalid_path_returns_none(self, populated_db):
         """Test that get_by_path returns None for non-existent path."""
@@ -498,9 +498,9 @@ class TestGetByIdentityIds:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
 
     def test_taylor_identity(self, populated_db):
         """Identity 4 (Taylor) has NameID 40. Songs 3, 6, 8 credited to NameID 40."""
@@ -550,9 +550,9 @@ class TestFindByMetadata:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
-        assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        assert songs[0].title == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+        )
         assert songs[0].year == 1991, f"Expected 1991, got {songs[0].year}"
 
     def test_no_match_wrong_year(self, populated_db):
@@ -568,9 +568,9 @@ class TestFindByMetadata:
 
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert songs[0].id == 2, f"Expected 2, got {songs[0].id}"
-        assert (
-            songs[0].title == "Everlong"
-        ), f"Expected 'Everlong', got '{songs[0].title}'"
+        assert songs[0].title == "Everlong", (
+            f"Expected 'Everlong', got '{songs[0].title}'"
+        )
 
     def test_exact_performer_set_match(self, populated_db):
         """Test that exact performer set is required."""
@@ -627,27 +627,27 @@ class TestRowToSong:
 
         assert song.id == 1, f"Expected 1, got {song.id}"
         assert song.type_id == 1, f"Expected 1, got {song.type_id}"
-        assert (
-            song.media_name == "Test Song"
-        ), f"Expected 'Test Song', got '{song.media_name}'"
+        assert song.media_name == "Test Song", (
+            f"Expected 'Test Song', got '{song.media_name}'"
+        )
         assert song.title == "Test Song", f"Expected 'Test Song', got '{song.title}'"
-        assert (
-            song.duration_s == 200.0
-        ), f"Expected 200000ms (converted), got {song.duration_ms}"
-        assert (
-            song.source_path == "/path/test"
-        ), f"Expected '/path/test', got '{song.source_path}'"
-        assert (
-            song.audio_hash == "hash123"
-        ), f"Expected 'hash123', got '{song.audio_hash}'"
+        assert song.duration_s == 200.0, (
+            f"Expected 200000ms (converted), got {song.duration_ms}"
+        )
+        assert song.source_path == "/path/test", (
+            f"Expected '/path/test', got '{song.source_path}'"
+        )
+        assert song.audio_hash == "hash123", (
+            f"Expected 'hash123', got '{song.audio_hash}'"
+        )
         assert song.is_active is True, f"Expected True (1->True), got {song.is_active}"
         assert song.year == 2024, f"Expected 2024, got {song.year}"
         assert song.processing_status == 0, f"Expected 0, got {song.processing_status}"
         assert song.notes is None, f"Expected None, got {song.notes}"
         assert song.bpm == 120, f"Expected 120, got {song.bpm}"
-        assert (
-            song.isrc == "USRC12345678"
-        ), f"Expected 'USRC12345678', got '{song.isrc}'"
+        assert song.isrc == "USRC12345678", (
+            f"Expected 'USRC12345678', got '{song.isrc}'"
+        )
         assert song.credits == [], f"Expected empty credits, got {song.credits}"
         assert song.albums == [], f"Expected empty albums, got {song.albums}"
 
@@ -671,13 +671,13 @@ class TestRowToSong:
         song = repo._row_to_song(mock_row)
 
         assert song.id == 4, f"Expected 4, got {song.id}"
-        assert (
-            song.audio_hash is None
-        ), f"Expected None for NULL hash, got {song.audio_hash}"
+        assert song.audio_hash is None, (
+            f"Expected None for NULL hash, got {song.audio_hash}"
+        )
         assert song.year is None, f"Expected None for NULL year, got {song.year}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0 for processing_status, got {song.processing_status}"
+        assert song.processing_status == 0, (
+            f"Expected 0 for processing_status, got {song.processing_status}"
+        )
         assert song.notes is None, f"Expected None for NULL notes, got {song.notes}"
         assert song.bpm is None, f"Expected None for NULL bpm, got {song.bpm}"
         assert song.isrc is None, f"Expected None for NULL isrc, got {song.isrc}"

@@ -90,9 +90,9 @@ class TestPreview:
         assert r.status_code == 200
         results = r.json()
         assert results[0]["exists"] is True
-        assert (
-            results[0]["identity_id"] == 1
-        ), f"Expected identity_id 1, got {results[0].get('identity_id')}"
+        assert results[0]["identity_id"] == 1, (
+            f"Expected identity_id 1, got {results[0].get('identity_id')}"
+        )
 
     def test_unknown_name_returns_exists_false(self, api_db):
         r = api_db.post(

@@ -93,9 +93,9 @@ class SongAlbumRepository(BaseRepository):
                     (album.album_title, album_type, album.release_year),
                 )
                 album_id = cursor.lastrowid
-                assert isinstance(
-                    album_id, int
-                ), "Failed to retrieve AlbumID after insert"
+                assert isinstance(album_id, int), (
+                    "Failed to retrieve AlbumID after insert"
+                )
                 self._insert_album_credits(cursor, album_id, album)
             elif was_deleted:
                 # Reconnect soft-deleted album

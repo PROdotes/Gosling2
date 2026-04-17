@@ -17,21 +17,21 @@ class TestGetById:
         assert identity is not None, f"Expected identity object, got {identity}"
         assert identity.id == 1, f"Expected 1, got {identity.id}"
         assert identity.type == "person", f"Expected 'person', got '{identity.type}'"
-        assert (
-            identity.display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{identity.display_name}'"
-        assert (
-            identity.legal_name == "David Eric Grohl"
-        ), f"Expected 'David Eric Grohl' for legal_name, got {identity.legal_name}"
-        assert (
-            identity.aliases == []
-        ), f"Expected empty list for aliases, got {identity.aliases}"
-        assert (
-            identity.members == []
-        ), f"Expected empty list for members, got {identity.members}"
-        assert (
-            identity.groups == []
-        ), f"Expected empty list for groups, got {identity.groups}"
+        assert identity.display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{identity.display_name}'"
+        )
+        assert identity.legal_name == "David Eric Grohl", (
+            f"Expected 'David Eric Grohl' for legal_name, got {identity.legal_name}"
+        )
+        assert identity.aliases == [], (
+            f"Expected empty list for aliases, got {identity.aliases}"
+        )
+        assert identity.members == [], (
+            f"Expected empty list for members, got {identity.members}"
+        )
+        assert identity.groups == [], (
+            f"Expected empty list for groups, got {identity.groups}"
+        )
 
     def test_group_identity(self, populated_db):
         """Test that get_by_id returns complete group identity."""
@@ -41,21 +41,21 @@ class TestGetById:
         assert identity is not None, f"Expected identity object, got {identity}"
         assert identity.id == 2, f"Expected 2, got {identity.id}"
         assert identity.type == "group", f"Expected 'group', got '{identity.type}'"
-        assert (
-            identity.display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{identity.display_name}'"
-        assert (
-            identity.legal_name is None
-        ), f"Expected None for legal_name, got {identity.legal_name}"
-        assert (
-            identity.aliases == []
-        ), f"Expected empty list for aliases, got {identity.aliases}"
-        assert (
-            identity.members == []
-        ), f"Expected empty list for members, got {identity.members}"
-        assert (
-            identity.groups == []
-        ), f"Expected empty list for groups, got {identity.groups}"
+        assert identity.display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{identity.display_name}'"
+        )
+        assert identity.legal_name is None, (
+            f"Expected None for legal_name, got {identity.legal_name}"
+        )
+        assert identity.aliases == [], (
+            f"Expected empty list for aliases, got {identity.aliases}"
+        )
+        assert identity.members == [], (
+            f"Expected empty list for members, got {identity.members}"
+        )
+        assert identity.groups == [], (
+            f"Expected empty list for groups, got {identity.groups}"
+        )
 
     def test_nonexistent_returns_none(self, populated_db):
         """Test that get_by_id returns None for non-existent ID."""
@@ -76,39 +76,39 @@ class TestGetByIds:
 
         # Identity 1: Dave Grohl - exhaustive assertions
         assert identities[0].id == 1, f"Expected 1, got {identities[0].id}"
-        assert (
-            identities[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
-        assert (
-            identities[0].type == "person"
-        ), f"Expected 'person', got '{identities[0].type}'"
+        assert identities[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
+        )
+        assert identities[0].type == "person", (
+            f"Expected 'person', got '{identities[0].type}'"
+        )
 
         # Identity 2: Nirvana - exhaustive assertions
         assert identities[1].id == 2, f"Expected 2, got {identities[1].id}"
-        assert (
-            identities[1].display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{identities[1].display_name}'"
-        assert (
-            identities[1].type == "group"
-        ), f"Expected 'group', got '{identities[1].type}'"
+        assert identities[1].display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{identities[1].display_name}'"
+        )
+        assert identities[1].type == "group", (
+            f"Expected 'group', got '{identities[1].type}'"
+        )
 
         # Identity 3: Foo Fighters - exhaustive assertions
         assert identities[2].id == 3, f"Expected 3, got {identities[2].id}"
-        assert (
-            identities[2].display_name == "Foo Fighters"
-        ), f"Expected 'Foo Fighters', got '{identities[2].display_name}'"
-        assert (
-            identities[2].type == "group"
-        ), f"Expected 'group', got '{identities[2].type}'"
+        assert identities[2].display_name == "Foo Fighters", (
+            f"Expected 'Foo Fighters', got '{identities[2].display_name}'"
+        )
+        assert identities[2].type == "group", (
+            f"Expected 'group', got '{identities[2].type}'"
+        )
 
         # Identity 4: Taylor Hawkins - exhaustive assertions
         assert identities[3].id == 4, f"Expected 4, got {identities[3].id}"
-        assert (
-            identities[3].display_name == "Taylor Hawkins"
-        ), f"Expected 'Taylor Hawkins', got '{identities[3].display_name}'"
-        assert (
-            identities[3].type == "person"
-        ), f"Expected 'person', got '{identities[3].type}'"
+        assert identities[3].display_name == "Taylor Hawkins", (
+            f"Expected 'Taylor Hawkins', got '{identities[3].display_name}'"
+        )
+        assert identities[3].type == "person", (
+            f"Expected 'person', got '{identities[3].type}'"
+        )
 
     def test_empty_list_returns_empty(self, populated_db):
         """Test that get_by_ids returns empty list for empty input."""
@@ -123,12 +123,12 @@ class TestGetByIds:
 
         assert len(identities) == 1, f"Expected 1 identity, got {len(identities)}"
         assert identities[0].id == 1, f"Expected 1, got {identities[0].id}"
-        assert (
-            identities[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
-        assert (
-            identities[0].type == "person"
-        ), f"Expected 'person', got '{identities[0].type}'"
+        assert identities[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
+        )
+        assert identities[0].type == "person", (
+            f"Expected 'person', got '{identities[0].type}'"
+        )
 
 
 class TestGetAllIdentities:
@@ -143,36 +143,36 @@ class TestGetAllIdentities:
 
         # Ordered by DisplayName COLLATE NOCASE ASC
         assert identities[0].id == 1, f"Expected 1, got {identities[0].id}"
-        assert (
-            identities[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
-        assert (
-            identities[0].type == "person"
-        ), f"Expected 'person', got '{identities[0].type}'"
+        assert identities[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{identities[0].display_name}'"
+        )
+        assert identities[0].type == "person", (
+            f"Expected 'person', got '{identities[0].type}'"
+        )
 
         assert identities[1].id == 3, f"Expected 3, got {identities[1].id}"
-        assert (
-            identities[1].display_name == "Foo Fighters"
-        ), f"Expected 'Foo Fighters', got '{identities[1].display_name}'"
-        assert (
-            identities[1].type == "group"
-        ), f"Expected 'group', got '{identities[1].type}'"
+        assert identities[1].display_name == "Foo Fighters", (
+            f"Expected 'Foo Fighters', got '{identities[1].display_name}'"
+        )
+        assert identities[1].type == "group", (
+            f"Expected 'group', got '{identities[1].type}'"
+        )
 
         assert identities[2].id == 2, f"Expected 2, got {identities[2].id}"
-        assert (
-            identities[2].display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{identities[2].display_name}'"
-        assert (
-            identities[2].type == "group"
-        ), f"Expected 'group', got '{identities[2].type}'"
+        assert identities[2].display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{identities[2].display_name}'"
+        )
+        assert identities[2].type == "group", (
+            f"Expected 'group', got '{identities[2].type}'"
+        )
 
         assert identities[3].id == 4, f"Expected 4, got {identities[3].id}"
-        assert (
-            identities[3].display_name == "Taylor Hawkins"
-        ), f"Expected 'Taylor Hawkins', got '{identities[3].display_name}'"
-        assert (
-            identities[3].type == "person"
-        ), f"Expected 'person', got '{identities[3].type}'"
+        assert identities[3].display_name == "Taylor Hawkins", (
+            f"Expected 'Taylor Hawkins', got '{identities[3].display_name}'"
+        )
+        assert identities[3].type == "person", (
+            f"Expected 'person', got '{identities[3].type}'"
+        )
 
     def test_empty_db_returns_empty(self, empty_db):
         """Test that get_all_identities returns empty on empty DB."""
@@ -191,9 +191,9 @@ class TestSearchIdentities:
 
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 2, f"Expected 2, got {results[0].id}"
-        assert (
-            results[0].display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{results[0].display_name}'"
+        assert results[0].display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{results[0].display_name}'"
+        )
         assert results[0].type == "group", f"Expected 'group', got '{results[0].type}'"
 
     def test_partial_name_match(self, populated_db):
@@ -203,9 +203,9 @@ class TestSearchIdentities:
 
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 1, f"Expected 1, got {results[0].id}"
-        assert (
-            results[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        assert results[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        )
 
     def test_alias_match_returns_primary_identity(self, populated_db):
         """Searching 'Grohlton' should return Dave Grohl (identity 1) with primary display name."""
@@ -214,9 +214,9 @@ class TestSearchIdentities:
 
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 1, f"Expected 1, got {results[0].id}"
-        assert (
-            results[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        assert results[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        )
 
     def test_another_alias(self, populated_db):
         """Searching 'Late!' should also return Dave Grohl."""
@@ -225,9 +225,9 @@ class TestSearchIdentities:
 
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 1, f"Expected 1, got {results[0].id}"
-        assert (
-            results[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        assert results[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{results[0].display_name}'"
+        )
 
     def test_case_insensitive(self, populated_db):
         """Test that search is case-insensitive."""
@@ -236,9 +236,9 @@ class TestSearchIdentities:
 
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0].id == 2, f"Expected 2, got {results[0].id}"
-        assert (
-            results[0].display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{results[0].display_name}'"
+        assert results[0].display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{results[0].display_name}'"
+        )
 
     def test_no_match_returns_empty(self, populated_db):
         """Test that search returns empty list for no matches."""
@@ -289,9 +289,9 @@ class TestGetAliasesBatch:
         repo = IdentityRepository(populated_db)
         aliases = repo.get_aliases_batch([1])
 
-        assert (
-            1 in aliases
-        ), f"Expected key 1 in aliases dict, got keys: {aliases.keys()}"
+        assert 1 in aliases, (
+            f"Expected key 1 in aliases dict, got keys: {aliases.keys()}"
+        )
         assert len(aliases[1]) == 4, f"Expected 4 aliases, got {len(aliases[1])}"
         alias_names = {a.display_name for a in aliases[1]}
         assert alias_names == {
@@ -304,25 +304,25 @@ class TestGetAliasesBatch:
         # Verify primary flag
         primary = [a for a in aliases[1] if a.is_primary]
         assert len(primary) == 1, f"Expected 1 primary alias, got {len(primary)}"
-        assert (
-            primary[0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl' as primary, got '{primary[0].display_name}'"
+        assert primary[0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl' as primary, got '{primary[0].display_name}'"
+        )
 
     def test_group_aliases(self, populated_db):
         """Nirvana (ID=2) has one name: 'Nirvana' (primary)."""
         repo = IdentityRepository(populated_db)
         aliases = repo.get_aliases_batch([2])
 
-        assert (
-            2 in aliases
-        ), f"Expected key 2 in aliases dict, got keys: {aliases.keys()}"
+        assert 2 in aliases, (
+            f"Expected key 2 in aliases dict, got keys: {aliases.keys()}"
+        )
         assert len(aliases[2]) == 1, f"Expected 1 alias, got {len(aliases[2])}"
-        assert (
-            aliases[2][0].display_name == "Nirvana"
-        ), f"Expected 'Nirvana', got '{aliases[2][0].display_name}'"
-        assert (
-            aliases[2][0].is_primary is True
-        ), f"Expected True for is_primary, got {aliases[2][0].is_primary}"
+        assert aliases[2][0].display_name == "Nirvana", (
+            f"Expected 'Nirvana', got '{aliases[2][0].display_name}'"
+        )
+        assert aliases[2][0].is_primary is True, (
+            f"Expected True for is_primary, got {aliases[2][0].is_primary}"
+        )
 
     def test_empty_input_returns_empty_dict(self, populated_db):
         """Test that empty input returns empty dict."""
@@ -335,12 +335,12 @@ class TestGetAliasesBatch:
         repo = IdentityRepository(populated_db)
         # ID 999 doesn't exist but the batch method pre-fills keys
         aliases = repo.get_aliases_batch([999])
-        assert (
-            999 in aliases
-        ), f"Expected key 999 in aliases dict, got keys: {aliases.keys()}"
-        assert (
-            aliases[999] == []
-        ), f"Expected empty list for nonexistent identity, got {aliases[999]}"
+        assert 999 in aliases, (
+            f"Expected key 999 in aliases dict, got keys: {aliases.keys()}"
+        )
+        assert aliases[999] == [], (
+            f"Expected empty list for nonexistent identity, got {aliases[999]}"
+        )
 
 
 class TestGetMembersBatch:
@@ -351,23 +351,23 @@ class TestGetMembersBatch:
         repo = IdentityRepository(populated_db)
         members = repo.get_members_batch([2])
 
-        assert (
-            2 in members
-        ), f"Expected key 2 in members dict, got keys: {members.keys()}"
+        assert 2 in members, (
+            f"Expected key 2 in members dict, got keys: {members.keys()}"
+        )
         assert len(members[2]) == 1, f"Expected 1 member, got {len(members[2])}"
         assert members[2][0].id == 1, f"Expected 1, got {members[2][0].id}"
-        assert (
-            members[2][0].display_name == "Dave Grohl"
-        ), f"Expected 'Dave Grohl', got '{members[2][0].display_name}'"
+        assert members[2][0].display_name == "Dave Grohl", (
+            f"Expected 'Dave Grohl', got '{members[2][0].display_name}'"
+        )
 
     def test_foo_fighters_members(self, populated_db):
         """Foo Fighters (ID=3) has two members: Dave(1) and Taylor(4)."""
         repo = IdentityRepository(populated_db)
         members = repo.get_members_batch([3])
 
-        assert (
-            3 in members
-        ), f"Expected key 3 in members dict, got keys: {members.keys()}"
+        assert 3 in members, (
+            f"Expected key 3 in members dict, got keys: {members.keys()}"
+        )
         assert len(members[3]) == 2, f"Expected 2 members, got {len(members[3])}"
         member_names = {m.display_name for m in members[3]}
         assert member_names == {
@@ -380,9 +380,9 @@ class TestGetMembersBatch:
         repo = IdentityRepository(populated_db)
         members = repo.get_members_batch([1])
 
-        assert (
-            1 in members
-        ), f"Expected key 1 in members dict, got keys: {members.keys()}"
+        assert 1 in members, (
+            f"Expected key 1 in members dict, got keys: {members.keys()}"
+        )
         assert members[1] == [], f"Expected empty list for person, got {members[1]}"
 
     def test_empty_input_returns_empty_dict(self, populated_db):
@@ -415,9 +415,9 @@ class TestGetGroupsBatch:
         assert 4 in groups, f"Expected key 4 in groups dict, got keys: {groups.keys()}"
         assert len(groups[4]) == 1, f"Expected 1 group, got {len(groups[4])}"
         assert groups[4][0].id == 3, f"Expected 3, got {groups[4][0].id}"
-        assert (
-            groups[4][0].display_name == "Foo Fighters"
-        ), f"Expected 'Foo Fighters', got '{groups[4][0].display_name}'"
+        assert groups[4][0].display_name == "Foo Fighters", (
+            f"Expected 'Foo Fighters', got '{groups[4][0].display_name}'"
+        )
 
     def test_group_has_no_groups(self, populated_db):
         """Nirvana (group ID=2) does not belong to any group."""
@@ -444,9 +444,9 @@ class TestFallbackDisplayName:
 
         assert identity is not None, f"Expected identity object, got {identity}"
         assert identity.id == 100, f"Expected 100, got {identity.id}"
-        assert (
-            identity.display_name == "Unknown Artist #100"
-        ), f"Expected 'Unknown Artist #100', got '{identity.display_name}'"
+        assert identity.display_name == "Unknown Artist #100", (
+            f"Expected 'Unknown Artist #100', got '{identity.display_name}'"
+        )
         assert identity.type == "person", f"Expected 'person', got '{identity.type}'"
 
 
@@ -489,7 +489,7 @@ class TestRowToIdentity:
 
         assert identity is not None, f"Expected identity object, got {identity}"
         assert identity.id == 101, f"Expected 101, got {identity.id}"
-        assert (
-            identity.display_name == "John Legal"
-        ), f"Expected 'John Legal', got '{identity.display_name}'"
+        assert identity.display_name == "John Legal", (
+            f"Expected 'John Legal', got '{identity.display_name}'"
+        )
         assert identity.type == "person", f"Expected 'person', got '{identity.type}'"

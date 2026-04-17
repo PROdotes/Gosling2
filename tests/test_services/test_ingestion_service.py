@@ -130,26 +130,26 @@ class TestExactPerformerSetMatch:
         results = repo.find_by_metadata(
             "Smells Like Teen Spirit", ["Nirvana", "Dave Grohl"], 1991
         )
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for superset artist, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for superset artist, got {len(results)}"
+        )
 
     def test_subset_artists_no_match(self, populated_db):
         """DB has [Dave Grohl, Taylor Hawkins] for Joint Venture.
         Searching only [Dave Grohl] must NOT match (subset)."""
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata("Joint Venture", ["Dave Grohl"], None)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for subset artist, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for subset artist, got {len(results)}"
+        )
 
     def test_subset_artists_no_match_other_side(self, populated_db):
         """Searching only [Taylor Hawkins] for Joint Venture must NOT match either."""
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata("Joint Venture", ["Taylor Hawkins"], None)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for subset artist, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for subset artist, got {len(results)}"
+        )
 
     def test_wrong_artist_completely(self, populated_db):
         """Correct title + year but completely wrong artist."""
@@ -157,9 +157,9 @@ class TestExactPerformerSetMatch:
         results = repo.find_by_metadata(
             "Smells Like Teen Spirit", ["Taylor Hawkins"], 1991
         )
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for wrong artist, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for wrong artist, got {len(results)}"
+        )
 
     def test_composer_not_treated_as_performer(self, populated_db):
         """Song 6 has Dave Grohl(Performer) + Taylor Hawkins(Composer).
@@ -169,9 +169,9 @@ class TestExactPerformerSetMatch:
         results = repo.find_by_metadata(
             "Dual Credit Track", ["Dave Grohl", "Taylor Hawkins"], None
         )
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results treating Composer as Performer, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results treating Composer as Performer, got {len(results)}"
+        )
 
     def test_composer_ignored_single_performer_match(self, populated_db):
         """Song 6: only Dave Grohl is Performer. Searching [Dave Grohl] should match."""
@@ -186,9 +186,9 @@ class TestExactPerformerSetMatch:
         results = repo.find_by_metadata(
             "Smells Like Teen Spirit", ["Nirvana", "Nirvana"], 1991
         )
-        assert (
-            len(results) == 1
-        ), f"Expected 1 result for duplicate artist, got {len(results)}"
+        assert len(results) == 1, (
+            f"Expected 1 result for duplicate artist, got {len(results)}"
+        )
         assert results[0].id == 1, f"Expected id 1, got {results[0].id}"
 
     def test_alias_name_not_cross_matched(self, populated_db):
@@ -197,9 +197,9 @@ class TestExactPerformerSetMatch:
         DisplayName, not IdentityID."""
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata("Grohlton Theme", ["Dave Grohl"], None)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for alias cross-match, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for alias cross-match, got {len(results)}"
+        )
 
     def test_alias_exact_name_matches(self, populated_db):
         """Searching with the actual credited alias name 'Grohlton' does match."""
@@ -246,9 +246,9 @@ class TestSameTitleDisambiguation:
         """'Shared Title' by Nirvana with year=None -> Songs 50 AND 53 (both Nirvana, different years)."""
         repo = SongRepository(disambiguation_db)
         results = repo.find_by_metadata("Shared Title", ["Nirvana"], None)
-        assert (
-            len(results) == 2
-        ), f"Expected 2 results for null year, got {len(results)}"
+        assert len(results) == 2, (
+            f"Expected 2 results for null year, got {len(results)}"
+        )
         ids = {r.id for r in results}
         assert ids == {50, 53}, f"Expected {{50, 53}}, got {ids}"
 
@@ -270,9 +270,9 @@ class TestSameTitleDisambiguation:
         """No song has 'Shared Title' by 'Late!', despite the title existing."""
         repo = SongRepository(disambiguation_db)
         results = repo.find_by_metadata("Shared Title", ["Late!"], 1991)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for wrong artist, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for wrong artist, got {len(results)}"
+        )
 
 
 class TestYearBehavior:
@@ -289,9 +289,9 @@ class TestYearBehavior:
         """Same title+artist but wrong year -> no match."""
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata("Everlong", ["Foo Fighters"], 2023)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results for wrong year, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results for wrong year, got {len(results)}"
+        )
 
     def test_null_year_query_matches_any_year(self, populated_db):
         """When incoming file has year=None, year filter is skipped.
@@ -306,9 +306,9 @@ class TestYearBehavior:
         Searching with year=2023 should NOT match because SQL NULL = 2023 is false."""
         repo = SongRepository(populated_db)
         results = repo.find_by_metadata("Grohlton Theme", ["Grohlton"], 2023)
-        assert (
-            len(results) == 0
-        ), f"Expected 0 results when DB has NULL year, got {len(results)}"
+        assert len(results) == 0, (
+            f"Expected 0 results when DB has NULL year, got {len(results)}"
+        )
 
     def test_null_year_both_sides(self, populated_db):
         """Song 4 has year=None. Searching with year=None skips the filter -> match."""
@@ -394,9 +394,9 @@ class TestPathCollision:
     def test_path_case_mismatch(self, populated_db):
         """Paths are stored as-is. /PATH/1 != /path/1."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.get_by_path("/PATH/1") is None
-        ), "Expected None for case-mismatched path"
+        assert repo.get_by_path("/PATH/1") is None, (
+            "Expected None for case-mismatched path"
+        )
 
     def test_path_trailing_slash(self, populated_db):
         """/path/1/ does not match /path/1."""
@@ -406,12 +406,12 @@ class TestPathCollision:
     def test_path_whitespace(self, populated_db):
         """Leading/trailing whitespace should not match."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.get_by_path(" /path/1") is None
-        ), "Expected None for leading whitespace"
-        assert (
-            repo.get_by_path("/path/1 ") is None
-        ), "Expected None for trailing whitespace"
+        assert repo.get_by_path(" /path/1") is None, (
+            "Expected None for leading whitespace"
+        )
+        assert repo.get_by_path("/path/1 ") is None, (
+            "Expected None for trailing whitespace"
+        )
 
     def test_similar_path(self, populated_db):
         """Similar but not equal path."""
@@ -439,9 +439,9 @@ class TestHashCollision:
     def test_no_hash_in_db(self, populated_db):
         """Nonexistent hash returns None."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.get_by_hash("nonexistent_hash") is None
-        ), "Expected None for nonexistent hash"
+        assert repo.get_by_hash("nonexistent_hash") is None, (
+            "Expected None for nonexistent hash"
+        )
 
 
 class TestEmptyAndBoundaryInputs:
@@ -450,51 +450,51 @@ class TestEmptyAndBoundaryInputs:
     def test_empty_title_returns_empty(self, populated_db):
         """Empty title returns no results."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.find_by_metadata("", ["Nirvana"], 1991) == []
-        ), "Expected [] for empty title"
+        assert repo.find_by_metadata("", ["Nirvana"], 1991) == [], (
+            "Expected [] for empty title"
+        )
 
     def test_empty_artist_list_returns_empty(self, populated_db):
         """Empty artist list returns no results."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.find_by_metadata("Everlong", [], 1997) == []
-        ), "Expected [] for empty artist list"
+        assert repo.find_by_metadata("Everlong", [], 1997) == [], (
+            "Expected [] for empty artist list"
+        )
 
     def test_empty_artist_string_returns_empty(self, populated_db):
         """Empty artist string in list returns no results."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.find_by_metadata("Everlong", [""], 1997) == []
-        ), "Expected [] for empty artist string"
+        assert repo.find_by_metadata("Everlong", [""], 1997) == [], (
+            "Expected [] for empty artist string"
+        )
 
     def test_song_with_no_credits(self, populated_db):
         """Song 7 (Hollow Song) has zero credits.
         Searching for it with any artist should return nothing."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.find_by_metadata("Hollow Song", ["Anyone"], None) == []
-        ), "Expected [] for song with no credits"
+        assert repo.find_by_metadata("Hollow Song", ["Anyone"], None) == [], (
+            "Expected [] for song with no credits"
+        )
 
     def test_nonexistent_title(self, populated_db):
         """Nonexistent title returns no results."""
         repo = SongRepository(populated_db)
-        assert (
-            repo.find_by_metadata("ZZZZZ_NONEXISTENT", ["Nirvana"], 1991) == []
-        ), "Expected [] for nonexistent title"
+        assert repo.find_by_metadata("ZZZZZ_NONEXISTENT", ["Nirvana"], 1991) == [], (
+            "Expected [] for nonexistent title"
+        )
 
     def test_empty_db(self, empty_db):
         """All queries return empty/None on empty database."""
         repo = SongRepository(empty_db)
-        assert (
-            repo.find_by_metadata("Anything", ["Anyone"], 2000) == []
-        ), "Expected [] on empty DB"
-        assert (
-            repo.get_by_path("/any/path") is None
-        ), "Expected None for path on empty DB"
-        assert (
-            repo.get_by_hash("any_hash") is None
-        ), "Expected None for hash on empty DB"
+        assert repo.find_by_metadata("Anything", ["Anyone"], 2000) == [], (
+            "Expected [] on empty DB"
+        )
+        assert repo.get_by_path("/any/path") is None, (
+            "Expected None for path on empty DB"
+        )
+        assert repo.get_by_hash("any_hash") is None, (
+            "Expected None for hash on empty DB"
+        )
 
 
 # ========================================
@@ -615,17 +615,17 @@ class TestIngestBatch:
         service = CatalogService(populated_db)
         report = service.ingest_batch([], max_workers=5)
 
-        assert (
-            report["total_files"] == 0
-        ), f"Expected 0 total_files, got {report['total_files']}"
+        assert report["total_files"] == 0, (
+            f"Expected 0 total_files, got {report['total_files']}"
+        )
         assert report["ingested"] == 0, f"Expected 0 ingested, got {report['ingested']}"
-        assert (
-            report["duplicates"] == 0
-        ), f"Expected 0 duplicates, got {report['duplicates']}"
+        assert report["duplicates"] == 0, (
+            f"Expected 0 duplicates, got {report['duplicates']}"
+        )
         assert report["errors"] == 0, f"Expected 0 errors, got {report['errors']}"
-        assert (
-            report["results"] == []
-        ), f"Expected empty results, got {report['results']}"
+        assert report["results"] == [], (
+            f"Expected empty results, got {report['results']}"
+        )
 
     def test_single_file_sequential_behavior(self, populated_db, tmp_path):
         """Single file batch behaves same as single ingest_file() call."""

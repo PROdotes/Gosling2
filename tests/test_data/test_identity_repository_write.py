@@ -12,7 +12,6 @@ from src.data.identity_repository import IdentityRepository
 
 
 class TestUpdateLegalName:
-
     def test_update_legal_name_success(self, populated_db):
         """Update LegalName on an existing identity."""
         repo = IdentityRepository(populated_db)
@@ -20,9 +19,9 @@ class TestUpdateLegalName:
             repo.update_legal_name(1, "David Eric Grohl Jr.", conn)
             conn.commit()
         result = repo.get_by_id(1)
-        assert (
-            result.legal_name == "David Eric Grohl Jr."
-        ), f"Expected updated name, got {result.legal_name}"
+        assert result.legal_name == "David Eric Grohl Jr.", (
+            f"Expected updated name, got {result.legal_name}"
+        )
 
     def test_update_legal_name_clears_to_none(self, populated_db):
         """Setting legal_name to None clears the field."""
@@ -165,7 +164,6 @@ def test_add_alias_rollback(populated_db):
 
 
 class TestMergeOrphanInto:
-
     def test_song_credits_repointed(self, populated_db):
         """SongCredits for the source name should point to the target name after merge."""
         repo = IdentityRepository(populated_db)

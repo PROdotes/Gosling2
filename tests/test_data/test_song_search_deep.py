@@ -14,12 +14,12 @@ class TestSearchSlimDeepFields:
         rows = repo.search_slim("1991")
 
         assert len(rows) == 1, f"Expected 1 match for year '1991', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
-        assert (
-            rows[0]["MediaName"] == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        )
 
     def test_search_partial_year(self, populated_db):
         """'199' should match all 90s songs (1991, 1997, 1992) via CAST year LIKE."""
@@ -38,15 +38,15 @@ class TestSearchSlimDeepFields:
         rows = repo.search_slim("Nirvana")
 
         assert len(rows) == 1, f"Expected 1 match for artist 'Nirvana', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
 
         # Negative isolation
         returned_ids = {r["SourceID"] for r in rows}
-        assert (
-            2 not in returned_ids
-        ), "Everlong (Foo Fighters) should not be in Nirvana search results"
+        assert 2 not in returned_ids, (
+            "Everlong (Foo Fighters) should not be in Nirvana search results"
+        )
 
     def test_search_by_legal_name(self, populated_db):
         """'David Eric' matches songs via Identity.LegalName join."""
@@ -62,12 +62,12 @@ class TestSearchSlimDeepFields:
         repo = SongRepository(populated_db)
         rows = repo.search_slim("Nevermind")
 
-        assert (
-            len(rows) == 1
-        ), f"Expected 1 match for album 'Nevermind', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        assert len(rows) == 1, (
+            f"Expected 1 match for album 'Nevermind', got {len(rows)}"
+        )
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
 
     def test_search_case_insensitive(self, populated_db):
         """LIKE search is case-insensitive."""
@@ -75,9 +75,9 @@ class TestSearchSlimDeepFields:
         rows = repo.search_slim("teen spirit")
 
         assert len(rows) == 1, f"Expected 1 match for 'teen spirit', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
 
     def test_search_by_isrc(self, populated_db):
         """'ISRC123' matches Song 7 via Songs.ISRC field."""
@@ -85,21 +85,21 @@ class TestSearchSlimDeepFields:
         rows = repo.search_slim("ISRC123")
 
         assert len(rows) == 1, f"Expected 1 match for ISRC 'ISRC123', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 7
-        ), f"Expected SourceID=7, got {rows[0]['SourceID']}"
-        assert (
-            rows[0]["ISRC"] == "ISRC123"
-        ), f"Expected 'ISRC123', got '{rows[0]['ISRC']}'"
+        assert rows[0]["SourceID"] == 7, (
+            f"Expected SourceID=7, got {rows[0]['SourceID']}"
+        )
+        assert rows[0]["ISRC"] == "ISRC123", (
+            f"Expected 'ISRC123', got '{rows[0]['ISRC']}'"
+        )
 
     def test_search_by_role_is_ignored(self, populated_db):
         """'Composer' role name should NOT match (role is not a search field)."""
         repo = SongRepository(populated_db)
         rows = repo.search_slim("Composer")
 
-        assert (
-            len(rows) == 0
-        ), f"Expected 0 matches for role 'Composer', got {len(rows)}"
+        assert len(rows) == 0, (
+            f"Expected 0 matches for role 'Composer', got {len(rows)}"
+        )
 
     def test_search_by_publisher(self, populated_db):
         """'DGC' matches Song 1 via RecordingPublishers/Publishers join."""
@@ -107,12 +107,12 @@ class TestSearchSlimDeepFields:
         rows = repo.search_slim("DGC")
 
         assert len(rows) == 1, f"Expected 1 match for publisher 'DGC', got {len(rows)}"
-        assert (
-            rows[0]["SourceID"] == 1
-        ), f"Expected SourceID=1, got {rows[0]['SourceID']}"
-        assert (
-            rows[0]["MediaName"] == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        assert rows[0]["SourceID"] == 1, (
+            f"Expected SourceID=1, got {rows[0]['SourceID']}"
+        )
+        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", (
+            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
+        )
 
     def test_search_by_tag(self, populated_db):
         """'Grunge' matches via MediaSourceTags/Tags join."""
