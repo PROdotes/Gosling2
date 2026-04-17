@@ -37,6 +37,8 @@ export function createChipInput({
     tagMode = false,
     getCreateLabel = null, // (query) => string — custom label for the "+ Add" option
     categoryColors = {},   // {Category: "#hexcolor"} — for tagMode chips
+    labelAttrs = null,     // (item) => {[attr]: value} — extra data-* attrs on chip label (for open-edit-modal wiring)
+    extraChipButtons = null, // (item) => [{html, onClick}] — buttons rendered before ×
 }) {
     let items = [...initialItems];
     let dropdownResults = [];
@@ -74,11 +76,35 @@ export function createChipInput({
             const chip = document.createElement("span");
             chip.className = "chip-input__chip";
 
+            const attrs = labelAttrs ? labelAttrs(item) : null;
+            const attrStr = attrs
+                ? Object.entries(attrs).map(([k, v]) => `${k}="${escHtml(String(v))}"`).join(" ")
+                : "";
+            const labelTag = attrs ? "button" : "span";
+            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escHtml(item.label)}</${labelTag}>`;
+
             if (tagMode && item.category) {
                 const color = categoryColors[item.category] || "#888";
-                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escHtml(color)}">${escHtml(item.category)}</span><span class="chip-input__chip-label">${escHtml(item.label)}</span>`;
+                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escHtml(color)}">${escHtml(item.category)}</span>${labelHtml}`;
             } else {
-                chip.innerHTML = `<span class="chip-input__chip-label">${escHtml(item.label)}</span>`;
+                chip.innerHTML = labelHtml;
+            }
+
+            if (extraChipButtons) {
+                for (const btnSpec of extraChipButtons(item)) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = btnSpec.className || "chip-input__chip-btn";
+                    btn.innerHTML = btnSpec.html;
+                    if (btnSpec.title) btn.title = btnSpec.title;
+                    if (btnSpec.dataset) {
+                        for (const [k, v] of Object.entries(btnSpec.dataset)) btn.dataset[k] = v;
+                    }
+                    if (btnSpec.onClick) {
+                        btn.addEventListener("click", (e) => { e.stopPropagation(); btnSpec.onClick(item); });
+                    }
+                    chip.appendChild(btn);
+                }
             }
 
             if (onSplit) {

@@ -988,3 +988,99 @@
     --accent-green: #10B981;
     --accent-red:   #F43F5E;
 }
+
+/* ── Bucket 2: Lost features ──────────────────────────────────────────────── */
+
+#songs-workspace .editor-input-row {
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+}
+
+#songs-workspace .editor-input-row .editor-input {
+    flex: 1;
+}
+
+#songs-workspace .editor-case-btn {
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-sec);
+    border-radius: 4px;
+    padding: 0 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+#songs-workspace .editor-case-btn:hover {
+    color: var(--text-pure);
+    border-color: var(--border-focus);
+}
+
+#songs-workspace .chip-input__chip-label[data-action] {
+    background: none;
+    border: none;
+    color: inherit;
+    font: inherit;
+    padding: 0;
+    cursor: pointer;
+}
+
+#songs-workspace .chip-input__chip-label[data-action]:hover {
+    text-decoration: underline;
+}
+
+#songs-workspace .chip-input__chip-star {
+    color: var(--text-mut);
+    opacity: 0.5;
+}
+
+#songs-workspace .chip-input__chip-star:hover {
+    opacity: 1;
+    color: #facc15;
+}
+
+#songs-workspace .chip-input__chip-star.is-primary {
+    color: #facc15;
+    opacity: 1;
+}
+
+#songs-workspace .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--text-sec);
+    cursor: pointer;
+    user-select: none;
+}
+
+#songs-workspace .sidebar-toggle input {
+    margin: 0;
+    cursor: pointer;
+}
+
+#songs-workspace .sidebar-sync-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 6px;
+    font-size: 11px;
+    color: var(--text-mut);
+}
+
+#songs-workspace .sync-led {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #888;
+    flex-shrink: 0;
+}
+
+#songs-workspace .sync-mismatch-list {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

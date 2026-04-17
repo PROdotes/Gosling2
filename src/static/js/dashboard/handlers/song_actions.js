@@ -232,7 +232,10 @@ export class SongActionsHandler {
         if (!input) return;
 
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
-        const isChecked = input.checked;
+        // When event.target is the <input> itself the browser has already toggled it,
+        // so checked reflects the new value. When target is the <label> or <span>
+        // the browser hasn't toggled yet, so we invert.
+        const isChecked = event?.target === input ? input.checked : !input.checked;
 
         try {
             await api.patchSongScalars(id, { is_active: isChecked });
@@ -245,12 +248,20 @@ export class SongActionsHandler {
                     : s,
             );
 
-            // If the song detail pane is open, refresh it
-            // Compatibility: main.js uses activeDetailKey global
-            const activeKey =
-                typeof activeDetailKey !== "undefined" ? activeDetailKey : null;
-            if (activeKey === `songs:${id}`) {
-                this.ctx.refreshActiveDetail();
+            // Refresh V2 editor if in V2 songs mode and this song is active
+            if (
+                this.ctx.refreshActiveSongV2
+                && state.currentMode === "songs"
+                && state.activeSong
+                && String(state.activeSong.id) === String(id)
+            ) {
+                await this.ctx.refreshActiveSongV2(id);
+            } else {
+                const activeKey =
+                    typeof activeDetailKey !== "undefined" ? activeDetailKey : null;
+                if (activeKey === `songs:${id}`) {
+                    this.ctx.refreshActiveDetail();
+                }
             }
         } catch (err) {
             // Revert state if failed (validation error, etc.)
@@ -310,11 +321,19 @@ export class SongActionsHandler {
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
-            if (this.ctx.showBanner) {
-                this.ctx.showBanner(
-                    `Organization failed: ${err.message}`,
-                    "error",
+
+            const msg = `Organization failed: ${err.message}`;
+            // 409 Conflict - File already exists at target
+            if (err.message && (err.message.includes("already exists") || err.message.includes("409"))) {
+                await showConfirm(
+                    "Conflict detected: A file with this name already exists in the destination library folder. Please check for duplicates.",
+                    { title: "Organization Conflict", okLabel: "OK", cancelLabel: null }
                 );
+                return;
+            }
+
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(msg, "error");
             }
         }
     }
@@ -371,7 +390,11 @@ export class SongActionsHandler {
         const { songId, tagId } = actionTarget.dataset;
         try {
             await api.setPrimarySongTag(songId, tagId);
-            this.ctx.refreshActiveDetail();
+            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                await this.ctx.refreshActiveSongV2(songId);
+            } else {
+                this.ctx.refreshActiveDetail();
+            }
         } catch (err) {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
@@ -443,7 +466,9 @@ export class SongActionsHandler {
                 field,
                 type,
             );
-            if (this.ctx.openSongDetail) {
+            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs" && entityType === "song") {
+                await this.ctx.refreshActiveSongV2(entityId);
+            } else if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
             }
         } catch (err) {

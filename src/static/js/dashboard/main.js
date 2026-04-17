@@ -127,6 +127,7 @@ const state = {
     id3Frames: null,
     allRoles: [],
     activeSong: null,
+    activeSongFile: null,
     currentMode: "songs", // Renaming activeView to currentMode for consistency
     successCount: 0,
     actionCount: 0,
@@ -135,6 +136,7 @@ const state = {
     allowedExtensions: [],
     searchEngines: {},
     defaultSearchEngine: null,
+    chipHandles: null,
 };
 
 const modeConfig = {
@@ -218,18 +220,26 @@ const ctx = {
     openSongDetail: (...args) => openSongDetail(...args),
     clearSongEditorV2() {
         state.activeSong = null;
+        state.activeSongFile = null;
         renderSongEditorEmpty();
     },
     async refreshActiveSongV2(songId) {
         const fresh = await getCatalogSong(songId);
         state.activeSong = fresh;
-        renderSongEditorV2(fresh);
+        // Only refresh sidebar + LED — avoid re-rendering the editor which would
+        // wipe chip inputs and lose the onSplit handlers wired at initial load.
         renderActionSidebar(fresh, {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
         });
-        wireScalarInputs(fresh, state.validationRules, (f) => { state.activeSong = f; });
-        wireChipInputs(fresh, (f) => { state.activeSong = f; }, null, state.validationRules);
+        updateSyncLed(fresh.id);
+        // Fix: Refresh drift indicators to reflect changes (e.g. after confirmation)
+        wireDriftIndicators(fresh, state.activeSongFile);
+
+        // Aligned to V2 Audit: Sync chip inputs for properties changed via global actions (like primary tag)
+        if (state.chipHandles?.updateField) {
+            state.chipHandles.updateField("tags", fresh);
+        }
     },
     performSearch: (query) => performSearch(query),
     showDetailPanel(html) {
@@ -346,7 +356,8 @@ function syncModeUi() {
     const isSongs = state.currentMode === "songs";
     elements.songsWorkspace?.classList.toggle("active", isSongs);
     if (elements.legacyMain) {
-        elements.legacyMain.style.display = isSongs ? "none" : "";
+        // Aligned to V2 Audit: Other modes still use legacy card results container
+        elements.legacyMain.style.display = isSongs ? "none" : "block";
     }
     if (isSongs) renderSongEditorEmpty();
 }
@@ -694,6 +705,7 @@ async function openSelectedResult(index) {
         ]);
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
+        state.activeSongFile = fileData;
         renderSongEditorV2(result, fileData);
         wireDriftIndicators(result, fileData);
         wireAuditHistory(result.id, () => getAuditHistory("Songs", result.id));
@@ -701,14 +713,17 @@ async function openSelectedResult(index) {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
         });
+        updateSyncLed(result.id);
         wireScalarInputs(result, state.validationRules, (fresh) => {
             state.activeSong = fresh;
+            wireDriftIndicators(fresh, state.activeSongFile);
             renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
         });
-        wireChipInputs(
+        state.chipHandles = wireChipInputs(
             result,
             (fresh) => {
                 state.activeSong = fresh;
+                wireDriftIndicators(fresh, state.activeSongFile);
                 renderActionSidebar(fresh, { searchEngines: state.searchEngines, defaultSearchEngine: state.defaultSearchEngine });
             },
             async ({ songId, text, role, creditId }) => {
@@ -716,20 +731,21 @@ async function openSelectedResult(index) {
                 openSplitterModal({
                     songId,
                     text,
-                    target: role,
-                    classification: null,
+                    target: "credits",
+                    classification: role,
                     remove: { type: "credit", id: creditId },
                     separators: state.validationRules?.credit_separators || [],
                     onConfirm: async () => {
                         const fresh = await getCatalogSong(songId);
                         state.activeSong = fresh;
-                        renderSongEditorV2(fresh);
+                        state.chipHandles?.updateField(role, fresh);
+                        // Fixed: wireDriftIndicators is now called in refreshActiveSongV2 path, 
+                        // but keeping here for explicit confirmation logic.
+                        wireDriftIndicators(fresh, state.activeSongFile);
                         renderActionSidebar(fresh, {
                             searchEngines: state.searchEngines,
                             defaultSearchEngine: state.defaultSearchEngine,
                         });
-                        wireScalarInputs(fresh, state.validationRules, (f) => { state.activeSong = f; });
-                        wireChipInputs(fresh, (f) => { state.activeSong = f; }, null, state.validationRules);
                     },
                 });
             },
@@ -867,6 +883,7 @@ document.addEventListener("checkchange", () => {
     } else if (checked.length === 0) {
         renderSongEditorEmpty();
         state.activeSong = null;
+        state.activeSongFile = null;
     }
     // If exactly 1 checked, the row click already opened the editor — do nothing
 });

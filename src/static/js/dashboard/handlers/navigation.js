@@ -76,6 +76,7 @@ export class NavigationHandler {
     }
 
     async handleSelectResult(actionTarget, event) {
+        if (event.target.type === "checkbox") return;
         event.preventDefault();
         const { index } = actionTarget.dataset;
         const state = this.ctx.getState();
@@ -101,7 +102,13 @@ export class NavigationHandler {
 
     async handleOpenEditModal(actionTarget) {
         const { chipType, itemId } = actionTarget.dataset;
-        const onClose = this.ctx.refreshActiveDetail;
+        const state = this.ctx.getState?.();
+        const inV2Songs = state?.currentMode === "songs"
+            && document.getElementById("song-list-panel")
+            && state?.activeSong;
+        const onClose = inV2Songs
+            ? () => this.ctx.refreshActiveSongV2?.(state.activeSong.id)
+            : this.ctx.refreshActiveDetail;
 
         if (chipType === "publisher") {
             const publisherName = actionTarget.textContent.trim();

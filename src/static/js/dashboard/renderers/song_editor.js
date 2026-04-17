@@ -25,14 +25,20 @@ function renderChips(items, emptyLabel) {
         .join("");
 }
 
-function renderScalarField(label, value, inputId, type = "text") {
+function renderScalarField(label, value, inputId, type = "text", extraButtons = "") {
     const missing = value == null || value === "";
     return `
 <div class="editor-field${missing ? " missing" : ""}">
   <label class="editor-label" for="${inputId}">${escapeHtml(label)}</label>
-  <input class="editor-input" id="${inputId}" type="${type}"
-    value="${escapeHtml(value ?? "")}" readonly>
+  <div class="editor-input-row">
+    <input class="editor-input" id="${inputId}" type="${type}"
+      value="${escapeHtml(value ?? "")}" readonly>${extraButtons}
+  </div>
 </div>`;
+}
+
+function renderCaseButtons(songId, field) {
+    return `<button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="sentence" title="Sentence case" type="button">S</button><button class="editor-case-btn" data-action="format-case" data-entity-type="song" data-entity-id="${songId}" data-field="${field}" data-type="title" title="Title Case" type="button">T</button>`;
 }
 
 function renderChipField(label, chips, emptyLabel, canMiss = true, fieldKey = null) {
@@ -179,34 +185,75 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
  * @param {object} fileSong - from getSongDetail (inspect-file)
  */
 export function wireDriftIndicators(dbSong, fileSong) {
+    document.querySelectorAll("#editor-panel .drift-dot").forEach((el) => el.remove());
     if (!fileSong) return;
-    const DRIFT_FIELDS = [
+
+    const SCALAR_FIELDS = [
         { inputId: "ef-title", dbField: "media_name", fileField: "media_name" },
         { inputId: "ef-year",  dbField: "year",        fileField: "year"       },
         { inputId: "ef-bpm",   dbField: "bpm",         fileField: "bpm"        },
         { inputId: "ef-isrc",  dbField: "isrc",        fileField: "isrc"       },
     ];
-    for (const { inputId, dbField, fileField } of DRIFT_FIELDS) {
+    for (const { inputId, dbField, fileField } of SCALAR_FIELDS) {
         const input = document.getElementById(inputId);
         if (!input) continue;
         const dbVal = dbSong[dbField] ?? null;
         const fileVal = fileSong[fileField] ?? null;
         if (String(dbVal ?? "") === String(fileVal ?? "")) continue;
+        appendDot(input.closest(".editor-field")?.querySelector(".editor-label"),
+            `DB: ${dbVal ?? "(empty)"}\nFile: ${fileVal ?? "(empty)"}`);
+    }
 
-        const labelEl = input.closest(".editor-field")?.querySelector(".editor-label");
-        if (!labelEl) continue;
+    const norm = (s) => String(s ?? "").trim().toLowerCase();
+    const keySet = (arr) => new Set((arr || []).map(norm).filter((x) => x !== ""));
+    const eqSet = (a, b) => a.size === b.size && [...a].every((v) => b.has(v));
 
-        const dot = document.createElement("span");
-        dot.className = "drift-dot";
-        dot.title = `File value: ${fileVal ?? "(empty)"}`;
-        labelEl.appendChild(dot);
+    const creditsByRole = (song, role) =>
+        (song.credits || []).filter((c) => c.role_name === role).map((c) => c.display_name);
+
+    const CHIP_FIELDS = [
+        { fieldKey: "performer", getDb: (s) => creditsByRole(s, "Performer"), getFile: (s) => creditsByRole(s, "Performer") },
+        { fieldKey: "composer",  getDb: (s) => creditsByRole(s, "Composer"),  getFile: (s) => creditsByRole(s, "Composer")  },
+        { fieldKey: "lyricist",  getDb: (s) => creditsByRole(s, "Lyricist"),  getFile: (s) => creditsByRole(s, "Lyricist")  },
+        { fieldKey: "producer",  getDb: (s) => creditsByRole(s, "Producer"),  getFile: (s) => creditsByRole(s, "Producer")  },
+        { fieldKey: "publisher", getDb: (s) => (s.publishers || []).map((p) => p.name), getFile: (s) => (s.publishers || []).map((p) => p.name) },
+        { fieldKey: "album",     getDb: (s) => (s.albums || []).map((a) => a.album_title), getFile: (s) => (s.albums || []).map((a) => a.album_title) },
+    ];
+    for (const { fieldKey, getDb, getFile } of CHIP_FIELDS) {
+        const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
+        if (!field) continue;
+        const dbItems = getDb(dbSong);
+        const fileItems = getFile(fileSong);
+        if (eqSet(keySet(dbItems), keySet(fileItems))) continue;
+        appendDot(field.querySelector(".editor-label"),
+            `DB: ${dbItems.join(", ") || "(empty)"}\nFile: ${fileItems.join(", ") || "(empty)"}`);
     }
 }
 
+function appendDot(labelEl, title) {
+    if (!labelEl) return;
+    const dot = document.createElement("span");
+    dot.className = "drift-dot";
+    dot.title = title;
+    labelEl.appendChild(dot);
+}
+
 export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
+    const handles = {};
+    const getItemsByField = {};
+
+    function syncMissing(fieldKey, items) {
+        const field = document.querySelector(`[data-chip-field="${fieldKey}"]`);
+        if (!field) return;
+        field.classList.toggle("missing", (items || []).length === 0);
+    }
+
     async function refresh() {
         const fresh = await getCatalogSong(song.id);
         updateListRowBlockers(song.id, fresh.review_blockers);
+        for (const [key, getItems] of Object.entries(getItemsByField)) {
+            syncMissing(key, getItems(fresh));
+        }
         if (onUpdated) onUpdated(fresh);
         return fresh;
     }
@@ -228,7 +275,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
         if (!wrap) return;
         const getItems = (s) => s.credits
             .filter((c) => c.role_name === role)
-            .map((c) => ({ id: c.credit_id, label: c.display_name, _identityId: c.identity_id }));
+            .map((c) => ({ id: c.credit_id, label: c.display_name, _identityId: c.identity_id, _nameId: c.name_id }));
 
         const handle = createChipInput({
             container: wrap,
@@ -249,7 +296,16 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
             },
             onSplit: onSplit ? (item) => onSplit({ songId: song.id, text: item.label, role, creditId: item.id }) : null,
             allowCreate: true,
+            labelAttrs: (item) => item._identityId ? {
+                "data-action": "open-edit-modal",
+                "data-chip-type": "credit",
+                "data-song-id": song.id,
+                "data-item-id": item._nameId ?? "",
+                "data-identity-id": item._identityId,
+            } : null,
         });
+        handles[role.toLowerCase()] = handle;
+        getItemsByField[role.toLowerCase()] = getItems;
     }
 
     wireCreditRole("Performer");
@@ -262,7 +318,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
     if (tagsWrap) {
         const tagRules = validationRules?.tags || {};
         const categoryColors = tagRules.category_colors || {};
-        const getItems = (s) => s.tags.map((t) => ({ id: t.id, label: t.name, category: t.category }));
+        const getItems = (s) => s.tags.map((t) => ({ id: t.id, label: t.name, category: t.category, _isPrimary: !!t.is_primary }));
         const handle = createChipInput({
             container: tagsWrap,
             items: getItems(song),
@@ -289,7 +345,27 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 const { name, category } = parseTagInput(q, tagRules);
                 return `+ Add "${name}" in "${category}"`;
             },
+            labelAttrs: (item) => ({
+                "data-action": "open-edit-modal",
+                "data-chip-type": "tag",
+                "data-item-id": item.id,
+            }),
+            extraChipButtons: (item) => {
+                if (item.category !== "Genre") return [];
+                return [{
+                    className: `chip-input__chip-btn chip-input__chip-star${item._isPrimary ? " is-primary" : ""}`,
+                    html: "★",
+                    title: item._isPrimary ? "Primary genre" : "Set as primary genre",
+                    dataset: {
+                        action: "set-primary-tag",
+                        songId: String(song.id),
+                        tagId: String(item.id),
+                    },
+                }];
+            },
         });
+        handles.tags = handle;
+        getItemsByField.tags = getItems;
     }
 
     // ── Publisher ──────────────────────────────────────────────────────────────
@@ -315,7 +391,14 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
             },
             allowCreate: true,
             singleSelect: true,
+            labelAttrs: (item) => ({
+                "data-action": "open-edit-modal",
+                "data-chip-type": "publisher",
+                "data-item-id": item.id,
+            }),
         });
+        handles.publisher = handle;
+        getItemsByField.publisher = getItems;
     }
 
     // ── Album ──────────────────────────────────────────────────────────────────
@@ -341,7 +424,22 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
             },
             allowCreate: true,
         });
+        handles.album = handle;
+        getItemsByField.album = getItems;
     }
+
+    return {
+        updateField(fieldKey, freshSong) {
+            const key = String(fieldKey).toLowerCase();
+            const handle = handles[key];
+            const getItems = getItemsByField[key];
+            if (!handle || !getItems) return;
+            const items = getItems(freshSong);
+            handle.setItems(items);
+            syncMissing(key, items);
+            updateListRowBlockers(freshSong.id, freshSong.review_blockers);
+        },
+    };
 }
 
 /**
@@ -363,7 +461,7 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
 
     // ── Organize / Mark as Done button ────────────────────────────────────────
     let organizeBtn = "";
-    let unreviweBtn = "";
+    let unreviewBtn = "";
     if (status === 1) {
         const blocked = blockers.length > 0;
         organizeBtn = `<button class="sidebar-btn organize${blocked ? " blocked" : ""}"
@@ -371,7 +469,7 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
             ${blocked ? "disabled title=\"Missing required fields\"" : ""}>Mark as Done</button>`;
     } else if (status === 0 && isInStaging) {
         organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
-        unreviweBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
+        unreviewBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
     }
 
     const targetPath = isInStaging && song.organized_path_preview
@@ -397,7 +495,16 @@ export function renderActionSidebar(song, { searchEngines = {}, defaultSearchEng
            <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
         : "";
 
+    const playBtn = `<button class="sidebar-btn" data-action="open-scrubber" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">▶ Play</button>`;
+
+    const syncLedHtml = `<span class="sync-led" data-song-id="${song.id}" title="Checking sync..."></span><span class="sync-mismatch-list" data-song-id="${song.id}"></span>`;
+
     sidebar.innerHTML = `
+<div class="sidebar-group-label">Playback</div>
+${playBtn}
+
+<div class="sidebar-divider"></div>
+
 <div class="sidebar-group-label">Research</div>
 <button class="sidebar-btn" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop())}">Parse</button>
 <button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
@@ -406,9 +513,10 @@ ${searchSplitBtn}
 <div class="sidebar-divider"></div>
 
 <div class="sidebar-group-label">Finalize</div>
+<div class="sidebar-sync-row">${syncLedHtml}</div>
 <button class="sidebar-btn sidebar-btn--id3" data-action="sync-id3" data-song-id="${song.id}">↑ Write ID3</button>
 ${organizeBtn}
-${unreviweBtn}
+${unreviewBtn}
 ${targetPath}
 
 <div class="sidebar-divider"></div>
@@ -488,7 +596,7 @@ export function renderSongEditorV2(song, fileData = null) {
   <div class="editor-section-title">Required Metadata</div>
   <div class="editor-row">
     <div class="editor-col col-8">
-      ${renderScalarField("Title", song.media_name, "ef-title")}
+      ${renderScalarField("Title", song.media_name, "ef-title", "text", renderCaseButtons(song.id, "media_name"))}
     </div>
     <div class="editor-col col-4">
       ${renderScalarField("Year", song.year, "ef-year", "number")}
@@ -515,6 +623,12 @@ export function renderSongEditorV2(song, fileData = null) {
 
 <div class="editor-section">
   <div class="editor-section-title">Raw / File Data</div>
+  <div class="editor-field">
+    <label class="sidebar-toggle" data-action="toggle-active" data-id="${song.id}">
+      <input type="checkbox" ${song.is_active ? "checked" : ""} ${song.processing_status !== 0 ? "disabled" : ""}>
+      <span>Active (airplay)</span>
+    </label>
+  </div>
   <div class="editor-field">
     <label class="editor-label" for="ef-notes">Comments</label>
     <textarea class="editor-input editor-textarea" id="ef-notes" rows="3">${escapeHtml(song.notes ?? "")}</textarea>

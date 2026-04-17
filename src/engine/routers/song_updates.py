@@ -817,6 +817,11 @@ async def move_song_to_library(
             f"[SongUpdates] <- move_song_to_library FILE_NOT_FOUND id={song_id}: {e}"
         )
         raise HTTPException(status_code=400, detail=str(e))
+    except FileExistsError as e:
+        logger.warning(
+            f"[SongUpdates] <- move_song_to_library FILE_EXISTS id={song_id}: {e}"
+        )
+        raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(
             f"[SongUpdates] <- move_song_to_library CRITICAL id={song_id}: {e}"
