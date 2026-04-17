@@ -29,9 +29,9 @@ class TestDelete:
         assert result is True, f"Expected True (deleted), got {result}"
 
         # 4. Verify song is HIDDEN (MediaSources + Songs join filters it)
-        assert (
-            repo.get_by_id(song_id) is None
-        ), f"Song {song_id} should be unretrievable after soft delete"
+        assert repo.get_by_id(song_id) is None, (
+            f"Song {song_id} should be unretrievable after soft delete"
+        )
 
         # 5. Verify credits are PURGED (Manual links HARD delete)
         with repo._get_connection() as conn:

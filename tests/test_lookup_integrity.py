@@ -112,7 +112,6 @@ def get_members_to_verify(file_path: str):
 
 
 class TestLookupIntegrity:
-
     def test_lookup_protocol_integrity(self):
         """
         CONSTITUTION CHECK: Every non-model .py file and its methods
@@ -127,9 +126,9 @@ class TestLookupIntegrity:
         py_files = get_all_py_files(src_dir)
 
         assert len(py_files) > 0, f"No .py files found in src_dir '{src_dir}'"
-        assert (
-            len(doc_map) > 0
-        ), f"No documented locations found in '{lookup_dir}' -- lookup docs are empty"
+        assert len(doc_map) > 0, (
+            f"No documented locations found in '{lookup_dir}' -- lookup docs are empty"
+        )
 
         location_errors = []
         signature_errors = []
@@ -161,9 +160,9 @@ class TestLookupIntegrity:
                         f"[SIGNATURE MISSING] '{member}' in {rel_path} is not in docs/lookup/"
                     )
 
-        assert (
-            len(location_errors) == 0
-        ), "Lookup Protocol -- Location Violations:\n" + "\n".join(location_errors)
-        assert (
-            len(signature_errors) == 0
-        ), "Lookup Protocol -- Signature Violations:\n" + "\n".join(signature_errors)
+        assert len(location_errors) == 0, (
+            "Lookup Protocol -- Location Violations:\n" + "\n".join(location_errors)
+        )
+        assert len(signature_errors) == 0, (
+            "Lookup Protocol -- Signature Violations:\n" + "\n".join(signature_errors)
+        )

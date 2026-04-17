@@ -44,9 +44,9 @@ class TestAddIdentityAliasReassignment:
         # Verify ID 1 survives but lost the alias
         id1 = catalog_service.get_identity(1)
         assert not any(a.display_name == "Late!" for a in id1.aliases)
-        assert any(
-            a.display_name == "Dave Grohl" for a in id1.aliases
-        ), "Parent must survive"
+        assert any(a.display_name == "Dave Grohl" for a in id1.aliases), (
+            "Parent must survive"
+        )
 
     def test_relink_primary_name_parent_raises(self, catalog_service):
         """
@@ -89,9 +89,9 @@ class TestRemoveIdentityAlias:
         catalog_service.remove_identity_alias(11)
         identity = catalog_service.get_identity(1)
         alias_names = [a.display_name for a in identity.aliases]
-        assert (
-            "Grohlton" not in alias_names
-        ), f"Expected 'Grohlton' removed, got {alias_names}"
+        assert "Grohlton" not in alias_names, (
+            f"Expected 'Grohlton' removed, got {alias_names}"
+        )
 
     def test_remove_alias_leaves_other_aliases(self, catalog_service):
         """Removing NameID=11 should not affect NameID=12 (Late!)."""
@@ -106,9 +106,9 @@ class TestRemoveIdentityAlias:
             catalog_service.remove_identity_alias(10)
         identity = catalog_service.get_identity(1)
         alias_names = [a.display_name for a in identity.aliases]
-        assert (
-            "Dave Grohl" in alias_names
-        ), "Expected 'Dave Grohl' to remain after failed remove"
+        assert "Dave Grohl" in alias_names, (
+            "Expected 'Dave Grohl' to remain after failed remove"
+        )
 
     def test_remove_nonexistent_name_is_noop(self, catalog_service):
         """Removing a name_id that doesn't exist should not raise."""
@@ -121,14 +121,13 @@ class TestRemoveIdentityAlias:
 
 
 class TestUpdateIdentityLegalName:
-
     def test_update_legal_name_success(self, catalog_service):
         """Valid update persists and is returned by get_identity."""
         catalog_service.update_identity_legal_name(1, "David Eric Grohl Jr.")
         identity = catalog_service.get_identity(1)
-        assert (
-            identity.legal_name == "David Eric Grohl Jr."
-        ), f"Expected updated name, got {identity.legal_name}"
+        assert identity.legal_name == "David Eric Grohl Jr.", (
+            f"Expected updated name, got {identity.legal_name}"
+        )
 
     def test_update_legal_name_clear_to_none(self, catalog_service):
         """Setting to None clears the legal name."""
@@ -148,7 +147,6 @@ class TestUpdateIdentityLegalName:
 
 
 class TestUpdateCreditName:
-
     def test_clean_rename_succeeds(self, catalog_service):
         """Renaming to a brand-new name should work without errors."""
         catalog_service.update_credit_name(11, "Grohlton Reloaded")
@@ -186,7 +184,6 @@ class TestUpdateCreditName:
 
 
 class TestMergeIdentityInto:
-
     def test_merge_succeeds_and_credits_repointed(self, catalog_service):
         """After merge, songs credited to Taylor should resolve under Dave's identity."""
         # Taylor (NameID=40, IdentityID=4) is a solo orphan.

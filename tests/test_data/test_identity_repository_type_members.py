@@ -16,7 +16,6 @@ from src.data.identity_repository import IdentityRepository
 
 
 class TestSetType:
-
     def test_person_to_group_succeeds(self, populated_db):
         """Converting a person identity to group should persist."""
         repo = IdentityRepository(populated_db)
@@ -75,9 +74,9 @@ class TestSetType:
             with pytest.raises(ValueError):
                 repo.set_type(2, "person", conn)
         identity = repo.get_by_id(2)
-        assert (
-            identity.type == "group"
-        ), f"Expected type unchanged, got {identity.type!r}"
+        assert identity.type == "group", (
+            f"Expected type unchanged, got {identity.type!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +85,6 @@ class TestSetType:
 
 
 class TestAddMember:
-
     def test_add_member_succeeds(self, populated_db):
         """Adding Taylor (4) as a member of Nirvana (2) should persist."""
         repo = IdentityRepository(populated_db)
@@ -150,7 +148,6 @@ class TestAddMember:
 
 
 class TestRemoveMember:
-
     def test_remove_member_succeeds(self, populated_db):
         """Removing Dave (1) from Nirvana (2) should delete the link."""
         repo = IdentityRepository(populated_db)
@@ -171,9 +168,9 @@ class TestRemoveMember:
             repo.remove_member(2, 1, cursor)
             conn.commit()
 
-        assert (
-            repo.get_by_id(1) is not None
-        ), "Dave's identity should survive member removal"
+        assert repo.get_by_id(1) is not None, (
+            "Dave's identity should survive member removal"
+        )
 
     def test_remove_member_noop_if_not_linked(self, populated_db):
         """Removing a member that isn't linked should not raise."""

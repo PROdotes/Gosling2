@@ -1,5 +1,4 @@
 import hashlib
-import os
 import pytest
 from src.utils.audio_hash import calculate_audio_hash
 
@@ -26,7 +25,9 @@ class TestCalculateAudioHash:
         filepath = create_temp_file(tmp_path, "pure.mp3", audio_data)
 
         expected_hash = get_hash(audio_data)
-        assert calculate_audio_hash(filepath) == expected_hash, f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        assert calculate_audio_hash(filepath) == expected_hash, (
+            f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        )
 
     def test_id3v1_only(self, tmp_path):
         audio_data = b"B" * 200
@@ -35,7 +36,9 @@ class TestCalculateAudioHash:
         filepath = create_temp_file(tmp_path, "id3v1.mp3", audio_data + id3v1_tag)
 
         expected_hash = get_hash(audio_data)
-        assert calculate_audio_hash(filepath) == expected_hash, f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        assert calculate_audio_hash(filepath) == expected_hash, (
+            f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        )
 
     def test_id3v2_only(self, tmp_path):
         audio_data = b"C" * 200
@@ -43,20 +46,28 @@ class TestCalculateAudioHash:
         # Size of 5 -> \x00\x00\x00\x05
         id3v2_header = b"ID3\x03\x00\x00\x00\x00\x00\x05"
         id3v2_body = b"12345"  # 5 bytes to match size
-        filepath = create_temp_file(tmp_path, "id3v2.mp3", id3v2_header + id3v2_body + audio_data)
+        filepath = create_temp_file(
+            tmp_path, "id3v2.mp3", id3v2_header + id3v2_body + audio_data
+        )
 
         expected_hash = get_hash(audio_data)
-        assert calculate_audio_hash(filepath) == expected_hash, f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        assert calculate_audio_hash(filepath) == expected_hash, (
+            f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        )
 
     def test_both_id3v1_and_id3v2(self, tmp_path):
         audio_data = b"D" * 200
         id3v2_header = b"ID3\x03\x00\x00\x00\x00\x00\x05"
         id3v2_body = b"12345"
         id3v1_tag = b"TAG" + b"X" * 125
-        filepath = create_temp_file(tmp_path, "both.mp3", id3v2_header + id3v2_body + audio_data + id3v1_tag)
+        filepath = create_temp_file(
+            tmp_path, "both.mp3", id3v2_header + id3v2_body + audio_data + id3v1_tag
+        )
 
         expected_hash = get_hash(audio_data)
-        assert calculate_audio_hash(filepath) == expected_hash, f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        assert calculate_audio_hash(filepath) == expected_hash, (
+            f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        )
 
     def test_fallback_invalid_boundaries(self, tmp_path):
         # Create an ID3v2 tag that claims a large size (100 -> \x64), but file is small.
@@ -68,4 +79,6 @@ class TestCalculateAudioHash:
 
         # When boundaries are invalid, the function hashes the entire file
         expected_hash = get_hash(content)
-        assert calculate_audio_hash(filepath) == expected_hash, f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        assert calculate_audio_hash(filepath) == expected_hash, (
+            f"Expected {expected_hash}, got {calculate_audio_hash(filepath)}"
+        )

@@ -40,9 +40,9 @@ DUAL_CREDIT_ROW = {"SourceID": 6, "MediaName": "Dual Credit Track"}
 
 def _assert_slim_row(row: dict, expected: dict, context: str = ""):
     for key, val in expected.items():
-        assert (
-            row[key] == val
-        ), f"[{context}] '{key}': expected {val!r}, got {row[key]!r}"
+        assert row[key] == val, (
+            f"[{context}] '{key}': expected {val!r}, got {row[key]!r}"
+        )
 
 
 class TestSearchSongsDeepSlimSearch:
@@ -65,15 +65,15 @@ class TestSearchSongsDeepSlimSearch:
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         media_names = {r["MediaName"] for r in rows}
 
-        assert (
-            "Grohlton Theme" in media_names
-        ), f"Expected 'Grohlton Theme', got {media_names}"
-        assert (
-            "Smells Like Teen Spirit" in media_names
-        ), f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
-        assert (
-            "Everlong" in media_names
-        ), f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        assert "Grohlton Theme" in media_names, (
+            f"Expected 'Grohlton Theme', got {media_names}"
+        )
+        assert "Smells Like Teen Spirit" in media_names, (
+            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        )
+        assert "Everlong" in media_names, (
+            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        )
 
         _assert_slim_row(
             _get_row_by_media_name(rows, "Grohlton Theme", "alias_search"),
@@ -103,9 +103,9 @@ class TestSearchSongsDeepSlimSearch:
             "Joint Venture",
         }
         for title in expected:
-            assert (
-                title in media_names
-            ), f"Expected '{title}' in deep_slim results for 'Dave Grohl', got {media_names}"
+            assert title in media_names, (
+                f"Expected '{title}' in deep_slim results for 'Dave Grohl', got {media_names}"
+            )
 
         _assert_slim_row(
             _get_row_by_media_name(rows, "Smells Like Teen Spirit", "primary_name"),
@@ -134,20 +134,20 @@ class TestSearchSongsDeepSlimSearch:
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         media_names = {r["MediaName"] for r in rows}
 
-        assert (
-            "Everlong" in media_names
-        ), f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
-        assert (
-            "Smells Like Teen Spirit" in media_names
-        ), f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        assert "Everlong" in media_names, (
+            f"Expected 'Everlong' via Foo Fighters group, got {media_names}"
+        )
+        assert "Smells Like Teen Spirit" in media_names, (
+            f"Expected 'Smells Like Teen Spirit' via Nirvana group, got {media_names}"
+        )
 
     def test_search_excludes_duplicates(self, catalog_service):
         """No duplicate SourceIDs even when matched via multiple expansion paths."""
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         source_ids = [r["SourceID"] for r in rows]
-        assert len(source_ids) == len(
-            set(source_ids)
-        ), f"Duplicate SourceIDs in results: {source_ids}"
+        assert len(source_ids) == len(set(source_ids)), (
+            f"Duplicate SourceIDs in results: {source_ids}"
+        )
 
     def test_result_rows_have_required_slim_fields(self, catalog_service):
         """Every result row must contain the required slim dict keys."""

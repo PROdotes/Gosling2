@@ -38,25 +38,25 @@ class TestInsertAlbums:
                 "SELECT AlbumID, AlbumTitle, ReleaseYear FROM Albums WHERE AlbumTitle = 'Get the Money'"
             ).fetchone()
             assert row is not None, "Expected 'Get the Money' album row to exist"
-            assert (
-                row["AlbumTitle"] == "Get the Money"
-            ), f"Expected 'Get the Money', got '{row['AlbumTitle']}'"
-            assert (
-                row["ReleaseYear"] == 2019
-            ), f"Expected 2019, got {row['ReleaseYear']}"
+            assert row["AlbumTitle"] == "Get the Money", (
+                f"Expected 'Get the Money', got '{row['AlbumTitle']}'"
+            )
+            assert row["ReleaseYear"] == 2019, (
+                f"Expected 2019, got {row['ReleaseYear']}"
+            )
 
         # Verify SongAlbums link
         result = repo.get_albums_for_songs([3])
         assert len(result) == 1, f"Expected 1 album on Song 3, got {len(result)}"
-        assert (
-            result[0].album_title == "Get the Money"
-        ), f"Expected 'Get the Money', got '{result[0].album_title}'"
-        assert (
-            result[0].track_number == 5
-        ), f"Expected track 5, got {result[0].track_number}"
-        assert (
-            result[0].disc_number == 1
-        ), f"Expected disc 1, got {result[0].disc_number}"
+        assert result[0].album_title == "Get the Money", (
+            f"Expected 'Get the Money', got '{result[0].album_title}'"
+        )
+        assert result[0].track_number == 5, (
+            f"Expected track 5, got {result[0].track_number}"
+        )
+        assert result[0].disc_number == 1, (
+            f"Expected disc 1, got {result[0].disc_number}"
+        )
 
     def test_insert_existing_album_reuses_album_id(self, populated_db):
         """Insert 'Nevermind'/1991 (already AlbumID=100) onto Song 3 — should reuse, not duplicate."""
@@ -81,22 +81,22 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind' AND ReleaseYear = 1991"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Nevermind' album row (reused), got {len(rows)}"
-            assert (
-                rows[0]["AlbumID"] == 100
-            ), f"Expected AlbumID=100 (original), got {rows[0]['AlbumID']}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Nevermind' album row (reused), got {len(rows)}"
+            )
+            assert rows[0]["AlbumID"] == 100, (
+                f"Expected AlbumID=100 (original), got {rows[0]['AlbumID']}"
+            )
 
         # Verify link was created for Song 3
         result = repo.get_albums_for_songs([3])
         assert len(result) == 1, f"Expected 1 album on Song 3, got {len(result)}"
-        assert (
-            result[0].album_id == 100
-        ), f"Expected AlbumID=100, got {result[0].album_id}"
-        assert (
-            result[0].track_number == 10
-        ), f"Expected track 10, got {result[0].track_number}"
+        assert result[0].album_id == 100, (
+            f"Expected AlbumID=100, got {result[0].album_id}"
+        )
+        assert result[0].track_number == 10, (
+            f"Expected track 10, got {result[0].track_number}"
+        )
 
     def test_same_title_different_year_creates_separate_albums(self, populated_db):
         """Two 'Greatest Hits' with different years should be different albums."""
@@ -121,15 +121,15 @@ class TestInsertAlbums:
                 "SELECT AlbumID, ReleaseYear FROM Albums WHERE AlbumTitle = 'Greatest Hits' ORDER BY ReleaseYear"
             ).fetchall()
             assert len(rows) == 2, f"Expected 2 'Greatest Hits' albums, got {len(rows)}"
-            assert (
-                rows[0]["ReleaseYear"] == 2005
-            ), f"Expected 2005, got {rows[0]['ReleaseYear']}"
-            assert (
-                rows[1]["ReleaseYear"] == 2015
-            ), f"Expected 2015, got {rows[1]['ReleaseYear']}"
-            assert (
-                rows[0]["AlbumID"] != rows[1]["AlbumID"]
-            ), "Expected different AlbumIDs"
+            assert rows[0]["ReleaseYear"] == 2005, (
+                f"Expected 2005, got {rows[0]['ReleaseYear']}"
+            )
+            assert rows[1]["ReleaseYear"] == 2015, (
+                f"Expected 2015, got {rows[1]['ReleaseYear']}"
+            )
+            assert rows[0]["AlbumID"] != rows[1]["AlbumID"], (
+                "Expected different AlbumIDs"
+            )
 
     def test_track_and_disc_numbers_persist(self, populated_db):
         """Track and disc numbers should survive the round-trip."""
@@ -150,12 +150,12 @@ class TestInsertAlbums:
 
         result = repo.get_albums_for_songs([7])
         assert len(result) == 1, f"Expected 1 album on Song 7, got {len(result)}"
-        assert (
-            result[0].track_number == 7
-        ), f"Expected track 7, got {result[0].track_number}"
-        assert (
-            result[0].disc_number == 2
-        ), f"Expected disc 2, got {result[0].disc_number}"
+        assert result[0].track_number == 7, (
+            f"Expected track 7, got {result[0].track_number}"
+        )
+        assert result[0].disc_number == 2, (
+            f"Expected disc 2, got {result[0].disc_number}"
+        )
 
     def test_insert_empty_list_is_noop(self, populated_db):
         """Passing empty list should not crash or create any rows."""
@@ -163,18 +163,18 @@ class TestInsertAlbums:
 
         # Song 7 has no albums before
         before = repo.get_albums_for_songs([7])
-        assert (
-            len(before) == 0
-        ), f"Expected 0 albums on Song 7 before, got {len(before)}"
+        assert len(before) == 0, (
+            f"Expected 0 albums on Song 7 before, got {len(before)}"
+        )
 
         with repo._get_connection() as conn:
             repo.insert_albums(7, [], conn)
             conn.commit()
 
         after = repo.get_albums_for_songs([7])
-        assert (
-            len(after) == 0
-        ), f"Expected 0 albums on Song 7 after empty insert, got {len(after)}"
+        assert len(after) == 0, (
+            f"Expected 0 albums on Song 7 after empty insert, got {len(after)}"
+        )
 
     def test_insert_album_with_null_year(self, populated_db):
         """Album with no release year should still create correctly."""
@@ -190,12 +190,12 @@ class TestInsertAlbums:
 
         result = repo.get_albums_for_songs([7])
         assert len(result) == 1, f"Expected 1 album on Song 7, got {len(result)}"
-        assert (
-            result[0].album_title == "Mystery Album"
-        ), f"Expected 'Mystery Album', got '{result[0].album_title}'"
-        assert (
-            result[0].release_year is None
-        ), f"Expected None release_year, got {result[0].release_year}"
+        assert result[0].album_title == "Mystery Album", (
+            f"Expected 'Mystery Album', got '{result[0].album_title}'"
+        )
+        assert result[0].release_year is None, (
+            f"Expected None release_year, got {result[0].release_year}"
+        )
 
     def test_insert_album_case_insensitive_reuses_existing(self, populated_db):
         """'nevermind'/1991 should match 'Nevermind'/1991 (AlbumID=100), not create a duplicate."""
@@ -220,12 +220,12 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind' COLLATE UTF8_NOCASE AND ReleaseYear = 1991"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Nevermind' album (reused), got {len(rows)}"
-            assert (
-                rows[0]["AlbumID"] == 100
-            ), f"Expected AlbumID=100, got {rows[0]['AlbumID']}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Nevermind' album (reused), got {len(rows)}"
+            )
+            assert rows[0]["AlbumID"] == 100, (
+                f"Expected AlbumID=100, got {rows[0]['AlbumID']}"
+            )
 
     def test_same_title_same_year_different_artist_creates_separate_albums(
         self, populated_db
@@ -261,12 +261,12 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Greatest Hits' AND ReleaseYear = 1992"
             ).fetchall()
-            assert (
-                len(rows) == 2
-            ), f"Expected 2 'Greatest Hits'/1992 albums (different artists), got {len(rows)}"
-            assert (
-                rows[0]["AlbumID"] != rows[1]["AlbumID"]
-            ), "Expected different AlbumIDs"
+            assert len(rows) == 2, (
+                f"Expected 2 'Greatest Hits'/1992 albums (different artists), got {len(rows)}"
+            )
+            assert rows[0]["AlbumID"] != rows[1]["AlbumID"], (
+                "Expected different AlbumIDs"
+            )
 
     def test_same_title_same_year_same_artist_reuses_album(self, populated_db):
         """Two songs on 'Greatest Hits'/1992 by ABBA should share one album row."""
@@ -302,18 +302,18 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Greatest Hits' AND ReleaseYear = 1992"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Greatest Hits'/1992 album (reused), got {len(rows)}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Greatest Hits'/1992 album (reused), got {len(rows)}"
+            )
 
         # Both songs should link to it
         result7 = repo.get_albums_for_songs([7])
         result9 = repo.get_albums_for_songs([9])
         assert len(result7) == 1
         assert len(result9) == 1
-        assert (
-            result7[0].album_id == result9[0].album_id
-        ), "Expected same AlbumID for both songs"
+        assert result7[0].album_id == result9[0].album_id, (
+            "Expected same AlbumID for both songs"
+        )
 
     def test_multi_artist_same_set_reuses_album(self, populated_db):
         """'Collab Album'/2020 by [ABBA, Queen] inserted twice should reuse one album."""
@@ -351,9 +351,9 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Collab Album' AND ReleaseYear = 2020"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Collab Album' (same artist set), got {len(rows)}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Collab Album' (same artist set), got {len(rows)}"
+            )
 
     def test_multi_artist_different_order_reuses_album(self, populated_db):
         """[Queen, ABBA] should match [ABBA, Queen] — order doesn't matter."""
@@ -395,9 +395,9 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Collab Album' AND ReleaseYear = 2020"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Collab Album' (order-independent match), got {len(rows)}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Collab Album' (order-independent match), got {len(rows)}"
+            )
 
     def test_multi_artist_superset_creates_separate_album(self, populated_db):
         """[ABBA, Queen] vs [ABBA, Queen, Freddie Mercury] — overlapping but not equal, should be 2 albums."""
@@ -440,12 +440,12 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Collab Album' AND ReleaseYear = 2020"
             ).fetchall()
-            assert (
-                len(rows) == 2
-            ), f"Expected 2 'Collab Album' (superset != original set), got {len(rows)}"
-            assert (
-                rows[0]["AlbumID"] != rows[1]["AlbumID"]
-            ), "Expected different AlbumIDs"
+            assert len(rows) == 2, (
+                f"Expected 2 'Collab Album' (superset != original set), got {len(rows)}"
+            )
+            assert rows[0]["AlbumID"] != rows[1]["AlbumID"], (
+                "Expected different AlbumIDs"
+            )
 
     def test_no_credits_still_matches_by_title_year_only(self, populated_db):
         """Albums with no credits should fall back to Title+Year matching (backwards compat)."""
@@ -464,6 +464,6 @@ class TestInsertAlbums:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Untitled' AND ReleaseYear = 2020"
             ).fetchall()
-            assert (
-                len(rows) == 1
-            ), f"Expected 1 'Untitled'/2020 album (reused, no credits), got {len(rows)}"
+            assert len(rows) == 1, (
+                f"Expected 1 'Untitled'/2020 album (reused, no credits), got {len(rows)}"
+            )

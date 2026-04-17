@@ -8,7 +8,6 @@ from src.data.song_repository import SongRepository
 
 
 class TestSongRepositoryOptimization:
-
     def test_get_by_path_hydrates_all_fields(self, populated_db):
         """
         Test that get_by_path (optimized) returns all song-specific fields

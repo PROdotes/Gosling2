@@ -325,7 +325,9 @@ class SongView(BaseModel):
             year=self.year,
             has_performer=any(c.role_name == "Performer" for c in self.credits),
             has_composer=any(c.role_name == "Composer" for c in self.credits),
-            has_genre=any(t.category and t.category.lower() == "genre" for t in self.tags),
+            has_genre=any(
+                t.category and t.category.lower() == "genre" for t in self.tags
+            ),
             has_publisher=bool(self.publishers),
             has_album=bool(self.albums),
             duration_s=self.duration_s,
