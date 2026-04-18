@@ -27,7 +27,13 @@
       "Bash(curl -s \"http://127.0.0.1:8000/api/v1/metabolic/inspect-file/519\")",
       "Bash(curl -s \"http://127.0.0.1:8000/api/v1/songs?q=&limit=5\")",
       "Bash(curl -s \"http://127.0.0.1:8000/api/v1/metabolic/inspect-file/3\")",
-      "Bash(curl -s \"http://127.0.0.1:8000/api/v1/audit/history/Songs/3\")"
+      "Bash(curl -s \"http://127.0.0.1:8000/api/v1/audit/history/Songs/3\")",
+      "Bash(python main.py)",
+      "Bash(curl -s http://127.0.0.1:8000/ -o /dev/null -w \"%{http_code}\")",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git worktree *)",
+      "Bash(git branch *)"
     ]
   }
 }

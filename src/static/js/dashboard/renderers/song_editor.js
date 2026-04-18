@@ -72,50 +72,48 @@ function renderAlbumSubCards(albums, songId) {
 
         return `
 <div class="album-sub-card" data-album-id="${albumId}">
-  <div class="album-sub-header">
-    <div class="editor-input-row" style="flex:1">
-      <span class="editable-scalar editor-input album-sub-title" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>
-    </div>
-    <div class="album-sub-btns">
+  <div class="editor-section-title">
+    <span>Linked Album</span>
+    <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
+  </div>
+  <div class="editor-field">
+    <label class="editor-label">Album Title</label>
+    <div class="editor-input-row">
+      <span class="editable-scalar editor-input" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
-      <button class="album-sub-remove" data-action="remove-album" data-song-id="${songId}" data-album-id="${albumId}" title="Unlink album" type="button">✕</button>
     </div>
   </div>
 
-  <div class="album-sub-row">
-    <div class="editor-label">Artist</div>
+  <div class="editor-field">
+    <label class="editor-label">Album Artist</label>
     <div class="album-sub-chips" data-album-chips="artist" data-album-id="${albumId}"></div>
   </div>
 
-  <div class="album-sub-row">
-    <div class="editor-label">Publisher</div>
+  <div class="editor-field">
+    <label class="editor-label">Album Publisher</label>
     <div class="album-sub-chips" data-album-chips="publisher" data-album-id="${albumId}"></div>
   </div>
 
   <div class="album-sub-meta-row">
-    <div class="album-sub-meta-item">
-      <span class="editor-label">Type</span>
-      <select class="editor-input album-sub-select" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
+    <div class="editor-field">
+      <label class="editor-label">Type</label>
+      <select class="editor-input" data-action="change-album-type" data-album-id="${albumId}" data-song-id="${songId}">${typeOptions}</select>
     </div>
-    <div class="album-sub-meta-item">
-      <span class="editor-label">Year</span>
+    <div class="editor-field">
+      <label class="editor-label">Year</label>
       <span class="editable-scalar editor-input" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>
     </div>
-    <div class="album-sub-meta-item">
-      <span class="editor-label">Disc</span>
+    <div class="editor-field">
+      <label class="editor-label">Disc</label>
       <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
     </div>
-    <div class="album-sub-meta-item">
-      <span class="editor-label">Track</span>
+    <div class="editor-field">
+      <label class="editor-label">Track</label>
       <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
     </div>
   </div>
-  <div class="album-sub-info-row">
-    <div class="album-sub-actions">
-      <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync metadata from song</button>
-    </div>
-  </div>
+  <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync metadata from song</button>
 </div>`;
     }).join("");
 }

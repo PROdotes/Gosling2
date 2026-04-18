@@ -942,61 +942,17 @@
 /* ── Album sub-cards ────────────────────────────────────────────────────────── */
 
 #songs-workspace .album-sub-card {
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)),
-        var(--bg-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 10px 12px;
     margin-top: 6px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    position: relative;
-    overflow: hidden;
 }
 
-#songs-workspace .album-sub-card::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(180deg, var(--accent), transparent);
-    opacity: 0.6;
-}
-
-#songs-workspace .album-sub-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-}
-
-#songs-workspace .album-sub-title-block {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-#songs-workspace .album-sub-title {
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-}
-
-#songs-workspace .album-sub-artist {
-    font-size: 11px;
-    color: var(--text-sec);
-    margin-top: 1px;
-    opacity: 0.85;
-}
-
-#songs-workspace .album-sub-btns {
-    display: flex;
-    gap: 4px;
-    margin-left: auto;
-    align-items: center;
+#songs-workspace .album-sub-card .editor-section-title {
+    margin-bottom: 0;
 }
 
 #songs-workspace .album-sub-remove {
@@ -1015,44 +971,22 @@
 
 #songs-workspace .album-sub-meta-row {
     display: flex;
-    gap: 8px;
-    margin-top: 4px;
+    gap: 10px;
 }
 
-#songs-workspace .album-sub-meta-item {
+#songs-workspace .album-sub-meta-row > .editor-field {
     flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
     min-width: 0;
 }
 
-#songs-workspace .album-sub-select {
-    padding: 4px 6px;
-    font-size: 12px;
+#songs-workspace .album-sub-meta-row > .editor-field .editor-input {
+    width: 100%;
+    box-sizing: border-box;
 }
 
-#songs-workspace .album-sub-info-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 4px;
-}
-
-#songs-workspace .album-sub-publisher {
-    font-size: 11px;
-    color: var(--text-mut);
-    font-family: var(--font-mono, monospace);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: 12px;
-}
-
-#songs-workspace .album-sub-actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
+#songs-workspace select.editor-input option {
+    background: var(--bg-surface);
+    color: var(--text-pri);
 }
 
 #songs-workspace .album-sub-sync-btn {
@@ -1064,22 +998,11 @@
     padding: 0;
     cursor: pointer;
     font-family: inherit;
+    align-self: flex-start;
 }
 
 #songs-workspace .album-sub-sync-btn:hover {
     color: var(--text-pure);
-}
-
-
-#songs-workspace .album-sub-row {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    margin-top: 6px;
-}
-
-#songs-workspace .album-sub-row .editor-label {
-    margin-bottom: 2px;
 }
 
 #songs-workspace .album-search-wrap {

@@ -441,7 +441,7 @@ async def delete_staging_orphan(path: str):
         raise HTTPException(status_code=404, detail="File not found.")
 
     service = _get_service()
-    song = service._song_repo.get_by_path(real_target)
+    song = service._song_repo.get_by_path(str(real_target))
     if song is not None:
         raise HTTPException(
             status_code=409,
