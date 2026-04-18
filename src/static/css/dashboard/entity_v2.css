@@ -1,0 +1,707 @@
+/*
+ * Entity Workspace V2 — shared layout for Albums / Artists / Publishers / Tags.
+ * Matches the Songs V2 aesthetic (dark slate surfaces, indigo accent, tight
+ * uppercase labels). Scoped to #entity-workspace.
+ */
+
+#entity-workspace {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+
+    --bg-master:   #030407;
+    --bg-window:   #0A0D14;
+    --bg-panel:    #12151E;
+    --bg-element:  #1D2230;
+    --bg-hover:    #2A3041;
+    --bg-active:   #4F46E5;
+    --border-subtle: #2A3041;
+    --border-focus:  #818CF8;
+    --text-pure:   #FFFFFF;
+    --text-sec:    #94A3B8;
+    --text-mut:    #64748B;
+    --accent-blue:  #818CF8;
+    --accent-green: #10B981;
+    --accent-red:   #F43F5E;
+}
+
+#entity-workspace.active {
+    display: flex;
+}
+
+/* ── LIST PANE ──────────────────────────────────────────────────────────── */
+
+#entity-workspace .entity-list-pane {
+    width: 520px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--bg-window);
+    overflow: hidden;
+}
+
+#entity-workspace .entity-list-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+#entity-workspace .entity-list-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    margin-right: auto;
+}
+
+#entity-workspace .entity-list-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+#entity-workspace .entity-list-body {
+    flex: 1;
+    overflow-y: auto;
+}
+
+#entity-workspace .entity-empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: var(--text-mut);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+}
+
+/* ── ROWS ───────────────────────────────────────────────────────────────── */
+
+#entity-workspace .entity-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+#entity-workspace .entity-row:hover {
+    background: var(--bg-panel);
+}
+
+#entity-workspace .entity-row.active {
+    background: var(--bg-panel);
+    box-shadow: inset 3px 0 0 var(--bg-active);
+}
+
+#entity-workspace .entity-row.active .entity-row-title {
+    color: var(--text-pure);
+    font-weight: 700;
+}
+
+#entity-workspace .entity-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#entity-workspace .entity-row-title {
+    font-weight: 600;
+    color: var(--text-pure);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#entity-workspace .entity-row-sub {
+    color: var(--text-sec);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#entity-workspace .entity-row-id {
+    margin-left: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-mut);
+    font-weight: 500;
+}
+
+#entity-workspace .entity-row-meta {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: center;
+}
+
+/* ── PILLS (shared visual vocabulary with Songs) ────────────────────────── */
+
+#entity-workspace .pill {
+    background: var(--bg-element);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-sec);
+    border: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+
+#entity-workspace .pill.mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#entity-workspace .pill.miss,
+#entity-workspace .pill.unlinked {
+    background: rgba(244, 63, 94, 0.1);
+    color: var(--accent-red);
+    border-color: rgba(244, 63, 94, 0.3);
+}
+
+#entity-workspace .pill.done {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--accent-green);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+#entity-workspace .pill.publisher {
+    color: #ffb84d;
+    border-color: rgba(255, 184, 77, 0.3);
+    background: rgba(255, 184, 77, 0.08);
+}
+
+#entity-workspace .pill.artist {
+    color: #7dd3fc;
+    border-color: rgba(125, 211, 252, 0.3);
+    background: rgba(125, 211, 252, 0.08);
+}
+
+/* ── DETAIL PANE ────────────────────────────────────────────────────────── */
+
+#entity-workspace .entity-detail-pane {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-panel);
+    overflow: hidden;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+    z-index: 10;
+}
+
+#entity-workspace .entity-detail-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-mut);
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#entity-workspace .detail-header {
+    padding: 20px 28px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+#entity-workspace .detail-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-pure);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    word-break: break-word;
+}
+
+#entity-workspace .detail-subtitle {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#entity-workspace .detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 28px 28px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-hover) transparent;
+}
+
+#entity-workspace .detail-section {
+    margin-bottom: 24px;
+}
+
+#entity-workspace .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#entity-workspace .meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+#entity-workspace .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+#entity-workspace .meta-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-mut);
+}
+
+#entity-workspace .meta-value {
+    font-size: 13px;
+    color: var(--text-pure);
+    font-weight: 500;
+    word-break: break-word;
+}
+
+#entity-workspace .muted-note {
+    color: var(--text-mut);
+    font-size: 12px;
+    font-style: italic;
+}
+
+#entity-workspace .inline-link {
+    background: transparent;
+    border: none;
+    color: var(--accent-blue);
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+}
+
+#entity-workspace .inline-link:hover {
+    text-decoration: underline;
+}
+
+/* ── TAG / CHIP LIST (read-only) ────────────────────────────────────────── */
+
+#entity-workspace .chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#entity-workspace .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-pure);
+    font-size: 12px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+#entity-workspace .chip.link {
+    background: transparent;
+    color: var(--accent-blue);
+    cursor: pointer;
+}
+
+#entity-workspace .chip.link:hover {
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--accent-blue);
+}
+
+#entity-workspace .chip.publisher {
+    color: #ffb84d;
+    border-color: rgba(255, 184, 77, 0.3);
+}
+
+#entity-workspace .chip-remove {
+    background: transparent;
+    border: none;
+    color: var(--text-mut);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+#entity-workspace .chip-remove:hover {
+    color: var(--accent-red);
+}
+
+/* ── SONG LIST (inside detail) ──────────────────────────────────────────── */
+
+#entity-workspace .song-sub-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#entity-workspace .song-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    background: var(--bg-element);
+    transition: background 0.1s;
+}
+
+#entity-workspace .song-sub-row:last-child {
+    border-bottom: none;
+}
+
+#entity-workspace .song-sub-row:hover {
+    background: var(--bg-hover);
+}
+
+#entity-workspace .song-sub-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+#entity-workspace .song-sub-row-title {
+    font-weight: 600;
+    color: var(--text-pure);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#entity-workspace .song-sub-row-sub {
+    color: var(--text-sec);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#entity-workspace .song-sub-row-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-mut);
+    text-align: right;
+    flex-shrink: 0;
+}
+
+/* ── BUTTONS ────────────────────────────────────────────────────────────── */
+
+#entity-workspace .btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-element);
+    color: var(--text-sec);
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.1s;
+}
+
+#entity-workspace .btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#entity-workspace .btn.primary {
+    background: var(--bg-active);
+    color: var(--text-pure);
+    border-color: transparent;
+}
+
+#entity-workspace .btn.primary:hover {
+    filter: brightness(1.1);
+}
+
+#entity-workspace .btn.danger {
+    color: var(--accent-red);
+    border-color: rgba(244, 63, 94, 0.3);
+    background: rgba(244, 63, 94, 0.05);
+}
+
+#entity-workspace .btn.danger:hover {
+    background: rgba(244, 63, 94, 0.15);
+    color: var(--accent-red);
+}
+
+#entity-workspace .btn.danger:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+#entity-workspace .btn.small {
+    padding: 3px 8px;
+    font-size: 10px;
+}
+
+#entity-workspace .btn.add {
+    color: var(--accent-blue);
+    border-color: rgba(129, 140, 248, 0.3);
+    background: rgba(129, 140, 248, 0.05);
+}
+
+#entity-workspace .btn.add:hover {
+    background: rgba(129, 140, 248, 0.15);
+    color: var(--accent-blue);
+}
+
+/* ── STATUS BANNER / FILE STATUS ────────────────────────────────────────── */
+
+#entity-workspace .file-status {
+    padding: 10px 14px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--bg-element);
+    color: var(--text-sec);
+}
+
+#entity-workspace .file-status.loading {
+    color: #F59E0B;
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+#entity-workspace .file-status.found {
+    color: var(--accent-green);
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+#entity-workspace .file-status.missing {
+    color: var(--accent-red);
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.3);
+}
+
+/* ── AUDIT TIMELINE (V2 compact form) ───────────────────────────────────── */
+
+#entity-workspace .audit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    background: var(--bg-master);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 8px;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+#entity-workspace .audit-entry {
+    display: grid;
+    grid-template-columns: 140px 60px 1fr;
+    gap: 8px;
+    align-items: baseline;
+    padding: 3px 4px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+#entity-workspace .audit-entry:last-child {
+    border-bottom: none;
+}
+
+#entity-workspace .audit-ts {
+    color: var(--text-mut);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+#entity-workspace .audit-action {
+    font-weight: 700;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--accent-blue);
+}
+
+#entity-workspace .audit-action.CHANGE {
+    color: var(--accent-green);
+}
+
+#entity-workspace .audit-action.LIFECYCLE {
+    color: #F59E0B;
+}
+
+#entity-workspace .audit-details {
+    color: var(--text-sec);
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+#entity-workspace .audit-empty {
+    color: var(--text-mut);
+    font-style: italic;
+    padding: 4px;
+}
+
+#entity-workspace .audit-old {
+    color: var(--accent-red);
+    text-decoration: line-through;
+    margin-right: 4px;
+}
+
+#entity-workspace .audit-new {
+    color: var(--accent-green);
+    margin-left: 4px;
+}
+
+/* ── UI BANNER ──────────────────────────────────────────────────────────── */
+
+#entity-workspace .ui-banner {
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid transparent;
+}
+
+#entity-workspace .ui-banner-error {
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.3);
+    color: var(--accent-red);
+}
+
+#entity-workspace .ui-banner-success {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: var(--accent-green);
+}
+
+#entity-workspace .ui-banner-warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: #F59E0B;
+}
+
+/* ── TOGGLE (Active switch reused inside sub-rows) ──────────────────────── */
+
+#entity-workspace .switch {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+#entity-workspace .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+#entity-workspace .switch .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.08);
+    transition: 0.3s;
+    border-radius: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+#entity-workspace .switch .slider:before {
+    position: absolute;
+    content: "";
+    height: 10px;
+    width: 10px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #666;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+#entity-workspace .switch input:checked + .slider {
+    background-color: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.4);
+}
+
+#entity-workspace .switch input:checked + .slider:before {
+    transform: translateX(12px);
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+}
+
+#entity-workspace .switch.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── TAG CATEGORY BADGE (compact V2 style) ──────────────────────────────── */
+
+#entity-workspace .tag-category-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--bg-element);
+    color: var(--text-sec);
+    border: 1px solid var(--border-subtle);
+}

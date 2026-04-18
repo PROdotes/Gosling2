@@ -3,7 +3,6 @@ import {
     buildNavigateAttrs,
     escapeHtml,
     renderAuditTimeline,
-    renderEmptyState,
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
@@ -15,11 +14,11 @@ function renderIdentityTags(items) {
     }
 
     return `
-        <div class="tag-list">
+        <div class="chip-list">
             ${identities
                 .map(
                     (identity) => `
-                <button class="tag link" ${buildNavigateAttrs("artists", identity.display_name || "")}>${escapeHtml(identity.display_name || "-")}</button>
+                <button type="button" class="chip link" ${buildNavigateAttrs("artists", identity.display_name || "")}>${escapeHtml(identity.display_name || "-")}</button>
             `,
                 )
                 .join("")}
@@ -34,11 +33,11 @@ function renderAliasTags(items) {
     }
 
     return `
-        <div class="tag-list">
+        <div class="chip-list">
             ${aliases
                 .map(
                     (alias) => `
-                <button class="tag ${alias.is_primary ? "genre" : ""} link" ${buildNavigateAttrs("artists", alias.display_name || "")}>${escapeHtml(alias.display_name || "-")}</button>
+                <button type="button" class="chip link" ${buildNavigateAttrs("artists", alias.display_name || "")}>${escapeHtml(alias.display_name || "-")}</button>
             `,
                 )
                 .join("")}
@@ -50,47 +49,49 @@ export function renderArtists(ctx, artists) {
     ctx.setState({ selectedIndex: -1, displayedItems: artists });
     ctx.updateResultsSummary(artists.length, "artist");
 
-    ctx.elements.sortControlsBox.innerHTML =
-        '<span class="sort-label">Sort:</span><span class="muted-note" style="font-size:0.75rem; margin-left:0.5rem;">(Not available for artists)</span>';
+    const listTitle = document.getElementById("entity-list-title");
+    if (listTitle) listTitle.textContent = `Artists (${artists.length})`;
+
+    const actionsSlot = document.getElementById("entity-list-actions");
+    if (actionsSlot) {
+        const unlinkedCount = artists.filter((a) => a.song_count === 0).length;
+        actionsSlot.innerHTML = unlinkedCount > 0
+            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-identities">Delete ${unlinkedCount} unlinked</button>`
+            : "";
+    }
 
     if (!artists.length) {
         ctx.elements.resultsContainer.innerHTML =
-            renderEmptyState("No artists found");
+            '<div class="entity-empty-state">No artists found</div>';
         return;
     }
 
-    const unlinkedCount = artists.filter((a) => a.song_count === 0).length;
-    const bulkBtn =
-        unlinkedCount > 0
-            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-identities">Delete ${unlinkedCount} unlinked</button></div>`
-            : "";
-
-    ctx.elements.resultsContainer.innerHTML =
-        bulkBtn +
-        artists
-            .map(
-                (artist, index) => `
-        <article class="result-card artist-card" data-action="select-result" data-index="${index}" data-selectable="true">
-            <div class="card-icon">ID</div>
-            <div class="card-body">
-                <div class="card-title">${escapeHtml(artist.display_name || "Unnamed Identity")}</div>
-                <div class="card-subtitle mono">#${escapeHtml(artist.id || "-")}</div>
+    ctx.elements.resultsContainer.innerHTML = artists
+        .map(
+            (artist, index) => `
+        <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
+            <div class="entity-row-info">
+                <div class="entity-row-title">
+                    ${escapeHtml(artist.display_name || "Unnamed Identity")}
+                    <span class="entity-row-id">#${escapeHtml(artist.id || "-")}</span>
+                </div>
+                <div class="entity-row-sub">${escapeHtml(artist.type || "identity")}</div>
             </div>
-            <div class="card-meta">
-                <span class="pill artist-badge">${escapeHtml(artist.type || "identity")}</span>
+            <div class="entity-row-meta">
+                <span class="pill artist">${escapeHtml(artist.type || "identity")}</span>
                 ${artist.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
             </div>
-        </article>
+        </div>
     `,
-            )
-            .join("");
+        )
+        .join("");
 }
 
 export function renderArtistDetailLoading(ctx, artist) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(artist.display_name || "Unnamed Identity")} <span class="pill mono">#${escapeHtml(artist.id || "-")}</span></div>
-            <div class="detail-path">${escapeHtml(String(artist.type || "identity").toUpperCase())}${artist.legal_name ? ` • Legal: ${escapeHtml(artist.legal_name)}` : ""}</div>
+            <div class="detail-subtitle">${escapeHtml(String(artist.type || "identity").toUpperCase())}${artist.legal_name ? ` • Legal: ${escapeHtml(artist.legal_name)}` : ""}</div>
         </div>
         <div class="detail-content">
             ${renderStatus("loading", "Loading artist catalog...")}
@@ -108,7 +109,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(tree.display_name || "Unnamed Identity")} <span class="pill mono">#${escapeHtml(tree.id || "-")}</span></div>
-            <div class="detail-path">${escapeHtml(String(tree.type || "identity").toUpperCase())}${tree.legal_name ? ` • Legal: ${escapeHtml(tree.legal_name)}` : ""}</div>
+            <div class="detail-subtitle">${escapeHtml(String(tree.type || "identity").toUpperCase())}${tree.legal_name ? ` • Legal: ${escapeHtml(tree.legal_name)}` : ""}</div>
         </div>
         <div class="detail-content">
             ${aliases ? `<div class="detail-section"><div class="section-title">Aliases</div>${aliases}</div>` : ""}
@@ -127,7 +128,8 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
 
             <div class="detail-section">
                 <button
-                    class="btn-danger"
+                    type="button"
+                    class="btn danger"
                     data-action="delete-identity"
                     data-identity-id="${tree.id}"
                     ${!isUnlinked ? 'disabled title="Cannot delete — identity is linked to songs or albums"' : ""}

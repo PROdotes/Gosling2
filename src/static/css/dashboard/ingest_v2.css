@@ -1,0 +1,560 @@
+/*
+ * Ingest Workspace V2 — dark slate surfaces, indigo accent.
+ * Scoped to #ingest-workspace. Shares the design tokens with Songs/Entity V2.
+ */
+
+#ingest-workspace {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+
+    --bg-master:   #030407;
+    --bg-window:   #0A0D14;
+    --bg-panel:    #12151E;
+    --bg-element:  #1D2230;
+    --bg-hover:    #2A3041;
+    --bg-active:   #4F46E5;
+    --border-subtle: #2A3041;
+    --border-focus:  #818CF8;
+    --text-pure:   #FFFFFF;
+    --text-sec:    #94A3B8;
+    --text-mut:    #64748B;
+    --accent-blue:  #818CF8;
+    --accent-green: #10B981;
+    --accent-red:   #F43F5E;
+    --accent-amber: #F59E0B;
+}
+
+#ingest-workspace.active {
+    display: flex;
+}
+
+#ingest-workspace #ingest-container {
+    flex: 1;
+    overflow-y: auto;
+    background: var(--bg-window);
+    color: var(--text-sec);
+}
+
+/* ── LAYOUT ─────────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingestion-view {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+#ingest-workspace .ingestion-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#ingest-workspace .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-mut);
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+    margin: 0;
+}
+
+#ingest-workspace .muted-note {
+    color: var(--text-mut);
+    font-size: 12px;
+}
+
+/* ── DROP ZONE ──────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingest-drop-zone {
+    border: 2px dashed var(--border-subtle);
+    border-radius: 6px;
+    padding: 28px 24px;
+    background: var(--bg-panel);
+    transition: 0.15s;
+    cursor: pointer;
+}
+
+#ingest-workspace .ingest-drop-zone.drag-over {
+    border-color: var(--border-focus);
+    background: rgba(129, 140, 248, 0.08);
+}
+
+#ingest-workspace .ingest-drop-zone.uploading {
+    border-color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.06);
+    cursor: wait;
+}
+
+#ingest-workspace .drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+}
+
+#ingest-workspace .drop-zone-icon {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    background: var(--bg-element);
+    color: var(--accent-blue);
+    font-size: 22px;
+    font-weight: 300;
+}
+
+#ingest-workspace .drop-zone-label {
+    color: var(--text-pure);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#ingest-workspace .drop-zone-hint {
+    font-size: 11px;
+    color: var(--text-mut);
+}
+
+#ingest-workspace .drop-zone-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--accent-amber);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#ingest-workspace .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(245, 158, 11, 0.25);
+    border-top-color: var(--accent-amber);
+    border-radius: 50%;
+    animation: ingest-spin 0.8s linear infinite;
+}
+
+@keyframes ingest-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── INPUT ROW ──────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingest-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#ingest-workspace .ingest-input-row input[type="text"],
+#ingest-workspace input.link-modal-input {
+    flex: 1;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-pure);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#ingest-workspace .ingest-input-row input[type="text"]::placeholder {
+    color: var(--text-mut);
+}
+
+#ingest-workspace .ingest-input-row input[type="text"]:focus,
+#ingest-workspace input.link-modal-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.15);
+}
+
+/* ── BUTTONS ────────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingest-btn-primary,
+#ingest-workspace .ingest-btn-secondary,
+#ingest-workspace .ingest-btn-danger,
+#ingest-workspace .ingest-btn-link {
+    padding: 7px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    font-family: inherit;
+    transition: 0.1s;
+    white-space: nowrap;
+}
+
+#ingest-workspace .ingest-btn-primary {
+    background: var(--bg-active);
+    color: var(--text-pure);
+    border-color: transparent;
+}
+
+#ingest-workspace .ingest-btn-primary:hover:not(:disabled) {
+    filter: brightness(1.1);
+}
+
+#ingest-workspace .ingest-btn-secondary {
+    background: var(--bg-element);
+    color: var(--text-sec);
+}
+
+#ingest-workspace .ingest-btn-secondary:hover:not(:disabled) {
+    background: var(--bg-hover);
+    color: var(--text-pure);
+}
+
+#ingest-workspace .ingest-btn-danger {
+    color: var(--accent-red);
+    border-color: rgba(244, 63, 94, 0.3);
+    background: rgba(244, 63, 94, 0.05);
+}
+
+#ingest-workspace .ingest-btn-danger:hover:not(:disabled) {
+    background: rgba(244, 63, 94, 0.15);
+}
+
+#ingest-workspace .ingest-btn-link {
+    background: transparent;
+    border-color: rgba(129, 140, 248, 0.3);
+    color: var(--accent-blue);
+}
+
+#ingest-workspace .ingest-btn-link:hover {
+    background: rgba(129, 140, 248, 0.1);
+}
+
+#ingest-workspace .ingest-btn-primary:disabled,
+#ingest-workspace .ingest-btn-secondary:disabled,
+#ingest-workspace .ingest-btn-danger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* ── ACTIONS ROW ────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingest-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#ingest-workspace .ingest-hint {
+    margin-left: auto;
+    font-size: 11px;
+}
+
+/* ── RESULTS LIST ───────────────────────────────────────────────────────── */
+
+#ingest-workspace .ingest-results {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#ingest-workspace .ingest-results:empty {
+    display: none;
+}
+
+#ingest-workspace .result-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    border-left: 3px solid var(--border-subtle);
+}
+
+#ingest-workspace .result-card.ingest-card.new,
+#ingest-workspace .result-card.ingest-card.ingested {
+    border-left-color: var(--accent-green);
+}
+
+#ingest-workspace .result-card.ingest-card.converting,
+#ingest-workspace .result-card.ingest-card.pending_convert,
+#ingest-workspace .result-card.ingest-card.already_exists,
+#ingest-workspace .result-card.ingest-card.conflict {
+    border-left-color: var(--accent-amber);
+}
+
+#ingest-workspace .result-card.ingest-card.error {
+    border-left-color: var(--accent-red);
+}
+
+#ingest-workspace .card-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    color: var(--text-sec);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#ingest-workspace .card-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#ingest-workspace .card-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+#ingest-workspace .card-title {
+    color: var(--text-pure);
+    font-weight: 600;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#ingest-workspace .card-subtitle {
+    color: var(--text-sec);
+    font-size: 12px;
+}
+
+#ingest-workspace .detail-path {
+    color: var(--text-mut);
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    word-break: break-all;
+}
+
+#ingest-workspace .ingest-actions-row {
+    margin-top: 6px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#ingest-workspace .ingest-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+    align-items: flex-end;
+}
+
+/* ── FILE STATUS (inline pill inside cards) ─────────────────────────── */
+
+#ingest-workspace .file-status {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--bg-element);
+    color: var(--text-sec);
+    border: 1px solid var(--border-subtle);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#ingest-workspace .file-status.found {
+    color: var(--accent-green);
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+}
+
+#ingest-workspace .file-status.missing {
+    color: var(--accent-red);
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.3);
+}
+
+#ingest-workspace .file-status.loading {
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* ── PILL ───────────────────────────────────────────────────────────────── */
+
+#ingest-workspace .pill {
+    background: var(--bg-element);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-sec);
+    border: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+
+#ingest-workspace .pill.mono {
+    font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── BATCH SUMMARY ──────────────────────────────────────────────────────── */
+
+#ingest-workspace .batch-summary-card {
+    border-left-color: var(--accent-blue);
+    background: var(--bg-element);
+}
+
+#ingest-workspace .batch-stats {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+#ingest-workspace .stat-pill {
+    background: var(--bg-master);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: center;
+}
+
+#ingest-workspace .stat-pill .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-pure);
+}
+
+#ingest-workspace .stat-pill .stat-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-mut);
+}
+
+/* ── ORPHAN SECTION ─────────────────────────────────────────────────────── */
+
+#ingest-workspace .orphan-section {
+    margin-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 16px;
+}
+
+#ingest-workspace .orphan-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-sec);
+    cursor: pointer;
+    padding: 4px 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-family: inherit;
+}
+
+#ingest-workspace .orphan-toggle:hover {
+    color: var(--text-pure);
+}
+
+#ingest-workspace .orphan-body {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#ingest-workspace .orphan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+}
+
+#ingest-workspace .orphan-name {
+    flex: 1;
+    color: var(--text-pure);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#ingest-workspace .orphan-size {
+    color: var(--text-mut);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+#ingest-workspace .orphan-row .row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* ── PENDING/CONFLICT BOXES ─────────────────────────────────────────────── */
+
+#ingest-workspace .pending-convert-box {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: 4px;
+}
+
+/* ── UI BANNER ──────────────────────────────────────────────────────────── */
+
+#ingest-workspace .ui-banner {
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid transparent;
+}
+
+#ingest-workspace .ui-banner-error {
+    background: rgba(244, 63, 94, 0.08);
+    border-color: rgba(244, 63, 94, 0.3);
+    color: var(--accent-red);
+}
+
+#ingest-workspace .ui-banner-success {
+    background: rgba(16, 185, 129, 0.08);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: var(--accent-green);
+}
+
+#ingest-workspace .ui-banner-warning {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: var(--accent-amber);
+}

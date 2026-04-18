@@ -3,7 +3,6 @@ import {
     buildNavigateAttrs,
     escapeHtml,
     renderAuditTimeline,
-    renderEmptyState,
     renderSongList,
     renderStatus,
     textOrDash,
@@ -16,19 +15,19 @@ function renderAlbumCredits(credits, albumId) {
     }
 
     return `
-        <div class="link-chip-list">
+        <div class="chip-list">
             ${items
                 .map(
                     (credit) => `
-                <span class="link-chip">
-                    <button class="link-chip-label"
+                <span class="chip">
+                    <button class="inline-link"
                             data-action="open-edit-modal"
                             data-chip-type="credit"
                             data-album-id="${albumId}"
                             data-item-id="${credit.name_id}">
                         ${escapeHtml(credit.display_name || credit.name || "-")}
                     </button>
-                    <button class="link-chip-remove"
+                    <button class="chip-remove"
                             data-action="remove-album-credit"
                             data-album-id="${albumId}"
                             data-credit-id="${credit.name_id}"
@@ -48,18 +47,18 @@ function renderAlbumPublishers(publishers, albumId) {
     }
 
     return `
-        <div class="link-chip-list">
+        <div class="chip-list">
             ${items
                 .map(
                     (publisher) => `
-                <span class="link-chip tag publisher">
-                    <button class="link-chip-label"
+                <span class="chip publisher">
+                    <button class="inline-link"
                             data-action="open-edit-modal"
                             data-chip-type="publisher"
                             data-item-id="${publisher.id}">
                         ${escapeHtml(publisher.parent_name ? `${publisher.name} (${publisher.parent_name})` : publisher.name)}
                     </button>
-                    <button class="link-chip-remove"
+                    <button class="chip-remove"
                             data-action="remove-album-publisher"
                             data-album-id="${albumId}"
                             data-publisher-id="${publisher.id}"
@@ -76,41 +75,40 @@ export function renderAlbums(ctx, albums) {
     ctx.setState({ selectedIndex: -1, displayedItems: albums });
     ctx.updateResultsSummary(albums.length, "album");
 
-    ctx.elements.sortControlsBox.innerHTML =
-        '<span class="sort-label">Sort:</span><span class="muted-note" style="font-size:0.75rem; margin-left:0.5rem;">(Not available for albums)</span>';
+    const listTitle = document.getElementById("entity-list-title");
+    if (listTitle) listTitle.textContent = `Albums (${albums.length})`;
+
+    const actionsSlot = document.getElementById("entity-list-actions");
+    if (actionsSlot) {
+        const unlinkedCount = albums.filter((a) => a.song_count === 0).length;
+        actionsSlot.innerHTML = unlinkedCount > 0
+            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-albums">Delete ${unlinkedCount} unlinked</button>`
+            : "";
+    }
 
     if (!albums.length) {
         ctx.elements.resultsContainer.innerHTML =
-            renderEmptyState("No albums found");
+            '<div class="entity-empty-state">No albums found</div>';
         return;
     }
 
-    const unlinkedCount = albums.filter((a) => a.song_count === 0).length;
-    const bulkBtn =
-        unlinkedCount > 0
-            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-albums">Delete ${unlinkedCount} unlinked</button></div>`
-            : "";
-
-    ctx.elements.resultsContainer.innerHTML =
-        bulkBtn +
-        albums
+    ctx.elements.resultsContainer.innerHTML = albums
         .map(
             (album, index) => `
-        <article class="result-card album-card" data-action="select-result" data-index="${index}" data-selectable="true">
-            <div class="card-icon">LP</div>
-            <div class="card-body">
-                <div class="card-title">${escapeHtml(album.title || "Untitled Album")}</div>
-                <div class="card-subtitle">${escapeHtml(album.display_artist || "Unknown Artist")}${album.album_type ? ` · ${escapeHtml(album.album_type)}` : ""}</div>
+        <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
+            <div class="entity-row-info">
+                <div class="entity-row-title">
+                    ${escapeHtml(album.title || "Untitled Album")}
+                    <span class="entity-row-id">#${escapeHtml(album.id || "-")}</span>
+                </div>
+                <div class="entity-row-sub">${escapeHtml(album.display_artist || "Unknown Artist")}${album.album_type ? ` · ${escapeHtml(album.album_type)}` : ""}</div>
             </div>
-            <div class="card-meta">
+            <div class="entity-row-meta">
                 <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
-                ${album.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count} track${album.song_count === 1 ? "" : "s"}</span>`}
+                ${album.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count}</span>`}
                 ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
             </div>
-            <div class="card-actions">
-                <span class="pill mono">#${escapeHtml(album.id || "-")}</span>
-            </div>
-        </article>
+        </div>
     `,
         )
         .join("");
@@ -120,7 +118,7 @@ export function renderAlbumDetailLoading(ctx, album) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(album.title || "Untitled Album")} <span class="pill mono">#${escapeHtml(album.id || "-")}</span></div>
-            <div class="detail-path">ALBUM${album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : ""}</div>
+            <div class="detail-subtitle">ALBUM${album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : ""}</div>
         </div>
         <div class="detail-content">
             ${renderStatus("loading", "Loading album detail...")}
@@ -138,7 +136,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(album.title || "Untitled Album")} <span class="pill mono">#${escapeHtml(album.id || "-")}</span></div>
-            <div class="detail-path">ALBUM${album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : ""}</div>
+            <div class="detail-subtitle">ALBUM${album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : ""}</div>
         </div>
         <div class="detail-content">
             <div class="detail-section">
@@ -152,23 +150,19 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title-row">
-                    <span class="section-title">Publishers</span>
-                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album-publishers" data-album-id="${albumId}">+ Add</button>
+                <div class="section-title">
+                    <span>Publishers</span>
+                    <button type="button" class="btn add small" data-action="open-link-modal" data-modal-type="album-publishers" data-album-id="${albumId}">+ Add</button>
                 </div>
-                <div class="surface-box">
-                    ${renderAlbumPublishers(publishers, albumId)}
-                </div>
+                ${renderAlbumPublishers(publishers, albumId)}
             </div>
 
             <div class="detail-section">
-                <div class="section-title-row">
-                    <span class="section-title">Album Credits</span>
-                    <button class="section-add-btn" data-action="open-link-modal" data-modal-type="album-credits" data-album-id="${albumId}">+ Add</button>
+                <div class="section-title">
+                    <span>Album Credits</span>
+                    <button type="button" class="btn add small" data-action="open-link-modal" data-modal-type="album-credits" data-album-id="${albumId}">+ Add</button>
                 </div>
-                <div class="surface-box">
-                    ${renderAlbumCredits(credits, albumId)}
-                </div>
+                ${renderAlbumCredits(credits, albumId)}
             </div>
 
             <div class="detail-section">
@@ -183,7 +177,8 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
 
             <div class="detail-section">
                 <button
-                    class="btn-danger"
+                    type="button"
+                    class="btn danger"
                     data-action="delete-album"
                     data-album-id="${albumId}"
                     ${!isUnlinked ? 'disabled title="Cannot delete — album has songs"' : ""}

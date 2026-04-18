@@ -11,18 +11,13 @@
         href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="/static/css/dashboard/base.css">
-    <link rel="stylesheet" href="/static/css/dashboard/layout.css">
-    <link rel="stylesheet" href="/static/css/dashboard/cards.css">
-    <link rel="stylesheet" href="/static/css/dashboard/detail.css">
-    <link rel="stylesheet" href="/static/css/dashboard/lists.css">
-    <link rel="stylesheet" href="/static/css/dashboard/responsive.css">
-    <link rel="stylesheet" href="/static/css/dashboard/ingestion.css">
-    <link rel="stylesheet" href="/static/css/dashboard/controls.css">
+    <link rel="stylesheet" href="/static/css/dashboard/songs_v2.css">
+    <link rel="stylesheet" href="/static/css/dashboard/entity_v2.css">
+    <link rel="stylesheet" href="/static/css/dashboard/ingest_v2.css">
     <link rel="stylesheet" href="/static/css/dashboard/modals.css">
     <link rel="stylesheet" href="/static/css/dashboard/tokens-preview.css">
     <link rel="stylesheet" href="/static/css/dashboard/toasts.css">
     <link rel="stylesheet" href="/static/css/dashboard/ingest-tab.css">
-    <link rel="stylesheet" href="/static/css/dashboard/songs_v2.css">
 </head>
 
 <body>
@@ -38,7 +33,7 @@
         </nav>
         <div class="header-search">
             <div class="search-input-wrapper">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input type="text" id="searchInput" placeholder="Search library..." autocomplete="off">
@@ -117,21 +112,28 @@
         </div>
     </div>
 
-    <!-- Legacy main: hidden when Songs tab is active (songs-workspace takes its place) -->
-    <main style="display:none">
-        <section class="results-panel">
-            <div id="sort-controls-box" class="sort-controls"></div>
-            <div class="results-main-layout">
-                <div id="results-container">
-                    <div class="empty-state">
-                        <div class="empty-glyph">♪</div>
-                        <p>Start typing to discover music</p>
-                    </div>
-                </div>
+    <!-- Entity workspace: used by Albums / Artists / Publishers / Tags -->
+    <div id="entity-workspace">
+        <div class="entity-list-pane">
+            <div class="entity-list-header">
+                <span class="entity-list-title" id="entity-list-title">Results</span>
+                <div class="entity-list-actions" id="entity-list-actions"></div>
             </div>
-        </section>
-        <section class="detail-panel" id="detail-panel"></section>
-    </main>    <div id="scrubber-modal" class="link-modal-overlay" style="display:none">
+            <div class="entity-list-body" id="results-container">
+                <div class="entity-empty-state">Start typing to discover music</div>
+            </div>
+        </div>
+        <div class="entity-detail-pane" id="detail-panel">
+            <div class="entity-detail-empty">Select an item to see details</div>
+        </div>
+    </div>
+
+    <!-- Ingest workspace: custom layout for the Ingest tab -->
+    <div id="ingest-workspace">
+        <div id="ingest-container"></div>
+    </div>
+
+    <div id="scrubber-modal" class="link-modal-overlay" style="display:none">
         <div class="link-modal" style="max-width:640px">
             <div class="link-modal-header">
                 <span class="link-modal-title" id="scrubber-modal-title">Player</span>

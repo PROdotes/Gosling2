@@ -1,7 +1,6 @@
 import {
     asArray,
     escapeHtml,
-    renderEmptyState,
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
@@ -18,46 +17,48 @@ export function renderTags(ctx, tags) {
     ctx.setState({ selectedIndex: -1, displayedItems: tags });
     ctx.updateResultsSummary(tags.length, "tag");
 
+    const listTitle = document.getElementById("entity-list-title");
+    if (listTitle) listTitle.textContent = `Tags (${tags.length})`;
+
+    const actionsSlot = document.getElementById("entity-list-actions");
+    if (actionsSlot) {
+        const unlinkedCount = tags.filter((t) => t.song_count === 0).length;
+        actionsSlot.innerHTML = unlinkedCount > 0
+            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-tags">Delete ${unlinkedCount} unlinked</button>`
+            : "";
+    }
+
     if (!tags.length) {
         ctx.elements.resultsContainer.innerHTML =
-            renderEmptyState("No tags found");
+            '<div class="entity-empty-state">No tags found</div>';
         return;
     }
 
-    const unlinkedCount = tags.filter((t) => t.song_count === 0).length;
-    const bulkBtn =
-        unlinkedCount > 0
-            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-tags">Delete ${unlinkedCount} unlinked</button></div>`
-            : "";
-
-    ctx.elements.resultsContainer.innerHTML =
-        bulkBtn +
-        tags
-            .map(
-                (tag, index) => `
-        <article class="result-card tag-card" data-action="select-result" data-index="${index}" data-selectable="true">
-            <div class="card-icon">TAG</div>
-            <div class="card-body">
-                <div class="card-title-row">
-                    <div class="card-title">${escapeHtml(tag.name || "Unnamed Tag")}</div>
-                    <span class="pill mono">#${escapeHtml(tag.id || "-")}</span>
+    ctx.elements.resultsContainer.innerHTML = tags
+        .map(
+            (tag, index) => `
+        <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
+            <div class="entity-row-info">
+                <div class="entity-row-title">
+                    ${escapeHtml(tag.name || "Unnamed Tag")}
+                    <span class="entity-row-id">#${escapeHtml(tag.id || "-")}</span>
                 </div>
-                <div class="card-subtitle">${renderCategoryBadge(tag.category)}</div>
+                <div class="entity-row-sub">${renderCategoryBadge(tag.category)}</div>
             </div>
-            <div class="card-meta">
+            <div class="entity-row-meta">
                 ${tag.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${tag.song_count}</span>`}
             </div>
-        </article>
+        </div>
     `,
-            )
-            .join("");
+        )
+        .join("");
 }
 
 export function renderTagDetailLoading(ctx, tag) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(tag.name || "Unnamed Tag")} <span class="pill mono">#${escapeHtml(tag.id || "-")}</span></div>
-            <div class="detail-path">TAG</div>
+            <div class="detail-subtitle">TAG</div>
         </div>
         <div class="detail-content">
             ${renderStatus("loading", "Loading songs...")}
@@ -71,7 +72,7 @@ export function renderTagDetailComplete(ctx, tag, songs) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(tag.name || "Unnamed Tag")} <span class="pill mono">#${escapeHtml(tag.id || "-")}</span></div>
-            <div class="detail-path">TAG</div>
+            <div class="detail-subtitle">TAG</div>
         </div>
         <div class="detail-content">
             <div class="detail-section">
@@ -89,7 +90,8 @@ export function renderTagDetailComplete(ctx, tag, songs) {
 
             <div class="detail-section">
                 <button
-                    class="btn-danger"
+                    type="button"
+                    class="btn danger"
                     data-action="delete-tag"
                     data-tag-id="${tag.id}"
                     ${!isUnlinked ? 'disabled title="Cannot delete — tag is linked to songs"' : ""}

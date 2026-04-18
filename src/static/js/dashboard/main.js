@@ -102,9 +102,9 @@ const elements = {
     matchCount: document.getElementById("match-count"),
     statSep: document.getElementById("stat-sep"),
     deepSearchToggle: document.getElementById("deepSearchToggle"),
-    sortControlsBox: document.getElementById("sort-controls-box"),
     songsWorkspace: document.getElementById("songs-workspace"),
-    legacyMain: document.querySelector("main"),
+    entityWorkspace: document.getElementById("entity-workspace"),
+    ingestWorkspace: document.getElementById("ingest-workspace"),
 };
 
 const state = {
@@ -252,11 +252,12 @@ const ctx = {
     performSearch: (query) => performSearch(query),
     showDetailPanel(html) {
         elements.detailPanel.innerHTML = html;
-        elements.detailPanel.style.display = "flex";
+        elements.detailPanel.style.display = "";
     },
     hideDetailPanel() {
-        elements.detailPanel.style.display = "none";
-        elements.detailPanel.innerHTML = "";
+        elements.detailPanel.innerHTML =
+            '<div class="entity-detail-empty">Select an item to see details</div>';
+        elements.detailPanel.style.display = "";
     },
     showBanner(msg, type = "error") {
         const banner = document.createElement("div");
@@ -361,11 +362,15 @@ function syncModeUi() {
     elements.searchInput.placeholder =
         modeConfig[state.currentMode].placeholder;
 
-    const isSongs = state.currentMode === "songs";
+    const mode = state.currentMode;
+    const isSongs = mode === "songs";
+    const isIngest = mode === "ingest";
+    const isEntity = !isSongs && !isIngest;
+
     elements.songsWorkspace?.classList.toggle("active", isSongs);
-    if (elements.legacyMain) {
-        elements.legacyMain.style.display = isSongs ? "none" : "block";
-    }
+    elements.entityWorkspace?.classList.toggle("active", isEntity);
+    elements.ingestWorkspace?.classList.toggle("active", isIngest);
+
     if (isSongs) renderSongEditorEmpty();
 }
 

@@ -2,7 +2,6 @@ import {
     asArray,
     buildNavigateAttrs,
     escapeHtml,
-    renderEmptyState,
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
@@ -14,11 +13,11 @@ function renderSubPublishers(items) {
     }
 
     return `
-        <div class="tag-list">
+        <div class="chip-list">
             ${publishers
                 .map(
                     (publisher) => `
-                <button class="tag publisher link" ${buildNavigateAttrs("publishers", publisher.name || "")}>${escapeHtml(publisher.name || "-")}</button>
+                <button type="button" class="chip publisher link" ${buildNavigateAttrs("publishers", publisher.name || "")}>${escapeHtml(publisher.name || "-")}</button>
             `,
                 )
                 .join("")}
@@ -30,49 +29,52 @@ export function renderPublishers(ctx, publishers) {
     ctx.setState({ selectedIndex: -1, displayedItems: publishers });
     ctx.updateResultsSummary(publishers.length, "publisher");
 
+    const listTitle = document.getElementById("entity-list-title");
+    if (listTitle) listTitle.textContent = `Publishers (${publishers.length})`;
+
+    const actionsSlot = document.getElementById("entity-list-actions");
+    if (actionsSlot) {
+        const unlinkedCount = publishers.filter(
+            (p) => p.song_count === 0 && p.album_count === 0,
+        ).length;
+        actionsSlot.innerHTML = unlinkedCount > 0
+            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-publishers">Delete ${unlinkedCount} unlinked</button>`
+            : "";
+    }
+
     if (!publishers.length) {
-        ctx.elements.resultsContainer.innerHTML = renderEmptyState(
-            "No publishers found",
-        );
+        ctx.elements.resultsContainer.innerHTML =
+            '<div class="entity-empty-state">No publishers found</div>';
         return;
     }
 
-    const unlinkedCount = publishers.filter(
-        (p) => p.song_count === 0 && p.album_count === 0,
-    ).length;
-    const bulkBtn =
-        unlinkedCount > 0
-            ? `<div class="list-actions"><button class="btn-danger" data-action="bulk-delete-unlinked-publishers">Delete ${unlinkedCount} unlinked</button></div>`
-            : "";
-
-    ctx.elements.resultsContainer.innerHTML =
-        bulkBtn +
-        publishers
-            .map(
-                (publisher, index) => `
-        <article class="result-card publisher-card" data-action="select-result" data-index="${index}" data-selectable="true">
-            <div class="card-icon">PUB</div>
-            <div class="card-body">
-                <div class="card-title-row">
-                    <div class="card-title">${escapeHtml(publisher.name || "Unnamed Publisher")}</div>
-                    <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span>
+    ctx.elements.resultsContainer.innerHTML = publishers
+        .map(
+            (publisher, index) => `
+        <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
+            <div class="entity-row-info">
+                <div class="entity-row-title">
+                    ${escapeHtml(publisher.name || "Unnamed Publisher")}
+                    <span class="entity-row-id">#${escapeHtml(publisher.id || "-")}</span>
                 </div>
-                <div class="card-subtitle">${escapeHtml(publisher.parent_name || "Independent / top level")}</div>
+                <div class="entity-row-sub">${escapeHtml(publisher.parent_name || "Independent / top level")}</div>
             </div>
-            <div class="card-meta">
-                ${publisher.song_count === 0 && publisher.album_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${publisher.song_count} song${publisher.song_count === 1 ? "" : "s"} · ${publisher.album_count} album${publisher.album_count === 1 ? "" : "s"}</span>`}
+            <div class="entity-row-meta">
+                ${publisher.song_count === 0 && publisher.album_count === 0
+                    ? '<span class="pill unlinked">0</span>'
+                    : `<span class="pill">${publisher.song_count}S</span><span class="pill">${publisher.album_count}A</span>`}
             </div>
-        </article>
+        </div>
     `,
-            )
-            .join("");
+        )
+        .join("");
 }
 
 export function renderPublisherDetailLoading(ctx, publisher) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>
-            <div class="detail-path">PUBLISHER</div>
+            <div class="detail-subtitle">PUBLISHER</div>
         </div>
         <div class="detail-content">
             ${renderStatus("loading", "Loading repertoire...")}
@@ -85,7 +87,7 @@ export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>
-            <div class="detail-path">PUBLISHER</div>
+            <div class="detail-subtitle">PUBLISHER</div>
         </div>
         <div class="detail-content">
             <div class="detail-section">
@@ -108,7 +110,8 @@ export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
 
             <div class="detail-section">
                 <button
-                    class="btn-danger"
+                    type="button"
+                    class="btn danger"
                     data-action="delete-publisher"
                     data-publisher-id="${publisher.id}"
                     ${!isUnlinked ? 'disabled title="Cannot delete — publisher is linked to songs or albums"' : ""}

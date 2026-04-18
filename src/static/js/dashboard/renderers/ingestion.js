@@ -94,7 +94,10 @@ export async function renderIngestionPanel(ctx) {
         // No fallbacks. UI will handle missing config.
     }
 
-    ctx.elements.resultsContainer.innerHTML = `
+    const container =
+        document.getElementById("ingest-container") ||
+        ctx.elements.resultsContainer;
+    container.innerHTML = `
         <div class="ingestion-view">
             <div class="ingestion-header">
                 <div class="section-title">File Verification</div>
@@ -602,29 +605,25 @@ function createResultCard(result, path) {
 
             ${status === "CONFLICT"
             ? `
-                <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
-                    <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #ff9500; font-weight: 600;">EXISTING GHOST RECORD (Soft-Deleted)</div>
-                    <div style="display: grid; grid-template-columns: auto 1fr; gap: 0.5rem; font-size: 0.85rem;">
+                <div class="pending-convert-box">
+                    <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: var(--accent-amber); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Existing Ghost Record (Soft-Deleted)</div>
+                    <div style="display: grid; grid-template-columns: 70px 1fr; gap: 4px 8px; font-size: 12px;">
                         <div class="muted-note">ID:</div>
-                        <div class="mono" style="font-weight: 500;">#${result.ghost_id}</div>
-
+                        <div class="mono">#${result.ghost_id}</div>
                         <div class="muted-note">Title:</div>
-                        <div style="font-weight: 500;">${escapeHtml(result.title || "Unknown")}</div>
-
+                        <div>${escapeHtml(result.title || "Unknown")}</div>
                         <div class="muted-note">Duration:</div>
                         <div class="mono">${formatDuration(result.duration_s)}</div>
-
                         <div class="muted-note">Year:</div>
                         <div class="mono">${result.year || "(none)"}</div>
-
                         <div class="muted-note">ISRC:</div>
-                        <div class="mono" style="font-size: 0.8rem;">${result.isrc ? escapeHtml(result.isrc) : "(none)"}</div>
+                        <div class="mono">${result.isrc ? escapeHtml(result.isrc) : "(none)"}</div>
                     </div>
-                    <div class="muted-note" style="font-size: 0.75rem; margin-top: 0.75rem; font-style: italic;">
-                        This file matches a previously deleted record. Click below to re-activate with new metadata.
+                    <div class="muted-note" style="font-size: 11px; margin-top: 8px; font-style: italic;">
+                        This file matches a previously deleted record. Re-activate with new metadata.
                     </div>
-                    <div style="margin-top: 0.75rem;">
-                        <button style="padding: 0.5rem 1rem; background: #ff9500; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
+                    <div style="margin-top: 8px;">
+                        <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
                             Re-ingest & Activate
                         </button>
                     </div>
@@ -635,11 +634,11 @@ function createResultCard(result, path) {
 
             ${status === "PENDING_CONVERT"
             ? `
-                <div class="pending-convert-box" style="margin-top: 1rem; padding: 0.75rem; background: rgba(255, 149, 0, 0.1); border-left: 3px solid #ff9500; border-radius: 4px;">
-                    <div class="muted-note" style="font-size: 0.75rem; margin-bottom: 0.75rem; font-style: italic;">
+                <div class="pending-convert-box">
+                    <div class="muted-note" style="font-size: 11px; margin-bottom: 8px; font-style: italic;">
                         This WAV file needs to be converted to MP3 before ingestion.
                     </div>
-                    <button style="padding: 0.5rem 1rem; background: #ff9500; color: white; border: none; border-radius: 4px; font-weight: 600; cursor: pointer;" data-action="convert-wav" data-staged-path="${escapeHtml(result.staged_path)}">
+                    <button type="button" class="ingest-btn-primary" data-action="convert-wav" data-staged-path="${escapeHtml(result.staged_path)}">
                         Convert & Ingest
                     </button>
                 </div>

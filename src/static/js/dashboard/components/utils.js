@@ -92,29 +92,27 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
     }
 
     return `
-        <div class="stack-list">
+        <div class="song-sub-list">
             ${items
                 .map(
                     (song) => `
-                <div class="list-row linkable" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                         <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}" 
-                                data-action="toggle-active" 
-                                data-id="${song.id}"
-                                title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
-                             <input type="checkbox" 
-                                    ${song.is_active ? "checked" : ""} 
-                                    ${song.processing_status !== 0 ? "disabled" : ""}>
-                             <span class="slider"></span>
-                        </label>
-                        <div>
-                            <div class="credit-name">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
-                            <div class="credit-role">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
-                        </div>
+                <div class="song-sub-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
+                    <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}"
+                           data-action="toggle-active"
+                           data-id="${song.id}"
+                           title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
+                        <input type="checkbox"
+                               ${song.is_active ? "checked" : ""}
+                               ${song.processing_status !== 0 ? "disabled" : ""}>
+                        <span class="slider"></span>
+                    </label>
+                    <div class="song-sub-row-info">
+                        <div class="song-sub-row-title">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
+                        <div class="song-sub-row-sub">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
                     </div>
-                    <div style="text-align: right">
-                        <div class="credit-role mono">${escapeHtml(song.formatted_duration || "")}</div>
-                        ${song.bpm ? `<div class="meta-label" style="margin: 0">${escapeHtml(song.bpm)} BPM</div>` : ""}
+                    <div class="song-sub-row-meta">
+                        <div>${escapeHtml(song.formatted_duration || "")}</div>
+                        ${song.bpm ? `<div>${escapeHtml(song.bpm)} BPM</div>` : ""}
                     </div>
                 </div>
             `,
@@ -143,18 +141,16 @@ export function isModalOpen() {
 export function renderAuditTimeline(history) {
     const items = asArray(history);
     if (!items.length) {
-        return '<div class="muted-note">No history found for this record</div>';
+        return '<div class="audit-empty">No history found for this record</div>';
     }
 
     return `
-        <div class="timeline">
+        <div class="audit-list">
             ${items
                 .map((item) => {
-                    const typeClass = escapeHtml(
-                        (item.type || "ACTION").toUpperCase(),
-                    );
-                    const details = escapeHtml(item.details || "");
-                    let diffHtml = "";
+                    const type = (item.type || "ACTION").toUpperCase();
+                    const typeClass = escapeHtml(type);
+                    let detailsHtml = escapeHtml(item.details || item.label || "");
 
                     if (item.type === "CHANGE" && item.new !== undefined) {
                         const oldValue =
@@ -165,31 +161,17 @@ export function renderAuditTimeline(history) {
                             item.new === null || item.new === ""
                                 ? "(empty)"
                                 : item.new;
-                        diffHtml = `
-                        <div class="timeline-diff">
-                            <span class="timeline-old">${escapeHtml(oldValue)}</span>
-                            <span>→</span>
-                            <span class="timeline-new">${escapeHtml(newValue)}</span>
-                        </div>
-                    `;
-                    }
-
-                    if (item.type === "LIFECYCLE" && item.snapshot) {
-                        diffHtml = `<div class="snapshot-box">Snapshot: ${escapeHtml(item.snapshot)}</div>`;
+                        const label = item.label ? `${escapeHtml(item.label)}: ` : "";
+                        detailsHtml = `${label}<span class="audit-old">${escapeHtml(oldValue)}</span><span class="audit-new">${escapeHtml(newValue)}</span>`;
+                    } else if (item.type === "LIFECYCLE" && item.snapshot) {
+                        detailsHtml = `${escapeHtml(item.label || "Lifecycle")} — ${escapeHtml(item.snapshot)}`;
                     }
 
                     return `
-                    <div class="timeline-item ${typeClass}">
-                        <div class="timeline-dot"></div>
-                        <div class="timeline-content">
-                            <div class="timeline-header">
-                                <span class="timeline-label">${escapeHtml(item.label || item.type || "Event")}</span>
-                                <span class="timeline-time">${escapeHtml(item.timestamp || "")}</span>
-                            </div>
-                            <div class="timeline-details">${details}</div>
-                            ${diffHtml}
-                            <div class="timeline-meta">User: ${escapeHtml(item.user || "SYSTEM")} • Batch: ${item.batch ? `#${escapeHtml(item.batch)}` : "-"}</div>
-                        </div>
+                    <div class="audit-entry">
+                        <span class="audit-ts">${escapeHtml(item.timestamp || "")}</span>
+                        <span class="audit-action ${typeClass}">${typeClass}</span>
+                        <span class="audit-details">${detailsHtml}</span>
                     </div>
                 `;
                 })
