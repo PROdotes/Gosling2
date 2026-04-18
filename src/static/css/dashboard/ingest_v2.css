@@ -10,22 +10,7 @@
     font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 13px;
     -webkit-font-smoothing: antialiased;
-
-    --bg-master:   #030407;
-    --bg-window:   #0A0D14;
-    --bg-panel:    #12151E;
-    --bg-element:  #1D2230;
-    --bg-hover:    #2A3041;
-    --bg-active:   #4F46E5;
-    --border-subtle: #2A3041;
-    --border-focus:  #818CF8;
-    --text-pure:   #FFFFFF;
-    --text-sec:    #94A3B8;
-    --text-mut:    #64748B;
-    --accent-blue:  #818CF8;
-    --accent-green: #10B981;
-    --accent-red:   #F43F5E;
-    --accent-amber: #F59E0B;
+    --accent-amber: var(--warning);
 }
 
 #ingest-workspace.active {
