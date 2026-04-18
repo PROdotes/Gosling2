@@ -265,7 +265,12 @@ const ctx = {
     },
     hideDetailPanel() {
         elements.detailPanel.innerHTML =
-            '<div class="entity-detail-empty">Select an item to see details</div>';
+            '<div class="entity-detail-empty">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+            '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>' +
+            '<div class="entity-detail-empty-title">Nothing selected</div>' +
+            '<div class="entity-detail-empty-sub">Choose an item from the list to see details</div>' +
+            "</div>";
         elements.detailPanel.style.display = "";
     },
     showBanner(msg, type = "error") {

@@ -78,35 +78,38 @@
     margin-top: 12px;
 }
 
+/* .filter-section-header typography lives in base.css (.section-title primitive) */
 #songs-workspace .filter-section-header {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-sec);
-    text-transform: uppercase;
-    margin-bottom: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+#songs-workspace .filter-section-header:hover {
+    color: var(--text);
 }
 
 #songs-workspace .filter-value {
     width: 100%;
     text-align: left;
-    padding: 4px 8px;
-    border-radius: 4px;
-    color: var(--text-sec);
+    padding: 5px 8px;
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
     font-size: 12px;
     background: transparent;
     border: none;
     cursor: pointer;
     font-family: inherit;
+    transition: background 0.1s ease, color 0.1s ease;
 }
 
 #songs-workspace .filter-value:hover {
-    background: var(--bg-hover);
-    color: var(--text-pure);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
 }
 
 #songs-workspace .filter-value.active {
-    background: rgba(79, 70, 229, 0.15);
-    color: var(--accent-blue);
+    background: var(--accent-soft);
+    color: var(--accent);
     font-weight: 600;
 }
 
@@ -231,66 +234,13 @@
     overflow-y: auto;
 }
 
-#songs-workspace .song-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    cursor: pointer;
-}
+/* .song-row base styling lives in base.css (shared list-row primitive). */
 
-#songs-workspace .song-row:hover {
-    background: var(--bg-panel);
-}
-
-#songs-workspace .song-row.selected {
-    background: var(--bg-panel);
-    box-shadow: inset 3px 0 0 var(--bg-active);
-    border-bottom: 1px solid transparent;
-}
-
-#songs-workspace .song-row.selected .row-title {
-    color: var(--text-pure);
-    font-weight: 700;
-}
+/* .row-title / .row-artist / .row-id / .col-info / .col-check typography
+   lives in base.css as a shared row primitive. */
 
 #songs-workspace .col-check input {
     accent-color: var(--bg-active);
-}
-
-#songs-workspace .col-info {
-    flex: 1;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-#songs-workspace .row-title {
-    font-weight: 600;
-    color: var(--text-pure);
-    font-size: 13px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-#songs-workspace .row-artist {
-    color: var(--text-sec);
-    font-size: 11px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-#songs-workspace .row-id {
-    margin-left: 6px;
-    font-family: var(--font-mono, monospace);
-    font-size: 10px;
-    color: var(--text-mut, #64748B);
 }
 
 #songs-workspace .col-missing {
@@ -323,14 +273,13 @@
 
 /* ── PANE 3: EDITOR ─────────────────────────────────────────────────────── */
 
+/* #editor-panel visuals live in base.css (shared detail-pane primitive). */
 #songs-workspace #editor-panel {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    background: var(--bg-panel);
     overflow: hidden;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
     z-index: 10;
 }
 
@@ -349,17 +298,7 @@
     scrollbar-color: var(--bg-hover) transparent;
 }
 
-#songs-workspace .editor-empty-state {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: 1;
-    color: var(--text-mut);
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+/* .editor-empty-state visuals live in base.css (shared empty-state primitive). */
 
 /* ── ACTION SIDEBAR ─────────────────────────────────────────────────────── */
 
@@ -374,91 +313,11 @@
     gap: 8px;
 }
 
-#songs-workspace .sidebar-btn {
-    width: 100%;
-    padding: 8px 10px;
-    border-radius: 5px;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    text-align: center;
-    border: 1px solid var(--border-subtle);
-    color: var(--text-sec);
-    background: var(--bg-element);
-    cursor: pointer;
-    transition: 0.1s;
-    font-family: inherit;
-}
+/* .sidebar-btn styling lives further down (single source of truth). */
 
-#songs-workspace .sidebar-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-pure);
-}
-
-#songs-workspace .sidebar-btn.organize {
-    background: linear-gradient(180deg, #10B981 0%, #059669 100%);
-    color: #fff;
-    border-color: transparent;
-    font-size: 12px;
-    padding: 10px;
-    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-}
-
-#songs-workspace .sidebar-btn.organize:hover {
-    filter: brightness(1.1);
-}
-
-#songs-workspace .sidebar-btn.organize.blocked {
-    background: var(--bg-element);
-    color: var(--text-mut);
-    box-shadow: none;
-    cursor: not-allowed;
-}
-
-#songs-workspace .sidebar-btn.write-id3 {
-    color: var(--accent-blue);
-    border-color: rgba(129, 140, 248, 0.3);
-}
-
-#songs-workspace .sidebar-btn.write-id3:hover {
-    background: rgba(129, 140, 248, 0.1);
-    color: var(--accent-blue);
-}
-
-#songs-workspace .sidebar-btn.delete-original {
-    color: #F59E0B;
-    border-color: rgba(245, 158, 11, 0.3);
-    background: rgba(245, 158, 11, 0.05);
-}
-
-#songs-workspace .sidebar-btn.delete-original:hover {
-    background: rgba(245, 158, 11, 0.12);
-}
-
-#songs-workspace .sidebar-btn.danger {
-    color: var(--accent-red);
-    border-color: rgba(244, 63, 94, 0.2);
-    margin-top: auto;
-}
-
-#songs-workspace .sidebar-btn.danger:hover {
-    background: rgba(244, 63, 94, 0.1);
-    color: var(--accent-red);
-}
-
-#songs-workspace .sidebar-btn.spotify {
-    color: #1DB954;
-    font-weight: 800;
-}
-
-#songs-workspace .sidebar-group-label {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-mut);
-    padding: 2px 2px;
+/* .sidebar-group-label typography lives in base.css (.section-title primitive) */
+#songs-workspace .sidebar-group-label + .sidebar-group-label {
+    margin-top: 4px;
 }
 
 #songs-workspace .sidebar-divider {
@@ -491,16 +350,7 @@
     margin-bottom: 28px;
 }
 
-#songs-workspace .editor-section-title {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--text-mut);
-    margin-bottom: 16px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--border-subtle);
-}
+/* .editor-section-title visuals live in base.css (shared section-title primitive). */
 
 #songs-workspace .editor-row {
     display: flex;
@@ -550,20 +400,28 @@
 }
 
 #songs-workspace .editor-input {
-    background: var(--bg-element);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    color: var(--text-pure);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
     font-size: 13px;
     font-family: inherit;
-    padding: 6px 10px;
+    padding: 7px 10px;
     outline: none;
     width: 100%;
     box-sizing: border-box;
+    transition: border-color 0.12s ease, background 0.12s ease, box-shadow 0.12s ease;
+}
+
+#songs-workspace .editor-input:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border-strong);
 }
 
 #songs-workspace .editor-input:focus {
-    border-color: var(--border-focus);
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 #songs-workspace .editor-textarea {
@@ -831,15 +689,7 @@
     overflow-y: auto;
 }
 
-#songs-workspace .sidebar-group-label {
-    font-size: 9px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    color: var(--text-mut);
-    margin-top: 4px;
-    margin-bottom: 2px;
-}
+/* .sidebar-group-label styling lives in base.css (.section-title primitive) */
 
 #songs-workspace .sidebar-divider {
     height: 1px;
@@ -850,69 +700,88 @@
 #songs-workspace .sidebar-btn {
     width: 100%;
     padding: 8px 10px;
-    border-radius: 5px;
+    border-radius: var(--radius);
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
     text-align: center;
-    border: 1px solid var(--border-subtle);
-    color: var(--text-sec);
-    background: var(--bg-element);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
 }
 
 #songs-workspace .sidebar-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-pure);
+    background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+    color: var(--text);
+    border-color: var(--border-strong);
 }
 
+#songs-workspace .sidebar-btn:active {
+    transform: translateY(1px);
+}
+
+/* Primary action: MARK AS DONE — the only strong-accent button */
 #songs-workspace .sidebar-btn.organize {
-    background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+    background: linear-gradient(180deg, var(--accent-hover) 0%, var(--accent) 100%);
     color: #fff;
     border-color: transparent;
     font-size: 12px;
     padding: 10px;
-    box-shadow: 0 2px 8px rgba(16,185,129,0.3);
+    box-shadow: 0 2px 10px rgba(249, 115, 22, 0.32);
 }
 
 #songs-workspace .sidebar-btn.organize:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.08);
 }
 
 #songs-workspace .sidebar-btn.organize.blocked,
 #songs-workspace .sidebar-btn.organize:disabled {
-    background: var(--bg-element);
-    color: var(--text-mut);
+    background: var(--bg-raised);
+    color: var(--text-mute);
     box-shadow: none;
     cursor: not-allowed;
     filter: none;
 }
 
+/* Secondary action: WRITE ID3 — soft accent outline */
 #songs-workspace .sidebar-btn--id3 {
-    color: var(--accent-blue);
-    border-color: rgba(129,140,248,0.3);
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
 }
 
 #songs-workspace .sidebar-btn--id3:hover {
-    background: rgba(129,140,248,0.1);
-    color: var(--accent-blue);
+    background: rgba(249, 115, 22, 0.22);
+    color: var(--accent-hover);
+    border-color: var(--accent);
 }
 
+/* Caution (file-impacting, non-destructive to data) */
 #songs-workspace .sidebar-btn.delete-original {
-    color: #F59E0B;
-    border-color: rgba(245,158,11,0.3);
-    background: rgba(245,158,11,0.05);
+    color: var(--warning);
+    border-color: rgba(234, 179, 8, 0.3);
+    background: rgba(234, 179, 8, 0.06);
 }
 
 #songs-workspace .sidebar-btn.delete-original:hover {
-    background: rgba(245,158,11,0.12);
+    background: rgba(234, 179, 8, 0.14);
+    color: var(--warning);
 }
 
+/* Destructive */
 #songs-workspace .sidebar-btn--danger {
-    color: var(--accent-red);
-    border-color: rgba(244,63,94,0.2);
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.28);
+    margin-top: auto;
+}
+
+#songs-workspace .sidebar-btn--danger:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border-color: var(--danger);
 }
 
 #songs-workspace .sidebar-path {
@@ -971,23 +840,7 @@
  * Where the names match (--border-subtle, --bg-panel, etc.) they already
  * resolve from base.css. New names are declared below.
  */
-#songs-workspace {
-    --bg-master:   #030407;
-    --bg-window:   #0A0D14;
-    --bg-panel:    #12151E;
-    --bg-element:  #1D2230;
-    --bg-hover:    #2A3041;
-    --bg-active:   #4F46E5;
-    --bg-danger:   #E11D48;
-    --border-subtle: #2A3041;
-    --border-focus:  #818CF8;
-    --text-pure:   #FFFFFF;
-    --text-sec:    #94A3B8;
-    --text-mut:    #64748B;
-    --accent-blue:  #818CF8;
-    --accent-green: #10B981;
-    --accent-red:   #F43F5E;
-}
+/* Token overrides removed — #songs-workspace inherits unified tokens from base.css */
 
 /* ── Bucket 2: Lost features ──────────────────────────────────────────────── */
 
@@ -1089,14 +942,29 @@
 /* ── Album sub-cards ────────────────────────────────────────────────────────── */
 
 #songs-workspace .album-sub-card {
-    background: var(--bg-element);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    padding: 6px 10px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.008)),
+        var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
     margin-top: 6px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+}
+
+#songs-workspace .album-sub-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, var(--accent), transparent);
+    opacity: 0.6;
 }
 
 #songs-workspace .album-sub-header {

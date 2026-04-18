@@ -1,44 +1,72 @@
 :root {
-    /* Global Backgrounds */
-    --bg-deep: #0a0b0f;
-    --bg-master: #030407;
-    --bg-surface: #12131a;
-    --bg-panel: #12151E;
-    --bg-card: #1a1b24;
-    --bg-card-raised: #202230;
-    --bg-element: #1D2230;
-    --bg-hover: #2A3041;
-    --bg-active: #4F46E5;
-    --bg-danger: #E11D48;
+    /* Surfaces: app → surface → panel → raised (4 levels, in order of elevation) */
+    --bg-app:       #0b0d13;
+    --bg-surface:   #11131b;
+    --bg-panel:     #161924;
+    --bg-raised:    #1f2230;
+    --bg-elevated:  #272a38;
 
     /* Borders */
-    --border-subtle: rgba(255, 255, 255, 0.06);
-    --border-accent: rgba(255, 255, 255, 0.14);
-    --border-focus: #818CF8;
+    --border:         rgba(255, 255, 255, 0.06);
+    --border-strong:  rgba(255, 255, 255, 0.12);
+    --border-focus:   var(--accent);
 
-    /* Text */
-    --text-primary: #f4f4f5;
-    --text-secondary: #a1a1aa;
-    --text-muted: #71717a;
-    --text-pure: #FFFFFF;
-    --text-sec: #94A3B8;
-    --text-mut: #64748B;
+    /* Text (3 tiers) */
+    --text:       #f1f2f5;
+    --text-dim:   #a0a3ae;
+    --text-mute:  #6a6e7c;
 
-    /* Accents */
-    --accent: #f97316;
-    --accent-dim: rgba(249, 115, 22, 0.35);
-    --accent-glow: rgba(249, 115, 22, 0.15);
-    --accent-blue:  #818CF8;
-    --accent-green: #10B981;
-    --accent-red:   #F43F5E;
-    
-    --publisher-accent: #ffb84d;
-    --artist-accent: #7dd3fc;
+    /* Primary accent (single brand color for actions/selection) */
+    --accent:         #f97316;
+    --accent-hover:   #fb8c3d;
+    --accent-soft:    rgba(249, 115, 22, 0.14);
+    --accent-border:  rgba(249, 115, 22, 0.38);
+
+    /* Semantic */
     --success: #22c55e;
     --warning: #eab308;
-    --danger: #ef4444;
+    --danger:  #ef4444;
 
+    /* Category accents (reserved for entity type differentiation) */
+    --category-artist:    #7dd3fc;
+    --category-publisher: #ffb84d;
+
+    /* Radii & shadow */
+    --radius-sm: 4px;
+    --radius:    6px;
+    --radius-lg: 10px;
     --shadow-deep: 0 18px 45px rgba(0, 0, 0, 0.35);
+    --shadow-panel: 0 1px 0 rgba(255,255,255,0.03), 0 12px 28px rgba(0, 0, 0, 0.35);
+
+    /* --- Legacy aliases (keep existing selectors working) --- */
+    --bg-deep:        var(--bg-app);
+    --bg-master:      var(--bg-app);
+    --bg-window:      var(--bg-surface);
+    --bg-card:        var(--bg-panel);
+    --bg-card-raised: var(--bg-raised);
+    --bg-element:     var(--bg-raised);
+    --bg-hover:       var(--bg-raised);
+    --bg-active:      var(--accent);
+    --bg-danger:      var(--danger);
+
+    --border-subtle: var(--border);
+    --border-accent: var(--border-strong);
+
+    --text-primary:   var(--text);
+    --text-secondary: var(--text-dim);
+    --text-muted:     var(--text-mute);
+    --text-pure:      #ffffff;
+    --text-sec:       var(--text-dim);
+    --text-mut:       var(--text-mute);
+
+    --accent-dim:  var(--accent-border);
+    --accent-glow: var(--accent-soft);
+    --accent-blue:  var(--category-artist);
+    --accent-green: var(--success);
+    --accent-red:   var(--danger);
+
+    --publisher-accent: var(--category-publisher);
+    --artist-accent:    var(--category-artist);
 }
 
 * {
@@ -54,23 +82,43 @@ body {
 
 body {
     background:
-        radial-gradient(
-            circle at top left,
-            rgba(249, 115, 22, 0.09),
-            transparent 30%
-        ),
-        radial-gradient(
-            circle at top right,
-            rgba(125, 211, 252, 0.07),
-            transparent 25%
-        ),
-        var(--bg-deep);
-    color: var(--text-primary);
-    font-family: "DM Sans", sans-serif;
+        radial-gradient(ellipse 900px 500px at 0% -10%, rgba(249, 115, 22, 0.06), transparent 60%),
+        radial-gradient(ellipse 700px 400px at 100% 0%, rgba(125, 211, 252, 0.04), transparent 60%),
+        var(--bg-app);
+    color: var(--text);
+    font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv11", "ss01";
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+/* Elegant scrollbars */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.12);
+    background-clip: padding-box;
+    border: 2px solid transparent;
 }
 
 button,
@@ -83,22 +131,43 @@ button {
 }
 
 header {
-    height: 48px;
-    background: var(--bg-master);
-    border-bottom: 1px solid var(--border-subtle);
+    height: 52px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%),
+        var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 10px 30px -20px rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
-    padding: 0 24px;
+    padding: 0 20px;
+    gap: 20px;
     justify-content: space-between;
     flex-shrink: 0;
+    position: relative;
+    z-index: 20;
+}
+
+header::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent-soft) 20%, var(--accent-soft) 80%, transparent);
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 .header-logo {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
-    letter-spacing: 1px;
-    color: var(--text-primary);
+    letter-spacing: 0.14em;
+    color: var(--text);
     white-space: nowrap;
+    padding-right: 12px;
+    border-right: 1px solid var(--border);
+    margin-right: 4px;
 }
 
 .header-logo span {
@@ -109,31 +178,48 @@ header {
     display: flex;
     align-items: center;
     height: 100%;
-    gap: 6px;
+    gap: 2px;
 }
 
 .mode-tab {
+    position: relative;
     background: transparent;
     border: none;
-    color: var(--text-secondary);
-    padding: 4px 10px;
+    color: var(--text-dim);
+    padding: 6px 12px;
     font-size: 11px;
     font-weight: 700;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: 0.1s;
+    letter-spacing: 0.08em;
+    transition: color 0.12s ease, background 0.12s ease;
 }
 
 .mode-tab:hover {
-    background: var(--bg-card);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
 }
 
 .mode-tab.active {
-    background: var(--bg-card);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
+.mode-tab.active::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -14px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent);
+    box-shadow: 0 0 12px var(--accent-border), 0 0 4px var(--accent);
+    border-radius: 2px;
+}
+
+.header-logo {
+    text-shadow: 0 0 24px rgba(249, 115, 22, 0.08);
 }
 
 .header-search {
@@ -148,30 +234,34 @@ header {
 }
 
 .btn-filter-toggle {
-    background: var(--bg-active);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    color: var(--text-pure);
-    border-radius: 4px; /* Slightly sharper industrial corner */
-    padding: 0 16px;
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    color: var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 0 14px;
     font-size: 10px;
     font-weight: 700;
     height: 32px;
     display: flex;
     align-items: center;
+    gap: 6px;
     white-space: nowrap;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     cursor: pointer;
-    transition: filter 0.1s;
+    transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 .btn-filter-toggle:hover {
-    filter: brightness(1.1);
+    background: rgba(249, 115, 22, 0.22);
+    border-color: var(--accent);
+    color: var(--text);
 }
 
 .btn-filter-toggle.active {
-    background: var(--text-pure);
-    color: var(--bg-active);
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
 }
 
 .search-input-wrapper {
@@ -183,18 +273,24 @@ header {
 .search-input-wrapper input {
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.05); /* Softer industrial background */
-    border: 1px solid var(--border-subtle);
-    color: var(--text-primary);
-    padding: 0 12px 0 44px;
-    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0 12px 0 40px;
+    border-radius: var(--radius);
     font-size: 13px;
     outline: none;
-    transition: border-color 0.1s;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.search-input-wrapper input:hover {
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .search-input-wrapper input:focus {
-    border-color: var(--border-focus);
+    border-color: var(--accent-border);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .search-input-wrapper input::placeholder {
@@ -331,4 +427,209 @@ input:checked + .slider:before {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Shared components
+ * One rule per concept. Both Songs and Entity tabs use these — do not
+ * redefine in scoped stylesheets unless you need a genuine variation.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/* Section title: small uppercase label with glowing orange tick */
+.section-title,
+#entity-workspace .section-title,
+#songs-workspace .editor-section-title,
+#songs-workspace .filter-section-header,
+#songs-workspace .sidebar-group-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    padding: 0 0 8px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    position: relative;
+}
+
+.section-title::before,
+#entity-workspace .section-title::before,
+#songs-workspace .editor-section-title::before,
+#songs-workspace .filter-section-header::before,
+#songs-workspace .sidebar-group-label::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 2px;
+    width: 3px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--accent-border);
+}
+
+/* Selectable list row: hover + selected with glowing orange bar */
+.list-row,
+.song-row,
+#entity-workspace .entity-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.12s ease, padding-left 0.12s ease;
+}
+
+.list-row::before,
+.song-row::before,
+#entity-workspace .entity-row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--accent);
+    transform: scaleY(0);
+    transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.list-row:hover,
+.song-row:hover,
+#entity-workspace .entity-row:hover {
+    background: rgba(255, 255, 255, 0.025);
+}
+
+.list-row.selected,
+.list-row.active,
+.song-row.selected,
+.song-row.active,
+#entity-workspace .entity-row.active {
+    background:
+        linear-gradient(90deg, var(--accent-soft), transparent 40%),
+        rgba(255, 255, 255, 0.03);
+    padding-left: 18px;
+    border-bottom-color: transparent;
+}
+
+.list-row.selected::before,
+.list-row.active::before,
+.song-row.selected::before,
+.song-row.active::before,
+#entity-workspace .entity-row.active::before {
+    transform: scaleY(1);
+    box-shadow: 0 0 12px var(--accent-border);
+}
+
+/* Row internals: shared across song-row wherever it appears */
+.col-check {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.col-info {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.row-title {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-artist {
+    color: var(--text-dim);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.row-id {
+    margin-left: 6px;
+    font-family: var(--font-mono, 'JetBrains Mono', monospace);
+    font-size: 10px;
+    color: var(--text-mute);
+    font-weight: 400;
+}
+
+.col-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-mute);
+    text-align: right;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.song-row.selected .row-title,
+.song-row.active .row-title {
+    color: #fff;
+    font-weight: 700;
+}
+
+/* Empty state: icon + title + subtitle, centered */
+.empty-state,
+#entity-workspace .entity-detail-empty,
+#songs-workspace .editor-empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: var(--text-mute);
+    padding: 32px;
+    text-align: center;
+    min-height: 160px;
+}
+
+.empty-state svg,
+#entity-workspace .entity-detail-empty svg {
+    width: 40px;
+    height: 40px;
+    color: var(--text-mute);
+    opacity: 0.45;
+    margin-bottom: 4px;
+    stroke-width: 1.4;
+}
+
+.empty-state-title,
+#entity-workspace .entity-detail-empty-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: 0.02em;
+}
+
+.empty-state-sub,
+#entity-workspace .entity-detail-empty-sub {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mute);
+}
+
+/* Detail pane: ambient orange wash at the top */
+.detail-pane,
+#entity-workspace .entity-detail-pane,
+#songs-workspace #editor-panel {
+    background:
+        radial-gradient(ellipse 800px 400px at 50% -10%, var(--accent-soft), transparent 55%),
+        var(--bg-panel);
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.4), inset 1px 0 0 rgba(255, 255, 255, 0.03);
 }

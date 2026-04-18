@@ -96,21 +96,23 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
             ${items
                 .map(
                     (song) => `
-                <div class="song-sub-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
-                    <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}"
-                           data-action="toggle-active"
-                           data-id="${song.id}"
-                           title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
-                        <input type="checkbox"
-                               ${song.is_active ? "checked" : ""}
-                               ${song.processing_status !== 0 ? "disabled" : ""}>
-                        <span class="slider"></span>
-                    </label>
-                    <div class="song-sub-row-info">
-                        <div class="song-sub-row-title">${escapeHtml(song.media_name || song.title || "Untitled")}</div>
-                        <div class="song-sub-row-sub">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
+                <div class="song-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
+                    <div class="col-check">
+                        <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}"
+                               data-action="toggle-active"
+                               data-id="${song.id}"
+                               title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
+                            <input type="checkbox"
+                                   ${song.is_active ? "checked" : ""}
+                                   ${song.processing_status !== 0 ? "disabled" : ""}>
+                            <span class="slider"></span>
+                        </label>
                     </div>
-                    <div class="song-sub-row-meta">
+                    <div class="col-info">
+                        <div class="row-title">${escapeHtml(song.media_name || song.title || "Untitled")}<span class="row-id"> #${song.id}</span></div>
+                        <div class="row-artist">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
+                    </div>
+                    <div class="col-meta">
                         <div>${escapeHtml(song.formatted_duration || "")}</div>
                         ${song.bpm ? `<div>${escapeHtml(song.bpm)} BPM</div>` : ""}
                     </div>
