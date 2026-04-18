@@ -250,6 +250,15 @@ const ctx = {
         }
     },
     performSearch: (query) => performSearch(query),
+    reloadFilters: () => filterSidebar.load(),
+    syncIngestBadges: async () => {
+        try {
+            const status = await getIngestStatus();
+            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+        } catch (e) {
+            console.error("Ingest sync failed", e);
+        }
+    },
     showDetailPanel(html) {
         elements.detailPanel.innerHTML = html;
         elements.detailPanel.style.display = "";
@@ -320,7 +329,7 @@ const filterSidebar = new FilterSidebarHandler({
     onFilterCleared: () => performSearch(state.currentQuery),
 });
 filterSidebar.setupListeners();
-filterSidebar.load();
+const filterLoadPromise = filterSidebar.load();
 
 function getActiveList() {
     if (state.currentMode === "songs") {
@@ -968,7 +977,9 @@ Promise.all([
     }
 });
 setupHeaderDropZone();
-performSearch("");
+filterLoadPromise.then(() => {
+    if (!filterSidebar.hasActiveFilters()) performSearch("");
+});
 
 // Restore in-progress badges on page reload
 (async () => {

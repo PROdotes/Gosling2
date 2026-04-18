@@ -68,8 +68,7 @@ export class NavigationHandler {
     async handleRefreshResults(actionTarget) {
         const state = this.ctx.getState();
         actionTarget.classList.add("spinning");
-        state.successCount = 0;
-        this.ctx.updateIngestBadges?.();
+        await Promise.all([this.ctx.reloadFilters?.(), this.ctx.syncIngestBadges?.()]);
         this.ctx.performSearch?.(state.currentQuery).finally(() => {
             actionTarget.classList.remove("spinning");
         });
