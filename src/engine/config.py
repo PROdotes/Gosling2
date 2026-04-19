@@ -1,9 +1,17 @@
 import os
+from enum import IntEnum
 from pathlib import Path
 from typing import Optional
 
 # --- GOSLING2 ENGINE CONFIG ---
 # Centralized source of truth for all paths and environment variables.
+
+
+class ProcessingStatus(IntEnum):
+    REVIEWED = 0
+    NEEDS_REVIEW = 1
+    PENDING_ENRICHMENT = 2
+    CONVERTING = 3
 
 
 # Database Path
@@ -79,6 +87,20 @@ AUTO_SAVE_ID3 = True
 DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = Path("json/rules.json")
 SCRUBBER_AUTO_PLAY = True
+
+# Scalar fields allowed in PATCH /songs/{id}
+SCALAR_ALLOWED = {
+    "media_name",
+    "year",
+    "bpm",
+    "isrc",
+    "is_active",
+    "processing_status",
+    "mood",
+    "energy",
+    "comment",
+}
+METADATA_ALLOWED = SCALAR_ALLOWED | {"credits", "albums", "tags", "publishers"}
 
 # CORS Configuration (Audit #4)
 # Whitelist of trusted origins for local development and testing.

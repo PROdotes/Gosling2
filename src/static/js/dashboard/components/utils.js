@@ -1,3 +1,5 @@
+import { PROCESSING_STATUS } from "../constants.js";
+
 // Track mousedown origin so overlay click handlers can ignore drag-outside events
 let _lastMousedownTarget = null;
 document.addEventListener(
@@ -98,13 +100,13 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                     (song) => `
                 <div class="song-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
                     <div class="col-check">
-                        <label class="switch ${song.processing_status !== 0 ? "disabled" : ""}"
+                        <label class="switch ${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "disabled" : ""}"
                                data-action="toggle-active"
                                data-id="${song.id}"
-                               title="${song.processing_status !== 0 ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
+                               title="${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
                             <input type="checkbox"
                                    ${song.is_active ? "checked" : ""}
-                                   ${song.processing_status !== 0 ? "disabled" : ""}>
+                                   ${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "disabled" : ""}>
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -152,7 +154,9 @@ export function renderAuditTimeline(history) {
                 .map((item) => {
                     const type = (item.type || "ACTION").toUpperCase();
                     const typeClass = escapeHtml(type);
-                    let detailsHtml = escapeHtml(item.details || item.label || "");
+                    let detailsHtml = escapeHtml(
+                        item.details || item.label || "",
+                    );
 
                     if (item.type === "CHANGE" && item.new !== undefined) {
                         const oldValue =
@@ -163,7 +167,9 @@ export function renderAuditTimeline(history) {
                             item.new === null || item.new === ""
                                 ? "(empty)"
                                 : item.new;
-                        const label = item.label ? `${escapeHtml(item.label)}: ` : "";
+                        const label = item.label
+                            ? `${escapeHtml(item.label)}: `
+                            : "";
                         detailsHtml = `${label}<span class="audit-old">${escapeHtml(oldValue)}</span><span class="audit-new">${escapeHtml(newValue)}</span>`;
                     } else if (item.type === "LIFECYCLE" && item.snapshot) {
                         detailsHtml = `${escapeHtml(item.label || "Lifecycle")} — ${escapeHtml(item.snapshot)}`;

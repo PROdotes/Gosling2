@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
 from typing import List, Optional
 from src.models.view_models import (
     SongView,
@@ -11,6 +10,8 @@ from src.models.view_models import (
     IdentityView,
     IngestionCheckRequest,
     IngestionReportView,
+    AddAliasBody,
+    UpdateLegalNameBody,
 )
 from src.services.catalog_service import CatalogService
 from src.services.logger import logger
@@ -195,11 +196,6 @@ async def search_identities(q: str) -> List[IdentityView]:
     return views
 
 
-class AddAliasBody(BaseModel):
-    display_name: str
-    name_id: Optional[int] = None
-
-
 @router.post("/identities/{identity_id:int}/aliases")
 async def add_identity_alias(identity_id: int, body: AddAliasBody) -> dict:
     """Add or re-link an alias name to an identity."""
@@ -222,10 +218,6 @@ async def remove_identity_alias(identity_id: int, name_id: int) -> None:  # noqa
         _get_service().remove_identity_alias(name_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-class UpdateLegalNameBody(BaseModel):
-    legal_name: Optional[str] = None
 
 
 @router.patch("/identities/{identity_id:int}/legal-name", status_code=204)
@@ -572,7 +564,8 @@ def _load_tag_category_colors() -> dict:
 
     path = os.path.join(os.path.dirname(__file__), "../../../json/id3_frames.json")
     try:
-        frames = json.load(open(os.path.normpath(path)))
+        with open(os.path.normpath(path)) as f:
+            frames = json.load(f)
         colors = {}
         for v in frames.values():
             if isinstance(v, dict) and "tag_category" in v and "color" in v:

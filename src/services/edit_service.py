@@ -29,12 +29,15 @@ from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
 from src.services.library_service import LibraryService
 from src.engine.config import (
+    get_db_path,
     RENAME_RULES_PATH,
     LIBRARY_ROOT,
-    get_db_path,
-    AUTO_SAVE_ID3,
     STAGING_DIR,
     SCALAR_VALIDATION,
+    SCALAR_ALLOWED,
+    METADATA_ALLOWED,
+    AUTO_SAVE_ID3,
+    ProcessingStatus,
 )
 from src.engine.models.spotify import SpotifyCredit
 
@@ -42,18 +45,8 @@ from src.engine.models.spotify import SpotifyCredit
 class EditService:
     """Specialized orchestrator for modifying metadata, credits, links, and library organization."""
 
-    _SCALAR_ALLOWED = {
-        "media_name",
-        "year",
-        "bpm",
-        "isrc",
-        "is_active",
-        "processing_status",
-        "mood",
-        "energy",
-        "comment",
-    }
-    _METADATA_ALLOWED = _SCALAR_ALLOWED | {"credits", "albums", "tags", "publishers"}
+    _SCALAR_ALLOWED = SCALAR_ALLOWED
+    _METADATA_ALLOWED = METADATA_ALLOWED
 
     def __init__(
         self,
@@ -113,8 +106,8 @@ class EditService:
             raise LookupError(f"Song {song_id} not found")
 
         # 3. Workflow Validation (Review/Activation)
-        if fields.get("is_active") is True or fields.get("processing_status") == 0:
-            if fields.get("processing_status") == 0:
+        if fields.get("is_active") is True or fields.get("processing_status") == ProcessingStatus.REVIEWED:
+            if fields.get("processing_status") == ProcessingStatus.REVIEWED:
                 from src.models.view_models import SongView
 
                 view = SongView.from_domain(song)
@@ -126,9 +119,9 @@ class EditService:
 
             if fields.get("is_active") is True:
                 status = fields.get("processing_status", song.processing_status)
-                if status != 0:
+                if status != ProcessingStatus.REVIEWED:
                     raise ValueError(
-                        "Cannot activate song unless processing_status is 0 (Reviewed)"
+                        f"Cannot activate song unless processing_status is {ProcessingStatus.REVIEWED} (Reviewed)"
                     )
 
         # 3. Scalar Validation
@@ -749,7 +742,7 @@ class EditService:
     ) -> str:
         """Orchestrates organization and organization of a song into the library folder."""
         song = self._library_service.get_song(song_id)
-        if not song or song.processing_status != 0:
+        if not song or song.processing_status != ProcessingStatus.REVIEWED:
             raise ValueError("Song not found or not in Reviewed state")
 
         library_root = library_root_path or LIBRARY_ROOT

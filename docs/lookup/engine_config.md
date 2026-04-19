@@ -45,3 +45,10 @@ Path to rename rules JSON. Defaults to `config/rename_rules.json`.
 
 ### TRUSTED_ORIGINS
 CORS whitelist of trusted origins (localhost/127.0.0.1 on ports 3000, 5173, 8000).
+
+### ProcessingStatus(IntEnum)
+Named constants for `processing_status` values across the stack:
+- `REVIEWED = 0` — human review done
+- `NEEDS_REVIEW = 1` — auto-check done, awaiting human review
+- `PENDING_ENRICHMENT = 2` — MP3 ingested, waiting for MusicBrainz auto-check
+- `CONVERTING = 3` — WAV staged, awaiting conversion

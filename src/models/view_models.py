@@ -10,6 +10,7 @@ from src.models.domain import (
     Identity,
     ArtistName,
 )
+from src.engine.config import ProcessingStatus
 
 
 def compute_review_blockers(
@@ -169,7 +170,7 @@ class SongView(BaseModel):
     source_path: str
     duration_s: float
     audio_hash: Optional[str] = None
-    processing_status: Optional[int] = 0
+    processing_status: Optional[int] = ProcessingStatus.REVIEWED
     is_active: bool = False
     notes: Optional[str] = None
     bpm: Optional[int] = None
@@ -623,3 +624,20 @@ AlbumView.model_rebuild()
 IngestionReportView.model_rebuild()
 BatchIngestReport.model_rebuild()
 IngestStatusModel.model_rebuild()
+
+
+class AddAliasBody(BaseModel):
+    display_name: str
+    name_id: Optional[int] = None
+
+
+class UpdateLegalNameBody(BaseModel):
+    legal_name: Optional[str] = None
+
+
+class SetIdentityTypeBody(BaseModel):
+    type: str
+
+
+class AddMemberBody(BaseModel):
+    member_id: int

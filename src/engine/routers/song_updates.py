@@ -1,6 +1,5 @@
 from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.services.catalog_service import CatalogService
 from src.services.edit_service import EditService
@@ -23,6 +22,8 @@ from src.models.view_models import (
     UpdatePublisherBody,
     SetPublisherParentBody,
     AddAlbumPublisherBody,
+    SetIdentityTypeBody,
+    AddMemberBody,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["song-updates"])
@@ -238,14 +239,6 @@ async def merge_identity(
 
 
 # --- Identity Type / Members ---
-
-
-class SetIdentityTypeBody(BaseModel):
-    type: str
-
-
-class AddMemberBody(BaseModel):
-    member_id: int
 
 
 @router.patch("/identities/{identity_id}/type", status_code=204)

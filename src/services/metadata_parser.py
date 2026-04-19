@@ -6,7 +6,7 @@ from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, Album
 from src.models.metadata_frames import ID3FrameConfig
 from src.services.logger import logger
 from src.services.metadata_frames_reader import load_id3_frames, load_tag_categories
-from src.engine.config import COMMA_SPLIT_FIELDS, SONG_DEFAULT_YEAR
+from src.engine.config import COMMA_SPLIT_FIELDS, SONG_DEFAULT_YEAR, ProcessingStatus
 
 
 class MetadataParser:
@@ -39,7 +39,7 @@ class MetadataParser:
             "media_name": "",
             "source_path": str(file_path),
             "duration_s": 0.0,
-            "processing_status": 2,  # Virgin: newly parsed, not yet enriched
+            "processing_status": ProcessingStatus.PENDING_ENRICHMENT,
             "credits": [],
             "tags": [],
             "albums": [],

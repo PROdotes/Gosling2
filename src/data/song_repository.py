@@ -7,6 +7,7 @@ from src.data.song_album_repository import SongAlbumRepository
 from src.data.publisher_repository import PublisherRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.services.logger import logger
+from src.engine.config import ProcessingStatus
 
 
 # ── Review blocker SQL fragments ─────────────────────────────────────────────
@@ -725,10 +726,10 @@ class SongRepository(MediaSourceRepository):
         # 4. Statuses
         if statuses:
             status_map = {
-                "done": "m.ProcessingStatus = 0",
-                "not_done": "m.ProcessingStatus != 0",
-                "missing_data": f"m.ProcessingStatus != 0 AND ({BLOCKER_SQL})",
-                "ready_to_finalize": f"m.ProcessingStatus != 0 AND {NO_BLOCKER_SQL}",
+                "done": f"m.ProcessingStatus = {ProcessingStatus.REVIEWED}",
+                "not_done": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED}",
+                "missing_data": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND ({BLOCKER_SQL})",
+                "ready_to_finalize": f"m.ProcessingStatus != {ProcessingStatus.REVIEWED} AND {NO_BLOCKER_SQL}",
             }
             parts = [
                 f"SELECT m.SourceID FROM MediaSources m LEFT JOIN Songs s ON m.SourceID = s.SourceID WHERE m.IsDeleted = 0 AND {status_map[s]}"

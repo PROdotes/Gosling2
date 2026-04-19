@@ -1,4 +1,3 @@
-# TODO: Split this class into IngestionService, QueryService, EditService — it's 1594 lines
 import sqlite3
 from typing import Optional, List, Dict, Any
 from src.data.album_repository import AlbumRepository
@@ -26,6 +25,8 @@ from src.engine.config import (
     SCALAR_VALIDATION,
     LIBRARY_ROOT,
     get_db_path,
+    SCALAR_ALLOWED,
+    METADATA_ALLOWED,
 )
 from src.services.identity_service import IdentityService
 from src.services.library_service import LibraryService
@@ -37,18 +38,8 @@ from src.engine.models.spotify import SpotifyCredit
 class CatalogService:
     """Entry point for song access. Stateless orchestrator."""
 
-    _SCALAR_ALLOWED = {
-        "media_name",
-        "year",
-        "bpm",
-        "isrc",
-        "is_active",
-        "processing_status",
-        "mood",
-        "energy",
-        "comment",
-    }
-    _METADATA_ALLOWED = _SCALAR_ALLOWED | {"credits", "albums", "tags", "publishers"}
+    _SCALAR_ALLOWED = SCALAR_ALLOWED
+    _METADATA_ALLOWED = METADATA_ALLOWED
 
     def __init__(self, db_path=None):
         if db_path is None:

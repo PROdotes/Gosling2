@@ -22,6 +22,7 @@ from src.services.library_service import LibraryService
 from src.engine.config import (
     RENAME_RULES_PATH,
     get_db_path,
+    ProcessingStatus,
 )
 
 
@@ -247,14 +248,14 @@ class IngestionService:
             return check
 
         song = check["song"]
-        song = song.model_copy(update={"processing_status": 3})
+        song = song.model_copy(update={"processing_status": ProcessingStatus.CONVERTING})
         conn = self._song_repo.get_connection()
         try:
             new_id = self._song_repo.insert(song, conn)
             hydrated_song = song.model_copy(update={"id": new_id})
             conn.commit()
             logger.info(
-                f"[IngestionService] <- ingest_wav_as_converting(path='{staged_path}') INGESTED ID={new_id} (Status=3)"
+                f"[IngestionService] <- ingest_wav_as_converting(path='{staged_path}') INGESTED ID={new_id} (Status={ProcessingStatus.CONVERTING})"
             )
             return {"status": "CONVERTING", "song": hydrated_song}
         except Exception as e:
@@ -296,7 +297,7 @@ class IngestionService:
                             "source_path": mp3_path,
                             "audio_hash": mp3_hash,
                             "is_active": False,
-                            "processing_status": 1,
+                            "processing_status": ProcessingStatus.NEEDS_REVIEW,
                         }
                     )
                     self._song_repo.reactivate_ghost(existing["id"], reactivated, conn)
@@ -337,7 +338,7 @@ class IngestionService:
                 song_id,
                 {
                     "source_path": mp3_path,
-                    "processing_status": 2,
+                    "processing_status": ProcessingStatus.PENDING_ENRICHMENT,
                     "audio_hash": mp3_hash,
                 },
                 conn,
@@ -345,7 +346,7 @@ class IngestionService:
             self._enrich_metadata(song_id, conn)
             conn.commit()
             logger.info(
-                f"[IngestionService] <- finalize_wav_conversion(id={song_id}) Status now 1"
+                f"[IngestionService] <- finalize_wav_conversion(id={song_id}) Status now {ProcessingStatus.NEEDS_REVIEW}"
             )
             return song_id
         except Exception as e:
@@ -391,7 +392,7 @@ class IngestionService:
             new_id = self._song_repo.insert(song, conn)
             hydrated_song = song.model_copy(update={"id": new_id})
             self._enrich_metadata(new_id, conn)
-            hydrated_song = hydrated_song.model_copy(update={"processing_status": 1})
+            hydrated_song = hydrated_song.model_copy(update={"processing_status": ProcessingStatus.NEEDS_REVIEW})
             conn.commit()
             logger.info(
                 f"[IngestionService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
@@ -435,7 +436,7 @@ class IngestionService:
             return {"status": "ERROR", "message": "Staged file not found"}
 
         is_wav = Path(staged_path).suffix.lower() == ".wav"
-        target_status = 3 if is_wav else 1
+        target_status = ProcessingStatus.CONVERTING if is_wav else ProcessingStatus.NEEDS_REVIEW
 
         conn = self._song_repo.get_connection()
         try:
@@ -550,4 +551,4 @@ class IngestionService:
     def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (SIMULATED)."""
         logger.debug(f"[IngestionService] -> _enrich_metadata(id={song_id})")
-        self._song_repo.update_scalars(song_id, {"processing_status": 1}, conn)
+        self._song_repo.update_scalars(song_id, {"processing_status": ProcessingStatus.NEEDS_REVIEW}, conn)

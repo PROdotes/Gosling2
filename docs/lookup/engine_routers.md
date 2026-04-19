@@ -190,11 +190,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Returns status (NEW, ALREADY_EXISTS, ERROR) and match details.
 - Wraps `CatalogService.check_ingestion`.
 
-### AddAliasBody
+### AddAliasBody *(see src/models/view_models.py)*
 `{ display_name: str, name_id: int|null }`
 Used by `add_identity_alias`.
 
-### UpdateLegalNameBody
+### UpdateLegalNameBody *(see src/models/view_models.py)*
 `{ legal_name: str|null }`
 Used by `update_identity_legal_name`.
 
@@ -369,10 +369,10 @@ Used by `update_identity_legal_name`.
 - Merges a solo identity into an existing one by repointing all credits.
 - Wraps `CatalogService.merge_identity_into`.
 
-### SetIdentityTypeBody
+### SetIdentityTypeBody *(see src/models/view_models.py)*
 `{ type: str }`
 
-### AddMemberBody
+### AddMemberBody *(see src/models/view_models.py)*
 `{ member_id: int }`
 
 ### async def set_identity_type(identity_id: int, body: SetIdentityTypeBody, service: CatalogService = Depends(_get_service))

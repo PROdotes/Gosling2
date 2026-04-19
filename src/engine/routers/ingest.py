@@ -25,6 +25,7 @@ from src.engine.config import (
     ACCEPTED_EXTENSIONS,
     WAV_AUTO_CONVERT,
     get_downloads_folder,
+    ProcessingStatus,
 )
 from src.utils.audio_hash import calculate_audio_hash
 
@@ -374,7 +375,7 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
 async def get_pending_convert():
     """List songs with processing_status=3 (WAV staged, awaiting conversion)."""
     service = _get_service()
-    songs = service._song_repo.get_by_processing_status(3)
+    songs = service._song_repo.get_by_processing_status(ProcessingStatus.CONVERTING)
     results = []
     for s in songs:
         hydrated = service.get_song(s.id)

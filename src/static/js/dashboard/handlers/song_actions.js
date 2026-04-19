@@ -6,6 +6,7 @@
 import * as api from "../api.js";
 import { showToast } from "../components/toast.js";
 import { isModalOpen } from "../components/utils.js";
+import { PROCESSING_STATUS } from "../constants.js";
 
 export async function updateSyncLed(songId) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
@@ -197,7 +198,10 @@ export class SongActionsHandler {
 
         try {
             await api.deleteSong(id);
-            if (this.ctx.getState().currentMode === "songs" && this.ctx.clearSongEditorV2) {
+            if (
+                this.ctx.getState().currentMode === "songs" &&
+                this.ctx.clearSongEditorV2
+            ) {
                 this.ctx.clearSongEditorV2();
             } else if (this.ctx.hideDetailPanel) {
                 this.ctx.hideDetailPanel();
@@ -235,7 +239,8 @@ export class SongActionsHandler {
         // When event.target is the <input> itself the browser has already toggled it,
         // so checked reflects the new value. When target is the <label> or <span>
         // the browser hasn't toggled yet, so we invert.
-        const isChecked = event?.target === input ? input.checked : !input.checked;
+        const isChecked =
+            event?.target === input ? input.checked : !input.checked;
 
         try {
             await api.patchSongScalars(id, { is_active: isChecked });
@@ -250,15 +255,17 @@ export class SongActionsHandler {
 
             // Refresh V2 editor if in V2 songs mode and this song is active
             if (
-                this.ctx.refreshActiveSongV2
-                && state.currentMode === "songs"
-                && state.activeSong
-                && String(state.activeSong.id) === String(id)
+                this.ctx.refreshActiveSongV2 &&
+                state.currentMode === "songs" &&
+                state.activeSong &&
+                String(state.activeSong.id) === String(id)
             ) {
                 await this.ctx.refreshActiveSongV2(id);
             } else {
                 const activeKey =
-                    typeof activeDetailKey !== "undefined" ? activeDetailKey : null;
+                    typeof activeDetailKey !== "undefined"
+                        ? activeDetailKey
+                        : null;
                 if (activeKey === `songs:${id}`) {
                     this.ctx.refreshActiveDetail();
                 }
@@ -276,18 +283,27 @@ export class SongActionsHandler {
     }
 
     async handleMarkReviewed(actionTarget) {
-        return this._handleReviewStatus(actionTarget, 0); // 0 = REVIEWED
+        return this._handleReviewStatus(
+            actionTarget,
+            PROCESSING_STATUS.REVIEWED,
+        );
     }
 
     async handleUnreviewSong(actionTarget) {
-        return this._handleReviewStatus(actionTarget, 1); // 1 = NEEDS_REVIEW
+        return this._handleReviewStatus(
+            actionTarget,
+            PROCESSING_STATUS.NEEDS_REVIEW,
+        );
     }
 
     async _handleReviewStatus(actionTarget, newStatus) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
             await api.patchSongScalars(id, { processing_status: newStatus });
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(id);
             } else if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail({ id }, { reuseFileData: true });
@@ -313,7 +329,10 @@ export class SongActionsHandler {
             if (this.ctx.showBanner) {
                 this.ctx.showBanner("Organized successfully!", "success");
             }
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(id);
             } else if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail({ id }, { reuseFileData: false });
@@ -324,10 +343,18 @@ export class SongActionsHandler {
 
             const msg = `Organization failed: ${err.message}`;
             // 409 Conflict - File already exists at target
-            if (err.message && (err.message.includes("already exists") || err.message.includes("409"))) {
+            if (
+                err.message &&
+                (err.message.includes("already exists") ||
+                    err.message.includes("409"))
+            ) {
                 await showConfirm(
                     "Conflict detected: A file with this name already exists in the destination library folder. Please check for duplicates.",
-                    { title: "Organization Conflict", okLabel: "OK", cancelLabel: null }
+                    {
+                        title: "Organization Conflict",
+                        okLabel: "OK",
+                        cancelLabel: null,
+                    },
                 );
                 return;
             }
@@ -390,7 +417,10 @@ export class SongActionsHandler {
         const { songId, tagId } = actionTarget.dataset;
         try {
             await api.setPrimarySongTag(songId, tagId);
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();
@@ -439,7 +469,10 @@ export class SongActionsHandler {
         const { songId, albumId } = actionTarget.dataset;
         try {
             await api.removeSongAlbum(songId, albumId);
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();
@@ -470,7 +503,11 @@ export class SongActionsHandler {
                 field,
                 type,
             );
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs" && entityType === "song") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs" &&
+                entityType === "song"
+            ) {
                 await this.ctx.refreshActiveSongV2(entityId);
             } else if (this.ctx.openSongDetail) {
                 this.ctx.openSongDetail(updatedSong, { reuseFileData: true });
@@ -487,8 +524,11 @@ export class SongActionsHandler {
 
     async handleWebSearch(actionTarget) {
         const { engine } = actionTarget.dataset;
-        const songId = actionTarget.dataset.songId
-            || actionTarget.closest(".web-search-split")?.querySelector(".web-search-main")?.dataset.songId;
+        const songId =
+            actionTarget.dataset.songId ||
+            actionTarget
+                .closest(".web-search-split")
+                ?.querySelector(".web-search-main")?.dataset.songId;
         try {
             const data = await api.getSongWebSearch(songId, engine || null);
             if (data && data.url) {
@@ -556,7 +596,9 @@ export class SongActionsHandler {
             if (!res.ok) throw new Error("Conversion failed");
             showToast("Conversion started...", "info");
             if (this.ctx.updateCachedIngestResult) {
-                this.ctx.updateCachedIngestResult(stagedPath, { status: "CONVERTING" });
+                this.ctx.updateCachedIngestResult(stagedPath, {
+                    status: "CONVERTING",
+                });
             }
         } catch (err) {
             actionTarget.disabled = false;
@@ -595,10 +637,17 @@ export class SongActionsHandler {
 
                 if (this.ctx.updateIngestBadges) {
                     const status = await api.getIngestStatus();
-                    this.ctx.updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+                    this.ctx.updateIngestBadges({
+                        success: status.success,
+                        action: status.action,
+                        pending: status.pending,
+                    });
                 }
                 if (this.ctx.updateCachedIngestResult) {
-                    this.ctx.updateCachedIngestResult(stagedPath, { status: "INGESTED", song: data.song });
+                    this.ctx.updateCachedIngestResult(stagedPath, {
+                        status: "INGESTED",
+                        song: data.song,
+                    });
                 }
             } else if (data.status === "PENDING_CONVERT") {
                 const card = actionTarget.closest(".result-card");
@@ -695,11 +744,16 @@ export class SongActionsHandler {
             onApply: async () => {
                 if (this.ctx.showBanner)
                     this.ctx.showBanner("Metadata applied", "success");
-                if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                if (
+                    this.ctx.refreshActiveSongV2 &&
+                    this.ctx.getState().currentMode === "songs"
+                ) {
                     await this.ctx.refreshActiveSongV2(id);
                 } else {
                     const state = this.ctx.getState();
-                    const song = state.cachedSongs.find((s) => String(s.id) === String(id));
+                    const song = state.cachedSongs.find(
+                        (s) => String(s.id) === String(id),
+                    );
                     if (song && this.ctx.openSongDetail)
                         this.ctx.openSongDetail(song, { reuseFileData: true });
                 }
@@ -720,7 +774,10 @@ export class SongActionsHandler {
                 return await api.updateAlbum(albumId, { [field]: val });
             },
             onSave: async () => {
-                if (this.ctx.refreshActiveSongV2 && state.currentMode === "songs") {
+                if (
+                    this.ctx.refreshActiveSongV2 &&
+                    state.currentMode === "songs"
+                ) {
                     await this.ctx.refreshActiveSongV2(songId);
                 } else {
                     const song = state.cachedSongs.find(
@@ -763,7 +820,10 @@ export class SongActionsHandler {
                 );
             },
             onSave: async () => {
-                if (this.ctx.refreshActiveSongV2 && state.currentMode === "songs") {
+                if (
+                    this.ctx.refreshActiveSongV2 &&
+                    state.currentMode === "songs"
+                ) {
                     await this.ctx.refreshActiveSongV2(songId);
                 } else {
                     const song = state.cachedSongs.find(
@@ -797,8 +857,14 @@ export class SongActionsHandler {
             existingPublishers: song?.publishers || [],
             onComplete: async () => {
                 if (this.ctx.showBanner)
-                    this.ctx.showBanner("Spotify credits imported successfully", "success");
-                if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+                    this.ctx.showBanner(
+                        "Spotify credits imported successfully",
+                        "success",
+                    );
+                if (
+                    this.ctx.refreshActiveSongV2 &&
+                    this.ctx.getState().currentMode === "songs"
+                ) {
                     await this.ctx.refreshActiveSongV2(id);
                 } else if (this.ctx.refreshActiveDetail) {
                     this.ctx.refreshActiveDetail();
@@ -875,7 +941,11 @@ export class SongActionsHandler {
         actionTarget.disabled = true;
         try {
             await api.removeAlbumPublisher(albumId, publisherId);
-            if (songId && this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                songId &&
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();
@@ -895,7 +965,11 @@ export class SongActionsHandler {
         actionTarget.disabled = true;
         try {
             await api.removeAlbumCredit(albumId, creditId);
-            if (songId && this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                songId &&
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();
@@ -916,7 +990,10 @@ export class SongActionsHandler {
         actionTarget.textContent = "syncing...";
         try {
             await syncAlbumWithSong(albumId, songId);
-            if (this.ctx.refreshActiveSongV2 && this.ctx.getState().currentMode === "songs") {
+            if (
+                this.ctx.refreshActiveSongV2 &&
+                this.ctx.getState().currentMode === "songs"
+            ) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
                 this.ctx.refreshActiveDetail();
