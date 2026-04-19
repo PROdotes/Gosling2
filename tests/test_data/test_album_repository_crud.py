@@ -27,12 +27,12 @@ class TestCreateAlbum:
 
         album = repo.get_by_id(album_id)
         assert album is not None, f"Expected album to exist with id={album_id}"
-        assert album.title == "In Utero", (
-            f"Expected title='In Utero', got '{album.title}'"
-        )
-        assert album.release_year == 1993, (
-            f"Expected year=1993, got {album.release_year}"
-        )
+        assert (
+            album.title == "In Utero"
+        ), f"Expected title='In Utero', got '{album.title}'"
+        assert (
+            album.release_year == 1993
+        ), f"Expected year=1993, got {album.release_year}"
 
     def test_create_album_reuses_existing(self, populated_db):
         """Creating an album with same title+year as existing should return existing id."""
@@ -49,9 +49,9 @@ class TestCreateAlbum:
             rows = conn.execute(
                 "SELECT AlbumID FROM Albums WHERE AlbumTitle = 'Nevermind'"
             ).fetchall()
-            assert len(rows) == 1, (
-                f"Expected 1 Nevermind row (no duplicate), got {len(rows)}"
-            )
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 Nevermind row (no duplicate), got {len(rows)}"
 
     def test_create_album_reactivates_soft_deleted(self, populated_db):
         """Creating an album matching a soft-deleted record should reactivate it."""
@@ -81,9 +81,9 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.title == "Nevermind (Deluxe)", (
-            f"Expected updated title, got '{album.title}'"
-        )
+        assert (
+            album.title == "Nevermind (Deluxe)"
+        ), f"Expected updated title, got '{album.title}'"
 
     def test_update_release_year(self, populated_db):
         """Update album release year."""
@@ -94,9 +94,9 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.release_year == 2011, (
-            f"Expected year=2011, got {album.release_year}"
-        )
+        assert (
+            album.release_year == 2011
+        ), f"Expected year=2011, got {album.release_year}"
 
     def test_update_partial_does_not_affect_other_fields(self, populated_db):
         """Updating only title should leave year unchanged."""
@@ -107,12 +107,12 @@ class TestUpdateAlbum:
             conn.commit()
 
         album = repo.get_by_id(100)
-        assert album.title == "Changed Title", (
-            f"Expected 'Changed Title', got '{album.title}'"
-        )
-        assert album.release_year == 1991, (
-            f"Expected year=1991 unchanged, got {album.release_year}"
-        )
+        assert (
+            album.title == "Changed Title"
+        ), f"Expected 'Changed Title', got '{album.title}'"
+        assert (
+            album.release_year == 1991
+        ), f"Expected year=1991 unchanged, got {album.release_year}"
 
     def test_update_album_does_not_affect_other_albums(self, populated_db):
         """Updating Album 100 should not affect Album 200."""
@@ -124,9 +124,9 @@ class TestUpdateAlbum:
             conn.commit()
 
         after = repo.get_by_id(200)
-        assert after.title == before.title, (
-            f"Album 200 title should not change, got '{after.title}'"
-        )
-        assert after.release_year == before.release_year, (
-            f"Album 200 year should not change, got {after.release_year}"
-        )
+        assert (
+            after.title == before.title
+        ), f"Album 200 title should not change, got '{after.title}'"
+        assert (
+            after.release_year == before.release_year
+        ), f"Album 200 year should not change, got {after.release_year}"

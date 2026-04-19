@@ -46,23 +46,23 @@ class TestUpdateSongScalars:
     def test_update_isrc_valid_strips_dashes_and_saves(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"isrc": "US-RC1-99-00001"})
-        assert song.isrc == "USRC19900001", (
-            f"Expected 'USRC19900001' (dashes stripped), got '{song.isrc}'"
-        )
+        assert (
+            song.isrc == "USRC19900001"
+        ), f"Expected 'USRC19900001' (dashes stripped), got '{song.isrc}'"
 
     def test_update_isrc_no_dashes_saves_as_is(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"isrc": "USRC19900001"})
-        assert song.isrc == "USRC19900001", (
-            f"Expected 'USRC19900001', got '{song.isrc}'"
-        )
+        assert (
+            song.isrc == "USRC19900001"
+        ), f"Expected 'USRC19900001', got '{song.isrc}'"
 
     def test_update_is_active_false(self, populated_db):
         service = CatalogService(populated_db)
         song = service.update_song_scalars(1, {"is_active": False})
-        assert song.is_active is False, (
-            f"Expected is_active=False, got {song.is_active}"
-        )
+        assert (
+            song.is_active is False
+        ), f"Expected is_active=False, got {song.is_active}"
 
     def test_update_multiple_fields_at_once(self, populated_db):
         service = CatalogService(populated_db)
@@ -153,9 +153,9 @@ class TestUpdateSongScalars:
         service = CatalogService(populated_db)
         # Song 7 is Status 1 in fixture.
         song = service.update_song_scalars(7, {"is_active": False})
-        assert song.is_active is False, (
-            f"Expected is_active=False, got {song.is_active}"
-        )
+        assert (
+            song.is_active is False
+        ), f"Expected is_active=False, got {song.is_active}"
 
     def test_activate_and_review_validation_interaction(self, populated_db):
         """Verify that is_active=True check uses the NEW status if provided in same call."""
@@ -185,12 +185,12 @@ class TestAddSongCredit:
         service = CatalogService(populated_db)
         credit = service.add_song_credit(2, "Dave Grohl", "Composer")
         assert credit.credit_id is not None, "Expected credit_id to be assigned"
-        assert credit.display_name == "Dave Grohl", (
-            f"Expected 'Dave Grohl', got '{credit.display_name}'"
-        )
-        assert credit.role_name == "Composer", (
-            f"Expected 'Composer', got '{credit.role_name}'"
-        )
+        assert (
+            credit.display_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert (
+            credit.role_name == "Composer"
+        ), f"Expected 'Composer', got '{credit.role_name}'"
 
     def test_add_credit_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
@@ -205,12 +205,12 @@ class TestAddSongCredit:
         credit = service.add_song_credit(2, "Dave Grohl", "Performer")
 
         # 1. Assert Contract (Method works)
-        assert credit.display_name == "Dave Grohl", (
-            f"Expected 'Dave Grohl', got '{credit.display_name}'"
-        )
-        assert credit.role_name == "Performer", (
-            f"Expected 'Performer', got '{credit.role_name}'"
-        )
+        assert (
+            credit.display_name == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got '{credit.display_name}'"
+        assert (
+            credit.role_name == "Performer"
+        ), f"Expected 'Performer', got '{credit.role_name}'"
         assert credit.identity_id == 1, "Should have linked to existing identity ID 1"
 
         # 2. Assert Effect (Verify no duplicate link via Service)
@@ -228,9 +228,9 @@ class TestAddSongCredit:
         # Verify through get_song
         song = service.get_song(2)
         target = next(c for c in song.credits if c.display_name == "David Grohl")
-        assert target.identity_id == 1, (
-            f"Expected link to identity 1, got {target.identity_id}"
-        )
+        assert (
+            target.identity_id == 1
+        ), f"Expected link to identity 1, got {target.identity_id}"
 
 
 class TestRemoveSongCredit:
@@ -258,9 +258,9 @@ class TestRemoveSongCredit:
         # (We check Dave Grohl's existing name_id=10 is still renameable)
         service.update_credit_name(10, "Dave G.")
         revived = service.get_song(6)  # Song 6 uses name_id 10
-        assert any(c.display_name == "Dave G." for c in revived.credits), (
-            "Artist record should survive credit removal"
-        )
+        assert any(
+            c.display_name == "Dave G." for c in revived.credits
+        ), "Artist record should survive credit removal"
 
 
 class TestUpdateCreditName:
@@ -270,9 +270,9 @@ class TestUpdateCreditName:
         service.update_credit_name(10, "Dave Grohl Jr.")
         song6 = service.get_song(6)
         names_6 = [c.display_name for c in song6.credits]
-        assert "Dave Grohl Jr." in names_6, (
-            f"Expected 'Dave Grohl Jr.' in song 6 credits, got {names_6}"
-        )
+        assert (
+            "Dave Grohl Jr." in names_6
+        ), f"Expected 'Dave Grohl Jr.' in song 6 credits, got {names_6}"
 
     def test_rename_empty_raises_value_error(self, populated_db):
         service = CatalogService(populated_db)
@@ -302,9 +302,9 @@ class TestAddSongTag:
     def test_add_new_tag_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         tag = service.add_song_tag(1, "Live Recording", "Type")
-        assert tag.name == "Live Recording", (
-            f"Expected 'Live Recording', got '{tag.name}'"
-        )
+        assert (
+            tag.name == "Live Recording"
+        ), f"Expected 'Live Recording', got '{tag.name}'"
         assert tag.category == "Type", f"Expected 'Type', got '{tag.category}'"
 
     def test_add_tag_by_id_links_existing(self, populated_db):
@@ -349,15 +349,15 @@ class TestRemoveSongTag:
         song9 = service.get_song(9)  # Song 9 also has Grunge (1)
         matches = [t for t in song9.tags if t.id == 1]
         assert len(matches) == 1, "Tag 1 should still be on song 9"
-        assert matches[0].name == "Grunge Rock", (
-            "Renaming should have applied to surviving tag record"
-        )
+        assert (
+            matches[0].name == "Grunge Rock"
+        ), "Renaming should have applied to surviving tag record"
 
         # 3. Final global check via search
         tags = service.search_tags("Grunge Rock")
-        assert any(t.id == 1 for t in tags), (
-            "Tag should be globally searchable after being unlinked from one song"
-        )
+        assert any(
+            t.id == 1 for t in tags
+        ), "Tag should be globally searchable after being unlinked from one song"
 
 
 class TestUpdateTag:
@@ -366,9 +366,9 @@ class TestUpdateTag:
         service.update_tag(1, "Alternative Rock", "Genre")
         song = service.get_song(1)
         tag_names = [t.name for t in song.tags]
-        assert "Alternative Rock" in tag_names, (
-            f"Expected 'Alternative Rock' in tags, got {tag_names}"
-        )
+        assert (
+            "Alternative Rock" in tag_names
+        ), f"Expected 'Alternative Rock' in tags, got {tag_names}"
         assert "Grunge" not in tag_names, f"'Grunge' should be renamed, got {tag_names}"
 
     def test_rename_tag_empty_raises_value_error(self, populated_db):
@@ -383,34 +383,34 @@ class TestAddSongPublisher:
         # Song 2 has no publisher — add Sub Pop (pub_id=5) by name
         publisher = service.add_song_publisher(2, "Sub Pop")
         assert publisher.id is not None, "Expected publisher id"
-        assert publisher.name == "Sub Pop", (
-            f"Expected 'Sub Pop', got '{publisher.name}'"
-        )
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{publisher.name}'"
 
     def test_add_publisher_by_name_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
         service.add_song_publisher(2, "Sub Pop")
         song = service.get_song(2)
         pub_names = [p.name for p in song.publishers]
-        assert "Sub Pop" in pub_names, (
-            f"Expected 'Sub Pop' in publishers, got {pub_names}"
-        )
+        assert (
+            "Sub Pop" in pub_names
+        ), f"Expected 'Sub Pop' in publishers, got {pub_names}"
 
     def test_add_new_publisher_creates_and_links(self, populated_db):
         service = CatalogService(populated_db)
         publisher = service.add_song_publisher(1, "Brand New Label")
-        assert publisher.name == "Brand New Label", (
-            f"Expected 'Brand New Label', got '{publisher.name}'"
-        )
+        assert (
+            publisher.name == "Brand New Label"
+        ), f"Expected 'Brand New Label', got '{publisher.name}'"
 
     def test_add_publisher_by_id_links_existing(self, populated_db):
         service = CatalogService(populated_db)
         # Song 2 has no publisher — link Sub Pop (pub_id=5) by ID
         publisher = service.add_song_publisher(2, None, publisher_id=5)
         assert publisher.id == 5, f"Expected publisher id=5, got {publisher.id}"
-        assert publisher.name == "Sub Pop", (
-            f"Expected 'Sub Pop', got '{publisher.name}'"
-        )
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected 'Sub Pop', got '{publisher.name}'"
 
     def test_add_publisher_by_id_persisted_on_get_song(self, populated_db):
         service = CatalogService(populated_db)
@@ -437,9 +437,9 @@ class TestRemoveSongPublisher:
         service.remove_song_publisher(1, 10)
         song = service.get_song(1)
         pub_ids = [p.id for p in song.publishers]
-        assert 10 not in pub_ids, (
-            f"Publisher 10 should be unlinked from song 1, got {pub_ids}"
-        )
+        assert (
+            10 not in pub_ids
+        ), f"Publisher 10 should be unlinked from song 1, got {pub_ids}"
         # Publisher record still exists
         import sqlite3
 
@@ -457,9 +457,9 @@ class TestUpdatePublisher:
         service.update_publisher(10, "DGC Records International")
         song = service.get_song(1)
         pub_names = [p.name for p in song.publishers]
-        assert "DGC Records International" in pub_names, (
-            f"Expected 'DGC Records International' in publishers, got {pub_names}"
-        )
+        assert (
+            "DGC Records International" in pub_names
+        ), f"Expected 'DGC Records International' in publishers, got {pub_names}"
 
     def test_rename_publisher_empty_raises_value_error(self, populated_db):
         service = CatalogService(populated_db)
@@ -474,12 +474,12 @@ class TestSetPublisherParent:
         service.set_publisher_parent(5, 1)
 
         publisher = service.get_publisher(5)
-        assert publisher.parent_id == 1, (
-            f"Expected parent_id=1, got {publisher.parent_id}"
-        )
-        assert publisher.name == "Sub Pop", (
-            f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
-        )
+        assert (
+            publisher.parent_id == 1
+        ), f"Expected parent_id=1, got {publisher.parent_id}"
+        assert (
+            publisher.name == "Sub Pop"
+        ), f"Expected name='Sub Pop' unchanged, got '{publisher.name}'"
 
     def test_clear_parent_sets_none(self, populated_db):
         """Clear parent from DGC Records (10, parent=1) → parent=None."""
@@ -487,12 +487,12 @@ class TestSetPublisherParent:
         service.set_publisher_parent(10, None)
 
         publisher = service.get_publisher(10)
-        assert publisher.parent_id is None, (
-            f"Expected parent_id=None after clear, got {publisher.parent_id}"
-        )
-        assert publisher.name == "DGC Records", (
-            f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
-        )
+        assert (
+            publisher.parent_id is None
+        ), f"Expected parent_id=None after clear, got {publisher.parent_id}"
+        assert (
+            publisher.name == "DGC Records"
+        ), f"Expected name='DGC Records' unchanged, got '{publisher.name}'"
 
     def test_set_parent_nonexistent_publisher_raises(self, populated_db):
         """set_publisher_parent on nonexistent publisher should raise LookupError."""

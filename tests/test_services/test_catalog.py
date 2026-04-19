@@ -20,15 +20,15 @@ class TestGetSong:
         assert song is not None, "Song 2 should exist"
         assert song.id == 2, f"Expected id 2, got {song.id}"
         assert song.title == "Everlong", f"Expected title 'Everlong', got {song.title}"
-        assert song.media_name == "Everlong", (
-            f"Expected media_name 'Everlong', got {song.media_name}"
-        )
-        assert song.source_path == "/path/2", (
-            f"Expected source_path '/path/2', got {song.source_path}"
-        )
-        assert song.duration_s == 240.0, (
-            f"Expected duration_ms 240000, got {song.duration_ms}"
-        )
+        assert (
+            song.media_name == "Everlong"
+        ), f"Expected media_name 'Everlong', got {song.media_name}"
+        assert (
+            song.source_path == "/path/2"
+        ), f"Expected source_path '/path/2', got {song.source_path}"
+        assert (
+            song.duration_s == 240.0
+        ), f"Expected duration_ms 240000, got {song.duration_ms}"
         assert song.is_active is True, f"Expected is_active True, got {song.is_active}"
         assert song.type_id == 1, f"Expected type_id 1, got {song.type_id}"
 
@@ -39,19 +39,19 @@ class TestGetSong:
         assert len(song.credits) == 1, f"Expected 1 credit, got {len(song.credits)}"
 
         credit = song.credits[0]
-        assert credit.display_name == "Foo Fighters", (
-            f"Expected display_name 'Foo Fighters', got {credit.display_name}"
-        )
+        assert (
+            credit.display_name == "Foo Fighters"
+        ), f"Expected display_name 'Foo Fighters', got {credit.display_name}"
         assert credit.role_id == 1, f"Expected role_id 1, got {credit.role_id}"
-        assert credit.role_name == "Performer", (
-            f"Expected role_name 'Performer', got {credit.role_name}"
-        )
-        assert credit.identity_id == 3, (
-            f"Expected identity_id 3 (Foo Fighters), got {credit.identity_id}"
-        )
-        assert credit.is_primary is True, (
-            f"Expected is_primary True, got {credit.is_primary}"
-        )
+        assert (
+            credit.role_name == "Performer"
+        ), f"Expected role_name 'Performer', got {credit.role_name}"
+        assert (
+            credit.identity_id == 3
+        ), f"Expected identity_id 3 (Foo Fighters), got {credit.identity_id}"
+        assert (
+            credit.is_primary is True
+        ), f"Expected is_primary True, got {credit.is_primary}"
 
     def test_multiple_credits(self, catalog_service):
         """Song 6 (Dual Credit): Dave Grohl(Performer) + Taylor Hawkins(Composer)."""
@@ -60,38 +60,38 @@ class TestGetSong:
         assert len(song.credits) == 2, f"Expected 2 credits, got {len(song.credits)}"
 
         credit_map = {c.display_name: c for c in song.credits}
-        assert "Dave Grohl" in credit_map, (
-            f"Expected 'Dave Grohl' in credits, got {list(credit_map.keys())}"
-        )
-        assert credit_map["Dave Grohl"].role_name == "Performer", (
-            f"Expected Dave role 'Performer', got {credit_map['Dave Grohl'].role_name}"
-        )
-        assert credit_map["Dave Grohl"].role_id == 1, (
-            f"Expected Dave role_id 1, got {credit_map['Dave Grohl'].role_id}"
-        )
-        assert credit_map["Dave Grohl"].is_primary is True, (
-            f"Expected Dave is_primary True, got {credit_map['Dave Grohl'].is_primary}"
-        )
-        assert "Taylor Hawkins" in credit_map, (
-            f"Expected 'Taylor Hawkins' in credits, got {list(credit_map.keys())}"
-        )
-        assert credit_map["Taylor Hawkins"].role_name == "Composer", (
-            f"Expected Taylor role 'Composer', got {credit_map['Taylor Hawkins'].role_name}"
-        )
-        assert credit_map["Taylor Hawkins"].role_id == 2, (
-            f"Expected Taylor role_id 2, got {credit_map['Taylor Hawkins'].role_id}"
-        )
-        assert credit_map["Taylor Hawkins"].is_primary is True, (
-            f"Expected Taylor is_primary True, got {credit_map['Taylor Hawkins'].is_primary}"
-        )
+        assert (
+            "Dave Grohl" in credit_map
+        ), f"Expected 'Dave Grohl' in credits, got {list(credit_map.keys())}"
+        assert (
+            credit_map["Dave Grohl"].role_name == "Performer"
+        ), f"Expected Dave role 'Performer', got {credit_map['Dave Grohl'].role_name}"
+        assert (
+            credit_map["Dave Grohl"].role_id == 1
+        ), f"Expected Dave role_id 1, got {credit_map['Dave Grohl'].role_id}"
+        assert (
+            credit_map["Dave Grohl"].is_primary is True
+        ), f"Expected Dave is_primary True, got {credit_map['Dave Grohl'].is_primary}"
+        assert (
+            "Taylor Hawkins" in credit_map
+        ), f"Expected 'Taylor Hawkins' in credits, got {list(credit_map.keys())}"
+        assert (
+            credit_map["Taylor Hawkins"].role_name == "Composer"
+        ), f"Expected Taylor role 'Composer', got {credit_map['Taylor Hawkins'].role_name}"
+        assert (
+            credit_map["Taylor Hawkins"].role_id == 2
+        ), f"Expected Taylor role_id 2, got {credit_map['Taylor Hawkins'].role_id}"
+        assert (
+            credit_map["Taylor Hawkins"].is_primary is True
+        ), f"Expected Taylor is_primary True, got {credit_map['Taylor Hawkins'].is_primary}"
 
     def test_zero_credits(self, catalog_service):
         """Song 7 (Hollow Song): no credits."""
         song = catalog_service.get_song(7)
         assert song is not None, "Song 7 should exist"
-        assert song.title == "Hollow Song", (
-            f"Expected title 'Hollow Song', got {song.title}"
-        )
+        assert (
+            song.title == "Hollow Song"
+        ), f"Expected title 'Hollow Song', got {song.title}"
         assert song.credits == [], f"Expected empty credits, got {song.credits}"
 
     def test_album_hydration(self, catalog_service):
@@ -102,23 +102,23 @@ class TestGetSong:
 
         album = song.albums[0]
         assert album.album_id == 100, f"Expected album_id 100, got {album.album_id}"
-        assert album.album_title == "Nevermind", (
-            f"Expected album_title 'Nevermind', got {album.album_title}"
-        )
-        assert album.track_number == 1, (
-            f"Expected track_number 1, got {album.track_number}"
-        )
-        assert album.is_primary is True, (
-            f"Expected is_primary True, got {album.is_primary}"
-        )
-        assert album.release_year == 1991, (
-            f"Expected release_year 1991, got {album.release_year}"
-        )
+        assert (
+            album.album_title == "Nevermind"
+        ), f"Expected album_title 'Nevermind', got {album.album_title}"
+        assert (
+            album.track_number == 1
+        ), f"Expected track_number 1, got {album.track_number}"
+        assert (
+            album.is_primary is True
+        ), f"Expected is_primary True, got {album.is_primary}"
+        assert (
+            album.release_year == 1991
+        ), f"Expected release_year 1991, got {album.release_year}"
 
         # Album publishers hydrated
-        assert len(album.album_publishers) == 2, (
-            f"Expected 2 album publishers, got {len(album.album_publishers)}"
-        )
+        assert (
+            len(album.album_publishers) == 2
+        ), f"Expected 2 album publishers, got {len(album.album_publishers)}"
         pub_names = {p.name for p in album.album_publishers}
         assert pub_names == {
             "DGC Records",
@@ -135,23 +135,23 @@ class TestGetSong:
         """Song 1: has DGC Records as recording publisher with parent_name resolved."""
         song = catalog_service.get_song(1)
         assert song is not None, "Song 1 should exist"
-        assert len(song.publishers) == 1, (
-            f"Expected 1 publisher, got {len(song.publishers)}"
-        )
-        assert song.publishers[0].name == "DGC Records", (
-            f"Expected publisher name 'DGC Records', got {song.publishers[0].name}"
-        )
-        assert song.publishers[0].parent_name == "Universal Music Group", (
-            f"Expected parent_name 'Universal Music Group', got {song.publishers[0].parent_name}"
-        )
+        assert (
+            len(song.publishers) == 1
+        ), f"Expected 1 publisher, got {len(song.publishers)}"
+        assert (
+            song.publishers[0].name == "DGC Records"
+        ), f"Expected publisher name 'DGC Records', got {song.publishers[0].name}"
+        assert (
+            song.publishers[0].parent_name == "Universal Music Group"
+        ), f"Expected parent_name 'Universal Music Group', got {song.publishers[0].parent_name}"
 
     def test_song_without_publisher(self, catalog_service):
         """Song 2 has no RecordingPublisher."""
         song = catalog_service.get_song(2)
         assert song is not None, "Song 2 should exist"
-        assert song.publishers == [], (
-            f"Expected empty publishers, got {song.publishers}"
-        )
+        assert (
+            song.publishers == []
+        ), f"Expected empty publishers, got {song.publishers}"
 
     def test_tag_hydration(self, catalog_service):
         """Song 1: Grunge(Genre), Energetic(Mood), English(Jezik)."""
@@ -159,15 +159,15 @@ class TestGetSong:
         assert song is not None, "Song 1 should exist"
         assert len(song.tags) == 3, f"Expected 3 tags, got {len(song.tags)}"
         tag_map = {t.name: t for t in song.tags}
-        assert tag_map["Grunge"].category == "Genre", (
-            f"Expected Grunge category 'Genre', got {tag_map['Grunge'].category}"
-        )
-        assert tag_map["Energetic"].category == "Mood", (
-            f"Expected Energetic category 'Mood', got {tag_map['Energetic'].category}"
-        )
-        assert tag_map["English"].category == "Jezik", (
-            f"Expected English category 'Jezik', got {tag_map['English'].category}"
-        )
+        assert (
+            tag_map["Grunge"].category == "Genre"
+        ), f"Expected Grunge category 'Genre', got {tag_map['Grunge'].category}"
+        assert (
+            tag_map["Energetic"].category == "Mood"
+        ), f"Expected Energetic category 'Mood', got {tag_map['Energetic'].category}"
+        assert (
+            tag_map["English"].category == "Jezik"
+        ), f"Expected English category 'Jezik', got {tag_map['English'].category}"
 
     def test_song_with_no_tags(self, catalog_service):
         """Song 7 (Hollow Song): no tags."""
@@ -196,9 +196,9 @@ class TestGetSong:
         for song_id, expected_title in expected.items():
             song = catalog_service.get_song(song_id)
             assert song is not None, f"Song {song_id} should exist"
-            assert song.title == expected_title, (
-                f"Expected song {song_id} title '{expected_title}', got {song.title}"
-            )
+            assert (
+                song.title == expected_title
+            ), f"Expected song {song_id} title '{expected_title}', got {song.title}"
 
 
 # ===================================================================
@@ -211,17 +211,17 @@ class TestSearchSongsSlim:
         """search_songs_slim('Spirit') matches Song 1 by title."""
         rows = catalog_service.search_songs_slim("Spirit")
         assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
-        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
-        )
+        assert (
+            rows[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_album_match(self, catalog_service):
         """search_songs_slim('Nevermind') matches Song 1 via album title."""
         rows = catalog_service.search_songs_slim("Nevermind")
         assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
-        assert rows[0]["MediaName"] == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
-        )
+        assert (
+            rows[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{rows[0]['MediaName']}'"
 
     def test_identity_match_surface_only(self, catalog_service):
         """search_songs_slim('Dave Grohl') finds directly-credited songs only —
@@ -229,28 +229,28 @@ class TestSearchSongsSlim:
         rows = catalog_service.search_songs_slim("Dave Grohl")
         media_names = {r["MediaName"] for r in rows}
 
-        assert "Dual Credit Track" in media_names, (
-            "Expected 'Dual Credit Track' in surface results for 'Dave Grohl'"
-        )
-        assert "Joint Venture" in media_names, (
-            "Expected 'Joint Venture' in surface results for 'Dave Grohl'"
-        )
+        assert (
+            "Dual Credit Track" in media_names
+        ), "Expected 'Dual Credit Track' in surface results for 'Dave Grohl'"
+        assert (
+            "Joint Venture" in media_names
+        ), "Expected 'Joint Venture' in surface results for 'Dave Grohl'"
 
         # No group expansion in slim surface search
-        assert "Smells Like Teen Spirit" not in media_names, (
-            "Nirvana should not appear in surface search for Dave Grohl"
-        )
-        assert "Everlong" not in media_names, (
-            "Foo Fighters should not appear in surface search for Dave Grohl"
-        )
+        assert (
+            "Smells Like Teen Spirit" not in media_names
+        ), "Nirvana should not appear in surface search for Dave Grohl"
+        assert (
+            "Everlong" not in media_names
+        ), "Foo Fighters should not appear in surface search for Dave Grohl"
 
     def test_group_match(self, catalog_service):
         """search_songs_slim('Nirvana') finds SLTS directly via artist credit."""
         rows = catalog_service.search_songs_slim("Nirvana")
         media_names = {r["MediaName"] for r in rows}
-        assert "Smells Like Teen Spirit" in media_names, (
-            f"Expected 'Smells Like Teen Spirit', got {media_names}"
-        )
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), f"Expected 'Smells Like Teen Spirit', got {media_names}"
 
     def test_no_results_returns_empty_list(self, catalog_service):
         """search_songs_slim returns [] for a non-existent query."""
@@ -281,39 +281,39 @@ class TestSearchSongsDeepSlim:
 
         assert "Dual Credit Track" in media_names, "Expected direct Dave credit"
         assert "Joint Venture" in media_names, "Expected direct Dave credit"
-        assert "Smells Like Teen Spirit" in media_names, (
-            "Expected Nirvana songs via group expansion"
-        )
-        assert "Everlong" in media_names, (
-            "Expected Foo Fighters songs via group expansion"
-        )
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), "Expected Nirvana songs via group expansion"
+        assert (
+            "Everlong" in media_names
+        ), "Expected Foo Fighters songs via group expansion"
 
     def test_metadata_and_hierarchy_combined(self, catalog_service):
         """search_songs_deep_slim('Universal') finds DGC child-label songs."""
         rows = catalog_service.search_songs_deep_slim("Universal")
         media_names = {r["MediaName"] for r in rows}
-        assert "Smells Like Teen Spirit" in media_names, (
-            "Expected SLTS via publisher expansion (Universal → DGC)"
-        )
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), "Expected SLTS via publisher expansion (Universal → DGC)"
 
-        assert "Range Rover Bitch" not in media_names, (
-            "Range Rover Bitch has no Universal publisher link — should be excluded"
-        )
+        assert (
+            "Range Rover Bitch" not in media_names
+        ), "Range Rover Bitch has no Universal publisher link — should be excluded"
 
     def test_alias_match_resolves_to_group_songs(self, catalog_service):
         """search_songs_deep_slim('Grohlton') finds Grohlton Theme + group songs via alias→identity."""
         rows = catalog_service.search_songs_deep_slim("Grohlton")
         media_names = {r["MediaName"] for r in rows}
 
-        assert "Grohlton Theme" in media_names, (
-            f"Expected 'Grohlton Theme', got {media_names}"
-        )
-        assert "Smells Like Teen Spirit" in media_names, (
-            "Expected Nirvana songs via Grohlton→Dave→Nirvana expansion"
-        )
-        assert "Everlong" in media_names, (
-            "Expected Foo Fighters songs via Grohlton→Dave→Foo Fighters expansion"
-        )
+        assert (
+            "Grohlton Theme" in media_names
+        ), f"Expected 'Grohlton Theme', got {media_names}"
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), "Expected Nirvana songs via Grohlton→Dave→Nirvana expansion"
+        assert (
+            "Everlong" in media_names
+        ), "Expected Foo Fighters songs via Grohlton→Dave→Foo Fighters expansion"
 
     def test_no_results_returns_empty_list(self, catalog_service):
         """search_songs_deep_slim returns [] for a non-existent query."""
@@ -340,27 +340,27 @@ class TestGetSongsByIdentity:
         song_ids = {s.id for s in songs}
 
         # Direct/alias credits: 4, 5, 6, 8
-        assert 4 in song_ids, (
-            f"Expected song 4 (Grohlton Theme) in results, got {song_ids}"
-        )
-        assert 5 in song_ids, (
-            f"Expected song 5 (Pocketwatch Demo) in results, got {song_ids}"
-        )
-        assert 6 in song_ids, (
-            f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
-        )
-        assert 8 in song_ids, (
-            f"Expected song 8 (Joint Venture) in results, got {song_ids}"
-        )
+        assert (
+            4 in song_ids
+        ), f"Expected song 4 (Grohlton Theme) in results, got {song_ids}"
+        assert (
+            5 in song_ids
+        ), f"Expected song 5 (Pocketwatch Demo) in results, got {song_ids}"
+        assert (
+            6 in song_ids
+        ), f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
+        assert (
+            8 in song_ids
+        ), f"Expected song 8 (Joint Venture) in results, got {song_ids}"
 
         # Group credits: 1 (Nirvana), 2 (Foo Fighters)
         assert 1 in song_ids, f"Expected song 1 (SLTS) in results, got {song_ids}"
         assert 2 in song_ids, f"Expected song 2 (Everlong) in results, got {song_ids}"
 
         # NOT Taylor's solo
-        assert 3 not in song_ids, (
-            f"Did not expect song 3 (Range Rover Bitch) in results, got {song_ids}"
-        )
+        assert (
+            3 not in song_ids
+        ), f"Did not expect song 3 (Range Rover Bitch) in results, got {song_ids}"
 
     def test_taylor_hawkins(self, catalog_service):
         """Taylor (ID=4): person in Foo Fighters(3).
@@ -368,16 +368,16 @@ class TestGetSongsByIdentity:
         songs = catalog_service.get_songs_by_identity(4)
         song_ids = {s.id for s in songs}
 
-        assert 3 in song_ids, (
-            f"Expected song 3 (Range Rover Bitch) in results, got {song_ids}"
-        )
+        assert (
+            3 in song_ids
+        ), f"Expected song 3 (Range Rover Bitch) in results, got {song_ids}"
         assert 2 in song_ids, f"Expected song 2 (Everlong) in results, got {song_ids}"
-        assert 6 in song_ids, (
-            f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
-        )
-        assert 8 in song_ids, (
-            f"Expected song 8 (Joint Venture) in results, got {song_ids}"
-        )
+        assert (
+            6 in song_ids
+        ), f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
+        assert (
+            8 in song_ids
+        ), f"Expected song 8 (Joint Venture) in results, got {song_ids}"
 
     def test_nirvana_as_group(self, catalog_service):
         """Nirvana (ID=2, group): has member Dave(1).
@@ -387,43 +387,43 @@ class TestGetSongsByIdentity:
 
         assert 1 in song_ids, f"Expected song 1 (SLTS) in results, got {song_ids}"
         # Members expanded: Dave (1)
-        assert 4 in song_ids, (
-            f"Expected song 4 (Grohlton Theme) in results, got {song_ids}"
-        )
-        assert 5 in song_ids, (
-            f"Expected song 5 (Pocketwatch Demo) in results, got {song_ids}"
-        )
-        assert 6 in song_ids, (
-            f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
-        )
-        assert 8 in song_ids, (
-            f"Expected song 8 (Joint Venture) in results, got {song_ids}"
-        )
+        assert (
+            4 in song_ids
+        ), f"Expected song 4 (Grohlton Theme) in results, got {song_ids}"
+        assert (
+            5 in song_ids
+        ), f"Expected song 5 (Pocketwatch Demo) in results, got {song_ids}"
+        assert (
+            6 in song_ids
+        ), f"Expected song 6 (Dual Credit Track) in results, got {song_ids}"
+        assert (
+            8 in song_ids
+        ), f"Expected song 8 (Joint Venture) in results, got {song_ids}"
 
     def test_not_found_identity(self, catalog_service):
         """Non-existent identity ID returns empty list."""
         songs = catalog_service.get_songs_by_identity(999)
-        assert songs == [], (
-            f"Expected empty list for non-existent identity, got {songs}"
-        )
+        assert (
+            songs == []
+        ), f"Expected empty list for non-existent identity, got {songs}"
 
     def test_results_are_hydrated(self, catalog_service):
         """Songs returned by get_songs_by_identity should be fully hydrated."""
         songs = catalog_service.get_songs_by_identity(2)  # Nirvana
         slts = next((s for s in songs if s.id == 1), None)
         assert slts is not None, "Song 1 (SLTS) should be in Nirvana results"
-        assert len(slts.credits) == 1, (
-            f"Expected 1 credit for SLTS, got {len(slts.credits)}"
-        )
-        assert slts.credits[0].display_name == "Nirvana", (
-            f"Expected credit 'Nirvana', got {slts.credits[0].display_name}"
-        )
-        assert len(slts.albums) == 1, (
-            f"Expected 1 album for SLTS, got {len(slts.albums)}"
-        )
-        assert slts.albums[0].album_title == "Nevermind", (
-            f"Expected album 'Nevermind', got {slts.albums[0].album_title}"
-        )
+        assert (
+            len(slts.credits) == 1
+        ), f"Expected 1 credit for SLTS, got {len(slts.credits)}"
+        assert (
+            slts.credits[0].display_name == "Nirvana"
+        ), f"Expected credit 'Nirvana', got {slts.credits[0].display_name}"
+        assert (
+            len(slts.albums) == 1
+        ), f"Expected 1 album for SLTS, got {len(slts.albums)}"
+        assert (
+            slts.albums[0].album_title == "Nevermind"
+        ), f"Expected album 'Nevermind', got {slts.albums[0].album_title}"
 
 
 # ===================================================================
@@ -436,9 +436,9 @@ class TestGetIdentity:
         """Dave Grohl (ID=1): aliases, groups, no members."""
         identity = catalog_service.get_identity(1)
         assert identity is not None, "Identity 1 (Dave Grohl) should exist"
-        assert identity.display_name == "Dave Grohl", (
-            f"Expected display_name 'Dave Grohl', got {identity.display_name}"
-        )
+        assert (
+            identity.display_name == "Dave Grohl"
+        ), f"Expected display_name 'Dave Grohl', got {identity.display_name}"
         assert identity.type == "person", f"Expected type 'person', got {identity.type}"
 
         # Aliases
@@ -448,9 +448,7 @@ class TestGetIdentity:
             "Grohlton",
             "Late!",
             "Ines Prajo",
-        }, (
-            f"Expected aliases {{'Dave Grohl', 'Grohlton', 'Late!', 'Ines Prajo'}}, got {alias_names}"
-        )
+        }, f"Expected aliases {{'Dave Grohl', 'Grohlton', 'Late!', 'Ines Prajo'}}, got {alias_names}"
 
         # Groups
         group_names = {g.display_name for g in identity.groups}
@@ -460,17 +458,17 @@ class TestGetIdentity:
         }, f"Expected groups {{'Nirvana', 'Foo Fighters'}}, got {group_names}"
 
         # No members (person)
-        assert identity.members == [], (
-            f"Expected no members for person, got {identity.members}"
-        )
+        assert (
+            identity.members == []
+        ), f"Expected no members for person, got {identity.members}"
 
     def test_group_with_members(self, catalog_service):
         """Foo Fighters (ID=3): members Dave + Taylor, no groups."""
         identity = catalog_service.get_identity(3)
         assert identity is not None, "Identity 3 (Foo Fighters) should exist"
-        assert identity.display_name == "Foo Fighters", (
-            f"Expected display_name 'Foo Fighters', got {identity.display_name}"
-        )
+        assert (
+            identity.display_name == "Foo Fighters"
+        ), f"Expected display_name 'Foo Fighters', got {identity.display_name}"
         assert identity.type == "group", f"Expected type 'group', got {identity.type}"
 
         member_names = {m.display_name for m in identity.members}
@@ -480,9 +478,9 @@ class TestGetIdentity:
         }, f"Expected members {{'Dave Grohl', 'Taylor Hawkins'}}, got {member_names}"
 
         # No groups
-        assert identity.groups == [], (
-            f"Expected no groups for group entity, got {identity.groups}"
-        )
+        assert (
+            identity.groups == []
+        ), f"Expected no groups for group entity, got {identity.groups}"
 
     def test_not_found(self, catalog_service):
         """Non-existent identity ID returns None."""
@@ -510,12 +508,12 @@ class TestGetAllIdentities:
         identities = catalog_service.get_all_identities()
         dave = next((i for i in identities if i.display_name == "Dave Grohl"), None)
         assert dave is not None, "Dave Grohl should be in all identities"
-        assert len(dave.aliases) == 4, (
-            f"Expected 4 aliases for Dave, got {len(dave.aliases)}"
-        )
-        assert len(dave.groups) == 2, (
-            f"Expected 2 groups for Dave, got {len(dave.groups)}"
-        )
+        assert (
+            len(dave.aliases) == 4
+        ), f"Expected 4 aliases for Dave, got {len(dave.aliases)}"
+        assert (
+            len(dave.groups) == 2
+        ), f"Expected 2 groups for Dave, got {len(dave.groups)}"
 
     def test_empty_db(self, catalog_service_empty):
         """Empty database returns empty list."""
@@ -530,21 +528,21 @@ class TestSearchIdentities:
         """Searching by group name returns the identity."""
         results = catalog_service.search_identities("Nirvana")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        assert results[0].display_name == "Nirvana", (
-            f"Expected display_name 'Nirvana', got {results[0].display_name}"
-        )
+        assert (
+            results[0].display_name == "Nirvana"
+        ), f"Expected display_name 'Nirvana', got {results[0].display_name}"
 
     def test_by_alias(self, catalog_service):
         """Searching 'Grohlton' returns Dave Grohl (hydrated)."""
         results = catalog_service.search_identities("Grohlton")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        assert results[0].display_name == "Dave Grohl", (
-            f"Expected display_name 'Dave Grohl', got {results[0].display_name}"
-        )
+        assert (
+            results[0].display_name == "Dave Grohl"
+        ), f"Expected display_name 'Dave Grohl', got {results[0].display_name}"
         # Should be hydrated
-        assert len(results[0].aliases) == 4, (
-            f"Expected 4 aliases, got {len(results[0].aliases)}"
-        )
+        assert (
+            len(results[0].aliases) == 4
+        ), f"Expected 4 aliases, got {len(results[0].aliases)}"
 
     def test_no_results(self, catalog_service):
         """Searching non-existent term returns empty list."""
@@ -575,14 +573,14 @@ class TestGetAllAlbums:
         assert nevermind is not None, "Nevermind should be in all albums"
 
         assert nevermind.id == 100, f"Expected id 100, got {nevermind.id}"
-        assert nevermind.release_year == 1991, (
-            f"Expected release_year 1991, got {nevermind.release_year}"
-        )
+        assert (
+            nevermind.release_year == 1991
+        ), f"Expected release_year 1991, got {nevermind.release_year}"
 
         # Publishers
-        assert len(nevermind.publishers) == 2, (
-            f"Expected 2 publishers, got {len(nevermind.publishers)}"
-        )
+        assert (
+            len(nevermind.publishers) == 2
+        ), f"Expected 2 publishers, got {len(nevermind.publishers)}"
         pub_names = {p.name for p in nevermind.publishers}
         assert pub_names == {
             "DGC Records",
@@ -590,18 +588,18 @@ class TestGetAllAlbums:
         }, f"Expected publishers {{'DGC Records', 'Sub Pop'}}, got {pub_names}"
 
         # Credits
-        assert len(nevermind.credits) == 1, (
-            f"Expected 1 credit, got {len(nevermind.credits)}"
-        )
-        assert nevermind.credits[0].display_name == "Nirvana", (
-            f"Expected credit 'Nirvana', got {nevermind.credits[0].display_name}"
-        )
+        assert (
+            len(nevermind.credits) == 1
+        ), f"Expected 1 credit, got {len(nevermind.credits)}"
+        assert (
+            nevermind.credits[0].display_name == "Nirvana"
+        ), f"Expected credit 'Nirvana', got {nevermind.credits[0].display_name}"
 
         # Songs
         assert len(nevermind.songs) == 1, f"Expected 1 song, got {len(nevermind.songs)}"
-        assert nevermind.songs[0].title == "Smells Like Teen Spirit", (
-            f"Expected song 'Smells Like Teen Spirit', got {nevermind.songs[0].title}"
-        )
+        assert (
+            nevermind.songs[0].title == "Smells Like Teen Spirit"
+        ), f"Expected song 'Smells Like Teen Spirit', got {nevermind.songs[0].title}"
 
     def test_empty_db(self, catalog_service_empty):
         """Empty database returns empty list."""
@@ -616,29 +614,29 @@ class TestGetAlbum:
         """The Colour and the Shape (ID=200): full hydration of all fields."""
         album = catalog_service.get_album(200)
         assert album is not None, "Album 200 should exist"
-        assert album.title == "The Colour and the Shape", (
-            f"Expected title 'The Colour and the Shape', got {album.title}"
-        )
-        assert album.release_year == 1997, (
-            f"Expected release_year 1997, got {album.release_year}"
-        )
-        assert album.album_type is None, (
-            f"Expected album_type None, got {album.album_type}"
-        )
-        assert len(album.publishers) == 1, (
-            f"Expected 1 publisher, got {len(album.publishers)}"
-        )
-        assert album.publishers[0].name == "Roswell Records", (
-            f"Expected publisher 'Roswell Records', got {album.publishers[0].name}"
-        )
+        assert (
+            album.title == "The Colour and the Shape"
+        ), f"Expected title 'The Colour and the Shape', got {album.title}"
+        assert (
+            album.release_year == 1997
+        ), f"Expected release_year 1997, got {album.release_year}"
+        assert (
+            album.album_type is None
+        ), f"Expected album_type None, got {album.album_type}"
+        assert (
+            len(album.publishers) == 1
+        ), f"Expected 1 publisher, got {len(album.publishers)}"
+        assert (
+            album.publishers[0].name == "Roswell Records"
+        ), f"Expected publisher 'Roswell Records', got {album.publishers[0].name}"
         assert len(album.credits) == 1, f"Expected 1 credit, got {len(album.credits)}"
-        assert album.credits[0].display_name == "Foo Fighters", (
-            f"Expected credit 'Foo Fighters', got {album.credits[0].display_name}"
-        )
+        assert (
+            album.credits[0].display_name == "Foo Fighters"
+        ), f"Expected credit 'Foo Fighters', got {album.credits[0].display_name}"
         assert len(album.songs) == 1, f"Expected 1 song, got {len(album.songs)}"
-        assert album.songs[0].title == "Everlong", (
-            f"Expected song 'Everlong', got {album.songs[0].title}"
-        )
+        assert (
+            album.songs[0].title == "Everlong"
+        ), f"Expected song 'Everlong', got {album.songs[0].title}"
 
     def test_not_found(self, catalog_service):
         """Non-existent album ID returns None."""
@@ -653,9 +651,9 @@ class TestSearchAlbumsSlim:
         """Partial title match returns matching album dict."""
         rows = catalog_service.search_albums_slim("Never")
         assert len(rows) == 1, f"Expected 1 result, got {len(rows)}"
-        assert rows[0]["AlbumTitle"] == "Nevermind", (
-            f"Expected 'Nevermind', got '{rows[0]['AlbumTitle']}'"
-        )
+        assert (
+            rows[0]["AlbumTitle"] == "Nevermind"
+        ), f"Expected 'Nevermind', got '{rows[0]['AlbumTitle']}'"
 
     def test_no_match(self, catalog_service):
         """Searching non-existent term returns empty list."""
@@ -687,24 +685,24 @@ class TestGetAllPublishers:
         """Every publisher should have parent_name resolved (or None for roots)."""
         pubs = catalog_service.get_all_publishers()
         pub_map = {p.name: p for p in pubs}
-        assert pub_map["DGC Records"].parent_name == "Universal Music Group", (
-            f"Expected DGC parent 'Universal Music Group', got {pub_map['DGC Records'].parent_name}"
-        )
-        assert pub_map["Island Records"].parent_name == "Universal Music Group", (
-            f"Expected Island Records parent 'Universal Music Group', got {pub_map['Island Records'].parent_name}"
-        )
-        assert pub_map["Island Def Jam"].parent_name == "Island Records", (
-            f"Expected Island Def Jam parent 'Island Records', got {pub_map['Island Def Jam'].parent_name}"
-        )
-        assert pub_map["Universal Music Group"].parent_name is None, (
-            f"Expected UMG parent None, got {pub_map['Universal Music Group'].parent_name}"
-        )
-        assert pub_map["Roswell Records"].parent_name is None, (
-            f"Expected Roswell parent None, got {pub_map['Roswell Records'].parent_name}"
-        )
-        assert pub_map["Sub Pop"].parent_name is None, (
-            f"Expected Sub Pop parent None, got {pub_map['Sub Pop'].parent_name}"
-        )
+        assert (
+            pub_map["DGC Records"].parent_name == "Universal Music Group"
+        ), f"Expected DGC parent 'Universal Music Group', got {pub_map['DGC Records'].parent_name}"
+        assert (
+            pub_map["Island Records"].parent_name == "Universal Music Group"
+        ), f"Expected Island Records parent 'Universal Music Group', got {pub_map['Island Records'].parent_name}"
+        assert (
+            pub_map["Island Def Jam"].parent_name == "Island Records"
+        ), f"Expected Island Def Jam parent 'Island Records', got {pub_map['Island Def Jam'].parent_name}"
+        assert (
+            pub_map["Universal Music Group"].parent_name is None
+        ), f"Expected UMG parent None, got {pub_map['Universal Music Group'].parent_name}"
+        assert (
+            pub_map["Roswell Records"].parent_name is None
+        ), f"Expected Roswell parent None, got {pub_map['Roswell Records'].parent_name}"
+        assert (
+            pub_map["Sub Pop"].parent_name is None
+        ), f"Expected Sub Pop parent None, got {pub_map['Sub Pop'].parent_name}"
 
     def test_empty_db(self, catalog_service_empty):
         """Empty database returns empty list."""
@@ -719,12 +717,12 @@ class TestGetPublisher:
         """UMG (1) should have children: Island Records(2), DGC Records(10)."""
         pub = catalog_service.get_publisher(1)
         assert pub is not None, "Publisher 1 (UMG) should exist"
-        assert pub.name == "Universal Music Group", (
-            f"Expected name 'Universal Music Group', got {pub.name}"
-        )
-        assert pub.parent_name is None, (
-            f"Expected parent_name None, got {pub.parent_name}"
-        )
+        assert (
+            pub.name == "Universal Music Group"
+        ), f"Expected name 'Universal Music Group', got {pub.name}"
+        assert (
+            pub.parent_name is None
+        ), f"Expected parent_name None, got {pub.parent_name}"
         child_names = {c.name for c in pub.sub_publishers}
         assert child_names == {
             "Island Records",
@@ -735,31 +733,31 @@ class TestGetPublisher:
         """Island Def Jam (3): parent_name should be 'Island Records'."""
         pub = catalog_service.get_publisher(3)
         assert pub is not None, "Publisher 3 (Island Def Jam) should exist"
-        assert pub.name == "Island Def Jam", (
-            f"Expected name 'Island Def Jam', got {pub.name}"
-        )
-        assert pub.parent_name == "Island Records", (
-            f"Expected parent_name 'Island Records', got {pub.parent_name}"
-        )
+        assert (
+            pub.name == "Island Def Jam"
+        ), f"Expected name 'Island Def Jam', got {pub.name}"
+        assert (
+            pub.parent_name == "Island Records"
+        ), f"Expected parent_name 'Island Records', got {pub.parent_name}"
 
     def test_dgc_parent(self, catalog_service):
         """DGC Records (10): parent_name should be 'Universal Music Group'."""
         pub = catalog_service.get_publisher(10)
         assert pub is not None, "Publisher 10 (DGC Records) should exist"
-        assert pub.parent_name == "Universal Music Group", (
-            f"Expected parent_name 'Universal Music Group', got {pub.parent_name}"
-        )
+        assert (
+            pub.parent_name == "Universal Music Group"
+        ), f"Expected parent_name 'Universal Music Group', got {pub.parent_name}"
 
     def test_leaf_publisher(self, catalog_service):
         """Sub Pop (5): no parent, no children."""
         pub = catalog_service.get_publisher(5)
         assert pub is not None, "Publisher 5 (Sub Pop) should exist"
-        assert pub.parent_name is None, (
-            f"Expected parent_name None, got {pub.parent_name}"
-        )
-        assert pub.sub_publishers == [], (
-            f"Expected no sub_publishers, got {pub.sub_publishers}"
-        )
+        assert (
+            pub.parent_name is None
+        ), f"Expected parent_name None, got {pub.parent_name}"
+        assert (
+            pub.sub_publishers == []
+        ), f"Expected no sub_publishers, got {pub.sub_publishers}"
 
     def test_not_found(self, catalog_service):
         """Non-existent publisher ID returns None."""
@@ -784,9 +782,9 @@ class TestSearchPublishers:
         """Search results should have parent_name resolved."""
         results = catalog_service.search_publishers("Island Def")
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
-        assert results[0].parent_name == "Island Records", (
-            f"Expected parent_name 'Island Records', got {results[0].parent_name}"
-        )
+        assert (
+            results[0].parent_name == "Island Records"
+        ), f"Expected parent_name 'Island Records', got {results[0].parent_name}"
 
     def test_no_match(self, catalog_service):
         """Searching non-existent term returns empty list."""
@@ -801,13 +799,13 @@ class TestGetPublisherSongs:
         """DGC Records (10) has Song 1 via RecordingPublishers."""
         songs = catalog_service.get_songs_by_publisher(10)
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].title == "Smells Like Teen Spirit", (
-            f"Expected title 'Smells Like Teen Spirit', got {songs[0].title}"
-        )
+        assert (
+            songs[0].title == "Smells Like Teen Spirit"
+        ), f"Expected title 'Smells Like Teen Spirit', got {songs[0].title}"
         # Song should be hydrated
-        assert len(songs[0].credits) == 1, (
-            f"Expected 1 credit, got {len(songs[0].credits)}"
-        )
+        assert (
+            len(songs[0].credits) == 1
+        ), f"Expected 1 credit, got {len(songs[0].credits)}"
 
     def test_publisher_with_no_songs(self, catalog_service):
         """Sub Pop (5) has no RecordingPublisher entries."""
@@ -825,97 +823,97 @@ class TestSongViewFromCatalog:
         """Song 1 (SLTS): single performer -> 'Nirvana'."""
         song = catalog_service.get_song(1)
         view = SongView.from_domain(song)
-        assert view.display_artist == "Nirvana", (
-            f"Expected display_artist 'Nirvana', got {view.display_artist}"
-        )
+        assert (
+            view.display_artist == "Nirvana"
+        ), f"Expected display_artist 'Nirvana', got {view.display_artist}"
 
     def test_display_artist_multiple_performers(self, catalog_service):
         """Song 8 (Joint Venture): two performers -> 'Dave Grohl, Taylor Hawkins'."""
         song = catalog_service.get_song(8)
         view = SongView.from_domain(song)
-        assert view.display_artist == "Dave Grohl, Taylor Hawkins", (
-            f"Expected display_artist 'Dave Grohl, Taylor Hawkins', got {view.display_artist}"
-        )
+        assert (
+            view.display_artist == "Dave Grohl, Taylor Hawkins"
+        ), f"Expected display_artist 'Dave Grohl, Taylor Hawkins', got {view.display_artist}"
 
     def test_display_artist_no_credits(self, catalog_service):
         """Song 7 (Hollow Song): no credits -> None."""
         song = catalog_service.get_song(7)
         view = SongView.from_domain(song)
-        assert view.display_artist is None, (
-            f"Expected display_artist None, got {view.display_artist}"
-        )
+        assert (
+            view.display_artist is None
+        ), f"Expected display_artist None, got {view.display_artist}"
 
     def test_formatted_duration(self, catalog_service):
         """Song 1 (200s=200000ms): '3:20'."""
         song = catalog_service.get_song(1)
         view = SongView.from_domain(song)
-        assert view.formatted_duration == "3:20", (
-            f"Expected formatted_duration '3:20', got {view.formatted_duration}"
-        )
+        assert (
+            view.formatted_duration == "3:20"
+        ), f"Expected formatted_duration '3:20', got {view.formatted_duration}"
 
     def test_formatted_duration_exact_minute(self, catalog_service):
         """Song 3 (180s=180000ms): '3:00'."""
         song = catalog_service.get_song(3)
         view = SongView.from_domain(song)
-        assert view.formatted_duration == "3:00", (
-            f"Expected formatted_duration '3:00', got {view.formatted_duration}"
-        )
+        assert (
+            view.formatted_duration == "3:00"
+        ), f"Expected formatted_duration '3:00', got {view.formatted_duration}"
 
     def test_formatted_duration_short(self, catalog_service):
         """Song 7 (10s=10000ms): '0:10'."""
         song = catalog_service.get_song(7)
         view = SongView.from_domain(song)
-        assert view.formatted_duration == "0:10", (
-            f"Expected formatted_duration '0:10', got {view.formatted_duration}"
-        )
+        assert (
+            view.formatted_duration == "0:10"
+        ), f"Expected formatted_duration '0:10', got {view.formatted_duration}"
 
     def test_primary_genre_explicit_primary(self, catalog_service):
         """Song 9: has Alt Rock (primary=True) and Grunge (primary=False). Should be 'Alt Rock'."""
         song = catalog_service.get_song(9)
         view = SongView.from_domain(song)
-        assert view.primary_genre == "Alt Rock", (
-            f"Expected primary_genre 'Alt Rock', got {view.primary_genre}"
-        )
+        assert (
+            view.primary_genre == "Alt Rock"
+        ), f"Expected primary_genre 'Alt Rock', got {view.primary_genre}"
 
     def test_primary_genre_implicit(self, catalog_service):
         """Song 1: no explicit primary, first Genre tag wins -> 'Grunge'."""
         song = catalog_service.get_song(1)
         view = SongView.from_domain(song)
-        assert view.primary_genre == "Grunge", (
-            f"Expected primary_genre 'Grunge', got {view.primary_genre}"
-        )
+        assert (
+            view.primary_genre == "Grunge"
+        ), f"Expected primary_genre 'Grunge', got {view.primary_genre}"
 
     def test_primary_genre_no_genre_tags(self, catalog_service):
         """Song 2: has '90s' (Era) only -> no Genre -> None."""
         song = catalog_service.get_song(2)
         view = SongView.from_domain(song)
-        assert view.primary_genre is None, (
-            f"Expected primary_genre None, got {view.primary_genre}"
-        )
+        assert (
+            view.primary_genre is None
+        ), f"Expected primary_genre None, got {view.primary_genre}"
 
     def test_primary_genre_no_tags(self, catalog_service):
         """Song 7: no tags at all -> None."""
         song = catalog_service.get_song(7)
         view = SongView.from_domain(song)
-        assert view.primary_genre is None, (
-            f"Expected primary_genre None, got {view.primary_genre}"
-        )
+        assert (
+            view.primary_genre is None
+        ), f"Expected primary_genre None, got {view.primary_genre}"
 
     def test_master_publisher_display(self, catalog_service):
         """Song 1: DGC Records (parent UMG) -> 'DGC Records (Universal Music Group)'."""
         song = catalog_service.get_song(1)
         view = SongView.from_domain(song)
-        assert view.display_master_publisher == "DGC Records (Universal Music Group)", (
-            f"Expected display_master_publisher 'DGC Records (Universal Music Group)', got {view.display_master_publisher}"
-        )
+        assert (
+            view.display_master_publisher == "DGC Records (Universal Music Group)"
+        ), f"Expected display_master_publisher 'DGC Records (Universal Music Group)', got {view.display_master_publisher}"
 
     def test_master_publisher_empty(self, catalog_service):
         """Song 2: no recording publisher -> empty string."""
         song = catalog_service.get_song(2)
         view = SongView.from_domain(song)
-        assert view.display_master_publisher == "", (
-            f"Expected display_master_publisher '', got {view.display_master_publisher}"
-        )
+        assert (
+            view.display_master_publisher == ""
+        ), f"Expected display_master_publisher '', got {view.display_master_publisher}"
 
 
 class TestAlbumViewFromCatalog:
@@ -926,9 +924,9 @@ class TestAlbumViewFromCatalog:
         album = catalog_service.get_album(100)
         view = AlbumView.from_domain(album)
 
-        assert view.display_artist == "Nirvana", (
-            f"Expected display_artist 'Nirvana', got {view.display_artist}"
-        )
+        assert (
+            view.display_artist == "Nirvana"
+        ), f"Expected display_artist 'Nirvana', got {view.display_artist}"
         assert view.song_count == 1, f"Expected song_count 1, got {view.song_count}"
         # Publisher display: Sub Pop has no parent, DGC has parent UMG
         # Exact order may vary by DB, but split by ', ' should give exact set
@@ -936,21 +934,19 @@ class TestAlbumViewFromCatalog:
         assert pub_parts == {
             "Sub Pop",
             "DGC Records (Universal Music Group)",
-        }, (
-            f"Expected publisher parts {{'Sub Pop', 'DGC Records (Universal Music Group)'}}, got {pub_parts}"
-        )
+        }, f"Expected publisher parts {{'Sub Pop', 'DGC Records (Universal Music Group)'}}, got {pub_parts}"
 
     def test_tcats_view(self, catalog_service):
         """The Colour and the Shape (200): display_artist, display_publisher, song_count."""
         album = catalog_service.get_album(200)
         view = AlbumView.from_domain(album)
 
-        assert view.display_artist == "Foo Fighters", (
-            f"Expected display_artist 'Foo Fighters', got {view.display_artist}"
-        )
-        assert view.display_publisher == "Roswell Records", (
-            f"Expected display_publisher 'Roswell Records', got {view.display_publisher}"
-        )
+        assert (
+            view.display_artist == "Foo Fighters"
+        ), f"Expected display_artist 'Foo Fighters', got {view.display_artist}"
+        assert (
+            view.display_publisher == "Roswell Records"
+        ), f"Expected display_publisher 'Roswell Records', got {view.display_publisher}"
         assert view.song_count == 1, f"Expected song_count 1, got {view.song_count}"
 
 
@@ -978,12 +974,12 @@ class TestSongWorkflowValidation:
         # 2. Verify initial state matches our test requirement
         original = catalog_service.get_song(7)
         assert original.id == 7, f"Expected ID 7, got {original.id}"
-        assert original.is_active is False, (
-            f"Expected is_active False before activation attempt, got {original.is_active}"
-        )
-        assert original.processing_status == 1, (
-            f"Expected status 1 before activation attempt, got {original.processing_status}"
-        )
+        assert (
+            original.is_active is False
+        ), f"Expected is_active False before activation attempt, got {original.is_active}"
+        assert (
+            original.processing_status == 1
+        ), f"Expected status 1 before activation attempt, got {original.processing_status}"
 
         # 3. Attempt to activate
         update = SongScalarUpdate(is_active=True)
@@ -995,25 +991,25 @@ class TestSongWorkflowValidation:
             )
 
         expected_msg = "Cannot activate song unless processing_status is 0 (Reviewed)"
-        assert expected_msg in str(exc.value), (
-            f"Expected error message '{expected_msg}', got '{exc.value}'"
-        )
+        assert expected_msg in str(
+            exc.value
+        ), f"Expected error message '{expected_msg}', got '{exc.value}'"
 
         # 4. Exhaustive check: Verify NOTHING changed
         refreshed = catalog_service.get_song(7)
         assert refreshed.id == 7, f"Expected ID 7, got {refreshed.id}"
-        assert refreshed.media_name == "Hollow Song", (
-            f"Expected 'Hollow Song', got '{refreshed.media_name}'"
-        )
-        assert refreshed.duration_s == 10.0, (
-            f"Expected 10.0, got {refreshed.duration_s}"
-        )
-        assert refreshed.is_active is False, (
-            f"Expected is_active False, got {refreshed.is_active}"
-        )
-        assert refreshed.processing_status == 1, (
-            f"Expected status 1, got {refreshed.processing_status}"
-        )
+        assert (
+            refreshed.media_name == "Hollow Song"
+        ), f"Expected 'Hollow Song', got '{refreshed.media_name}'"
+        assert (
+            refreshed.duration_s == 10.0
+        ), f"Expected 10.0, got {refreshed.duration_s}"
+        assert (
+            refreshed.is_active is False
+        ), f"Expected is_active False, got {refreshed.is_active}"
+        assert (
+            refreshed.processing_status == 1
+        ), f"Expected status 1, got {refreshed.processing_status}"
 
     def test_activate_allowed_if_reviewed(self, catalog_service):
         """Activation allowed if status is 0."""
@@ -1031,20 +1027,20 @@ class TestSongWorkflowValidation:
         success = catalog_service.update_song_scalars(
             7, update.model_dump(exclude_unset=True)
         )
-        assert success is not None, (
-            "update_song_scalars should return the hydrated Song object"
-        )
+        assert (
+            success is not None
+        ), "update_song_scalars should return the hydrated Song object"
 
         # Exhaustive check: Verify activation AND persistence of other fields
         song = catalog_service.get_song(7)
         assert song.id == 7, f"Expected ID 7, got {song.id}"
         assert song.is_active is True, f"Expected is_active True, got {song.is_active}"
-        assert song.media_name == "Hollow Song", (
-            f"Expected 'Hollow Song', got '{song.media_name}'"
-        )
-        assert song.processing_status == 0, (
-            f"Expected status 0, got {song.processing_status}"
-        )
+        assert (
+            song.media_name == "Hollow Song"
+        ), f"Expected 'Hollow Song', got '{song.media_name}'"
+        assert (
+            song.processing_status == 0
+        ), f"Expected status 0, got {song.processing_status}"
         assert song.duration_s == 10.0, f"Expected 10.0, got {song.duration_s}"
 
     def test_deactivate_always_allowed(self, catalog_service):
@@ -1068,12 +1064,12 @@ class TestSongWorkflowValidation:
         # Exhaustive check: Verify deactivation
         song = catalog_service.get_song(1)
         assert song.id == 1, f"Expected ID 1, got {song.id}"
-        assert song.is_active is False, (
-            f"Expected is_active False, got {song.is_active}"
-        )
-        assert song.media_name == "Smells Like Teen Spirit", (
-            f"Expected SLTS title, got '{song.media_name}'"
-        )
-        assert song.processing_status == 1, (
-            f"Expected status 1, got {song.processing_status}"
-        )
+        assert (
+            song.is_active is False
+        ), f"Expected is_active False, got {song.is_active}"
+        assert (
+            song.media_name == "Smells Like Teen Spirit"
+        ), f"Expected SLTS title, got '{song.media_name}'"
+        assert (
+            song.processing_status == 1
+        ), f"Expected status 1, got {song.processing_status}"

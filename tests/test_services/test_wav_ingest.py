@@ -80,27 +80,27 @@ class TestMetadataParserFilenameStemFallback:
         parser = MetadataParser()
         # WAV has no ID3 title tag — raw_metadata is empty
         song = parser.parse({}, str(wav))
-        assert song.media_name == "My WAV Track", (
-            f"Expected 'My WAV Track' from filename stem, got '{song.media_name}'"
-        )
+        assert (
+            song.media_name == "My WAV Track"
+        ), f"Expected 'My WAV Track' from filename stem, got '{song.media_name}'"
 
     def test_mp3_with_title_tag_uses_tag_not_stem(self, tmp_path):
         # When a title tag IS present, the stem fallback must NOT override it
         parser = MetadataParser()
         fake_path = tmp_path / "some_stem_name.mp3"
         song = parser.parse({"TIT2": ["Tagged Title"]}, str(fake_path))
-        assert song.media_name == "Tagged Title", (
-            f"Expected 'Tagged Title' from tag, got '{song.media_name}'"
-        )
+        assert (
+            song.media_name == "Tagged Title"
+        ), f"Expected 'Tagged Title' from tag, got '{song.media_name}'"
 
     def test_empty_title_tag_uses_filename_stem(self, tmp_path):
         # Edge: TIT2 present but empty string → still fall back to stem
         parser = MetadataParser()
         fake_path = tmp_path / "stem_title.mp3"
         song = parser.parse({"TIT2": [""]}, str(fake_path))
-        assert song.media_name == "stem_title", (
-            f"Expected 'stem_title' from stem, got '{song.media_name}'"
-        )
+        assert (
+            song.media_name == "stem_title"
+        ), f"Expected 'stem_title' from stem, got '{song.media_name}'"
 
 
 # ---------------------------------------------------------------------------
@@ -112,9 +112,9 @@ class TestIngestWavAsConverting:
     def test_new_wav_returns_converting_status(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))
-        assert result["status"] == "CONVERTING", (
-            f"Expected status CONVERTING, got {result['status']}"
-        )
+        assert (
+            result["status"] == "CONVERTING"
+        ), f"Expected status CONVERTING, got {result['status']}"
 
     def test_new_wav_returns_song_with_id(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
@@ -126,17 +126,17 @@ class TestIngestWavAsConverting:
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))
         song = result["song"]
-        assert song.processing_status == 3, (
-            f"Expected processing_status=3 (Converting), got {song.processing_status}"
-        )
+        assert (
+            song.processing_status == 3
+        ), f"Expected processing_status=3 (Converting), got {song.processing_status}"
 
     def test_new_wav_song_title_is_filename_stem(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))
         song = result["song"]
-        assert song.media_name == "Cool Song Name", (
-            f"Expected 'Cool Song Name' from stem, got '{song.media_name}'"
-        )
+        assert (
+            song.media_name == "Cool Song Name"
+        ), f"Expected 'Cool Song Name' from stem, got '{song.media_name}'"
 
     def test_new_wav_persisted_in_db(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
@@ -144,17 +144,17 @@ class TestIngestWavAsConverting:
         song_id = result["song"].id
         db_song = service.get_song(song_id)
         assert db_song is not None, "Song should be retrievable from DB after ingest"
-        assert db_song.processing_status == 3, (
-            f"Expected DB processing_status=3, got {db_song.processing_status}"
-        )
+        assert (
+            db_song.processing_status == 3
+        ), f"Expected DB processing_status=3, got {db_song.processing_status}"
 
     def test_new_wav_source_path_stored_correctly(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))
         song = result["song"]
-        assert song.source_path == str(staged_wav), (
-            f"Expected source_path={staged_wav}, got {song.source_path}"
-        )
+        assert song.source_path == str(
+            staged_wav
+        ), f"Expected source_path={staged_wav}, got {song.source_path}"
 
     def test_duplicate_wav_returns_already_exists(
         self, ingest_db, staged_wav, tmp_path
@@ -204,9 +204,9 @@ class TestFinalizeWavConversion:
 
         db_song = service.get_song(song_id)
         assert db_song is not None
-        assert db_song.source_path == mp3_path, (
-            f"Expected source_path={mp3_path}, got {db_song.source_path}"
-        )
+        assert (
+            db_song.source_path == mp3_path
+        ), f"Expected source_path={mp3_path}, got {db_song.source_path}"
 
     def test_finalize_sets_processing_status_to_1(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
@@ -220,9 +220,9 @@ class TestFinalizeWavConversion:
 
         db_song = service.get_song(song_id)
         assert db_song is not None
-        assert db_song.processing_status == 1, (
-            f"Expected processing_status=1 after finalize, got {db_song.processing_status}"
-        )
+        assert (
+            db_song.processing_status == 1
+        ), f"Expected processing_status=1 after finalize, got {db_song.processing_status}"
 
     def test_finalize_other_fields_unchanged(self, ingest_db, staged_wav):
         service = CatalogService(ingest_db)
@@ -237,9 +237,9 @@ class TestFinalizeWavConversion:
 
         db_song = service.get_song(song_id)
         assert db_song is not None
-        assert db_song.media_name == original_title, (
-            f"Expected title '{original_title}' to be unchanged, got '{db_song.media_name}'"
-        )
+        assert (
+            db_song.media_name == original_title
+        ), f"Expected title '{original_title}' to be unchanged, got '{db_song.media_name}'"
 
     def test_finalize_returns_song_id(self, ingest_db, staged_wav):
         """finalize_wav_conversion must return the same song_id (int), not None or a dict."""
@@ -251,12 +251,12 @@ class TestFinalizeWavConversion:
         mp3_path_obj.write_text("fake mp3 content")
         surviving_id = service.finalize_wav_conversion(song_id, str(mp3_path_obj))
 
-        assert isinstance(surviving_id, int), (
-            f"Expected finalize_wav_conversion to return int, got {type(surviving_id)}"
-        )
-        assert surviving_id == song_id, (
-            f"Expected surviving_id={song_id}, got {surviving_id}"
-        )
+        assert isinstance(
+            surviving_id, int
+        ), f"Expected finalize_wav_conversion to return int, got {type(surviving_id)}"
+        assert (
+            surviving_id == song_id
+        ), f"Expected surviving_id={song_id}, got {surviving_id}"
 
 
 # ---------------------------------------------------------------------------
@@ -291,9 +291,9 @@ class TestResolveConflictWav:
         ).fetchone()
         conn.close()
         assert row is not None
-        assert row[0] == 3, (
-            f"Expected ProcessingStatus=3 after WAV resolve, got {row[0]}"
-        )
+        assert (
+            row[0] == 3
+        ), f"Expected ProcessingStatus=3 after WAV resolve, got {row[0]}"
 
     def test_wav_resolve_returns_pending_convert_status(
         self, populated_db, ghost_id, staged_wav
@@ -303,9 +303,9 @@ class TestResolveConflictWav:
         result = service.resolve_conflict(
             ghost_id=ghost_id, staged_path=str(staged_wav)
         )
-        assert result.get("status") == "PENDING_CONVERT", (
-            f"Expected status='PENDING_CONVERT', got '{result.get('status')}'"
-        )
+        assert (
+            result.get("status") == "PENDING_CONVERT"
+        ), f"Expected status='PENDING_CONVERT', got '{result.get('status')}'"
 
     def test_wav_resolve_no_metadata_enrichment(
         self, populated_db, ghost_id, staged_wav
@@ -350,9 +350,9 @@ class TestResolveConflictWav:
 
         service = CatalogService(populated_db)
         result = service.resolve_conflict(ghost_id=ghost_id, staged_path=str(mp3))
-        assert result.get("status") == "INGESTED", (
-            f"MP3 resolve should return 'INGESTED', got '{result.get('status')}'"
-        )
+        assert (
+            result.get("status") == "INGESTED"
+        ), f"MP3 resolve should return 'INGESTED', got '{result.get('status')}'"
 
 
 # ---------------------------------------------------------------------------
@@ -405,9 +405,9 @@ class TestFinalizeWavConversionGhostReactivation:
         mp3_path.write_bytes(b"fake mp3")
 
         surviving_id = service.finalize_wav_conversion(wav_song_id, str(mp3_path))
-        assert surviving_id == ghost_id, (
-            f"Expected ghost_id={ghost_id} to be returned, got {surviving_id}"
-        )
+        assert (
+            surviving_id == ghost_id
+        ), f"Expected ghost_id={ghost_id} to be returned, got {surviving_id}"
 
     def test_ghost_hash_collision_undeletes_ghost(
         self, ingest_db, staged_wav, monkeypatch
@@ -484,6 +484,6 @@ class TestFinalizeWavConversionGhostReactivation:
             "SELECT SourceID FROM MediaSources WHERE SourceID = ?", (wav_song_id,)
         ).fetchone()
         conn.close()
-        assert row is None, (
-            f"WAV placeholder (id={wav_song_id}) should be hard-deleted after ghost reactivation"
-        )
+        assert (
+            row is None
+        ), f"WAV placeholder (id={wav_song_id}) should be hard-deleted after ghost reactivation"

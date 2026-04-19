@@ -44,9 +44,9 @@ class TestDashboard:
             404,
         ), f"Expected 200 or 404, got {resp.status_code}"
         if resp.status_code == 200:
-            assert "<!DOCTYPE html>" in resp.text or "<html" in resp.text, (
-                f"Expected HTML content, got: {resp.text[:200]}"
-            )
+            assert (
+                "<!DOCTYPE html>" in resp.text or "<html" in resp.text
+            ), f"Expected HTML content, got: {resp.text[:200]}"
 
     def test_static_dashboard_assets_are_served(self, populated_db, monkeypatch):
         """GET /static/... should serve extracted dashboard assets."""
@@ -54,9 +54,9 @@ class TestDashboard:
         c = TestClient(app)
         resp = c.get("/static/css/dashboard/base.css")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        assert "--bg-deep" in resp.text, (
-            f"Expected '--bg-deep' CSS variable in response, got: {resp.text[:200]}"
-        )
+        assert (
+            "--bg-deep" in resp.text
+        ), f"Expected '--bg-deep' CSS variable in response, got: {resp.text[:200]}"
 
 
 # ===========================================================================
@@ -69,73 +69,71 @@ class TestGetSong:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["id"] == 2, f"Expected id=2, got {data['id']}"
-        assert data["title"] == "Everlong", (
-            f"Expected title='Everlong', got {data['title']!r}"
-        )
-        assert data["media_name"] == "Everlong", (
-            f"Expected media_name='Everlong', got {data['media_name']!r}"
-        )
-        assert data["source_path"] == "/path/2", (
-            f"Expected source_path='/path/2', got {data['source_path']!r}"
-        )
-        assert data["duration_ms"] == 240000, (
-            f"Expected duration_s=240.0, got {data['duration_ms']}"
-        )
-        assert data["formatted_duration"] == "4:00", (
-            f"Expected formatted_duration='4:00', got {data['formatted_duration']!r}"
-        )
+        assert (
+            data["title"] == "Everlong"
+        ), f"Expected title='Everlong', got {data['title']!r}"
+        assert (
+            data["media_name"] == "Everlong"
+        ), f"Expected media_name='Everlong', got {data['media_name']!r}"
+        assert (
+            data["source_path"] == "/path/2"
+        ), f"Expected source_path='/path/2', got {data['source_path']!r}"
+        assert (
+            data["duration_ms"] == 240000
+        ), f"Expected duration_s=240.0, got {data['duration_ms']}"
+        assert (
+            data["formatted_duration"] == "4:00"
+        ), f"Expected formatted_duration='4:00', got {data['formatted_duration']!r}"
 
     def test_everlong_credits(self, client):
         """Song 2 has one credit: Foo Fighters as Performer."""
         data = client.get("/api/v1/songs/2").json()
-        assert len(data["credits"]) == 1, (
-            f"Expected 1 credit, got {len(data['credits'])}"
-        )
-        assert data["credits"][0]["display_name"] == "Foo Fighters", (
-            f"Expected display_name='Foo Fighters', got {data['credits'][0]['display_name']!r}"
-        )
-        assert data["credits"][0]["role_name"] == "Performer", (
-            f"Expected role_name='Performer', got {data['credits'][0]['role_name']!r}"
-        )
-        assert data["display_artist"] == "Foo Fighters", (
-            f"Expected display_artist='Foo Fighters', got {data['display_artist']!r}"
-        )
+        assert (
+            len(data["credits"]) == 1
+        ), f"Expected 1 credit, got {len(data['credits'])}"
+        assert (
+            data["credits"][0]["display_name"] == "Foo Fighters"
+        ), f"Expected display_name='Foo Fighters', got {data['credits'][0]['display_name']!r}"
+        assert (
+            data["credits"][0]["role_name"] == "Performer"
+        ), f"Expected role_name='Performer', got {data['credits'][0]['role_name']!r}"
+        assert (
+            data["display_artist"] == "Foo Fighters"
+        ), f"Expected display_artist='Foo Fighters', got {data['display_artist']!r}"
 
     def test_everlong_album(self, client):
         """Song 2 is on TCATS (album 200), track 11."""
         data = client.get("/api/v1/songs/2").json()
         assert len(data["albums"]) == 1, f"Expected 1 album, got {len(data['albums'])}"
         album = data["albums"][0]
-        assert album["album_id"] == 200, (
-            f"Expected album_id=200, got {album['album_id']}"
-        )
-        assert album["album_title"] == "The Colour and the Shape", (
-            f"Expected album_title='The Colour and the Shape', got {album['album_title']!r}"
-        )
-        assert album["track_number"] == 11, (
-            f"Expected track_number=11, got {album['track_number']}"
-        )
-        assert album["release_year"] == 1997, (
-            f"Expected release_year=1997, got {album['release_year']}"
-        )
+        assert (
+            album["album_id"] == 200
+        ), f"Expected album_id=200, got {album['album_id']}"
+        assert (
+            album["album_title"] == "The Colour and the Shape"
+        ), f"Expected album_title='The Colour and the Shape', got {album['album_title']!r}"
+        assert (
+            album["track_number"] == 11
+        ), f"Expected track_number=11, got {album['track_number']}"
+        assert (
+            album["release_year"] == 1997
+        ), f"Expected release_year=1997, got {album['release_year']}"
 
     def test_song_with_master_publisher(self, client):
         """Song 1 (SLTS) has recording publisher DGC Records."""
         data = client.get("/api/v1/songs/1").json()
-        assert data["title"] == "Smells Like Teen Spirit", (
-            f"Expected title='Smells Like Teen Spirit', got {data['title']!r}"
-        )
-        assert len(data["publishers"]) == 1, (
-            f"Expected 1 publisher, got {len(data['publishers'])}"
-        )
-        assert data["publishers"][0]["name"] == "DGC Records", (
-            f"Expected publisher name='DGC Records', got {data['publishers'][0]['name']!r}"
-        )
+        assert (
+            data["title"] == "Smells Like Teen Spirit"
+        ), f"Expected title='Smells Like Teen Spirit', got {data['title']!r}"
+        assert (
+            len(data["publishers"]) == 1
+        ), f"Expected 1 publisher, got {len(data['publishers'])}"
+        assert (
+            data["publishers"][0]["name"] == "DGC Records"
+        ), f"Expected publisher name='DGC Records', got {data['publishers'][0]['name']!r}"
         assert (
             data["display_master_publisher"] == "DGC Records (Universal Music Group)"
-        ), (
-            f"Expected display_master_publisher='DGC Records (Universal Music Group)', got {data['display_master_publisher']!r}"
-        )
+        ), f"Expected display_master_publisher='DGC Records (Universal Music Group)', got {data['display_master_publisher']!r}"
 
     def test_song_with_tags(self, client):
         """Song 1 has tags: Grunge, Energetic, English."""
@@ -146,39 +144,39 @@ class TestGetSong:
             "English",
             "Grunge",
         ], f"Expected tags ['Energetic', 'English', 'Grunge'], got {tag_names}"
-        assert data["primary_genre"] == "Grunge", (
-            f"Expected primary_genre='Grunge', got {data['primary_genre']!r}"
-        )
+        assert (
+            data["primary_genre"] == "Grunge"
+        ), f"Expected primary_genre='Grunge', got {data['primary_genre']!r}"
 
     def test_song_primary_genre_explicit(self, client):
         """Song 9 has Alt Rock(primary) and Grunge(not primary) - explicit wins."""
         data = client.get("/api/v1/songs/9").json()
-        assert data["primary_genre"] == "Alt Rock", (
-            f"Expected primary_genre='Alt Rock', got {data['primary_genre']!r}"
-        )
+        assert (
+            data["primary_genre"] == "Alt Rock"
+        ), f"Expected primary_genre='Alt Rock', got {data['primary_genre']!r}"
 
     def test_song_no_credits(self, client):
         """Song 7 (Hollow Song) has zero credits."""
         data = client.get("/api/v1/songs/7").json()
-        assert data["title"] == "Hollow Song", (
-            f"Expected title='Hollow Song', got {data['title']!r}"
-        )
-        assert data["credits"] == [], (
-            f"Expected empty credits list, got {data['credits']}"
-        )
-        assert data["display_artist"] is None, (
-            f"Expected display_artist=None, got {data['display_artist']!r}"
-        )
+        assert (
+            data["title"] == "Hollow Song"
+        ), f"Expected title='Hollow Song', got {data['title']!r}"
+        assert (
+            data["credits"] == []
+        ), f"Expected empty credits list, got {data['credits']}"
+        assert (
+            data["display_artist"] is None
+        ), f"Expected display_artist=None, got {data['display_artist']!r}"
 
     def test_song_dual_credits(self, client):
         """Song 6 has Dave Grohl (Performer) + Taylor Hawkins (Composer)."""
         data = client.get("/api/v1/songs/6").json()
-        assert data["title"] == "Dual Credit Track", (
-            f"Expected title='Dual Credit Track', got {data['title']!r}"
-        )
-        assert len(data["credits"]) == 2, (
-            f"Expected 2 credits, got {len(data['credits'])}"
-        )
+        assert (
+            data["title"] == "Dual Credit Track"
+        ), f"Expected title='Dual Credit Track', got {data['title']!r}"
+        assert (
+            len(data["credits"]) == 2
+        ), f"Expected 2 credits, got {len(data['credits'])}"
         credit_pairs = [(c["display_name"], c["role_name"]) for c in data["credits"]]
         assert (
             "Dave Grohl",
@@ -192,35 +190,35 @@ class TestGetSong:
         ) in credit_pairs, (
             f"Expected ('Taylor Hawkins', 'Composer') in credits, got {credit_pairs}"
         )
-        assert data["display_artist"] == "Dave Grohl", (
-            f"Expected display_artist='Dave Grohl' (Performers only), got {data['display_artist']!r}"
-        )
+        assert (
+            data["display_artist"] == "Dave Grohl"
+        ), f"Expected display_artist='Dave Grohl' (Performers only), got {data['display_artist']!r}"
 
     def test_song_two_performers(self, client):
         """Song 8 has Dave Grohl + Taylor Hawkins both as Performer."""
         data = client.get("/api/v1/songs/8").json()
-        assert data["title"] == "Joint Venture", (
-            f"Expected title='Joint Venture', got {data['title']!r}"
-        )
-        assert data["display_artist"] == "Dave Grohl, Taylor Hawkins", (
-            f"Expected display_artist='Dave Grohl, Taylor Hawkins', got {data['display_artist']!r}"
-        )
+        assert (
+            data["title"] == "Joint Venture"
+        ), f"Expected title='Joint Venture', got {data['title']!r}"
+        assert (
+            data["display_artist"] == "Dave Grohl, Taylor Hawkins"
+        ), f"Expected display_artist='Dave Grohl, Taylor Hawkins', got {data['display_artist']!r}"
 
     def test_not_found(self, client):
         """Non-existent song returns 404."""
         resp = client.get("/api/v1/songs/999")
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
-        assert "not found" in resp.json()["detail"].lower(), (
-            f"Expected 'not found' in detail, got {resp.json()['detail']!r}"
-        )
+        assert (
+            "not found" in resp.json()["detail"].lower()
+        ), f"Expected 'not found' in detail, got {resp.json()['detail']!r}"
 
     def test_all_nine_songs_accessible(self, client):
         """Every song ID 1-9 returns 200."""
         for song_id in range(1, 10):
             resp = client.get(f"/api/v1/songs/{song_id}")
-            assert resp.status_code == 200, (
-                f"Song {song_id} failed: got {resp.status_code}"
-            )
+            assert (
+                resp.status_code == 200
+            ), f"Song {song_id} failed: got {resp.status_code}"
 
 
 # ===========================================================================
@@ -249,21 +247,21 @@ class TestSearchSongs:
         )
         data = resp.json()
         titles = [s["title"] for s in data]
-        assert "Smells Like Teen Spirit" in titles, (
-            f"Expected 'Smells Like Teen Spirit' (via Nirvana) in results, got {titles}"
-        )
-        assert "Everlong" in titles, (
-            f"Expected 'Everlong' (via Foo Fighters) in results, got {titles}"
-        )
+        assert (
+            "Smells Like Teen Spirit" in titles
+        ), f"Expected 'Smells Like Teen Spirit' (via Nirvana) in results, got {titles}"
+        assert (
+            "Everlong" in titles
+        ), f"Expected 'Everlong' (via Foo Fighters) in results, got {titles}"
 
     def test_alias_expansion(self, client):
         """Searching 'Grohlton' (Dave's alias) resolves to his identity tree."""
         resp = client.get("/api/v1/songs/search", params={"q": "Grohlton"})
         data = resp.json()
         titles = [s["title"] for s in data]
-        assert "Grohlton Theme" in titles, (
-            f"Expected 'Grohlton Theme' in results, got {titles}"
-        )
+        assert (
+            "Grohlton Theme" in titles
+        ), f"Expected 'Grohlton Theme' in results, got {titles}"
 
     def test_no_results(self, client):
         """Non-matching query returns empty list."""
@@ -275,9 +273,9 @@ class TestSearchSongs:
         """Empty query returns results (exploration mode)."""
         resp = client.get("/api/v1/songs/search", params={"q": ""})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        assert len(resp.json()) > 0, (
-            f"Expected non-empty results for empty query, got {len(resp.json())} items"
-        )
+        assert (
+            len(resp.json()) > 0
+        ), f"Expected non-empty results for empty query, got {len(resp.json())} items"
 
     def test_no_params(self, client):
         """No query params at all still returns 200."""
@@ -289,12 +287,12 @@ class TestSearchSongs:
         resp = client.get("/api/v1/songs/search", params={"q": "Everlong"})
         data = resp.json()
         everlong = next(s for s in data if s["title"] == "Everlong")
-        assert everlong["display_artist"] == "Foo Fighters", (
-            f"Expected display_artist='Foo Fighters', got {everlong['display_artist']!r}"
-        )
-        assert everlong["duration_s"] == 240.0, (
-            f"Expected duration_s=240.0, got {everlong['duration_s']}"
-        )
+        assert (
+            everlong["display_artist"] == "Foo Fighters"
+        ), f"Expected display_artist='Foo Fighters', got {everlong['display_artist']!r}"
+        assert (
+            everlong["duration_s"] == 240.0
+        ), f"Expected duration_s=240.0, got {everlong['duration_s']}"
 
     def test_no_duplicate_songs(self, client):
         """Search for 'Nirvana' should not return SLTS twice."""
@@ -408,9 +406,9 @@ class TestGetIdentity:
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
         assert data["type"] == "person", f"Expected type='person', got {data['type']!r}"
-        assert data["display_name"] == "Dave Grohl", (
-            f"Expected display_name='Dave Grohl', got {data['display_name']!r}"
-        )
+        assert (
+            data["display_name"] == "Dave Grohl"
+        ), f"Expected display_name='Dave Grohl', got {data['display_name']!r}"
         alias_names = sorted([a["display_name"] for a in data["aliases"]])
         assert alias_names == [
             "Dave Grohl",
@@ -431,13 +429,13 @@ class TestGetIdentity:
         data = resp.json()
         assert data["id"] == 2, f"Expected id=2, got {data['id']}"
         assert data["type"] == "group", f"Expected type='group', got {data['type']!r}"
-        assert data["display_name"] == "Nirvana", (
-            f"Expected display_name='Nirvana', got {data['display_name']!r}"
-        )
+        assert (
+            data["display_name"] == "Nirvana"
+        ), f"Expected display_name='Nirvana', got {data['display_name']!r}"
         member_names = [m["display_name"] for m in data["members"]]
-        assert "Dave Grohl" in member_names, (
-            f"Expected 'Dave Grohl' in Nirvana members, got {member_names}"
-        )
+        assert (
+            "Dave Grohl" in member_names
+        ), f"Expected 'Dave Grohl' in Nirvana members, got {member_names}"
 
     def test_not_found(self, client):
         """Non-existent identity returns 404."""
@@ -455,24 +453,24 @@ class TestGetSongsByIdentity:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         titles = sorted([s["title"] for s in data])
-        assert "Smells Like Teen Spirit" in titles, (
-            f"Expected 'Smells Like Teen Spirit' in Dave's songs, got {titles}"
-        )
-        assert "Everlong" in titles, (
-            f"Expected 'Everlong' in Dave's songs, got {titles}"
-        )
-        assert "Grohlton Theme" in titles, (
-            f"Expected 'Grohlton Theme' in Dave's songs, got {titles}"
-        )
-        assert "Pocketwatch Demo" in titles, (
-            f"Expected 'Pocketwatch Demo' in Dave's songs, got {titles}"
-        )
-        assert "Dual Credit Track" in titles, (
-            f"Expected 'Dual Credit Track' in Dave's songs, got {titles}"
-        )
-        assert "Joint Venture" in titles, (
-            f"Expected 'Joint Venture' in Dave's songs, got {titles}"
-        )
+        assert (
+            "Smells Like Teen Spirit" in titles
+        ), f"Expected 'Smells Like Teen Spirit' in Dave's songs, got {titles}"
+        assert (
+            "Everlong" in titles
+        ), f"Expected 'Everlong' in Dave's songs, got {titles}"
+        assert (
+            "Grohlton Theme" in titles
+        ), f"Expected 'Grohlton Theme' in Dave's songs, got {titles}"
+        assert (
+            "Pocketwatch Demo" in titles
+        ), f"Expected 'Pocketwatch Demo' in Dave's songs, got {titles}"
+        assert (
+            "Dual Credit Track" in titles
+        ), f"Expected 'Dual Credit Track' in Dave's songs, got {titles}"
+        assert (
+            "Joint Venture" in titles
+        ), f"Expected 'Joint Venture' in Dave's songs, got {titles}"
 
     def test_taylor_hawkins(self, client):
         """Taylor Hawkins (ID 4) has Range Rover Bitch + Dual Credit + Joint Venture + FF songs."""
@@ -480,18 +478,18 @@ class TestGetSongsByIdentity:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         titles = sorted([s["title"] for s in data])
-        assert "Range Rover Bitch" in titles, (
-            f"Expected 'Range Rover Bitch' in Taylor's songs, got {titles}"
-        )
-        assert "Dual Credit Track" in titles, (
-            f"Expected 'Dual Credit Track' in Taylor's songs, got {titles}"
-        )
-        assert "Joint Venture" in titles, (
-            f"Expected 'Joint Venture' in Taylor's songs, got {titles}"
-        )
-        assert "Everlong" in titles, (
-            f"Expected 'Everlong' (Foo Fighters) in Taylor's songs, got {titles}"
-        )
+        assert (
+            "Range Rover Bitch" in titles
+        ), f"Expected 'Range Rover Bitch' in Taylor's songs, got {titles}"
+        assert (
+            "Dual Credit Track" in titles
+        ), f"Expected 'Dual Credit Track' in Taylor's songs, got {titles}"
+        assert (
+            "Joint Venture" in titles
+        ), f"Expected 'Joint Venture' in Taylor's songs, got {titles}"
+        assert (
+            "Everlong" in titles
+        ), f"Expected 'Everlong' (Foo Fighters) in Taylor's songs, got {titles}"
 
     def test_not_found_identity(self, client):
         """Non-existent identity returns 404."""
@@ -502,18 +500,18 @@ class TestGetSongsByIdentity:
         """Songs from identity endpoint include credits and albums."""
         data = client.get("/api/v1/identities/2/songs").json()
         slts = next(s for s in data if s["title"] == "Smells Like Teen Spirit")
-        assert len(slts["credits"]) == 1, (
-            f"Expected 1 credit on SLTS, got {len(slts['credits'])}"
-        )
-        assert slts["credits"][0]["display_name"] == "Nirvana", (
-            f"Expected credit='Nirvana', got {slts['credits'][0]['display_name']!r}"
-        )
-        assert len(slts["albums"]) == 1, (
-            f"Expected 1 album on SLTS, got {len(slts['albums'])}"
-        )
-        assert slts["albums"][0]["album_title"] == "Nevermind", (
-            f"Expected album='Nevermind', got {slts['albums'][0]['album_title']!r}"
-        )
+        assert (
+            len(slts["credits"]) == 1
+        ), f"Expected 1 credit on SLTS, got {len(slts['credits'])}"
+        assert (
+            slts["credits"][0]["display_name"] == "Nirvana"
+        ), f"Expected credit='Nirvana', got {slts['credits'][0]['display_name']!r}"
+        assert (
+            len(slts["albums"]) == 1
+        ), f"Expected 1 album on SLTS, got {len(slts['albums'])}"
+        assert (
+            slts["albums"][0]["album_title"] == "Nevermind"
+        ), f"Expected album='Nevermind', got {slts['albums'][0]['album_title']!r}"
 
 
 # ===========================================================================
@@ -545,25 +543,25 @@ class TestGetAllPublishers:
         """DGC Records (parent=1) has parent_name 'Universal Music Group'."""
         data = client.get("/api/v1/publishers").json()
         dgc = next(p for p in data if p["name"] == "DGC Records")
-        assert dgc["parent_name"] == "Universal Music Group", (
-            f"Expected parent_name='Universal Music Group', got {dgc['parent_name']!r}"
-        )
+        assert (
+            dgc["parent_name"] == "Universal Music Group"
+        ), f"Expected parent_name='Universal Music Group', got {dgc['parent_name']!r}"
 
     def test_island_def_jam_parent(self, client):
         """Island Def Jam (parent=2) has parent_name 'Island Records'."""
         data = client.get("/api/v1/publishers").json()
         idj = next(p for p in data if p["name"] == "Island Def Jam")
-        assert idj["parent_name"] == "Island Records", (
-            f"Expected parent_name='Island Records', got {idj['parent_name']!r}"
-        )
+        assert (
+            idj["parent_name"] == "Island Records"
+        ), f"Expected parent_name='Island Records', got {idj['parent_name']!r}"
 
     def test_top_level_has_no_parent(self, client):
         """Universal Music Group has no parent."""
         data = client.get("/api/v1/publishers").json()
         umg = next(p for p in data if p["name"] == "Universal Music Group")
-        assert umg["parent_name"] is None, (
-            f"Expected parent_name=None, got {umg['parent_name']!r}"
-        )
+        assert (
+            umg["parent_name"] is None
+        ), f"Expected parent_name=None, got {umg['parent_name']!r}"
 
     def test_empty_db(self, empty_client):
         """Empty DB returns empty list."""
@@ -581,12 +579,12 @@ class TestSearchPublishers:
         resp = client.get("/api/v1/publishers/search", params={"q": "island"})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         names = sorted([p["name"] for p in resp.json()])
-        assert "Island Records" in names, (
-            f"Expected 'Island Records' in results, got {names}"
-        )
-        assert "Island Def Jam" in names, (
-            f"Expected 'Island Def Jam' in results, got {names}"
-        )
+        assert (
+            "Island Records" in names
+        ), f"Expected 'Island Records' in results, got {names}"
+        assert (
+            "Island Def Jam" in names
+        ), f"Expected 'Island Def Jam' in results, got {names}"
 
     def test_no_match(self, client):
         """Non-matching search returns empty list."""
@@ -604,39 +602,39 @@ class TestGetPublisher:
         resp = client.get("/api/v1/publishers/1")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["name"] == "Universal Music Group", (
-            f"Expected name='Universal Music Group', got {data['name']!r}"
-        )
+        assert (
+            data["name"] == "Universal Music Group"
+        ), f"Expected name='Universal Music Group', got {data['name']!r}"
         child_names = sorted([c["name"] for c in data["sub_publishers"]])
-        assert "DGC Records" in child_names, (
-            f"Expected 'DGC Records' in sub_publishers, got {child_names}"
-        )
-        assert "Island Records" in child_names, (
-            f"Expected 'Island Records' in sub_publishers, got {child_names}"
-        )
+        assert (
+            "DGC Records" in child_names
+        ), f"Expected 'DGC Records' in sub_publishers, got {child_names}"
+        assert (
+            "Island Records" in child_names
+        ), f"Expected 'Island Records' in sub_publishers, got {child_names}"
 
     def test_dgc_parent_resolved(self, client):
         """Publisher 10 (DGC Records) has parent_name 'Universal Music Group'."""
         data = client.get("/api/v1/publishers/10").json()
-        assert data["name"] == "DGC Records", (
-            f"Expected name='DGC Records', got {data['name']!r}"
-        )
-        assert data["parent_name"] == "Universal Music Group", (
-            f"Expected parent_name='Universal Music Group', got {data['parent_name']!r}"
-        )
+        assert (
+            data["name"] == "DGC Records"
+        ), f"Expected name='DGC Records', got {data['name']!r}"
+        assert (
+            data["parent_name"] == "Universal Music Group"
+        ), f"Expected parent_name='Universal Music Group', got {data['parent_name']!r}"
 
     def test_leaf_publisher(self, client):
         """Publisher 4 (Roswell Records) has no parent, no children."""
         data = client.get("/api/v1/publishers/4").json()
-        assert data["name"] == "Roswell Records", (
-            f"Expected name='Roswell Records', got {data['name']!r}"
-        )
-        assert data["parent_name"] is None, (
-            f"Expected parent_name=None, got {data['parent_name']!r}"
-        )
-        assert data["sub_publishers"] == [], (
-            f"Expected empty sub_publishers, got {data['sub_publishers']}"
-        )
+        assert (
+            data["name"] == "Roswell Records"
+        ), f"Expected name='Roswell Records', got {data['name']!r}"
+        assert (
+            data["parent_name"] is None
+        ), f"Expected parent_name=None, got {data['parent_name']!r}"
+        assert (
+            data["sub_publishers"] == []
+        ), f"Expected empty sub_publishers, got {data['sub_publishers']}"
 
     def test_not_found(self, client):
         """Non-existent publisher returns 404."""
@@ -654,18 +652,18 @@ class TestGetPublisherSongs:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         titles = [s["title"] for s in data]
-        assert "Smells Like Teen Spirit" in titles, (
-            f"Expected 'Smells Like Teen Spirit' in DGC songs, got {titles}"
-        )
+        assert (
+            "Smells Like Teen Spirit" in titles
+        ), f"Expected 'Smells Like Teen Spirit' in DGC songs, got {titles}"
 
     def test_publisher_with_no_songs(self, client):
         """Roswell Records (ID 4) may have no recording-level songs."""
         resp = client.get("/api/v1/publishers/4/songs")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert isinstance(data, list), (
-            f"Expected list response, got {type(data).__name__}"
-        )
+        assert isinstance(
+            data, list
+        ), f"Expected list response, got {type(data).__name__}"
 
     def test_not_found_publisher(self, client):
         """Non-existent publisher returns 404."""
@@ -689,13 +687,13 @@ class TestGetAllAlbums:
         data = client.get("/api/v1/albums").json()
         nvm = next(a for a in data if a["title"] == "Nevermind")
         assert nvm["id"] == 100, f"Expected id=100, got {nvm['id']}"
-        assert nvm["release_year"] == 1991, (
-            f"Expected release_year=1991, got {nvm['release_year']}"
-        )
+        assert (
+            nvm["release_year"] == 1991
+        ), f"Expected release_year=1991, got {nvm['release_year']}"
         assert nvm["song_count"] == 1, f"Expected song_count=1, got {nvm['song_count']}"
-        assert nvm["display_artist"] == "Nirvana", (
-            f"Expected display_artist='Nirvana', got {nvm['display_artist']!r}"
-        )
+        assert (
+            nvm["display_artist"] == "Nirvana"
+        ), f"Expected display_artist='Nirvana', got {nvm['display_artist']!r}"
         # No hydrated publishers/credits/songs in slim view
         assert "publishers" not in nvm, "Slim album should not have 'publishers'"
         assert "credits" not in nvm, "Slim album should not have 'credits'"
@@ -706,15 +704,15 @@ class TestGetAllAlbums:
         data = client.get("/api/v1/albums").json()
         tcats = next(a for a in data if a["title"] == "The Colour and the Shape")
         assert tcats["id"] == 200, f"Expected id=200, got {tcats['id']}"
-        assert tcats["release_year"] == 1997, (
-            f"Expected release_year=1997, got {tcats['release_year']}"
-        )
-        assert tcats["display_artist"] == "Foo Fighters", (
-            f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
-        )
-        assert tcats["song_count"] == 1, (
-            f"Expected song_count=1, got {tcats['song_count']}"
-        )
+        assert (
+            tcats["release_year"] == 1997
+        ), f"Expected release_year=1997, got {tcats['release_year']}"
+        assert (
+            tcats["display_artist"] == "Foo Fighters"
+        ), f"Expected display_artist='Foo Fighters', got {tcats['display_artist']!r}"
+        assert (
+            tcats["song_count"] == 1
+        ), f"Expected song_count=1, got {tcats['song_count']}"
 
     def test_empty_db(self, empty_client):
         """Empty DB returns empty list."""
@@ -750,18 +748,18 @@ class TestGetAlbum:
         resp = client.get("/api/v1/albums/100")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["title"] == "Nevermind", (
-            f"Expected title='Nevermind', got {data['title']!r}"
-        )
-        assert data["release_year"] == 1991, (
-            f"Expected release_year=1991, got {data['release_year']}"
-        )
-        assert data["song_count"] == 1, (
-            f"Expected song_count=1, got {data['song_count']}"
-        )
-        assert data["display_artist"] == "Nirvana", (
-            f"Expected display_artist='Nirvana', got {data['display_artist']!r}"
-        )
+        assert (
+            data["title"] == "Nevermind"
+        ), f"Expected title='Nevermind', got {data['title']!r}"
+        assert (
+            data["release_year"] == 1991
+        ), f"Expected release_year=1991, got {data['release_year']}"
+        assert (
+            data["song_count"] == 1
+        ), f"Expected song_count=1, got {data['song_count']}"
+        assert (
+            data["display_artist"] == "Nirvana"
+        ), f"Expected display_artist='Nirvana', got {data['display_artist']!r}"
         pub_names = sorted([p["name"] for p in data["publishers"]])
         assert pub_names == [
             "DGC Records",
@@ -790,22 +788,22 @@ class TestAuditHistory:
             "CHANGE",
         ], f"Expected ['ACTION', 'CHANGE'], got {types}"
         action = next(e for e in data if e["type"] == "ACTION")
-        assert action["label"] == "RENAME", (
-            f"Expected label='RENAME', got {action['label']!r}"
-        )
-        assert action["details"] == "User updated artist name", (
-            f"Expected details='User updated artist name', got {action['details']!r}"
-        )
+        assert (
+            action["label"] == "RENAME"
+        ), f"Expected label='RENAME', got {action['label']!r}"
+        assert (
+            action["details"] == "User updated artist name"
+        ), f"Expected details='User updated artist name', got {action['details']!r}"
         change = next(e for e in data if e["type"] == "CHANGE")
-        assert change["label"] == "Updated DisplayName", (
-            f"Expected label='Updated DisplayName', got {change['label']!r}"
-        )
-        assert change["old"] == "PinkPantheress", (
-            f"Expected old='PinkPantheress', got {change['old']!r}"
-        )
-        assert change["new"] == "Ines Prajo", (
-            f"Expected new='Ines Prajo', got {change['new']!r}"
-        )
+        assert (
+            change["label"] == "Updated DisplayName"
+        ), f"Expected label='Updated DisplayName', got {change['label']!r}"
+        assert (
+            change["old"] == "PinkPantheress"
+        ), f"Expected old='PinkPantheress', got {change['old']!r}"
+        assert (
+            change["new"] == "Ines Prajo"
+        ), f"Expected new='Ines Prajo', got {change['new']!r}"
 
     def test_deleted_record_history(self, client):
         """Songs record 99 was deleted - should appear as lifecycle entry."""
@@ -816,21 +814,21 @@ class TestAuditHistory:
         types = [entry["type"] for entry in data]
         assert "LIFECYCLE" in types, f"Expected 'LIFECYCLE' in types, got {types}"
         lifecycle = data[0]
-        assert lifecycle["label"] == "RECORD DELETED", (
-            f"Expected label='RECORD DELETED', got {lifecycle['label']!r}"
-        )
-        assert '"Deleted Song"' in lifecycle["snapshot"], (
-            f"Expected '\"Deleted Song\"' in snapshot, got {lifecycle['snapshot']!r}"
-        )
+        assert (
+            lifecycle["label"] == "RECORD DELETED"
+        ), f"Expected label='RECORD DELETED', got {lifecycle['label']!r}"
+        assert (
+            '"Deleted Song"' in lifecycle["snapshot"]
+        ), f"Expected '\"Deleted Song\"' in snapshot, got {lifecycle['snapshot']!r}"
 
     def test_no_history(self, client):
         """Record with no audit history returns empty list."""
         resp = client.get("/api/v1/audit/history/Songs/1")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert isinstance(data, list), (
-            f"Expected list response, got {type(data).__name__}"
-        )
+        assert isinstance(
+            data, list
+        ), f"Expected list response, got {type(data).__name__}"
 
     def test_nonexistent_record(self, client):
         """Non-existent record returns empty list (not 404)."""
@@ -875,9 +873,9 @@ class TestMetabolicInspectFile:
         resp = c.get("/api/v1/metabolic/inspect-file/1")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["source_path"] == fixture_path, (
-            f"Expected source_path={fixture_path!r}, got {data['source_path']!r}"
-        )
+        assert (
+            data["source_path"] == fixture_path
+        ), f"Expected source_path={fixture_path!r}, got {data['source_path']!r}"
 
     def test_missing_file_returns_500(self, client):
         """Song with non-existent file path returns 500."""
@@ -893,23 +891,23 @@ class TestRouterEdgeCases:
         """Router coverage: 404 for missing song."""
         resp = client.get("/api/v1/songs/9999")
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
-        assert "not found" in resp.json()["detail"].lower(), (
-            f"Expected 'not found' in detail, got {resp.json()['detail']!r}"
-        )
+        assert (
+            "not found" in resp.json()["detail"].lower()
+        ), f"Expected 'not found' in detail, got {resp.json()['detail']!r}"
 
     def test_router_search_short_query_success(self, client):
         """Router coverage: Single character query now allowed."""
         resp = client.get("/api/v1/songs/search", params={"q": "A"})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        assert isinstance(resp.json(), list), (
-            f"Expected list response, got {type(resp.json()).__name__}"
-        )
+        assert isinstance(
+            resp.json(), list
+        ), f"Expected list response, got {type(resp.json()).__name__}"
 
     def test_router_get_song_success(self, client):
         """Router coverage: Successful get_song hit for ID 1."""
         resp = client.get("/api/v1/songs/1")
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         assert resp.json()["id"] == 1, f"Expected id=1, got {resp.json()['id']}"
-        assert resp.json()["title"] == "Smells Like Teen Spirit", (
-            f"Expected title='Smells Like Teen Spirit', got {resp.json()['title']!r}"
-        )
+        assert (
+            resp.json()["title"] == "Smells Like Teen Spirit"
+        ), f"Expected title='Smells Like Teen Spirit', got {resp.json()['title']!r}"

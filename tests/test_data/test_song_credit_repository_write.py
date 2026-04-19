@@ -35,21 +35,21 @@ class TestInsertCredits:
             identity = conn.execute(
                 "SELECT IdentityID, LegalName FROM Identities WHERE LegalName = 'Ella Maren'"
             ).fetchone()
-            assert identity is not None, (
-                "Expected Identity for 'Ella Maren' to be created"
-            )
+            assert (
+                identity is not None
+            ), "Expected Identity for 'Ella Maren' to be created"
 
             # Verify ArtistNames row is linked to that Identity
             row = conn.execute(
                 "SELECT NameID, OwnerIdentityID, IsPrimaryName FROM ArtistNames WHERE DisplayName = 'Ella Maren'"
             ).fetchone()
             assert row is not None, "Expected 'Ella Maren' ArtistNames row to exist"
-            assert row["OwnerIdentityID"] == identity["IdentityID"], (
-                f"Expected OwnerIdentityID={identity['IdentityID']}, got {row['OwnerIdentityID']}"
-            )
-            assert row["IsPrimaryName"] == 1, (
-                f"Expected IsPrimaryName=1, got {row['IsPrimaryName']}"
-            )
+            assert (
+                row["OwnerIdentityID"] == identity["IdentityID"]
+            ), f"Expected OwnerIdentityID={identity['IdentityID']}, got {row['OwnerIdentityID']}"
+            assert (
+                row["IsPrimaryName"] == 1
+            ), f"Expected IsPrimaryName=1, got {row['IsPrimaryName']}"
 
         # Verify credit is readable
         result = repo.get_credits_for_songs([7])
@@ -75,12 +75,12 @@ class TestInsertCredits:
             rows = conn.execute(
                 "SELECT NameID FROM ArtistNames WHERE DisplayName = 'Dave Grohl'"
             ).fetchall()
-            assert len(rows) == 1, (
-                f"Expected 1 'Dave Grohl' row (reused), got {len(rows)}"
-            )
-            assert rows[0]["NameID"] == 10, (
-                f"Expected NameID=10 (original), got {rows[0]['NameID']}"
-            )
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 'Dave Grohl' row (reused), got {len(rows)}"
+            assert (
+                rows[0]["NameID"] == 10
+            ), f"Expected NameID=10 (original), got {rows[0]['NameID']}"
 
         # Verify credit link
         result = repo.get_credits_for_songs([7])
@@ -210,6 +210,6 @@ class TestInsertCredits:
         roles = sorted([c.role_name for c in result])
         assert roles == ["Composer", "Performer"]
         # But only 1 ArtistNames row
-        assert result[0].name_id == result[1].name_id, (
-            "Expected same NameID for both credits"
-        )
+        assert (
+            result[0].name_id == result[1].name_id
+        ), "Expected same NameID for both credits"

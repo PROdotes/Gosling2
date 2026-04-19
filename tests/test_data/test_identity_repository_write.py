@@ -19,9 +19,9 @@ class TestUpdateLegalName:
             repo.update_legal_name(1, "David Eric Grohl Jr.", conn)
             conn.commit()
         result = repo.get_by_id(1)
-        assert result.legal_name == "David Eric Grohl Jr.", (
-            f"Expected updated name, got {result.legal_name}"
-        )
+        assert (
+            result.legal_name == "David Eric Grohl Jr."
+        ), f"Expected updated name, got {result.legal_name}"
 
     def test_update_legal_name_clears_to_none(self, populated_db):
         """Setting legal_name to None clears the field."""

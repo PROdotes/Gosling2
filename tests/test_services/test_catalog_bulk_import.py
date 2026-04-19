@@ -27,16 +27,16 @@ class TestCatalogBulkImport:
 
         # Verify exhaustive fields for a single credit
         nile_credit = [c for c in song.credits if c.display_name == "Nile Rodgers"][0]
-        assert nile_credit.role_name == "Guitar", (
-            f"Expected role 'Guitar', got {nile_credit.role_name}"
-        )
+        assert (
+            nile_credit.role_name == "Guitar"
+        ), f"Expected role 'Guitar', got {nile_credit.role_name}"
 
         # Verify publishers
         pub_names = {p.name for p in song.publishers}
         assert "Sony/ATV" in pub_names, f"Expected 'Sony/ATV' in {pub_names}"
-        assert "Universal Music" in pub_names, (
-            f"Expected 'Universal Music' in {pub_names}"
-        )
+        assert (
+            "Universal Music" in pub_names
+        ), f"Expected 'Universal Music' in {pub_names}"
 
     def test_import_credits_bulk_invalid_song_raises(self, catalog_service):
         """Rule 83: Assert state after the error."""
@@ -49,9 +49,9 @@ class TestCatalogBulkImport:
 
         # Verify record does not exist
         songs = catalog_service.search_songs_slim("")  # Get all
-        assert not any(s["SourceID"] == invalid_song_id for s in songs), (
-            f"Song {invalid_song_id} should not exist"
-        )
+        assert not any(
+            s["SourceID"] == invalid_song_id for s in songs
+        ), f"Song {invalid_song_id} should not exist"
 
     def test_import_credits_bulk_idempotency(self, catalog_service):
         """Verifies that re-importing the same text doesn't create duplicate links."""
@@ -68,9 +68,9 @@ class TestCatalogBulkImport:
         song_final = catalog_service.get_song(song_id)
         count_2 = len(song_final.credits)
 
-        assert count_1 == count_2, (
-            f"Expected idempotent import, but credit count changed from {count_1} to {count_2}"
-        )
+        assert (
+            count_1 == count_2
+        ), f"Expected idempotent import, but credit count changed from {count_1} to {count_2}"
 
     def test_import_credits_bulk_transactional_rollback(self, catalog_service):
         """Rule 94: Verifies partial failure causes full rollback."""
@@ -88,12 +88,12 @@ class TestCatalogBulkImport:
         # Verify rollback: "VALID NAME" should NOT be in the DB
         song_after = catalog_service.get_song(song_id)
         after_names = {c.display_name for c in song_after.credits}
-        assert "VALID NAME" not in after_names, (
-            "Transaction failed to rollback: 'VALID NAME' was created despite trailing failure"
-        )
-        assert after_names == before_names, (
-            f"Expected state to be identical to baseline, but it changed: {after_names ^ before_names}"
-        )
+        assert (
+            "VALID NAME" not in after_names
+        ), "Transaction failed to rollback: 'VALID NAME' was created despite trailing failure"
+        assert (
+            after_names == before_names
+        ), f"Expected state to be identical to baseline, but it changed: {after_names ^ before_names}"
 
     def test_import_credits_bulk_with_resolved_identity(self, catalog_service):
         """Service should use provided identity_id for credits (Truth-First)."""
@@ -107,6 +107,6 @@ class TestCatalogBulkImport:
         # Assert
         song = catalog_service.get_song(song_id)
         match = [c for c in song.credits if c.display_name == "The Drummer"][0]
-        assert match.identity_id == 1, (
-            f"Expected identity 1 for 'The Drummer', got {match.identity_id}"
-        )
+        assert (
+            match.identity_id == 1
+        ), f"Expected identity 1 for 'The Drummer', got {match.identity_id}"

@@ -103,12 +103,12 @@ class TestResolveNames:
 
 class TestDefaultSeparators:
     def test_default_separators_are_defined(self):
-        assert isinstance(DEFAULT_CREDIT_SEPARATORS, list), (
-            "DEFAULT_CREDIT_SEPARATORS should be a list"
-        )
-        assert len(DEFAULT_CREDIT_SEPARATORS) > 0, (
-            "DEFAULT_CREDIT_SEPARATORS should not be empty"
-        )
+        assert isinstance(
+            DEFAULT_CREDIT_SEPARATORS, list
+        ), "DEFAULT_CREDIT_SEPARATORS should be a list"
+        assert (
+            len(DEFAULT_CREDIT_SEPARATORS) > 0
+        ), "DEFAULT_CREDIT_SEPARATORS should not be empty"
         for sep in DEFAULT_CREDIT_SEPARATORS:
             assert isinstance(sep, str), f"Separator {sep!r} should be a string"
             assert len(sep) > 0, "Separator should not be empty string"

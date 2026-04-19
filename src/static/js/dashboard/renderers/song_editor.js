@@ -398,6 +398,16 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             else revert();
         });
     }
+
+    return {
+        updateField(field, value) {
+            const input = document.getElementById(
+                SCALAR_FIELDS.find((f) => f.field === field)?.inputId,
+            );
+            if (!input) return;
+            input.value = value ?? "";
+        },
+    };
 }
 
 /**

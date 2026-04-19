@@ -37,84 +37,84 @@ Menart/Croatia Records"""
 
         # Assert - Rule 69 (Exhaustive fields)
         expected_title = "Bezuvjetno"
-        assert res.parsed_title == expected_title, (
-            f"Expected {expected_title}, got {res.parsed_title}"
-        )
-        assert res.title_match is True, (
-            f"Expected title_match to be True for '{expected_title}'"
-        )
+        assert (
+            res.parsed_title == expected_title
+        ), f"Expected {expected_title}, got {res.parsed_title}"
+        assert (
+            res.title_match is True
+        ), f"Expected title_match to be True for '{expected_title}'"
 
         # Verify credits: Goran Boskovic (Composer, Lyricist, Producer — Arranger not in known_roles)
         goran_credits = [c for c in res.credits if c.name == "Goran Boskovic"]
-        assert len(goran_credits) == 3, (
-            f"Expected 3 credits for Goran, got {len(goran_credits)}"
-        )
+        assert (
+            len(goran_credits) == 3
+        ), f"Expected 3 credits for Goran, got {len(goran_credits)}"
         roles = {c.role for c in goran_credits}
         expected_roles = {"Composer", "Lyricist", "Producer"}
         assert roles == expected_roles, f"Expected roles {expected_roles}, got {roles}"
 
         # Verify Zeljko Nikolin (Arranger not in known_roles, only Producer)
         zeljko_credits = [c for c in res.credits if c.name == "\u017deljko Nikolin"]
-        assert len(zeljko_credits) == 1, (
-            f"Expected 1 credit for Zeljko, got {len(zeljko_credits)}"
-        )
+        assert (
+            len(zeljko_credits) == 1
+        ), f"Expected 1 credit for Zeljko, got {len(zeljko_credits)}"
         expected_zeljko_roles = {"Producer"}
-        assert {c.role for c in zeljko_credits} == expected_zeljko_roles, (
-            f"Expected roles {expected_zeljko_roles}, got { {c.role for c in zeljko_credits} }"
-        )
+        assert {
+            c.role for c in zeljko_credits
+        } == expected_zeljko_roles, f"Expected roles {expected_zeljko_roles}, got { {c.role for c in zeljko_credits} }"
 
         # Verify Mirko Mirkic
         mirko_credits = [c for c in res.credits if c.name == "Mirko Mirkic"]
-        assert len(mirko_credits) == 2, (
-            f"Expected 2 credits for Mirko, got {len(mirko_credits)}"
-        )
+        assert (
+            len(mirko_credits) == 2
+        ), f"Expected 2 credits for Mirko, got {len(mirko_credits)}"
         expected_mirko_roles = {"Composer", "Producer"}
-        assert {c.role for c in mirko_credits} == expected_mirko_roles, (
-            f"Expected roles {expected_mirko_roles}, got { {c.role for c in mirko_credits} }"
-        )
+        assert {
+            c.role for c in mirko_credits
+        } == expected_mirko_roles, f"Expected roles {expected_mirko_roles}, got { {c.role for c in mirko_credits} }"
 
         # Verify publishers
         expected_publishers = ["Menart", "Croatia Records"]
-        assert len(res.publishers) == 2, (
-            f"Expected 2 publishers, got {len(res.publishers)}"
-        )
+        assert (
+            len(res.publishers) == 2
+        ), f"Expected 2 publishers, got {len(res.publishers)}"
         for pub in expected_publishers:
-            assert pub in res.publishers, (
-                f"Expected publisher '{pub}' in result {res.publishers}"
-            )
+            assert (
+                pub in res.publishers
+            ), f"Expected publisher '{pub}' in result {res.publishers}"
 
     def test_parse_title_match_is_case_insensitive(self):
         raw = "Credits\nBEZUVJETNO\nArtist"
         res = SpotifyService.parse_credits(
             raw, reference_title="bezuvjetno", known_roles=KNOWN_ROLES
         )
-        assert res.title_match is True, (
-            f"Expected title_match to be True for case-insensitive match, got {res.title_match}"
-        )
+        assert (
+            res.title_match is True
+        ), f"Expected title_match to be True for case-insensitive match, got {res.title_match}"
 
     def test_parse_title_mismatch_fails_on_different_title(self):
         raw = "Credits\nWrong Song\nArtist"
         res = SpotifyService.parse_credits(
             raw, reference_title="Correct Song", known_roles=KNOWN_ROLES
         )
-        assert res.title_match is False, (
-            f"Expected title_match to be False for mismatch, got {res.title_match}"
-        )
+        assert (
+            res.title_match is False
+        ), f"Expected title_match to be False for mismatch, got {res.title_match}"
 
     def test_parse_empty_input_returns_graceful_defaults(self):
         res = SpotifyService.parse_credits(
             "", reference_title="Some Title", known_roles=KNOWN_ROLES
         )
-        assert res.parsed_title == "", (
-            f"Expected empty string for parsed_title, got '{res.parsed_title}'"
-        )
-        assert res.title_match is False, (
-            "Expected title_match to be False for empty input"
-        )
+        assert (
+            res.parsed_title == ""
+        ), f"Expected empty string for parsed_title, got '{res.parsed_title}'"
+        assert (
+            res.title_match is False
+        ), "Expected title_match to be False for empty input"
         assert res.credits == [], f"Expected empty list for credits, got {res.credits}"
-        assert res.publishers == [], (
-            f"Expected empty list for publishers, got {res.publishers}"
-        )
+        assert (
+            res.publishers == []
+        ), f"Expected empty list for publishers, got {res.publishers}"
 
     def test_parse_junk_text_returns_empty_data(self):
         raw = "This is not a spotify credits list.\nIt has no structure."
@@ -122,9 +122,9 @@ Menart/Croatia Records"""
             raw, reference_title="Any", known_roles=KNOWN_ROLES
         )
         assert res.credits == [], f"Expected empty list for credits, got {res.credits}"
-        assert res.publishers == [], (
-            f"Expected empty list for publishers, got {res.publishers}"
-        )
+        assert (
+            res.publishers == []
+        ), f"Expected empty list for publishers, got {res.publishers}"
 
     def test_parse_role_without_name_skips_credit(self):
         """Verifies that a role line appearing before a name is ignored."""
@@ -132,9 +132,9 @@ Menart/Croatia Records"""
         res = SpotifyService.parse_credits(
             raw, reference_title="Title", known_roles=KNOWN_ROLES
         )
-        assert res.credits == [], (
-            f"Expected empty list for orphan roles, got {res.credits}"
-        )
+        assert (
+            res.credits == []
+        ), f"Expected empty list for orphan roles, got {res.credits}"
 
     def test_parse_unknown_roles_are_dropped(self):
         """Verifies that roles not in known_roles are not appended as credits."""
@@ -142,9 +142,9 @@ Menart/Croatia Records"""
         res = SpotifyService.parse_credits(
             raw, reference_title="Title", known_roles=KNOWN_ROLES
         )
-        assert res.credits == [], (
-            f"Expected no credits for unknown roles, got {res.credits}"
-        )
+        assert (
+            res.credits == []
+        ), f"Expected no credits for unknown roles, got {res.credits}"
 
     def test_parse_name_without_roles_is_ignored(self):
         """A name with no following bullet lines results in no credits."""
@@ -163,9 +163,9 @@ Menart/Croatia Records"""
         res = SpotifyService.parse_credits(
             raw, reference_title="Title", known_roles=KNOWN_ROLES
         )
-        assert len(res.credits) == 0, (
-            f"Expected 0 credits due to name reset, got {len(res.credits)}"
-        )
+        assert (
+            len(res.credits) == 0
+        ), f"Expected 0 credits due to name reset, got {len(res.credits)}"
 
     def test_parse_sources_multislash_and_whitespace(self):
         raw = "Credits\nTitle\nArtist\n\nSources\nLabel A / Label B /   Label C  "
@@ -173,9 +173,9 @@ Menart/Croatia Records"""
             raw, reference_title="Title", known_roles=KNOWN_ROLES
         )
         expected_publishers = ["Label A", "Label B", "Label C"]
-        assert res.publishers == expected_publishers, (
-            f"Expected {expected_publishers}, got {res.publishers}"
-        )
+        assert (
+            res.publishers == expected_publishers
+        ), f"Expected {expected_publishers}, got {res.publishers}"
 
     def test_parse_reference_title_none_fails_match(self):
         """Rule 65: Test with None parameter."""
@@ -183,9 +183,9 @@ Menart/Croatia Records"""
         res = SpotifyService.parse_credits(
             raw, reference_title=None, known_roles=KNOWN_ROLES
         )
-        assert res.title_match is False, (
-            "Expected title_match False when reference_title is None"
-        )
+        assert (
+            res.title_match is False
+        ), "Expected title_match False when reference_title is None"
 
     def test_parse_solo_unknown_role_not_in_db_is_skipped(self):
         """A solo role line not in known_roles (e.g. Arranger not seeded) is treated as a name, not a credit."""
@@ -213,9 +213,9 @@ Hit Records"""
             raw, reference_title="Rasplele se kose Bosne", known_roles=KNOWN_ROLES
         )
         blum_credits = [c for c in res.credits if c.name == "Mihael Blum"]
-        assert len(blum_credits) == 1, (
-            f"Expected 1 credit for Blum (Producer only), got {len(blum_credits)}"
-        )
+        assert (
+            len(blum_credits) == 1
+        ), f"Expected 1 credit for Blum (Producer only), got {len(blum_credits)}"
         assert blum_credits[0].role == "Producer"
 
     def test_parse_writer_role_expands_to_composer_and_lyricist(self):
@@ -226,9 +226,9 @@ Hit Records"""
             raw, reference_title="Title", known_roles=["Composer", "Lyricist"]
         )
 
-        assert len(res.credits) == 2, (
-            f"Expected 2 credits for Writer, got {len(res.credits)}"
-        )
+        assert (
+            len(res.credits) == 2
+        ), f"Expected 2 credits for Writer, got {len(res.credits)}"
         roles = {c.role for c in res.credits}
         assert roles == {
             "Composer",

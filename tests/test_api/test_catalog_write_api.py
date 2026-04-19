@@ -9,8 +9,8 @@ from src.engine.config import SONG_DEFAULT_YEAR
 
 def collect_upload_stream(resp):
     """Parse NDJSON upload stream into a BatchIngestReport-shaped dict."""
-    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-    frames = [json.loads(l) for l in lines]
+    lines = [ln for ln in resp.text.strip().split("\n") if ln.strip()]
+    frames = [json.loads(ln) for ln in lines]
     results = [f["last_result"] for f in frames if f.get("last_result")]
     return {
         "total_files": len(results),
@@ -60,69 +60,69 @@ class TestCatalogWriteApi:
                 files=[("files", (sample_mp3.name, f, "audio/mpeg"))],
             )
 
-        assert resp.status_code == 200, (
-            f"Expected 200, got {resp.status_code}: {resp.text}"
-        )
+        assert (
+            resp.status_code == 200
+        ), f"Expected 200, got {resp.status_code}: {resp.text}"
         data = collect_upload_stream(resp)
 
         # 1. Batch Report Structure
         assert data["total_files"] == 1, f"Expected 1 file, got {data['total_files']}"
         assert data["ingested"] == 1, f"Expected 1 ingested, got {data['ingested']}"
-        assert data["duplicates"] == 0, (
-            f"Expected 0 duplicates, got {data['duplicates']}"
-        )
+        assert (
+            data["duplicates"] == 0
+        ), f"Expected 0 duplicates, got {data['duplicates']}"
         assert data["errors"] == 0, f"Expected 0 errors, got {data['errors']}"
-        assert len(data["results"]) == 1, (
-            f"Expected 1 result, got {len(data['results'])}"
-        )
+        assert (
+            len(data["results"]) == 1
+        ), f"Expected 1 result, got {len(data['results'])}"
 
         # 2. Individual Result
         result = data["results"][0]
-        assert result["status"] == "INGESTED", (
-            f"Expected 'INGESTED', got '{result['status']}'"
-        )
-        assert result.get("match_type") is None, (
-            f"Expected None match_type for new ingest, got {result.get('match_type')}"
-        )
+        assert (
+            result["status"] == "INGESTED"
+        ), f"Expected 'INGESTED', got '{result['status']}'"
+        assert (
+            result.get("match_type") is None
+        ), f"Expected None match_type for new ingest, got {result.get('match_type')}"
 
         # 3. EXHAUSTIVE SONGVIEW ASSERTIONS
         song = result["song"]
         assert song["id"] is not None, "Expected DB-assigned ID"
-        assert song["title"] == "Mayor of Crazy Town (Radio Edit)", (
-            f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['title']}'"
-        )
-        assert song["media_name"] == "Mayor of Crazy Town (Radio Edit)", (
-            f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['media_name']}'"
-        )
+        assert (
+            song["title"] == "Mayor of Crazy Town (Radio Edit)"
+        ), f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['title']}'"
+        assert (
+            song["media_name"] == "Mayor of Crazy Town (Radio Edit)"
+        ), f"Expected 'Mayor of Crazy Town (Radio Edit)', got '{song['media_name']}'"
         # duration in silence.mp3 is ~2.27s
-        assert 2.0 < song["duration_s"] < 3.0, (
-            f"Expected ~2.27s, got {song['duration_s']}"
-        )
+        assert (
+            2.0 < song["duration_s"] < 3.0
+        ), f"Expected ~2.27s, got {song['duration_s']}"
         assert song["duration_ms"] == int(song["duration_s"] * 1000)
         assert song["audio_hash"] is not None, "Expected hash calculation"
-        assert song["is_active"] is False, (
-            f"Expected default False, got {song['is_active']}"
-        )
-        assert song["processing_status"] == 1, (
-            f"Expected processing_status=1 after enrichment, got {song['processing_status']}"
-        )
-        assert song["year"] == SONG_DEFAULT_YEAR, (
-            f"Expected year {SONG_DEFAULT_YEAR}, got {song['year']}"
-        )
+        assert (
+            song["is_active"] is False
+        ), f"Expected default False, got {song['is_active']}"
+        assert (
+            song["processing_status"] == 1
+        ), f"Expected processing_status=1 after enrichment, got {song['processing_status']}"
+        assert (
+            song["year"] == SONG_DEFAULT_YEAR
+        ), f"Expected year {SONG_DEFAULT_YEAR}, got {song['year']}"
         assert song["bpm"] is None, f"Expected bpm None, got {song['bpm']}"
-        assert song["isrc"] == "USCGJ2326543", (
-            f"Expected ISRC USCGJ2326543, got {song['isrc']}"
-        )
+        assert (
+            song["isrc"] == "USCGJ2326543"
+        ), f"Expected ISRC USCGJ2326543, got {song['isrc']}"
         assert song["notes"] is None, f"Expected notes None, got {song['notes']}"
         # raw_tags may contain unrecognized frames (e.g. UFID from promo services) — that's expected
-        assert isinstance(song["raw_tags"], dict), (
-            f"Expected raw_tags to be a dict, got {type(song['raw_tags'])}"
-        )
+        assert isinstance(
+            song["raw_tags"], dict
+        ), f"Expected raw_tags to be a dict, got {type(song['raw_tags'])}"
 
         # Verification of relations
-        assert len(song["credits"]) >= 2, (
-            f"Expected at least 2 credits, got {len(song['credits'])}"
-        )
+        assert (
+            len(song["credits"]) >= 2
+        ), f"Expected at least 2 credits, got {len(song['credits'])}"
         # Performer
         performer = next(
             (c for c in song["credits"] if c["role_name"] == "Performer"), None
@@ -139,9 +139,9 @@ class TestCatalogWriteApi:
             "Sam Wade",
             "Linda Corelli",
         }
-        assert composer_names == expected_composers, (
-            f"Expected {expected_composers}, got {composer_names}"
-        )
+        assert (
+            composer_names == expected_composers
+        ), f"Expected {expected_composers}, got {composer_names}"
 
         assert len(song["albums"]) == 1, f"Expected 1 album, got {len(song['albums'])}"
         assert song["albums"][0]["album_title"] == "Mayor of Crazy Town"
@@ -162,17 +162,17 @@ class TestCatalogWriteApi:
                 files=[("files", (bad_file.name, f, "application/pdf"))],
             )
 
-        assert resp.status_code == 400, (
-            f"Expected 400 for bad extension, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"Expected 400 for bad extension, got {resp.status_code}"
         assert "no valid audio files" in resp.json()["detail"].lower()
 
     def test_upload_missing_file_returns_422(self, api_client):
         """POST /upload: Missing 'file' field returns 422."""
         resp = api_client.post("/api/v1/ingest/upload", files={})
-        assert resp.status_code == 422, (
-            f"Expected 422 for missing file, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for missing file, got {resp.status_code}"
 
     def test_delete_song_success_removes_from_library_and_staging(
         self, api_client, sample_mp3, tmp_path
@@ -196,26 +196,26 @@ class TestCatalogWriteApi:
 
         # 3. Action: Delete the new song
         del_resp = api_client.delete(f"/api/v1/ingest/songs/{song_id}")
-        assert del_resp.status_code == 200, (
-            f"Expected 200 DELETE, got {del_resp.status_code}"
-        )
+        assert (
+            del_resp.status_code == 200
+        ), f"Expected 200 DELETE, got {del_resp.status_code}"
         assert del_resp.json()["status"] == "DELETED"
         assert del_resp.json()["id"] == song_id
 
         # 4. Verify Positive: It's gone
         check_resp = api_client.get(f"/api/v1/songs/{song_id}")
-        assert check_resp.status_code == 404, (
-            f"Expected 404 after delete, got {check_resp.status_code}"
-        )
-        assert not os.path.exists(source_path), (
-            "Physical file should be purged from staging"
-        )
+        assert (
+            check_resp.status_code == 404
+        ), f"Expected 404 after delete, got {check_resp.status_code}"
+        assert not os.path.exists(
+            source_path
+        ), "Physical file should be purged from staging"
 
         # 5. Verify Negative Isolation: Song 1 still exists
         haystack_check = api_client.get("/api/v1/songs/1")
-        assert haystack_check.status_code == 200, (
-            "Deletion leaked! Song 1 was accidentally removed"
-        )
+        assert (
+            haystack_check.status_code == 200
+        ), "Deletion leaked! Song 1 was accidentally removed"
         assert haystack_check.json()["title"] == "Smells Like Teen Spirit"
 
     def test_delete_nonexistent_song_returns_404(self, api_client):

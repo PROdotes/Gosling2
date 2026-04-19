@@ -26,22 +26,22 @@ class TestUpdateSongScalars:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
-        assert data["media_name"] == "Renamed Title", (
-            f"Expected 'Renamed Title', got {data['media_name']}"
-        )
-        assert data["title"] == "Renamed Title", (
-            f"Expected title='Renamed Title', got {data['title']}"
-        )
-        assert data["source_path"] == "/path/1", (
-            f"Expected '/path/1', got {data['source_path']}"
-        )
+        assert (
+            data["media_name"] == "Renamed Title"
+        ), f"Expected 'Renamed Title', got {data['media_name']}"
+        assert (
+            data["title"] == "Renamed Title"
+        ), f"Expected title='Renamed Title', got {data['title']}"
+        assert (
+            data["source_path"] == "/path/1"
+        ), f"Expected '/path/1', got {data['source_path']}"
         assert data["duration_s"] == 200.0, f"Expected 200.0, got {data['duration_s']}"
-        assert data["audio_hash"] == "hash_1", (
-            f"Expected 'hash_1', got {data['audio_hash']}"
-        )
-        assert data["is_active"] is True, (
-            f"Expected is_active=True, got {data['is_active']}"
-        )
+        assert (
+            data["audio_hash"] == "hash_1"
+        ), f"Expected 'hash_1', got {data['audio_hash']}"
+        assert (
+            data["is_active"] is True
+        ), f"Expected is_active=True, got {data['is_active']}"
         assert data["year"] == 1991, f"Expected year=1991, got {data['year']}"
         assert data["bpm"] is None, f"Expected bpm=None, got {data['bpm']}"
         assert data["isrc"] is None, f"Expected isrc=None, got {data['isrc']}"
@@ -53,49 +53,49 @@ class TestUpdateSongScalars:
         data = resp.json()
         assert data["id"] == 7, f"Expected id=7, got {data['id']}"
         assert data["year"] == 2000, f"Expected year=2000, got {data['year']}"
-        assert data["media_name"] == "Hollow Song", (
-            f"Expected 'Hollow Song', got {data['media_name']}"
-        )
+        assert (
+            data["media_name"] == "Hollow Song"
+        ), f"Expected 'Hollow Song', got {data['media_name']}"
         assert data["bpm"] == 128, f"Expected bpm=128 (unchanged), got {data['bpm']}"
-        assert data["isrc"] == "ISRC123", (
-            f"Expected isrc='ISRC123' (unchanged), got {data['isrc']}"
-        )
-        assert data["source_path"] == "/path/7", (
-            f"Expected '/path/7', got {data['source_path']}"
-        )
+        assert (
+            data["isrc"] == "ISRC123"
+        ), f"Expected isrc='ISRC123' (unchanged), got {data['isrc']}"
+        assert (
+            data["source_path"] == "/path/7"
+        ), f"Expected '/path/7', got {data['source_path']}"
         assert data["duration_s"] == 10.0, f"Expected 10.0, got {data['duration_s']}"
-        assert data["is_active"] is True, (
-            f"Expected is_active=True, got {data['is_active']}"
-        )
+        assert (
+            data["is_active"] is True
+        ), f"Expected is_active=True, got {data['is_active']}"
 
     def test_update_bpm_does_not_wipe_other_fields(self, api):
         resp = api.patch("/api/v1/songs/7", json={"bpm": 140})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["bpm"] == 140, f"Expected bpm=140, got {data['bpm']}"
-        assert data["isrc"] == "ISRC123", (
-            f"Expected isrc='ISRC123' (unchanged), got {data['isrc']}"
-        )
-        assert data["media_name"] == "Hollow Song", (
-            f"Expected 'Hollow Song' (unchanged), got {data['media_name']}"
-        )
+        assert (
+            data["isrc"] == "ISRC123"
+        ), f"Expected isrc='ISRC123' (unchanged), got {data['isrc']}"
+        assert (
+            data["media_name"] == "Hollow Song"
+        ), f"Expected 'Hollow Song' (unchanged), got {data['media_name']}"
 
     def test_update_isrc_does_not_wipe_other_fields(self, api):
         resp = api.patch("/api/v1/songs/1", json={"isrc": "USRC12345678"})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["isrc"] == "USRC12345678", (
-            f"Expected 'USRC12345678', got {data['isrc']}"
-        )
-        assert data["media_name"] == "Smells Like Teen Spirit", (
-            f"Expected title unchanged, got {data['media_name']}"
-        )
-        assert data["year"] == 1991, (
-            f"Expected year=1991 (unchanged), got {data['year']}"
-        )
-        assert data["audio_hash"] == "hash_1", (
-            f"Expected hash unchanged, got {data['audio_hash']}"
-        )
+        assert (
+            data["isrc"] == "USRC12345678"
+        ), f"Expected 'USRC12345678', got {data['isrc']}"
+        assert (
+            data["media_name"] == "Smells Like Teen Spirit"
+        ), f"Expected title unchanged, got {data['media_name']}"
+        assert (
+            data["year"] == 1991
+        ), f"Expected year=1991 (unchanged), got {data['year']}"
+        assert (
+            data["audio_hash"] == "hash_1"
+        ), f"Expected hash unchanged, got {data['audio_hash']}"
 
     def test_422_no_fields(self, api):
         resp = api.patch("/api/v1/songs/1", json={})
@@ -115,12 +115,12 @@ class TestUpdateSongScalars:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["bpm"] == 140, f"Expected bpm=140, got {data['bpm']}"
-        assert data["year"] == 2024, (
-            f"Expected year=2024 (unchanged), got {data['year']}"
-        )
-        assert data["media_name"] == "Hollow Song", (
-            f"Expected title unchanged, got {data['media_name']}"
-        )
+        assert (
+            data["year"] == 2024
+        ), f"Expected year=2024 (unchanged), got {data['year']}"
+        assert (
+            data["media_name"] == "Hollow Song"
+        ), f"Expected title unchanged, got {data['media_name']}"
         assert data["isrc"] == "ISRC123", f"Expected isrc unchanged, got {data['isrc']}"
 
 
@@ -137,12 +137,12 @@ class TestSongCredits:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["display_name"] == "Dave Grohl", (
-            f"Expected 'Dave Grohl', got {data['display_name']}"
-        )
-        assert data["role_name"] == "Performer", (
-            f"Expected 'Performer', got {data['role_name']}"
-        )
+        assert (
+            data["display_name"] == "Dave Grohl"
+        ), f"Expected 'Dave Grohl', got {data['display_name']}"
+        assert (
+            data["role_name"] == "Performer"
+        ), f"Expected 'Performer', got {data['role_name']}"
         assert data["credit_id"] is not None, "Expected credit_id to be set"
         assert "source_id" in data, "Response missing 'source_id'"
         assert "name_id" in data, "Response missing 'name_id'"
@@ -171,9 +171,9 @@ class TestSongCredits:
 
         # Verify removed: song 7 should have no credits
         song = api.get("/api/v1/songs/7").json()
-        assert not any(c["credit_id"] == credit_id for c in song["credits"]), (
-            f"Credit {credit_id} should be removed but still present"
-        )
+        assert not any(
+            c["credit_id"] == credit_id for c in song["credits"]
+        ), f"Credit {credit_id} should be removed but still present"
 
     def test_remove_credit_404_bad_credit(self, api):
         resp = api.delete("/api/v1/songs/1/credits/99999")
@@ -194,12 +194,12 @@ class TestSongCredits:
 
         # Verify the rename is reflected
         song = api.get("/api/v1/songs/4").json()
-        assert any(c["display_name"] == "GrohltonX" for c in song["credits"]), (
-            "Renamed credit 'GrohltonX' not found on song 4"
-        )
-        assert not any(c["display_name"] == "Grohlton" for c in song["credits"]), (
-            "Old name 'Grohlton' should no longer appear on song 4"
-        )
+        assert any(
+            c["display_name"] == "GrohltonX" for c in song["credits"]
+        ), "Renamed credit 'GrohltonX' not found on song 4"
+        assert not any(
+            c["display_name"] == "Grohlton" for c in song["credits"]
+        ), "Old name 'Grohlton' should no longer appear on song 4"
 
     def test_update_credit_name_404(self, api):
         resp = api.patch("/api/v1/songs/1/credits/99999", json={"display_name": "X"})
@@ -221,15 +221,15 @@ class TestSongAlbums:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["album_id"] == 100, f"Expected album_id=100, got {data['album_id']}"
-        assert data["album_title"] == "Nevermind", (
-            f"Expected 'Nevermind', got {data['album_title']}"
-        )
-        assert data["track_number"] == 5, (
-            f"Expected track_number=5, got {data['track_number']}"
-        )
-        assert data["release_year"] == 1991, (
-            f"Expected release_year=1991, got {data['release_year']}"
-        )
+        assert (
+            data["album_title"] == "Nevermind"
+        ), f"Expected 'Nevermind', got {data['album_title']}"
+        assert (
+            data["track_number"] == 5
+        ), f"Expected track_number=5, got {data['track_number']}"
+        assert (
+            data["release_year"] == 1991
+        ), f"Expected release_year=1991, got {data['release_year']}"
         assert data["source_id"] == 3, f"Expected source_id=3, got {data['source_id']}"
         assert "disc_number" in data, "Response missing 'disc_number'"
         assert "is_primary" in data, "Response missing 'is_primary'"
@@ -241,12 +241,12 @@ class TestSongAlbums:
         )
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["album_title"] == "Brand New Album", (
-            f"Expected 'Brand New Album', got {data['album_title']}"
-        )
-        assert data["release_year"] == 2024, (
-            f"Expected 2024, got {data['release_year']}"
-        )
+        assert (
+            data["album_title"] == "Brand New Album"
+        ), f"Expected 'Brand New Album', got {data['album_title']}"
+        assert (
+            data["release_year"] == 2024
+        ), f"Expected 2024, got {data['release_year']}"
         assert data["album_id"] is not None, "Expected album_id to be set"
         assert data["source_id"] == 5, f"Expected source_id=5, got {data['source_id']}"
 
@@ -266,9 +266,9 @@ class TestSongAlbums:
 
         # Verify link is gone
         song = api.get("/api/v1/songs/1").json()
-        assert not any(a["album_id"] == 100 for a in song["albums"]), (
-            "Album link 100 should be removed but still present on song 1"
-        )
+        assert not any(
+            a["album_id"] == 100 for a in song["albums"]
+        ), "Album link 100 should be removed but still present on song 1"
 
     def test_remove_album_link_404_unknown_album(self, api):
         resp = api.delete("/api/v1/songs/1/albums/9999")
@@ -291,12 +291,12 @@ class TestSongAlbums:
         song = api.get("/api/v1/songs/2").json()
         link = next((a for a in song["albums"] if a["album_id"] == 200), None)
         assert link is not None, "Album link 200 not found on song 2"
-        assert link["track_number"] == 3, (
-            f"Expected track_number=3, got {link['track_number']}"
-        )
-        assert link["disc_number"] == 2, (
-            f"Expected disc_number=2, got {link['disc_number']}"
-        )
+        assert (
+            link["track_number"] == 3
+        ), f"Expected track_number=3, got {link['track_number']}"
+        assert (
+            link["disc_number"] == 2
+        ), f"Expected disc_number=2, got {link['disc_number']}"
 
     def test_update_album_link_partial_preserves_other_field(self, api):
         # Setup: multi-disc state
@@ -311,12 +311,12 @@ class TestSongAlbums:
         song = api.get("/api/v1/songs/2").json()
         link = next((a for a in song["albums"] if a["album_id"] == 200), None)
         assert link is not None, "Album link 200 not found on song 2"
-        assert link["track_number"] == 5, (
-            f"Expected track_number=5, got {link['track_number']}"
-        )
-        assert link["disc_number"] == 2, (
-            f"Expected disc_number=2 (unchanged), got {link['disc_number']}"
-        )
+        assert (
+            link["track_number"] == 5
+        ), f"Expected track_number=5, got {link['track_number']}"
+        assert (
+            link["disc_number"] == 2
+        ), f"Expected disc_number=2 (unchanged), got {link['disc_number']}"
 
     def test_update_album_link_404_bad_link(self, api):
         resp = api.patch("/api/v1/songs/1/albums/9999", json={"track_number": 1})
@@ -335,12 +335,12 @@ class TestAlbumUpdates:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["id"] == 100, f"Expected id=100, got {data['id']}"
-        assert data["title"] == "Nevermind (Remaster)", (
-            f"Expected 'Nevermind (Remaster)', got {data['title']}"
-        )
-        assert data["release_year"] == 1991, (
-            f"Expected release_year=1991 (unchanged), got {data['release_year']}"
-        )
+        assert (
+            data["title"] == "Nevermind (Remaster)"
+        ), f"Expected 'Nevermind (Remaster)', got {data['title']}"
+        assert (
+            data["release_year"] == 1991
+        ), f"Expected release_year=1991 (unchanged), got {data['release_year']}"
         assert "credits" in data, "Response missing 'credits'"
         assert "publishers" in data, "Response missing 'publishers'"
 
@@ -348,12 +348,12 @@ class TestAlbumUpdates:
         resp = api.patch("/api/v1/albums/200", json={"release_year": 1998})
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
-        assert data["release_year"] == 1998, (
-            f"Expected 1998, got {data['release_year']}"
-        )
-        assert data["title"] == "The Colour and the Shape", (
-            f"Expected title unchanged, got {data['title']}"
-        )
+        assert (
+            data["release_year"] == 1998
+        ), f"Expected 1998, got {data['release_year']}"
+        assert (
+            data["title"] == "The Colour and the Shape"
+        ), f"Expected title unchanged, got {data['title']}"
         assert data["id"] == 200, f"Expected id=200, got {data['id']}"
 
     def test_update_album_422_no_fields(self, api):
@@ -372,18 +372,18 @@ class TestAlbumUpdates:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         alb = api.get("/api/v1/albums/100")
-        assert alb.status_code == 200, (
-            f"Expected 200 on GET album, got {alb.status_code}"
-        )
+        assert (
+            alb.status_code == 200
+        ), f"Expected 200 on GET album, got {alb.status_code}"
         data = alb.json()
         names = [c["display_name"] for c in data["credits"]]
-        assert "Taylor Hawkins" in names, (
-            f"Expected 'Taylor Hawkins' in credits, got {names}"
-        )
+        assert (
+            "Taylor Hawkins" in names
+        ), f"Expected 'Taylor Hawkins' in credits, got {names}"
         # Existing credit (Nirvana) must still be present
-        assert "Nirvana" in names, (
-            f"Expected existing 'Nirvana' credit to remain, got {names}"
-        )
+        assert (
+            "Nirvana" in names
+        ), f"Expected existing 'Nirvana' credit to remain, got {names}"
 
     def test_add_album_credit_404_unknown_album(self, api):
         resp = api.post("/api/v1/albums/9999/credits", json={"display_name": "X"})
@@ -398,9 +398,9 @@ class TestAlbumUpdates:
         # Verify removed
         alb = api.get("/api/v1/albums/100").json()
         names = [c["display_name"] for c in alb["credits"]]
-        assert "Nirvana" not in names, (
-            f"Expected 'Nirvana' to be removed but still present: {names}"
-        )
+        assert (
+            "Nirvana" not in names
+        ), f"Expected 'Nirvana' to be removed but still present: {names}"
 
     def test_remove_album_credit_404_unknown_credit(self, api):
         resp = api.delete("/api/v1/albums/100/credits/9999")
@@ -421,9 +421,9 @@ class TestAlbumUpdates:
         # Verify reflected on album
         alb = api.get("/api/v1/albums/100").json()
         pub_names = [p["name"] for p in alb["publishers"]]
-        assert "Island Records" in pub_names, (
-            f"Expected 'Island Records' in publishers, got {pub_names}"
-        )
+        assert (
+            "Island Records" in pub_names
+        ), f"Expected 'Island Records' in publishers, got {pub_names}"
 
     def test_add_album_publisher_404_unknown_album(self, api):
         resp = api.post("/api/v1/albums/9999/publishers", json={"publisher_name": "X"})
@@ -448,9 +448,9 @@ class TestAlbumUpdates:
         # Album 200 (The Colour and the Shape) has Roswell Records (4).
         # It DOES NOT have DGC Records (10).
         resp = api.delete("/api/v1/albums/200/publishers/10")
-        assert resp.status_code == 404, (
-            f"Expected 404 on missing link, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 on missing link, got {resp.status_code}"
         assert "not found on album 200" in resp.json()["detail"]
 
 
@@ -468,9 +468,9 @@ class TestSongTags:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert data["name"] == "Grunge", f"Expected name='Grunge', got {data['name']}"
-        assert data["category"] == "Genre", (
-            f"Expected category='Genre', got {data['category']}"
-        )
+        assert (
+            data["category"] == "Genre"
+        ), f"Expected category='Genre', got {data['category']}"
         assert data["id"] is not None, "Expected id to be set"
         assert "is_primary" in data, "Response missing 'is_primary'"
 
@@ -482,12 +482,12 @@ class TestSongTags:
 
         song = api.get("/api/v1/songs/7").json()
         assert song["bpm"] == 128, f"Expected bpm=128 (unchanged), got {song['bpm']}"
-        assert song["isrc"] == "ISRC123", (
-            f"Expected isrc='ISRC123' (unchanged), got {song['isrc']}"
-        )
-        assert song["media_name"] == "Hollow Song", (
-            f"Expected title unchanged, got {song['media_name']}"
-        )
+        assert (
+            song["isrc"] == "ISRC123"
+        ), f"Expected isrc='ISRC123' (unchanged), got {song['isrc']}"
+        assert (
+            song["media_name"] == "Hollow Song"
+        ), f"Expected title unchanged, got {song['media_name']}"
 
     def test_add_tag_404_unknown_song(self, api):
         resp = api.post(
@@ -504,9 +504,9 @@ class TestSongTags:
         # Verify removed; song 1 still has tags 2 and 5
         song = api.get("/api/v1/songs/1").json()
         tag_ids = [t["id"] for t in song["tags"]]
-        assert 1 not in tag_ids, (
-            f"Tag 1 (Grunge) should be removed but still present: {tag_ids}"
-        )
+        assert (
+            1 not in tag_ids
+        ), f"Tag 1 (Grunge) should be removed but still present: {tag_ids}"
         assert 2 in tag_ids, f"Tag 2 (Energetic) should still be present: {tag_ids}"
         assert 5 in tag_ids, f"Tag 5 (English) should still be present: {tag_ids}"
 
@@ -529,21 +529,21 @@ class TestSongTags:
 
         song = api.get("/api/v1/songs/2").json()
         tag_names = [t["name"] for t in song["tags"]]
-        assert "Nineties" in tag_names, (
-            f"Expected 'Nineties' in song 2 tags after rename, got {tag_names}"
-        )
-        assert "90s" not in tag_names, (
-            f"Old name '90s' should be gone from song 2, got {tag_names}"
-        )
+        assert (
+            "Nineties" in tag_names
+        ), f"Expected 'Nineties' in song 2 tags after rename, got {tag_names}"
+        assert (
+            "90s" not in tag_names
+        ), f"Old name '90s' should be gone from song 2, got {tag_names}"
 
     def test_update_tag_does_not_affect_unrelated_song(self, api):
         # tag_id=3 (90s) is on song 2 only — verify song 1 tags unchanged
         api.patch("/api/v1/tags/3", json={"tag_name": "Nineties", "category": "Era"})
         song1 = api.get("/api/v1/songs/1").json()
         tag_names = [t["name"] for t in song1["tags"]]
-        assert "Nineties" not in tag_names, (
-            f"Song 1 should not have 'Nineties' tag: {tag_names}"
-        )
+        assert (
+            "Nineties" not in tag_names
+        ), f"Song 1 should not have 'Nineties' tag: {tag_names}"
 
     def test_update_tag_404(self, api):
         resp = api.patch("/api/v1/tags/9999", json={"tag_name": "X", "category": "Y"})
@@ -557,9 +557,9 @@ class TestSongTags:
         data = resp.json()
         assert data["id"] == 1, f"Expected id=1, got {data['id']}"
         assert data["name"] == "Grunge", f"Expected name='Grunge', got {data['name']}"
-        assert data["category"] == "Genre", (
-            f"Expected category='Genre', got {data['category']}"
-        )
+        assert (
+            data["category"] == "Genre"
+        ), f"Expected category='Genre', got {data['category']}"
 
     def test_add_tag_by_id_not_found_returns_500(self, api):
         resp = api.post("/api/v1/songs/2/tags", json={"tag_id": 9999})
@@ -602,9 +602,9 @@ class TestSongPublishers:
         # Verify removed
         song = api.get("/api/v1/songs/1").json()
         pub_ids = [p["id"] for p in song["publishers"]]
-        assert 10 not in pub_ids, (
-            f"Publisher 10 (DGC Records) should be removed but still present: {pub_ids}"
-        )
+        assert (
+            10 not in pub_ids
+        ), f"Publisher 10 (DGC Records) should be removed but still present: {pub_ids}"
 
     def test_remove_publisher_404_unknown_publisher(self, api):
         resp = api.delete("/api/v1/songs/1/publishers/9999")
@@ -625,21 +625,21 @@ class TestSongPublishers:
 
         song = api.get("/api/v1/songs/1").json()
         pub_names = [p["name"] for p in song["publishers"]]
-        assert "DGC (Universal)" in pub_names, (
-            f"Expected 'DGC (Universal)' in song 1 publishers, got {pub_names}"
-        )
-        assert "DGC Records" not in pub_names, (
-            f"Old name 'DGC Records' should be gone, got {pub_names}"
-        )
+        assert (
+            "DGC (Universal)" in pub_names
+        ), f"Expected 'DGC (Universal)' in song 1 publishers, got {pub_names}"
+        assert (
+            "DGC Records" not in pub_names
+        ), f"Old name 'DGC Records' should be gone, got {pub_names}"
 
     def test_update_publisher_does_not_affect_unrelated_song(self, api):
         # publisher_id=10 is on song 1 only — verify song 2 publishers unchanged
         api.patch("/api/v1/publishers/10", json={"publisher_name": "DGC (Universal)"})
         song2 = api.get("/api/v1/songs/2").json()
         pub_names = [p["name"] for p in song2["publishers"]]
-        assert "DGC (Universal)" not in pub_names, (
-            f"Song 2 should not have 'DGC (Universal)': {pub_names}"
-        )
+        assert (
+            "DGC (Universal)" not in pub_names
+        ), f"Song 2 should not have 'DGC (Universal)': {pub_names}"
 
     def test_update_publisher_404(self, api):
         resp = api.patch("/api/v1/publishers/9999", json={"publisher_name": "X"})
@@ -674,12 +674,12 @@ class TestSetPublisherParent:
         # Sub Pop (5) → parent=1 (Universal Music Group)
         api.patch("/api/v1/publishers/5/parent", json={"parent_id": 1})
         publisher = api.get("/api/v1/publishers/5").json()
-        assert publisher["parent_name"] == "Universal Music Group", (
-            f"Expected parent_name='Universal Music Group', got {publisher['parent_name']}"
-        )
-        assert publisher["name"] == "Sub Pop", (
-            f"Expected name='Sub Pop', got '{publisher['name']}'"
-        )
+        assert (
+            publisher["parent_name"] == "Universal Music Group"
+        ), f"Expected parent_name='Universal Music Group', got {publisher['parent_name']}"
+        assert (
+            publisher["name"] == "Sub Pop"
+        ), f"Expected name='Sub Pop', got '{publisher['name']}'"
 
     def test_clear_parent_returns_204(self, api):
         # DGC Records (10, parent=1) → clear parent
@@ -689,9 +689,9 @@ class TestSetPublisherParent:
     def test_clear_parent_persisted(self, api):
         api.patch("/api/v1/publishers/10/parent", json={"parent_id": None})
         publisher = api.get("/api/v1/publishers/10").json()
-        assert publisher["parent_name"] is None, (
-            f"Expected parent_name=None after clear, got {publisher['parent_name']}"
-        )
+        assert (
+            publisher["parent_name"] is None
+        ), f"Expected parent_name=None after clear, got {publisher['parent_name']}"
 
     def test_set_parent_404_unknown_publisher(self, api):
         resp = api.patch("/api/v1/publishers/9999/parent", json={"parent_id": 1})

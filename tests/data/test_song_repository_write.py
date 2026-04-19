@@ -37,31 +37,31 @@ class TestInsert:
 
         # Core MediaSources fields
         assert saved_song.id == new_id, f"Expected ID {new_id}, got {saved_song.id}"
-        assert saved_song.media_name == "TDD Anthem", (
-            f"Expected 'TDD Anthem', got '{saved_song.media_name}'"
-        )
-        assert saved_song.source_path == "/music/tdd_anthem.mp3", (
-            f"Expected path, got '{saved_song.source_path}'"
-        )
-        assert saved_song.duration_s == 180.5, (
-            f"Expected 180500ms, got {saved_song.duration_ms}"
-        )
-        assert saved_song.audio_hash == "abc_123_hash", (
-            f"Expected hash, got '{saved_song.audio_hash}'"
-        )
-        assert saved_song.processing_status == 1, (
-            f"Expected status 1, got {saved_song.processing_status}"
-        )
-        assert saved_song.is_active is True, (
-            f"Expected True, got {saved_song.is_active}"
-        )
+        assert (
+            saved_song.media_name == "TDD Anthem"
+        ), f"Expected 'TDD Anthem', got '{saved_song.media_name}'"
+        assert (
+            saved_song.source_path == "/music/tdd_anthem.mp3"
+        ), f"Expected path, got '{saved_song.source_path}'"
+        assert (
+            saved_song.duration_s == 180.5
+        ), f"Expected 180500ms, got {saved_song.duration_ms}"
+        assert (
+            saved_song.audio_hash == "abc_123_hash"
+        ), f"Expected hash, got '{saved_song.audio_hash}'"
+        assert (
+            saved_song.processing_status == 1
+        ), f"Expected status 1, got {saved_song.processing_status}"
+        assert (
+            saved_song.is_active is True
+        ), f"Expected True, got {saved_song.is_active}"
 
         # Song-specific fields
         assert saved_song.bpm == 120, f"Expected BPM 120, got {saved_song.bpm}"
         assert saved_song.year == 2026, f"Expected Year 2026, got {saved_song.year}"
-        assert saved_song.isrc == "US-ABC-26-00001", (
-            f"Expected ISRC, got '{saved_song.isrc}'"
-        )
+        assert (
+            saved_song.isrc == "US-ABC-26-00001"
+        ), f"Expected ISRC, got '{saved_song.isrc}'"
 
         # 5. Raw DB Side-Effect Check (TDD Standard Check)
         with repo._get_connection() as conn:
@@ -69,9 +69,9 @@ class TestInsert:
             row = conn.execute(
                 "SELECT SourceDuration FROM MediaSources WHERE SourceID = ?", (new_id,)
             ).fetchone()
-            assert row["SourceDuration"] == 180.5, (
-                f"Expected 180.5s in DB, got {row['SourceDuration']}"
-            )
+            assert (
+                row["SourceDuration"] == 180.5
+            ), f"Expected 180.5s in DB, got {row['SourceDuration']}"
 
     def test_insert_duplicate_hash_raises_integrity_error(self, populated_db):
         repo = SongRepository(populated_db)

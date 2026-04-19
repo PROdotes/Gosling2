@@ -34,23 +34,23 @@ class TestInsertTags:
                 "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = 'Ambient'"
             ).fetchone()
             assert row_ambient is not None, "Expected 'Ambient' tag row to exist"
-            assert row_ambient["TagName"] == "Ambient", (
-                f"Expected 'Ambient', got '{row_ambient['TagName']}'"
-            )
-            assert row_ambient["TagCategory"] == "Genre", (
-                f"Expected 'Genre', got '{row_ambient['TagCategory']}'"
-            )
+            assert (
+                row_ambient["TagName"] == "Ambient"
+            ), f"Expected 'Ambient', got '{row_ambient['TagName']}'"
+            assert (
+                row_ambient["TagCategory"] == "Genre"
+            ), f"Expected 'Genre', got '{row_ambient['TagCategory']}'"
 
             row_chill = conn.execute(
                 "SELECT TagID, TagName, TagCategory FROM Tags WHERE TagName = 'Chill'"
             ).fetchone()
             assert row_chill is not None, "Expected 'Chill' tag row to exist"
-            assert row_chill["TagName"] == "Chill", (
-                f"Expected 'Chill', got '{row_chill['TagName']}'"
-            )
-            assert row_chill["TagCategory"] == "Mood", (
-                f"Expected 'Mood', got '{row_chill['TagCategory']}'"
-            )
+            assert (
+                row_chill["TagName"] == "Chill"
+            ), f"Expected 'Chill', got '{row_chill['TagName']}'"
+            assert (
+                row_chill["TagCategory"] == "Mood"
+            ), f"Expected 'Mood', got '{row_chill['TagCategory']}'"
 
         # Verify MediaSourceTags links
         result = repo.get_tags_for_songs([7])
@@ -78,19 +78,19 @@ class TestInsertTags:
             rows = conn.execute(
                 "SELECT TagID FROM Tags WHERE TagName = 'Grunge'"
             ).fetchall()
-            assert len(rows) == 1, (
-                f"Expected 1 'Grunge' tag row (reused), got {len(rows)}"
-            )
-            assert rows[0]["TagID"] == 1, (
-                f"Expected TagID=1 (original), got {rows[0]['TagID']}"
-            )
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 'Grunge' tag row (reused), got {len(rows)}"
+            assert (
+                rows[0]["TagID"] == 1
+            ), f"Expected TagID=1 (original), got {rows[0]['TagID']}"
 
         # Verify link was created
         result = repo.get_tags_for_songs([3])
         assert len(result) == 1, f"Expected 1 tag on Song 3, got {len(result)}"
-        assert result[0][1].name == "Grunge", (
-            f"Expected 'Grunge', got '{result[0][1].name}'"
-        )
+        assert (
+            result[0][1].name == "Grunge"
+        ), f"Expected 'Grunge', got '{result[0][1].name}'"
 
     def test_insert_empty_list_is_noop(self, populated_db):
         """Passing empty list should not crash or create any rows."""
@@ -105,9 +105,9 @@ class TestInsertTags:
             conn.commit()
 
         after = repo.get_tags_for_songs([7])
-        assert len(after) == 0, (
-            f"Expected 0 tags on Song 7 after empty insert, got {len(after)}"
-        )
+        assert (
+            len(after) == 0
+        ), f"Expected 0 tags on Song 7 after empty insert, got {len(after)}"
 
     def test_insert_preserves_is_primary_flag(self, populated_db):
         """Tags with is_primary=True should persist that flag in MediaSourceTags."""
@@ -126,12 +126,12 @@ class TestInsertTags:
         assert len(result) == 2, f"Expected 2 tags on Song 7, got {len(result)}"
 
         tag_map = {t.name: t for _, t in result}
-        assert tag_map["Rock"].is_primary is True, (
-            f"Expected Rock.is_primary=True, got {tag_map['Rock'].is_primary}"
-        )
-        assert tag_map["Live"].is_primary is False, (
-            f"Expected Live.is_primary=False, got {tag_map['Live'].is_primary}"
-        )
+        assert (
+            tag_map["Rock"].is_primary is True
+        ), f"Expected Rock.is_primary=True, got {tag_map['Rock'].is_primary}"
+        assert (
+            tag_map["Live"].is_primary is False
+        ), f"Expected Live.is_primary=False, got {tag_map['Live'].is_primary}"
 
     def test_insert_case_insensitive_reuse(self, populated_db):
         """'grunge' (lowercase) should reuse existing 'Grunge' tag (TagID=1)."""
@@ -149,9 +149,9 @@ class TestInsertTags:
             rows = conn.execute(
                 "SELECT TagID FROM Tags WHERE TagName = 'Grunge' COLLATE UTF8_NOCASE"
             ).fetchall()
-            assert len(rows) == 1, (
-                f"Expected 1 tag row for Grunge (case-insensitive reuse), got {len(rows)}"
-            )
+            assert (
+                len(rows) == 1
+            ), f"Expected 1 tag row for Grunge (case-insensitive reuse), got {len(rows)}"
 
     def test_same_name_different_category_creates_separate_tags(self, populated_db):
         """'Jazz' as Genre and 'Jazz' as Mood should be two different tag rows."""
@@ -171,9 +171,9 @@ class TestInsertTags:
             rows = conn.execute(
                 "SELECT TagID, TagCategory FROM Tags WHERE TagName = 'Jazz'"
             ).fetchall()
-            assert len(rows) == 2, (
-                f"Expected 2 'Jazz' tag rows (different categories), got {len(rows)}"
-            )
+            assert (
+                len(rows) == 2
+            ), f"Expected 2 'Jazz' tag rows (different categories), got {len(rows)}"
             categories = sorted([r["TagCategory"] for r in rows])
             assert categories == [
                 "Genre",
@@ -243,9 +243,9 @@ class TestGetOrCreateTag:
             conn.commit()
 
         # 3. Assert: Should have matched 'jezik' (lowercase)
-        assert tag_id == existing_id, (
-            f"Expected to reuse TagID {existing_id}, but got {tag_id}"
-        )
+        assert (
+            tag_id == existing_id
+        ), f"Expected to reuse TagID {existing_id}, but got {tag_id}"
 
 
 class TestSetPrimaryTag:

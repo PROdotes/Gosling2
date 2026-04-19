@@ -24,34 +24,34 @@ class TestAlbumRepositoryGetAll:
 
         # ORDER BY AlbumTitle COLLATE NOCASE ASC -> Nevermind before The Colour and the Shape
         assert albums[0].id == 100, f"Expected id=100, got {albums[0].id}"
-        assert albums[0].title == "Nevermind", (
-            f"Expected 'Nevermind', got '{albums[0].title}'"
-        )
-        assert albums[0].album_type is None, (
-            f"Expected album_type=None, got {albums[0].album_type!r}"
-        )
-        assert albums[0].release_year == 1991, (
-            f"Expected release_year=1991, got {albums[0].release_year}"
-        )
-        assert albums[0].publishers == [], (
-            f"Expected publishers=[], got {albums[0].publishers}"
-        )
+        assert (
+            albums[0].title == "Nevermind"
+        ), f"Expected 'Nevermind', got '{albums[0].title}'"
+        assert (
+            albums[0].album_type is None
+        ), f"Expected album_type=None, got {albums[0].album_type!r}"
+        assert (
+            albums[0].release_year == 1991
+        ), f"Expected release_year=1991, got {albums[0].release_year}"
+        assert (
+            albums[0].publishers == []
+        ), f"Expected publishers=[], got {albums[0].publishers}"
         assert albums[0].credits == [], f"Expected credits=[], got {albums[0].credits}"
         assert albums[0].songs == [], f"Expected songs=[], got {albums[0].songs}"
 
         assert albums[1].id == 200, f"Expected id=200, got {albums[1].id}"
-        assert albums[1].title == "The Colour and the Shape", (
-            f"Expected 'The Colour and the Shape', got '{albums[1].title}'"
-        )
-        assert albums[1].album_type is None, (
-            f"Expected album_type=None, got {albums[1].album_type!r}"
-        )
-        assert albums[1].release_year == 1997, (
-            f"Expected release_year=1997, got {albums[1].release_year}"
-        )
-        assert albums[1].publishers == [], (
-            f"Expected publishers=[], got {albums[1].publishers}"
-        )
+        assert (
+            albums[1].title == "The Colour and the Shape"
+        ), f"Expected 'The Colour and the Shape', got '{albums[1].title}'"
+        assert (
+            albums[1].album_type is None
+        ), f"Expected album_type=None, got {albums[1].album_type!r}"
+        assert (
+            albums[1].release_year == 1997
+        ), f"Expected release_year=1997, got {albums[1].release_year}"
+        assert (
+            albums[1].publishers == []
+        ), f"Expected publishers=[], got {albums[1].publishers}"
         assert albums[1].credits == [], f"Expected credits=[], got {albums[1].credits}"
         assert albums[1].songs == [], f"Expected songs=[], got {albums[1].songs}"
 
@@ -72,15 +72,15 @@ class TestAlbumRepositorySearchSlim:
         assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
         row = rows[0]
         assert row["AlbumID"] == 100, f"Expected AlbumID=100, got {row['AlbumID']}"
-        assert row["AlbumTitle"] == "Nevermind", (
-            f"Expected 'Nevermind', got '{row['AlbumTitle']}'"
-        )
-        assert row["AlbumType"] is None, (
-            f"Expected AlbumType=None, got {row['AlbumType']!r}"
-        )
-        assert row["ReleaseYear"] == 1991, (
-            f"Expected ReleaseYear=1991, got {row['ReleaseYear']}"
-        )
+        assert (
+            row["AlbumTitle"] == "Nevermind"
+        ), f"Expected 'Nevermind', got '{row['AlbumTitle']}'"
+        assert (
+            row["AlbumType"] is None
+        ), f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert (
+            row["ReleaseYear"] == 1991
+        ), f"Expected ReleaseYear=1991, got {row['ReleaseYear']}"
         assert "SongCount" in row, "Row missing 'SongCount' field"
         assert "DisplayArtist" in row, "Row missing 'DisplayArtist' field"
         assert "DisplayPublisher" in row, "Row missing 'DisplayPublisher' field"
@@ -92,15 +92,15 @@ class TestAlbumRepositorySearchSlim:
         assert len(rows) == 1, f"Expected 1 album, got {len(rows)}"
         row = rows[0]
         assert row["AlbumID"] == 200, f"Expected AlbumID=200, got {row['AlbumID']}"
-        assert row["AlbumTitle"] == "The Colour and the Shape", (
-            f"Expected 'The Colour and the Shape', got '{row['AlbumTitle']}'"
-        )
-        assert row["AlbumType"] is None, (
-            f"Expected AlbumType=None, got {row['AlbumType']!r}"
-        )
-        assert row["ReleaseYear"] == 1997, (
-            f"Expected ReleaseYear=1997, got {row['ReleaseYear']}"
-        )
+        assert (
+            row["AlbumTitle"] == "The Colour and the Shape"
+        ), f"Expected 'The Colour and the Shape', got '{row['AlbumTitle']}'"
+        assert (
+            row["AlbumType"] is None
+        ), f"Expected AlbumType=None, got {row['AlbumType']!r}"
+        assert (
+            row["ReleaseYear"] == 1997
+        ), f"Expected ReleaseYear=1997, got {row['ReleaseYear']}"
 
     def test_no_match_returns_empty_list(self, populated_db):
         """search_slim('ZZZZZ') must return an empty list when no albums match."""
@@ -129,12 +129,12 @@ class TestAlbumRepositoryGetById:
         assert album is not None, "Expected album, got None"
         assert album.id == 100, f"Expected id=100, got {album.id}"
         assert album.title == "Nevermind", f"Expected 'Nevermind', got '{album.title}'"
-        assert album.album_type is None, (
-            f"Expected album_type=None, got {album.album_type!r}"
-        )
-        assert album.release_year == 1991, (
-            f"Expected release_year=1991, got {album.release_year}"
-        )
+        assert (
+            album.album_type is None
+        ), f"Expected album_type=None, got {album.album_type!r}"
+        assert (
+            album.release_year == 1991
+        ), f"Expected release_year=1991, got {album.release_year}"
         assert album.publishers == [], f"Expected publishers=[], got {album.publishers}"
         assert album.credits == [], f"Expected credits=[], got {album.credits}"
         assert album.songs == [], f"Expected songs=[], got {album.songs}"
@@ -172,12 +172,12 @@ class TestAlbumRepositoryGetSongIdsForAlbums:
         repo = AlbumRepository(populated_db)
         result = repo.get_song_ids_for_albums([100, 200])
         assert len(result) == 2, f"Expected 2 keys, got {len(result)}"
-        assert result[100] == [1], (
-            f"Expected [1] for album 100, got {result.get(100)!r}"
-        )
-        assert result[200] == [2], (
-            f"Expected [2] for album 200, got {result.get(200)!r}"
-        )
+        assert result[100] == [
+            1
+        ], f"Expected [1] for album 100, got {result.get(100)!r}"
+        assert result[200] == [
+            2
+        ], f"Expected [2] for album 200, got {result.get(200)!r}"
 
     def test_empty_input_returns_empty_dict(self, populated_db):
         """get_song_ids_for_albums([]) must return an empty dict."""
@@ -195,25 +195,25 @@ class TestSongCreditRepository:
         repo = SongCreditRepository(populated_db)
         credits = repo.get_credits_for_songs([1])
         assert len(credits) == 1, f"Expected 1 credit, got {len(credits)}"
-        assert credits[0].source_id == 1, (
-            f"Expected source_id=1, got {credits[0].source_id}"
-        )
-        assert credits[0].name_id == 20, (
-            f"Expected name_id=20, got {credits[0].name_id}"
-        )
-        assert credits[0].identity_id == 2, (
-            f"Expected identity_id=2, got {credits[0].identity_id}"
-        )
+        assert (
+            credits[0].source_id == 1
+        ), f"Expected source_id=1, got {credits[0].source_id}"
+        assert (
+            credits[0].name_id == 20
+        ), f"Expected name_id=20, got {credits[0].name_id}"
+        assert (
+            credits[0].identity_id == 2
+        ), f"Expected identity_id=2, got {credits[0].identity_id}"
         assert credits[0].role_id == 1, f"Expected role_id=1, got {credits[0].role_id}"
-        assert credits[0].role_name == "Performer", (
-            f"Expected role_name='Performer', got '{credits[0].role_name}'"
-        )
-        assert credits[0].display_name == "Nirvana", (
-            f"Expected display_name='Nirvana', got '{credits[0].display_name}'"
-        )
-        assert credits[0].is_primary is True, (
-            f"Expected is_primary=True, got {credits[0].is_primary}"
-        )
+        assert (
+            credits[0].role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{credits[0].role_name}'"
+        assert (
+            credits[0].display_name == "Nirvana"
+        ), f"Expected display_name='Nirvana', got '{credits[0].display_name}'"
+        assert (
+            credits[0].is_primary is True
+        ), f"Expected is_primary=True, got {credits[0].is_primary}"
 
     def test_dual_credit_song_returns_both_with_all_fields(self, populated_db):
         """Song 6 has Dave Grohl (Performer) + Taylor Hawkins (Composer)."""
@@ -222,47 +222,47 @@ class TestSongCreditRepository:
         assert len(credits) == 2, f"Expected 2 credits, got {len(credits)}"
 
         credit_map = {c.display_name: c for c in credits}
-        assert "Dave Grohl" in credit_map, (
-            f"Expected 'Dave Grohl' in credits, got {list(credit_map.keys())}"
-        )
-        assert "Taylor Hawkins" in credit_map, (
-            f"Expected 'Taylor Hawkins' in credits, got {list(credit_map.keys())}"
-        )
+        assert (
+            "Dave Grohl" in credit_map
+        ), f"Expected 'Dave Grohl' in credits, got {list(credit_map.keys())}"
+        assert (
+            "Taylor Hawkins" in credit_map
+        ), f"Expected 'Taylor Hawkins' in credits, got {list(credit_map.keys())}"
 
         dave = credit_map["Dave Grohl"]
         assert dave.source_id == 6, f"Expected source_id=6, got {dave.source_id}"
         assert dave.name_id == 10, f"Expected name_id=10, got {dave.name_id}"
         assert dave.identity_id == 1, f"Expected identity_id=1, got {dave.identity_id}"
         assert dave.role_id == 1, f"Expected role_id=1, got {dave.role_id}"
-        assert dave.role_name == "Performer", (
-            f"Expected role_name='Performer', got '{dave.role_name}'"
-        )
-        assert dave.is_primary is True, (
-            f"Expected is_primary=True, got {dave.is_primary}"
-        )
+        assert (
+            dave.role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{dave.role_name}'"
+        assert (
+            dave.is_primary is True
+        ), f"Expected is_primary=True, got {dave.is_primary}"
 
         taylor = credit_map["Taylor Hawkins"]
         assert taylor.source_id == 6, f"Expected source_id=6, got {taylor.source_id}"
         assert taylor.name_id == 40, f"Expected name_id=40, got {taylor.name_id}"
-        assert taylor.identity_id == 4, (
-            f"Expected identity_id=4, got {taylor.identity_id}"
-        )
+        assert (
+            taylor.identity_id == 4
+        ), f"Expected identity_id=4, got {taylor.identity_id}"
         assert taylor.role_id == 2, f"Expected role_id=2, got {taylor.role_id}"
-        assert taylor.role_name == "Composer", (
-            f"Expected role_name='Composer', got '{taylor.role_name}'"
-        )
-        assert taylor.is_primary is True, (
-            f"Expected is_primary=True, got {taylor.is_primary}"
-        )
+        assert (
+            taylor.role_name == "Composer"
+        ), f"Expected role_name='Composer', got '{taylor.role_name}'"
+        assert (
+            taylor.is_primary is True
+        ), f"Expected is_primary=True, got {taylor.is_primary}"
 
     def test_joint_performer_song_returns_both_as_performer(self, populated_db):
         """Song 8 (Joint Venture) has Dave + Taylor both as Performer."""
         repo = SongCreditRepository(populated_db)
         credits = repo.get_credits_for_songs([8])
         assert len(credits) == 2, f"Expected 2 credits, got {len(credits)}"
-        assert all(c.role_name == "Performer" for c in credits), (
-            f"Expected all Performer, got {[c.role_name for c in credits]}"
-        )
+        assert all(
+            c.role_name == "Performer" for c in credits
+        ), f"Expected all Performer, got {[c.role_name for c in credits]}"
         names = {c.display_name for c in credits}
         assert names == {
             "Dave Grohl",
@@ -280,25 +280,25 @@ class TestSongCreditRepository:
         repo = SongCreditRepository(populated_db)
         credits = repo.get_credits_for_songs([4])
         assert len(credits) == 1, f"Expected 1 credit, got {len(credits)}"
-        assert credits[0].source_id == 4, (
-            f"Expected source_id=4, got {credits[0].source_id}"
-        )
-        assert credits[0].name_id == 11, (
-            f"Expected name_id=11, got {credits[0].name_id}"
-        )
-        assert credits[0].identity_id == 1, (
-            f"Expected identity_id=1, got {credits[0].identity_id}"
-        )
+        assert (
+            credits[0].source_id == 4
+        ), f"Expected source_id=4, got {credits[0].source_id}"
+        assert (
+            credits[0].name_id == 11
+        ), f"Expected name_id=11, got {credits[0].name_id}"
+        assert (
+            credits[0].identity_id == 1
+        ), f"Expected identity_id=1, got {credits[0].identity_id}"
         assert credits[0].role_id == 1, f"Expected role_id=1, got {credits[0].role_id}"
-        assert credits[0].role_name == "Performer", (
-            f"Expected role_name='Performer', got '{credits[0].role_name}'"
-        )
-        assert credits[0].display_name == "Grohlton", (
-            f"Expected display_name='Grohlton', got '{credits[0].display_name}'"
-        )
-        assert credits[0].is_primary is False, (
-            f"Expected is_primary=False, got {credits[0].is_primary}"
-        )
+        assert (
+            credits[0].role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{credits[0].role_name}'"
+        assert (
+            credits[0].display_name == "Grohlton"
+        ), f"Expected display_name='Grohlton', got '{credits[0].display_name}'"
+        assert (
+            credits[0].is_primary is False
+        ), f"Expected is_primary=False, got {credits[0].is_primary}"
 
     def test_empty_input_returns_empty_list(self, populated_db):
         """get_credits_for_songs([]) must return an empty list."""
@@ -344,33 +344,33 @@ class TestSongAlbumRepository:
         repo = SongAlbumRepository(populated_db)
         assocs = repo.get_albums_for_songs([1])
         assert len(assocs) == 1, f"Expected 1 association, got {len(assocs)}"
-        assert assocs[0].source_id == 1, (
-            f"Expected source_id=1, got {assocs[0].source_id}"
-        )
-        assert assocs[0].album_id == 100, (
-            f"Expected album_id=100, got {assocs[0].album_id}"
-        )
-        assert assocs[0].track_number == 1, (
-            f"Expected track_number=1, got {assocs[0].track_number}"
-        )
-        assert assocs[0].disc_number == 1, (
-            f"Expected disc_number=1, got {assocs[0].disc_number!r}"
-        )
-        assert assocs[0].is_primary is True, (
-            f"Expected is_primary=True, got {assocs[0].is_primary}"
-        )
-        assert assocs[0].album_title == "Nevermind", (
-            f"Expected album_title='Nevermind', got '{assocs[0].album_title}'"
-        )
-        assert assocs[0].album_type is None, (
-            f"Expected album_type=None, got {assocs[0].album_type!r}"
-        )
-        assert assocs[0].release_year == 1991, (
-            f"Expected release_year=1991, got {assocs[0].release_year}"
-        )
-        assert assocs[0].album_publishers == [], (
-            f"Expected album_publishers=[], got {assocs[0].album_publishers}"
-        )
+        assert (
+            assocs[0].source_id == 1
+        ), f"Expected source_id=1, got {assocs[0].source_id}"
+        assert (
+            assocs[0].album_id == 100
+        ), f"Expected album_id=100, got {assocs[0].album_id}"
+        assert (
+            assocs[0].track_number == 1
+        ), f"Expected track_number=1, got {assocs[0].track_number}"
+        assert (
+            assocs[0].disc_number == 1
+        ), f"Expected disc_number=1, got {assocs[0].disc_number!r}"
+        assert (
+            assocs[0].is_primary is True
+        ), f"Expected is_primary=True, got {assocs[0].is_primary}"
+        assert (
+            assocs[0].album_title == "Nevermind"
+        ), f"Expected album_title='Nevermind', got '{assocs[0].album_title}'"
+        assert (
+            assocs[0].album_type is None
+        ), f"Expected album_type=None, got {assocs[0].album_type!r}"
+        assert (
+            assocs[0].release_year == 1991
+        ), f"Expected release_year=1991, got {assocs[0].release_year}"
+        assert (
+            assocs[0].album_publishers == []
+        ), f"Expected album_publishers=[], got {assocs[0].album_publishers}"
         assert assocs[0].credits == [], f"Expected credits=[], got {assocs[0].credits}"
 
     def test_song_2_album_returns_association_with_all_fields(self, populated_db):
@@ -378,33 +378,33 @@ class TestSongAlbumRepository:
         repo = SongAlbumRepository(populated_db)
         assocs = repo.get_albums_for_songs([2])
         assert len(assocs) == 1, f"Expected 1 association, got {len(assocs)}"
-        assert assocs[0].source_id == 2, (
-            f"Expected source_id=2, got {assocs[0].source_id}"
-        )
-        assert assocs[0].album_id == 200, (
-            f"Expected album_id=200, got {assocs[0].album_id}"
-        )
-        assert assocs[0].track_number == 11, (
-            f"Expected track_number=11, got {assocs[0].track_number}"
-        )
-        assert assocs[0].disc_number == 1, (
-            f"Expected disc_number=1, got {assocs[0].disc_number!r}"
-        )
-        assert assocs[0].is_primary is True, (
-            f"Expected is_primary=True, got {assocs[0].is_primary}"
-        )
-        assert assocs[0].album_title == "The Colour and the Shape", (
-            f"Expected album_title='The Colour and the Shape', got '{assocs[0].album_title}'"
-        )
-        assert assocs[0].album_type is None, (
-            f"Expected album_type=None, got {assocs[0].album_type!r}"
-        )
-        assert assocs[0].release_year == 1997, (
-            f"Expected release_year=1997, got {assocs[0].release_year}"
-        )
-        assert assocs[0].album_publishers == [], (
-            f"Expected album_publishers=[], got {assocs[0].album_publishers}"
-        )
+        assert (
+            assocs[0].source_id == 2
+        ), f"Expected source_id=2, got {assocs[0].source_id}"
+        assert (
+            assocs[0].album_id == 200
+        ), f"Expected album_id=200, got {assocs[0].album_id}"
+        assert (
+            assocs[0].track_number == 11
+        ), f"Expected track_number=11, got {assocs[0].track_number}"
+        assert (
+            assocs[0].disc_number == 1
+        ), f"Expected disc_number=1, got {assocs[0].disc_number!r}"
+        assert (
+            assocs[0].is_primary is True
+        ), f"Expected is_primary=True, got {assocs[0].is_primary}"
+        assert (
+            assocs[0].album_title == "The Colour and the Shape"
+        ), f"Expected album_title='The Colour and the Shape', got '{assocs[0].album_title}'"
+        assert (
+            assocs[0].album_type is None
+        ), f"Expected album_type=None, got {assocs[0].album_type!r}"
+        assert (
+            assocs[0].release_year == 1997
+        ), f"Expected release_year=1997, got {assocs[0].release_year}"
+        assert (
+            assocs[0].album_publishers == []
+        ), f"Expected album_publishers=[], got {assocs[0].album_publishers}"
         assert assocs[0].credits == [], f"Expected credits=[], got {assocs[0].credits}"
 
     def test_song_without_album_returns_empty_list(self, populated_db):
@@ -429,50 +429,50 @@ class TestAlbumCreditRepository:
         repo = AlbumCreditRepository(populated_db)
         credits = repo.get_credits_for_albums([100])
         assert len(credits) == 1, f"Expected 1 credit, got {len(credits)}"
-        assert credits[0].album_id == 100, (
-            f"Expected album_id=100, got {credits[0].album_id}"
-        )
-        assert credits[0].name_id == 20, (
-            f"Expected name_id=20, got {credits[0].name_id}"
-        )
-        assert credits[0].identity_id == 2, (
-            f"Expected identity_id=2, got {credits[0].identity_id}"
-        )
+        assert (
+            credits[0].album_id == 100
+        ), f"Expected album_id=100, got {credits[0].album_id}"
+        assert (
+            credits[0].name_id == 20
+        ), f"Expected name_id=20, got {credits[0].name_id}"
+        assert (
+            credits[0].identity_id == 2
+        ), f"Expected identity_id=2, got {credits[0].identity_id}"
         assert credits[0].role_id == 1, f"Expected role_id=1, got {credits[0].role_id}"
-        assert credits[0].role_name == "Performer", (
-            f"Expected role_name='Performer', got '{credits[0].role_name}'"
-        )
-        assert credits[0].display_name == "Nirvana", (
-            f"Expected display_name='Nirvana', got '{credits[0].display_name}'"
-        )
-        assert credits[0].is_primary is True, (
-            f"Expected is_primary=True, got {credits[0].is_primary}"
-        )
+        assert (
+            credits[0].role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{credits[0].role_name}'"
+        assert (
+            credits[0].display_name == "Nirvana"
+        ), f"Expected display_name='Nirvana', got '{credits[0].display_name}'"
+        assert (
+            credits[0].is_primary is True
+        ), f"Expected is_primary=True, got {credits[0].is_primary}"
 
     def test_tcats_credits_returns_foo_fighters_performer(self, populated_db):
         """TCATS (200) has Foo Fighters (NameID=30) as Performer with all fields."""
         repo = AlbumCreditRepository(populated_db)
         credits = repo.get_credits_for_albums([200])
         assert len(credits) == 1, f"Expected 1 credit, got {len(credits)}"
-        assert credits[0].album_id == 200, (
-            f"Expected album_id=200, got {credits[0].album_id}"
-        )
-        assert credits[0].name_id == 30, (
-            f"Expected name_id=30, got {credits[0].name_id}"
-        )
-        assert credits[0].identity_id == 3, (
-            f"Expected identity_id=3, got {credits[0].identity_id}"
-        )
+        assert (
+            credits[0].album_id == 200
+        ), f"Expected album_id=200, got {credits[0].album_id}"
+        assert (
+            credits[0].name_id == 30
+        ), f"Expected name_id=30, got {credits[0].name_id}"
+        assert (
+            credits[0].identity_id == 3
+        ), f"Expected identity_id=3, got {credits[0].identity_id}"
         assert credits[0].role_id == 1, f"Expected role_id=1, got {credits[0].role_id}"
-        assert credits[0].role_name == "Performer", (
-            f"Expected role_name='Performer', got '{credits[0].role_name}'"
-        )
-        assert credits[0].display_name == "Foo Fighters", (
-            f"Expected display_name='Foo Fighters', got '{credits[0].display_name}'"
-        )
-        assert credits[0].is_primary is True, (
-            f"Expected is_primary=True, got {credits[0].is_primary}"
-        )
+        assert (
+            credits[0].role_name == "Performer"
+        ), f"Expected role_name='Performer', got '{credits[0].role_name}'"
+        assert (
+            credits[0].display_name == "Foo Fighters"
+        ), f"Expected display_name='Foo Fighters', got '{credits[0].display_name}'"
+        assert (
+            credits[0].is_primary is True
+        ), f"Expected is_primary=True, got {credits[0].is_primary}"
 
     def test_batch_both_albums_returns_two_credits(self, populated_db):
         """Batch fetch for [100, 200] returns credits from both albums."""
@@ -504,39 +504,39 @@ class TestTagRepository:
 
         tags = {tag.name: tag for _, tag in results}
         assert "Grunge" in tags, f"Expected 'Grunge' in tags, got {list(tags.keys())}"
-        assert tags["Grunge"].id == 1, (
-            f"Expected id=1 for Grunge, got {tags['Grunge'].id}"
-        )
-        assert tags["Grunge"].category == "Genre", (
-            f"Expected category='Genre' for Grunge, got '{tags['Grunge'].category}'"
-        )
-        assert tags["Grunge"].is_primary is True, (
-            f"Expected is_primary=True for Grunge (primary genre for SLTS), got {tags['Grunge'].is_primary}"
-        )
+        assert (
+            tags["Grunge"].id == 1
+        ), f"Expected id=1 for Grunge, got {tags['Grunge'].id}"
+        assert (
+            tags["Grunge"].category == "Genre"
+        ), f"Expected category='Genre' for Grunge, got '{tags['Grunge'].category}'"
+        assert (
+            tags["Grunge"].is_primary is True
+        ), f"Expected is_primary=True for Grunge (primary genre for SLTS), got {tags['Grunge'].is_primary}"
 
-        assert "Energetic" in tags, (
-            f"Expected 'Energetic' in tags, got {list(tags.keys())}"
-        )
-        assert tags["Energetic"].id == 2, (
-            f"Expected id=2 for Energetic, got {tags['Energetic'].id}"
-        )
-        assert tags["Energetic"].category == "Mood", (
-            f"Expected category='Mood' for Energetic, got '{tags['Energetic'].category}'"
-        )
-        assert tags["Energetic"].is_primary is False, (
-            f"Expected is_primary=False for Energetic, got {tags['Energetic'].is_primary}"
-        )
+        assert (
+            "Energetic" in tags
+        ), f"Expected 'Energetic' in tags, got {list(tags.keys())}"
+        assert (
+            tags["Energetic"].id == 2
+        ), f"Expected id=2 for Energetic, got {tags['Energetic'].id}"
+        assert (
+            tags["Energetic"].category == "Mood"
+        ), f"Expected category='Mood' for Energetic, got '{tags['Energetic'].category}'"
+        assert (
+            tags["Energetic"].is_primary is False
+        ), f"Expected is_primary=False for Energetic, got {tags['Energetic'].is_primary}"
 
         assert "English" in tags, f"Expected 'English' in tags, got {list(tags.keys())}"
-        assert tags["English"].id == 5, (
-            f"Expected id=5 for English, got {tags['English'].id}"
-        )
-        assert tags["English"].category == "Jezik", (
-            f"Expected category='Jezik' for English, got '{tags['English'].category}'"
-        )
-        assert tags["English"].is_primary is False, (
-            f"Expected is_primary=False for English, got {tags['English'].is_primary}"
-        )
+        assert (
+            tags["English"].id == 5
+        ), f"Expected id=5 for English, got {tags['English'].id}"
+        assert (
+            tags["English"].category == "Jezik"
+        ), f"Expected category='Jezik' for English, got '{tags['English'].category}'"
+        assert (
+            tags["English"].is_primary is False
+        ), f"Expected is_primary=False for English, got {tags['English'].is_primary}"
 
     def test_song_2_tags_returns_single_tag_with_all_fields(self, populated_db):
         """Song 2 has only 90s(3/Era)."""
@@ -547,9 +547,9 @@ class TestTagRepository:
         assert tag.id == 3, f"Expected id=3, got {tag.id}"
         assert tag.name == "90s", f"Expected name='90s', got '{tag.name}'"
         assert tag.category == "Era", f"Expected category='Era', got '{tag.category}'"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False, got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False, got {tag.is_primary}"
 
     def test_song_with_no_tags_returns_empty_list(self, populated_db):
         """Song 3 (Range Rover Bitch) has no tags."""
@@ -565,28 +565,28 @@ class TestTagRepository:
 
         tags = {tag.name: tag for _, tag in results}
         assert "Grunge" in tags, f"Expected 'Grunge' in tags, got {list(tags.keys())}"
-        assert tags["Grunge"].id == 1, (
-            f"Expected id=1 for Grunge, got {tags['Grunge'].id}"
-        )
-        assert tags["Grunge"].category == "Genre", (
-            f"Expected category='Genre' for Grunge, got '{tags['Grunge'].category}'"
-        )
-        assert tags["Grunge"].is_primary is False, (
-            f"Expected is_primary=False for Grunge, got {tags['Grunge'].is_primary}"
-        )
+        assert (
+            tags["Grunge"].id == 1
+        ), f"Expected id=1 for Grunge, got {tags['Grunge'].id}"
+        assert (
+            tags["Grunge"].category == "Genre"
+        ), f"Expected category='Genre' for Grunge, got '{tags['Grunge'].category}'"
+        assert (
+            tags["Grunge"].is_primary is False
+        ), f"Expected is_primary=False for Grunge, got {tags['Grunge'].is_primary}"
 
-        assert "Alt Rock" in tags, (
-            f"Expected 'Alt Rock' in tags, got {list(tags.keys())}"
-        )
-        assert tags["Alt Rock"].id == 6, (
-            f"Expected id=6 for Alt Rock, got {tags['Alt Rock'].id}"
-        )
-        assert tags["Alt Rock"].category == "Genre", (
-            f"Expected category='Genre' for Alt Rock, got '{tags['Alt Rock'].category}'"
-        )
-        assert tags["Alt Rock"].is_primary is True, (
-            f"Expected is_primary=True for Alt Rock, got {tags['Alt Rock'].is_primary}"
-        )
+        assert (
+            "Alt Rock" in tags
+        ), f"Expected 'Alt Rock' in tags, got {list(tags.keys())}"
+        assert (
+            tags["Alt Rock"].id == 6
+        ), f"Expected id=6 for Alt Rock, got {tags['Alt Rock'].id}"
+        assert (
+            tags["Alt Rock"].category == "Genre"
+        ), f"Expected category='Genre' for Alt Rock, got '{tags['Alt Rock'].category}'"
+        assert (
+            tags["Alt Rock"].is_primary is True
+        ), f"Expected is_primary=True for Alt Rock, got {tags['Alt Rock'].is_primary}"
 
     def test_batch_multiple_songs_returns_all_tag_associations(self, populated_db):
         """Songs 1 + 2 should return 4 total tag associations (3 for song 1, 1 for song 2)."""

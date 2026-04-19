@@ -106,7 +106,10 @@ class EditService:
             raise LookupError(f"Song {song_id} not found")
 
         # 3. Workflow Validation (Review/Activation)
-        if fields.get("is_active") is True or fields.get("processing_status") == ProcessingStatus.REVIEWED:
+        if (
+            fields.get("is_active") is True
+            or fields.get("processing_status") == ProcessingStatus.REVIEWED
+        ):
             if fields.get("processing_status") == ProcessingStatus.REVIEWED:
                 from src.models.view_models import SongView
 

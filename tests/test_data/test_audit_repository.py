@@ -21,22 +21,22 @@ class TestGetActionsForTarget:
         assert len(actions) == 1, f"Expected 1 action, got {len(actions)}"
         action = actions[0]
         assert action.id == 1, f"Expected id=1, got {action.id}"
-        assert action.action_type == "RENAME", (
-            f"Expected 'RENAME', got {action.action_type}"
-        )
-        assert action.target_table == "ArtistNames", (
-            f"Expected 'ArtistNames', got {action.target_table}"
-        )
+        assert (
+            action.action_type == "RENAME"
+        ), f"Expected 'RENAME', got {action.action_type}"
+        assert (
+            action.target_table == "ArtistNames"
+        ), f"Expected 'ArtistNames', got {action.target_table}"
         assert action.target_id == "33", f"Expected '33', got {action.target_id}"
-        assert action.details == "User updated artist name", (
-            f"Expected 'User updated artist name', got {action.details}"
-        )
-        assert action.timestamp is not None, (
-            "Expected auto-populated timestamp, got None"
-        )
-        assert isinstance(action.timestamp, str), (
-            f"Expected timestamp str, got {type(action.timestamp)}"
-        )
+        assert (
+            action.details == "User updated artist name"
+        ), f"Expected 'User updated artist name', got {action.details}"
+        assert (
+            action.timestamp is not None
+        ), "Expected auto-populated timestamp, got None"
+        assert isinstance(
+            action.timestamp, str
+        ), f"Expected timestamp str, got {type(action.timestamp)}"
         assert action.user_id is None, f"Expected user_id=None, got {action.user_id}"
         assert action.batch_id is None, f"Expected batch_id=None, got {action.batch_id}"
 
@@ -44,17 +44,17 @@ class TestGetActionsForTarget:
         """Target ID 999 has no entries in ActionLog."""
         repo = AuditRepository(populated_db)
         actions = repo.get_actions_for_target(999, "ArtistNames")
-        assert len(actions) == 0, (
-            f"Expected 0 actions for unknown target, got {len(actions)}"
-        )
+        assert (
+            len(actions) == 0
+        ), f"Expected 0 actions for unknown target, got {len(actions)}"
 
     def test_no_actions_for_wrong_table(self, populated_db):
         """ActionID=1 targets ArtistNames; querying Songs must return empty."""
         repo = AuditRepository(populated_db)
         actions = repo.get_actions_for_target(33, "Songs")
-        assert len(actions) == 0, (
-            f"Expected 0 actions for wrong table, got {len(actions)}"
-        )
+        assert (
+            len(actions) == 0
+        ), f"Expected 0 actions for wrong table, got {len(actions)}"
 
     def test_empty_db_returns_no_actions(self, empty_db):
         """Empty database has no action log entries."""
@@ -77,34 +77,34 @@ class TestGetChangesForRecord:
         assert len(changes) == 1, f"Expected 1 change, got {len(changes)}"
         change = changes[0]
         assert change.id == 1, f"Expected id=1, got {change.id}"
-        assert change.table_name == "ArtistNames", (
-            f"Expected 'ArtistNames', got {change.table_name}"
-        )
+        assert (
+            change.table_name == "ArtistNames"
+        ), f"Expected 'ArtistNames', got {change.table_name}"
         assert change.record_id == "33", f"Expected '33', got {change.record_id}"
-        assert change.field_name == "DisplayName", (
-            f"Expected 'DisplayName', got {change.field_name}"
-        )
-        assert change.old_value == "PinkPantheress", (
-            f"Expected 'PinkPantheress', got {change.old_value}"
-        )
-        assert change.new_value == "Ines Prajo", (
-            f"Expected 'Ines Prajo', got {change.new_value}"
-        )
-        assert change.timestamp is not None, (
-            "Expected auto-populated timestamp, got None"
-        )
-        assert isinstance(change.timestamp, str), (
-            f"Expected timestamp str, got {type(change.timestamp)}"
-        )
+        assert (
+            change.field_name == "DisplayName"
+        ), f"Expected 'DisplayName', got {change.field_name}"
+        assert (
+            change.old_value == "PinkPantheress"
+        ), f"Expected 'PinkPantheress', got {change.old_value}"
+        assert (
+            change.new_value == "Ines Prajo"
+        ), f"Expected 'Ines Prajo', got {change.new_value}"
+        assert (
+            change.timestamp is not None
+        ), "Expected auto-populated timestamp, got None"
+        assert isinstance(
+            change.timestamp, str
+        ), f"Expected timestamp str, got {type(change.timestamp)}"
         assert change.batch_id is None, f"Expected batch_id=None, got {change.batch_id}"
 
     def test_no_changes_for_unknown_record(self, populated_db):
         """Record 999 in Songs has no change log entries."""
         repo = AuditRepository(populated_db)
         changes = repo.get_changes_for_record(999, "Songs")
-        assert len(changes) == 0, (
-            f"Expected 0 changes for unknown record, got {len(changes)}"
-        )
+        assert (
+            len(changes) == 0
+        ), f"Expected 0 changes for unknown record, got {len(changes)}"
 
     def test_table_expansion_songs_returns_empty(self, populated_db):
         """Querying Songs also searches SongCredits, SongAlbums, etc.
@@ -113,9 +113,9 @@ class TestGetChangesForRecord:
         """
         repo = AuditRepository(populated_db)
         changes = repo.get_changes_for_record(1, "Songs")
-        assert len(changes) == 0, (
-            f"Expected 0 changes for song records, got {len(changes)}"
-        )
+        assert (
+            len(changes) == 0
+        ), f"Expected 0 changes for song records, got {len(changes)}"
 
     def test_table_expansion_identities_finds_artist_names_change(self, populated_db):
         """Querying Identities also searches ArtistNames and GroupMemberships.
@@ -126,30 +126,30 @@ class TestGetChangesForRecord:
         repo = AuditRepository(populated_db)
         changes = repo.get_changes_for_record(33, "Identities")
 
-        assert len(changes) == 1, (
-            f"Expected 1 change via table expansion, got {len(changes)}"
-        )
+        assert (
+            len(changes) == 1
+        ), f"Expected 1 change via table expansion, got {len(changes)}"
         change = changes[0]
         assert change.id == 1, f"Expected id=1, got {change.id}"
-        assert change.table_name == "ArtistNames", (
-            f"Expected 'ArtistNames', got {change.table_name}"
-        )
+        assert (
+            change.table_name == "ArtistNames"
+        ), f"Expected 'ArtistNames', got {change.table_name}"
         assert change.record_id == "33", f"Expected '33', got {change.record_id}"
-        assert change.field_name == "DisplayName", (
-            f"Expected 'DisplayName', got {change.field_name}"
-        )
-        assert change.old_value == "PinkPantheress", (
-            f"Expected 'PinkPantheress', got {change.old_value}"
-        )
-        assert change.new_value == "Ines Prajo", (
-            f"Expected 'Ines Prajo', got {change.new_value}"
-        )
-        assert change.timestamp is not None, (
-            "Expected auto-populated timestamp, got None"
-        )
-        assert isinstance(change.timestamp, str), (
-            f"Expected timestamp str, got {type(change.timestamp)}"
-        )
+        assert (
+            change.field_name == "DisplayName"
+        ), f"Expected 'DisplayName', got {change.field_name}"
+        assert (
+            change.old_value == "PinkPantheress"
+        ), f"Expected 'PinkPantheress', got {change.old_value}"
+        assert (
+            change.new_value == "Ines Prajo"
+        ), f"Expected 'Ines Prajo', got {change.new_value}"
+        assert (
+            change.timestamp is not None
+        ), "Expected auto-populated timestamp, got None"
+        assert isinstance(
+            change.timestamp, str
+        ), f"Expected timestamp str, got {type(change.timestamp)}"
         assert change.batch_id is None, f"Expected batch_id=None, got {change.batch_id}"
 
 
@@ -167,25 +167,25 @@ class TestGetDeletedSnapshot:
 
         assert deleted is not None, "Expected a DeletedRecord, got None"
         assert deleted.id == 1, f"Expected id=1, got {deleted.id}"
-        assert deleted.table_name == "Songs", (
-            f"Expected 'Songs', got {deleted.table_name}"
-        )
+        assert (
+            deleted.table_name == "Songs"
+        ), f"Expected 'Songs', got {deleted.table_name}"
         assert deleted.record_id == "99", f"Expected '99', got {deleted.record_id}"
-        assert deleted.snapshot == '{"Title": "Deleted Song", "Type": "Song"}', (
-            f"Expected snapshot JSON, got {deleted.snapshot}"
-        )
-        assert deleted.deleted_at is not None, (
-            "Expected auto-populated deleted_at, got None"
-        )
-        assert isinstance(deleted.deleted_at, str), (
-            f"Expected deleted_at str, got {type(deleted.deleted_at)}"
-        )
-        assert deleted.restored_at is None, (
-            f"Expected restored_at=None, got {deleted.restored_at}"
-        )
-        assert deleted.batch_id is None, (
-            f"Expected batch_id=None, got {deleted.batch_id}"
-        )
+        assert (
+            deleted.snapshot == '{"Title": "Deleted Song", "Type": "Song"}'
+        ), f"Expected snapshot JSON, got {deleted.snapshot}"
+        assert (
+            deleted.deleted_at is not None
+        ), "Expected auto-populated deleted_at, got None"
+        assert isinstance(
+            deleted.deleted_at, str
+        ), f"Expected deleted_at str, got {type(deleted.deleted_at)}"
+        assert (
+            deleted.restored_at is None
+        ), f"Expected restored_at=None, got {deleted.restored_at}"
+        assert (
+            deleted.batch_id is None
+        ), f"Expected batch_id=None, got {deleted.batch_id}"
 
     def test_no_deleted_for_existing_record(self, populated_db):
         """Song 1 is NOT deleted; must return None."""

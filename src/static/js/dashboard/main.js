@@ -183,8 +183,6 @@ const modeConfig = {
 
 let detailController = null;
 let activeDetailKey = null;
-let cachedFileData = null;
-let cachedFileDataSongId = null;
 
 const ctx = {
     elements,
@@ -216,7 +214,6 @@ const ctx = {
         elements.totalCount.style.display = isFiltered ? "" : "none";
         elements.statSep.style.display = isFiltered ? "" : "none";
     },
-    openSongDetail: (...args) => openSongDetail(...args),
     clearSongEditorV2() {
         state.activeSong = null;
         state.activeSongFile = null;
@@ -506,70 +503,7 @@ function navigate(mode, query = "") {
     elements.searchInput.focus();
 }
 
-async function openSongDetail(song, { reuseFileData = false } = {}) {
-    const existingContent =
-        elements.detailPanel.querySelector(".detail-content");
-    const savedScroll = existingContent ? existingContent.scrollTop : 0;
-    const request = beginDetailRequest("songs", song.id);
-    const isSameSong = state.activeSong?.id === song.id;
-    if (!isSameSong) renderSongDetailLoading(ctx, song);
 
-    const fetchFile =
-        !reuseFileData || cachedFileDataSongId !== String(song.id)
-            ? getSongDetail(song.id, { signal: request.signal })
-            : Promise.resolve(cachedFileData);
-
-    const [catalogResult, fileResult, auditResult] = await Promise.allSettled([
-        getCatalogSong(song.id, { signal: request.signal }),
-        fetchFile,
-        getAuditHistory("Songs", song.id, { signal: request.signal }),
-    ]);
-
-    if (
-        [catalogResult, fileResult, auditResult].some(
-            (r) => r.status === "rejected" && isAbortError(r.reason),
-        )
-    ) {
-        return;
-    }
-    if (!isActiveDetail("songs", song.id)) {
-        return;
-    }
-
-    const catalogSong =
-        catalogResult.status === "fulfilled" && catalogResult.value
-            ? catalogResult.value
-            : song;
-    const fileData =
-        fileResult.status === "fulfilled" ? fileResult.value : null;
-    cachedFileData = fileData;
-    cachedFileDataSongId = String(song.id);
-    state.activeSong = catalogSong;
-    const auditHistory =
-        auditResult.status === "fulfilled" ? auditResult.value : [];
-    renderSongDetailComplete(
-        ctx,
-        catalogSong,
-        fileData,
-        auditHistory,
-        state.id3Frames,
-        state.allRoles,
-        state.searchEngines,
-        state.defaultSearchEngine,
-    );
-    updateSyncLed(catalogSong.id);
-    if (savedScroll) {
-        const newContent =
-            elements.detailPanel.querySelector(".detail-content");
-        if (newContent) {
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    newContent.scrollTop = savedScroll;
-                });
-            });
-        }
-    }
-}
 
 async function openAlbumDetail(album) {
     const request = beginDetailRequest("albums", album.id);
@@ -709,7 +643,7 @@ function refreshActiveDetail() {
     const list = getActiveList();
     const item = list.find((i) => String(i.id) === id);
     if (!item) return;
-    if (mode === "songs") openSongDetail(item, { reuseFileData: true });
+    if (mode === "songs") { ctx.refreshActiveSongV2(id); return; }
     else if (mode === "albums") openAlbumDetail(item);
     else if (mode === "artists") openArtistDetail(item);
     else if (mode === "tags") openTagDetail(item);
@@ -725,15 +659,10 @@ async function openSelectedResult(index) {
 
     if (state.currentMode === "songs" && document.getElementById("songs-workspace")?.classList.contains("active")) {
         const request = beginDetailRequest("songs", selected.id);
-        const [result, fileData] = await Promise.all([
-            getCatalogSong(selected.id, { signal: request.signal }).catch((e) => { if (!isAbortError(e)) throw e; return null; }),
-            getSongDetail(selected.id, { signal: request.signal }).catch(() => null),
-        ]);
+        const result = await getCatalogSong(selected.id, { signal: request.signal }).catch((e) => { if (!isAbortError(e)) throw e; return null; });
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
-        state.activeSongFile = fileData;
-        renderSongEditorV2(result, fileData);
-        wireDriftIndicators(result, fileData);
+        renderSongEditorV2(result, null);
         wireAuditHistory(result.id, () => getAuditHistory("Songs", result.id));
         renderActionSidebar(result, {
             searchEngines: state.searchEngines,
@@ -773,6 +702,14 @@ async function openSelectedResult(index) {
             },
             state.validationRules,
         );
+
+        getSongDetail(selected.id, { signal: request.signal })
+            .catch(() => null)
+            .then((fileData) => {
+                if (!fileData || !isActiveDetail("songs", selected.id)) return;
+                state.activeSongFile = fileData;
+                wireDriftIndicators(state.activeSong, fileData);
+            });
     } else if (state.currentMode === "albums") {
         await openAlbumDetail(selected);
     } else if (state.currentMode === "artists") {

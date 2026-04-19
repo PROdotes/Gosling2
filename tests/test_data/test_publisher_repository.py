@@ -18,32 +18,32 @@ class TestGetAll:
 
         # ORDER BY PublisherName - exhaustive assertions for each
         assert pubs[0].id == 10, f"Expected 10, got {pubs[0].id}"
-        assert pubs[0].name == "DGC Records", (
-            f"Expected 'DGC Records', got '{pubs[0].name}'"
-        )
+        assert (
+            pubs[0].name == "DGC Records"
+        ), f"Expected 'DGC Records', got '{pubs[0].name}'"
 
         assert pubs[1].id == 3, f"Expected 3, got {pubs[1].id}"
-        assert pubs[1].name == "Island Def Jam", (
-            f"Expected 'Island Def Jam', got '{pubs[1].name}'"
-        )
+        assert (
+            pubs[1].name == "Island Def Jam"
+        ), f"Expected 'Island Def Jam', got '{pubs[1].name}'"
 
         assert pubs[2].id == 2, f"Expected 2, got {pubs[2].id}"
-        assert pubs[2].name == "Island Records", (
-            f"Expected 'Island Records', got '{pubs[2].name}'"
-        )
+        assert (
+            pubs[2].name == "Island Records"
+        ), f"Expected 'Island Records', got '{pubs[2].name}'"
 
         assert pubs[3].id == 4, f"Expected 4, got {pubs[3].id}"
-        assert pubs[3].name == "Roswell Records", (
-            f"Expected 'Roswell Records', got '{pubs[3].name}'"
-        )
+        assert (
+            pubs[3].name == "Roswell Records"
+        ), f"Expected 'Roswell Records', got '{pubs[3].name}'"
 
         assert pubs[4].id == 5, f"Expected 5, got {pubs[4].id}"
         assert pubs[4].name == "Sub Pop", f"Expected 'Sub Pop', got '{pubs[4].name}'"
 
         assert pubs[5].id == 1, f"Expected 1, got {pubs[5].id}"
-        assert pubs[5].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{pubs[5].name}'"
-        )
+        assert (
+            pubs[5].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pubs[5].name}'"
 
     def test_parent_ids_correct(self, populated_db):
         """Test that parent_id relationships are correct."""
@@ -51,24 +51,24 @@ class TestGetAll:
         pubs = repo.get_all()
         parent_map = {p.name: p.parent_id for p in pubs}
 
-        assert parent_map["Universal Music Group"] is None, (
-            f"Expected None, got {parent_map['Universal Music Group']}"
-        )
-        assert parent_map["Island Records"] == 1, (
-            f"Expected 1, got {parent_map['Island Records']}"
-        )
-        assert parent_map["Island Def Jam"] == 2, (
-            f"Expected 2, got {parent_map['Island Def Jam']}"
-        )
-        assert parent_map["DGC Records"] == 1, (
-            f"Expected 1, got {parent_map['DGC Records']}"
-        )
-        assert parent_map["Roswell Records"] is None, (
-            f"Expected None, got {parent_map['Roswell Records']}"
-        )
-        assert parent_map["Sub Pop"] is None, (
-            f"Expected None, got {parent_map['Sub Pop']}"
-        )
+        assert (
+            parent_map["Universal Music Group"] is None
+        ), f"Expected None, got {parent_map['Universal Music Group']}"
+        assert (
+            parent_map["Island Records"] == 1
+        ), f"Expected 1, got {parent_map['Island Records']}"
+        assert (
+            parent_map["Island Def Jam"] == 2
+        ), f"Expected 2, got {parent_map['Island Def Jam']}"
+        assert (
+            parent_map["DGC Records"] == 1
+        ), f"Expected 1, got {parent_map['DGC Records']}"
+        assert (
+            parent_map["Roswell Records"] is None
+        ), f"Expected None, got {parent_map['Roswell Records']}"
+        assert (
+            parent_map["Sub Pop"] is None
+        ), f"Expected None, got {parent_map['Sub Pop']}"
 
     def test_empty_db_returns_empty(self, empty_db):
         """Test that get_all returns empty on empty DB."""
@@ -88,9 +88,9 @@ class TestSearch:
         assert len(pubs) == 1, f"Expected 1 publisher, got {len(pubs)}"
         assert pubs[0].id == 5, f"Expected 5, got {pubs[0].id}"
         assert pubs[0].name == "Sub Pop", f"Expected 'Sub Pop', got '{pubs[0].name}'"
-        assert pubs[0].parent_id is None, (
-            f"Expected None for parent_id, got {pubs[0].parent_id}"
-        )
+        assert (
+            pubs[0].parent_id is None
+        ), f"Expected None for parent_id, got {pubs[0].parent_id}"
 
     def test_partial_match_surface_only(self, populated_db):
         """search('Island') returns only name-matched publishers (Island Records + Island Def Jam),
@@ -119,18 +119,18 @@ class TestSearch:
 
         assert len(pubs) == 1, f"Expected 1 (surface match only), got {len(pubs)}"
         assert pubs[0].id == 1, f"Expected ID=1 (UMG), got {pubs[0].id}"
-        assert pubs[0].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{pubs[0].name}'"
-        )
+        assert (
+            pubs[0].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pubs[0].name}'"
 
         # Negative: children should NOT be returned by surface search
         returned_names = {p.name for p in pubs}
-        assert "DGC Records" not in returned_names, (
-            "DGC Records is a child — should not appear in surface search"
-        )
-        assert "Island Records" not in returned_names, (
-            "Island Records is a child — should not appear in surface search"
-        )
+        assert (
+            "DGC Records" not in returned_names
+        ), "DGC Records is a child — should not appear in surface search"
+        assert (
+            "Island Records" not in returned_names
+        ), "Island Records is a child — should not appear in surface search"
 
 
 class TestSearchDeep:
@@ -141,9 +141,9 @@ class TestSearchDeep:
         repo = PublisherRepository(populated_db)
         results = repo.search_deep("Universal")
 
-        assert len(results) == 4, (
-            f"Expected 4 publishers for 'Universal', got {len(results)}"
-        )
+        assert (
+            len(results) == 4
+        ), f"Expected 4 publishers for 'Universal', got {len(results)}"
         ids = {p.id for p in results}
         assert ids == {1, 2, 3, 10}, f"Expected IDs {{1, 2, 3, 10}}, got {ids}"
 
@@ -152,9 +152,9 @@ class TestSearchDeep:
         repo = PublisherRepository(populated_db)
         results = repo.search_deep("Island")
 
-        assert len(results) == 2, (
-            f"Expected 2 publishers for 'Island', got {len(results)}"
-        )
+        assert (
+            len(results) == 2
+        ), f"Expected 2 publishers for 'Island', got {len(results)}"
         ids = {p.id for p in results}
         assert ids == {2, 3}, f"Expected IDs {{2, 3}}, got {ids}"
 
@@ -183,18 +183,18 @@ class TestGetById:
 
         assert pub is not None, f"Expected publisher object, got {pub}"
         assert pub.id == 1, f"Expected 1, got {pub.id}"
-        assert pub.name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{pub.name}'"
-        )
-        assert pub.parent_id is None, (
-            f"Expected None for parent_id, got {pub.parent_id}"
-        )
-        assert pub.parent_name is None, (
-            f"Expected None for parent_name, got {pub.parent_name}"
-        )
-        assert pub.sub_publishers == [], (
-            f"Expected empty list for sub_publishers, got {pub.sub_publishers}"
-        )
+        assert (
+            pub.name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pub.name}'"
+        assert (
+            pub.parent_id is None
+        ), f"Expected None for parent_id, got {pub.parent_id}"
+        assert (
+            pub.parent_name is None
+        ), f"Expected None for parent_name, got {pub.parent_name}"
+        assert (
+            pub.sub_publishers == []
+        ), f"Expected empty list for sub_publishers, got {pub.sub_publishers}"
 
     def test_child_publisher(self, populated_db):
         """Test that child publisher has correct parent_id."""
@@ -250,13 +250,13 @@ class TestGetPublishers:
         assert 1 in pubs, f"Expected key 1 in dict, got keys: {pubs.keys()}"
         assert 2 in pubs, f"Expected key 2 in dict, got keys: {pubs.keys()}"
         assert pubs[1].id == 1, f"Expected 1, got {pubs[1].id}"
-        assert pubs[1].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{pubs[1].name}'"
-        )
+        assert (
+            pubs[1].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{pubs[1].name}'"
         assert pubs[2].id == 2, f"Expected 2, got {pubs[2].id}"
-        assert pubs[2].name == "Island Records", (
-            f"Expected 'Island Records', got '{pubs[2].name}'"
-        )
+        assert (
+            pubs[2].name == "Island Records"
+        ), f"Expected 'Island Records', got '{pubs[2].name}'"
 
     def test_empty_input_returns_empty_dict(self, populated_db):
         """Test that empty input returns empty dict."""
@@ -273,28 +273,28 @@ class TestGetHierarchyBatch:
         repo = PublisherRepository(populated_db)
         hierarchy = repo.get_hierarchy_batch([3])
 
-        assert 3 in hierarchy, (
-            f"Expected key 3 in hierarchy, got keys: {hierarchy.keys()}"
-        )
-        assert 2 in hierarchy, (
-            f"Expected key 2 in hierarchy, got keys: {hierarchy.keys()}"
-        )
-        assert 1 in hierarchy, (
-            f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
-        )
+        assert (
+            3 in hierarchy
+        ), f"Expected key 3 in hierarchy, got keys: {hierarchy.keys()}"
+        assert (
+            2 in hierarchy
+        ), f"Expected key 2 in hierarchy, got keys: {hierarchy.keys()}"
+        assert (
+            1 in hierarchy
+        ), f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
 
         assert hierarchy[3].id == 3, f"Expected 3, got {hierarchy[3].id}"
-        assert hierarchy[3].name == "Island Def Jam", (
-            f"Expected 'Island Def Jam', got '{hierarchy[3].name}'"
-        )
+        assert (
+            hierarchy[3].name == "Island Def Jam"
+        ), f"Expected 'Island Def Jam', got '{hierarchy[3].name}'"
         assert hierarchy[2].id == 2, f"Expected 2, got {hierarchy[2].id}"
-        assert hierarchy[2].name == "Island Records", (
-            f"Expected 'Island Records', got '{hierarchy[2].name}'"
-        )
+        assert (
+            hierarchy[2].name == "Island Records"
+        ), f"Expected 'Island Records', got '{hierarchy[2].name}'"
         assert hierarchy[1].id == 1, f"Expected 1, got {hierarchy[1].id}"
-        assert hierarchy[1].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
-        )
+        assert (
+            hierarchy[1].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
 
     def test_root_publisher(self, populated_db):
         """UMG (1) has no parent. CTE should return only itself."""
@@ -302,33 +302,33 @@ class TestGetHierarchyBatch:
         hierarchy = repo.get_hierarchy_batch([1])
 
         assert len(hierarchy) == 1, f"Expected 1 publisher, got {len(hierarchy)}"
-        assert 1 in hierarchy, (
-            f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
-        )
+        assert (
+            1 in hierarchy
+        ), f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
         assert hierarchy[1].id == 1, f"Expected 1, got {hierarchy[1].id}"
-        assert hierarchy[1].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
-        )
+        assert (
+            hierarchy[1].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
 
     def test_dgc_chain(self, populated_db):
         """DGC Records (10) -> UMG (1)."""
         repo = PublisherRepository(populated_db)
         hierarchy = repo.get_hierarchy_batch([10])
 
-        assert 10 in hierarchy, (
-            f"Expected key 10 in hierarchy, got keys: {hierarchy.keys()}"
-        )
-        assert 1 in hierarchy, (
-            f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
-        )
+        assert (
+            10 in hierarchy
+        ), f"Expected key 10 in hierarchy, got keys: {hierarchy.keys()}"
+        assert (
+            1 in hierarchy
+        ), f"Expected key 1 in hierarchy, got keys: {hierarchy.keys()}"
         assert hierarchy[10].id == 10, f"Expected 10, got {hierarchy[10].id}"
-        assert hierarchy[10].name == "DGC Records", (
-            f"Expected 'DGC Records', got '{hierarchy[10].name}'"
-        )
+        assert (
+            hierarchy[10].name == "DGC Records"
+        ), f"Expected 'DGC Records', got '{hierarchy[10].name}'"
         assert hierarchy[1].id == 1, f"Expected 1, got {hierarchy[1].id}"
-        assert hierarchy[1].name == "Universal Music Group", (
-            f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
-        )
+        assert (
+            hierarchy[1].name == "Universal Music Group"
+        ), f"Expected 'Universal Music Group', got '{hierarchy[1].name}'"
 
     def test_empty_input_returns_empty_dict(self, populated_db):
         """Test that empty input returns empty dict."""
@@ -356,9 +356,9 @@ class TestGetChildren:
 
         assert len(children) == 1, f"Expected 1 child, got {len(children)}"
         assert children[0].id == 3, f"Expected 3, got {children[0].id}"
-        assert children[0].name == "Island Def Jam", (
-            f"Expected 'Island Def Jam', got '{children[0].name}'"
-        )
+        assert (
+            children[0].name == "Island Def Jam"
+        ), f"Expected 'Island Def Jam', got '{children[0].name}'"
 
     def test_leaf_has_no_children(self, populated_db):
         """Sub Pop (5) has no children."""
@@ -380,9 +380,9 @@ class TestGetSongIdsByPublisher:
         """Sub Pop (5) has no RecordingPublisher entries."""
         repo = PublisherRepository(populated_db)
         song_ids = repo.get_song_ids_by_publisher(5)
-        assert song_ids == [], (
-            f"Expected empty list for publisher with no songs, got {song_ids}"
-        )
+        assert (
+            song_ids == []
+        ), f"Expected empty list for publisher with no songs, got {song_ids}"
 
 
 class TestGetPublishersForAlbums:
@@ -397,9 +397,9 @@ class TestGetPublishersForAlbums:
         pub_names = {pub.name for album_id, pub in results}
         assert pub_names == {"DGC Records", "Sub Pop"}, f"Unexpected names: {pub_names}"
         # All should be album 100
-        assert all(aid == 100 for aid, _ in results), (
-            f"Expected all album_id=100, got {[aid for aid, _ in results]}"
-        )
+        assert all(
+            aid == 100 for aid, _ in results
+        ), f"Expected all album_id=100, got {[aid for aid, _ in results]}"
 
     def test_tcats_publisher(self, populated_db):
         """The Colour and the Shape (200) has Roswell Records (4)."""
@@ -409,9 +409,9 @@ class TestGetPublishersForAlbums:
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0][0] == 200, f"Expected 200, got {results[0][0]}"
         assert results[0][1].id == 4, f"Expected 4, got {results[0][1].id}"
-        assert results[0][1].name == "Roswell Records", (
-            f"Expected 'Roswell Records', got '{results[0][1].name}'"
-        )
+        assert (
+            results[0][1].name == "Roswell Records"
+        ), f"Expected 'Roswell Records', got '{results[0][1].name}'"
 
     def test_empty_input_returns_empty(self, populated_db):
         """Test that empty input returns empty list."""
@@ -431,17 +431,17 @@ class TestGetPublishersForSongs:
         assert len(results) == 1, f"Expected 1 result, got {len(results)}"
         assert results[0][0] == 1, f"Expected 1, got {results[0][0]}"
         assert results[0][1].id == 10, f"Expected 10, got {results[0][1].id}"
-        assert results[0][1].name == "DGC Records", (
-            f"Expected 'DGC Records', got '{results[0][1].name}'"
-        )
+        assert (
+            results[0][1].name == "DGC Records"
+        ), f"Expected 'DGC Records', got '{results[0][1].name}'"
 
     def test_song_without_publisher(self, populated_db):
         """Song 2 has no RecordingPublisher entry."""
         repo = PublisherRepository(populated_db)
         results = repo.get_publishers_for_songs([2])
-        assert results == [], (
-            f"Expected empty list for song without publisher, got {results}"
-        )
+        assert (
+            results == []
+        ), f"Expected empty list for song without publisher, got {results}"
 
     def test_empty_input_returns_empty(self, populated_db):
         """Test that empty input returns empty list."""

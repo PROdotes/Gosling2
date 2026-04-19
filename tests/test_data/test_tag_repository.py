@@ -44,31 +44,31 @@ class TestGetTagsForSongs:
         assert grunge.id == 1, f"Expected id=1, got {grunge.id}"
         assert grunge.name == "Grunge", f"Expected 'Grunge', got '{grunge.name}'"
         assert grunge.category == "Genre", f"Expected 'Genre', got '{grunge.category}'"
-        assert grunge.is_primary is True, (
-            f"Expected is_primary=True (Grunge is primary genre for SLTS), got {grunge.is_primary}"
-        )
+        assert (
+            grunge.is_primary is True
+        ), f"Expected is_primary=True (Grunge is primary genre for SLTS), got {grunge.is_primary}"
 
         energetic = tag_map["Energetic"]
         assert energetic.id == 2, f"Expected id=2, got {energetic.id}"
-        assert energetic.name == "Energetic", (
-            f"Expected 'Energetic', got '{energetic.name}'"
-        )
-        assert energetic.category == "Mood", (
-            f"Expected 'Mood', got '{energetic.category}'"
-        )
-        assert energetic.is_primary is False, (
-            f"Expected is_primary=False, got {energetic.is_primary}"
-        )
+        assert (
+            energetic.name == "Energetic"
+        ), f"Expected 'Energetic', got '{energetic.name}'"
+        assert (
+            energetic.category == "Mood"
+        ), f"Expected 'Mood', got '{energetic.category}'"
+        assert (
+            energetic.is_primary is False
+        ), f"Expected is_primary=False, got {energetic.is_primary}"
 
         english = tag_map["English"]
         assert english.id == 5, f"Expected id=5, got {english.id}"
         assert english.name == "English", f"Expected 'English', got '{english.name}'"
-        assert english.category == "Jezik", (
-            f"Expected 'Jezik', got '{english.category}'"
-        )
-        assert english.is_primary is False, (
-            f"Expected is_primary=False, got {english.is_primary}"
-        )
+        assert (
+            english.category == "Jezik"
+        ), f"Expected 'Jezik', got '{english.category}'"
+        assert (
+            english.is_primary is False
+        ), f"Expected is_primary=False, got {english.is_primary}"
 
     def test_multiple_songs_returns_grouped_correctly(self, populated_db):
         """Song 1 has 3 tags, Song 2 has 1 tag, Song 4 has 1 tag."""
@@ -84,9 +84,9 @@ class TestGetTagsForSongs:
             tags_by_song.setdefault(song_id, []).append(tag)
 
         # Song 1: 3 tags
-        assert len(tags_by_song[1]) == 3, (
-            f"Expected 3 tags for Song 1, got {len(tags_by_song[1])}"
-        )
+        assert (
+            len(tags_by_song[1]) == 3
+        ), f"Expected 3 tags for Song 1, got {len(tags_by_song[1])}"
         song1_names = sorted([t.name for t in tags_by_song[1]])
         assert song1_names == [
             "Energetic",
@@ -95,26 +95,26 @@ class TestGetTagsForSongs:
         ], f"Expected ['Energetic', 'English', 'Grunge'], got {song1_names}"
 
         # Song 2: 1 tag
-        assert len(tags_by_song[2]) == 1, (
-            f"Expected 1 tag for Song 2, got {len(tags_by_song[2])}"
-        )
-        assert tags_by_song[2][0].name == "90s", (
-            f"Expected '90s', got '{tags_by_song[2][0].name}'"
-        )
-        assert tags_by_song[2][0].category == "Era", (
-            f"Expected 'Era', got '{tags_by_song[2][0].category}'"
-        )
+        assert (
+            len(tags_by_song[2]) == 1
+        ), f"Expected 1 tag for Song 2, got {len(tags_by_song[2])}"
+        assert (
+            tags_by_song[2][0].name == "90s"
+        ), f"Expected '90s', got '{tags_by_song[2][0].name}'"
+        assert (
+            tags_by_song[2][0].category == "Era"
+        ), f"Expected 'Era', got '{tags_by_song[2][0].category}'"
 
         # Song 4: 1 tag
-        assert len(tags_by_song[4]) == 1, (
-            f"Expected 1 tag for Song 4, got {len(tags_by_song[4])}"
-        )
-        assert tags_by_song[4][0].name == "Electronic", (
-            f"Expected 'Electronic', got '{tags_by_song[4][0].name}'"
-        )
-        assert tags_by_song[4][0].category == "Style", (
-            f"Expected 'Style', got '{tags_by_song[4][0].category}'"
-        )
+        assert (
+            len(tags_by_song[4]) == 1
+        ), f"Expected 1 tag for Song 4, got {len(tags_by_song[4])}"
+        assert (
+            tags_by_song[4][0].name == "Electronic"
+        ), f"Expected 'Electronic', got '{tags_by_song[4][0].name}'"
+        assert (
+            tags_by_song[4][0].category == "Style"
+        ), f"Expected 'Style', got '{tags_by_song[4][0].category}'"
 
     def test_song_with_no_tags_excluded_from_results(self, populated_db):
         """Song 3 has no tags, should not appear in results."""
@@ -128,18 +128,18 @@ class TestGetTagsForSongs:
         repo = TagRepository(populated_db)
         result = repo.get_tags_for_songs([])
 
-        assert len(result) == 0, (
-            f"Expected 0 results for empty input, got {len(result)}"
-        )
+        assert (
+            len(result) == 0
+        ), f"Expected 0 results for empty input, got {len(result)}"
 
     def test_nonexistent_song_id_returns_empty(self, populated_db):
         """Song 999 doesn't exist, should return empty."""
         repo = TagRepository(populated_db)
         result = repo.get_tags_for_songs([999])
 
-        assert len(result) == 0, (
-            f"Expected 0 tags for nonexistent song, got {len(result)}"
-        )
+        assert (
+            len(result) == 0
+        ), f"Expected 0 tags for nonexistent song, got {len(result)}"
 
     def test_partial_results_skip_missing_songs(self, populated_db):
         """Mix of existing and nonexistent songs returns only found tags."""
@@ -179,9 +179,9 @@ class TestGetAll:
         assert tag.id == 3, f"Expected id=3, got {tag.id}"
         assert tag.name == "90s", f"Expected '90s', got '{tag.name}'"
         assert tag.category == "Era", f"Expected 'Era', got '{tag.category}'"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False (not in row), got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False (not in row), got {tag.is_primary}"
 
     def test_empty_db_returns_empty_list(self, empty_db):
         """Empty database should return empty list."""
@@ -203,9 +203,9 @@ class TestSearch:
         assert tag.id == 1, f"Expected id=1, got {tag.id}"
         assert tag.name == "Grunge", f"Expected 'Grunge', got '{tag.name}'"
         assert tag.category == "Genre", f"Expected 'Genre', got '{tag.category}'"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False, got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False, got {tag.is_primary}"
 
         # Verify Alt Rock is NOT included
         names = [t.name for t in result]
@@ -217,9 +217,9 @@ class TestSearch:
         result = repo.search("e")
 
         # Should match: Grunge, Energetic, Electronic, English (4 tags)
-        assert len(result) >= 4, (
-            f"Expected at least 4 matches for 'e', got {len(result)}"
-        )
+        assert (
+            len(result) >= 4
+        ), f"Expected at least 4 matches for 'e', got {len(result)}"
 
         names = [t.name for t in result]
         assert "Grunge" in names, "Expected 'Grunge' to match 'e' (contains e)"
@@ -232,9 +232,9 @@ class TestSearch:
         repo = TagRepository(populated_db)
         result = repo.search("GRUNGE")
 
-        assert len(result) == 1, (
-            f"Expected 1 result (case-insensitive), got {len(result)}"
-        )
+        assert (
+            len(result) == 1
+        ), f"Expected 1 result (case-insensitive), got {len(result)}"
         assert result[0].name == "Grunge", f"Expected 'Grunge', got '{result[0].name}'"
 
     def test_no_matches_returns_empty_list(self, populated_db):
@@ -242,9 +242,9 @@ class TestSearch:
         repo = TagRepository(populated_db)
         result = repo.search("xyz_does_not_exist")
 
-        assert len(result) == 0, (
-            f"Expected 0 results for nonexistent term, got {len(result)}"
-        )
+        assert (
+            len(result) == 0
+        ), f"Expected 0 results for nonexistent term, got {len(result)}"
 
     def test_results_sorted_by_name(self, populated_db):
         """Results should be sorted alphabetically."""
@@ -253,9 +253,9 @@ class TestSearch:
 
         names = [t.name for t in result]
         sorted_names = sorted(names, key=str.lower)
-        assert names == sorted_names, (
-            f"Expected sorted names {sorted_names}, got {names}"
-        )
+        assert (
+            names == sorted_names
+        ), f"Expected sorted names {sorted_names}, got {names}"
 
 
 class TestGetById:
@@ -268,9 +268,9 @@ class TestGetById:
         assert tag.id == 1, f"Expected id=1, got {tag.id}"
         assert tag.name == "Grunge", f"Expected 'Grunge', got '{tag.name}'"
         assert tag.category == "Genre", f"Expected 'Genre', got '{tag.category}'"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False (not in row keys), got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False (not in row keys), got {tag.is_primary}"
 
     def test_nonexistent_id_returns_none(self, populated_db):
         """Tag 999 doesn't exist, should return None."""
@@ -312,9 +312,9 @@ class TestGetSongIdsByTag:
         repo = TagRepository(populated_db)
         song_ids = repo.get_song_ids_by_tag(1)
 
-        assert len(song_ids) == 2, (
-            f"Expected 2 songs for Tag 1 (Grunge), got {len(song_ids)}"
-        )
+        assert (
+            len(song_ids) == 2
+        ), f"Expected 2 songs for Tag 1 (Grunge), got {len(song_ids)}"
         assert 1 in song_ids, "Expected Song 1 in results"
         assert 9 in song_ids, "Expected Song 9 in results"
 
@@ -334,18 +334,18 @@ class TestGetSongIdsByTag:
             conn.commit()
 
         song_ids = repo.get_song_ids_by_tag(100)
-        assert len(song_ids) == 0, (
-            f"Expected 0 songs for orphan tag, got {len(song_ids)}"
-        )
+        assert (
+            len(song_ids) == 0
+        ), f"Expected 0 songs for orphan tag, got {len(song_ids)}"
 
     def test_nonexistent_tag_id_returns_empty(self, populated_db):
         """Tag 999 doesn't exist, should return empty."""
         repo = TagRepository(populated_db)
         song_ids = repo.get_song_ids_by_tag(999)
 
-        assert len(song_ids) == 0, (
-            f"Expected 0 songs for nonexistent tag, got {len(song_ids)}"
-        )
+        assert (
+            len(song_ids) == 0
+        ), f"Expected 0 songs for nonexistent tag, got {len(song_ids)}"
 
 
 class TestRowToTag:
@@ -363,12 +363,12 @@ class TestRowToTag:
 
         assert tag.id == 42, f"Expected id=42, got {tag.id}"
         assert tag.name == "Test Tag", f"Expected 'Test Tag', got '{tag.name}'"
-        assert tag.category == "Test Category", (
-            f"Expected 'Test Category', got '{tag.category}'"
-        )
-        assert tag.is_primary is True, (
-            f"Expected is_primary=True (1→True), got {tag.is_primary}"
-        )
+        assert (
+            tag.category == "Test Category"
+        ), f"Expected 'Test Category', got '{tag.category}'"
+        assert (
+            tag.is_primary is True
+        ), f"Expected is_primary=True (1→True), got {tag.is_primary}"
 
     def test_is_primary_false(self, populated_db):
         """Map row with IsPrimary=0."""
@@ -383,9 +383,9 @@ class TestRowToTag:
         tag = repo._row_to_tag(mock_row)
 
         assert tag.id == 43, f"Expected id=43, got {tag.id}"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False (0→False), got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False (0→False), got {tag.is_primary}"
 
     def test_is_primary_missing_defaults_false(self, populated_db):
         """If IsPrimary not in row keys, default to False."""
@@ -399,9 +399,9 @@ class TestRowToTag:
         tag = repo._row_to_tag(mock_row)
 
         assert tag.id == 44, f"Expected id=44, got {tag.id}"
-        assert tag.is_primary is False, (
-            f"Expected is_primary=False (missing key), got {tag.is_primary}"
-        )
+        assert (
+            tag.is_primary is False
+        ), f"Expected is_primary=False (missing key), got {tag.is_primary}"
 
     def test_category_can_be_none(self, populated_db):
         """TagCategory is nullable in schema."""

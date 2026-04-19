@@ -23,9 +23,9 @@ class TestSpotifyRouter:
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
         data = response.json()
-        assert data["parsed_title"] == "Title", (
-            f"Expected 'Title', got {data['parsed_title']}"
-        )
+        assert (
+            data["parsed_title"] == "Title"
+        ), f"Expected 'Title', got {data['parsed_title']}"
         assert data["title_match"] is True, "Expected title_match to be True"
         assert len(data["credits"]) > 0, "Expected credits in response"
         assert "Universal" in data["publishers"], "Expected publisher in response"
@@ -36,9 +36,9 @@ class TestSpotifyRouter:
             json={"raw_text": spotify_text, "reference_title": "Different"},
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}"
-        assert response.json()["title_match"] is False, (
-            "Expected title_match to be False"
-        )
+        assert (
+            response.json()["title_match"] is False
+        ), "Expected title_match to be False"
 
     def test_import_credits_success(self, api, spotify_text):
         """Rule 156: Verify bulk import orchestration via API."""
@@ -49,9 +49,9 @@ class TestSpotifyRouter:
             "publishers": ["Sony Music"],
         }
         response = api.post("/api/v1/spotify/import", json=payload)
-        assert response.status_code == 204, (
-            f"Expected 204, got {response.status_code}: {response.text}"
-        )
+        assert (
+            response.status_code == 204
+        ), f"Expected 204, got {response.status_code}: {response.text}"
 
         # Verify persistence via existing GET song endpoint
         get_resp = api.get("/api/v1/songs/2")

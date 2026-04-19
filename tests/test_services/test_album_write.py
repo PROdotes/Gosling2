@@ -29,15 +29,15 @@ class TestCreateAndLinkAlbum:
 
         # 1. Assert Method Contract (Hydration)
         assert isinstance(link, SongAlbum), f"Expected SongAlbum, got {type(link)}"
-        assert link.album_title == "The Fresh Pot", (
-            f"Expected 'The Fresh Pot', got {link.album_title}"
-        )
+        assert (
+            link.album_title == "The Fresh Pot"
+        ), f"Expected 'The Fresh Pot', got {link.album_title}"
         assert link.release_year == 2024, f"Expected 2024, got {link.release_year}"
         assert link.track_number == 1, f"Expected track 1, got {link.track_number}"
         assert link.disc_number == 1, f"Expected disc 1, got {link.disc_number}"
-        assert link.is_primary is True, (
-            f"Expected is_primary=True, got {link.is_primary}"
-        )
+        assert (
+            link.is_primary is True
+        ), f"Expected is_primary=True, got {link.is_primary}"
         assert link.album_id is not None, "Expected album_id to be assigned"
 
         # 2. Verify Persistence (Side Effect via Service)
@@ -85,9 +85,9 @@ class TestCreateAndLinkAlbum:
             service.create_and_link_album(9999, album_data)
 
         albums = service.search_albums_slim("Rollback Album")
-        assert len(albums) == 0, (
-            "Transaction failed to rollback: Album record created despite link failure"
-        )
+        assert (
+            len(albums) == 0
+        ), "Transaction failed to rollback: Album record created despite link failure"
 
     def test_missing_optional_track_info_returns_none(self, populated_db):
         service = CatalogService(populated_db)
@@ -106,12 +106,12 @@ class TestUpdateAlbum:
         )
 
         assert updated.id == 100
-        assert updated.title == "Nevermind (Spl)", (
-            f"Expected title update, got '{updated.title}'"
-        )
-        assert updated.release_year == 2011, (
-            f"Expected year update, got {updated.release_year}"
-        )
+        assert (
+            updated.title == "Nevermind (Spl)"
+        ), f"Expected title update, got '{updated.title}'"
+        assert (
+            updated.release_year == 2011
+        ), f"Expected year update, got {updated.release_year}"
 
         # Verify persistence
         album = service.get_album(100)
@@ -140,9 +140,9 @@ class TestUpdateAlbum:
         names = [c.display_name for c in updated.credits]
         assert "Nirvana" in names, "Credits should remain hydrated in returned object"
         pubs = [p.name for p in updated.publishers]
-        assert "DGC Records" in pubs, (
-            "Publishers should remain hydrated in returned object"
-        )
+        assert (
+            "DGC Records" in pubs
+        ), "Publishers should remain hydrated in returned object"
 
 
 class TestAddSongAlbum:

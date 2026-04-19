@@ -26,23 +26,23 @@ class TestRowToSource:
 
         assert source.id == 1, f"Expected 1, got {source.id}"
         assert source.type_id == 1, f"Expected 1, got {source.type_id}"
-        assert source.media_name == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
-        )
-        assert source.source_path == "/path/1", (
-            f"Expected '/path/1', got '{source.source_path}'"
-        )
+        assert (
+            source.media_name == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
+        assert (
+            source.source_path == "/path/1"
+        ), f"Expected '/path/1', got '{source.source_path}'"
         assert source.duration_s == 200.0, f"Expected 200.0, got {source.duration_s}"
-        assert source.duration_ms == 200000, (
-            f"Expected 200000, got {source.duration_ms}"
-        )
-        assert source.audio_hash == "hash_1", (
-            f"Expected 'hash_1', got '{source.audio_hash}'"
-        )
+        assert (
+            source.duration_ms == 200000
+        ), f"Expected 200000, got {source.duration_ms}"
+        assert (
+            source.audio_hash == "hash_1"
+        ), f"Expected 'hash_1', got '{source.audio_hash}'"
         assert source.is_active is True, f"Expected True, got {source.is_active}"
-        assert source.processing_status == 0, (
-            f"Expected 0, got {source.processing_status}"
-        )
+        assert (
+            source.processing_status == 0
+        ), f"Expected 0, got {source.processing_status}"
         assert source.notes is None, f"Expected None, got {source.notes}"
 
     def test_null_fields(self, populated_db):
@@ -61,12 +61,12 @@ class TestRowToSource:
         source = repo._row_to_source(mock_row)
 
         assert source.id == 4, f"Expected 4, got {source.id}"
-        assert source.audio_hash is None, (
-            f"Expected None for NULL hash, got {source.audio_hash}"
-        )
-        assert source.processing_status == 1, (
-            f"Expected 1 for status, got {source.processing_status}"
-        )
+        assert (
+            source.audio_hash is None
+        ), f"Expected None for NULL hash, got {source.audio_hash}"
+        assert (
+            source.processing_status == 1
+        ), f"Expected 1 for status, got {source.processing_status}"
 
     def test_null_duration_maps_to_zero(self, populated_db):
         """NULL SourceDuration must not crash - must map to 0.0."""
@@ -148,12 +148,12 @@ class TestGetByPath:
 
         assert source is not None, f"Expected MediaSource, got {source}"
         assert source.id == 1, f"Expected 1, got {source.id}"
-        assert source.media_name == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
-        )
-        assert source.source_path == "/path/1", (
-            f"Expected '/path/1', got '{source.source_path}'"
-        )
+        assert (
+            source.media_name == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
+        assert (
+            source.source_path == "/path/1"
+        ), f"Expected '/path/1', got '{source.source_path}'"
         assert source.type_id == 1, f"Expected 1, got {source.type_id}"
 
     def test_invalid_path_returns_none(self, populated_db):
@@ -194,12 +194,12 @@ class TestGetByHash:
 
         assert source is not None, f"Expected MediaSource, got {source}"
         assert source.id == 1, f"Expected 1, got {source.id}"
-        assert source.audio_hash == "hash_1", (
-            f"Expected 'hash_1', got '{source.audio_hash}'"
-        )
-        assert source.media_name == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
-        )
+        assert (
+            source.audio_hash == "hash_1"
+        ), f"Expected 'hash_1', got '{source.audio_hash}'"
+        assert (
+            source.media_name == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{source.media_name}'"
 
     def test_nonexistent_hash_returns_none(self, populated_db):
         """Nonexistent hash must return None."""
@@ -244,9 +244,9 @@ class TestDelete:
             res = conn.execute(
                 "SELECT COUNT(*) FROM Songs WHERE SourceID = ?", (source_id,)
             ).fetchone()
-            assert res[0] == 1, (
-                f"Expected song {source_id} to exist in Songs table before delete"
-            )
+            assert (
+                res[0] == 1
+            ), f"Expected song {source_id} to exist in Songs table before delete"
 
         # 2. Execute Soft Delete
         with repo._get_connection() as conn:
@@ -268,9 +268,9 @@ class TestDelete:
             res = conn.execute(
                 "SELECT COUNT(*) FROM Songs WHERE SourceID = ?", (source_id,)
             ).fetchone()
-            assert res[0] == 1, (
-                f"Expected extension record to be preserved after soft delete, got {res[0]}"
-            )
+            assert (
+                res[0] == 1
+            ), f"Expected extension record to be preserved after soft delete, got {res[0]}"
 
     def test_soft_delete_nonexistent_id_returns_false(self, populated_db):
         repo = MediaSourceRepository(populated_db)
@@ -309,9 +309,9 @@ class TestDelete:
             assert row is not None
             assert row["MediaName"] == "Universal Source"
             assert row["SourcePath"] == "/music/universal.mp3"
-            assert row["SourceDuration"] == 60.0, (
-                f"Expected 60.0s, got {row['SourceDuration']}"
-            )
+            assert (
+                row["SourceDuration"] == 60.0
+            ), f"Expected 60.0s, got {row['SourceDuration']}"
             assert row["AudioHash"] == "universal_hash"
 
             # Verify TypeID mapping

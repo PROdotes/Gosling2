@@ -15,15 +15,15 @@ class TestSearchSongsDeepSlim:
         rows = catalog_service.search_songs_deep_slim("Universal")
 
         media_names = {r["MediaName"] for r in rows}
-        assert "Smells Like Teen Spirit" in media_names, (
-            "Expected 'Universal' deep search to discover DGC's songs via publisher expansion."
-        )
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), "Expected 'Universal' deep search to discover DGC's songs via publisher expansion."
 
         slts = next(r for r in rows if r["SourceID"] == 1)
         assert slts["SourceID"] == 1, f"Expected SourceID=1, got {slts['SourceID']}"
-        assert slts["MediaName"] == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{slts['MediaName']}'"
-        )
+        assert (
+            slts["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{slts['MediaName']}'"
 
     def test_search_child_publisher_finds_own_songs_only(self, catalog_service):
         """'DGC' finds only SLTS (Song 1) — the sole DGC-published song."""
@@ -43,9 +43,9 @@ class TestSearchSongsDeepSlim:
         rows = catalog_service.search_songs_deep_slim("Dave Grohl")
 
         media_names = {r["MediaName"] for r in rows}
-        assert "Smells Like Teen Spirit" in media_names, (
-            "Dave Grohl's group membership should discover Nirvana songs."
-        )
+        assert (
+            "Smells Like Teen Spirit" in media_names
+        ), "Dave Grohl's group membership should discover Nirvana songs."
 
     def test_no_match_returns_empty(self, catalog_service):
         """Non-existent query returns empty list."""
@@ -70,6 +70,6 @@ class TestSearchSongsDeepSlim:
         # "Dave Grohl" direct credit AND group expansion could both find the same song
         rows = catalog_service.search_songs_deep_slim("Dave Grohl")
         ids = [r["SourceID"] for r in rows]
-        assert len(ids) == len(set(ids)), (
-            f"Duplicate SourceIDs in deep search results: {ids}"
-        )
+        assert len(ids) == len(
+            set(ids)
+        ), f"Duplicate SourceIDs in deep search results: {ids}"

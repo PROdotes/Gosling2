@@ -50,11 +50,10 @@ export async function orchestrateScrubber(ctx, songId, title) {
 function getUpdateCallback(ctx, songId) {
     return async () => {
         const state = ctx.getState();
-        const song = state.cachedSongs.find(
-            (s) => String(s.id) === String(songId),
-        );
-        if (song && ctx.openSongDetail) {
-            ctx.openSongDetail(song, { reuseFileData: true });
+        if (state.currentMode === "songs" && ctx.refreshActiveSongV2) {
+            await ctx.refreshActiveSongV2(songId);
+        } else if (ctx.refreshActiveDetail) {
+            ctx.refreshActiveDetail();
         }
     };
 }

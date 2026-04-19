@@ -53,18 +53,18 @@ class TestCatalogIngestionConflicts:
         # 4. Exhaustive Contract Assertions (Rule 1: Engineers think about the data)
         err = exc_info.value
         assert err.ghost_id == 1, f"Expected 1, got {err.ghost_id}"
-        assert err.title == "Smells Like Teen Spirit", (
-            f"Expected 'Smells Like Teen Spirit', got '{err.title}'"
-        )
+        assert (
+            err.title == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{err.title}'"
         assert err.duration_s == 200.0, f"Expected 200.0, got {err.duration_s}"
         assert err.status_code == 409, f"Expected 409, got {err.status_code}"
 
         expected_msg = (
             "song with that hash already exists, Smells Like Teen Spirit, 200.0"
         )
-        assert err.message == expected_msg, (
-            f"Expected '{expected_msg}', got '{err.message}'"
-        )
+        assert (
+            err.message == expected_msg
+        ), f"Expected '{expected_msg}', got '{err.message}'"
 
         # 5. Side Effects
         # Staged file should NOT have been deleted if it's a conflict (user might want to keep it)
@@ -73,9 +73,9 @@ class TestCatalogIngestionConflicts:
         # User said: "throw an error... wait for the frontend to say yes/no"
         # If we delete the file, the frontend can't resume.
         # So it should STAY in staging.
-        assert os.path.exists(staged_path), (
-            "Staged file must survive conflict for later resolution"
-        )
+        assert os.path.exists(
+            staged_path
+        ), "Staged file must survive conflict for later resolution"
 
     def test_ingest_file_raises_reingestion_conflict_on_hash_collision_at_different_path(
         self, populated_db, tmp_path
@@ -151,9 +151,9 @@ class TestResolveConflict:
         result = service.resolve_conflict(ghost_id, staged_path)
 
         # 4. Exhaustive Assertions on Return Value
-        assert result["status"] == "INGESTED", (
-            f"Expected 'INGESTED', got {result['status']}"
-        )
+        assert (
+            result["status"] == "INGESTED"
+        ), f"Expected 'INGESTED', got {result['status']}"
         assert "song" in result, "Result missing 'song' field"
         assert result["song"] is not None, "Expected song object, got None"
 
@@ -179,9 +179,9 @@ class TestResolveConflict:
         assert row[3] is not None, "Expected hash to be set, got None"
 
         # 6. File stays in staging (no move operation)
-        assert os.path.exists(staged_path), (
-            f"Staged file should remain in staging, but is missing at {staged_path}"
-        )
+        assert os.path.exists(
+            staged_path
+        ), f"Staged file should remain in staging, but is missing at {staged_path}"
 
     def test_resolve_conflict_nonexistent_ghost_id_returns_error(
         self, populated_db, tmp_path
@@ -227,9 +227,9 @@ class TestResolveConflict:
         result = service.resolve_conflict(ghost_id, fake_path)
 
         assert result["status"] == "ERROR", f"Expected 'ERROR', got {result['status']}"
-        assert result["message"] == "Staged file not found", (
-            f"Expected 'Staged file not found', got '{result['message']}'"
-        )
+        assert (
+            result["message"] == "Staged file not found"
+        ), f"Expected 'Staged file not found', got '{result['message']}'"
 
     def test_resolve_conflict_preserves_other_songs(
         self, populated_db, tmp_path, test_audio_file
@@ -269,24 +269,24 @@ class TestResolveConflict:
         # Verify song 2 unchanged - ALL FIELDS
         song_2_after = repo.get_by_id(2)
         assert song_2_after is not None, "Song 2 should still exist after reactivation"
-        assert song_2_after.id == song_2_before.id, (
-            f"Song 2 ID changed: {song_2_before.id} -> {song_2_after.id}"
-        )
-        assert song_2_after.media_name == song_2_before.media_name, (
-            f"Song 2 media_name changed: {song_2_before.media_name} -> {song_2_after.media_name}"
-        )
-        assert song_2_after.duration_s == song_2_before.duration_s, (
-            f"Song 2 duration changed: {song_2_before.duration_s} -> {song_2_after.duration_s}"
-        )
-        assert song_2_after.audio_hash == song_2_before.audio_hash, (
-            f"Song 2 hash changed: {song_2_before.audio_hash} -> {song_2_after.audio_hash}"
-        )
-        assert song_2_after.source_path == song_2_before.source_path, (
-            "Song 2 path changed"
-        )
-        assert song_2_after.is_active == song_2_before.is_active, (
-            "Song 2 is_active changed"
-        )
+        assert (
+            song_2_after.id == song_2_before.id
+        ), f"Song 2 ID changed: {song_2_before.id} -> {song_2_after.id}"
+        assert (
+            song_2_after.media_name == song_2_before.media_name
+        ), f"Song 2 media_name changed: {song_2_before.media_name} -> {song_2_after.media_name}"
+        assert (
+            song_2_after.duration_s == song_2_before.duration_s
+        ), f"Song 2 duration changed: {song_2_before.duration_s} -> {song_2_after.duration_s}"
+        assert (
+            song_2_after.audio_hash == song_2_before.audio_hash
+        ), f"Song 2 hash changed: {song_2_before.audio_hash} -> {song_2_after.audio_hash}"
+        assert (
+            song_2_after.source_path == song_2_before.source_path
+        ), "Song 2 path changed"
+        assert (
+            song_2_after.is_active == song_2_before.is_active
+        ), "Song 2 is_active changed"
         assert song_2_after.bpm == song_2_before.bpm, "Song 2 BPM changed"
         assert song_2_after.year == song_2_before.year, "Song 2 year changed"
         assert song_2_after.isrc == song_2_before.isrc, "Song 2 ISRC changed"

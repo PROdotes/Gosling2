@@ -27,28 +27,28 @@ class TestMetadataServiceExtractMetadata:
         metadata = service.extract_metadata(str(silence_mp3))
 
         assert isinstance(metadata, dict), f"Expected dict, got {type(metadata)}"
-        assert "TIT2" in metadata, (
-            f"Expected 'TIT2' in metadata keys, got {list(metadata.keys())}"
-        )
-        assert metadata["TIT2"] == ["Test Title"], (
-            f"Expected TIT2=['Test Title'], got {metadata['TIT2']}"
-        )
-        assert "TPE1" in metadata, (
-            f"Expected 'TPE1' in metadata keys, got {list(metadata.keys())}"
-        )
+        assert (
+            "TIT2" in metadata
+        ), f"Expected 'TIT2' in metadata keys, got {list(metadata.keys())}"
+        assert metadata["TIT2"] == [
+            "Test Title"
+        ], f"Expected TIT2=['Test Title'], got {metadata['TIT2']}"
+        assert (
+            "TPE1" in metadata
+        ), f"Expected 'TPE1' in metadata keys, got {list(metadata.keys())}"
         assert metadata["TPE1"] == [
             "Artist 1",
             "Artist 2",
         ], f"Expected TPE1=['Artist 1','Artist 2'], got {metadata['TPE1']}"
-        assert "TDRC" in metadata, (
-            f"Expected 'TDRC' in metadata keys, got {list(metadata.keys())}"
-        )
-        assert metadata["TDRC"] == ["2024-03-16"], (
-            f"Expected TDRC=['2024-03-16'], got {metadata['TDRC']}"
-        )
-        assert "TLEN" in metadata, (
-            f"Expected 'TLEN' injection from stream info, got {list(metadata.keys())}"
-        )
+        assert (
+            "TDRC" in metadata
+        ), f"Expected 'TDRC' in metadata keys, got {list(metadata.keys())}"
+        assert metadata["TDRC"] == [
+            "2024-03-16"
+        ], f"Expected TDRC=['2024-03-16'], got {metadata['TDRC']}"
+        assert (
+            "TLEN" in metadata
+        ), f"Expected 'TLEN' injection from stream info, got {list(metadata.keys())}"
         # silence.mp3 is 2.27s
         assert float(metadata["TLEN"][0]) > 2.0
 
@@ -64,22 +64,20 @@ class TestMetadataServiceExtractMetadata:
         service = MetadataService()
         metadata = service.extract_metadata(str(silence_mp3))
 
-        assert "TCOM" in metadata, (
-            f"Expected 'TCOM' in metadata keys, got {list(metadata.keys())}"
-        )
+        assert (
+            "TCOM" in metadata
+        ), f"Expected 'TCOM' in metadata keys, got {list(metadata.keys())}"
         assert metadata["TCOM"] == [
             "Composer 1",
             "Composer 2",
         ], f"Expected TCOM=['Composer 1','Composer 2'], got {metadata['TCOM']}"
-        assert "TXXX:CUSTOM_LIST" in metadata, (
-            f"Expected 'TXXX:CUSTOM_LIST' in metadata keys, got {list(metadata.keys())}"
-        )
+        assert (
+            "TXXX:CUSTOM_LIST" in metadata
+        ), f"Expected 'TXXX:CUSTOM_LIST' in metadata keys, got {list(metadata.keys())}"
         assert metadata["TXXX:CUSTOM_LIST"] == [
             "Item 1",
             "Item 2",
-        ], (
-            f"Expected TXXX:CUSTOM_LIST=['Item 1','Item 2'], got {metadata['TXXX:CUSTOM_LIST']}"
-        )
+        ], f"Expected TXXX:CUSTOM_LIST=['Item 1','Item 2'], got {metadata['TXXX:CUSTOM_LIST']}"
 
     def test_extract_metadata_tipl_resolution(self, silence_mp3):
         """TIPL people list must be resolved to clean name strings."""
@@ -95,21 +93,21 @@ class TestMetadataServiceExtractMetadata:
         service = MetadataService()
         metadata = service.extract_metadata(str(silence_mp3))
 
-        assert "TIPL" in metadata, (
-            f"Expected 'TIPL' in metadata keys, got {list(metadata.keys())}"
-        )
-        assert isinstance(metadata["TIPL"], list), (
-            f"Expected TIPL to be list, got {type(metadata['TIPL'])}"
-        )
-        assert len(metadata["TIPL"]) == 2, (
-            f"Expected 2 TIPL entries, got {len(metadata['TIPL'])}"
-        )
-        assert "Producer A" in metadata["TIPL"], (
-            f"Expected 'Producer A' in TIPL, got {metadata['TIPL']}"
-        )
-        assert "Engineer B" in metadata["TIPL"], (
-            f"Expected 'Engineer B' in TIPL, got {metadata['TIPL']}"
-        )
+        assert (
+            "TIPL" in metadata
+        ), f"Expected 'TIPL' in metadata keys, got {list(metadata.keys())}"
+        assert isinstance(
+            metadata["TIPL"], list
+        ), f"Expected TIPL to be list, got {type(metadata['TIPL'])}"
+        assert (
+            len(metadata["TIPL"]) == 2
+        ), f"Expected 2 TIPL entries, got {len(metadata['TIPL'])}"
+        assert (
+            "Producer A" in metadata["TIPL"]
+        ), f"Expected 'Producer A' in TIPL, got {metadata['TIPL']}"
+        assert (
+            "Engineer B" in metadata["TIPL"]
+        ), f"Expected 'Engineer B' in TIPL, got {metadata['TIPL']}"
 
     def test_extract_metadata_invalid_file(self, tmp_path):
         """extract_metadata must return an empty dict for unparsable files."""
@@ -162,30 +160,28 @@ class TestMetadataServiceExtractMetadata:
             "Skrillex",
             "ISOxo",
         ], f"Expected TPE1=['Skrillex','ISOxo'], got {metadata['TPE1']}"
-        assert metadata["TIT2"] == ["RATATA"], (
-            f"Expected TIT2=['RATATA'], got {metadata['TIT2']}"
-        )
-        assert metadata["TDRC"] == ["2023"], (
-            f"Expected TDRC=['2023'], got {metadata['TDRC']}"
-        )
-        assert "Skrillex" in metadata["TIPL"], (
-            f"Expected 'Skrillex' in TIPL, got {metadata['TIPL']}"
-        )
-        assert "ISOxo" in metadata["TIPL"], (
-            f"Expected 'ISOxo' in TIPL, got {metadata['TIPL']}"
-        )
-        assert "Tom Norris" in metadata["TIPL"], (
-            f"Expected 'Tom Norris' in TIPL, got {metadata['TIPL']}"
-        )
-        assert metadata["TXXX:STATUS"] == ["Released"], (
-            f"Expected TXXX:STATUS=['Released'], got {metadata['TXXX:STATUS']}"
-        )
+        assert metadata["TIT2"] == [
+            "RATATA"
+        ], f"Expected TIT2=['RATATA'], got {metadata['TIT2']}"
+        assert metadata["TDRC"] == [
+            "2023"
+        ], f"Expected TDRC=['2023'], got {metadata['TDRC']}"
+        assert (
+            "Skrillex" in metadata["TIPL"]
+        ), f"Expected 'Skrillex' in TIPL, got {metadata['TIPL']}"
+        assert (
+            "ISOxo" in metadata["TIPL"]
+        ), f"Expected 'ISOxo' in TIPL, got {metadata['TIPL']}"
+        assert (
+            "Tom Norris" in metadata["TIPL"]
+        ), f"Expected 'Tom Norris' in TIPL, got {metadata['TIPL']}"
+        assert metadata["TXXX:STATUS"] == [
+            "Released"
+        ], f"Expected TXXX:STATUS=['Released'], got {metadata['TXXX:STATUS']}"
         assert metadata["TXXX:PRODUCER"] == [
             "Skrillex",
             "ISOxo",
-        ], (
-            f"Expected TXXX:PRODUCER=['Skrillex','ISOxo'], got {metadata['TXXX:PRODUCER']}"
-        )
+        ], f"Expected TXXX:PRODUCER=['Skrillex','ISOxo'], got {metadata['TXXX:PRODUCER']}"
         assert metadata["TCOM"] == [
             "Sonny Moore",
             "Julian Isorena",
@@ -198,9 +194,9 @@ class TestMetadataServiceExtractMetadata:
             "Electronic",
             "Trap",
         ], f"Expected TCON=['Electronic','Trap'], got {metadata['TCON']}"
-        assert metadata["TLAN"] == ["eng"], (
-            f"Expected TLAN=['eng'], got {metadata['TLAN']}"
-        )
+        assert metadata["TLAN"] == [
+            "eng"
+        ], f"Expected TLAN=['eng'], got {metadata['TLAN']}"
 
     def test_extract_metadata_tagless_file(self, silence_mp3):
         """extract_metadata must handle files with no metadata headers gracefully."""
@@ -235,15 +231,15 @@ class TestMetadataServiceExtractMetadata:
         service = MetadataService()
         metadata = service.extract_metadata(str(silence_mp3))
 
-        assert "APIC" not in metadata, (
-            f"Expected 'APIC' absent from metadata keys, got {list(metadata.keys())}"
-        )
-        assert "TIT2" in metadata, (
-            f"Expected 'TIT2' in metadata keys, got {list(metadata.keys())}"
-        )
-        assert metadata["TIT2"] == ["Clean Title"], (
-            f"Expected TIT2=['Clean Title'], got {metadata['TIT2']}"
-        )
+        assert (
+            "APIC" not in metadata
+        ), f"Expected 'APIC' absent from metadata keys, got {list(metadata.keys())}"
+        assert (
+            "TIT2" in metadata
+        ), f"Expected 'TIT2' in metadata keys, got {list(metadata.keys())}"
+        assert metadata["TIT2"] == [
+            "Clean Title"
+        ], f"Expected TIT2=['Clean Title'], got {metadata['TIT2']}"
 
     def test_extract_metadata_skips_descriptive_binary(self, silence_mp3):
         """Binary frames with descriptors (e.g., APIC:Cover) must still be skipped if the base ID is in config."""
@@ -267,9 +263,9 @@ class TestMetadataServiceExtractMetadata:
 
         # We must check all keys because Mutagen might name it APIC:Cover
         apic_keys = [k for k in metadata.keys() if k.startswith("APIC")]
-        assert not apic_keys, (
-            f"Expected all APIC variants to be skipped, got {apic_keys}"
-        )
+        assert (
+            not apic_keys
+        ), f"Expected all APIC variants to be skipped, got {apic_keys}"
 
 
 class TestMetadataServiceCompare:

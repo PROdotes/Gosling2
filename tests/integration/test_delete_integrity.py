@@ -94,12 +94,12 @@ class TestSongDeletionIntegrity:
             res = conn.execute(
                 "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (song_id,)
             ).fetchone()
-            assert res is not None, (
-                "Song record should persist in MediaSources (soft-delete)"
-            )
-            assert res["IsDeleted"] == 1, (
-                f"Expected IsDeleted=1 for song {song_id}, got {res['IsDeleted']}"
-            )
+            assert (
+                res is not None
+            ), "Song record should persist in MediaSources (soft-delete)"
+            assert (
+                res["IsDeleted"] == 1
+            ), f"Expected IsDeleted=1 for song {song_id}, got {res['IsDeleted']}"
 
             assert (
                 conn.execute(
@@ -189,9 +189,9 @@ class TestSongDeletionIntegrity:
             res = conn.execute(
                 "SELECT IsDeleted FROM MediaSources WHERE SourceID = 999"
             ).fetchone()
-            assert res is not None and res["IsDeleted"] == 1, (
-                "Expected Song 999 to be soft-deleted in MediaSources"
-            )
+            assert (
+                res is not None and res["IsDeleted"] == 1
+            ), "Expected Song 999 to be soft-deleted in MediaSources"
             assert (
                 conn.execute("SELECT 1 FROM Songs WHERE SourceID = 999").fetchone()
                 is not None
@@ -289,9 +289,9 @@ class TestSongDeletionIntegrity:
             res = conn.execute(
                 "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (SID,)
             ).fetchone()
-            assert res is not None and res["IsDeleted"] == 1, (
-                "Expected MediaSources row to be soft-deleted"
-            )
+            assert (
+                res is not None and res["IsDeleted"] == 1
+            ), "Expected MediaSources row to be soft-deleted"
             assert (
                 conn.execute(
                     "SELECT count(*) as c FROM SongCredits WHERE SourceID = ?", (SID,)
@@ -420,9 +420,9 @@ class TestSongDeletionIntegrity:
 
         # ACTION: Delete Song A
         success = service.delete_song(S_A)
-        assert success is True, (
-            f"Expected delete_song({S_A}) to return True, got {success}"
-        )
+        assert (
+            success is True
+        ), f"Expected delete_song({S_A}) to return True, got {success}"
 
         # VERIFY: B is still linked
         conn = _connect(empty_db)
@@ -593,9 +593,9 @@ class TestSongDeletionIntegrity:
                 res = conn.execute(
                     "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (sid,)
                 ).fetchone()
-                assert res is not None and res["IsDeleted"] == 1, (
-                    f"Expected Song {sid} to be soft-deleted in MediaSources"
-                )
+                assert (
+                    res is not None and res["IsDeleted"] == 1
+                ), f"Expected Song {sid} to be soft-deleted in MediaSources"
                 assert (
                     conn.execute(
                         "SELECT count(*) as c FROM SongCredits WHERE SourceID = ?",

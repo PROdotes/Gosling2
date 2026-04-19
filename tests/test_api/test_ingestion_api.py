@@ -19,8 +19,8 @@ from src.engine_server import app
 
 def collect_upload_stream(resp):
     """Parse NDJSON upload stream into a BatchIngestReport-shaped dict."""
-    lines = [l for l in resp.text.strip().split("\n") if l.strip()]
-    frames = [json.loads(l) for l in lines]
+    lines = [ln for ln in resp.text.strip().split("\n") if ln.strip()]
+    frames = [json.loads(ln) for ln in lines]
     results = [f["last_result"] for f in frames if f.get("last_result")]
     return {
         "total_files": len(results),
@@ -68,16 +68,16 @@ class TestIngestionApi:
             "/api/v1/catalog/ingest/check",
             json={"file_path": "/absolutely/does/not/exist.mp3"},
         )
-        assert resp.status_code == 400, (
-            f"Expected 400 for missing file, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"Expected 400 for missing file, got {resp.status_code}"
         body = resp.json()
-        assert "detail" in body, (
-            f"Expected 'detail' key in error body, got {list(body.keys())}"
-        )
-        assert "File not found" in body["detail"], (
-            f"Expected 'File not found' in detail, got '{body['detail']}'"
-        )
+        assert (
+            "detail" in body
+        ), f"Expected 'detail' key in error body, got {list(body.keys())}"
+        assert (
+            "File not found" in body["detail"]
+        ), f"Expected 'File not found' in detail, got '{body['detail']}'"
 
     def test_check_ingestion_path_collision(self, client, populated_db, tmp_path):
         """Path that exists in DB returns ALREADY_EXISTS with PATH match and full song data."""
@@ -98,67 +98,67 @@ class TestIngestionApi:
         resp = client.post(
             "/api/v1/catalog/ingest/check", json={"file_path": target_path}
         )
-        assert resp.status_code == 200, (
-            f"Expected 200 for path collision, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 200
+        ), f"Expected 200 for path collision, got {resp.status_code}"
 
         data = resp.json()
 
         # Exhaustive field assertions on IngestionReportView
-        assert set(data.keys()) == EXPECTED_INGESTION_FIELDS, (
-            f"Expected response keys {EXPECTED_INGESTION_FIELDS}, got {set(data.keys())}"
-        )
-        assert data["status"] == "ALREADY_EXISTS", (
-            f"Expected status 'ALREADY_EXISTS', got '{data['status']}'"
-        )
-        assert data["match_type"] == "PATH", (
-            f"Expected match_type 'PATH', got '{data['match_type']}'"
-        )
-        assert data["message"] is not None, (
-            "Expected a non-None message for PATH collision"
-        )
-        assert isinstance(data["message"], str), (
-            f"Expected message to be str, got {type(data['message'])}"
-        )
-        assert "collision" in data["message"].lower(), (
-            f"Expected 'collision' in message, got '{data['message']}'"
-        )
+        assert (
+            set(data.keys()) == EXPECTED_INGESTION_FIELDS
+        ), f"Expected response keys {EXPECTED_INGESTION_FIELDS}, got {set(data.keys())}"
+        assert (
+            data["status"] == "ALREADY_EXISTS"
+        ), f"Expected status 'ALREADY_EXISTS', got '{data['status']}'"
+        assert (
+            data["match_type"] == "PATH"
+        ), f"Expected match_type 'PATH', got '{data['match_type']}'"
+        assert (
+            data["message"] is not None
+        ), "Expected a non-None message for PATH collision"
+        assert isinstance(
+            data["message"], str
+        ), f"Expected message to be str, got {type(data['message'])}"
+        assert (
+            "collision" in data["message"].lower()
+        ), f"Expected 'collision' in message, got '{data['message']}'"
 
         # Song must be present and have source_path matching the request
-        assert data["song"] is not None, (
-            "Expected song object in PATH collision response"
-        )
+        assert (
+            data["song"] is not None
+        ), "Expected song object in PATH collision response"
         song = data["song"]
-        assert "source_path" in song, (
-            f"Expected 'source_path' in song, got keys: {list(song.keys())}"
-        )
-        assert song["source_path"] == target_path, (
-            f"Expected song source_path '{target_path}', got '{song['source_path']}'"
-        )
+        assert (
+            "source_path" in song
+        ), f"Expected 'source_path' in song, got keys: {list(song.keys())}"
+        assert (
+            song["source_path"] == target_path
+        ), f"Expected song source_path '{target_path}', got '{song['source_path']}'"
         assert "id" in song, f"Expected 'id' in song, got keys: {list(song.keys())}"
         assert song["id"] is not None, "Expected song.id to be non-None"
 
     def test_check_ingestion_missing_field(self, client):
         """Missing file_path field returns 422 validation error."""
         resp = client.post("/api/v1/catalog/ingest/check", json={})
-        assert resp.status_code == 422, (
-            f"Expected 422 for missing field, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for missing field, got {resp.status_code}"
         body = resp.json()
-        assert "detail" in body, (
-            f"Expected 'detail' key in validation error body, got {list(body.keys())}"
-        )
+        assert (
+            "detail" in body
+        ), f"Expected 'detail' key in validation error body, got {list(body.keys())}"
 
     def test_check_ingestion_empty_path(self, client):
         """Empty string path returns 400 because no file exists at empty path."""
         resp = client.post("/api/v1/catalog/ingest/check", json={"file_path": ""})
-        assert resp.status_code == 400, (
-            f"Expected 400 for empty path, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"Expected 400 for empty path, got {resp.status_code}"
         body = resp.json()
-        assert "detail" in body, (
-            f"Expected 'detail' key in error body, got {list(body.keys())}"
-        )
+        assert (
+            "detail" in body
+        ), f"Expected 'detail' key in error body, got {list(body.keys())}"
 
 
 # ========================================
@@ -182,14 +182,14 @@ class TestBatchUploadApi:
     def test_no_files_uploaded_returns_422(self, client):
         """Uploading zero files returns 422 validation error."""
         resp = client.post("/api/v1/ingest/upload", files=[])
-        assert resp.status_code == 422, (
-            f"Expected 422 for no files, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for no files, got {resp.status_code}"
 
         body = resp.json()
-        assert "detail" in body, (
-            f"Expected 'detail' in error response, got {list(body.keys())}"
-        )
+        assert (
+            "detail" in body
+        ), f"Expected 'detail' in error response, got {list(body.keys())}"
 
     def test_invalid_extension_files_returns_400(self, client, tmp_path):
         """Uploading only non-.mp3 files returns 400."""
@@ -202,14 +202,14 @@ class TestBatchUploadApi:
                 files=[("files", ("test.txt", f, "text/plain"))],
             )
 
-        assert resp.status_code == 400, (
-            f"Expected 400 for invalid extension, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 400
+        ), f"Expected 400 for invalid extension, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
-        assert "No valid audio files" in body["detail"], (
-            f"Expected rejection message, got '{body['detail']}'"
-        )
+        assert (
+            "No valid audio files" in body["detail"]
+        ), f"Expected rejection message, got '{body['detail']}'"
 
     def test_batch_report_structure(self, client, tmp_path):
         """Valid batch upload returns BatchIngestReport with all required fields."""
@@ -227,17 +227,17 @@ class TestBatchUploadApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         data = collect_upload_stream(resp)
-        assert set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS, (
-            f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
-        )
+        assert (
+            set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS
+        ), f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
         assert isinstance(data["total_files"], int)
         assert isinstance(data["ingested"], int)
         assert isinstance(data["duplicates"], int)
         assert isinstance(data["errors"], int)
         assert isinstance(data["results"], list)
-        assert data["total_files"] >= 1, (
-            f"Expected at least 1 total_file, got {data['total_files']}"
-        )
+        assert (
+            data["total_files"] >= 1
+        ), f"Expected at least 1 total_file, got {data['total_files']}"
 
     def test_mixed_valid_invalid_files_filters_correctly(self, client, tmp_path):
         """Mix of .mp3 and .txt files only processes .mp3 files."""
@@ -267,9 +267,9 @@ class TestBatchUploadApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         data = collect_upload_stream(resp)
-        assert data["total_files"] == 2, (
-            f"Expected 2 files processed, got {data['total_files']}"
-        )
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 files processed, got {data['total_files']}"
 
 
 class TestScanFolderApi:
@@ -282,14 +282,14 @@ class TestScanFolderApi:
             json={"folder_path": "/absolutely/does/not/exist", "recursive": True},
         )
 
-        assert resp.status_code == 404, (
-            f"Expected 404 for nonexistent folder, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 for nonexistent folder, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
-        assert "No audio files found" in body["detail"], (
-            f"Expected rejection message, got '{body['detail']}'"
-        )
+        assert (
+            "No audio files found" in body["detail"]
+        ), f"Expected rejection message, got '{body['detail']}'"
 
     def test_empty_folder_returns_404(self, client, tmp_path):
         """Scanning empty folder returns 404."""
@@ -301,9 +301,9 @@ class TestScanFolderApi:
             json={"folder_path": str(empty_dir), "recursive": True},
         )
 
-        assert resp.status_code == 404, (
-            f"Expected 404 for empty folder, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 404
+        ), f"Expected 404 for empty folder, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in error response"
 
@@ -311,9 +311,9 @@ class TestScanFolderApi:
         """Missing folder_path field returns 422 validation error."""
         resp = client.post("/api/v1/ingest/scan-folder", json={"recursive": True})
 
-        assert resp.status_code == 422, (
-            f"Expected 422 for missing field, got {resp.status_code}"
-        )
+        assert (
+            resp.status_code == 422
+        ), f"Expected 422 for missing field, got {resp.status_code}"
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in validation error"
 
@@ -333,14 +333,14 @@ class TestScanFolderApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
         data = resp.json()
-        assert set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS, (
-            f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
-        )
+        assert (
+            set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS
+        ), f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
 
         # Should have found 2 files
-        assert data["total_files"] == 2, (
-            f"Expected 2 total_files, got {data['total_files']}"
-        )
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 total_files, got {data['total_files']}"
 
     def test_recursive_false_only_scans_top_level(self, client, tmp_path):
         """recursive=false only processes top-level files."""
@@ -361,9 +361,9 @@ class TestScanFolderApi:
         data = resp.json()
 
         # Should only find top.mp3 (not nested.mp3)
-        assert data["total_files"] == 1, (
-            f"Expected 1 file (non-recursive), got {data['total_files']}"
-        )
+        assert (
+            data["total_files"] == 1
+        ), f"Expected 1 file (non-recursive), got {data['total_files']}"
 
     def test_recursive_true_scans_subdirectories(self, client, tmp_path):
         """recursive=true processes all subdirectories."""
@@ -384,9 +384,9 @@ class TestScanFolderApi:
         data = resp.json()
 
         # Should find both files
-        assert data["total_files"] == 2, (
-            f"Expected 2 files (recursive), got {data['total_files']}"
-        )
+        assert (
+            data["total_files"] == 2
+        ), f"Expected 2 files (recursive), got {data['total_files']}"
 
 
 # ========================================
@@ -420,9 +420,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert isinstance(data, list), f"Expected list, got {type(data)}"
-        assert len(data) >= 1, (
-            f"Expected at least one item for status=3 song, got {data}"
-        )
+        assert (
+            len(data) >= 1
+        ), f"Expected at least one item for status=3 song, got {data}"
 
     def test_each_item_has_pending_convert_status(self, client, populated_db):
         """Every item returned must have status='PENDING_CONVERT'."""
@@ -437,9 +437,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         for item in data:
-            assert item.get("status") == "PENDING_CONVERT", (
-                f"Expected status='PENDING_CONVERT', got '{item.get('status')}'"
-            )
+            assert (
+                item.get("status") == "PENDING_CONVERT"
+            ), f"Expected status='PENDING_CONVERT', got '{item.get('status')}'"
 
     def test_each_item_has_required_shape(self, client, populated_db):
         """Each result item must have status, staged_path, and song keys."""
@@ -474,9 +474,9 @@ class TestPendingConvertApi:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         song_ids = [item["song"]["id"] for item in data if item.get("song")]
-        assert 1 not in song_ids, (
-            f"Soft-deleted song 1 should not appear in pending-convert, got ids={song_ids}"
-        )
+        assert (
+            1 not in song_ids
+        ), f"Soft-deleted song 1 should not appear in pending-convert, got ids={song_ids}"
 
 
 # ========================================
@@ -502,12 +502,12 @@ class TestConvertWavApi:
         resp = client.post(f"/api/v1/ingest/convert-wav?staged_path={wav_path}")
         assert resp.status_code == 200, f"Expected 200 envelope, got {resp.status_code}"
         data = resp.json()
-        assert data.get("status") == "ERROR", (
-            f"Expected status='ERROR' for unknown path, got '{data.get('status')}'"
-        )
-        assert "message" in data, (
-            f"Expected 'message' key in error response, got {data}"
-        )
-        assert "No DB record" in data["message"], (
-            f"Expected 'No DB record' in message, got '{data['message']}'"
-        )
+        assert (
+            data.get("status") == "ERROR"
+        ), f"Expected status='ERROR' for unknown path, got '{data.get('status')}'"
+        assert (
+            "message" in data
+        ), f"Expected 'message' key in error response, got {data}"
+        assert (
+            "No DB record" in data["message"]
+        ), f"Expected 'No DB record' in message, got '{data['message']}'"

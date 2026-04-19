@@ -248,7 +248,9 @@ class IngestionService:
             return check
 
         song = check["song"]
-        song = song.model_copy(update={"processing_status": ProcessingStatus.CONVERTING})
+        song = song.model_copy(
+            update={"processing_status": ProcessingStatus.CONVERTING}
+        )
         conn = self._song_repo.get_connection()
         try:
             new_id = self._song_repo.insert(song, conn)
@@ -392,7 +394,9 @@ class IngestionService:
             new_id = self._song_repo.insert(song, conn)
             hydrated_song = song.model_copy(update={"id": new_id})
             self._enrich_metadata(new_id, conn)
-            hydrated_song = hydrated_song.model_copy(update={"processing_status": ProcessingStatus.NEEDS_REVIEW})
+            hydrated_song = hydrated_song.model_copy(
+                update={"processing_status": ProcessingStatus.NEEDS_REVIEW}
+            )
             conn.commit()
             logger.info(
                 f"[IngestionService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
@@ -436,7 +440,9 @@ class IngestionService:
             return {"status": "ERROR", "message": "Staged file not found"}
 
         is_wav = Path(staged_path).suffix.lower() == ".wav"
-        target_status = ProcessingStatus.CONVERTING if is_wav else ProcessingStatus.NEEDS_REVIEW
+        target_status = (
+            ProcessingStatus.CONVERTING if is_wav else ProcessingStatus.NEEDS_REVIEW
+        )
 
         conn = self._song_repo.get_connection()
         try:
@@ -551,4 +557,6 @@ class IngestionService:
     def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (SIMULATED)."""
         logger.debug(f"[IngestionService] -> _enrich_metadata(id={song_id})")
-        self._song_repo.update_scalars(song_id, {"processing_status": ProcessingStatus.NEEDS_REVIEW}, conn)
+        self._song_repo.update_scalars(
+            song_id, {"processing_status": ProcessingStatus.NEEDS_REVIEW}, conn
+        )

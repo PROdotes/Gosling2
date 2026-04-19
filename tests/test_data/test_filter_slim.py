@@ -257,23 +257,23 @@ class TestFilterSlimStatus:
         ids = {r["SourceID"] for r in rows}
         # Song 7: no credits, no publisher, no genre -> missing data
         # Song 9: no credits, no publisher (has genres but no publisher/performer credit)
-        assert 7 in ids, (
-            f"Song 7 (no credits/publisher/genre) not in missing_data: {ids}"
-        )
+        assert (
+            7 in ids
+        ), f"Song 7 (no credits/publisher/genre) not in missing_data: {ids}"
         assert 9 in ids, f"Song 9 (no credits/publisher) not in missing_data: {ids}"
         # Done songs must NOT appear
-        assert not ids.intersection({1, 2, 3, 4, 5, 6, 8}), (
-            f"Done songs leaked into missing_data: {ids}"
-        )
+        assert not ids.intersection(
+            {1, 2, 3, 4, 5, 6, 8}
+        ), f"Done songs leaked into missing_data: {ids}"
 
     def test_ready_to_finalize_songs_have_no_blockers(self, repo):
         # In populated_db, no not-done song has all required fields → this should be empty
         rows = repo.filter_slim(statuses=["ready_to_finalize"])
         ids = {r["SourceID"] for r in rows}
         # Done songs must not appear
-        assert not ids.intersection({1, 2, 3, 4, 5, 6, 8}), (
-            f"Done songs in ready_to_finalize: {ids}"
-        )
+        assert not ids.intersection(
+            {1, 2, 3, 4, 5, 6, 8}
+        ), f"Done songs in ready_to_finalize: {ids}"
 
 
 # ---------------------------------------------------------------------------
