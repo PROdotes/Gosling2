@@ -498,13 +498,13 @@ export class FilterSidebarHandler {
         }
 
         sidebar.innerHTML = `
-            <div class="filter-sidebar-controls">
+            <div class="filter-header">
                 <button id="filter-expand-all" class="filter-ctrl-btn" title="Expand all">ALL +</button>
                 <button id="filter-collapse-all" class="filter-ctrl-btn" title="Collapse all">ALL −</button>
                 <button id="filter-mode-all" class="filter-ctrl-btn${this._mode === "ALL" ? " active" : ""}" title="AND logic">ALL</button>
                 <button id="filter-mode-any" class="filter-ctrl-btn${this._mode === "ANY" ? " active" : ""}" title="OR logic">ANY</button>
             </div>
-            <div class="filter-sidebar-sections">
+            <div class="filter-sections">
                 ${sectionsHtml}
             </div>
             <div class="filter-active-chips">

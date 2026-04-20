@@ -130,6 +130,7 @@ class MediaSourceRepository(BaseRepository):
                 SELECT
                     ms.SourceID,
                     ms.MediaName,
+                    ms.SourcePath,
                     ms.SourceDuration,
                     ms.IsDeleted,
                     s.RecordingYear,
@@ -143,6 +144,7 @@ class MediaSourceRepository(BaseRepository):
             return {
                 "id": r["SourceID"],
                 "title": r["MediaName"],
+                "source_path": r["SourcePath"],
                 "duration_s": float(r["SourceDuration"] or 0),
                 "is_deleted": bool(r["IsDeleted"]),
                 "year": r["RecordingYear"],

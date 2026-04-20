@@ -409,8 +409,13 @@ async def get_staging_orphans():
         audio_hash = calculate_audio_hash(fpath)
         existing = service._song_repo.get_source_metadata_by_hash(audio_hash)
 
-        # If no record exists, OR if it's a soft-deleted ghost, it belongs in the Orphans section
-        if not existing or existing["is_deleted"]:
+        # Orphan if: no DB record, soft-deleted ghost, or DB record points elsewhere (leftover conflict file)
+        is_leftover = (
+            existing
+            and not existing["is_deleted"]
+            and os.path.normpath(existing["source_path"]) != os.path.normpath(fpath)
+        )
+        if not existing or existing["is_deleted"] or is_leftover:
             orphans.append(
                 {
                     "filename": fname,

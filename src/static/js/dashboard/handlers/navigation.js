@@ -68,6 +68,9 @@ export class NavigationHandler {
     async handleRefreshResults(actionTarget) {
         const state = this.ctx.getState();
         actionTarget.classList.add("spinning");
+        await api.resetIngestStatus().catch((e) =>
+            console.error("Ingest reset failed", e),
+        );
         await Promise.all([this.ctx.reloadFilters?.(), this.ctx.syncIngestBadges?.()]);
         this.ctx.performSearch?.(state.currentQuery).finally(() => {
             actionTarget.classList.remove("spinning");

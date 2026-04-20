@@ -37,6 +37,7 @@ import {
     updatePublisher,
     updateTag,
     getIngestStatus,
+    resetIngestStatus,
     readNdjsonStream,
     uploadFiles,
 } from "./api.js";
@@ -292,9 +293,8 @@ const ctx = {
     openSelectedResult,
     updateSelection,
     updateIngestBadges,
-    updateCachedIngestResult(path, patch) {
-        const state = getState();
-        const idx = state.cachedIngestResults.findIndex(r => r.path === path);
+    updateCachedIngestResult(stagedPath, patch) {
+        const idx = state.cachedIngestResults.findIndex(r => r.stagedPath === stagedPath);
         if (idx >= 0) {
             state.cachedIngestResults[idx].result = {
                 ...state.cachedIngestResults[idx].result,
@@ -470,13 +470,12 @@ async function switchMode(mode) {
     state.currentQuery = "";
     state.selectedIndex = -1;
 
-    // Aligned to Blueprint: Entering Ingest mode clears the session counters
-    if (mode === "ingest" && state.pendingCount > 0) {
+    if (mode === "ingest") {
         try {
-            const status = await getIngestStatus();
-            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+            await resetIngestStatus();
+            updateIngestBadges({ success: 0, action: 0, pending: 0 });
         } catch (e) {
-            console.error("Failed to sync ingest status:", e);
+            console.error("Failed to reset ingest status:", e);
         }
     }
     elements.searchInput.value = "";

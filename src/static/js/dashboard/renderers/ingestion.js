@@ -78,6 +78,9 @@ export async function renderIngestionPanel(ctx) {
         state.ingestTasks = [];
     }
 
+    // Already initialized — don't re-render or re-attach listeners
+    if (document.getElementById("ingest-drop-zone")) return;
+
     const DROP_ZONE_ID = "ingest-drop-zone";
     let downloadsFolder = "";
     let allowedExtensions = [];
@@ -158,7 +161,6 @@ export async function renderIngestionPanel(ctx) {
     );
     setupBulkParseButton("ingest-bulk-parse-btn", RESULTS_LIST_ID, ctx);
     setupOrphanSection("ingest-orphan-section");
-    setupResultsListDelegation(RESULTS_LIST_ID, ctx);
 
     // Restore cached tasks/results
     if (state.cachedIngestResults && state.cachedIngestResults.length > 0) {
@@ -466,7 +468,7 @@ function appendResult(resultsId, result, path, ctx) {
 
     // Persist to cache
     if (state.cachedIngestResults) {
-        state.cachedIngestResults.unshift({ isBatch: false, result, path });
+        state.cachedIngestResults.unshift({ isBatch: false, result, path, stagedPath: result.staged_path || null });
     }
 
     _appendResultToDom(list, result, path, false);
@@ -721,78 +723,3 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
     });
 }
 
-/**
- * Handles clicks on the results list via delegation for performance and stability.
- */
-function setupResultsListDelegation(resultsId, ctx) {
-    const list = document.getElementById(resultsId);
-    if (!list) return;
-
-    list.addEventListener("click", async (e) => {
-        const btn = e.target.closest("button");
-        if (!btn || !btn.dataset.action) return;
-
-        const action = btn.dataset.action;
-        const path = btn.dataset.stagedPath;
-
-        if (action === "resolve-conflict") {
-            const ghostId = btn.dataset.ghostId;
-            btn.disabled = true;
-            btn.textContent = "Reactivating...";
-            try {
-                const res = await fetch(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(path)}`, {
-                    method: "POST"
-                });
-                if (!res.ok) throw new Error("Reactivation failed");
-                const data = await res.json();
-                
-                // Update the card UI and state
-                const card = btn.closest(".result-card");
-                if (card) {
-                    // Re-render the specific card or just update it
-                    const newResult = { ...data, status: "INGESTED" };
-                    card.replaceWith(createResultCard(newResult, path));
-                    
-                    // Update cache
-                    ctx.updateCachedIngestResult?.(path, newResult);
-                }
-                showToast("Song reactivated successfully!", "success");
-                
-                // Sync badges
-                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
-            } catch (err) {
-                btn.disabled = false;
-                btn.textContent = "Re-ingest & Activate";
-                showToast(`Error: ${err.message}`, "error");
-            }
-        } else if (action === "convert-wav") {
-            btn.disabled = true;
-            btn.textContent = "Converting...";
-            try {
-                const res = await fetch(`/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(path)}`, {
-                    method: "POST"
-                });
-                if (!res.ok) throw new Error("Conversion failed");
-                const data = await res.json();
-
-                const card = btn.closest(".result-card");
-                if (card) {
-                    card.replaceWith(createResultCard(data, path));
-                    ctx.updateCachedIngestResult?.(path, data);
-                }
-                showToast("WAV converted and ingested!", "success");
-                
-                // Sync badges
-                fetch("/api/v1/ingest/status").then(r => r.json()).then(s => ctx.updateIngestBadges?.(s));
-            } catch (err) {
-                btn.disabled = false;
-                btn.textContent = "Convert & Ingest";
-                showToast(`Error: ${err.message}`, "error");
-            }
-        } else if (action === "navigate-search") {
-            const mode = btn.dataset.mode || "songs";
-            const query = btn.dataset.query || "";
-            ctx.navigate(mode, query);
-        }
-    });
-}

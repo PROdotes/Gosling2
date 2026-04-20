@@ -117,7 +117,9 @@ class IngestionService:
 
     @classmethod
     def reset_session_status(cls):
-        """Reset the session counters."""
+        """Reset the session counters — only if no tasks are in flight."""
+        if cls._active_tasks:
+            return
         cls._session_success = 0
         cls._session_action = 0
 

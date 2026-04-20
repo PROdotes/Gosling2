@@ -250,6 +250,10 @@ export function getIngestStatus() {
     return fetchJson("/api/v1/ingest/status");
 }
 
+export function resetIngestStatus() {
+    return fetchJson("/api/v1/ingest/reset-status", { method: "POST" });
+}
+
 export function resolveConflict(ghostId, stagedPath) {
     return fetchJson(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
         method: "POST",
