@@ -21,8 +21,12 @@ export async function orchestrateScrubber(ctx, songId, title) {
     openScrubberModal(songId, title, {
         autoPlay,
         onClose: () => {
-            const s = ctx.getState();
-            if (s.activeSong && s.currentMode === "songs" && ctx.refreshActiveSongV2) {
+            const s = state;
+            if (
+                s.activeSong &&
+                s.currentMode === "songs" &&
+                ctx.refreshActiveSongV2
+            ) {
                 ctx.refreshActiveSongV2(s.activeSong.id);
             }
         },

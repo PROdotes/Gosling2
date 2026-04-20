@@ -71,16 +71,14 @@ export function buildNavigateAttrs(mode, query) {
     return `data-action="navigate-search" data-mode="${escapeHtml(mode)}" data-query="${escapeHtml(String(query || "").trim())}"`;
 }
 
-export function renderModuleToolbar(ctx, sortControlsHtml = "") {
-    const filterVisible = ctx.handlers?.filterSidebar?._sidebarVisible || false;
-    const filterActiveClass = filterVisible ? " active" : "";
+export function renderModuleToolbar(_ctx, sortControlsHtml = "") {
     const separator = sortControlsHtml
         ? '<div class="toolbar-separator"></div>'
         : "";
 
     return `
         <div class="sort-controls">
-            <button id="filter-toggle-btn" class="filter-toggle-btn${filterActiveClass}" data-action="toggle-filter-sidebar">Filter</button>
+            <button id="filter-toggle-btn" class="filter-toggle-btn" data-action="toggle-filter-sidebar">Filter</button>
             ${separator}
             ${sortControlsHtml}
         </div>

@@ -112,8 +112,8 @@ export function activateInlineEdit(
 
     input.addEventListener("blur", () => {
         if (hasError) return;
-        setTimeout(() => {
+        requestAnimationFrame(() => {
             if (document.contains(input)) commitEdit();
-        }, 100);
+        });
     });
 }

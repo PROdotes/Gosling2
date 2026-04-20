@@ -18,7 +18,10 @@ function loadSavedFilterState() {
 
 function saveFilterState(active, liveOnly, mode, sidebarVisible) {
     try {
-        localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ active, liveOnly, mode, sidebarVisible }));
+        localStorage.setItem(
+            FILTER_STORAGE_KEY,
+            JSON.stringify({ active, liveOnly, mode, sidebarVisible }),
+        );
     } catch {}
 }
 
@@ -48,7 +51,8 @@ export class FilterSidebarHandler {
             tag_categories: {},
         };
         this._liveOnly = saved?.liveOnly ?? false;
-        this._mode = saved?.mode ?? "ALL";
+        this._mode =
+            saved?.mode === "ALL" || saved?.mode === "ANY" ? saved.mode : "ALL";
         this._sidebarVisible = saved?.sidebarVisible ?? false;
 
         // Restore sidebar visibility immediately (before async load)
@@ -255,7 +259,12 @@ export class FilterSidebarHandler {
     // ─── APPLY ────────────────────────────────────────────────────────────────
 
     _applyFilters() {
-        saveFilterState(this._active, this._liveOnly, this._mode, this._sidebarVisible);
+        saveFilterState(
+            this._active,
+            this._liveOnly,
+            this._mode,
+            this._sidebarVisible,
+        );
         if (!this.hasActiveFilters()) {
             // No filters — hand back to normal search
             this.ctx.onFilterCleared?.();

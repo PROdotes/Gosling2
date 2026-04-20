@@ -167,9 +167,14 @@ export async function renderIngestionPanel(ctx) {
         const list = document.getElementById(RESULTS_LIST_ID);
         if (list) {
             // Cache is newest-first, so appendChild maintains that visual order
-            state.cachedIngestResults.forEach(cached => {
+            state.cachedIngestResults.forEach((cached) => {
                 if (cached.isBatch) {
-                    _appendBatchToDom(list, cached.report, cached.summary, true);
+                    _appendBatchToDom(
+                        list,
+                        cached.report,
+                        cached.summary,
+                        true,
+                    );
                 } else {
                     _appendResultToDom(list, cached.result, cached.path, true);
                 }
@@ -178,15 +183,17 @@ export async function renderIngestionPanel(ctx) {
     }
 
     // Load any WAVs that were uploaded but not yet converted (status=3)
-    getPendingConvert().then((pending) => {
-        if (!pending || pending.length === 0) return;
-        const list = document.getElementById(RESULTS_LIST_ID);
-        if (!list) return;
-        pending.forEach((result) => {
-            const path = result.staged_path || result.source_path;
-            list.prepend(createResultCard(result, path));
-        });
-    }).catch(() => { });  // silently ignore on load failure
+    getPendingConvert()
+        .then((pending) => {
+            if (!pending || pending.length === 0) return;
+            const list = document.getElementById(RESULTS_LIST_ID);
+            if (!list) return;
+            pending.forEach((result) => {
+                const path = result.staged_path || result.source_path;
+                list.prepend(createResultCard(result, path));
+            });
+        })
+        .catch(() => {}); // silently ignore on load failure
 }
 
 function setupOrphanSection(sectionId) {
@@ -330,15 +337,24 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
             if (!response.ok) throw new Error("Upload failed");
 
             await readNdjsonStream(response, (update) => {
-                if (update.error) { showToast(update.error, "error"); return; }
-                ctx.updateIngestBadges?.({ success: update.success, action: update.action, pending: update.pending });
+                if (update.error) {
+                    showToast(update.error, "error");
+                    return;
+                }
+                ctx.updateIngestBadges?.({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                });
                 const res = update.last_result;
                 if (res) {
-                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
+                    const fileName =
+                        basename(res.song?.source_path) ||
+                        basename(res.staged_path) ||
+                        "Unknown";
                     appendResult(resultsId, res, fileName, ctx);
                 }
             });
-
         } catch (error) {
             console.error("Drop error:", error);
             appendResult(
@@ -387,8 +403,6 @@ function setupInputHandlers(inputId, btnId, resultsId, ctx) {
     });
 }
 
-
-
 function setupClearButton(btnId, resultsId, ctx) {
     const btn = document.getElementById(btnId);
     const list = document.getElementById(resultsId);
@@ -426,7 +440,10 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
 
             // Show individual file results
             for (const fileResult of result.results) {
-                const fileName = basename(fileResult.song?.source_path) || basename(fileResult.staged_path) || "Unknown";
+                const fileName =
+                    basename(fileResult.song?.source_path) ||
+                    basename(fileResult.staged_path) ||
+                    "Unknown";
                 appendResult(resultsId, fileResult, fileName, ctx);
             }
         } catch (error) {
@@ -468,7 +485,12 @@ function appendResult(resultsId, result, path, ctx) {
 
     // Persist to cache
     if (state.cachedIngestResults) {
-        state.cachedIngestResults.unshift({ isBatch: false, result, path, stagedPath: result.staged_path || null });
+        state.cachedIngestResults.unshift({
+            isBatch: false,
+            result,
+            path,
+            stagedPath: result.staged_path || null,
+        });
     }
 
     _appendResultToDom(list, result, path, false);
@@ -490,7 +512,11 @@ function appendBatchSummary(resultsId, batchReport, summary, ctx) {
     // Persist to cache
     const state = ctx.getState();
     if (state.cachedIngestResults) {
-        state.cachedIngestResults.unshift({ isBatch: true, report: batchReport, summary });
+        state.cachedIngestResults.unshift({
+            isBatch: true,
+            report: batchReport,
+            summary,
+        });
     }
 
     _appendBatchToDom(list, batchReport, summary, false);
@@ -583,7 +609,10 @@ function createResultCard(result, path) {
     const title =
         status === "CONFLICT" && result.title
             ? result.title
-            : song?.media_name || song?.title || basename(result.staged_path) || "Unknown Title";
+            : song?.media_name ||
+              song?.title ||
+              basename(result.staged_path) ||
+              "Unknown Title";
     const artist = song?.display_artist || "-";
 
     // Helper to format duration (seconds to MM:SS)
@@ -605,9 +634,10 @@ function createResultCard(result, path) {
             <div class="detail-path">${escapeHtml(path)}</div>
             ${result.message && status === "ERROR" ? `<div class="muted-note" style="margin-top: 0.5rem; color: var(--danger);">${escapeHtml(result.message)}</div>` : ""}
 
-            ${status === "CONFLICT"
-            ? `
-                <div class="pending-convert-box">
+            ${
+                status === "CONFLICT"
+                    ? `
+                <div class="pending-convert-box" data-ghost-box>
                     <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: var(--accent-amber); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Existing Ghost Record (Soft-Deleted)</div>
                     <div style="display: grid; grid-template-columns: 70px 1fr; gap: 4px 8px; font-size: 12px;">
                         <div class="muted-note">ID:</div>
@@ -631,11 +661,12 @@ function createResultCard(result, path) {
                     </div>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "PENDING_CONVERT"
-            ? `
+            ${
+                status === "PENDING_CONVERT"
+                    ? `
                 <div class="pending-convert-box">
                     <div class="muted-note" style="font-size: 11px; margin-bottom: 8px; font-style: italic;">
                         This WAV file needs to be converted to MP3 before ingestion.
@@ -645,11 +676,12 @@ function createResultCard(result, path) {
                     </button>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "INGESTED"
-            ? `
+            ${
+                status === "INGESTED"
+                    ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
@@ -657,27 +689,29 @@ function createResultCard(result, path) {
                     <span class="muted-note">• UUID Staged</span>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
 
-            ${status === "NEW"
-            ? `
+            ${
+                status === "NEW"
+                    ? `
                 <div class="ingest-actions-row">
                     <span class="muted-note">Verified. Drop physical file to commit.</span>
                 </div>
             `
-            : ""
-        }
+                    : ""
+            }
         </div>
-        ${song
-            ? `
+        ${
+            song
+                ? `
             <div class="ingest-meta">
                 ${song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
                 ${song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
                 ${song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
             </div>
         `
-            : ""
+                : ""
         }
     `;
 
@@ -722,4 +756,3 @@ function setupBulkParseButton(btnId, resultsId, ctx) {
         });
     });
 }
-

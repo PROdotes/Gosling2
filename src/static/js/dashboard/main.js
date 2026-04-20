@@ -1,65 +1,32 @@
 import {
     ABORTED,
     abortAllSearches,
-    addSongCredit,
-    addSongPublisher,
-    addSongTag,
     fetchAppConfig,
     fetchId3Frames,
     fetchRoles,
     fetchValidationRules,
-    formatMetadataCase,
     getAcceptedFormats,
     getAlbumDetail,
     getArtistSongs,
-    getArtistTree,
     getAuditHistory,
     getCatalogSong,
+    getIngestStatus,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
-    getSongWebSearch,
-    getTagCategories,
-    getTagDetail,
-    getTagSongs,
     isAbortError,
-    patchSongScalars,
-    removeSongCredit,
-    removeSongPublisher,
-    removeSongTag,
+    readNdjsonStream,
+    resetIngestStatus,
     searchAlbums,
     searchArtists,
     searchPublishers,
     searchSongs,
     searchTags,
-    setPrimarySongTag,
-    setPublisherParent,
-    updatePublisher,
-    updateTag,
-    getIngestStatus,
-    resetIngestStatus,
-    readNdjsonStream,
     uploadFiles,
 } from "./api.js";
-import { openEditModal } from "./components/edit_modal.js";
-import { activateInlineEdit } from "./components/inline_editor.js";
-import { closeLinkModal, openLinkModal } from "./components/link_modal.js";
-import {
-    closeScrubberModal,
-    openScrubberModal,
-} from "./components/scrubber_modal.js";
-import {
-    closeSplitterModal,
-    openSplitterModal,
-} from "./components/splitter_modal.js";
-import {
-    closeSpotifyModal,
-    openSpotifyModal,
-} from "./components/spotify_modal.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {
     basename,
-    formatCountLabel,
     isModalOpen,
     renderEmptyState,
 } from "./components/utils.js";
@@ -67,8 +34,6 @@ import { FilterSidebarHandler } from "./handlers/filter_sidebar.js";
 import { NavigationHandler } from "./handlers/navigation.js";
 import { SongActionsHandler, updateSyncLed } from "./handlers/song_actions.js";
 import { WebSearchHandler } from "./handlers/web_search.js";
-import * as orch from "./orchestrator.js";
-import { renderSongEditorEmpty, renderSongEditorV2, renderSongEditorMultiSelect, renderActionSidebar, wireScalarInputs, wireChipInputs, wireDriftIndicators, wireAuditHistory } from "./renderers/song_editor.js";
 import {
     renderAlbumDetailComplete,
     renderAlbumDetailLoading,
@@ -86,8 +51,16 @@ import {
     renderPublishers as renderPublisherResults,
 } from "./renderers/publishers.js";
 import {
-    renderSongs,
-} from "./renderers/songs.js";
+    renderActionSidebar,
+    renderSongEditorEmpty,
+    renderSongEditorMultiSelect,
+    renderSongEditorV2,
+    wireAuditHistory,
+    wireChipInputs,
+    wireDriftIndicators,
+    wireScalarInputs,
+} from "./renderers/song_editor.js";
+import { renderSongs } from "./renderers/songs.js";
 import {
     renderTagDetailComplete,
     renderTagDetailLoading,
@@ -197,14 +170,16 @@ const ctx = {
             state.totalLibraryCount = count;
         } else if (state.totalLibraryCount === 0) {
             // Filters active on load — fetch unfiltered total in background
-            searchSongs("").then((items) => {
-                if (Array.isArray(items)) {
-                    state.totalLibraryCount = items.length;
-                    elements.totalCount.textContent = String(items.length);
-                    elements.totalCount.style.display = "";
-                    elements.statSep.style.display = "";
-                }
-            }).catch(() => { });
+            searchSongs("")
+                .then((items) => {
+                    if (Array.isArray(items)) {
+                        state.totalLibraryCount = items.length;
+                        elements.totalCount.textContent = String(items.length);
+                        elements.totalCount.style.display = "";
+                        elements.statSep.style.display = "";
+                    }
+                })
+                .catch(() => {});
         }
         const isFiltered =
             (state.currentQuery || filterSidebar.hasActiveFilters()) &&
@@ -235,14 +210,28 @@ const ctx = {
 
         // Sync chip inputs for properties changed via global actions
         if (state.chipHandles?.updateField) {
-            for (const field of ["performer", "composer", "lyricist", "producer", "publisher", "tags", "album"]) {
+            for (const field of [
+                "performer",
+                "composer",
+                "lyricist",
+                "producer",
+                "publisher",
+                "tags",
+                "album",
+            ]) {
                 state.chipHandles.updateField(field, fresh);
             }
         }
 
         // Sync scalar inputs (Title, Year, etc.)
         if (state.scalarHandles?.updateField) {
-            for (const field of ["media_name", "year", "bpm", "isrc", "notes"]) {
+            for (const field of [
+                "media_name",
+                "year",
+                "bpm",
+                "isrc",
+                "notes",
+            ]) {
                 state.scalarHandles.updateField(field, fresh[field]);
             }
         }
@@ -252,7 +241,11 @@ const ctx = {
     syncIngestBadges: async () => {
         try {
             const status = await getIngestStatus();
-            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+            updateIngestBadges({
+                success: status.success,
+                action: status.action,
+                pending: status.pending,
+            });
         } catch (e) {
             console.error("Ingest sync failed", e);
         }
@@ -294,15 +287,20 @@ const ctx = {
     updateSelection,
     updateIngestBadges,
     updateCachedIngestResult(stagedPath, patch) {
-        const idx = state.cachedIngestResults.findIndex(r => r.stagedPath === stagedPath);
+        const idx = state.cachedIngestResults.findIndex(
+            (r) =>
+                r.stagedPath === stagedPath ||
+                (r.stagedPath === null && r.path === stagedPath),
+        );
         if (idx >= 0) {
             state.cachedIngestResults[idx].result = {
                 ...state.cachedIngestResults[idx].result,
-                ...patch
+                ...patch,
             };
         }
     },
     abortDetailRequest,
+    getActiveDetailKey: () => activeDetailKey,
 };
 
 const songActions = new SongActionsHandler(ctx);
@@ -387,7 +385,9 @@ function syncModeUi() {
 
 function updateSelection() {
     const songListPanel = document.getElementById("song-list-panel");
-    const songsWorkspaceActive = document.getElementById("songs-workspace")?.classList.contains("active");
+    const songsWorkspaceActive = document
+        .getElementById("songs-workspace")
+        ?.classList.contains("active");
     if (songListPanel && songsWorkspaceActive) {
         const rows = songListPanel.querySelectorAll("[data-selectable='true']");
         rows.forEach((row, index) => {
@@ -470,7 +470,7 @@ async function switchMode(mode) {
     state.currentQuery = "";
     state.selectedIndex = -1;
 
-    if (mode === "ingest") {
+    if (mode === "ingest" && state.pendingCount === 0) {
         try {
             await resetIngestStatus();
             updateIngestBadges({ success: 0, action: 0, pending: 0 });
@@ -501,8 +501,6 @@ function navigate(mode, query = "") {
     performSearch(state.currentQuery);
     elements.searchInput.focus();
 }
-
-
 
 async function openAlbumDetail(album) {
     const request = beginDetailRequest("albums", album.id);
@@ -642,8 +640,10 @@ function refreshActiveDetail() {
     const list = getActiveList();
     const item = list.find((i) => String(i.id) === id);
     if (!item) return;
-    if (mode === "songs") { ctx.refreshActiveSongV2(id); return; }
-    else if (mode === "albums") openAlbumDetail(item);
+    if (mode === "songs") {
+        ctx.refreshActiveSongV2(id);
+        return;
+    } else if (mode === "albums") openAlbumDetail(item);
     else if (mode === "artists") openArtistDetail(item);
     else if (mode === "tags") openTagDetail(item);
     else if (mode === "publishers") openPublisherDetail(item);
@@ -656,9 +656,17 @@ async function openSelectedResult(index) {
         return;
     }
 
-    if (state.currentMode === "songs" && document.getElementById("songs-workspace")?.classList.contains("active")) {
+    if (
+        state.currentMode === "songs" &&
+        document.getElementById("songs-workspace")?.classList.contains("active")
+    ) {
         const request = beginDetailRequest("songs", selected.id);
-        const result = await getCatalogSong(selected.id, { signal: request.signal }).catch((e) => { if (!isAbortError(e)) throw e; return null; });
+        const result = await getCatalogSong(selected.id, {
+            signal: request.signal,
+        }).catch((e) => {
+            if (!isAbortError(e)) throw e;
+            return null;
+        });
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
         renderSongEditorV2(result, null);
@@ -668,16 +676,22 @@ async function openSelectedResult(index) {
             defaultSearchEngine: state.defaultSearchEngine,
         });
         updateSyncLed(result.id);
-        state.scalarHandles = wireScalarInputs(result, state.validationRules, () => {
-            ctx.refreshActiveSongV2(result.id);
-        });
+        state.scalarHandles = wireScalarInputs(
+            result,
+            state.validationRules,
+            () => {
+                ctx.refreshActiveSongV2(result.id);
+            },
+        );
         state.chipHandles = wireChipInputs(
             result,
             () => {
                 ctx.refreshActiveSongV2(result.id);
             },
             async ({ songId, text, role, creditId }) => {
-                const { openSplitterModal } = await import("./components/splitter_modal.js");
+                const { openSplitterModal } = await import(
+                    "./components/splitter_modal.js"
+                );
                 openSplitterModal({
                     songId,
                     text,
@@ -689,7 +703,7 @@ async function openSelectedResult(index) {
                         const fresh = await getCatalogSong(songId);
                         state.activeSong = fresh;
                         state.chipHandles?.updateField(role, fresh);
-                        // Fixed: wireDriftIndicators is now called in refreshActiveSongV2 path, 
+                        // Fixed: wireDriftIndicators is now called in refreshActiveSongV2 path,
                         // but keeping here for explicit confirmation logic.
                         wireDriftIndicators(fresh, state.activeSongFile);
                         renderActionSidebar(fresh, {
@@ -794,32 +808,55 @@ async function setupHeaderDropZone() {
         const items = e.dataTransfer?.items;
         if (!items || items.length === 0) return;
 
-        const allFiles = await collectFilesFromItems(items, state.allowedExtensions);
+        const allFiles = await collectFilesFromItems(
+            items,
+            state.allowedExtensions,
+        );
         if (allFiles.length === 0) {
             showToast("No valid audio files found in drop", "error", 3000);
             return;
         }
 
         const formData = new FormData();
-        allFiles.forEach(f => formData.append("files", f));
+        allFiles.forEach((f) => formData.append("files", f));
 
         try {
             const response = await uploadFiles(allFiles);
             if (!response.ok) throw new Error("Upload failed");
 
             await readNdjsonStream(response, (update) => {
-                if (update.error) { showToast(update.error, "error"); return; }
+                if (update.error) {
+                    showToast(update.error, "error");
+                    return;
+                }
 
-                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending });
+                updateIngestBadges({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                });
 
                 const res = update.last_result;
                 if (res) {
-                    const title = res.song?.media_name || res.title || basename(res.staged_path) || "Unknown File";
-                    if (res.status === "INGESTED") showToast(`Ingested: ${title}`, "success", 2000);
-                    else if (res.status === "ALREADY_EXISTS") showToast(`Already exists: ${title}`, "info", 2000);
-                    else if (res.status === "CONFLICT") showToast(`Conflict: ${title}`, "error", 5000);
-                    else if (res.status === "ERROR") showToast(`Error: ${res.message || title}`, "error", 5000);
-                    else if (res.status === "PENDING_CONVERT") showToast(`WAV Staged: ${title}`, "info", 3000);
+                    const title =
+                        res.song?.media_name ||
+                        res.title ||
+                        basename(res.staged_path) ||
+                        "Unknown File";
+                    if (res.status === "INGESTED")
+                        showToast(`Ingested: ${title}`, "success", 2000);
+                    else if (res.status === "ALREADY_EXISTS")
+                        showToast(`Already exists: ${title}`, "info", 2000);
+                    else if (res.status === "CONFLICT")
+                        showToast(`Conflict: ${title}`, "error", 5000);
+                    else if (res.status === "ERROR")
+                        showToast(
+                            `Error: ${res.message || title}`,
+                            "error",
+                            5000,
+                        );
+                    else if (res.status === "PENDING_CONVERT")
+                        showToast(`WAV Staged: ${title}`, "info", 3000);
                 }
             });
         } catch (error) {
@@ -833,7 +870,9 @@ document.addEventListener("checkchange", () => {
     if (state.currentMode !== "songs") return;
     const panel = document.getElementById("song-list-panel");
     if (!panel) return;
-    const checked = panel.querySelectorAll(".col-check input[type=checkbox]:checked");
+    const checked = panel.querySelectorAll(
+        ".col-check input[type=checkbox]:checked",
+    );
     if (checked.length > 1) {
         renderSongEditorMultiSelect(checked.length);
     } else if (checked.length === 0) {
@@ -927,7 +966,11 @@ filterLoadPromise.then(() => {
     try {
         const status = await getIngestStatus();
         if (status.pending > 0) {
-            updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+            updateIngestBadges({
+                success: status.success,
+                action: status.action,
+                pending: status.pending,
+            });
         }
     } catch (e) {
         console.error("Initial ingest sync failed", e);

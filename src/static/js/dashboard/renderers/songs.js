@@ -105,8 +105,6 @@ function clickableM2MRow(
     `;
 }
 
-// TODO: Migrate to backend sorting when expanding the frontend dashboard (Router, Service, and Repository ORDER BY support).
-// State for frontend sorting
 let currentSongs = [];
 const SORT_STORAGE_KEY = "gosling_song_sort";
 function loadSavedSort() {
@@ -184,15 +182,25 @@ function renderSongRows(ctx, songs) {
 
     panel.innerHTML = songs
         .map((song, index) => {
-            const title = escapeHtml(song.title || song.media_name || "Untitled");
+            const title = escapeHtml(
+                song.title || song.media_name || "Untitled",
+            );
             const artist = escapeHtml(song.display_artist || "Unknown Artist");
             const blockerLabels = {
-                media_name: "TTL", year: "YR", performers: "ART",
-                composers: "COMP", genres: "GNR", publishers: "PUB",
-                albums: "ALB", duration: "DUR",
+                media_name: "TTL",
+                year: "YR",
+                performers: "ART",
+                composers: "COMP",
+                genres: "GNR",
+                publishers: "PUB",
+                albums: "ALB",
+                duration: "DUR",
             };
             const pills = (song.review_blockers || [])
-                .map((b) => `<span class="pill miss" title="Missing: ${b}">${blockerLabels[b] || b}</span>`)
+                .map(
+                    (b) =>
+                        `<span class="pill miss" title="Missing: ${b}">${blockerLabels[b] || b}</span>`,
+                )
                 .join("");
             const selectedClass = song.id === selectedId ? " selected" : "";
             return `<div class="song-row${selectedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
@@ -241,7 +249,8 @@ function renderSongRows(ctx, songs) {
             id: "id",
         };
         if (currentSort.field) {
-            const shortField = reverseFieldMap[currentSort.field] || currentSort.field;
+            const shortField =
+                reverseFieldMap[currentSort.field] || currentSort.field;
             sortSelect.value = `${shortField}-${currentSort.direction}`;
         } else {
             sortSelect.value = "default";
@@ -253,10 +262,14 @@ function renderSongRows(ctx, songs) {
     if (selectAll) {
         selectAll.removeEventListener("change", selectAll._v2Handler);
         selectAll._v2Handler = (e) => {
-            panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
-                cb.checked = e.target.checked;
-            });
-            panel.dispatchEvent(new CustomEvent("checkchange", { bubbles: true }));
+            panel
+                .querySelectorAll(".col-check input[type=checkbox]")
+                .forEach((cb) => {
+                    cb.checked = e.target.checked;
+                });
+            panel.dispatchEvent(
+                new CustomEvent("checkchange", { bubbles: true }),
+            );
         };
         selectAll.addEventListener("change", selectAll._v2Handler);
     }
@@ -265,7 +278,9 @@ function renderSongRows(ctx, songs) {
     panel.querySelectorAll(".col-check input[type=checkbox]").forEach((cb) => {
         cb.addEventListener("click", (e) => e.stopPropagation());
         cb.addEventListener("change", () => {
-            panel.dispatchEvent(new CustomEvent("checkchange", { bubbles: true }));
+            panel.dispatchEvent(
+                new CustomEvent("checkchange", { bubbles: true }),
+            );
         });
     });
 }
@@ -292,4 +307,3 @@ export function renderSongs(ctx, songs) {
     ctx.setState({ selectedIndex: -1, displayedItems: displaySongs });
     renderSongRows(ctx, displaySongs);
 }
-

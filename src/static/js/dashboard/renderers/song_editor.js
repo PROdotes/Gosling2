@@ -186,10 +186,6 @@ function wireAlbumSubChips(song, refresh) {
 
         if (field === "artist") {
             const getItems = (a) => {
-                console.log(
-                    `[DEBUG] Album artist credits for ${albumId}:`,
-                    a.credits,
-                );
                 return (a.credits || [])
                     .filter((c) => c.role_name === "Performer")
                     .map((c) => ({
@@ -209,7 +205,6 @@ function wireAlbumSubChips(song, refresh) {
                     }));
                 },
                 onAdd: async (opt) => {
-                    console.log(`[DEBUG] Adding album artist:`, opt);
                     await addAlbumCredit(
                         albumId,
                         opt.label,
@@ -219,7 +214,6 @@ function wireAlbumSubChips(song, refresh) {
                     await refresh();
                 },
                 onRemove: async (nameId) => {
-                    console.log(`[DEBUG] Removing album artist ID:`, nameId);
                     await removeAlbumCredit(albumId, nameId);
                     await refresh();
                 },
@@ -245,12 +239,10 @@ function wireAlbumSubChips(song, refresh) {
                     return (r || []).map((p) => ({ id: p.id, label: p.name }));
                 },
                 onAdd: async (opt) => {
-                    console.log(`[DEBUG] Adding album publisher:`, opt);
                     await addAlbumPublisher(albumId, opt.label, opt.id);
                     await refresh();
                 },
                 onRemove: async (pubId) => {
-                    console.log(`[DEBUG] Removing album publisher ID:`, pubId);
                     await removeAlbumPublisher(albumId, pubId);
                     await refresh();
                 },

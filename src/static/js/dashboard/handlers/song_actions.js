@@ -262,10 +262,7 @@ export class SongActionsHandler {
             ) {
                 await this.ctx.refreshActiveSongV2(id);
             } else {
-                const activeKey =
-                    typeof activeDetailKey !== "undefined"
-                        ? activeDetailKey
-                        : null;
+                const activeKey = this.ctx.getActiveDetailKey?.() ?? null;
                 if (activeKey === `songs:${id}`) {
                     this.ctx.refreshActiveDetail();
                 }
@@ -636,9 +633,7 @@ export class SongActionsHandler {
             } else if (data.status === "PENDING_CONVERT") {
                 const card = actionTarget.closest(".result-card");
                 if (card) {
-                    const conflictBox = card.querySelector(
-                        '[style*="rgba(255, 149, 0"]',
-                    );
+                    const conflictBox = card.querySelector("[data-ghost-box]");
                     if (conflictBox) {
                         conflictBox.className = "pending-convert-box";
                         conflictBox.innerHTML = `

@@ -404,10 +404,10 @@
     padding-top: 0.25rem;
 }
 
-/* Unscoped button styles for modals (ingest_v2.css scopes these to #ingest-workspace) */
-.ingest-btn-primary,
-.ingest-btn-secondary,
-.ingest-btn-danger {
+/* Scoped button styles for link-modal (ingest_v2.css scopes these to #ingest-workspace) */
+.link-modal .ingest-btn-primary,
+.link-modal .ingest-btn-secondary,
+.link-modal .ingest-btn-danger {
     padding: 7px 14px;
     font-size: 11px;
     font-weight: 700;
@@ -421,39 +421,39 @@
     white-space: nowrap;
 }
 
-.ingest-btn-primary {
+.link-modal .ingest-btn-primary {
     background: var(--bg-active);
     color: var(--text-pure);
     border-color: transparent;
 }
 
-.ingest-btn-primary:hover:not(:disabled) {
+.link-modal .ingest-btn-primary:hover:not(:disabled) {
     filter: brightness(1.1);
 }
 
-.ingest-btn-secondary {
+.link-modal .ingest-btn-secondary {
     background: var(--bg-element);
     color: var(--text-sec);
 }
 
-.ingest-btn-secondary:hover:not(:disabled) {
+.link-modal .ingest-btn-secondary:hover:not(:disabled) {
     background: var(--bg-hover);
     color: var(--text-pure);
 }
 
-.ingest-btn-danger {
+.link-modal .ingest-btn-danger {
     color: var(--accent-red);
     border-color: rgba(244, 63, 94, 0.3);
     background: rgba(244, 63, 94, 0.05);
 }
 
-.ingest-btn-danger:hover:not(:disabled) {
+.link-modal .ingest-btn-danger:hover:not(:disabled) {
     background: rgba(244, 63, 94, 0.15);
 }
 
-.ingest-btn-primary:disabled,
-.ingest-btn-secondary:disabled,
-.ingest-btn-danger:disabled {
+.link-modal .ingest-btn-primary:disabled,
+.link-modal .ingest-btn-secondary:disabled,
+.link-modal .ingest-btn-danger:disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }
