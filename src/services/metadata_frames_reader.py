@@ -5,8 +5,9 @@ from typing import List
 from pydantic import TypeAdapter
 from src.models.metadata_frames import ID3FrameMapping
 from src.services.logger import logger
+from src.engine.config import ID3_FRAMES_PATH
 
-_FRAMES_PATH = "json/id3_frames.json"
+_FRAMES_PATH = str(ID3_FRAMES_PATH)
 
 
 def _load_raw(path: str) -> dict:

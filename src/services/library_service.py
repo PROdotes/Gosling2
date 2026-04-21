@@ -1,4 +1,5 @@
 import sqlite3
+import os
 from typing import List, Optional, Dict, Any
 from src.data.song_repository import SongRepository
 from src.data.album_repository import AlbumRepository
@@ -8,6 +9,7 @@ from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.publisher_repository import PublisherRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
+from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Song,
     Album,
@@ -33,6 +35,7 @@ class LibraryService:
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
+        self._staging_repo = StagingRepository(db_path)
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
@@ -330,6 +333,13 @@ class LibraryService:
         for song in songs:
             if song.id is None:
                 continue
+                
+            # Origin check
+            origin_path = self._staging_repo.get_origin(song.id, conn)
+            original_exists = False
+            if origin_path and os.path.exists(origin_path):
+                original_exists = True
+
             hydrated_songs.append(
                 song.model_copy(
                     update={
@@ -337,6 +347,8 @@ class LibraryService:
                         "albums": assocs_by_song.get(song.id, []),
                         "publishers": pubs_by_song.get(song.id, []),
                         "tags": tags_by_song.get(song.id, []),
+                        "estimated_original_path": origin_path,
+                        "original_exists": original_exists,
                     }
                 )
             )

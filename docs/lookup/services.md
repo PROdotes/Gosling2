@@ -231,6 +231,9 @@ Soft-delete a single song. Handles physical cleanup if in staging.
 ### move_song_to_library(song_id: int) -> str
 Calculates the target routing, moves the physical file, and updates the database records.
 
+### delete_original_source(song_id: int) -> bool
+Physical deletion of the original file linked to this song (e.g. from Downloads). Cleans up `StagingOrigins` mapping.
+
 ### delete_unlinked_tags(tag_ids: List[int]) -> int
 Soft-delete tags from the given list that have zero active song links.
 
@@ -284,6 +287,12 @@ Filter songs by sidebar criteria. Returns slim list-view rows.
 
 ### resolve_conflict(ghost_id: int, staged_path: str) -> Dict[str, Any]
 (-> `IngestionService.resolve_conflict`)
+
+### delete_original_source(song_id: int) -> bool
+(-> `EditService.delete_original_source`)
+
+### get_staging_origin(song_id: int) -> Optional[str]
+Fetch the original birth-path for this staged song via `StagingRepository`.
 
 
 

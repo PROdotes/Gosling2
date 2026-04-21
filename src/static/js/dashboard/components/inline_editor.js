@@ -73,6 +73,9 @@ export function activateInlineEdit(
         input.disabled = true;
         try {
             const updated = await onCommit(payload);
+            input.replaceWith(span);
+            span.textContent = rawValue === "" ? "-" : rawValue;
+            errorEl.remove();
             if (onSave) onSave(updated, field);
         } catch (err) {
             input.disabled = false;

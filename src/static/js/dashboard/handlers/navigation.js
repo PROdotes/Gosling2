@@ -297,7 +297,7 @@ export class NavigationHandler {
 
             if (
                 event.key === "Escape" &&
-                this.elements.detailPanel.style.display === "flex" &&
+                this.ctx.getState().activeSong &&
                 !modalOpen
             ) {
                 this.ctx.abortDetailRequest?.();
@@ -314,7 +314,20 @@ export class NavigationHandler {
                 return;
             }
 
-            if (modalOpen || document.activeElement === this.searchInput) {
+            const activeEl = document.activeElement;
+            const targetEl = event.target;
+            const isEditableInput = (el) =>
+                el &&
+                (el.tagName === "INPUT" || el.tagName === "TEXTAREA") &&
+                !el.readOnly &&
+                !el.disabled;
+            if (
+                modalOpen ||
+                activeEl === this.searchInput ||
+                targetEl === this.searchInput ||
+                isEditableInput(activeEl) ||
+                isEditableInput(targetEl)
+            ) {
                 return;
             }
 
@@ -377,26 +390,25 @@ export class NavigationHandler {
 
             if (
                 event.key === "Enter" &&
-                this.ctx.getState().selectedIndex >= 0
+                this.ctx.getState().selectedIndex >= 0 &&
+                !isEditableInput(activeEl) &&
+                !isEditableInput(targetEl)
             ) {
                 event.preventDefault();
                 const state = this.ctx.getState();
                 const selected = items[state.selectedIndex];
                 if (!selected) return;
 
-                const isSongDetailOpen =
-                    state.currentMode === "songs" &&
-                    this.elements.detailPanel.style.display === "flex";
                 const isActiveSongDetail =
-                    isSongDetailOpen &&
+                    state.currentMode === "songs" &&
                     state.activeSong &&
                     String(state.activeSong.id) === String(selected.id);
 
                 if (isActiveSongDetail) {
                     orch.orchestrateScrubber(
                         this.ctx,
-                        state.activeSong.id,
-                        state.activeSong.media_name || state.activeSong.title,
+                        selected.id,
+                        selected.media_name || selected.title,
                     );
                     return;
                 }

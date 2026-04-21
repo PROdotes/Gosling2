@@ -89,21 +89,34 @@ function seek(delta) {
 document.addEventListener("keydown", (e) => {
     if (overlay.style.display === "none") return;
     if (e.target.tagName === "INPUT") return;
+
+    // Safety: ignore if a sub-modal is open on top of the scrubber
+    const subModals = ["link-modal", "edit-modal", "confirm-modal", "spotify-modal", "splitter-modal", "filename-parser-modal"];
+    if (subModals.some(id => document.getElementById(id)?.style.display === "flex")) return;
     if (e.key === " ") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         playBtn.click();
     }
     if (e.key === "ArrowLeft" || e.key === "a") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         seek(-10);
     }
     if (e.key === "ArrowRight" || e.key === "d") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         seek(10);
     }
     if (e.key === "+" || e.key === "NumpadAdd") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         tagsBtn.click();
+    }
+    if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        closeScrubberModal();
     }
 });
 

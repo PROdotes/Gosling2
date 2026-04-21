@@ -613,7 +613,8 @@ class BatchIngestReport(BaseModel):
 class CleanupOriginalRequest(BaseModel):
     """Request to physically delete an original source file."""
 
-    file_path: str
+    file_path: Optional[str] = None
+    song_id: Optional[int] = None
 
 
 PublisherView.model_rebuild()

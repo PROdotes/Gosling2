@@ -103,6 +103,9 @@ Updates an album's release type (CD, Vinyl, Digital).
 ### handleOpenSpotifyModal(actionTarget)
 Opens the Spotify credit importer.
 
+### handleQuickCreateAlbum(actionTarget)
+Quickly creates an album from a song and links it.
+
 ### handleCloseEditModal(actionTarget)
 Closes the EditModal.
 

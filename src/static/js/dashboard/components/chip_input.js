@@ -197,6 +197,7 @@ export function createChipInput({
         }
 
         dropdownEl.hidden = dropdownEl.children.length === 0;
+        if (!dropdownEl.hidden) highlightOption(0);
         dropdownResults = results;
     }
 

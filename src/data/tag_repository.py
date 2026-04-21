@@ -205,7 +205,7 @@ class TagRepository(BaseRepository):
         """Get-or-create a Tag by name+category (case-insensitive). Reactivates soft-deleted. Returns tag_id."""
         category = category.strip() if category else category
         row = cursor.execute(
-            "SELECT TagID, IsDeleted FROM Tags WHERE TagName = ? COLLATE UTF8_NOCASE AND TagCategory = ? COLLATE UTF8_NOCASE",
+            "SELECT TagID, TagName, TagCategory, IsDeleted FROM Tags WHERE LOWER(TagName) = LOWER(?) AND LOWER(TagCategory) = LOWER(?)",
             (name, category),
         ).fetchone()
         if row:

@@ -597,3 +597,22 @@ Fetch the last JSON snapshot of a deleted record.
 ### _row_to_deleted(row: sqlite3.Row) -> DeletedRecord
 
 **Internal**: Maps physical database rows to the `Audit*` domain models.
+
+---
+
+## StagingRepository
+
+*Location: `src/data/staging_repository.py`*
+**Responsibility**: Temporary storage for linking staged songs back to their original source (Downloads/etc) using the `StagingOrigins` table.
+
+### set_origin(source_id: int, origin_path: str, conn: Optional[sqlite3.Connection] = None) -> None
+
+Saves the original origin path for a song id. Used after ingestion to keep track of the source file.
+
+### get_origin(source_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[str]
+
+Retrieves the original path for a song id, if it exists. Returns `None` if the mapping was cleared or never existed.
+
+### clear_origin(source_id: int, conn: Optional[sqlite3.Connection] = None) -> None
+
+Removes the origin mapping for a song. Usually called after the original file has been physically deleted or organized.

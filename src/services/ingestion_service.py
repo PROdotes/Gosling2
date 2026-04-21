@@ -12,6 +12,7 @@ from src.data.publisher_repository import PublisherRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
 from src.models.exceptions import ReingestionConflictError
+from src.data.staging_repository import StagingRepository
 from src.services.logger import logger
 from src.utils.audio_hash import calculate_audio_hash
 from src.services.metadata_service import MetadataService
@@ -56,6 +57,7 @@ class IngestionService:
         self._pub_repo = pub_repo or PublisherRepository(db_path)
         self._tag_repo = tag_repo or TagRepository(db_path)
         self._identity_repo = identity_repo or IdentityRepository(db_path)
+        self._staging_repo = StagingRepository(db_path)
 
         # Cross-service dependencies
         self._library_service = library_service or LibraryService(db_path)
@@ -232,12 +234,12 @@ class IngestionService:
             logger.error(f"[IngestionService] check_ingestion internal error: {e}")
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
-    def ingest_wav_as_converting(self, staged_path: str) -> Dict[str, Any]:
+    def ingest_wav_as_converting(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Ingest a WAV file immediately with processing_status=3 (Converting).
         """
         logger.debug(
-            f"[IngestionService] -> ingest_wav_as_converting(path='{staged_path}')"
+            f"[IngestionService] -> ingest_wav_as_converting(path='{staged_path}', original='{original_path}')"
         )
 
         check = self.check_ingestion(staged_path)
@@ -256,6 +258,8 @@ class IngestionService:
         conn = self._song_repo.get_connection()
         try:
             new_id = self._song_repo.insert(song, conn)
+            if original_path:
+                self._staging_repo.set_origin(new_id, original_path, conn)
             hydrated_song = song.model_copy(update={"id": new_id})
             conn.commit()
             logger.info(
@@ -360,11 +364,11 @@ class IngestionService:
         finally:
             conn.close()
 
-    def ingest_file(self, staged_path: str) -> Dict[str, Any]:
+    def ingest_file(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Write path for a staged file. Handles collisions and single transaction.
         """
-        logger.debug(f"[IngestionService] -> ingest_file(path='{staged_path}')")
+        logger.debug(f"[IngestionService] -> ingest_file(path='{staged_path}', original='{original_path}')")
 
         # 1. Validation check
         check = self.check_ingestion(staged_path)
@@ -399,6 +403,8 @@ class IngestionService:
             hydrated_song = hydrated_song.model_copy(
                 update={"processing_status": ProcessingStatus.NEEDS_REVIEW}
             )
+            if original_path:
+                self._staging_repo.set_origin(new_id, original_path, conn)
             conn.commit()
             logger.info(
                 f"[IngestionService] <- ingest_file(path='{staged_path}') INGESTED ID={new_id}"
@@ -427,7 +433,7 @@ class IngestionService:
         finally:
             conn.close()
 
-    def resolve_conflict(self, ghost_id: int, staged_path: str) -> Dict[str, Any]:
+    def resolve_conflict(self, ghost_id: int, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Resolve a ghost conflict by re-activating the soft-deleted record.
         """
@@ -462,6 +468,8 @@ class IngestionService:
                 }
             )
             self._song_repo.reactivate_ghost(ghost_id, reactivated, conn)
+            if original_path:
+                self._staging_repo.set_origin(ghost_id, original_path, conn)
             conn.commit()
 
             status_label = "PENDING_CONVERT" if is_wav else "INGESTED"
@@ -532,10 +540,10 @@ class IngestionService:
             "results": results,
         }
 
-    def _ingest_single(self, file_path: str) -> Dict[str, Any]:
+    def _ingest_single(self, file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """Thread-safe single file ingestion wrapper."""
         try:
-            return self.ingest_file(file_path)
+            return self.ingest_file(file_path, original_path)
         except ReingestionConflictError as e:
             return {
                 "status": "CONFLICT",

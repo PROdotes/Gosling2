@@ -26,6 +26,7 @@ from src.engine.config import (
     WAV_AUTO_CONVERT,
     get_downloads_folder,
     ProcessingStatus,
+    PARSER_PRESETS_PATH,
 )
 from src.utils.audio_hash import calculate_audio_hash
 
@@ -35,6 +36,15 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 def _get_service() -> CatalogService:
     """Service factory for the ingestion router."""
     return CatalogService()
+
+
+@router.get("/parser-config")
+async def get_parser_config():
+    """Retrieve dynamic tokens and presets for the Filename Parser."""
+    if not PARSER_PRESETS_PATH.exists():
+        return {"tokens": [], "presets": []}
+    with open(PARSER_PRESETS_PATH, "r") as f:
+        return json.load(f)
 
 
 @router.get("/downloads-folder")
@@ -103,16 +113,27 @@ async def upload_files(files: list[UploadFile] = File(...)):
             await asyncio.sleep(0)
 
             for p in staged_paths:
+                original_src = os.path.join(get_downloads_folder(), Path(p).name.split("_", 1)[-1])
                 if Path(p).suffix.lower() == ".wav":
-                    res = await run_in_threadpool(service.ingest_wav_as_converting, p)
-                    if res["status"] == "CONVERTING":
-                        res["status"] = "PENDING_CONVERT"
+                    if WAV_AUTO_CONVERT:
+                        try:
+                            mp3 = await run_in_threadpool(convert_to_mp3, Path(p))
+                            p = str(mp3)
+                            res = await run_in_threadpool(
+                                service._ingestion_service._ingest_single, p, original_path=original_src
+                            )
+                        except RuntimeError as e:
+                            res = {"status": "ERROR", "message": str(e)}
+                    else:
+                        res = await run_in_threadpool(service.ingest_wav_as_converting, p, original_path=original_src)
+                        if res["status"] == "CONVERTING":
+                            res["status"] = "PENDING_CONVERT"
                     if res.get("song"):
                         res["song"] = SongView.from_domain(res["song"])
                     res["staged_path"] = p
                 else:
                     res = await run_in_threadpool(
-                        service._ingestion_service._ingest_single, p
+                        service._ingestion_service._ingest_single, p, original_path=original_src
                     )
                     if res.get("song"):
                         res["song"] = SongView.from_domain(res["song"])
@@ -128,6 +149,13 @@ async def upload_files(files: list[UploadFile] = File(...)):
             yield f"{json.dumps({'error': str(e)})}\n"
 
     return StreamingResponse(_stream_ingest(), media_type="application/x-ndjson")
+
+@router.get("/cleanup-origin/{song_id}")
+async def get_cleanup_origin(song_id: int):
+    """Checks if there is a known original file path for this song."""
+    service = _get_service()
+    path = service.get_staging_origin(song_id)
+    return {"id": song_id, "origin_path": path, "exists": bool(path)}
 
 
 @router.post("/convert-wav")
@@ -177,7 +205,9 @@ async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportVi
 
     try:
         service = _get_service()
-        result = service.resolve_conflict(ghost_id, staged_path)
+        # Heuristic for the original path of an uploaded staged file
+        original_src = os.path.join(get_downloads_folder(), Path(staged_path).name.split("_", 1)[-1])
+        result = service.resolve_conflict(ghost_id, staged_path, original_path=original_src)
 
         # Convert Domain Song to SongView if present
         if "song" in result and result["song"]:
@@ -262,7 +292,9 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
         else:
             # Ingest as status=3, await manual conversion
             for wav in wav_paths:
-                result = service.ingest_wav_as_converting(wav)
+                # Find the original source path by matching the filename from audio_files
+                original_src = next((f for f in audio_files if Path(f).name == Path(wav).name.split("_", 1)[-1]), None)
+                result = service.ingest_wav_as_converting(wav, original_path=original_src)
                 if result["status"] == "CONVERTING":
                     result["status"] = "PENDING_CONVERT"
                 if result.get("song"):
@@ -273,11 +305,17 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
     # 5. Batch ingest non-WAVs
     try:
         if ingest_paths:
-            batch_report = service.ingest_batch(ingest_paths)
-            for result in batch_report["results"]:
+            # We need to pass origin paths for non-WAVs too
+            batch_results = []
+            for p in ingest_paths:
+                original_src = next((f for f in audio_files if Path(f).name == Path(p).name.split("_", 1)[-1]), None)
+                res = await run_in_threadpool(service._ingestion_service.ingest_file, p, original_src)
+                batch_results.append(res)
+            
+            for result in batch_results:
                 if "song" in result and result["song"]:
                     result["song"] = SongView.from_domain(result["song"])
-            combined_results.extend(batch_report["results"])
+            combined_results.extend(batch_results)
 
         total = len(combined_results)
         ingested = sum(
@@ -334,40 +372,61 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
     Physical deletion of the original source file (e.g. from Downloads).
     Safety: Path must be within the user's Downloads folder.
     """
-    logger.info(f"[IngestRouter] -> cleanup_original_file(path='{request.file_path}')")
-
     downloads = get_downloads_folder()
     if not downloads:
         raise HTTPException(
             status_code=500, detail="Downloads folder not identified on this platform."
         )
 
-    # Security: Ensure the path is within the Downloads folder
-    # Need realpath to prevent '..' traversal or tricky symlinks
-    real_downloads = Path(downloads).resolve()
-    real_target = Path(request.file_path).resolve()
-
-    if not real_target.is_relative_to(real_downloads):
-        logger.warning(
-            f"[IngestRouter] Security: Blocked deletion of file outside Downloads: {request.file_path}"
-        )
-        raise HTTPException(
-            status_code=403,
-            detail="Deletion is restricted to the Downloads folder for safety.",
-        )
-
-    if not os.path.exists(real_target):
-        logger.warning(
-            f"[IngestRouter] File not found for cleanup: {request.file_path}"
-        )
-        raise HTTPException(status_code=404, detail="File not found.")
-
     try:
+        service = _get_service()
+        file_path = request.file_path
+        
+        if request.song_id is not None:
+            # Enhanced cleanup via song_id lookup
+            success = service.delete_original_source(request.song_id)
+            if success:
+                return {"status": "DELETED", "id": request.song_id}
+            else:
+                # If we have song_id but lookup fails or file is already gone
+                origin = service.get_staging_origin(request.song_id)
+                if not origin:
+                    raise HTTPException(status_code=404, detail="No original source link found for this song.")
+                file_path = origin
+
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Either file_path or song_id must be provided.")
+
+        # Legacy direct path cleanup (still used by some UI parts)
+        # Security: Ensure the path is within the Downloads folder
+        real_downloads = Path(downloads).resolve()
+        real_target = Path(file_path).resolve()
+
+        if not real_target.is_relative_to(real_downloads):
+            logger.warning(
+                f"[IngestRouter] Security: Blocked deletion of file outside Downloads: {file_path}"
+            )
+            raise HTTPException(
+                status_code=403,
+                detail="Deletion is restricted to the Downloads folder for safety.",
+            )
+
+        if not os.path.exists(real_target):
+            # If path existed in DB but is gone from disk, clear it
+            if request.song_id:
+                service._edit_service._staging_repo.clear_origin(request.song_id)
+            return {"status": "ALREADY_GONE", "path": str(real_target)}
+
         os.remove(real_target)
+        if request.song_id:
+            service._edit_service._staging_repo.clear_origin(request.song_id)
+            
         logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
-        return {"status": "DELETED", "path": real_target}
+        return {"status": "DELETED", "path": str(real_target)}
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"[IngestRouter] Cleanup failed for {real_target}: {e}")
+        logger.error(f"[IngestRouter] Cleanup failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
 
 

@@ -1,0 +1,20 @@
+{
+    "tokens": [
+        { "label": "Artist", "code": "{Artist}" },
+        { "label": "Title", "code": "{Title}" },
+        { "label": "Album", "code": "{Album}" },
+        { "label": "Year", "code": "{Year}" },
+        { "label": "BPM", "code": "{BPM}" },
+        { "label": "Genre", "code": "{Genre}" },
+        { "label": "Publisher", "code": "{Publisher}" },
+        { "label": "ISRC", "code": "{ISRC}" },
+        { "label": "Junk", "code": "{Ignore}", "title": "Skip this part" }
+    ],
+    "presets": [
+        { "label": "Artist - Title", "value": "{Artist} - {Title}" },
+        { "label": "Artist - Title (...)", "value": "{Artist} - {Title} ({Ignore})" },
+        { "label": "# - Artist - Title", "value": "{Ignore} - {Artist} - {Title}" },
+        { "label": "Artist - Album - Title", "value": "{Artist} - {Album} - {Title}" },
+        { "label": "Album_Title_Artist_Publisher", "value": "{Album}_{Title}_{Artist}_{Publisher}" }
+    ]
+}

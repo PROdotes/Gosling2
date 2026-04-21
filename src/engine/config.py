@@ -86,6 +86,8 @@ PROMPT_BEFORE_MOVE = True
 AUTO_SAVE_ID3 = True
 DEFAULT_SEARCH_ENGINE = "spotify"
 RENAME_RULES_PATH = Path("json/rules.json")
+PARSER_PRESETS_PATH = Path("json/parser_presets.json")
+ID3_FRAMES_PATH = Path("json/id3_frames.json")
 SCRUBBER_AUTO_PLAY = True
 
 # Scalar fields allowed in PATCH /songs/{id}

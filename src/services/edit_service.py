@@ -16,6 +16,7 @@ from src.data.publisher_repository import PublisherRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
 from src.data.album_credit_repository import AlbumCreditRepository
+from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Album,
     SongAlbum,
@@ -72,6 +73,7 @@ class EditService:
         self._tag_repo = tag_repo or TagRepository(db_path)
         self._identity_repo = identity_repo or IdentityRepository(db_path)
         self._album_credit_repo = album_credit_repo or AlbumCreditRepository(db_path)
+        self._staging_repo = StagingRepository(db_path)
 
         # Cross-service dependencies
         self._library_service = library_service or LibraryService(db_path)
@@ -733,6 +735,10 @@ class EditService:
             if source_path.startswith(str(staging)):
                 if os.path.exists(source_path):
                     os.remove(source_path)
+            
+            # 4. Cleanup transient staging origin link
+            self._staging_repo.clear_origin(song_id, conn)
+            
             return True
         except Exception:
             conn.rollback()
@@ -760,6 +766,11 @@ class EditService:
                 self._metadata_writer.write_metadata(shipped_song)
             if source_abs_path.exists():
                 source_abs_path.unlink()
+            
+            # Origin stays until user confirms deletion OR it's been handled manually.
+            # Actually, user wants a reminder. If we clear it here, the reminder is gone.
+            # So we keep it.
+            
             return str(new_abs_path.relative_to(library_root))
         except Exception:
             raise
@@ -828,3 +839,23 @@ class EditService:
                 self._metadata_writer.write_metadata(song)
         except Exception as e:
             logger.error(f"[EditService] ID3 sync failed: {e}")
+
+    def delete_original_source(self, song_id: int) -> bool:
+        """Physical deletion of the original file linked to this song (e.g. in Downloads)."""
+        origin_path = self._staging_repo.get_origin(song_id)
+        if not origin_path:
+            return False
+
+        if os.path.exists(origin_path):
+            try:
+                os.remove(origin_path)
+                self._staging_repo.clear_origin(song_id)
+                logger.info(f"[EditService] Deleted original source: {origin_path}")
+                return True
+            except Exception as e:
+                logger.error(f"[EditService] Failed to delete original source {origin_path}: {e}")
+                return False
+        else:
+            # Path is dead, clear it anyway
+            self._staging_repo.clear_origin(song_id)
+            return False

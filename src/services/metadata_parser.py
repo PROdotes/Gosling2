@@ -6,13 +6,18 @@ from src.models.domain import Song, SongCredit, SongAlbum, Tag, Publisher, Album
 from src.models.metadata_frames import ID3FrameConfig
 from src.services.logger import logger
 from src.services.metadata_frames_reader import load_id3_frames, load_tag_categories
-from src.engine.config import COMMA_SPLIT_FIELDS, SONG_DEFAULT_YEAR, ProcessingStatus
+from src.engine.config import (
+    COMMA_SPLIT_FIELDS,
+    SONG_DEFAULT_YEAR,
+    ProcessingStatus,
+    ID3_FRAMES_PATH,
+)
 
 
 class MetadataParser:
     """Parses raw metadata dictionaries into relaxed Song domain models."""
 
-    def __init__(self, json_path: str = "json/id3_frames.json"):
+    def __init__(self, json_path: str = str(ID3_FRAMES_PATH)):
         """Initializes the parser with the frame mapping configuration."""
         self.config = load_id3_frames(json_path)
         # Pre-process config for faster lookup

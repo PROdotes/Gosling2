@@ -375,12 +375,39 @@
     margin-bottom: 12px;
 }
 
+#songs-workspace .editor-label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 #songs-workspace .editor-label {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-mut);
+}
+
+#songs-workspace .editor-quick-create-btn {
+    background: none;
+    border: none;
+    color: var(--text-mut);
+    font-size: 16px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 4px;
+    transition: color 0.15s ease, transform 0.1s ease;
+}
+
+#songs-workspace .editor-quick-create-btn:hover {
+    color: var(--accent-red, #f43f5e);
+    transform: scale(1.2);
+}
+
+#songs-workspace .editor-quick-create-btn.loading {
+    animation: sync-pulse 1s infinite;
+    pointer-events: none;
 }
 
 #songs-workspace .editor-field.missing .editor-label {
@@ -1003,6 +1030,23 @@
 
 #songs-workspace .album-sub-sync-btn:hover {
     color: var(--text-pure);
+}
+
+#songs-workspace .album-sub-sync-btn.loading {
+    color: var(--accent);
+    animation: sync-pulse 1s infinite;
+    cursor: wait;
+}
+
+#songs-workspace .album-sub-sync-btn.success {
+    color: var(--accent-green);
+    transition: color 0.3s ease;
+}
+
+@keyframes sync-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
 }
 
 #songs-workspace .album-search-wrap {

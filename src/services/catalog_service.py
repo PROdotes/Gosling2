@@ -9,6 +9,7 @@ from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
 from src.data.audit_repository import AuditRepository
+from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Song,
     Album,
@@ -53,6 +54,7 @@ class CatalogService:
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
+        self._staging_repo = StagingRepository(db_path)
         self._audit_repo = AuditRepository(db_path)
         self._identity_service = IdentityService(
             db_path, identity_repo=self._identity_repo
@@ -92,17 +94,17 @@ class CatalogService:
         """Dry-run ingestion check for path, hash, and metadata collisions."""
         return self._ingestion_service.check_ingestion(file_path)
 
-    def ingest_wav_as_converting(self, staged_path: str) -> Dict[str, Any]:
+    def ingest_wav_as_converting(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """Ingest a WAV file immediately with processing_status=3 (Converting)."""
-        return self._ingestion_service.ingest_wav_as_converting(staged_path)
+        return self._ingestion_service.ingest_wav_as_converting(staged_path, original_path)
 
     def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> int:
         """Called after WAV→MP3 conversion completes to update the DB record."""
         return self._ingestion_service.finalize_wav_conversion(song_id, mp3_path)
 
-    def ingest_file(self, staged_path: str) -> Dict[str, Any]:
+    def ingest_file(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """Write path for a staged file. Handles collisions and reingestion errors."""
-        return self._ingestion_service.ingest_file(staged_path)
+        return self._ingestion_service.ingest_file(staged_path, original_path)
 
     def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (Delegated)."""
@@ -126,9 +128,9 @@ class CatalogService:
         """Soft-delete a single song. Handles physical cleanup if in staging."""
         return self._edit_service.delete_song(song_id, staging_dir=STAGING_DIR)
 
-    def resolve_conflict(self, ghost_id: int, staged_path: str) -> Dict[str, Any]:
+    def resolve_conflict(self, ghost_id: int, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """Resolve a ghost conflict by re-activating the soft-deleted record."""
-        return self._ingestion_service.resolve_conflict(ghost_id, staged_path)
+        return self._ingestion_service.resolve_conflict(ghost_id, staged_path, original_path)
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
@@ -513,3 +515,11 @@ class CatalogService:
         return self._edit_service.move_song_to_library(
             song_id, library_root_path=LIBRARY_ROOT
         )
+
+    def delete_original_source(self, song_id: int) -> bool:
+        """Physical deletion of the original file linked to this song."""
+        return self._edit_service.delete_original_source(song_id)
+
+    def get_staging_origin(self, song_id: int) -> Optional[str]:
+        """Fetch the original birth-path for this staged song."""
+        return self._staging_repo.get_origin(song_id)

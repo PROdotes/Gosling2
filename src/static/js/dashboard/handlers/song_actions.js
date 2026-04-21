@@ -116,6 +116,7 @@ export class SongActionsHandler {
             "close-filename-parser-modal",
             "close-scrubber-modal",
             "sync-id3",
+            "quick-create-album",
         ]);
     }
 
@@ -318,11 +319,41 @@ export class SongActionsHandler {
 
         try {
             await api.moveSongToLibrary(id);
+            
+            // Check for original file cleanup reminder
+            const state = this.ctx.getState();
+            const song = state.activeSong;
+            const hadOriginal = song && song.original_exists && song.id == id;
+
             if (this.ctx.showBanner) {
                 this.ctx.showBanner("Organized successfully!", "success");
             }
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(id);
+            }
+
+            if (hadOriginal) {
+                // Fetch fresh song to see if it still exists (it should, move just copies in some cases or moves staged)
+                const fresh = this.ctx.getState().activeSong;
+                if (fresh && fresh.original_exists) {
+                    const cleanNow = await showConfirm(
+                        "Song organized! However, the original source file still exists in your Downloads folder.\n\nWould you like to delete the original copy now?",
+                        {
+                            title: "Cleanup Original File",
+                            okLabel: "Yes, Delete Original",
+                            cancelLabel: "Not Now"
+                        }
+                    );
+                    if (cleanNow) {
+                        try {
+                            await api.cleanupOriginalFile(null, id);
+                            showToast("Original file deleted.", "success");
+                            await this.ctx.refreshActiveSongV2(id);
+                        } catch (cleanErr) {
+                            showToast(`Cleanup failed: ${cleanErr.message}`, "error");
+                        }
+                    }
+                }
             }
         } catch (err) {
             actionTarget.disabled = false;
@@ -667,9 +698,14 @@ export class SongActionsHandler {
 
         actionTarget.style.opacity = "0.5";
         actionTarget.style.pointerEvents = "none";
+        const songId = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            await api.cleanupOriginalFile(path);
-            this.ctx.refreshActiveDetail();
+            await api.cleanupOriginalFile(path, songId);
+            if (this.ctx.refreshActiveSongV2) {
+                await this.ctx.refreshActiveSongV2(songId);
+            } else {
+                this.ctx.refreshActiveDetail();
+            }
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(
                     "Original file deleted successfully",
@@ -947,9 +983,19 @@ export class SongActionsHandler {
     async handleSyncAlbumFromSong(actionTarget) {
         const { albumId, songId } = actionTarget.dataset;
         actionTarget.disabled = true;
-        actionTarget.textContent = "syncing...";
+        actionTarget.classList.add("loading");
+        const originalText = actionTarget.textContent;
+        actionTarget.textContent = "Syncing...";
+
         try {
             await syncAlbumWithSong(albumId, songId);
+            actionTarget.classList.remove("loading");
+            actionTarget.classList.add("success");
+            actionTarget.textContent = "✓ Synced";
+
+            // Brief delay to show success before refreshing
+            await new Promise((r) => setTimeout(r, 600));
+
             if (
                 this.ctx.refreshActiveSongV2 &&
                 this.ctx.getState().currentMode === "songs"
@@ -960,7 +1006,8 @@ export class SongActionsHandler {
             }
         } catch (err) {
             actionTarget.disabled = false;
-            actionTarget.textContent = "↓ sync from song";
+            actionTarget.classList.remove("loading");
+            actionTarget.textContent = originalText;
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`Sync failed: ${err.message}`, "error");
         }
@@ -975,6 +1022,55 @@ export class SongActionsHandler {
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`Update failed: ${err.message}`, "error");
             this.ctx.refreshActiveDetail();
+        }
+    }
+
+    async handleQuickCreateAlbum(actionTarget) {
+        const { songId } = actionTarget.dataset;
+        const state = this.ctx.getState();
+        const song = state.activeSong;
+        if (!song || !song.media_name) return;
+
+        actionTarget.disabled = true;
+        actionTarget.classList.add("loading");
+        const originalHtml = actionTarget.innerHTML;
+        actionTarget.innerHTML = "Creating...";
+
+        try {
+            // 1. Create and Link Album
+            const res = await api.addSongAlbum(
+                songId,
+                null,           /* albumId (null for new) */
+                song.media_name,/* albumTitle */
+                1,              /* disc_number */
+                1               /* track_number */
+            );
+
+            const albumId = res.album_id;
+
+            // 2. Sync metadata (Artist, Publisher, Year)
+            await syncAlbumWithSong(albumId, songId);
+
+            // 3. Optional: Sync from Song logic often needs a refresh of the song detail
+            if (this.ctx.refreshActiveSongV2) {
+                await this.ctx.refreshActiveSongV2(songId);
+            } else {
+                this.ctx.refreshActiveDetail();
+            }
+
+            showToast(`Album "${song.media_name}" created & synced.`, "success");
+
+            // Reset button state since surgical refresh doesn't overwrite this DOM node
+            actionTarget.disabled = false;
+            actionTarget.classList.remove("loading");
+            actionTarget.innerHTML = originalHtml;
+        } catch (err) {
+            actionTarget.disabled = false;
+            actionTarget.classList.remove("loading");
+            actionTarget.innerHTML = originalHtml;
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(`Quick Create failed: ${err.message}`, "error");
+            }
         }
     }
 

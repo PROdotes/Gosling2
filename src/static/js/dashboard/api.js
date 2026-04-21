@@ -635,11 +635,11 @@ export function applyFilenameParsing(items, pattern) {
     });
 }
 
-export function cleanupOriginalFile(filePath) {
+export function cleanupOriginalFile(filePath = null, songId = null) {
     return fetchJson("/api/v1/ingest/cleanup-original", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_path: filePath }),
+        body: JSON.stringify({ file_path: filePath, song_id: songId }),
     });
 }
 

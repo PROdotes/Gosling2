@@ -12,6 +12,7 @@ against the real repository with zero mocking.
 """
 
 import json
+from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app
@@ -272,6 +273,107 @@ class TestBatchUploadApi:
         ), f"Expected 2 files processed, got {data['total_files']}"
 
 
+class TestWavUploadApi:
+    """WAV auto-convert vs. pending-convert behaviour through the streaming upload endpoint."""
+
+    def _make_wav(self, tmp_path: Path, stem: str = "my_wav_track") -> Path:
+        import wave
+
+        wav_path = tmp_path / f"{stem}.wav"
+        with wave.open(str(wav_path), "w") as f:
+            f.setnchannels(1)
+            f.setsampwidth(2)
+            f.setframerate(44100)
+            f.writeframes(b"\x00\x00" * 4410)
+        return wav_path
+
+    def test_wav_auto_convert_produces_ingested_status(
+        self, client, tmp_path, monkeypatch
+    ):
+        """When WAV_AUTO_CONVERT=True, uploading a WAV yields INGESTED (not PENDING_CONVERT)."""
+        import src.engine.routers.ingest as ingest_mod
+
+        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", True)
+
+        # Stub convert_to_mp3 so no real ffmpeg call is needed.
+        # It copies the WAV to a .mp3 path and returns that path.
+        def fake_convert(wav_path):
+            mp3_path = wav_path.with_suffix(".mp3")
+            import shutil
+            shutil.copy(wav_path, mp3_path)
+            return mp3_path
+
+        monkeypatch.setattr(ingest_mod, "convert_to_mp3", fake_convert)
+
+        wav_file = self._make_wav(tmp_path)
+        with open(wav_file, "rb") as f:
+            resp = client.post(
+                "/api/v1/ingest/upload",
+                files=[("files", (wav_file.name, f, "audio/wav"))],
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = collect_upload_stream(resp)
+        assert data["total_files"] == 1, f"Expected 1 file processed, got {data['total_files']}"
+        result = data["results"][0]
+        assert result["status"] != "PENDING_CONVERT", (
+            f"WAV_AUTO_CONVERT=True must not produce PENDING_CONVERT, got '{result['status']}'"
+        )
+        assert result["status"] in ("INGESTED", "ALREADY_EXISTS", "MATCHED_HASH"), (
+            f"Expected INGESTED-family status, got '{result['status']}'"
+        )
+
+    def test_wav_no_auto_convert_produces_pending_convert_status(
+        self, client, tmp_path, monkeypatch
+    ):
+        """When WAV_AUTO_CONVERT=False, uploading a WAV yields PENDING_CONVERT."""
+        import src.engine.routers.ingest as ingest_mod
+
+        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", False)
+
+        wav_file = self._make_wav(tmp_path, stem="pending_wav")
+        with open(wav_file, "rb") as f:
+            resp = client.post(
+                "/api/v1/ingest/upload",
+                files=[("files", (wav_file.name, f, "audio/wav"))],
+            )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        data = collect_upload_stream(resp)
+        assert data["total_files"] == 1, f"Expected 1 file processed, got {data['total_files']}"
+        result = data["results"][0]
+        assert result["status"] == "PENDING_CONVERT", (
+            f"WAV_AUTO_CONVERT=False must produce PENDING_CONVERT, got '{result['status']}'"
+        )
+
+    def test_wav_auto_convert_error_produces_error_status(
+        self, client, tmp_path, monkeypatch
+    ):
+        """When WAV_AUTO_CONVERT=True and conversion fails, result is ERROR (not a crash)."""
+        import src.engine.routers.ingest as ingest_mod
+
+        def _raise(_p):
+            raise RuntimeError("ffmpeg not found")
+
+        monkeypatch.setattr(ingest_mod, "WAV_AUTO_CONVERT", True)
+        monkeypatch.setattr(ingest_mod, "convert_to_mp3", _raise)
+
+        wav_file = self._make_wav(tmp_path, stem="broken_wav")
+        with open(wav_file, "rb") as f:
+            resp = client.post(
+                "/api/v1/ingest/upload",
+                files=[("files", (wav_file.name, f, "audio/wav"))],
+            )
+
+        assert resp.status_code == 200, f"Expected 200 envelope, got {resp.status_code}"
+        data = collect_upload_stream(resp)
+        assert data["total_files"] == 1
+        result = data["results"][0]
+        assert result["status"] == "ERROR", (
+            f"Conversion failure must yield ERROR status, got '{result['status']}'"
+        )
+
+
 class TestScanFolderApi:
     """Tests for POST /api/v1/ingest/scan-folder endpoint."""
 
@@ -511,3 +613,39 @@ class TestConvertWavApi:
         assert (
             "No DB record" in data["message"]
         ), f"Expected 'No DB record' in message, got '{data['message']}'"
+
+class TestCleanupOriginApi:
+    """Group 6: GET /api/v1/ingest/cleanup-origin/{song_id} and /parser-config"""
+
+    def test_get_cleanup_origin_valid(self, client, populated_db, tmp_path):
+        import sqlite3
+        temp_file = tmp_path / "origin.mp3"
+        temp_file.write_bytes(b"")
+        target_path = str(temp_file)
+        
+        conn = sqlite3.connect(populated_db)
+        conn.execute("INSERT OR REPLACE INTO StagingOrigins (SourceID, OriginPath) VALUES (?, ?)", (1, target_path))
+        conn.commit()
+        conn.close()
+
+        resp = client.get("/api/v1/ingest/cleanup-origin/1")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == 1
+        assert data["origin_path"] == target_path
+        assert data["exists"] is True
+
+    def test_get_cleanup_origin_missing(self, client):
+        resp = client.get("/api/v1/ingest/cleanup-origin/9999")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == 9999
+        assert data["origin_path"] is None
+        assert data["exists"] is False
+
+    def test_get_parser_config(self, client):
+        resp = client.get("/api/v1/ingest/parser-config")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "tokens" in data
+        assert "presets" in data

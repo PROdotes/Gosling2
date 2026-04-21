@@ -374,10 +374,12 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             if (e.key === "Enter" && input.tagName !== "TEXTAREA") {
                 e.preventDefault();
                 commit();
+                input.blur();
             }
             if (e.key === "Escape") {
                 e.preventDefault();
                 revert();
+                input.blur();
             }
         });
 
@@ -833,10 +835,9 @@ export function renderActionSidebar(
 </div>`;
 
     // ── Delete Original ────────────────────────────────────────────────────────
-    const hasOriginal =
-        song.original_exists && isInStaging && song.estimated_original_path;
+    const hasOriginal = song.original_exists && song.estimated_original_path;
     const deleteOriginalBtn = hasOriginal
-        ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-path="${escapeHtml(song.estimated_original_path)}">⚠ Delete Original</button>
+        ? `<button class="sidebar-btn delete-original" data-action="cleanup-original" data-song-id="${song.id}" data-path="${escapeHtml(song.estimated_original_path)}">⚠ Delete Original</button>
            <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
         : "";
 
@@ -959,7 +960,10 @@ export function renderSongEditorV2(song, fileData = null) {
   ${renderChipField("Tags", tags, "No tags", true, "tags")}
   ${renderChipField("Publisher", publishers, "No publisher", true, "publisher")}
   <div class="editor-field${song.albums.length === 0 ? " missing" : ""}" data-chip-field="album">
-    <label class="editor-label">Album / Release</label>
+    <div class="editor-label-row">
+      <label class="editor-label">Album / Release</label>
+      <button class="editor-quick-create-btn" data-action="quick-create-album" data-song-id="${song.id}" title="Quick create album from title">♥</button>
+    </div>
     <div data-album-sub-song="${song.id}">${renderAlbumSubCards(song.albums, song.id)}</div>
     <div class="album-search-wrap"></div>
   </div>

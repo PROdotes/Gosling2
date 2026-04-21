@@ -24,32 +24,39 @@ let _config = null;
 let _debounceTimer = null;
 let _lastPreview = [];
 
-const TOKENS = [
-    { label: "Artist", code: "{Artist}" },
-    { label: "Title", code: "{Title}" },
-    { label: "Album", code: "{Album}" },
-    { label: "Year", code: "{Year}" },
-    { label: "BPM", code: "{BPM}" },
-    { label: "Genre", code: "{Genre}" },
-    { label: "Publisher", code: "{Publisher}" },
-    { label: "ISRC", code: "{ISRC}" },
-    { label: "Junk", code: "{Ignore}", title: "Skip this part" },
-];
+let _tokens = [];
+let _presets = [];
 
 // ---------------------------------------------------------------------------
 // Initialization
 // ---------------------------------------------------------------------------
 
-function initTokens() {
-    tokenContainer.innerHTML = TOKENS.map(
-        (t) => `
+async function initConfig() {
+    try {
+        const res = await fetch("/api/v1/ingest/parser-config");
+        const data = await res.json();
+        _tokens = data.tokens || [];
+        _presets = data.presets || [];
+
+        renderTokens();
+        renderPresets();
+    } catch (err) {
+        console.error("[ParserModal] Failed to load config:", err);
+    }
+}
+
+function renderTokens() {
+    tokenContainer.innerHTML = _tokens
+        .map(
+            (t) => `
         <button class="token-chip ${t.code === "{Ignore}" ? "ignore" : ""}" 
                 data-code="${t.code}" 
                 title="${t.title || `Add ${t.label}`}">
             ${t.label}
         </button>
     `,
-    ).join("");
+        )
+        .join("");
 
     tokenContainer.querySelectorAll(".token-chip").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -58,11 +65,8 @@ function initTokens() {
             const end = patternInput.selectionEnd;
             const text = patternInput.value;
 
-            // Insert at cursor
             patternInput.value = text.slice(0, start) + code + text.slice(end);
             patternInput.dispatchEvent(new Event("input"));
-
-            // Refocus
             patternInput.focus();
             const newPos = start + code.length;
             patternInput.setSelectionRange(newPos, newPos);
@@ -70,7 +74,14 @@ function initTokens() {
     });
 }
 
-initTokens();
+function renderPresets() {
+    presetSelect.innerHTML = `<option value="">(Select Preset)</option>` +
+        _presets.map(p => `
+            <option value="${escapeHtml(p.value)}">${escapeHtml(p.label)}</option>
+        `).join("");
+}
+
+initConfig();
 
 // ---------------------------------------------------------------------------
 // Main Logic

@@ -64,7 +64,7 @@ function renderItems() {
 
 function renderDropdown(options) {
     _dropdownItems = options;
-    _dropdownIndex = -1;
+    _dropdownIndex = options.length > 0 ? 0 : -1;
 
     if (!options.length) {
         dropdown.style.display = "none";
@@ -269,10 +269,13 @@ input.addEventListener("keydown", (e) => {
         updateDropdownHighlight();
     } else if (e.key === "Enter") {
         e.preventDefault();
+        const q = input.value.trim();
         if (_dropdownIndex >= 0) {
             selectOption(_dropdownIndex);
         } else if (_dropdownItems.length === 1) {
             selectOption(0);
+        } else if (!q) {
+            closeLinkModal();
         }
     }
 });

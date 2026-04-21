@@ -222,6 +222,10 @@ Used by `update_identity_legal_name`.
 ### def _get_service() -> CatalogService
 **Internal**: Service factory for the ingestion router.
 
+### async def get_parser_config() -> dict
+**HTTP**: `GET /api/v1/ingest/parser-config`
+- Retrieve dynamic tokens and presets for the Filename Parser.
+
 ### async def get_downloads_folder_json() -> JSONResponse
 **HTTP**: `GET /api/v1/ingest/downloads-folder`
 - Returns the platform-specific default downloads folder.
@@ -289,6 +293,11 @@ Used by `update_identity_legal_name`.
 - Converts a staged WAV to MP3 and finalizes the existing status-3 DB record.
 - WAV must already be in the DB (ingested via `/upload` as status=3).
 - Wraps `convert_to_mp3` then `CatalogService.finalize_wav_conversion`.
+
+### async def get_cleanup_origin(song_id: int) -> dict
+**HTTP**: `GET /api/v1/ingest/cleanup-origin/{song_id}`
+- Checks if there is a known original file path for this song.
+- Returns `{"id": song_id, "origin_path": str|null, "exists": bool}`.
 
 ### async def cleanup_original_file(request: CleanupOriginalRequest) -> dict
 **HTTP**: `POST /api/v1/ingest/cleanup-original`

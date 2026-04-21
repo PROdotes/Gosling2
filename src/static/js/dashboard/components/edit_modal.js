@@ -159,7 +159,7 @@ async function runSlotSearch(slot, q) {
 
 function renderSlotDropdown(slot, options) {
     slot.dropdownItems = options;
-    slot.dropdownIndex = -1;
+    slot.dropdownIndex = options.length > 0 ? 0 : -1;
 
     if (!options.length) {
         slot.dropdownEl.style.display = "none";
@@ -253,9 +253,13 @@ function attachSlotHandlers(slot) {
             updateSlotDropdownHighlight(slot);
         } else if (e.key === "Enter") {
             e.preventDefault();
+            const q = slot.inputEl.value.trim();
             if (slot.dropdownIndex >= 0)
                 selectSlotOption(slot, slot.dropdownIndex);
-            else if (slot.dropdownItems.length === 1) selectSlotOption(slot, 0);
+            else if (slot.dropdownItems.length === 1)
+                selectSlotOption(slot, 0);
+            else if (!q)
+                closeEditModal();
         }
     });
 
@@ -377,7 +381,8 @@ function attachHandlers() {
         nameInput.addEventListener("keydown", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
-                commitRename(nameInput);
+                if (!nameInput.value.trim()) closeEditModal();
+                else commitRename(nameInput);
             }
         });
     }
@@ -423,12 +428,17 @@ function attachHandlers() {
                     e.preventDefault();
                     if (_catDropdownIndex >= 0)
                         selectCatOption(_catDropdownIndex);
-                    else commitCategory(catInput);
+                    else {
+                        const q = catInput.value.trim();
+                        if (!q) closeEditModal();
+                        else commitCategory(catInput);
+                    }
                 }
             } else {
                 if (e.key === "Enter") {
                     e.preventDefault();
-                    commitCategory(catInput);
+                    if (!catInput.value.trim()) closeEditModal();
+                    else commitCategory(catInput);
                 }
             }
         });
@@ -558,7 +568,7 @@ async function runCatSearch(q) {
 
 function renderCatDropdown(options) {
     _catDropdownItems = options;
-    _catDropdownIndex = -1;
+    _catDropdownIndex = options.length > 0 ? 0 : -1;
 
     if (!options.length) {
         hideCatDropdown();

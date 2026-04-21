@@ -18,7 +18,7 @@ class Logger:
     def __init__(self, log_file="gosling.log"):
         self.log_file = log_file
         # Set level from env at init
-        env_level = os.getenv("GOSLING_LOG_LEVEL", "INFO").upper()
+        env_level = os.getenv("GOSLING_LOG_LEVEL", "DEBUG").upper()
         self.current_level = self.LEVELS.get(env_level, 20)
         self.console_enabled = os.getenv("GOSLING_LOG_CONSOLE", "on").lower() != "off"
         self.file_enabled = os.getenv("GOSLING_LOG_FILE", "on").lower() != "off"

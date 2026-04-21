@@ -171,4 +171,10 @@ CREATE TABLE IF NOT EXISTS DeletedRecords (
     RestoredAt DATETIME,
     BatchID TEXT
 );
+
+CREATE TABLE IF NOT EXISTS StagingOrigins (
+    SourceID INTEGER PRIMARY KEY,
+    OriginPath TEXT NOT NULL,
+    FOREIGN KEY (SourceID) REFERENCES MediaSources(SourceID) ON DELETE CASCADE
+);
 """
