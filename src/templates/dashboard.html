@@ -286,17 +286,19 @@
                 <span class="link-modal-title">Bulk Parse Filenames</span>
                 <button type="button" class="link-modal-close" data-action="close-filename-parser-modal">✕</button>
             </div>
-            <div class="link-modal-body" style="padding: 1.5rem;">
-                <div class="section-title" style="margin-bottom:0.75rem;">Pattern Builder</div>
-                <div class="muted-note" style="margin-bottom:1.25rem;">
-                    Click tokens to add them to your pattern. Order matters. Use <code>{Ignore}</code> for junk.
+            <div class="link-modal-body" style="padding: 1.25rem; display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <div class="section-title" style="margin: 0;">Pattern Builder</div>
+                    <div class="muted-note" style="font-size: 0.8rem; margin: 0;">
+                        Click tokens to build pattern. Use <code>{Ignore}</code> for junk.
+                    </div>
                 </div>
                 
-                <div id="filename-parser-tokens" class="token-container" style="margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+                <div id="filename-parser-tokens" class="token-container" style="margin-bottom:0.75rem; flex-wrap:wrap; gap:0.4rem;">
                     <!-- Tokens will be injected here: {Artist}, {Title}, etc. -->
                 </div>
 
-                <div class="ingest-input-row" style="margin-bottom: 1.5rem;">
+                <div class="ingest-input-row" style="margin-bottom: 1rem;">
                     <div style="flex:1; position:relative;">
                         <input type="text" id="filename-pattern-input" class="link-modal-input" 
                                 placeholder="{Artist} - {Title}" 
@@ -308,8 +310,8 @@
                     </select>
                 </div>
 
-                <div class="section-title" style="margin-bottom:0.75rem;">Live Preview</div>
-                <div class="preview-table-wrapper">
+                <div class="section-title" style="margin-bottom:0.5rem;">Live Preview</div>
+                <div class="preview-table-wrapper" style="flex: 1; min-height: 200px; display: flex; flex-direction: column;">
                     <table class="preview-table">
                         <thead id="filename-preview-thead">
                             <!-- Dynamic headers based on tokens -->
@@ -320,7 +322,7 @@
                     </table>
                 </div>
 
-                <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:2rem;">
+                <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.25rem;">
                     <button type="button" class="ingest-btn-secondary" data-action="close-filename-parser-modal">Cancel</button>
                     <button id="filename-parser-apply-btn" type="button" class="ingest-btn-primary" disabled>Apply Metadata</button>
                 </div>

@@ -43,7 +43,7 @@ export const validators = {
             ? new RegExp(rules.isrc.pattern)
             : /^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$/;
         if (!pattern.test(stripped))
-            return "ISRC format: CC-XXX-YY-NNNNN (2 letters, 3 alphanumeric, 2 digits, 5 digits)";
+            return "ISRC must be 12 characters (e.g., US-ABC-12-12345)";
         return null;
     },
 

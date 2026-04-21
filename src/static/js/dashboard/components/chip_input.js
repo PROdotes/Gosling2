@@ -9,7 +9,6 @@
  *   onRemove,      // async (id) => void
  *   onSplit,       // async ({id, label}) => void  — per-chip ✂, optional
  *   allowCreate,   // bool — show "+ Add X" option when no exact match
- *   singleSelect,  // bool — hide text input when an item is present
  *   tagMode,       // bool — show category prefix on chips
  * })
  */
@@ -33,7 +32,6 @@ export function createChipInput({
     onRemove,
     onSplit,
     allowCreate = false,
-    singleSelect = false,
     tagMode = false,
     getCreateLabel = null, // (query) => string — custom label for the "+ Add" option
     categoryColors = {},   // {Category: "#hexcolor"} — for tagMode chips
@@ -132,7 +130,6 @@ export function createChipInput({
                     await onRemove(item.id);
                     items = items.filter((i) => i.id !== item.id || i.label !== item.label);
                     renderChips();
-                    updateInputVisibility();
                 } catch {
                     removeBtn.disabled = false;
                 }
@@ -140,15 +137,6 @@ export function createChipInput({
             chip.appendChild(removeBtn);
 
             chipsEl.appendChild(chip);
-        }
-    }
-
-    function updateInputVisibility() {
-        if (singleSelect && items.length > 0) {
-            inputEl.hidden = true;
-            closeDropdown();
-        } else {
-            inputEl.hidden = false;
         }
     }
 
@@ -271,14 +259,12 @@ export function createChipInput({
     // ── Init ───────────────────────────────────────────────────────────────────
 
     renderChips();
-    updateInputVisibility();
 
     // Return a handle for the parent to refresh items after a server round-trip
     return {
         setItems(newItems) {
             items = [...newItems];
             renderChips();
-            updateInputVisibility();
         },
     };
 }

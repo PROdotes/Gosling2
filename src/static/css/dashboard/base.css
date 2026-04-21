@@ -537,10 +537,10 @@ input:checked + .slider:before {
 .col-info {
     flex: 1;
     min-width: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2px;
+    align-items: center;
 }
 
 .row-title {
@@ -550,6 +550,7 @@ input:checked + .slider:before {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: block; /* guarantee block layout for ellipsis */
 }
 
 .row-artist {
@@ -558,6 +559,7 @@ input:checked + .slider:before {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    display: block;
 }
 
 .row-id {

@@ -304,7 +304,12 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
 
         const errorEl = document.createElement("div");
         errorEl.className = "editor-input-error";
-        input.after(errorEl);
+        const container = input.closest(".editor-input-row");
+        if (container) {
+            container.after(errorEl);
+        } else {
+            input.after(errorEl);
+        }
 
         function showError(msg) {
             hasError = true;
@@ -704,7 +709,6 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 await refresh();
             },
             allowCreate: true,
-            singleSelect: true,
             labelAttrs: (item) => ({
                 "data-action": "open-edit-modal",
                 "data-chip-type": "publisher",
@@ -846,13 +850,13 @@ export function renderActionSidebar(
     const syncLedHtml = `<span class="sync-led" data-song-id="${song.id}" title="Checking sync..."></span><span class="sync-mismatch-list" data-song-id="${song.id}"></span>`;
 
     sidebar.innerHTML = `
-<div class="sidebar-group-label">Playback</div>
+<div class="sidebar-group-label">File</div>
 ${playBtn}
+<button class="sidebar-btn" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop())}">Parse Filename</button>
 
 <div class="sidebar-divider"></div>
 
 <div class="sidebar-group-label">Research</div>
-<button class="sidebar-btn" data-action="open-filename-parser-single" data-id="${song.id}" data-filename="${escapeHtml((song.source_path || "").split(/[\\/]/).pop())}">Parse</button>
 <button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
 ${searchSplitBtn}
 

@@ -197,19 +197,52 @@ const ctx = {
     },
     async refreshActiveSongV2(songId) {
         const fresh = await getCatalogSong(songId);
+
+        // Detect structural changes that require a full re-render
+        const old = state.activeSong;
+        const structuralChange =
+            !old ||
+            fresh.albums?.length !== old.albums?.length ||
+            fresh.credits?.length !== old.credits?.length ||
+            fresh.publishers?.length !== old.publishers?.length;
+
         state.activeSong = fresh;
-        // Only refresh sidebar + LED — avoid re-rendering the editor which would
-        // wipe chip inputs and lose the onSplit handlers wired at initial load.
+
+        if (structuralChange) {
+            // Full re-render to handle new cards/structure
+            renderSongEditorV2(fresh, state.activeSongFile);
+            state.chipHandles = wireChipInputs(
+                fresh,
+                () => ctx.refreshActiveSongV2(fresh.id),
+                state.chipHandles?.onSplit,
+                state.validationRules,
+            );
+            state.scalarHandles = wireScalarInputs(
+                fresh,
+                state.validationRules,
+                () => ctx.refreshActiveSongV2(fresh.id),
+            );
+        }
+
         renderActionSidebar(fresh, {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
         });
         updateSyncLed(fresh.id);
-        // Fix: Refresh drift indicators to reflect changes (e.g. after confirmation)
-        wireDriftIndicators(fresh, state.activeSongFile);
+        wireAuditHistory(fresh.id, () => getAuditHistory("Songs", fresh.id));
 
-        // Sync chip inputs for properties changed via global actions
-        if (state.chipHandles?.updateField) {
+        if (!structuralChange && state.chipHandles && state.scalarHandles) {
+            // Surgical updates for performance and focus preservation
+            for (const field of [
+                "media_name",
+                "media_path",
+                "year",
+                "bpm",
+                "genre",
+                "is_reviewed",
+            ]) {
+                state.scalarHandles.updateField(field, fresh);
+            }
             for (const field of [
                 "performer",
                 "composer",

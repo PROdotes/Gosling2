@@ -537,7 +537,8 @@ export class SongActionsHandler {
     async handleWebSearch(actionTarget) {
         const { engine } = actionTarget.dataset;
         const songId =
-            actionTarget.dataset.songId ||
+            actionTarget.dataset.songId || 
+            actionTarget.dataset.id ||
             actionTarget
                 .closest(".web-search-split")
                 ?.querySelector(".web-search-main")?.dataset.songId;
@@ -983,31 +984,15 @@ export class SongActionsHandler {
     async handleSyncAlbumFromSong(actionTarget) {
         const { albumId, songId } = actionTarget.dataset;
         actionTarget.disabled = true;
-        actionTarget.classList.add("loading");
-        const originalText = actionTarget.textContent;
-        actionTarget.textContent = "Syncing...";
-
+        actionTarget.textContent = "syncing...";
         try {
             await syncAlbumWithSong(albumId, songId);
-            actionTarget.classList.remove("loading");
-            actionTarget.classList.add("success");
-            actionTarget.textContent = "✓ Synced";
-
-            // Brief delay to show success before refreshing
+            // Settle delay for aggregate views
             await new Promise((r) => setTimeout(r, 600));
-
-            if (
-                this.ctx.refreshActiveSongV2 &&
-                this.ctx.getState().currentMode === "songs"
-            ) {
-                await this.ctx.refreshActiveSongV2(songId);
-            } else {
-                this.ctx.refreshActiveDetail();
-            }
+            this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
-            actionTarget.classList.remove("loading");
-            actionTarget.textContent = originalText;
+            actionTarget.textContent = "↓ sync from song";
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`Sync failed: ${err.message}`, "error");
         }
@@ -1051,16 +1036,15 @@ export class SongActionsHandler {
             // 2. Sync metadata (Artist, Publisher, Year)
             await syncAlbumWithSong(albumId, songId);
 
-            // 3. Optional: Sync from Song logic often needs a refresh of the song detail
-            if (this.ctx.refreshActiveSongV2) {
-                await this.ctx.refreshActiveSongV2(songId);
-            } else {
-                this.ctx.refreshActiveDetail();
-            }
+            // 3. Settle delay for DB views
+            await new Promise((r) => setTimeout(r, 600));
+
+            // 4. Structural Refresh
+            await this.ctx.refreshActiveDetail();
 
             showToast(`Album "${song.media_name}" created & synced.`, "success");
 
-            // Reset button state since surgical refresh doesn't overwrite this DOM node
+            // Reset button state
             actionTarget.disabled = false;
             actionTarget.classList.remove("loading");
             actionTarget.innerHTML = originalHtml;

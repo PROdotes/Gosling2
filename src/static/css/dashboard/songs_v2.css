@@ -232,6 +232,7 @@
 #songs-workspace #song-list-panel {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* .song-row base styling lives in base.css (shared list-row primitive). */

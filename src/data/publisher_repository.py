@@ -181,7 +181,7 @@ class PublisherRepository(BaseRepository):
         self, name: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[int]:
         """Return the PublisherID for an exact (case-insensitive) name match, or None."""
-        query = "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0"
+        query = "SELECT PublisherID FROM Publishers WHERE LOWER(PublisherName) = LOWER(?) AND IsDeleted = 0"
         if conn:
             row = conn.execute(query, (name,)).fetchone()
             return row[0] if row else None
@@ -451,7 +451,7 @@ class PublisherRepository(BaseRepository):
     def get_or_create_publisher(self, name: str, cursor) -> int:
         """Get-or-create a Publisher by name. Reactivates soft-deleted. Returns publisher_id."""
         row = cursor.execute(
-            "SELECT PublisherID, IsDeleted FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE",
+            "SELECT PublisherID, IsDeleted FROM Publishers WHERE LOWER(PublisherName) = LOWER(?)",
             (name,),
         ).fetchone()
         if row:
