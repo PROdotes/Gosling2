@@ -74,35 +74,72 @@ def get_actual_members(path: str):
         all_members = set()
         for root, _, files in os.walk(path):
             for file in files:
-                if file.endswith(".py"):
+                if file.endswith((".py", ".js")):
                     file_members = get_actual_members(os.path.join(root, file))
                     if file_members:
                         all_members.update(file_members)
         return all_members
 
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            tree = ast.parse(f.read())
-    except Exception:
-        return set()
+    if path.endswith(".py"):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                tree = ast.parse(f.read())
+            members = set()
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    members.add(node.name)
+                    if isinstance(node, ast.ClassDef):
+                        for item in node.body:
+                            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                                members.add(item.name)
+                elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    targets = node.targets if hasattr(node, "targets") else [node.target]
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            members.add(target.id)
+            return members
+        except Exception:
+            return set()
 
-    members = set()
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            members.add(node.name)
-            if isinstance(node, ast.ClassDef):
-                for item in node.body:
-                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        members.add(item.name)
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    members.add(target.id)
-        elif isinstance(node, ast.AnnAssign):
-            if isinstance(node.target, ast.Name):
-                members.add(node.target.id)
+    if path.endswith(".js"):
+        import re
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+            
+            members = set()
+            # 1. Functions, Classes, and Constants
+            matches = re.finditer(r'export\s+(?:async\s+)?(?:function|class|const)\s+([a-zA-Z0-9_]+)', content)
+            for m in matches:
+                members.add(m.group(1))
+            
+            # 2. Methods in classes
+            class_blocks = re.finditer(r'export\s+class\s+([a-zA-Z0-9_]+)\s*\{([\s\S]*?)\n\}', content)
+            for cb in class_blocks:
+                class_content = cb.group(2)
+                keywords = {'if', 'for', 'while', 'catch', 'switch'}
+                method_matches = re.finditer(r'^\s*(?:async\s+)?([a-zA-Z0-9][a-zA-Z0-9_]*)\s*\([^)]*\)\s*\{', class_content, re.MULTILINE)
+                for mm in method_matches:
+                    m_name = mm.group(1)
+                    if m_name != "constructor" and m_name not in keywords:
+                        members.add(m_name)
+            
+            # 3. Named exports
+            named_matches = re.finditer(r'export\s+\{(.*)\}', content)
+            for m in named_matches:
+                for n in m.group(1).split(","):
+                    members.add(n.strip())
+            
+            # 4. Local functions (for shared.js/utils.js where they aren't always exported)
+            local_matches = re.finditer(r'(?:async\s+)?function\s+([a-zA-Z0-9_]+)\s*\(', content)
+            for m in local_matches:
+                members.add(m.group(1))
+                
+            return members
+        except Exception:
+            return set()
 
-    return members
+    return set()
 
 
 class TestLookupJunkDetector:
