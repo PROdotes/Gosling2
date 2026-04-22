@@ -433,20 +433,28 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
         btn.textContent = "Scanning...";
 
         try {
-            const result = await scanFolder(folderPath, true, true);
+            const response = await scanFolder(folderPath, true, true);
+            if (!response.ok) throw new Error("Scan failed");
 
-            // Result is BatchIngestReport
-            const summary = `Scanned folder: ${result.total_files} files processed (${result.ingested} ingested, ${result.duplicates} duplicates, ${result.errors} errors)`;
-            appendBatchSummary(resultsId, result, summary, ctx);
-
-            // Show individual file results
-            for (const fileResult of result.results) {
-                const fileName =
-                    basename(fileResult.song?.source_path) ||
-                    basename(fileResult.staged_path) ||
-                    "Unknown";
-                appendResult(resultsId, fileResult, fileName, ctx);
-            }
+            await readNdjsonStream(response, (update) => {
+                if (update.error) {
+                    showToast(update.error, "error");
+                    return;
+                }
+                ctx.updateIngestBadges?.({
+                    success: update.success,
+                    action: update.action,
+                    pending: update.pending,
+                });
+                const res = update.last_result;
+                if (res) {
+                    const fileName =
+                        basename(res.song?.source_path) ||
+                        basename(res.staged_path) ||
+                        "Unknown";
+                    appendResult(resultsId, res, fileName, ctx);
+                }
+            });
         } catch (error) {
             appendResult(
                 resultsId,

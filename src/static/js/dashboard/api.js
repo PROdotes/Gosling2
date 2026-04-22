@@ -286,7 +286,7 @@ export async function readNdjsonStream(response, onUpdate) {
 }
 
 export function scanFolder(folderPath, recursive = true, inPlace = false) {
-    return fetchJson("/api/v1/ingest/scan-folder", {
+    return fetch("/api/v1/ingest/scan-folder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder_path: folderPath, recursive, in_place: inPlace }),

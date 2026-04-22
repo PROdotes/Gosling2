@@ -420,9 +420,8 @@ class TestScanFolderApi:
         body = resp.json()
         assert "detail" in body, "Expected 'detail' in validation error"
 
-    def test_scan_folder_returns_batch_report(self, client, tmp_path):
-        """Valid folder scan returns BatchIngestReport structure."""
-        # Create folder with mock mp3 files
+    def test_scan_folder_returns_ndjson_stream(self, client, tmp_path):
+        """Valid folder scan returns NDJSON stream with per-file results."""
         audio_dir = tmp_path / "audio"
         audio_dir.mkdir()
         (audio_dir / "song1.mp3").write_bytes(b"mock mp3 1")
@@ -435,15 +434,14 @@ class TestScanFolderApi:
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
 
-        data = resp.json()
-        assert (
-            set(data.keys()) == EXPECTED_BATCH_REPORT_FIELDS
-        ), f"Expected keys {EXPECTED_BATCH_REPORT_FIELDS}, got {set(data.keys())}"
+        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+        updates = [json.loads(l) for l in lines]
+        results = [u["last_result"] for u in updates if "last_result" in u]
 
-        # Should have found 2 files
-        assert (
-            data["total_files"] == 2
-        ), f"Expected 2 total_files, got {data['total_files']}"
+        assert len(results) == 2, f"Expected 2 results, got {len(results)}"
+        assert all(r["status"] == "INGESTED" for r in results), (
+            f"Expected all INGESTED, got {[r['status'] for r in results]}"
+        )
 
     def test_recursive_false_only_scans_top_level(self, client, tmp_path):
         """recursive=false only processes top-level files."""
@@ -461,12 +459,11 @@ class TestScanFolderApi:
         )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
+        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+        updates = [json.loads(l) for l in lines]
+        results = [u["last_result"] for u in updates if "last_result" in u]
 
-        # Should only find top.mp3 (not nested.mp3)
-        assert (
-            data["total_files"] == 1
-        ), f"Expected 1 file (non-recursive), got {data['total_files']}"
+        assert len(results) == 1, f"Expected 1 file (non-recursive), got {len(results)}"
 
     def test_recursive_true_scans_subdirectories(self, client, tmp_path):
         """recursive=true processes all subdirectories."""
@@ -484,12 +481,11 @@ class TestScanFolderApi:
         )
 
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
-        data = resp.json()
+        lines = [l for l in resp.text.strip().split("\n") if l.strip()]
+        updates = [json.loads(l) for l in lines]
+        results = [u["last_result"] for u in updates if "last_result" in u]
 
-        # Should find both files
-        assert (
-            data["total_files"] == 2
-        ), f"Expected 2 files (recursive), got {data['total_files']}"
+        assert len(results) == 2, f"Expected 2 files (recursive), got {len(results)}"
 
 
 class TestScanFolderInPlace:

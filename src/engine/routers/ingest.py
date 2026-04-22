@@ -34,8 +34,58 @@ router = APIRouter(prefix="/api/v1/ingest", tags=["ingestion"])
 
 
 def _get_service() -> CatalogService:
-    """Service factory for the ingestion router."""
     return CatalogService()
+
+
+async def _stream_ingestion(service, work_items):
+    """
+    Shared streaming ingestion pipeline.
+    work_items: [(staged_path, original_path), ...]
+    Yields NDJSON with session status and per-file results.
+    """
+    from typing import Optional
+
+    task_id = str(uuid4())
+    service._ingestion_service.register_task(task_id, len(work_items))
+
+    try:
+        yield f"{json.dumps(jsonable_encoder(service._ingestion_service.get_session_status()))}\n"
+        await asyncio.sleep(0)
+
+        for staged_path, original_path in work_items:
+            if Path(staged_path).suffix.lower() == ".wav":
+                if WAV_AUTO_CONVERT:
+                    try:
+                        mp3 = await run_in_threadpool(convert_to_mp3, Path(staged_path))
+                        res = await run_in_threadpool(
+                            service._ingestion_service._ingest_single, str(mp3), original_path=original_path
+                        )
+                    except RuntimeError as e:
+                        res = {"status": "ERROR", "message": str(e)}
+                else:
+                    res = await run_in_threadpool(
+                        service.ingest_wav_as_converting, staged_path, original_path=original_path
+                    )
+                    if res["status"] == "CONVERTING":
+                        res["status"] = "PENDING_CONVERT"
+                    if res.get("song"):
+                        res["song"] = SongView.from_domain(res["song"])
+                    res["staged_path"] = staged_path
+            else:
+                res = await run_in_threadpool(
+                    service._ingestion_service._ingest_single, staged_path, original_path=original_path
+                )
+                if res.get("song"):
+                    res["song"] = SongView.from_domain(res["song"])
+
+            service._ingestion_service._update_task(task_id, res["status"])
+            status = service._ingestion_service.get_session_status()
+            yield f"{json.dumps(jsonable_encoder({**status, 'last_result': res}))}\n"
+            await asyncio.sleep(0)
+
+    except Exception as e:
+        logger.error(f"[IngestRouter] Stream error: {e}")
+        yield f"{json.dumps({'error': str(e)})}\n"
 
 
 @router.get("/parser-config")
@@ -76,19 +126,15 @@ async def reset_ingest_status():
 
 @router.post("/upload")
 async def upload_files(files: list[UploadFile] = File(...)):
-    """
-    Refactored to stream the 'Whole Model' status.
-    Uses SSE-style newline-delimited JSON chunks.
-    """
+    """Upload files via browser and stream ingestion progress."""
     logger.info(f"[IngestRouter] -> upload_files(count={len(files)})")
 
     os.makedirs(STAGING_DIR, exist_ok=True)
+    work_items = []
 
-    staged_paths = []
     for file in files:
         if not file.filename:
             continue
-        # Replace backslashes with forward slashes to handle Windows-style paths on Unix
         safe_filename = Path(file.filename.replace("\\", "/")).name
         if Path(safe_filename).suffix.lower() not in ACCEPTED_EXTENSIONS:
             continue
@@ -96,59 +142,19 @@ async def upload_files(files: list[UploadFile] = File(...)):
         try:
             with open(staged_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
-            staged_paths.append(staged_path)
+            original_src = os.path.join(get_downloads_folder(), safe_filename)
+            work_items.append((staged_path, original_src))
         except Exception as e:
             logger.error(f"[IngestRouter] Failed to stage {file.filename}: {e}")
 
-    if not staged_paths:
+    if not work_items:
         raise HTTPException(status_code=400, detail="No valid audio files found.")
 
     service = _get_service()
-    task_id = str(uuid4())
-    service._ingestion_service.register_task(task_id, len(staged_paths))
-
-    async def _stream_ingest():
-        try:
-            yield f"{json.dumps(jsonable_encoder(service._ingestion_service.get_session_status()))}\n"
-            await asyncio.sleep(0)
-
-            for p in staged_paths:
-                original_src = os.path.join(get_downloads_folder(), Path(p).name.split("_", 1)[-1])
-                if Path(p).suffix.lower() == ".wav":
-                    if WAV_AUTO_CONVERT:
-                        try:
-                            mp3 = await run_in_threadpool(convert_to_mp3, Path(p))
-                            p = str(mp3)
-                            res = await run_in_threadpool(
-                                service._ingestion_service._ingest_single, p, original_path=original_src
-                            )
-                        except RuntimeError as e:
-                            res = {"status": "ERROR", "message": str(e)}
-                    else:
-                        res = await run_in_threadpool(service.ingest_wav_as_converting, p, original_path=original_src)
-                        if res["status"] == "CONVERTING":
-                            res["status"] = "PENDING_CONVERT"
-                    if res.get("song"):
-                        res["song"] = SongView.from_domain(res["song"])
-                    res["staged_path"] = p
-                else:
-                    res = await run_in_threadpool(
-                        service._ingestion_service._ingest_single, p, original_path=original_src
-                    )
-                    if res.get("song"):
-                        res["song"] = SongView.from_domain(res["song"])
-
-                service._ingestion_service._update_task(task_id, res["status"])
-
-                status = service._ingestion_service.get_session_status()
-                yield f"{json.dumps(jsonable_encoder({**status, 'last_result': res}))}\n"
-                await asyncio.sleep(0)
-
-        except Exception as e:
-            logger.error(f"[IngestRouter] Stream error: {e}")
-            yield f"{json.dumps({'error': str(e)})}\n"
-
-    return StreamingResponse(_stream_ingest(), media_type="application/x-ndjson")
+    return StreamingResponse(
+        _stream_ingestion(service, work_items),
+        media_type="application/x-ndjson",
+    )
 
 @router.get("/cleanup-origin/{song_id}")
 async def get_cleanup_origin(song_id: int):
@@ -222,27 +228,16 @@ async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportVi
         )
 
 
-@router.post("/scan-folder", response_model=BatchIngestReport)
-async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
+@router.post("/scan-folder")
+async def scan_folder(request: FolderScanRequest):
     """
     Server-side folder scanning and ingestion.
-    Scans a local filesystem path for audio files and ingests them.
-
-    Use this for desktop app or when files are already on the server.
-    For browser uploads, use /upload instead.
-
-    Example:
-        POST /api/v1/ingest/scan-folder
-        {
-            "folder_path": "Z:\\Songs\\New Album",
-            "recursive": true
-        }
+    Streams ingestion progress via NDJSON.
     """
     logger.info(
         f"[IngestRouter] -> scan_folder(path='{request.folder_path}', recursive={request.recursive})"
     )
 
-    # 1. Scan for audio files
     service = _get_service()
     audio_files = service.scan_folder(request.folder_path, request.recursive)
 
@@ -254,103 +249,34 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
 
     os.makedirs(STAGING_DIR, exist_ok=True)
 
-    # 3. Copy files to staging (or bypass if in_place)
-    staged_paths = []
+    work_items = []
     if request.in_place:
-        staged_paths = audio_files
-        logger.info(f"[IngestRouter] Bypassing STAGING_DIR. In-place processing {len(staged_paths)} files.")
+        for file_path in audio_files:
+            work_items.append((file_path, None))
+        logger.info(f"[IngestRouter] In-place processing {len(work_items)} files.")
     else:
         for file_path in audio_files:
             try:
                 uuid_filename = f"{uuid4()}_{Path(file_path).name}"
                 staged_path = os.path.join(STAGING_DIR, uuid_filename)
                 shutil.copy2(file_path, staged_path)
-                staged_paths.append(staged_path)
+                work_items.append((staged_path, file_path))
                 logger.debug(f"[IngestRouter] Staged: {file_path} -> {staged_path}")
             except Exception as e:
                 logger.error(f"[IngestRouter] Failed to stage {file_path}: {e}")
-                # Continue with other files
 
-    if not staged_paths:
+    if not work_items:
         raise HTTPException(
             status_code=500, detail="Failed to stage any files for ingestion"
         )
 
-    # 4. Split WAVs and non-WAVs
-    wav_paths = [p for p in staged_paths if Path(p).suffix.lower() == ".wav"]
-    ingest_paths = [p for p in staged_paths if Path(p).suffix.lower() != ".wav"]
-    combined_results = []
-
-    if wav_paths:
-        if WAV_AUTO_CONVERT:
-            # Convert inline and ingest as normal
-            for wav in wav_paths:
-                try:
-                    mp3 = convert_to_mp3(Path(wav))
-                    ingest_paths.append(str(mp3))
-                except RuntimeError as e:
-                    logger.error(
-                        f"[IngestRouter] scan_folder WAV conversion failed for {wav}: {e}"
-                    )
-                    combined_results.append({"status": "ERROR", "message": str(e)})
-        else:
-            # Ingest as status=3, await manual conversion
-            for wav in wav_paths:
-                # Find the original source path by matching the filename from audio_files
-                # Skip tracking origin when in_place=True (file stays in place, no separate original)
-                original_src = None if request.in_place else next((f for f in audio_files if Path(f).name == Path(wav).name.split("_", 1)[-1]), None)
-                result = service.ingest_wav_as_converting(wav, original_path=original_src)
-                if result["status"] == "CONVERTING":
-                    result["status"] = "PENDING_CONVERT"
-                if result.get("song"):
-                    result["song"] = SongView.from_domain(result["song"])
-                result["staged_path"] = wav
-                combined_results.append(result)
-
-    # 5. Batch ingest non-WAVs
-    try:
-        if ingest_paths:
-            # Skip tracking origin when in_place=True (file stays in place, no separate original)
-            batch_results = []
-            for p in ingest_paths:
-                original_src = None if request.in_place else next((f for f in audio_files if Path(f).name == Path(p).name.split("_", 1)[-1]), None)
-                res = await run_in_threadpool(service._ingestion_service.ingest_file, p, original_src)
-                batch_results.append(res)
-            
-            for result in batch_results:
-                if "song" in result and result["song"]:
-                    result["song"] = SongView.from_domain(result["song"])
-            combined_results.extend(batch_results)
-
-        total = len(combined_results)
-        ingested = sum(
-            1
-            for r in combined_results
-            if r.get("status") in ("INGESTED", "CONVERTING", "PENDING_CONVERT")
-        )
-        duplicates = sum(
-            1
-            for r in combined_results
-            if r.get("status") in ("ALREADY_EXISTS", "MATCHED_HASH")
-        )
-        errors = sum(1 for r in combined_results if r.get("status") == "ERROR")
-
-        logger.info(
-            f"[IngestRouter] <- scan_folder() found={len(audio_files)} ingested={ingested}"
-        )
-        return BatchIngestReport(
-            total_files=total,
-            ingested=ingested,
-            duplicates=duplicates,
-            errors=errors,
-            results=combined_results,
-        )
-
-    except Exception as e:
-        logger.error(f"[IngestRouter] Folder scan ingestion error: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Internal Ingestion Error: {str(e)}"
-        )
+    logger.info(
+        f"[IngestRouter] <- scan_folder() queuing {len(work_items)} files for ingestion"
+    )
+    return StreamingResponse(
+        _stream_ingestion(service, work_items),
+        media_type="application/x-ndjson",
+    )
 
 
 @router.delete("/songs/{song_id:int}")
