@@ -140,13 +140,13 @@ async def get_song(song_id: int) -> SongView:
             from src.engine.config import LIBRARY_ROOT
 
             root = LIBRARY_ROOT
-            preview = service._filing_service.evaluate_routing(song)
-            view.organized_path_preview = str(root / preview)
+            preview = service._library_service._filing_service.evaluate_routing(song)
+            view.projected_path = str(root / preview)
         except Exception as e:
             logger.debug(
-                f"[CatalogRouter] Routing preview skipped for song {song_id}: {e}"
+                f"[CatalogRouter] Routing preview failed for song {song_id}: {e}"
             )
-            view.organized_path_preview = f"[Routing error] {e}"
+            view.projected_path = f"[Routing error] {e}"
 
     return view
 

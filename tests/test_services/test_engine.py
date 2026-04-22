@@ -85,6 +85,8 @@ class TestGetSong:
         assert (
             data["formatted_duration"] == "4:00"
         ), f"Expected formatted_duration='4:00', got {data['formatted_duration']!r}"
+        assert data["projected_path"], "projected_path should not be empty"
+        assert "[Routing error]" not in data["projected_path"], f"Routing failed: {data['projected_path']}"
 
     def test_everlong_credits(self, client):
         """Song 2 has one credit: Foo Fighters as Performer."""

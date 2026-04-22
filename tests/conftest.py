@@ -25,6 +25,15 @@ import pytest  # noqa: E402
 from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
 from src.services.audit_service import AuditService  # noqa: E402
+from src.engine import config  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def disable_side_effects(monkeypatch):
+    """Disable destructive side-effects during general test runs."""
+    monkeypatch.setattr(config, "AUTO_MOVE_ON_APPROVE", False)
+    monkeypatch.setattr(config, "AUTO_SAVE_ID3", False)
+
 
 
 # ---------------------------------------------------------------------------
@@ -346,6 +355,7 @@ def _populate_db_data(db_path):
         (4, "Electronic", "Style"),
         (5, "English", "Jezik"),
         (6, "Alt Rock", "Genre"),
+        (7, "Rock", "Genre"),
     ]
     for tag_id, name, category in tags:
         cursor.execute(
@@ -359,6 +369,7 @@ def _populate_db_data(db_path):
         (1, 2, 0),  # SLTS -> Energetic
         (1, 5, 0),  # SLTS -> English
         (2, 3, 0),  # Everlong -> 90s
+        (2, 7, 1),  # Everlong -> Rock (primary)
         (4, 4, 0),  # Grohlton Theme -> Electronic
         (9, 1, 0),  # Priority Test -> Grunge (NOT primary)
         (9, 6, 1),  # Priority Test -> Alt Rock (IS primary)
