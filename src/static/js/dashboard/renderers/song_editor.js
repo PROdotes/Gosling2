@@ -812,7 +812,9 @@ export function renderActionSidebar(
             data-action="mark-reviewed" data-id="${song.id}"
             ${blocked ? 'disabled title="Missing required fields"' : ""}>Mark as Done</button>`;
     } else if (status === PROCESSING_STATUS.REVIEWED) {
-        organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
+        if (song.needs_organization) {
+            organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
+        }
         unreviewBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
     }
 

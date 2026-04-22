@@ -1,5 +1,6 @@
 import sqlite3
 import os
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from src.data.song_repository import SongRepository
 from src.data.album_repository import AlbumRepository
@@ -20,13 +21,16 @@ from src.models.domain import (
     Tag,
 )
 from src.services.logger import logger
+from src.services.filing_service import FilingService
+from src.engine import config
 
 
 class LibraryService:
     """Specialized orchestrator for Reading and Hydrating the music catalog."""
 
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, rules_path: Optional[Path] = None, library_root: Optional[Path] = None):
         self._db_path = db_path
+        self._library_root = library_root or config.LIBRARY_ROOT
         self._song_repo = SongRepository(db_path)
         self._album_repo_dir = AlbumRepository(db_path)
         self._album_repo = SongAlbumRepository(db_path)
@@ -36,6 +40,10 @@ class LibraryService:
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
         self._staging_repo = StagingRepository(db_path)
+        
+        # Determine rules path
+        actual_rules_path = rules_path or config.RENAME_RULES_PATH
+        self._filing_service = FilingService(actual_rules_path)
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
@@ -333,22 +341,47 @@ class LibraryService:
         for song in songs:
             if song.id is None:
                 continue
-                
+
             # Origin check
             origin_path = self._staging_repo.get_origin(song.id, conn)
-            original_exists = False
-            if origin_path and os.path.exists(origin_path):
-                original_exists = True
+
+            # --- 1. Hydrate full domain object ---
+            song = song.model_copy(
+                update={
+                    "credits": credits_by_song.get(song.id, []),
+                    "albums": assocs_by_song.get(song.id, []),
+                    "publishers": pubs_by_song.get(song.id, []),
+                    "tags": tags_by_song.get(song.id, []),
+                    "estimated_original_path": origin_path,
+                    "original_exists": bool(origin_path and os.path.exists(origin_path)),
+                }
+            )
+
+            # --- 2. Desired State Sync (Declarative Physical Move) ---
+            projected_path = None
+            needs_organization = False
+            
+            # Optimization: Only calculate paths and check moves if song is Reviewed
+            # This prevents 500+ exists() checks during a simple library search
+            if song.processing_status == config.ProcessingStatus.REVIEWED:
+                try:
+                    projected_path = str(self._library_root / self._filing_service.evaluate_routing(song))
+                    if song.source_path and os.path.normpath(song.source_path) != os.path.normpath(projected_path):
+                        needs_organization = True
+                        if config.AUTO_MOVE_ON_APPROVE:
+                            new_path = self._filing_service.move_to_library(song, self._library_root)
+                            self._song_repo.update_scalars(song.id, {"source_path": str(new_path)}, conn)
+                            # Re-sync path on the object
+                            song = song.model_copy(update={"source_path": str(new_path)})
+                            needs_organization = False
+                except Exception as e:
+                    logger.error(f"[LibraryService] Desired State Sync failed for {song.id}: {e}")
 
             hydrated_songs.append(
                 song.model_copy(
                     update={
-                        "credits": credits_by_song.get(song.id, []),
-                        "albums": assocs_by_song.get(song.id, []),
-                        "publishers": pubs_by_song.get(song.id, []),
-                        "tags": tags_by_song.get(song.id, []),
-                        "estimated_original_path": origin_path,
-                        "original_exists": original_exists,
+                        "projected_path": projected_path,
+                        "needs_organization": needs_organization,
                     }
                 )
             )

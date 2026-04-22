@@ -96,11 +96,14 @@ class FilingService:
                 break
 
         if not rule_path_template:
+            rule_path_template = self._rules.get("default_rule")
+
+        if not rule_path_template:
             logger.warning(
-                f"[FilingService] <- evaluate_routing() FAILURE: No rule matches genre '{genre_name}'"
+                f"[FilingService] <- evaluate_routing() FAILURE: No rule matches genre '{genre_name}' and no default_rule defined."
             )
             raise ValueError(
-                f"No filing rule exists for genre '{genre_name}'. Add it to rules.json."
+                f"No filing rule exists for genre '{genre_name}' and no default_rule found. Add it to rules.json."
             )
 
         # 4. Interpolate the sanitized components into the structural directory rule
@@ -185,5 +188,23 @@ class FilingService:
         logger.info(f"[FilingService] Copying: {source_path} -> {target_absolute}")
 
         shutil.copy2(str(source_path), str(target_absolute))
-
         return target_absolute
+
+    def move_to_library(self, song: Song, library_root: Path) -> Path:
+        """Organizes a file into the library and removes the old source."""
+        source_path = Path(song.source_path)
+        target_path = self.copy_to_library(song, library_root)
+        
+        # Safe comparison: samefile() handles different path formats pointing to same inode
+        is_same = False
+        try:
+            if source_path.exists() and target_path.exists():
+                is_same = source_path.samefile(target_path)
+        except Exception:
+            pass
+
+        if source_path.exists() and not is_same:
+            source_path.unlink()
+            logger.debug(f"[FilingService] Unlinked old source: {source_path}")
+            
+        return target_path

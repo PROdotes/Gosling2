@@ -62,6 +62,8 @@ class EditService:
         tag_repo: Optional[TagRepository] = None,
         identity_repo: Optional[IdentityRepository] = None,
         album_credit_repo: Optional[AlbumCreditRepository] = None,
+        rules_path: Optional[Path] = None,
+        library_root: Optional[Path] = None,
     ):
         if db_path is None:
             db_path = get_db_path()
@@ -77,12 +79,13 @@ class EditService:
         self._staging_repo = StagingRepository(db_path)
 
         # Cross-service dependencies
-        self._library_service = library_service or LibraryService(db_path)
+        self._library_service = library_service or LibraryService(db_path, rules_path=rules_path, library_root=library_root)
 
         # Edit Helpers
         self._metadata_writer = MetadataWriter()
         self._casing_service = CasingService()
-        self._filing_service = FilingService(RENAME_RULES_PATH)
+        actual_rules_path = rules_path or RENAME_RULES_PATH
+        self._filing_service = FilingService(actual_rules_path)
 
     def update_song_scalars(
         self,
@@ -169,13 +172,13 @@ class EditService:
         # 4. Persistence
         conn = self._song_repo.get_connection()
         try:
+            print(f"DEBUG: update_song_scalars called for {song_id}")
             self._song_repo.update_scalars(song_id, fields, conn)
             conn.commit()
             self._sync_id3_if_enabled(song_id)
 
             new_status = fields.get("processing_status", song.processing_status)
-            if AUTO_MOVE_ON_APPROVE and new_status == ProcessingStatus.REVIEWED:
-                self.move_song_to_library(song_id)
+            return self._library_service.get_song(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- update_song_scalars FAILED: {e}")

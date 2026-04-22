@@ -30,7 +30,7 @@ from src.services.catalog_service import CatalogService
 from tests.conftest import _connect
 
 
-def _connect(db_path):
+def _connect_with_collation(db_path):
     conn = _connect(db_path)
     conn.create_collation(
         "UTF8_NOCASE",
@@ -46,7 +46,7 @@ def disambiguation_db(tmp_path, _master_populated_db):
     shutil.copy(_master_populated_db, dest)
     db_path = str(dest)
 
-    conn = _connect(db_path)
+    conn = _connect_with_collation(db_path)
     c = conn.cursor()
 
     # Song 50: "Shared Title" by Nirvana, 1991

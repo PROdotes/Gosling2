@@ -537,7 +537,10 @@ Unified timeline of actions and changes for a record.
 Calculates the target relative path based on rules.
 
 ### copy_to_library(song: Song, library_root: Path) -> Path
-Copies physical file to library.
+Copies physical file to library. Handles same-file bypass logic.
+
+### move_to_library(song: Song, library_root: Path) -> Path
+Organizes a file into the library and removes the old source. Atomic-style transaction: Copy -> Confirm -> Delete.
 
 ---
 

@@ -183,7 +183,8 @@ class SongView(BaseModel):
     publishers: List[Publisher] = []
     tags: List[Tag] = []
     raw_tags: Dict[str, List[str]] = {}
-    organized_path_preview: Optional[str] = None
+    projected_path: Optional[str] = None
+    needs_organization: bool = False
     estimated_original_path: Optional[str] = None
     original_exists: bool = False
 
@@ -195,6 +196,9 @@ class SongView(BaseModel):
 
         # Map domain albums to album views
         data["albums"] = [SongAlbumView(**a.model_dump()) for a in song.albums]
+        # Ensure projected path and needs_organization are explicitly passed
+        data["projected_path"] = song.projected_path
+        data["needs_organization"] = song.needs_organization
         return cls(**data)
 
     @computed_field
