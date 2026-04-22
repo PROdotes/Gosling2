@@ -26,10 +26,12 @@ def _save_raw(path: str, data: dict) -> None:
 
 @lru_cache(maxsize=1)
 def load_id3_frames(path: str = _FRAMES_PATH) -> ID3FrameMapping:
-    """
-    The single source of truth for ID3 frame mapping.
-    Uses @lru_cache to ensure we only read the JSON from disk once.
-    """
+    """The single source of truth for ID3 frame mapping. Resolves paths to ensure cache hits."""
+    return _load_id3_frames_cached(str(Path(path).resolve()))
+
+
+@lru_cache(maxsize=1)
+def _load_id3_frames_cached(path: str) -> ID3FrameMapping:
     try:
         raw_data = _load_raw(path)
         # Strip non-frame keys before validation
@@ -37,7 +39,7 @@ def load_id3_frames(path: str = _FRAMES_PATH) -> ID3FrameMapping:
         adapter = TypeAdapter(ID3FrameMapping)
         mapping = adapter.validate_python(frame_data)
         logger.debug(
-            f"[MetadataFramesReader] Loaded {len(mapping)} frame mapping entries."
+            f"[MetadataFramesReader] [DISK READ] Loaded {len(mapping)} frame mapping entries from {path}"
         )
         return mapping
     except Exception as e:
@@ -47,9 +49,13 @@ def load_id3_frames(path: str = _FRAMES_PATH) -> ID3FrameMapping:
         return {}
 
 
-@lru_cache(maxsize=1)
 def load_tag_categories(path: str = _FRAMES_PATH) -> List[str]:
     """Returns the live registry of known tag categories from id3_frames.json."""
+    return _load_tag_categories_cached(str(Path(path).resolve()))
+
+
+@lru_cache(maxsize=1)
+def _load_tag_categories_cached(path: str) -> List[str]:
     raw_data = _load_raw(path)
     return raw_data.get("tag_categories", [])
 
@@ -62,7 +68,7 @@ def register_tag_category(category: str, path: str = _FRAMES_PATH) -> None:
         categories.append(category)
         raw_data["tag_categories"] = sorted(categories)
         _save_raw(path, raw_data)
-        load_tag_categories.cache_clear()
+        _load_tag_categories_cached.cache_clear()
         logger.info(f"[MetadataFramesReader] Registered tag category: '{category}'")
 
 
@@ -74,5 +80,5 @@ def unregister_tag_category(category: str, path: str = _FRAMES_PATH) -> None:
         categories.remove(category)
         raw_data["tag_categories"] = categories
         _save_raw(path, raw_data)
-        load_tag_categories.cache_clear()
+        _load_tag_categories_cached.cache_clear()
         logger.info(f"[MetadataFramesReader] Unregistered tag category: '{category}'")
