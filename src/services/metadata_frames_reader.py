@@ -36,7 +36,7 @@ def load_id3_frames(path: str = _FRAMES_PATH) -> ID3FrameMapping:
         frame_data = {k: v for k, v in raw_data.items() if k != "tag_categories"}
         adapter = TypeAdapter(ID3FrameMapping)
         mapping = adapter.validate_python(frame_data)
-        logger.info(
+        logger.debug(
             f"[MetadataFramesReader] Loaded {len(mapping)} frame mapping entries."
         )
         return mapping

@@ -86,22 +86,6 @@ class Logger:
         self.current_level = self.LEVELS.get(env_level, 20)
         self.console_enabled = os.getenv("GOSLING_LOG_CONSOLE", "on").lower() != "off"
         self.file_enabled = os.getenv("GOSLING_LOG_FILE", "on").lower() != "off"
-        self._f: Optional[TextIO] = None
-
-    def _get_file(self) -> Optional[TextIO]:
-        """Lazy file handle acquisition with stderr fallback on failure."""
-        if self._f:
-            return self._f
-
-        try:
-            self._f = open(self.log_file, "a", encoding="utf-8")
-            return self._f
-        except Exception as e:
-            # Audit #13: Don't swallow logging failures silently.
-            sys.stderr.write(
-                f"CRITICAL: Failed to open log file {self.log_file}: {e}\n"
-            )
-            return None
 
     def _log(self, level: str, msg: str):
         level_val = self.LEVELS.get(level, 20)
@@ -115,13 +99,13 @@ class Logger:
             print(line)
 
         if self.file_enabled:
-            f = self._get_file()
-            if f:
-                try:
+            try:
+                # Audit: Open and close for every write to prevent file locking on Windows.
+                # This allows the user to clear the log file while the server is running.
+                with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(line + "\n")
-                    f.flush()  # Ensure it hits disk
-                except Exception as e:
-                    sys.stderr.write(f"ERROR: Failed to write to log file: {e}\n")
+            except Exception as e:
+                sys.stderr.write(f"ERROR: Failed to write to log file {self.log_file}: {e}\n")
 
     def debug(self, msg: str):
         self._log("DEBUG", msg)
