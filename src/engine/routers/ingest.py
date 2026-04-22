@@ -254,18 +254,22 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
 
     os.makedirs(STAGING_DIR, exist_ok=True)
 
-    # 3. Copy files to staging
+    # 3. Copy files to staging (or bypass if in_place)
     staged_paths = []
-    for file_path in audio_files:
-        try:
-            uuid_filename = f"{uuid4()}_{Path(file_path).name}"
-            staged_path = os.path.join(STAGING_DIR, uuid_filename)
-            shutil.copy2(file_path, staged_path)
-            staged_paths.append(staged_path)
-            logger.debug(f"[IngestRouter] Staged: {file_path} -> {staged_path}")
-        except Exception as e:
-            logger.error(f"[IngestRouter] Failed to stage {file_path}: {e}")
-            # Continue with other files
+    if request.in_place:
+        staged_paths = audio_files
+        logger.info(f"[IngestRouter] Bypassing STAGING_DIR. In-place processing {len(staged_paths)} files.")
+    else:
+        for file_path in audio_files:
+            try:
+                uuid_filename = f"{uuid4()}_{Path(file_path).name}"
+                staged_path = os.path.join(STAGING_DIR, uuid_filename)
+                shutil.copy2(file_path, staged_path)
+                staged_paths.append(staged_path)
+                logger.debug(f"[IngestRouter] Staged: {file_path} -> {staged_path}")
+            except Exception as e:
+                logger.error(f"[IngestRouter] Failed to stage {file_path}: {e}")
+                # Continue with other files
 
     if not staged_paths:
         raise HTTPException(
@@ -293,7 +297,8 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
             # Ingest as status=3, await manual conversion
             for wav in wav_paths:
                 # Find the original source path by matching the filename from audio_files
-                original_src = next((f for f in audio_files if Path(f).name == Path(wav).name.split("_", 1)[-1]), None)
+                # Skip tracking origin when in_place=True (file stays in place, no separate original)
+                original_src = None if request.in_place else next((f for f in audio_files if Path(f).name == Path(wav).name.split("_", 1)[-1]), None)
                 result = service.ingest_wav_as_converting(wav, original_path=original_src)
                 if result["status"] == "CONVERTING":
                     result["status"] = "PENDING_CONVERT"
@@ -305,10 +310,10 @@ async def scan_folder(request: FolderScanRequest) -> BatchIngestReport:
     # 5. Batch ingest non-WAVs
     try:
         if ingest_paths:
-            # We need to pass origin paths for non-WAVs too
+            # Skip tracking origin when in_place=True (file stays in place, no separate original)
             batch_results = []
             for p in ingest_paths:
-                original_src = next((f for f in audio_files if Path(f).name == Path(p).name.split("_", 1)[-1]), None)
+                original_src = None if request.in_place else next((f for f in audio_files if Path(f).name == Path(p).name.split("_", 1)[-1]), None)
                 res = await run_in_threadpool(service._ingestion_service.ingest_file, p, original_src)
                 batch_results.append(res)
             

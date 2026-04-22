@@ -102,3 +102,79 @@ def test_move_song_to_library_collision_fails(filing_service, tmp_path):
     # Verify both files still exist (No deletion)
     assert source_file.exists()
     assert target_file.exists()
+
+
+def _make_song(source_path: str) -> object:
+    """Minimal Song for filing tests."""
+    return Song(
+        id=99,
+        media_name="Title",
+        source_path=source_path,
+        duration_s=180.0,
+        year=2024,
+        processing_status=0,
+        credits=[
+            SongCredit(
+                credit_id=1,
+                source_id=1,
+                name_id=1,
+                role_id=1,
+                role_name="Performer",
+                display_name="Artist",
+                is_primary=True,
+            )
+        ],
+        tags=[Tag(id=10, name="Pop", category="Genre", is_primary=True)],
+    )
+
+
+class TestCopyToLibraryInPlace:
+    """copy_to_library when source IS already the target (in-place ingestion path)."""
+
+    def test_source_equals_target_returns_path_without_error(self, filing_service, tmp_path):
+        """When source_path resolves to the same inode as target, return target without raising."""
+        library_root = tmp_path / "library"
+        (library_root / "2024").mkdir(parents=True)
+        existing_file = library_root / "2024" / "Artist - Title.mp3"
+        existing_file.write_bytes(b"real audio data")
+
+        song = _make_song(str(existing_file))
+
+        result = filing_service.copy_to_library(song, library_root)
+
+        assert result == existing_file, (
+            f"Expected target path {existing_file}, got {result}"
+        )
+
+    def test_source_equals_target_file_still_exists_after_call(self, filing_service, tmp_path):
+        """Original file must survive copy_to_library when source IS the target — no deletion."""
+        library_root = tmp_path / "library"
+        (library_root / "2024").mkdir(parents=True)
+        existing_file = library_root / "2024" / "Artist - Title.mp3"
+        existing_file.write_bytes(b"original content do not delete")
+
+        song = _make_song(str(existing_file))
+        filing_service.copy_to_library(song, library_root)
+
+        assert existing_file.exists(), "Original file was deleted during in-place copy_to_library — this is a critical regression"
+        assert existing_file.read_bytes() == b"original content do not delete", (
+            "File contents were modified during in-place copy_to_library"
+        )
+
+    def test_different_source_and_target_still_copies(self, filing_service, tmp_path):
+        """When source != target, the normal copy path still works correctly."""
+        staging_dir = tmp_path / "staging"
+        staging_dir.mkdir(exist_ok=True)
+        source_file = staging_dir / "some_uuid_Artist - Title.mp3"
+        source_file.write_bytes(b"staged content")
+
+        library_root = tmp_path / "library"
+        library_root.mkdir()
+
+        song = _make_song(str(source_file))
+        result = filing_service.copy_to_library(song, library_root)
+
+        assert result.exists(), f"Expected file to be copied to {result}, but it does not exist"
+        assert result.read_bytes() == b"staged content", "Copied file content does not match source"
+        assert source_file.exists(), "Source staging file was deleted during copy — should only be unlinked by EditService"
+

@@ -81,10 +81,10 @@ class FilingService:
             )
 
         placeholders = {
-            "artist": artist_str,
-            "title": song.media_name,
-            "year": str(song.year),
-            "genre": genre_name,
+            "artist": self._sanitize_for_filesystem(artist_str),
+            "title": self._sanitize_for_filesystem(song.media_name),
+            "year": self._sanitize_for_filesystem(str(song.year)),
+            "genre": self._sanitize_for_filesystem(genre_name),
         }
 
         # 3. Find matching rule
@@ -103,11 +103,12 @@ class FilingService:
                 f"No filing rule exists for genre '{genre_name}'. Add it to rules.json."
             )
 
-        # 4. Interpolate and sanitize
+        # 4. Interpolate the sanitized components into the structural directory rule
         raw_path = rule_path_template.format(**placeholders)
 
-        # 5. Physical Filename Sanitization (ASCII-only, no illegal chars)
-        sanitized_path = self._sanitize_for_filesystem(raw_path)
+        # 5. Clean up structural borders (stripping rogue spaces/dots from folder names)
+        components = [c.strip(". ") for c in raw_path.replace("\\", "/").split("/")]
+        sanitized_path = "/".join(components)
 
         # 6. Preserve extension from source
         orig_ext = Path(song.source_path or "").suffix or ".mp3"
@@ -143,17 +144,14 @@ class FilingService:
         normalized = unicodedata.normalize("NFKD", path_str)
         ascii_only = normalized.encode("ascii", "ignore").decode("ascii")
 
-        # 3. Path-Illegal Character Cleanup (except slashes)
-        # We replace : * ? " < > | with _ to preserve path structure but stay safe
-        # GOSLING protocol: keep spaces, they are fine in modern file systems
-        safe = re.sub(r'[\\:*?"<>|]', "_", ascii_only)
+        # 3. Path-Illegal Character Cleanup
+        # We replace slashes, colons, and illegal characters with _
+        safe = re.sub(r'[\\/*?"<>|:]', "_", ascii_only)
 
-        # 4. Collapse multiple spaces or dots
+        # 4. Collapse multiple spaces
         safe = re.sub(r"  +", " ", safe)
 
-        # 5. Remove leading/trailing periods or spaces from each component
-        components = [c.strip(". ") for c in safe.replace("\\", "/").split("/")]
-        return "/".join(components)
+        return safe.strip(". ")
 
     def copy_to_library(self, song: Song, library_root: Path) -> Path:
         """
@@ -164,7 +162,18 @@ class FilingService:
         target_relative = self.evaluate_routing(song)
         target_absolute = library_root / target_relative
 
+        source_path = Path(song.source_path)
+        if not source_path.exists():
+            logger.error(f"[FilingService] Source file not found: {source_path}")
+            raise FileNotFoundError(f"Source file not found: {source_path}")
+
         if target_absolute.exists():
+            try:
+                if source_path.resolve() == target_absolute.resolve() or source_path.samefile(target_absolute):
+                    logger.info(f"[FilingService] File already natively exists at perfect target path, bypassing physical copy: {target_absolute}")
+                    return target_absolute
+            except Exception:
+                pass
             raise FileExistsError(
                 f"Target path already exists in library: {target_absolute}"
             )
@@ -172,11 +181,6 @@ class FilingService:
         # Ensure target directory exists
         if not target_absolute.parent.exists():
             target_absolute.parent.mkdir(parents=True, exist_ok=True)
-
-        source_path = Path(song.source_path)
-        if not source_path.exists():
-            logger.error(f"[FilingService] Source file not found: {source_path}")
-            raise FileNotFoundError(f"Source file not found: {source_path}")
 
         logger.info(f"[FilingService] Copying: {source_path} -> {target_absolute}")
 

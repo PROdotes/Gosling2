@@ -2,6 +2,7 @@ import pytest
 import os
 from src.services.catalog_service import CatalogService
 from src.models.exceptions import ReingestionConflictError
+from tests.conftest import _connect
 
 
 class TestCatalogIngestionConflicts:
@@ -22,7 +23,7 @@ class TestCatalogIngestionConflicts:
         # (CatalogService.delete_song also works, but repo SQL is more isolating)
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (source_id,)
         )
@@ -90,7 +91,7 @@ class TestCatalogIngestionConflicts:
         # 1. Soft delete ghost
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (source_id,)
         )
@@ -134,7 +135,7 @@ class TestResolveConflict:
         import sqlite3
         import shutil
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
         )
@@ -166,7 +167,7 @@ class TestResolveConflict:
         assert song.is_active is False, f"Expected False, got {song.is_active}"
 
         # 5. Database Side Effects - Verify IsDeleted=0
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         row = conn.execute(
             "SELECT MediaName, IsDeleted, SourceDuration, AudioHash FROM MediaSources WHERE SourceID = ?",
             (ghost_id,),
@@ -215,7 +216,7 @@ class TestResolveConflict:
         # Soft-delete to create ghost
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
         )
@@ -244,7 +245,7 @@ class TestResolveConflict:
         import sqlite3
         import shutil
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ?", (ghost_id,)
         )

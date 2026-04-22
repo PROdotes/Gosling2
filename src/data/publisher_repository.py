@@ -181,7 +181,7 @@ class PublisherRepository(BaseRepository):
         self, name: str, conn: Optional[sqlite3.Connection] = None
     ) -> Optional[int]:
         """Return the PublisherID for an exact (case-insensitive) name match, or None."""
-        query = "SELECT PublisherID FROM Publishers WHERE LOWER(PublisherName) = LOWER(?) AND IsDeleted = 0"
+        query = "SELECT PublisherID FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE AND IsDeleted = 0"
         if conn:
             row = conn.execute(query, (name,)).fetchone()
             return row[0] if row else None
@@ -451,7 +451,7 @@ class PublisherRepository(BaseRepository):
     def get_or_create_publisher(self, name: str, cursor) -> int:
         """Get-or-create a Publisher by name. Reactivates soft-deleted. Returns publisher_id."""
         row = cursor.execute(
-            "SELECT PublisherID, IsDeleted FROM Publishers WHERE LOWER(PublisherName) = LOWER(?)",
+            "SELECT PublisherID, IsDeleted FROM Publishers WHERE PublisherName = ? COLLATE UTF8_NOCASE",
             (name,),
         ).fetchone()
         if row:
@@ -466,18 +466,23 @@ class PublisherRepository(BaseRepository):
         return cursor.lastrowid
 
     def add_song_publisher(
-        self, source_id: int, name: str, conn: sqlite3.Connection
+        self, source_id: int, name: str, conn: sqlite3.Connection, publisher_id: Optional[int] = None
     ) -> Publisher:
         """
         Add a publisher link to a song. Get-or-creates the Publisher record.
         Returns the Publisher. Does NOT commit.
         """
         logger.debug(
-            f"[PublisherRepository] -> add_song_publisher(source_id={source_id}, name='{name}')"
+            f"[PublisherRepository] -> add_song_publisher(source_id={source_id}, name='{name}', publisher_id={publisher_id})"
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        pub_id = self.get_or_create_publisher(name, cursor)
+        
+        if publisher_id is not None:
+             cursor.execute("UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?", (publisher_id,))
+             pub_id = publisher_id
+        else:
+             pub_id = self.get_or_create_publisher(name, cursor)
         cursor.execute(
             "INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)",
             (source_id, pub_id),
@@ -506,18 +511,23 @@ class PublisherRepository(BaseRepository):
         logger.debug("[PublisherRepository] <- remove_song_publisher() done")
 
     def add_album_publisher(
-        self, album_id: int, name: str, conn: sqlite3.Connection
+        self, album_id: int, name: str, conn: sqlite3.Connection, publisher_id: Optional[int] = None
     ) -> Publisher:
         """
         Add a publisher link for an album. Get-or-creates the Publisher record.
         Returns the Publisher. Does NOT commit.
         """
         logger.debug(
-            f"[PublisherRepository] -> add_album_publisher(album_id={album_id}, name='{name}')"
+            f"[PublisherRepository] -> add_album_publisher(album_id={album_id}, name='{name}', publisher_id={publisher_id})"
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        pub_id = self.get_or_create_publisher(name, cursor)
+        
+        if publisher_id is not None:
+             cursor.execute("UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?", (publisher_id,))
+             pub_id = publisher_id
+        else:
+             pub_id = self.get_or_create_publisher(name, cursor)
         cursor.execute(
             "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
             (album_id, pub_id),

@@ -9,6 +9,7 @@ populated_db Song 2: "Everlong", BPM=None, Year=1997
 
 import sqlite3
 from src.data.song_repository import SongRepository
+from tests.conftest import _connect
 
 
 class TestUpdateScalars:
@@ -151,7 +152,7 @@ class TestGetByProcessingStatus:
         """A song manually set to status=3 is returned."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
         conn.commit()
         conn.close()
@@ -172,7 +173,7 @@ class TestGetByProcessingStatus:
         """A soft-deleted song with status=3 must NOT appear in results."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET ProcessingStatus = 3, IsDeleted = 1 WHERE SourceID = 2"
         )
@@ -190,7 +191,7 @@ class TestGetByProcessingStatus:
         """All non-deleted songs with matching status are returned, not just the first."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID IN (1, 2)"
         )

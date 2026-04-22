@@ -27,10 +27,11 @@ import os
 import pytest
 from src.data.song_repository import SongRepository
 from src.services.catalog_service import CatalogService
+from tests.conftest import _connect
 
 
 def _connect(db_path):
-    conn = sqlite3.connect(db_path)
+    conn = _connect(db_path)
     conn.create_collation(
         "UTF8_NOCASE",
         lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),

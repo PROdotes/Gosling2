@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app
+from tests.conftest import _connect
 
 
 def collect_upload_stream(resp):
@@ -89,7 +90,7 @@ class TestIngestionApi:
         target_path = str(temp_file)
 
         # Update DB to point to this real path
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1", (target_path,)
         )
@@ -491,6 +492,67 @@ class TestScanFolderApi:
         ), f"Expected 2 files (recursive), got {data['total_files']}"
 
 
+class TestScanFolderInPlace:
+    """Tests for in_place=True flag on POST /api/v1/ingest/scan-folder."""
+
+    def test_in_place_true_does_not_copy_files_to_staging(self, client, tmp_path, monkeypatch):
+        """in_place=True must NOT create any staging copies — source files stay where they are."""
+        import src.engine.routers.ingest as ingest_mod
+
+        # Redirect staging to a known empty tmp dir so we can verify it stays empty
+        staging_dir = tmp_path / "staging"
+        staging_dir.mkdir(exist_ok=True)
+        monkeypatch.setattr(ingest_mod, "STAGING_DIR", str(staging_dir))
+        audio_dir = tmp_path / "library"
+        audio_dir.mkdir()
+        source_file = audio_dir / "Artist - Song.mp3"
+        source_file.write_bytes(b"real audio in place")
+
+        resp = client.post(
+            "/api/v1/ingest/scan-folder",
+            json={"folder_path": str(audio_dir), "recursive": False, "in_place": True},
+        )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+
+        # The staging dir must remain empty — no copies were made
+        staged = list(staging_dir.iterdir())
+        assert staged == [], (
+            f"in_place=True must not create staging copies, but found: {staged}"
+        )
+
+        # The original source file must still exist untouched
+        assert source_file.exists(), "Source file was deleted during in_place scan — critical regression"
+        assert source_file.read_bytes() == b"real audio in place", (
+            "Source file contents were modified during in_place scan"
+        )
+
+    def test_in_place_false_default_creates_staging_copies(self, client, tmp_path, monkeypatch):
+        """in_place=False (default) must copy files to staging as normal."""
+        import src.engine.routers.ingest as ingest_mod
+
+        staging_dir = tmp_path / "staging"
+        staging_dir.mkdir(exist_ok=True)
+        monkeypatch.setattr(ingest_mod, "STAGING_DIR", str(staging_dir))
+
+        audio_dir = tmp_path / "source"
+        audio_dir.mkdir()
+        (audio_dir / "Artist - Song.mp3").write_bytes(b"source audio")
+
+        resp = client.post(
+            "/api/v1/ingest/scan-folder",
+            json={"folder_path": str(audio_dir), "recursive": False, "in_place": False},
+        )
+
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+
+        # At least one staging copy must have been created
+        staged = list(staging_dir.iterdir())
+        assert len(staged) >= 1, (
+            f"in_place=False must create staging copies, but staging dir is empty"
+        )
+
+
 # ========================================
 # PENDING CONVERT TESTS
 # ========================================
@@ -513,7 +575,7 @@ class TestPendingConvertApi:
         """A song manually set to status=3 must appear in the results."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
         conn.commit()
         conn.close()
@@ -530,7 +592,7 @@ class TestPendingConvertApi:
         """Every item returned must have status='PENDING_CONVERT'."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
         conn.commit()
         conn.close()
@@ -547,7 +609,7 @@ class TestPendingConvertApi:
         """Each result item must have status, staged_path, and song keys."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
         conn.commit()
         conn.close()
@@ -565,7 +627,7 @@ class TestPendingConvertApi:
         """A soft-deleted song with status=3 must NOT appear in pending-convert results."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET ProcessingStatus = 3, IsDeleted = 1 WHERE SourceID = 1"
         )
@@ -623,7 +685,7 @@ class TestCleanupOriginApi:
         temp_file.write_bytes(b"")
         target_path = str(temp_file)
         
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("INSERT OR REPLACE INTO StagingOrigins (SourceID, OriginPath) VALUES (?, ?)", (1, target_path))
         conn.commit()
         conn.close()

@@ -18,6 +18,7 @@ import pytest
 
 from src.services.catalog_service import CatalogService
 from src.services.metadata_parser import MetadataParser
+from tests.conftest import _connect
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -45,7 +46,7 @@ def ingest_db(empty_db):
     """Seed empty_db with Types + Roles needed for ingestion."""
     import sqlite3
 
-    conn = sqlite3.connect(empty_db)
+    conn = _connect(empty_db)
     conn.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
     conn.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (1, 'Performer')")
     conn.commit()
@@ -285,7 +286,7 @@ class TestResolveConflictWav:
 
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         row = conn.execute(
             "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
         ).fetchone()
@@ -316,7 +317,7 @@ class TestResolveConflictWav:
 
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         row = conn.execute(
             "SELECT ProcessingStatus FROM MediaSources WHERE SourceID = ?", (ghost_id,)
         ).fetchone()
@@ -333,7 +334,7 @@ class TestResolveConflictWav:
 
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         row = conn.execute(
             "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (ghost_id,)
         ).fetchone()
@@ -383,7 +384,7 @@ class TestFinalizeWavConversionGhostReactivation:
         wav_song_id = result["song"].id
 
         # Create a ghost: insert a second song and soft-delete it
-        conn = sqlite3.connect(ingest_db)
+        conn = _connect(ingest_db)
         conn.execute(
             "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
             "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
@@ -419,7 +420,7 @@ class TestFinalizeWavConversionGhostReactivation:
         result = service.ingest_wav_as_converting(str(staged_wav))
         wav_song_id = result["song"].id
 
-        conn = sqlite3.connect(ingest_db)
+        conn = _connect(ingest_db)
         conn.execute(
             "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
             "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
@@ -441,7 +442,7 @@ class TestFinalizeWavConversionGhostReactivation:
 
         service.finalize_wav_conversion(wav_song_id, str(mp3_path))
 
-        conn = sqlite3.connect(ingest_db)
+        conn = _connect(ingest_db)
         row = conn.execute(
             "SELECT IsDeleted FROM MediaSources WHERE SourceID = ?", (ghost_id,)
         ).fetchone()
@@ -458,7 +459,7 @@ class TestFinalizeWavConversionGhostReactivation:
         result = service.ingest_wav_as_converting(str(staged_wav))
         wav_song_id = result["song"].id
 
-        conn = sqlite3.connect(ingest_db)
+        conn = _connect(ingest_db)
         conn.execute(
             "INSERT INTO MediaSources (TypeID, MediaName, SourcePath, AudioHash, IsDeleted, ProcessingStatus) "
             "VALUES (1, 'Ghost Song', '/ghost/path.mp3', 'FAKE_GHOST_HASH', 1, 1)"
@@ -479,7 +480,7 @@ class TestFinalizeWavConversionGhostReactivation:
 
         service.finalize_wav_conversion(wav_song_id, str(mp3_path))
 
-        conn = sqlite3.connect(ingest_db)
+        conn = _connect(ingest_db)
         row = conn.execute(
             "SELECT SourceID FROM MediaSources WHERE SourceID = ?", (wav_song_id,)
         ).fetchone()

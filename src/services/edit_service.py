@@ -38,6 +38,7 @@ from src.engine.config import (
     SCALAR_ALLOWED,
     METADATA_ALLOWED,
     AUTO_SAVE_ID3,
+    AUTO_MOVE_ON_APPROVE,
     ProcessingStatus,
 )
 from src.engine.models.spotify import SpotifyCredit
@@ -171,6 +172,10 @@ class EditService:
             self._song_repo.update_scalars(song_id, fields, conn)
             conn.commit()
             self._sync_id3_if_enabled(song_id)
+
+            new_status = fields.get("processing_status", song.processing_status)
+            if AUTO_MOVE_ON_APPROVE and new_status == ProcessingStatus.REVIEWED:
+                self.move_song_to_library(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- update_song_scalars FAILED: {e}")
@@ -463,7 +468,7 @@ class EditService:
         conn = self._pub_repo.get_connection()
         try:
             publisher = self._pub_repo.add_album_publisher(
-                album_id, publisher_name, conn
+                album_id, publisher_name, conn, publisher_id=publisher_id
             )
             conn.commit()
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
@@ -526,7 +531,7 @@ class EditService:
         conn = self._tag_repo.get_connection()
         try:
             tag = self._tag_repo.add_tag(
-                song_id, tag_name, category, conn, is_primary=is_primary
+                song_id, tag_name, category, conn, is_primary=is_primary, tag_id=tag_id
             )
             conn.commit()
             if category not in load_tag_categories():
@@ -621,7 +626,7 @@ class EditService:
 
         conn = self._pub_repo.get_connection()
         try:
-            publisher = self._pub_repo.add_song_publisher(song_id, publisher_name, conn)
+            publisher = self._pub_repo.add_song_publisher(song_id, publisher_name, conn, publisher_id=publisher_id)
             conn.commit()
             self._sync_id3_if_enabled(song_id)
             return publisher
@@ -764,7 +769,14 @@ class EditService:
             shipped_song = self._library_service.get_song(song_id)
             if shipped_song:
                 self._metadata_writer.write_metadata(shipped_song)
-            if source_abs_path.exists():
+            
+            # Unlink ONLY if there was an actual physical move (bypasses in-place ingestion logic safely)
+            try:
+                is_same_file = source_abs_path.resolve() == new_abs_path.resolve() or source_abs_path.samefile(new_abs_path)
+            except Exception:
+                is_same_file = False
+                
+            if source_abs_path.exists() and not is_same_file:
                 source_abs_path.unlink()
             
             # Origin stays until user confirms deletion OR it's been handled manually.

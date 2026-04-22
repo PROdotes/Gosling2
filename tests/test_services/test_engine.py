@@ -11,6 +11,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from src.engine_server import app
+from tests.conftest import _connect
 
 
 # ---------------------------------------------------------------------------
@@ -860,7 +861,7 @@ class TestMetabolicInspectFile:
         if not os.path.exists(fixture_path):
             pytest.skip("silence.mp3 fixture not available")
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute(
             "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
             (fixture_path,),

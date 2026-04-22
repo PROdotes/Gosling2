@@ -327,6 +327,7 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                         message: "No audio files found in dropped folder(s)",
                     },
                     "Drag and Drop",
+                    ctx,
                 );
                 showLoading(false);
                 return;
@@ -432,11 +433,11 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
         btn.textContent = "Scanning...";
 
         try {
-            const result = await scanFolder(folderPath, true);
+            const result = await scanFolder(folderPath, true, true);
 
             // Result is BatchIngestReport
             const summary = `Scanned folder: ${result.total_files} files processed (${result.ingested} ingested, ${result.duplicates} duplicates, ${result.errors} errors)`;
-            appendBatchSummary(resultsId, result, summary);
+            appendBatchSummary(resultsId, result, summary, ctx);
 
             // Show individual file results
             for (const fileResult of result.results) {

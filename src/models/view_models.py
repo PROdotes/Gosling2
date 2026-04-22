@@ -586,6 +586,7 @@ class FolderScanRequest(BaseModel):
 
     folder_path: str
     recursive: bool = True
+    in_place: bool = False
 
 
 class IngestStatusModel(BaseModel):

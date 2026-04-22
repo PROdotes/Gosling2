@@ -7,6 +7,70 @@ from typing import Optional, TextIO
 class Logger:
     """Simple v3 bootstrap logger with file persistence and level filtering."""
 
+    # ---------------------------------------------------------------------------
+    # GOSLING2 LOGGING STANDARD
+    # ---------------------------------------------------------------------------
+    #
+    # LEVEL SEMANTICS
+    #
+    #   DEBUG    Internal plumbing — method entry/exit, query results, counts,
+    #            branching decisions. Only useful while actively debugging.
+    #            If you'd remove it in production, it's DEBUG.
+    #
+    #   INFO     Business state changes — anything that mutates data or produces
+    #            a meaningful artifact. Song ingested, tag linked, file moved,
+    #            entity soft-deleted, bulk import completed.
+    #            If it changes the DB or filesystem, it's INFO.
+    #
+    #   WARNING  Unexpected but recoverable — precondition failures, fallbacks.
+    #            NOT_FOUND on an update/delete (expected entity is missing),
+    #            rules file missing (using defaults), ambiguous match resolved.
+    #            The operation continues, but something was off.
+    #
+    #   ERROR    Operation failed and was aborted — exception in a catch block,
+    #            FK violation, file I/O failure, validation rejection.
+    #            Something the user or caller needs to know about.
+    #
+    #   CRITICAL Application cannot continue — DB unreachable, config invalid.
+    #            Reserved for bootstrapping / startup failures only.
+    #
+    #
+    # MESSAGE FORMAT
+    #
+    #   Method entry:    [ClassName] -> method(key=args)
+    #   Method exit:     [ClassName] <- method() result_or_count
+    #   Business event:  [ClassName] ENTITY_CREATED id=N 'name'
+    #   Error:           [ClassName] method FAILED: {exception}
+    #   Warning:         [ClassName] method NOT_FOUND id=N
+    #
+    #   Rules:
+    #     - Always prefix with [ClassName].
+    #     - Entry uses ->  Exit uses <-
+    #     - Every method that logs entry MUST log exit (including error paths).
+    #     - Never log at INFO unless something changed (no "checked X, found Y").
+    #     - Never log raw SQL; log the semantic intent instead.
+    #     - Include identifying data (id, name) in every message.
+    #
+    #
+    # PER-CLASS EXPECTATIONS
+    #
+    #   Repository layer (src/data/):
+    #     DEBUG  entry/exit on every public method
+    #     INFO   write operations (insert, link, soft-delete, reactivate)
+    #     ERROR  catch blocks with exception detail
+    #
+    #   Service layer (src/services/):
+    #     DEBUG  entry/exit on orchestrating methods
+    #     INFO   every successful mutation (the service is the audit trail)
+    #     ERROR  catch blocks; include the upstream method name
+    #
+    #   Router layer (src/engine/routers/):
+    #     DEBUG  entry with request params
+    #     ERROR  unhandled exceptions (most should be caught by services)
+    #     INFO   not normally used (services log the business events)
+    #
+    # ---------------------------------------------------------------------------
+
     LEVELS = {
         "DEBUG": 10,
         "INFO": 20,

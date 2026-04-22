@@ -10,6 +10,7 @@ from src.data.song_credit_repository import SongCreditRepository
 from src.data.song_album_repository import SongAlbumRepository
 from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
+from tests.conftest import _connect
 
 
 # ===================================================================
@@ -320,7 +321,7 @@ class TestSongCreditRepository:
 
     def test_null_role_raises_value_error(self, populated_db):
         """Contract: NULL RoleID must raise ValueError with 'Database integrity error'."""
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute(

@@ -11,6 +11,7 @@ import pytest
 import sqlite3
 from src.services.catalog_service import CatalogService
 from src.models.domain import SongAlbum, Publisher
+from tests.conftest import _connect
 
 
 class TestCreateAndLinkAlbum:
@@ -59,7 +60,7 @@ class TestCreateAndLinkAlbum:
 
     def test_reactivate_soft_deleted_album(self, populated_db):
         service = CatalogService(populated_db)
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.execute("UPDATE Albums SET IsDeleted = 1 WHERE AlbumID = 100")
         conn.commit()
         conn.close()
@@ -71,7 +72,7 @@ class TestCreateAndLinkAlbum:
         album = service.get_album(100)
         assert album is not None, "Album 100 should be retrievable via Service"
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         deleted = conn.execute(
             "SELECT IsDeleted FROM Albums WHERE AlbumID = 100"
         ).fetchone()[0]

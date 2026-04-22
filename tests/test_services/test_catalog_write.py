@@ -4,6 +4,7 @@ import pytest
 from pathlib import Path
 from src.services.catalog_service import CatalogService
 from src.engine.config import SONG_DEFAULT_YEAR
+from tests.conftest import _connect
 
 
 @pytest.fixture
@@ -55,7 +56,7 @@ def ingest_db(empty_db):
     """Seed empty_db with required Types/Roles for ingestion tests (local)."""
     import sqlite3
 
-    conn = sqlite3.connect(empty_db)
+    conn = _connect(empty_db)
     conn.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
     # Ingestion tests need Performer role
     conn.execute("INSERT INTO Roles (RoleID, RoleName) VALUES (1, 'Performer')")

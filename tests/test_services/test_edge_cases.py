@@ -11,6 +11,7 @@ from src.data.song_repository import SongRepository
 from src.data.identity_repository import IdentityRepository
 from src.data.publisher_repository import PublisherRepository
 from src.services.catalog_service import CatalogService
+from tests.conftest import _connect
 
 
 # ===========================================================================
@@ -683,7 +684,7 @@ class TestGeneralEdgeCases:
         from src.services.catalog_service import CatalogService
         from src.models.view_models import SongView
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO MediaSources (SourceID, TypeID, MediaName, SourcePath, SourceDuration, ProcessingStatus) VALUES (99, 1, 'Composer Only', '/path/99', 100, 0)"

@@ -5,6 +5,7 @@ Every assertion verifies EXACT values from the populated_db fixture.
 """
 
 from src.services.audit_service import AuditService
+from tests.conftest import _connect
 
 
 class TestGetHistoryWithData:
@@ -135,7 +136,7 @@ class TestGetHistoryChangeLabeling:
         """When change is from a related table, label should be '[RelatedTable] Updated {field}'."""
         import sqlite3
 
-        conn = sqlite3.connect(populated_db)
+        conn = _connect(populated_db)
         conn.create_collation(
             "UTF8_NOCASE",
             lambda s1, s2: (s1.lower() > s2.lower()) - (s1.lower() < s2.lower()),
