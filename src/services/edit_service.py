@@ -295,6 +295,29 @@ class EditService:
         finally:
             conn.close()
 
+    def _validate_album_scalars(self, fields: dict) -> dict:
+        """Validate SongAlbum scalar fields. Returns cleaned fields dict."""
+        rules = SCALAR_VALIDATION
+        for key in ("track_number", "disc_number", "release_year"):
+            value = fields.get(key)
+            if value is None:
+                continue
+            rule = rules.get(key)
+            if not rule:
+                continue
+            val = int(value)
+            if "min" in rule and val < rule["min"]:
+                raise ValueError(f"{key} must be >= {rule['min']}")
+            if "max" in rule and val > rule["max"]:
+                raise ValueError(f"{key} must be <= {rule['max']}")
+            if key == "release_year":
+                import datetime
+                max_year = datetime.date.today().year + rule.get("max_offset", 1)
+                if not (rule["min"] <= val <= max_year):
+                    raise ValueError(f"{key} must be between {rule['min']} and {max_year}")
+            fields[key] = val
+        return fields
+
     def add_song_album(
         self,
         song_id: int,
@@ -311,16 +334,13 @@ class EditService:
         if not self._library_service.get_album(album_id):
             raise LookupError(f"Album {album_id} not found")
 
-        # Validate track_number and disc_number
-        rules = SCALAR_VALIDATION
+        fields = {}
         if track_number is not None:
-            tn_rules = rules.get("track_number", {"min": 1})
-            if int(track_number) < tn_rules["min"]:
-                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+            fields["track_number"] = track_number
         if disc_number is not None:
-            dn_rules = rules.get("disc_number", {"min": 1})
-            if int(disc_number) < dn_rules["min"]:
-                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
+            fields["disc_number"] = disc_number
+        if fields:
+            self._validate_album_scalars(fields)
 
         conn = self._album_repo.get_connection()
         try:
@@ -353,16 +373,15 @@ class EditService:
         if not self._song_repo.get_by_id(song_id):
             raise LookupError(f"Song {song_id} not found")
 
-        # Validate track_number and disc_number
-        rules = SCALAR_VALIDATION
+        fields = {}
         if track_number is not None:
-            tn_rules = rules.get("track_number", {"min": 1})
-            if int(track_number) < tn_rules["min"]:
-                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+            fields["track_number"] = track_number
         if disc_number is not None:
-            dn_rules = rules.get("disc_number", {"min": 1})
-            if int(disc_number) < dn_rules["min"]:
-                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
+            fields["disc_number"] = disc_number
+        if "release_year" in album_data and album_data["release_year"] is not None:
+            fields["release_year"] = album_data["release_year"]
+        if fields:
+            self._validate_album_scalars(fields)
 
         conn = self._album_repo_dir.get_connection()
         try:
@@ -413,16 +432,13 @@ class EditService:
         if not any(link.album_id == album_id for link in existing_links):
             raise LookupError(f"Song {song_id} is not linked to Album {album_id}")
 
-        # Validate track_number and disc_number
-        rules = SCALAR_VALIDATION
+        fields = {}
         if track_number is not None:
-            tn_rules = rules.get("track_number", {"min": 1})
-            if int(track_number) < tn_rules["min"]:
-                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+            fields["track_number"] = track_number
         if disc_number is not None:
-            dn_rules = rules.get("disc_number", {"min": 1})
-            if int(disc_number) < dn_rules["min"]:
-                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
+            fields["disc_number"] = disc_number
+        if fields:
+            self._validate_album_scalars(fields)
 
         conn = self._album_repo.get_connection()
         try:
@@ -444,6 +460,10 @@ class EditService:
             raise ValueError("Album title cannot be empty")
         if not self._library_service.get_album(album_id):
             raise LookupError(f"Album {album_id} not found")
+
+        if "release_year" in album_data and album_data["release_year"] is not None:
+            self._validate_album_scalars({"release_year": album_data["release_year"]})
+
         conn = self._album_repo_dir.get_connection()
         try:
             self._album_repo_dir.update_album(album_id, album_data, conn)

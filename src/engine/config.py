@@ -73,8 +73,8 @@ SCALAR_VALIDATION = {
         "strip": "-",
         "uppercase": True,
     },
-    "track_number": {"min": 1},
-    "disc_number": {"min": 1},
+    "track_number": {"min": 1, "max": 999},
+    "disc_number": {"min": 1, "max": 99},
 }
 
 # Blur-saves scalars: if True, blurring a scalar input saves the value; if False, it reverts.
