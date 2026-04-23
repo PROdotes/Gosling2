@@ -342,9 +342,9 @@ A secondary bug was found: the tag delimiter default is `:` in JS but `::` in Py
 ## Checklist
 
 ### Phase 1: Quick Wins (eliminate duplication)
-- [ ] **1.** Remove `validators.js` content for 4 fields backend already validates (media_name, year, bpm, isrc) — VL-1
-- [ ] **2.** Remove client-side guards backend already enforces (group→person, groups-as-members) — BR-6, BR-7
-- [ ] **3.** Fix tag delimiter mismatch (`:` in JS vs `::` in Python) — BUG-1
+- [x] **1.** Remove `validators.js` content for 4 fields backend already validates (media_name, year, bpm, isrc) — VL-1
+- [x] **2.** Remove client-side guards backend already enforces (group→person, groups-as-members) — BR-6, BR-7
+- [x] **3.** Fix tag delimiter mismatch (`:` in JS vs `::` in Python) — BUG-1
 
 ### Phase 2: Backend Enforcement Gaps
 - [ ] **4.** Add backend validation for `release_year`, `track_number`, `disc_number` — VL-2

@@ -543,7 +543,7 @@ class TestTagRepository:
         """Song 2 has only 90s(3/Era)."""
         repo = TagRepository(populated_db)
         results = repo.get_tags_for_songs([2])
-        assert len(results) == 1, f"Expected 1 tag result, got {len(results)}"
+        assert len(results) == 2, f"Expected 2 tag results, got {len(results)}"
         _, tag = results[0]
         assert tag.id == 3, f"Expected id=3, got {tag.id}"
         assert tag.name == "90s", f"Expected name='90s', got '{tag.name}'"
@@ -593,7 +593,7 @@ class TestTagRepository:
         """Songs 1 + 2 should return 4 total tag associations (3 for song 1, 1 for song 2)."""
         repo = TagRepository(populated_db)
         results = repo.get_tags_for_songs([1, 2])
-        assert len(results) == 4, f"Expected 4 tag results, got {len(results)}"
+        assert len(results) == 5, f"Expected 5 tag results, got {len(results)}"
 
     def test_empty_input_returns_empty_list(self, populated_db):
         """get_tags_for_songs([]) must return an empty list."""

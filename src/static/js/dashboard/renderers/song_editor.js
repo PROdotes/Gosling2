@@ -359,8 +359,8 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
                 updateListRowBlockers(song.id, fresh.review_blockers);
                 if (onUpdated) onUpdated(fresh);
             } catch (err) {
+                input.value = committedValue;
                 showError(`Save failed: ${err.message}`);
-                revert();
             } finally {
                 input.disabled = false;
                 saving = false;
@@ -378,11 +378,13 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
         input.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && input.tagName !== "TEXTAREA") {
                 e.preventDefault();
+                e.stopPropagation();
                 commit();
                 input.blur();
             }
             if (e.key === "Escape") {
                 e.preventDefault();
+                e.stopPropagation();
                 revert();
                 input.blur();
             }

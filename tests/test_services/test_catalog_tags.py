@@ -8,7 +8,7 @@ Covers:
 - get_songs_by_tag (reverse lookup with hydration)
 
 Uses populated_db which has:
-    Tags: 1=Grunge/Genre, 2=Energetic/Mood, 3=90s/Era, 4=Electronic/Style, 5=English/Jezik, 6=Alt Rock/Genre
+    Tags: 1=Grunge/Genre, 2=Energetic/Mood, 3=90s/Era, 4=Electronic/Style, 5=English/Jezik, 6=Alt Rock/Genre, 7=Rock/Genre
     Songs: 1-9 (various)
     MediaSourceTags: Song 1 -> Grunge,Energetic,English; Song 2 -> 90s; Song 4 -> Electronic; Song 9 -> Grunge,Alt Rock
 """
@@ -18,11 +18,11 @@ from src.services.catalog_service import CatalogService
 
 class TestGetAllTags:
     def test_returns_all_tags_sorted(self, populated_db):
-        """Should return all 6 tags from populated_db, sorted by name."""
+        """Should return all 7 tags from populated_db, sorted by name."""
         service = CatalogService(populated_db)
         tags = service.get_all_tags()
 
-        assert len(tags) == 6, f"Expected 6 tags, got {len(tags)}"
+        assert len(tags) == 7, f"Expected 7 tags, got {len(tags)}"
 
         # Verify sorted order
         names = [t.name for t in tags]
@@ -33,6 +33,7 @@ class TestGetAllTags:
             "Energetic",
             "English",
             "Grunge",
+            "Rock",
         ]
         assert names == expected_order, f"Expected {expected_order}, got {names}"
 
@@ -163,7 +164,7 @@ class TestGetTagSongs:
         assert song.processing_status == 0, f"Expected 0, got {song.processing_status}"
 
         # Verify tags are hydrated (Song 2 has only "90s" tag)
-        assert len(song.tags) == 1, f"Expected 1 tag on Song 2, got {len(song.tags)}"
+        assert len(song.tags) == 2, f"Expected 2 tags on Song 2 (90s, Rock), got {len(song.tags)}"
         assert (
             song.tags[0].name == "90s"
         ), f"Expected '90s' tag, got '{song.tags[0].name}'"

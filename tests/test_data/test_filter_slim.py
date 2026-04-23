@@ -18,7 +18,7 @@ populated_db reference (filter-relevant data):
     contributors (all roles): Dave Grohl, Foo Fighters, Grohlton, Late!, Nirvana, Taylor Hawkins
     years: [2016, 1997, 1992, 1991]
     decades: [2010, 1990]
-    genres: [Alt Rock, Grunge]
+    genres: [Alt Rock, Grunge, Rock]
     albums: [Nevermind, The Colour and the Shape]
     publishers: [DGC Records]
     tag_categories: {Era: [90s], Jezik: [English], Mood: [Energetic], Style: [Electronic]}
@@ -85,7 +85,7 @@ class TestGetFilterValues:
     def test_genres_only_genre_category(self, repo):
         fv = repo.get_filter_values()
         # Only Genre-category tags
-        assert set(fv["genres"]) == {"Grunge", "Alt Rock"}
+        assert set(fv["genres"]) == {"Grunge", "Alt Rock", "Rock"}
         # Non-genre tags must NOT appear in genres
         assert "Energetic" not in fv["genres"]
         assert "90s" not in fv["genres"]

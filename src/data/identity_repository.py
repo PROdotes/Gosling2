@@ -95,18 +95,19 @@ class IdentityRepository(BaseRepository):
             return identities
 
     def search_identities(
-        self, query: str, conn: Optional[sqlite3.Connection] = None
+        self, query: str, conn: Optional[sqlite3.Connection] = None, exclude_groups: bool = False
     ) -> List[Identity]:
         """Find identities whose DisplayName, LegalName, or Alias match the query."""
         logger.debug(f"[IdentityRepository] -> search_identities(q='{query}')")
         fmt_q = f"%{query}%"
 
-        # Search against all aliases, but return identities with their primary DisplayName
+        type_filter = " AND i.IdentityType != 'group'" if exclude_groups else ""
+
         query_sql = f"""
             SELECT DISTINCT {self._IDENTITY_COLUMNS}
             FROM Identities i
             {self._IDENTITY_JOIN}
-            WHERE i.IsDeleted = 0 AND (i.IdentityID IN (
+            WHERE i.IsDeleted = 0{type_filter} AND (i.IdentityID IN (
                 SELECT OwnerIdentityID FROM ArtistNames 
                 WHERE DisplayName LIKE ? AND IsDeleted = 0
             ) OR i.LegalName LIKE ?)

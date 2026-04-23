@@ -63,7 +63,7 @@ class TestGetFilterValues:
     def test_genres_are_genre_category_only(self, api):
         data = api.get("/api/v1/songs/filter-values").json()
         genres = set(data["genres"])
-        assert genres == {"Grunge", "Alt Rock"}, f"Unexpected genres: {genres}"
+        assert genres == {"Grunge", "Alt Rock", "Rock"}, f"Unexpected genres: {genres}"
         assert "Energetic" not in genres
         assert "90s" not in genres
 

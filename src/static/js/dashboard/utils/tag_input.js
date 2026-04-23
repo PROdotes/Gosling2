@@ -6,7 +6,7 @@
  * @returns {{name: string, category: string}}
  */
 export function parseTagInput(raw, rules = {}) {
-    const delimiter = rules.delimiter || ":";
+    const delimiter = rules.delimiter;
     const defaultCategory = rules.default_category || "Genre";
     const format = rules.input_format || "tag:category";
     const nameFirst = format.toLowerCase().startsWith("tag");

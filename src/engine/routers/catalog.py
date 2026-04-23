@@ -182,11 +182,11 @@ async def get_all_identities() -> List[IdentityView]:
 
 
 @router.get("/identities/search", response_model=List[IdentityView])
-async def search_identities(q: str) -> List[IdentityView]:
+async def search_identities(q: str, exclude_groups: bool = False) -> List[IdentityView]:
     """Search for identities by name or alias."""
-    logger.debug(f"[CatalogRouter] search_identities(q='{q}')")
+    logger.debug(f"[CatalogRouter] search_identities(q='{q}', exclude_groups={exclude_groups})")
     service = _get_service()
-    identities = service.search_identities(q)
+    identities = service.search_identities(q, exclude_groups=exclude_groups)
     counts = service.get_identity_song_counts(
         [i.id for i in identities if i.id is not None]
     )

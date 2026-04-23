@@ -172,9 +172,9 @@ class CatalogService:
         """Return True if a Publisher with this exact name exists."""
         return self._pub_repo.find_by_name(name) is not None
 
-    def search_identities(self, query: str) -> List[Identity]:
+    def search_identities(self, query: str, exclude_groups: bool = False) -> List[Identity]:
         """Search for identities by name or alias."""
-        return self._identity_service.search_identities(query)
+        return self._identity_service.search_identities(query, exclude_groups=exclude_groups)
 
     def get_publisher_link_counts(self, publisher_ids: List[int]) -> dict:
         """Batch song+album counts for publishers."""

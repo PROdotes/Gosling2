@@ -67,7 +67,7 @@ function getUpdateCallback(ctx, songId) {
 export function manageSongTags(ctx, songId, songTitle, currentTags) {
     const state = ctx.getState();
     const rules = state.validationRules?.tags || {};
-    const delimiter = rules.delimiter || ":";
+    const delimiter = rules.delimiter;
     const format = rules.input_format || "tag:category";
     openLinkModal({
         title: `Edit Tags: ${songTitle}`,
@@ -412,9 +412,8 @@ export async function manageArtist(ctx, artistId, artistName) {
                       label: m.display_name,
                   })),
                   onSearch: async (q) => {
-                      const results = await api.searchArtists(q);
+                      const results = await api.searchArtists(q, { excludeGroups: true });
                       return (results || [])
-                          .filter((a) => a.type !== "group")
                           .map((a) => ({
                               id: a.id,
                               label: a.display_name || a.name,

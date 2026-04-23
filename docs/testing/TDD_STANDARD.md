@@ -23,6 +23,28 @@
 
 ---
 
+## Fast Track: Cleanup & Refactoring
+
+Not every change is a new feature. For **cleanup tasks** — deleting dead code, removing hardcoded fallbacks, threading a single existing param through existing layers, fixing config mismatches — the full feature chain is unnecessary overhead.
+
+**Qualifies as cleanup when:**
+- No new methods or endpoints are being created (only modified or removed)
+- No new business logic or state transitions are introduced
+- The change is reversible and isolated to 1-3 files
+
+**Fast-track workflow:**
+```
+1. Describe what's changing and why (1-3 sentences)
+2. User approves scope
+3. If testable new behavior exists (e.g. a new query param), write tests for it
+4. If pure deletion/config fix, just do it
+5. Run existing test suite to confirm nothing broke
+```
+
+**Cleanup does NOT get a feature chain.** Chains are for implementations.
+
+---
+
 ## Step 1: The Feature Chain
 
 Before any code, map the full call chain from trigger to data. Check `docs/lookup/` first — most layers already exist.

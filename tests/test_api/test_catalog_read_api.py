@@ -10,6 +10,7 @@ populated_db reference:
     4: Electronic / Style
     5: English / Jezik
     6: Alt Rock / Genre
+    7: Rock / Genre
 
   Publishers:
     1:  Universal Music Group  parent=NULL
@@ -42,7 +43,7 @@ class TestGetAllTags:
         assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
         data = resp.json()
         assert isinstance(data, list), f"Expected list, got {type(data)}"
-        assert len(data) == 6, f"Expected 6 tags, got {len(data)}"
+        assert len(data) == 7, f"Expected 7 tags, got {len(data)}"
 
     def test_response_shape_matches_tag_view(self, api):
         resp = api.get("/api/v1/tags")
@@ -60,7 +61,7 @@ class TestGetAllTags:
         resp = api.get("/api/v1/tags")
         data = resp.json()
         ids = [t["id"] for t in data]
-        for expected_id in [1, 2, 3, 4, 5, 6]:
+        for expected_id in [1, 2, 3, 4, 5, 6, 7]:
             assert (
                 expected_id in ids
             ), f"Expected tag_id={expected_id} in list, got {ids}"
@@ -89,7 +90,7 @@ class TestSearchTags:
         resp = api.get("/api/v1/tags/search?q=Grunge")
         data = resp.json()
         ids = [t["id"] for t in data]
-        for excluded in [2, 3, 4, 5, 6]:
+        for excluded in [2, 3, 4, 5, 6, 7]:
             assert (
                 excluded not in ids
             ), f"Tag {excluded} should not match 'Grunge', got {ids}"

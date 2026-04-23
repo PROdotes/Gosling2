@@ -884,8 +884,8 @@ class TestSongViewFromCatalog:
         ), f"Expected primary_genre 'Grunge', got {view.primary_genre}"
 
     def test_primary_genre_no_genre_tags(self, catalog_service):
-        """Song 2: has '90s' (Era) only -> no Genre -> None."""
-        song = catalog_service.get_song(2)
+        """Song 4: has 'Electronic' (Style) only -> no Genre -> None."""
+        song = catalog_service.get_song(4)
         view = SongView.from_domain(song)
         assert (
             view.primary_genre is None

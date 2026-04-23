@@ -602,7 +602,7 @@ class TestSongsWithNoAlbum:
         assert song.year == 1997, f"Expected year=1997, got {song.year}"
         assert song.isrc is None, f"Expected isrc=None, got {song.isrc}"
         assert song.publishers == [], f"Expected no publishers, got {song.publishers}"
-        assert len(song.tags) == 1, f"Expected 1 tag, got {len(song.tags)}"
+        assert len(song.tags) == 2, f"Expected 2 tags on Song 2 (90s, Rock), got {len(song.tags)}"
         tag = song.tags[0]
         assert tag.id == 3, f"Expected tag id=3, got {tag.id}"
         assert tag.name == "90s", f"Expected tag name='90s', got {tag.name}"

@@ -10,7 +10,7 @@ Covers:
 - _row_to_tag (mapper)
 
 Uses populated_db which has:
-    Tags: 1=Grunge/Genre, 2=Energetic/Mood, 3=90s/Era, 4=Electronic/Style, 5=English/Jezik, 6=Alt Rock/Genre
+    Tags: 1=Grunge/Genre, 2=Energetic/Mood, 3=90s/Era, 4=Electronic/Style, 5=English/Jezik, 6=Alt Rock/Genre, 7=Rock/Genre
     MediaSourceTags: Song 1 -> Grunge,Energetic,English; Song 2 -> 90s; Song 4 -> Electronic; Song 9 -> Grunge,Alt Rock
 """
 
@@ -75,8 +75,8 @@ class TestGetTagsForSongs:
         repo = TagRepository(populated_db)
         result = repo.get_tags_for_songs([1, 2, 4])
 
-        # Total of 5 tag links
-        assert len(result) == 5, f"Expected 5 total tag links, got {len(result)}"
+        # Total of 6 tag links
+        assert len(result) == 6, f"Expected 6 total tag links, got {len(result)}"
 
         # Group by song_id
         tags_by_song = {}
@@ -96,8 +96,8 @@ class TestGetTagsForSongs:
 
         # Song 2: 1 tag
         assert (
-            len(tags_by_song[2]) == 1
-        ), f"Expected 1 tag for Song 2, got {len(tags_by_song[2])}"
+            len(tags_by_song[2]) == 2
+        ), f"Expected 2 tags for Song 2, got {len(tags_by_song[2])}"
         assert (
             tags_by_song[2][0].name == "90s"
         ), f"Expected '90s', got '{tags_by_song[2][0].name}'"
@@ -146,8 +146,8 @@ class TestGetTagsForSongs:
         repo = TagRepository(populated_db)
         result = repo.get_tags_for_songs([1, 999, 2])
 
-        # Should get 4 tags: 3 from Song 1, 1 from Song 2
-        assert len(result) == 4, f"Expected 4 tags (3+1), got {len(result)}"
+        # Should get 5 tags: 3 from Song 1, 2 from Song 2
+        assert len(result) == 5, f"Expected 5 tags (3+2), got {len(result)}"
 
         song_ids = set([s_id for s_id, _ in result])
         assert song_ids == {1, 2}, f"Expected song_ids {{1, 2}}, got {song_ids}"
@@ -160,7 +160,7 @@ class TestGetAll:
         repo = TagRepository(populated_db)
         result = repo.get_all()
 
-        assert len(result) == 6, f"Expected 6 tags, got {len(result)}"
+        assert len(result) == 7, f"Expected 7 tags, got {len(result)}"
 
         # Verify sorted order (case-insensitive)
         names = [t.name for t in result]
@@ -171,6 +171,7 @@ class TestGetAll:
             "Energetic",
             "English",
             "Grunge",
+            "Rock",
         ]
         assert names == expected_order, f"Expected {expected_order}, got {names}"
 

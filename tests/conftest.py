@@ -141,7 +141,7 @@ def mock_db_path(empty_db):
 #
 # TAGS on songs:
 #   Song 1: Grunge(1/Genre), Energetic(2/Mood), English(5/Jezik)
-#   Song 2: 90s(3/Era)
+#   Song 2: 90s(3/Era), Rock(7/Genre)
 #   Song 4: Electronic(4/Style)
 #   Song 9: Grunge(1/Genre, NOT primary), Alt Rock(6/Genre, IS primary)
 #

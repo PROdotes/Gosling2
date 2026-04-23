@@ -111,10 +111,14 @@ export function searchAlbums(query = "") {
     return runSearch("albums", url);
 }
 
-export function searchArtists(query = "") {
-    const url = query
-        ? `/api/v1/identities/search?q=${encodeURIComponent(query)}`
-        : "/api/v1/identities";
+export function searchArtists(query = "", { excludeGroups = false } = {}) {
+    let url;
+    if (query) {
+        url = `/api/v1/identities/search?q=${encodeURIComponent(query)}`;
+        if (excludeGroups) url += "&exclude_groups=true";
+    } else {
+        url = "/api/v1/identities";
+    }
     return runSearch("artists", url);
 }
 
