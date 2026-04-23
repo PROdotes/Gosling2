@@ -19,17 +19,6 @@ from src.engine.config import TRUSTED_ORIGINS, get_db_path
 from src.data.schema import SCHEMA_SQL
 
 
-def _run_migrations(conn):
-    """Run ALTER TABLE migrations for existing DBs."""
-    cursor = conn.cursor()
-    # Migration: Add SourceNotes column to MediaSources if not exists
-    cursor.execute("PRAGMA table_info(MediaSources)")
-    columns = [row[1] for row in cursor.fetchall()]
-    if "SourceNotes" not in columns:
-        cursor.execute("ALTER TABLE MediaSources ADD COLUMN SourceNotes TEXT")
-        logger.info("[EngineServer] Migration: Added SourceNotes column to MediaSources")
-
-
 def _ensure_db():
     db_path = get_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -40,8 +29,6 @@ def _ensure_db():
     )
     conn.executescript(SCHEMA_SQL)
     conn.execute("INSERT OR IGNORE INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
-    # Migrations for existing DBs
-    _run_migrations(conn)
     conn.commit()
     conn.close()
     logger.info(f"[EngineServer] DB ready at {db_path}")
