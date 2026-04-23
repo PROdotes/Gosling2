@@ -1,4 +1,4 @@
-import { validators } from "../utils/validators.js";
+
 
 /**
  * Activates an inline text editor on a <span> element.
@@ -39,16 +39,6 @@ export function activateInlineEdit(
         input.classList.remove("inline-edit-input--error");
         hasError = false;
 
-        const validate = validators[field];
-        const error = validate ? validate(rawValue, validationRules) : null;
-        if (error) {
-            hasError = true;
-            input.classList.add("inline-edit-input--error");
-            errorEl.textContent = error;
-            input.focus();
-            return;
-        }
-
         if (rawValue === currentValue) {
             input.replaceWith(span);
             errorEl.remove();
@@ -86,18 +76,7 @@ export function activateInlineEdit(
     }
 
     input.addEventListener("input", () => {
-        const validate = validators[field];
-        if (!validate) return;
-        const error = validate(input.value.trim(), validationRules);
-        if (error) {
-            hasError = true;
-            input.classList.add("inline-edit-input--error");
-            errorEl.textContent = error;
-        } else {
-            hasError = false;
-            input.classList.remove("inline-edit-input--error");
-            errorEl.textContent = "";
-        }
+        // Backend handles validation - no client-side checking needed
     });
 
     input.addEventListener("keydown", (e) => {

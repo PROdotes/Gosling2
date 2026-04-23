@@ -21,7 +21,6 @@ Disambiguation fixture (local, extends populated_db):
     Song 53: "Shared Title"             Performers: [Nirvana]                       Year: 2020
 """
 
-import sqlite3
 import shutil
 import os
 import pytest

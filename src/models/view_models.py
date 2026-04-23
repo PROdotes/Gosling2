@@ -188,6 +188,38 @@ class SongView(BaseModel):
     estimated_original_path: Optional[str] = None
     original_exists: bool = False
 
+    # Computed backend fields for frontend logic
+    @computed_field
+    @property
+    def is_in_staging(self) -> bool:
+        """True if the song's source_path is in the staging directory."""
+        from src.engine.config import STAGING_DIR
+
+        return self.source_path and str(self.source_path).lower().startswith(
+            str(STAGING_DIR).lower()
+        )
+
+    @computed_field
+    @property
+    def can_activate(self) -> bool:
+        """True if the song can be activated (processing_status == REVIEWED)."""
+        return self.processing_status == ProcessingStatus.REVIEWED
+
+    @computed_field
+    @property
+    def available_actions(self) -> List[str]:
+        """List of available actions based on current state."""
+        actions = []
+        if (
+            self.processing_status == ProcessingStatus.NEEDS_REVIEW
+            and not self.review_blockers
+        ):
+            actions.append("mark_reviewed")
+        if self.processing_status == ProcessingStatus.REVIEWED and self.is_in_staging:
+            actions.append("move_to_library")
+            actions.append("unreview")
+        return actions
+
     @classmethod
     def from_domain(cls, song: Song) -> "SongView":
         """Factory to create a view-model from a domain model."""
@@ -350,6 +382,12 @@ class AlbumSlimView(BaseModel):
     display_publisher: Optional[str] = None
     song_count: int = 0
 
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        """True if no songs are linked to this album."""
+        return self.song_count == 0
+
     @classmethod
     def from_row(cls, row: dict) -> "AlbumSlimView":
         return cls(
@@ -436,6 +474,12 @@ class TagView(BaseModel):
     category: Optional[str] = None
     song_count: int = 0
 
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        """True if no songs are linked to this tag."""
+        return self.song_count == 0
+
 
 class PublisherView(BaseModel):
     """View-model for publisher detail."""
@@ -446,6 +490,12 @@ class PublisherView(BaseModel):
     sub_publishers: List["PublisherView"] = []
     song_count: int = 0
     album_count: int = 0
+
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        """True if no songs or albums are linked to this publisher."""
+        return self.song_count == 0 and self.album_count == 0
 
 
 class IdentityView(BaseModel):
@@ -463,6 +513,12 @@ class IdentityView(BaseModel):
     # Recursive connections
     members: List["IdentityView"] = []
     groups: List["IdentityView"] = []
+
+    @computed_field
+    @property
+    def can_delete(self) -> bool:
+        """True if no songs are linked to this identity."""
+        return self.song_count == 0
 
     @classmethod
     def from_domain(cls, identity: Identity) -> "IdentityView":

@@ -144,7 +144,6 @@ class TestJsLookupIntegrity:
         """
         src_dir = os.path.abspath("src/static/js/dashboard")
         lookup_dir = os.path.abspath("docs/lookup")
-        import sys
 
         assert os.path.exists(lookup_dir), f"Lookup directory missing: {lookup_dir}"
 

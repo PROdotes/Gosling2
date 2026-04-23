@@ -1,7 +1,6 @@
 import datetime
 import os
 import sys
-from typing import Optional, TextIO
 
 
 class Logger:
@@ -105,7 +104,9 @@ class Logger:
                 with open(self.log_file, "a", encoding="utf-8") as f:
                     f.write(line + "\n")
             except Exception as e:
-                sys.stderr.write(f"ERROR: Failed to write to log file {self.log_file}: {e}\n")
+                sys.stderr.write(
+                    f"ERROR: Failed to write to log file {self.log_file}: {e}\n"
+                )
 
     def debug(self, msg: str):
         self._log("DEBUG", msg)

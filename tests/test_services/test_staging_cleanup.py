@@ -1,6 +1,5 @@
 import os
 import tempfile
-import pytest
 from src.services.edit_service import EditService
 from src.services.catalog_service import CatalogService
 from src.data.staging_repository import StagingRepository

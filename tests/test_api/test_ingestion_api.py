@@ -83,7 +83,6 @@ class TestIngestionApi:
 
     def test_check_ingestion_path_collision(self, client, populated_db, tmp_path):
         """Path that exists in DB returns ALREADY_EXISTS with PATH match and full song data."""
-        import sqlite3
 
         temp_file = tmp_path / "song1.mp3"
         temp_file.write_bytes(b"")
@@ -545,7 +544,7 @@ class TestScanFolderInPlace:
         # At least one staging copy must have been created
         staged = list(staging_dir.iterdir())
         assert len(staged) >= 1, (
-            f"in_place=False must create staging copies, but staging dir is empty"
+            "in_place=False must create staging copies, but staging dir is empty"
         )
 
 
@@ -569,7 +568,6 @@ class TestPendingConvertApi:
 
     def test_status3_song_appears_in_results(self, client, populated_db):
         """A song manually set to status=3 must appear in the results."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
@@ -586,7 +584,6 @@ class TestPendingConvertApi:
 
     def test_each_item_has_pending_convert_status(self, client, populated_db):
         """Every item returned must have status='PENDING_CONVERT'."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
@@ -603,7 +600,6 @@ class TestPendingConvertApi:
 
     def test_each_item_has_required_shape(self, client, populated_db):
         """Each result item must have status, staged_path, and song keys."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
@@ -621,7 +617,6 @@ class TestPendingConvertApi:
 
     def test_soft_deleted_status3_song_excluded(self, client, populated_db):
         """A soft-deleted song with status=3 must NOT appear in pending-convert results."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(
@@ -676,7 +671,6 @@ class TestCleanupOriginApi:
     """Group 6: GET /api/v1/ingest/cleanup-origin/{song_id} and /parser-config"""
 
     def test_get_cleanup_origin_valid(self, client, populated_db, tmp_path):
-        import sqlite3
         temp_file = tmp_path / "origin.mp3"
         temp_file.write_bytes(b"")
         target_path = str(temp_file)

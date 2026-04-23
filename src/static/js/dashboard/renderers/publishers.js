@@ -34,9 +34,7 @@ export function renderPublishers(ctx, publishers) {
 
     const actionsSlot = document.getElementById("entity-list-actions");
     if (actionsSlot) {
-        const unlinkedCount = publishers.filter(
-            (p) => p.song_count === 0 && p.album_count === 0,
-        ).length;
+        const unlinkedCount = publishers.filter((p) => p.can_delete).length;
         actionsSlot.innerHTML = unlinkedCount > 0
             ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-publishers">Delete ${unlinkedCount} unlinked</button>`
             : "";
@@ -60,7 +58,7 @@ export function renderPublishers(ctx, publishers) {
                 <div class="entity-row-sub">${escapeHtml(publisher.parent_name || "Independent / top level")}</div>
             </div>
             <div class="entity-row-meta">
-                ${publisher.song_count === 0 && publisher.album_count === 0
+                ${publisher.can_delete
                     ? '<span class="pill unlinked">0</span>'
                     : `<span class="pill">${publisher.song_count}S</span><span class="pill">${publisher.album_count}A</span>`}
             </div>
@@ -83,7 +81,6 @@ export function renderPublisherDetailLoading(ctx, publisher) {
 }
 
 export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
-    const isUnlinked = publisher.song_count === 0 && publisher.album_count === 0;
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>
@@ -114,7 +111,7 @@ export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
                     class="btn danger"
                     data-action="delete-publisher"
                     data-publisher-id="${publisher.id}"
-                    ${!isUnlinked ? 'disabled title="Cannot delete — publisher is linked to songs or albums"' : ""}
+                    ${!publisher.can_delete ? 'disabled title="Cannot delete — publisher is linked to songs or albums"' : ""}
                 >Delete Publisher</button>
             </div>
         </div>

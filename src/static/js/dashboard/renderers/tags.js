@@ -22,7 +22,7 @@ export function renderTags(ctx, tags) {
 
     const actionsSlot = document.getElementById("entity-list-actions");
     if (actionsSlot) {
-        const unlinkedCount = tags.filter((t) => t.song_count === 0).length;
+        const unlinkedCount = tags.filter((t) => t.can_delete).length;
         actionsSlot.innerHTML = unlinkedCount > 0
             ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-tags">Delete ${unlinkedCount} unlinked</button>`
             : "";
@@ -46,7 +46,7 @@ export function renderTags(ctx, tags) {
                 <div class="entity-row-sub">${renderCategoryBadge(tag.category)}</div>
             </div>
             <div class="entity-row-meta">
-                ${tag.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${tag.song_count}</span>`}
+                ${tag.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${tag.song_count}</span>`}
             </div>
         </div>
     `,
@@ -68,7 +68,6 @@ export function renderTagDetailLoading(ctx, tag) {
 
 export function renderTagDetailComplete(ctx, tag, songs) {
     const songCount = asArray(songs).length;
-    const isUnlinked = songCount === 0;
     ctx.showDetailPanel(`
         <div class="detail-header">
             <div class="detail-title">${escapeHtml(tag.name || "Unnamed Tag")} <span class="pill mono">#${escapeHtml(tag.id || "-")}</span></div>
@@ -94,7 +93,7 @@ export function renderTagDetailComplete(ctx, tag, songs) {
                     class="btn danger"
                     data-action="delete-tag"
                     data-tag-id="${tag.id}"
-                    ${!isUnlinked ? 'disabled title="Cannot delete — tag is linked to songs"' : ""}
+                    ${!tag.can_delete ? 'disabled title="Cannot delete — tag is linked to songs"' : ""}
                 >Delete Tag</button>
             </div>
         </div>

@@ -98,16 +98,16 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                     (song) => `
                 <div class="song-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
                     <div class="col-check">
-                        <label class="switch ${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "disabled" : ""}"
-                               data-action="toggle-active"
-                               data-id="${song.id}"
-                               title="${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "Only reviewed songs can be active for airplay" : song.is_active ? "Deactivate" : "Activate"}">
-                            <input type="checkbox"
-                                   ${song.is_active ? "checked" : ""}
-                                   ${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "disabled" : ""}>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
+                         <label class="switch ${song.can_activate ? "" : "disabled"}"
+                                data-action="toggle-active"
+                                data-id="${song.id}"
+                                title="${song.can_activate ? (song.is_active ? "Deactivate" : "Activate") : "Only reviewed songs can be active for airplay"}">
+                             <input type="checkbox"
+                                    ${song.is_active ? "checked" : ""}
+                                    ${song.can_activate ? "" : "disabled"}>
+                             <span class="slider"></span>
+                         </label>
+                     </div>
                     <div class="col-info">
                         <div class="row-title">${escapeHtml(song.media_name || song.title || "Untitled")}<span class="row-id"> #${song.id}</span></div>
                         <div class="row-artist">${escapeHtml(song.display_artist || "Unknown Artist")}</div>

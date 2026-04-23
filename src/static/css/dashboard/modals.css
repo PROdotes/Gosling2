@@ -300,14 +300,15 @@
 }
 
 .inline-edit-input {
-    background: var(--bg-card-raised);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--accent);
-    border-radius: 4px;
+    border-radius: var(--radius);
     color: var(--text-primary);
-    padding: 0.15rem 0.4rem;
-    font-size: inherit;
-    width: 100%;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
     outline: none;
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .inline-edit-input--error {

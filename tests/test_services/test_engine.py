@@ -857,7 +857,6 @@ class TestMetabolicInspectFile:
 
     def test_real_file_inspection(self, populated_db, monkeypatch):
         """inspect-file with a real audio file returns SongView."""
-        import sqlite3
 
         fixture_path = os.path.abspath("tests/fixtures/silence.mp3")
         if not os.path.exists(fixture_path):

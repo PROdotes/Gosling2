@@ -234,7 +234,9 @@ class IngestionService:
             logger.error(f"[IngestionService] check_ingestion internal error: {e}")
             return {"status": "ERROR", "message": f"Metadata failed: {str(e)}"}
 
-    def ingest_wav_as_converting(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def ingest_wav_as_converting(
+        self, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Ingest a WAV file immediately with processing_status=3 (Converting).
         """
@@ -364,11 +366,15 @@ class IngestionService:
         finally:
             conn.close()
 
-    def ingest_file(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def ingest_file(
+        self, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Write path for a staged file. Handles collisions and single transaction.
         """
-        logger.debug(f"[IngestionService] -> ingest_file(path='{staged_path}', original='{original_path}')")
+        logger.debug(
+            f"[IngestionService] -> ingest_file(path='{staged_path}', original='{original_path}')"
+        )
 
         # 1. Validation check
         check = self.check_ingestion(staged_path)
@@ -433,7 +439,9 @@ class IngestionService:
         finally:
             conn.close()
 
-    def resolve_conflict(self, ghost_id: int, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def resolve_conflict(
+        self, ghost_id: int, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Resolve a ghost conflict by re-activating the soft-deleted record.
         """
@@ -540,7 +548,9 @@ class IngestionService:
             "results": results,
         }
 
-    def _ingest_single(self, file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def _ingest_single(
+        self, file_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Thread-safe single file ingestion wrapper."""
         try:
             return self.ingest_file(file_path, original_path)

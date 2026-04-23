@@ -38,7 +38,6 @@ from src.engine.config import (
     SCALAR_ALLOWED,
     METADATA_ALLOWED,
     AUTO_SAVE_ID3,
-    AUTO_MOVE_ON_APPROVE,
     ProcessingStatus,
 )
 from src.engine.models.spotify import SpotifyCredit
@@ -79,7 +78,9 @@ class EditService:
         self._staging_repo = StagingRepository(db_path)
 
         # Cross-service dependencies
-        self._library_service = library_service or LibraryService(db_path, rules_path=rules_path, library_root=library_root)
+        self._library_service = library_service or LibraryService(
+            db_path, rules_path=rules_path, library_root=library_root
+        )
 
         # Edit Helpers
         self._metadata_writer = MetadataWriter()
@@ -168,6 +169,19 @@ class EditService:
                     "isrc must be 12 characters: 2-letter country, 3-char registrant, 2-digit year, 5-digit designation"
                 )
             fields["isrc"] = isrc
+
+        # Validate release_year if present
+        if "release_year" in fields and fields["release_year"] is not None:
+            release_year = int(fields["release_year"])
+            ry_rules = rules.get("release_year", {"min": 1860, "max_offset": 1})
+            import datetime
+
+            max_year = datetime.date.today().year + ry_rules.get("max_offset", 1)
+            if not (ry_rules["min"] <= release_year <= max_year):
+                raise ValueError(
+                    f"release_year must be between {ry_rules['min']} and {max_year}"
+                )
+            fields["release_year"] = release_year
 
         # 4. Persistence
         conn = self._song_repo.get_connection()
@@ -296,6 +310,18 @@ class EditService:
             raise LookupError(f"Song {song_id} not found")
         if not self._library_service.get_album(album_id):
             raise LookupError(f"Album {album_id} not found")
+
+        # Validate track_number and disc_number
+        rules = SCALAR_VALIDATION
+        if track_number is not None:
+            tn_rules = rules.get("track_number", {"min": 1})
+            if int(track_number) < tn_rules["min"]:
+                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+        if disc_number is not None:
+            dn_rules = rules.get("disc_number", {"min": 1})
+            if int(disc_number) < dn_rules["min"]:
+                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
+
         conn = self._album_repo.get_connection()
         try:
             self._album_repo.add_album(
@@ -326,6 +352,17 @@ class EditService:
             raise ValueError("Album title cannot be empty")
         if not self._song_repo.get_by_id(song_id):
             raise LookupError(f"Song {song_id} not found")
+
+        # Validate track_number and disc_number
+        rules = SCALAR_VALIDATION
+        if track_number is not None:
+            tn_rules = rules.get("track_number", {"min": 1})
+            if int(track_number) < tn_rules["min"]:
+                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+        if disc_number is not None:
+            dn_rules = rules.get("disc_number", {"min": 1})
+            if int(disc_number) < dn_rules["min"]:
+                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
 
         conn = self._album_repo_dir.get_connection()
         try:
@@ -375,6 +412,18 @@ class EditService:
         existing_links = self._album_repo.get_albums_for_songs([song_id])
         if not any(link.album_id == album_id for link in existing_links):
             raise LookupError(f"Song {song_id} is not linked to Album {album_id}")
+
+        # Validate track_number and disc_number
+        rules = SCALAR_VALIDATION
+        if track_number is not None:
+            tn_rules = rules.get("track_number", {"min": 1})
+            if int(track_number) < tn_rules["min"]:
+                raise ValueError(f"track_number must be >= {tn_rules['min']}")
+        if disc_number is not None:
+            dn_rules = rules.get("disc_number", {"min": 1})
+            if int(disc_number) < dn_rules["min"]:
+                raise ValueError(f"disc_number must be >= {dn_rules['min']}")
+
         conn = self._album_repo.get_connection()
         try:
             self._album_repo.update_track_info(
@@ -629,7 +678,9 @@ class EditService:
 
         conn = self._pub_repo.get_connection()
         try:
-            publisher = self._pub_repo.add_song_publisher(song_id, publisher_name, conn, publisher_id=publisher_id)
+            publisher = self._pub_repo.add_song_publisher(
+                song_id, publisher_name, conn, publisher_id=publisher_id
+            )
             conn.commit()
             self._sync_id3_if_enabled(song_id)
             return publisher
@@ -743,10 +794,10 @@ class EditService:
             if source_path.startswith(str(staging)):
                 if os.path.exists(source_path):
                     os.remove(source_path)
-            
+
             # 4. Cleanup transient staging origin link
             self._staging_repo.clear_origin(song_id, conn)
-            
+
             return True
         except Exception:
             conn.rollback()
@@ -772,20 +823,23 @@ class EditService:
             shipped_song = self._library_service.get_song(song_id)
             if shipped_song:
                 self._metadata_writer.write_metadata(shipped_song)
-            
+
             # Unlink ONLY if there was an actual physical move (bypasses in-place ingestion logic safely)
             try:
-                is_same_file = source_abs_path.resolve() == new_abs_path.resolve() or source_abs_path.samefile(new_abs_path)
+                is_same_file = (
+                    source_abs_path.resolve() == new_abs_path.resolve()
+                    or source_abs_path.samefile(new_abs_path)
+                )
             except Exception:
                 is_same_file = False
-                
+
             if source_abs_path.exists() and not is_same_file:
                 source_abs_path.unlink()
-            
+
             # Origin stays until user confirms deletion OR it's been handled manually.
             # Actually, user wants a reminder. If we clear it here, the reminder is gone.
             # So we keep it.
-            
+
             return str(new_abs_path.relative_to(library_root))
         except Exception:
             raise
@@ -868,7 +922,9 @@ class EditService:
                 logger.info(f"[EditService] Deleted original source: {origin_path}")
                 return True
             except Exception as e:
-                logger.error(f"[EditService] Failed to delete original source {origin_path}: {e}")
+                logger.error(
+                    f"[EditService] Failed to delete original source {origin_path}: {e}"
+                )
                 return False
         else:
             # Path is dead, clear it anyway

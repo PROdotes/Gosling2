@@ -54,7 +54,6 @@ def unicode_mp3(tmp_path):
 @pytest.fixture
 def ingest_db(empty_db):
     """Seed empty_db with required Types/Roles for ingestion tests (local)."""
-    import sqlite3
 
     conn = _connect(empty_db)
     conn.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")

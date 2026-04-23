@@ -113,10 +113,14 @@ class IdentityService:
                 )
                 raise
 
-    def search_identities(self, query: str, exclude_groups: bool = False) -> List[Identity]:
+    def search_identities(
+        self, query: str, exclude_groups: bool = False
+    ) -> List[Identity]:
         """Search for identities by name or alias."""
         logger.debug(f"[IdentityService] -> search_identities(q='{query}')")
-        identities = self._identity_repo.search_identities(query, exclude_groups=exclude_groups)
+        identities = self._identity_repo.search_identities(
+            query, exclude_groups=exclude_groups
+        )
         result = self._hydrate_identities(identities)
         logger.debug(
             f"[IdentityService] <- search_identities(q='{query}') count={len(result)}"

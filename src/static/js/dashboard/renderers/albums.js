@@ -80,7 +80,7 @@ export function renderAlbums(ctx, albums) {
 
     const actionsSlot = document.getElementById("entity-list-actions");
     if (actionsSlot) {
-        const unlinkedCount = albums.filter((a) => a.song_count === 0).length;
+        const unlinkedCount = albums.filter((a) => a.can_delete).length;
         actionsSlot.innerHTML = unlinkedCount > 0
             ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-albums">Delete ${unlinkedCount} unlinked</button>`
             : "";
@@ -105,7 +105,7 @@ export function renderAlbums(ctx, albums) {
             </div>
             <div class="entity-row-meta">
                 <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
-                ${album.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count}</span>`}
+                ${album.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count}</span>`}
                 ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
             </div>
         </div>
@@ -131,7 +131,6 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
     const songs = asArray(album.songs);
     const publishers = asArray(album.publishers);
     const albumId = album.id;
-    const isUnlinked = songs.length === 0;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -171,7 +170,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Lifecycle & History</div>
+                <div class="title">Lifecycle & History</div>
                 ${renderAuditTimeline(auditHistory)}
             </div>
 
@@ -181,7 +180,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
                     class="btn danger"
                     data-action="delete-album"
                     data-album-id="${albumId}"
-                    ${!isUnlinked ? 'disabled title="Cannot delete — album has songs"' : ""}
+                    ${!album.can_delete ? 'disabled title="Cannot delete — album has songs"' : ""}
                 >Delete Album</button>
             </div>
         </div>

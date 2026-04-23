@@ -94,15 +94,21 @@ class CatalogService:
         """Dry-run ingestion check for path, hash, and metadata collisions."""
         return self._ingestion_service.check_ingestion(file_path)
 
-    def ingest_wav_as_converting(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def ingest_wav_as_converting(
+        self, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Ingest a WAV file immediately with processing_status=3 (Converting)."""
-        return self._ingestion_service.ingest_wav_as_converting(staged_path, original_path)
+        return self._ingestion_service.ingest_wav_as_converting(
+            staged_path, original_path
+        )
 
     def finalize_wav_conversion(self, song_id: int, mp3_path: str) -> int:
         """Called after WAV→MP3 conversion completes to update the DB record."""
         return self._ingestion_service.finalize_wav_conversion(song_id, mp3_path)
 
-    def ingest_file(self, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def ingest_file(
+        self, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Write path for a staged file. Handles collisions and reingestion errors."""
         return self._ingestion_service.ingest_file(staged_path, original_path)
 
@@ -128,9 +134,13 @@ class CatalogService:
         """Soft-delete a single song. Handles physical cleanup if in staging."""
         return self._edit_service.delete_song(song_id, staging_dir=STAGING_DIR)
 
-    def resolve_conflict(self, ghost_id: int, staged_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
+    def resolve_conflict(
+        self, ghost_id: int, staged_path: str, original_path: Optional[str] = None
+    ) -> Dict[str, Any]:
         """Resolve a ghost conflict by re-activating the soft-deleted record."""
-        return self._ingestion_service.resolve_conflict(ghost_id, staged_path, original_path)
+        return self._ingestion_service.resolve_conflict(
+            ghost_id, staged_path, original_path
+        )
 
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
@@ -172,9 +182,13 @@ class CatalogService:
         """Return True if a Publisher with this exact name exists."""
         return self._pub_repo.find_by_name(name) is not None
 
-    def search_identities(self, query: str, exclude_groups: bool = False) -> List[Identity]:
+    def search_identities(
+        self, query: str, exclude_groups: bool = False
+    ) -> List[Identity]:
         """Search for identities by name or alias."""
-        return self._identity_service.search_identities(query, exclude_groups=exclude_groups)
+        return self._identity_service.search_identities(
+            query, exclude_groups=exclude_groups
+        )
 
     def get_publisher_link_counts(self, publisher_ids: List[int]) -> dict:
         """Batch song+album counts for publishers."""

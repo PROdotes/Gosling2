@@ -138,7 +138,7 @@ class Song(MediaSource):
     # Staging Context (Transient)
     estimated_original_path: Optional[str] = None
     original_exists: bool = False
-    
+
     # Filing Context (Hydrated)
     projected_path: Optional[str] = None
     needs_organization: bool = False

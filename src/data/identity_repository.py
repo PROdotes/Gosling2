@@ -95,7 +95,10 @@ class IdentityRepository(BaseRepository):
             return identities
 
     def search_identities(
-        self, query: str, conn: Optional[sqlite3.Connection] = None, exclude_groups: bool = False
+        self,
+        query: str,
+        conn: Optional[sqlite3.Connection] = None,
+        exclude_groups: bool = False,
     ) -> List[Identity]:
         """Find identities whose DisplayName, LegalName, or Alias match the query."""
         logger.debug(f"[IdentityRepository] -> search_identities(q='{query}')")

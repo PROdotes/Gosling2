@@ -12,7 +12,6 @@ import asyncio
 from src.models.view_models import (
     SongView,
     FolderScanRequest,
-    BatchIngestReport,
     IngestionReportView,
     CleanupOriginalRequest,
     IngestStatusModel,
@@ -43,7 +42,6 @@ async def _stream_ingestion(service, work_items):
     work_items: [(staged_path, original_path), ...]
     Yields NDJSON with session status and per-file results.
     """
-    from typing import Optional
 
     task_id = str(uuid4())
     service._ingestion_service.register_task(task_id, len(work_items))
@@ -58,13 +56,17 @@ async def _stream_ingestion(service, work_items):
                     try:
                         mp3 = await run_in_threadpool(convert_to_mp3, Path(staged_path))
                         res = await run_in_threadpool(
-                            service._ingestion_service._ingest_single, str(mp3), original_path=original_path
+                            service._ingestion_service._ingest_single,
+                            str(mp3),
+                            original_path=original_path,
                         )
                     except RuntimeError as e:
                         res = {"status": "ERROR", "message": str(e)}
                 else:
                     res = await run_in_threadpool(
-                        service.ingest_wav_as_converting, staged_path, original_path=original_path
+                        service.ingest_wav_as_converting,
+                        staged_path,
+                        original_path=original_path,
                     )
                     if res["status"] == "CONVERTING":
                         res["status"] = "PENDING_CONVERT"
@@ -73,7 +75,9 @@ async def _stream_ingestion(service, work_items):
                     res["staged_path"] = staged_path
             else:
                 res = await run_in_threadpool(
-                    service._ingestion_service._ingest_single, staged_path, original_path=original_path
+                    service._ingestion_service._ingest_single,
+                    staged_path,
+                    original_path=original_path,
                 )
                 if res.get("song"):
                     res["song"] = SongView.from_domain(res["song"])
@@ -156,6 +160,7 @@ async def upload_files(files: list[UploadFile] = File(...)):
         media_type="application/x-ndjson",
     )
 
+
 @router.get("/cleanup-origin/{song_id}")
 async def get_cleanup_origin(song_id: int):
     """Checks if there is a known original file path for this song."""
@@ -212,8 +217,12 @@ async def resolve_conflict(ghost_id: int, staged_path: str) -> IngestionReportVi
     try:
         service = _get_service()
         # Heuristic for the original path of an uploaded staged file
-        original_src = os.path.join(get_downloads_folder(), Path(staged_path).name.split("_", 1)[-1])
-        result = service.resolve_conflict(ghost_id, staged_path, original_path=original_src)
+        original_src = os.path.join(
+            get_downloads_folder(), Path(staged_path).name.split("_", 1)[-1]
+        )
+        result = service.resolve_conflict(
+            ghost_id, staged_path, original_path=original_src
+        )
 
         # Convert Domain Song to SongView if present
         if "song" in result and result["song"]:
@@ -312,7 +321,7 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
     try:
         service = _get_service()
         file_path = request.file_path
-        
+
         if request.song_id is not None:
             # Enhanced cleanup via song_id lookup
             success = service.delete_original_source(request.song_id)
@@ -322,11 +331,16 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
                 # If we have song_id but lookup fails or file is already gone
                 origin = service.get_staging_origin(request.song_id)
                 if not origin:
-                    raise HTTPException(status_code=404, detail="No original source link found for this song.")
+                    raise HTTPException(
+                        status_code=404,
+                        detail="No original source link found for this song.",
+                    )
                 file_path = origin
 
         if not file_path:
-            raise HTTPException(status_code=400, detail="Either file_path or song_id must be provided.")
+            raise HTTPException(
+                status_code=400, detail="Either file_path or song_id must be provided."
+            )
 
         # Legacy direct path cleanup (still used by some UI parts)
         # Security: Ensure the path is within the Downloads folder
@@ -351,7 +365,7 @@ async def cleanup_original_file(request: CleanupOriginalRequest):
         os.remove(real_target)
         if request.song_id:
             service._edit_service._staging_repo.clear_origin(request.song_id)
-            
+
         logger.info(f"[IngestRouter] <- cleanup_original_file() SUCCESS: {real_target}")
         return {"status": "DELETED", "path": str(real_target)}
     except HTTPException:

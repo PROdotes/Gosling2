@@ -54,7 +54,7 @@ export function renderArtists(ctx, artists) {
 
     const actionsSlot = document.getElementById("entity-list-actions");
     if (actionsSlot) {
-        const unlinkedCount = artists.filter((a) => a.song_count === 0).length;
+        const unlinkedCount = artists.filter((a) => a.can_delete).length;
         actionsSlot.innerHTML = unlinkedCount > 0
             ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-identities">Delete ${unlinkedCount} unlinked</button>`
             : "";
@@ -79,7 +79,7 @@ export function renderArtists(ctx, artists) {
             </div>
             <div class="entity-row-meta">
                 <span class="pill artist">${escapeHtml(artist.type || "identity")}</span>
-                ${artist.song_count === 0 ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
+                ${artist.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${artist.song_count}</span>`}
             </div>
         </div>
     `,
@@ -104,7 +104,6 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
     const members = renderIdentityTags(tree.members);
     const groups = renderIdentityTags(tree.groups);
     const catalogHtml = renderSongList(songs, "No songs mapped yet");
-    const isUnlinked = asArray(songs).length === 0;
 
     ctx.showDetailPanel(`
         <div class="detail-header">
@@ -115,14 +114,14 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
             ${aliases ? `<div class="detail-section"><div class="section-title">Aliases</div>${aliases}</div>` : ""}
             ${members ? `<div class="detail-section"><div class="section-title">Members</div>${members}</div>` : ""}
             ${groups ? `<div class="detail-section"><div class="section-title">Member Of</div>${groups}</div>` : ""}
-
+ 
             <div class="detail-section">
                 <div class="section-title">Full Catalog (${asArray(songs).length})</div>
                 ${catalogHtml}
             </div>
 
             <div class="detail-section">
-                <div class="section-title">Lifecycle & History</div>
+                <div class="title">Lifecycle & History</div>
                 ${renderAuditTimeline(auditHistory)}
             </div>
 
@@ -132,7 +131,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
                     class="btn danger"
                     data-action="delete-identity"
                     data-identity-id="${tree.id}"
-                    ${!isUnlinked ? 'disabled title="Cannot delete — identity is linked to songs or albums"' : ""}
+                    ${!tree.can_delete ? 'disabled title="Cannot delete — identity is linked to songs or albums"' : ""}
                 >Delete Identity</button>
             </div>
         </div>

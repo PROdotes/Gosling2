@@ -680,7 +680,6 @@ class TestGeneralEdgeCases:
 
     def test_song_display_artist_composer_only(self, populated_db):
         """Domain coverage: Song with credits but NO performers returns None."""
-        import sqlite3
         from src.services.catalog_service import CatalogService
         from src.models.view_models import SongView
 

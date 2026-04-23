@@ -134,7 +134,6 @@ class TestGetHistoryChangeLabeling:
 
     def test_cross_table_change_gets_prefix(self, populated_db):
         """When change is from a related table, label should be '[RelatedTable] Updated {field}'."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.create_collation(

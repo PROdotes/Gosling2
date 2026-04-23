@@ -172,8 +172,13 @@ class FilingService:
 
         if target_absolute.exists():
             try:
-                if source_path.resolve() == target_absolute.resolve() or source_path.samefile(target_absolute):
-                    logger.info(f"[FilingService] File already natively exists at perfect target path, bypassing physical copy: {target_absolute}")
+                if (
+                    source_path.resolve() == target_absolute.resolve()
+                    or source_path.samefile(target_absolute)
+                ):
+                    logger.info(
+                        f"[FilingService] File already natively exists at perfect target path, bypassing physical copy: {target_absolute}"
+                    )
                     return target_absolute
             except Exception:
                 pass
@@ -194,7 +199,7 @@ class FilingService:
         """Organizes a file into the library and removes the old source."""
         source_path = Path(song.source_path)
         target_path = self.copy_to_library(song, library_root)
-        
+
         # Safe comparison: samefile() handles different path formats pointing to same inode
         is_same = False
         try:
@@ -206,5 +211,5 @@ class FilingService:
         if source_path.exists() and not is_same:
             source_path.unlink()
             logger.debug(f"[FilingService] Unlinked old source: {source_path}")
-            
+
         return target_path

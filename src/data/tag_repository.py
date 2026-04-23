@@ -239,9 +239,9 @@ class TagRepository(BaseRepository):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         if tag_id is not None:
-             cursor.execute("UPDATE Tags SET IsDeleted = 0 WHERE TagID = ?", (tag_id,))
+            cursor.execute("UPDATE Tags SET IsDeleted = 0 WHERE TagID = ?", (tag_id,))
         else:
-             tag_id = self.get_or_create_tag(name, category, cursor)
+            tag_id = self.get_or_create_tag(name, category, cursor)
 
         cursor.execute(
             "INSERT OR IGNORE INTO MediaSourceTags (SourceID, TagID, IsPrimary) VALUES (?, ?, ?)",

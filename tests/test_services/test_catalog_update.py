@@ -443,7 +443,6 @@ class TestRemoveSongPublisher:
             10 not in pub_ids
         ), f"Publisher 10 should be unlinked from song 1, got {pub_ids}"
         # Publisher record still exists
-        import sqlite3
 
         conn = _connect(populated_db)
         count = conn.execute(
@@ -494,11 +493,8 @@ class TestAutoMoveOnApprove:
 
     def test_reviewed_auto_moves_when_enabled(self, populated_db, tmp_path, monkeypatch):
         """REVIEWED song + AUTO_MOVE_ON_APPROVE=True + scalar save → file moved to computed target."""
-        import shutil
         from src.services.edit_service import EditService
         from src.services.library_service import LibraryService
-        from src.services.filing_service import FilingService
-        from src.engine.config import AUTO_MOVE_ON_APPROVE, LIBRARY_ROOT
         from tests.conftest import _connect
 
         # Setup: library root and a source file in a staging dir
@@ -553,8 +549,6 @@ class TestAutoMoveOnApprove:
     def test_reviewed_no_auto_move_when_disabled(self, populated_db, tmp_path, monkeypatch):
         """REVIEWED song + AUTO_MOVE_ON_APPROVE=False + scalar save → no move."""
         from src.services.edit_service import EditService
-        from src.services.filing_service import FilingService
-        from src.engine.config import AUTO_MOVE_ON_APPROVE
         from tests.conftest import _connect
 
         staging_dir = tmp_path / "staging"
@@ -583,7 +577,6 @@ class TestAutoMoveOnApprove:
     def test_not_reviewed_no_auto_move_even_when_enabled(self, populated_db, tmp_path, monkeypatch):
         """NOT_REVIEWED song + AUTO_MOVE_ON_APPROVE=True + scalar save → no move."""
         from src.services.edit_service import EditService
-        from src.engine.config import AUTO_MOVE_ON_APPROVE
         from tests.conftest import _connect
 
         staging_dir = tmp_path / "staging"
@@ -613,7 +606,6 @@ class TestAutoMoveOnApprove:
     def test_reviewed_file_already_at_target_no_op(self, populated_db, tmp_path, monkeypatch):
         """REVIEWED + AUTO_MOVE=True + source_path already equals computed target → no copy, no unlink."""
         from src.services.edit_service import EditService
-        from src.engine.config import AUTO_MOVE_ON_APPROVE
         from tests.conftest import _connect
 
         monkeypatch.setattr("src.engine.config.AUTO_MOVE_ON_APPROVE", True)
@@ -657,7 +649,6 @@ class TestAutoMoveOnApprove:
         """After auto-move, DB source_path points to new location, not old staging path."""
         from src.services.edit_service import EditService
         from src.services.library_service import LibraryService
-        from src.engine.config import AUTO_MOVE_ON_APPROVE
         from tests.conftest import _connect
 
         library_root = tmp_path / "library"

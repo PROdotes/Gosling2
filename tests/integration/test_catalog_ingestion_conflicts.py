@@ -21,7 +21,6 @@ class TestCatalogIngestionConflicts:
         # 1. Soft delete the existing song
         # Use simple SQL to simulate the state since we are testing the service's reaction
         # (CatalogService.delete_song also works, but repo SQL is more isolating)
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(
@@ -89,7 +88,6 @@ class TestCatalogIngestionConflicts:
         source_id = 1  # hash_1
 
         # 1. Soft delete ghost
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(
@@ -132,7 +130,6 @@ class TestResolveConflict:
         ghost_id = 1  # Song 1: "Smells Like Teen Spirit", hash_1, 200s, 1991
 
         # 1. Soft-delete the existing song to create a ghost
-        import sqlite3
         import shutil
 
         conn = _connect(populated_db)
@@ -214,7 +211,6 @@ class TestResolveConflict:
         ghost_id = 1
 
         # Soft-delete to create ghost
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(
@@ -242,7 +238,6 @@ class TestResolveConflict:
         ghost_id = 1
 
         # Soft-delete song 1
-        import sqlite3
         import shutil
 
         conn = _connect(populated_db)

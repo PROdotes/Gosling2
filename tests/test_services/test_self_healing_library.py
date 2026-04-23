@@ -1,8 +1,6 @@
 import pytest
-from pathlib import Path
 from src.services.library_service import LibraryService
 from src.services.edit_service import EditService
-from src.engine import config
 from tests.conftest import _connect
 
 @pytest.fixture

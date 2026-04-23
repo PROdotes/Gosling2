@@ -466,7 +466,11 @@ class PublisherRepository(BaseRepository):
         return cursor.lastrowid
 
     def add_song_publisher(
-        self, source_id: int, name: str, conn: sqlite3.Connection, publisher_id: Optional[int] = None
+        self,
+        source_id: int,
+        name: str,
+        conn: sqlite3.Connection,
+        publisher_id: Optional[int] = None,
     ) -> Publisher:
         """
         Add a publisher link to a song. Get-or-creates the Publisher record.
@@ -477,12 +481,15 @@ class PublisherRepository(BaseRepository):
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         if publisher_id is not None:
-             cursor.execute("UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?", (publisher_id,))
-             pub_id = publisher_id
+            cursor.execute(
+                "UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?",
+                (publisher_id,),
+            )
+            pub_id = publisher_id
         else:
-             pub_id = self.get_or_create_publisher(name, cursor)
+            pub_id = self.get_or_create_publisher(name, cursor)
         cursor.execute(
             "INSERT OR IGNORE INTO RecordingPublishers (SourceID, PublisherID) VALUES (?, ?)",
             (source_id, pub_id),
@@ -511,7 +518,11 @@ class PublisherRepository(BaseRepository):
         logger.debug("[PublisherRepository] <- remove_song_publisher() done")
 
     def add_album_publisher(
-        self, album_id: int, name: str, conn: sqlite3.Connection, publisher_id: Optional[int] = None
+        self,
+        album_id: int,
+        name: str,
+        conn: sqlite3.Connection,
+        publisher_id: Optional[int] = None,
     ) -> Publisher:
         """
         Add a publisher link for an album. Get-or-creates the Publisher record.
@@ -522,12 +533,15 @@ class PublisherRepository(BaseRepository):
         )
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
-        
+
         if publisher_id is not None:
-             cursor.execute("UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?", (publisher_id,))
-             pub_id = publisher_id
+            cursor.execute(
+                "UPDATE Publishers SET IsDeleted = 0 WHERE PublisherID = ?",
+                (publisher_id,),
+            )
+            pub_id = publisher_id
         else:
-             pub_id = self.get_or_create_publisher(name, cursor)
+            pub_id = self.get_or_create_publisher(name, cursor)
         cursor.execute(
             "INSERT OR IGNORE INTO AlbumPublishers (AlbumID, PublisherID) VALUES (?, ?)",
             (album_id, pub_id),

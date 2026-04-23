@@ -150,7 +150,6 @@ class TestGetByProcessingStatus:
 
     def test_returns_song_with_matching_status(self, populated_db):
         """A song manually set to status=3 is returned."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute("UPDATE MediaSources SET ProcessingStatus = 3 WHERE SourceID = 1")
@@ -171,7 +170,6 @@ class TestGetByProcessingStatus:
 
     def test_soft_deleted_song_is_excluded(self, populated_db):
         """A soft-deleted song with status=3 must NOT appear in results."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(
@@ -189,7 +187,6 @@ class TestGetByProcessingStatus:
 
     def test_returns_all_matching_songs(self, populated_db):
         """All non-deleted songs with matching status are returned, not just the first."""
-        import sqlite3
 
         conn = _connect(populated_db)
         conn.execute(

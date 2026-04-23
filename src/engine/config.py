@@ -61,16 +61,20 @@ ALBUM_DEFAULT_TYPE = "Single"
 
 # Song defaults
 SONG_DEFAULT_YEAR = 2026
+YEAR_VALIDATION = {"min": 1860, "max_offset": 1}  # max = current_year + max_offset
 
 # Scalar field validation rules (single source of truth — exposed via /api/v1/validation-rules)
 SCALAR_VALIDATION = {
-    "year": {"min": 1860, "max_offset": 1},  # max = current_year + max_offset
+    "year": YEAR_VALIDATION,
+    "release_year": YEAR_VALIDATION,
     "bpm": {"min": 1, "max": 300},
     "isrc": {
         "pattern": r"^[A-Z]{2}[A-Z0-9]{3}\d{2}\d{5}$",
         "strip": "-",
         "uppercase": True,
     },
+    "track_number": {"min": 1},
+    "disc_number": {"min": 1},
 }
 
 # Blur-saves scalars: if True, blurring a scalar input saves the value; if False, it reverts.

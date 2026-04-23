@@ -44,7 +44,6 @@ def _make_wav(path: Path, title_stem: str = "My WAV Track") -> Path:
 @pytest.fixture
 def ingest_db(empty_db):
     """Seed empty_db with Types + Roles needed for ingestion."""
-    import sqlite3
 
     conn = _connect(empty_db)
     conn.execute("INSERT INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
@@ -284,7 +283,6 @@ class TestResolveConflictWav:
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
 
-        import sqlite3
 
         conn = _connect(populated_db)
         row = conn.execute(
@@ -315,7 +313,6 @@ class TestResolveConflictWav:
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
 
-        import sqlite3
 
         conn = _connect(populated_db)
         row = conn.execute(
@@ -332,7 +329,6 @@ class TestResolveConflictWav:
         service = CatalogService(populated_db)
         service.resolve_conflict(ghost_id=ghost_id, staged_path=str(staged_wav))
 
-        import sqlite3
 
         conn = _connect(populated_db)
         row = conn.execute(
@@ -375,7 +371,6 @@ class TestFinalizeWavConversionGhostReactivation:
         self, ingest_db, staged_wav, monkeypatch
     ):
         """When MP3 hash matches a deleted record, the ghost's ID is returned."""
-        import sqlite3
 
         service = CatalogService(ingest_db)
 
@@ -414,7 +409,6 @@ class TestFinalizeWavConversionGhostReactivation:
         self, ingest_db, staged_wav, monkeypatch
     ):
         """The reactivated ghost must have IsDeleted=0 after finalize."""
-        import sqlite3
 
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))
@@ -453,7 +447,6 @@ class TestFinalizeWavConversionGhostReactivation:
         self, ingest_db, staged_wav, monkeypatch
     ):
         """The original WAV placeholder must be hard-deleted after ghost reactivation."""
-        import sqlite3
 
         service = CatalogService(ingest_db)
         result = service.ingest_wav_as_converting(str(staged_wav))

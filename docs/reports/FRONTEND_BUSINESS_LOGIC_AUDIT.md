@@ -347,11 +347,11 @@ A secondary bug was found: the tag delimiter default is `:` in JS but `::` in Py
 - [x] **3.** Fix tag delimiter mismatch (`:` in JS vs `::` in Python) — BUG-1
 
 ### Phase 2: Backend Enforcement Gaps
-- [ ] **4.** Add backend validation for `release_year`, `track_number`, `disc_number` — VL-2
-- [ ] **5.** Add `can_delete: bool` to entity list responses — BR-4
-- [ ] **6.** Add `can_activate: bool` to song responses — BR-3
-- [ ] **7.** Add `is_in_staging: bool` to song responses — BR-1
-- [ ] **8.** Add `available_actions: [...]` to song responses — BR-2
+- [x] **4.** Add backend validation for `release_year`, `track_number`, `disc_number` — VL-2
+- [x] **5.** Add `can_delete: bool` to entity list responses — BR-4
+- [x] **6.** Add `can_activate: bool` to song responses — BR-3
+- [x] **7.** Add `is_in_staging: bool` to song responses — BR-1
+- [x] **8.** Add `available_actions: [...]` to song responses — BR-2
 
 ### Phase 3: Atomic Backend Operations
 - [ ] **9.** Create `POST /albums/{id}/sync-from-song/{songId}` — eliminates CW-1, CW-2, CW-6, HC-3

@@ -27,7 +27,7 @@ import {
 import { createChipInput } from "../components/chip_input.js";
 import { PROCESSING_STATUS } from "../constants.js";
 import { parseTagInput } from "../utils/tag_input.js";
-import { validators } from "../utils/validators.js";
+
 
 function escapeHtml(str) {
     if (str == null) return "";
@@ -333,13 +333,6 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             const raw = input.value.trim();
             clearError();
 
-            const validate = validators[field];
-            const error = validate ? validate(raw, validationRules) : null;
-            if (error) {
-                showError(error);
-                return;
-            }
-
             if (raw === committedValue) return;
 
             const payload = numeric
@@ -368,11 +361,7 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
         }
 
         input.addEventListener("input", () => {
-            const validate = validators[field];
-            if (!validate) return;
-            const error = validate(input.value.trim(), validationRules);
-            if (error) showError(error);
-            else clearError();
+            // Backend handles validation - no client-side checking needed
         });
 
         input.addEventListener("keydown", (e) => {
@@ -801,23 +790,24 @@ export function renderActionSidebar(
 
     const status = song.processing_status ?? PROCESSING_STATUS.NEEDS_REVIEW;
     const blockers = song.review_blockers || [];
-    const isInStaging = (song.source_path || "")
-        .toLowerCase()
-        .includes("staging");
+    const isInStaging = song.is_in_staging ?? false;
 
     // ── Organize / Mark as Done button ────────────────────────────────────────
     let organizeBtn = "";
     let unreviewBtn = "";
-    if (status === PROCESSING_STATUS.NEEDS_REVIEW) {
+    const actions = song.available_actions || [];
+    if (actions.includes("mark_reviewed")) {
         const blocked = blockers.length > 0;
         organizeBtn = `<button class="sidebar-btn organize${blocked ? " blocked" : ""}"
             data-action="mark-reviewed" data-id="${song.id}"
             ${blocked ? 'disabled title="Missing required fields"' : ""}>Mark as Done</button>`;
-    } else if (status === PROCESSING_STATUS.REVIEWED) {
-        if (song.needs_organization) {
+    } else if (actions.includes("move_to_library") || actions.includes("unreview")) {
+        if (actions.includes("move_to_library")) {
             organizeBtn = `<button class="sidebar-btn organize" data-action="move-to-library" data-id="${song.id}">Organize to Library</button>`;
         }
-        unreviewBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
+        if (actions.includes("unreview")) {
+            unreviewBtn = `<button class="sidebar-btn" data-action="unreview-song" data-id="${song.id}">Unreview</button>`;
+        }
     }
 
     const targetPath =
@@ -994,7 +984,7 @@ export function renderSongEditorV2(song, fileData = null) {
   <div class="editor-section-title">Raw / File Data</div>
   <div class="editor-field">
     <label class="sidebar-toggle" data-action="toggle-active" data-id="${song.id}">
-      <input type="checkbox" ${song.is_active ? "checked" : ""} ${song.processing_status !== PROCESSING_STATUS.REVIEWED ? "disabled" : ""}>
+      <input type="checkbox" ${song.is_active ? "checked" : ""} ${song.can_activate ? "" : "disabled"}>
       <span>Active (airplay)</span>
     </label>
   </div>
