@@ -339,35 +339,35 @@ A secondary bug was found: the tag delimiter default is `:` in JS but `::` in Py
 
 ---
 
-## Priority Fix Order
+## Checklist
 
 ### Phase 1: Quick Wins (eliminate duplication)
-1. **Remove validators.js content** for the 4 fields backend already validates (media_name, year, bpm, isrc).
-2. **Remove client-side guards** that backend already enforces (BR-6 group→person, BR-7 groups-as-members).
-3. **Fix BUG-1** (delimiter mismatch).
+- [ ] **1.** Remove `validators.js` content for 4 fields backend already validates (media_name, year, bpm, isrc) — VL-1
+- [ ] **2.** Remove client-side guards backend already enforces (group→person, groups-as-members) — BR-6, BR-7
+- [ ] **3.** Fix tag delimiter mismatch (`:` in JS vs `::` in Python) — BUG-1
 
 ### Phase 2: Backend Enforcement Gaps
-4. **Add backend validation** for release_year, track_number, disc_number (currently only validated in JS).
-5. **Add `can_delete: bool`** to entity list responses.
-6. **Add `can_activate: bool`** to song responses.
-7. **Add `is_in_staging: bool`** to song responses.
-8. **Add `available_actions: [...]`** to song responses.
+- [ ] **4.** Add backend validation for `release_year`, `track_number`, `disc_number` — VL-2
+- [ ] **5.** Add `can_delete: bool` to entity list responses — BR-4
+- [ ] **6.** Add `can_activate: bool` to song responses — BR-3
+- [ ] **7.** Add `is_in_staging: bool` to song responses — BR-1
+- [ ] **8.** Add `available_actions: [...]` to song responses — BR-2
 
 ### Phase 3: Atomic Backend Operations
-9. **Create `POST /albums/{id}/sync-from-song/{songId}`** — eliminates CW-1, CW-2, CW-6, HC-3.
-10. **Create `POST /songs/{id}/quick-create-album`** — eliminates CW-2.
-11. **Move identity resolution to backend** — eliminates CW-3.
-12. **Backend tag parsing on `POST /songs/{id}/tags`** — eliminates DT-1, DT-2.
+- [ ] **9.** Create `POST /albums/{id}/sync-from-song/{songId}` — eliminates CW-1, CW-2, CW-6, HC-3
+- [ ] **10.** Create `POST /songs/{id}/quick-create-album` — eliminates CW-2
+- [ ] **11.** Move identity resolution to backend — eliminates CW-3
+- [ ] **12.** Backend tag parsing on `POST /songs/{id}/tags` — eliminates DT-1, DT-2
 
 ### Phase 4: Computed Display Fields
-13. **Guarantee `display_title`, `display_artist`, `display_name`** in all API responses.
-14. **Add `status_label` + `status_severity`** to ingestion items.
-15. **Add `formatted_duration` + `display_size`** to ingestion responses.
-16. **Return `credits_by_role`** as computed field.
+- [ ] **13.** Guarantee `display_title`, `display_artist`, `display_name` in all API responses — FB-1–FB-6
+- [ ] **14.** Add `status_label` + `status_severity` to ingestion items — DE-2, SM-2
+- [ ] **15.** Add `formatted_duration` + `display_size` to ingestion responses — DT-5, DT-6
+- [ ] **16.** Return `credits_by_role` as computed field — DT-8
 
 ### Phase 5: Replace DOM Scraping
-17. **Replace all 4 DOM-scraping patterns** in `navigation.js` with data model access.
+- [ ] **17.** Replace DOM-scraping in `navigation.js` with data model access — DS-1–DS-4
 
 ### Phase 6: Config Consolidation
-18. **Expand `/api/v1/config` or `/api/v1/validation-rules`** to include: PROCESSING_STATUS, ALBUM_TYPES, STATUS_FILTERS, credit roles, filter dimensions, default patterns.
-19. **Remove all hardcoded fallback defaults** from JS — require backend config.
+- [ ] **18.** Expand `/api/v1/config` to include: PROCESSING_STATUS, ALBUM_TYPES, STATUS_FILTERS, credit roles, filter dimensions, default patterns — DE-1–DE-6
+- [ ] **19.** Remove all hardcoded fallback defaults from JS — HC-1–HC-3
