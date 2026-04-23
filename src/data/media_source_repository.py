@@ -23,10 +23,10 @@ class MediaSourceRepository(BaseRepository):
 
         cursor.execute(
             """
-            INSERT INTO MediaSources 
-                (TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus)
-            VALUES 
-                ((SELECT TypeID FROM Types WHERE TypeName = ?), ?, ?, ?, ?, ?, ?)
+            INSERT INTO MediaSources
+                (TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus, SourceNotes)
+            VALUES
+                ((SELECT TypeID FROM Types WHERE TypeName = ?), ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 type_name,
@@ -36,6 +36,7 @@ class MediaSourceRepository(BaseRepository):
                 model.audio_hash,
                 1 if model.is_active else 0,
                 model.processing_status if model.processing_status is not None else 2,
+                model.notes,
             ),
         )
 
@@ -56,7 +57,7 @@ class MediaSourceRepository(BaseRepository):
         logger.debug(f"[MediaSourceRepository] -> get_by_path(path='{path}')")
 
         query = """
-            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus, SourceNotes
             FROM MediaSources
             WHERE SourcePath = ? AND IsDeleted = 0
         """
@@ -89,7 +90,7 @@ class MediaSourceRepository(BaseRepository):
         logger.debug(f"[MediaSourceRepository] -> get_by_hash(hash='{audio_hash}')")
 
         query = """
-            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus
+            SELECT SourceID, TypeID, MediaName, SourcePath, SourceDuration, AudioHash, IsActive, ProcessingStatus, SourceNotes
             FROM MediaSources
             WHERE AudioHash = ? AND IsDeleted = 0
         """
@@ -133,6 +134,7 @@ class MediaSourceRepository(BaseRepository):
                     ms.SourcePath,
                     ms.SourceDuration,
                     ms.IsDeleted,
+                    ms.SourceNotes,
                     s.RecordingYear,
                     s.ISRC
                 FROM MediaSources ms
@@ -147,6 +149,7 @@ class MediaSourceRepository(BaseRepository):
                 "source_path": r["SourcePath"],
                 "duration_s": float(r["SourceDuration"] or 0),
                 "is_deleted": bool(r["IsDeleted"]),
+                "notes": r["SourceNotes"],
                 "year": r["RecordingYear"],
                 "isrc": r["ISRC"],
             }
@@ -174,7 +177,7 @@ class MediaSourceRepository(BaseRepository):
             audio_hash=row["AudioHash"],
             is_active=bool(row["IsActive"]) if row["IsActive"] is not None else False,
             processing_status=row["ProcessingStatus"],
-            notes=None,  # Not in core MediaSources table currently
+            notes=row["SourceNotes"] if "SourceNotes" in row.keys() else None,
         )
 
     def soft_delete(self, source_id: int, conn: sqlite3.Connection) -> bool:

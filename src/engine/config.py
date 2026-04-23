@@ -104,7 +104,7 @@ SCALAR_ALLOWED = {
     "processing_status",
     "mood",
     "energy",
-    "comment",
+    "notes",
 }
 METADATA_ALLOWED = SCALAR_ALLOWED | {"credits", "albums", "tags", "publishers"}
 
