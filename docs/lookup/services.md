@@ -180,6 +180,12 @@ Update track metadata for a song-album association.
 ### create_and_link_album(song_id: int, album_data: dict, track_number: int, disc_number: int) -> SongAlbum
 Atomic: Create and link album.
 
+### sync_album_with_song(album_id: int, song_id: int) -> Album
+Sync album metadata from a song (backend CW-1). Syncs: release_year (if missing), Performer credits, publishers. Atomic operation.
+
+### quick_create_album_for_song(song_id: int, title: Optional[str] = None) -> SongAlbum
+Quick-create an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
+
 ### update_album(album_id: int, album_data: dict) -> Album
 Update album metadata.
 
@@ -195,8 +201,8 @@ Add publisher to an album.
 ### remove_album_publisher(album_id: int, publisher_id: int) -> None
 Remove publisher from an album.
 
-### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None) -> Tag
-Add a tag to a song.
+### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None, raw_tag: Optional[str] = None) -> Tag
+Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2).
 
 ### remove_song_tag(song_id: int, tag_id: int) -> None
 Remove a tag from a song.
@@ -220,7 +226,7 @@ Global publisher update.
 Set or clear the parent of a publisher.
 
 ### import_credits_bulk(song_id: int, credits: List[SpotifyCredit], publishers: List[str]) -> None
-Atomic import of Spotify credits and publishers.
+Atomic import of Spotify credits and publishers. Now does backend identity resolution (CW-3).
 
 ### format_entity_field(entity_type: str, entity_id: int, field: str, format_type: str) -> Any
 Standardizes the casing of an entity's metadata field.
@@ -429,6 +435,9 @@ Update track metadata for a song-album association.
 ### create_and_link_album(song_id: int, title: str, album_type: str, release_year: int, track_number: int, disc_number: int) -> int
 Atomic: Create and link album.
 
+### quick_create_album_for_song(song_id: int, title: Optional[str] = None) -> SongAlbum
+Quick-create an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
+
 ### update_album(album_id: int, body: Dict[str, Any]) -> Album
 Update album metadata.
 
@@ -444,8 +453,9 @@ Add publisher to an album.
 ### remove_album_publisher(album_id: int, publisher_id: int) -> None
 Remove publisher from an album.
 
-### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None) -> Tag
-Add a tag to a song. 
+### add_song_tag(song_id: int, tag_name: str, category: str, tag_id: Optional[int] = None, raw_tag: Optional[str] = None) -> Tag
+Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2).
+
 - **Auto-Primary**: If category is 'Genre' and the song has no primary genre, the new link is automatically marked as primary.
 
 ### remove_song_tag(song_id: int, tag_id: int) -> None
@@ -492,7 +502,7 @@ Global publisher update.
 Set or clear the parent of a publisher.
 
 ### import_credits_bulk(song_id: int, credits: List[SpotifyCredit], publishers: List[str]) -> None
-Atomic import of Spotify credits and publishers.
+Atomic import of Spotify credits and publishers. Now does backend identity resolution (CW-3).
 
 ### get_id3_frames_config() -> Dict[str, Any]
 Returns the consolidated ID3 frame mapping.

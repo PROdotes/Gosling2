@@ -29,6 +29,7 @@ from src.services.metadata_writer import MetadataWriter
 from src.services.casing_service import CasingService
 from src.services.filing_service import FilingService
 from src.services.library_service import LibraryService
+from src.services.identity_service import IdentityService
 from src.engine.config import (
     get_db_path,
     RENAME_RULES_PATH,
@@ -312,9 +313,12 @@ class EditService:
                 raise ValueError(f"{key} must be <= {rule['max']}")
             if key == "release_year":
                 import datetime
+
                 max_year = datetime.date.today().year + rule.get("max_offset", 1)
                 if not (rule["min"] <= val <= max_year):
-                    raise ValueError(f"{key} must be between {rule['min']} and {max_year}")
+                    raise ValueError(
+                        f"{key} must be between {rule['min']} and {max_year}"
+                    )
             fields[key] = val
         return fields
 
@@ -433,7 +437,6 @@ class EditService:
         if not any(link.album_id == album_id for link in existing_links):
             raise LookupError(f"Song {song_id} is not linked to Album {album_id}")
 
-        fields_set = fields_set or set()
         to_validate = {}
         if track_number is not None:
             to_validate["track_number"] = track_number
@@ -442,10 +445,13 @@ class EditService:
         if to_validate:
             self._validate_album_scalars(to_validate)
 
+        fields_set = fields_set or set(to_validate.keys())
+
         conn = self._album_repo.get_connection()
         try:
             self._album_repo.update_track_info(
-                song_id, album_id,
+                song_id,
+                album_id,
                 track_number if "track_number" in fields_set else ...,
                 disc_number if "disc_number" in fields_set else ...,
                 conn,
@@ -577,14 +583,188 @@ class EditService:
         finally:
             conn.close()
 
+    def sync_album_with_song(self, album_id: int, song_id: int) -> Album:
+        """
+        Sync album metadata from a song (backend implementation of CW-1).
+        Syncs: release_year (if missing), Performer credits, publishers.
+        Atomic operation — all-or-nothing via single connection.
+        """
+        logger.info(
+            f"[EditService] -> sync_album_with_song(album_id={album_id}, song_id={song_id})"
+        )
+        song = self._library_service.get_song(song_id)
+        if not song:
+            raise LookupError(f"Song {song_id} not found")
+
+        album = self._library_service.get_album(album_id)
+        if not album:
+            raise LookupError(f"Album {album_id} not found")
+
+        conn = self._album_repo_dir.get_connection()
+        try:
+            # Sync release_year if missing on album but present on song
+            if not album.release_year and song.year:
+                self._album_repo_dir.update_album(
+                    album_id, {"release_year": song.year}, conn
+                )
+                logger.debug(f"[EditService] synced release_year={song.year} to album")
+
+            # Sync Performer credits (only role that gets synced per original logic)
+            existing_credit_name_ids = {c.name_id for c in (album.credits or [])}
+            for credit in song.credits or []:
+                if credit.role_name != "Performer":
+                    continue
+                if credit.name_id not in existing_credit_name_ids:
+                    name_id = self._album_credit_repo.add_credit(
+                        album_id,
+                        credit.display_name,
+                        credit.role_name,
+                        conn,
+                        identity_id=credit.identity_id or None,
+                    )
+                    existing_credit_name_ids.add(name_id)
+                    logger.debug(
+                        f"[EditService] added credit '{credit.display_name}' to album"
+                    )
+
+            # Sync publishers
+            existing_pub_ids = {p.id for p in (album.publishers or [])}
+            for pub in song.publishers or []:
+                if pub.id not in existing_pub_ids:
+                    self._pub_repo.add_album_publisher(
+                        album_id, pub.name, conn, publisher_id=pub.id
+                    )
+                    existing_pub_ids.add(pub.id)
+                    logger.debug(f"[EditService] added publisher '{pub.name}' to album")
+
+            conn.commit()
+            # ID3 sync for all linked songs
+            song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
+            for sid in song_ids:
+                self._sync_id3_if_enabled(sid)
+
+            result = self._library_service.get_album(album_id)
+            logger.info(f"[EditService] <- sync_album_with_song() OK '{result.title}'")
+            return result
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[EditService] sync_album_with_song FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+
+    def quick_create_album_for_song(
+        self, song_id: int, title: Optional[str] = None
+    ) -> SongAlbum:
+        """
+        Quick-create an album from a song (backend implementation of CW-2).
+        Creates album with song's media_name, defaults disc=1, track=1,
+        then syncs metadata from song atomically.
+        """
+        logger.info(
+            f"[EditService] -> quick_create_album_for_song(song_id={song_id}, title='{title}')"
+        )
+        song = self._library_service.get_song(song_id)
+        if not song:
+            raise LookupError(f"Song {song_id} not found")
+
+        album_title = (title or song.media_name or "Unknown Album").strip()
+        if not album_title:
+            raise ValueError("Album title cannot be empty")
+
+        conn = self._album_repo_dir.get_connection()
+        try:
+            # Create album
+            album_id = self._album_repo_dir.create_album(
+                album_title, "Album", song.year, conn
+            )
+            # Link to song with defaults
+            self._album_repo.add_album(song_id, album_id, 1, 1, conn)
+            logger.debug(
+                f"[EditService] created album_id={album_id}, linked to song_id={song_id}"
+            )
+
+            # Sync metadata (Performer credits + publishers) using already-fetched data
+            # We need to re-fetch album within this transaction to get credits/publishers
+            # For simplicity, just sync the album we just created
+            # Sync Performer credits
+            existing_credit_name_ids = set()
+            for credit in song.credits or []:
+                if credit.role_name != "Performer":
+                    continue
+                name_id = self._album_credit_repo.add_credit(
+                    album_id,
+                    credit.display_name,
+                    credit.role_name,
+                    conn,
+                    identity_id=credit.identity_id or None,
+                )
+                existing_credit_name_ids.add(name_id)
+
+            # Sync publishers
+            for pub in song.publishers or []:
+                self._pub_repo.add_album_publisher(
+                    album_id, pub.name, conn, publisher_id=pub.id
+                )
+
+            conn.commit()
+            # ID3 sync
+            self._sync_id3_if_enabled(song_id)
+
+            # Return the link info
+            links = self._album_repo.get_albums_for_songs([song_id], conn)
+            result = next((link for link in links if link.album_id == album_id), None)
+            logger.info(
+                f"[EditService] <- quick_create_album_for_song() OK album_id={album_id}"
+            )
+            return result
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"[EditService] quick_create_album_for_song FAILED: {e}")
+            raise
+        finally:
+            conn.close()
+
+    def _parse_raw_tag(self, raw: str) -> dict:
+        """
+        Parse a raw tag input string into {name, category}.
+        Uses TAG_CATEGORY_DELIMITER and TAG_INPUT_FORMAT from config.
+        """
+        delimiter = "::"  # config.TAG_CATEGORY_DELIMITER
+        default_category = "Genre"  # config.TAG_DEFAULT_CATEGORY
+        format_ = "tag:category"  # config.TAG_INPUT_FORMAT
+        name_first = format_.lower().startswith("tag")
+
+        raw = raw.strip()
+        if not raw:
+            raise ValueError("Tag name cannot be empty")
+
+        if delimiter not in raw:
+            return {"name": raw, "category": default_category}
+
+        idx = raw.find(delimiter)
+        a = raw[:idx].strip()
+        b = raw[idx + len(delimiter) :].strip()
+        if name_first:
+            return {"name": a, "category": b}
+        else:
+            return {"name": b, "category": a}
+
     def add_song_tag(
         self,
         song_id: int,
         tag_name: Optional[str] = None,
         category: Optional[str] = None,
         tag_id: Optional[int] = None,
+        raw_tag: Optional[str] = None,
     ) -> Tag:
-        """Add a tag to a song."""
+        """Add a tag to a song. Supports raw_tag parsing (DT-1, DT-2)."""
+        # Parse raw_tag if provided (backend tag parsing)
+        if raw_tag is not None:
+            parsed = self._parse_raw_tag(raw_tag)
+            tag_name = parsed["name"]
+            category = parsed["category"]
+
         if tag_id is not None:
             existing = self._tag_repo.get_by_id(tag_id)
             if not existing:
@@ -772,16 +952,29 @@ class EditService:
     def import_credits_bulk(
         self, song_id: int, credits: List[SpotifyCredit], publishers: List[str]
     ) -> None:
-        """Atomic bulk import for Spotify credits and publishers."""
+        """Atomic bulk import for Spotify credits and publishers (backend CW-3)."""
         if not self._song_repo.get_by_id(song_id):
             raise LookupError(f"Song {song_id} not found")
+
+        # Backend identity resolution (moved from frontend CW-3)
+        # Only resolve if identity_id not already provided (Truth-First)
+        identity_service = IdentityService(self._db_path)
+        resolved_credits = []
+        for c in credits:
+            identity_id = c.identity_id or identity_service.resolve_identity_by_name(
+                c.name
+            )
+            resolved_credits.append(
+                SpotifyCredit(name=c.name, role=c.role, identity_id=identity_id)
+            )
+
         conn = self._song_repo.get_connection()
         try:
             domain_credits = [
                 SongCredit(
                     display_name=c.name, role_name=c.role, identity_id=c.identity_id
                 )
-                for c in credits
+                for c in resolved_credits
             ]
             if domain_credits:
                 self._credit_repo.insert_credits(song_id, domain_credits, conn=conn)
@@ -870,7 +1063,9 @@ class EditService:
                     or source_abs_path.samefile(new_abs_path)
                 )
             except Exception as e:
-                logger.debug(f"[EditService] move_song_to_library file compare failed: {e}")
+                logger.debug(
+                    f"[EditService] move_song_to_library file compare failed: {e}"
+                )
                 is_same_file = False
 
             if source_abs_path.exists() and not is_same_file:

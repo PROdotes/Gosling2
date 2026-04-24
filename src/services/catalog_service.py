@@ -402,6 +402,12 @@ class CatalogService:
             song_id, album_data, track_number, disc_number
         )
 
+    def quick_create_album_for_song(
+        self, song_id: int, title: Optional[str] = None
+    ) -> SongAlbum:
+        """Quick-create album from song (backend implementation of CW-2)."""
+        return self._edit_service.quick_create_album_for_song(song_id, title)
+
     def remove_song_album(self, song_id: int, album_id: int) -> None:
         """Unlink album via EditService."""
         return self._edit_service.remove_song_album(song_id, album_id)
@@ -416,7 +422,11 @@ class CatalogService:
     ) -> None:
         """Update link metadata via EditService."""
         return self._edit_service.update_song_album_link(
-            song_id, album_id, track_number, disc_number, fields_set=fields_set,
+            song_id,
+            album_id,
+            track_number,
+            disc_number,
+            fields_set=fields_set,
         )
 
     def update_album(self, album_id: int, album_data: dict) -> Album:
@@ -460,9 +470,12 @@ class CatalogService:
         tag_name: Optional[str] = None,
         category: Optional[str] = None,
         tag_id: Optional[int] = None,
+        raw_tag: Optional[str] = None,
     ) -> Tag:
-        """Add song tag via EditService."""
-        return self._edit_service.add_song_tag(song_id, tag_name, category, tag_id)
+        """Add song tag via EditService. Supports raw_tag (DT-1, DT-2)."""
+        return self._edit_service.add_song_tag(
+            song_id, tag_name, category, tag_id, raw_tag
+        )
 
     def remove_song_tag(self, song_id: int, tag_id: int) -> None:
         """Remove song tag via EditService."""

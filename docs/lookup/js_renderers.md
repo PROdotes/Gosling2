@@ -33,6 +33,9 @@ Renders the vertical action column (Organization, Cleanup, etc).
 ### wireScalarInputs(container, song)
 Attaches inline-edit triggers to all scalar fields (BPM, Year, ISRC).
 
+### wireAlbumScalarInputs(song, refresh)
+Attaches inline-edit triggers to scalar fields on album cards (track number, disc number, etc).
+
 ### wireChipInputs(container, song)
 Attaches link-modal triggers to all relationship chips (Artists, Albums, Tags).
 

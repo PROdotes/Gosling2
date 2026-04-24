@@ -7,6 +7,10 @@
 
 ## Modals
 
+### createModalLifecycle(overlayEl, { onOpen, onClose, onBeforeClose, overlayClickCheck })
+*Location: `src/static/js/dashboard/components/modal_lifecycle.js`*
+Factory that wires open/close lifecycle (overlay click, ESC key, callbacks) onto a modal overlay element. Returns a `{ open, close }` controller object.
+
 ### openEditModal(config, actionTarget)
 *Location: `src/static/js/dashboard/components/edit_modal.js`*
 Displays the modal with custom fields and callbacks.

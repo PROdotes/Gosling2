@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.services.catalog_service import CatalogService
@@ -332,6 +332,36 @@ async def add_song_album(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/songs/{song_id}/quick-create-album", response_model=SongAlbum)
+async def quick_create_album(
+    song_id: int,
+    title: Optional[str] = None,
+    service: CatalogService = Depends(_get_service),
+) -> SongAlbum:
+    """
+    Quick-create an album from a song (backend implementation of CW-2).
+    Creates album with song's media_name (or provided title), defaults disc=1, track=1,
+    then syncs metadata (release_year, Performer credits, publishers) atomically.
+    """
+    logger.debug(f"[SongUpdates] -> quick_create_album(id={song_id}, title='{title}')")
+    _require_song(song_id, service)
+    try:
+        result = service.quick_create_album_for_song(song_id, title)
+        logger.debug(
+            f"[SongUpdates] <- quick_create_album OK album_id={result.album_id}"
+        )
+        return result
+    except ValueError as e:
+        logger.warning(f"[SongUpdates] <- quick_create_album VAL_ERROR: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError:
+        logger.warning(f"[SongUpdates] <- quick_create_album NOT_FOUND id={song_id}")
+        raise HTTPException(status_code=404, detail=f"Song {song_id} not found")
+    except Exception as e:
+        logger.error(f"[SongUpdates] <- quick_create_album CRITICAL: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/songs/{song_id}/albums/{album_id}", status_code=204)
 async def remove_song_album(
     song_id: int,
@@ -389,7 +419,10 @@ async def update_song_album_link(
 
     try:
         service.update_song_album_link(
-            song_id, album_id, body.track_number, body.disc_number,
+            song_id,
+            album_id,
+            body.track_number,
+            body.disc_number,
             fields_set=body.model_fields_set,
         )
         logger.debug("[SongUpdates] <- update_song_album_link OK")
@@ -553,9 +586,13 @@ async def add_song_tag(
     service: CatalogService = Depends(_get_service),
 ):
     _require_song(song_id, service)
-    logger.debug(f"[SongUpdates] -> add_song_tag(id={song_id}, tag='{body.tag_name}')")
+    logger.debug(
+        f"[SongUpdates] -> add_song_tag(id={song_id}, tag='{body.tag_name}', raw='{body.raw_tag}')"
+    )
     try:
-        tag = service.add_song_tag(song_id, body.tag_name, body.category, body.tag_id)
+        tag = service.add_song_tag(
+            song_id, body.tag_name, body.category, body.tag_id, body.raw_tag
+        )
         logger.debug("[SongUpdates] <- add_song_tag OK")
         return tag
     except Exception as e:

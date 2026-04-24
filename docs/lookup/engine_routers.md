@@ -442,8 +442,13 @@ Used by `update_identity_legal_name`.
 
 ### async def add_song_tag(song_id: int, body: AddTagBody, service: CatalogService = Depends(_get_service)) -> Tag
 **HTTP**: `POST /api/v1/songs/{song_id}/tags`
-- Adds a tag to a song. Get-or-creates the tag record.
+- Adds a tag to a song. Get-or-creates the tag record. Supports raw_tag parsing (DT-1, DT-2).
 - Wraps `CatalogService.add_song_tag`.
+
+### async def quick_create_album(song_id: int, title: Optional[str] = None, service: CatalogService = Depends(_get_service)) -> SongAlbum
+**HTTP**: `POST /api/v1/songs/{song_id}/quick-create-album`
+- Quick-creates an album from a song (backend CW-2). Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
+- Wraps `CatalogService.quick_create_album_for_song`.
 
 ### async def remove_song_tag(song_id: int, tag_id: int, service: CatalogService = Depends(_get_service))
 **HTTP**: `DELETE /api/v1/songs/{song_id}/tags/{tag_id}`
@@ -506,6 +511,17 @@ Used by `update_identity_legal_name`.
 - Action endpoint to manually fix casing of a song or album field.
 - Returns the updated hydrated entity (SongView or AlbumView).
 - Wraps `CatalogService.format_entity_field`.
+
+---
+
+## Album Updates Router
+*Location: `src/engine/routers/album_updates.py`*
+**Responsibility**: HTTP interface for album-specific write operations.
+
+### async def sync_album_with_song(album_id: int, song_id: int, service: CatalogService = Depends(_get_service)) -> Album
+**HTTP**: `POST /api/v1/albums/{album_id}/sync-from-song/{song_id}`
+- Syncs album metadata from a song (backend CW-1). Syncs: release_year (if missing), Performer credits, publishers. Atomic operation.
+- Wraps `CatalogService.sync_album_with_song`.
 
 ---
 

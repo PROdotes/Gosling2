@@ -591,6 +591,7 @@ class AddTagBody(BaseModel):
     tag_name: Optional[str] = None
     category: Optional[str] = None
     tag_id: Optional[int] = None
+    raw_tag: Optional[str] = None  # Parsed server-side if provided (DT-1, DT-2)
 
 
 class UpdateTagBody(BaseModel):
