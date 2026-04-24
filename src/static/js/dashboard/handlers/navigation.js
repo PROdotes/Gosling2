@@ -130,32 +130,37 @@ export class NavigationHandler {
             openEditModal(
                 {
                     title: "Edit Publisher",
-                    name: publisherDetail?.name || publisherName,
-                    onRename: async (newName) =>
-                        api.updatePublisher(itemId, newName),
-                    onClose,
-                    category: null,
-                    children: {
-                        label: "Sub-publishers",
-                        items: childItems,
-                        onSearch: async (q) =>
-                            (await api.searchPublishers(q))?.map((p) => ({
-                                id: p.id,
-                                label: p.name,
-                            })) || [],
-                        onAdd: async (opt) => {
-                            await api.setPublisherParent(
-                                opt.id,
-                                Number(itemId),
-                            );
-                            childItems.push({ id: opt.id, label: opt.label });
+                    fields: {
+                        name: {
+                            type: "text",
+                            label: "Name",
+                            value: publisherDetail?.name || publisherName,
+                            onSave: async (val) => api.updatePublisher(itemId, val),
                         },
-                        onRemove: async (item) =>
-                            api.setPublisherParent(item.id, null),
-                        onRenameChild: async (item, newName) =>
-                            api.updatePublisher(item.id, newName),
-                        createLabel: (q) => `Add "${q}" as sub-publisher`,
+                        subPublishers: {
+                            type: "chipList",
+                            label: "Sub-publishers",
+                            items: childItems,
+                            onSearch: async (q) =>
+                                (await api.searchPublishers(q))?.map((p) => ({
+                                    id: p.id,
+                                    label: p.name,
+                                })) || [],
+                            onAdd: async (opt) => {
+                                await api.setPublisherParent(
+                                    opt.id,
+                                    Number(itemId),
+                                );
+                                childItems.push({ id: opt.id, label: opt.label });
+                            },
+                            onRemove: async (item) =>
+                                api.setPublisherParent(item.id, null),
+                            onRename: async (item, newName) =>
+                                api.updatePublisher(item.id, newName),
+                            createLabel: (q) => `Add "${q}" as sub-publisher`,
+                        },
                     },
+                    onClose,
                 },
                 actionTarget,
             );
@@ -166,22 +171,28 @@ export class NavigationHandler {
             openEditModal(
                 {
                     title: "Edit Tag",
-                    name: tagDetail.name,
-                    onRename: async (newName) =>
-                        api.updateTag(itemId, newName, tagDetail.category),
-                    onClose,
-                    category: {
-                        label: "Category",
-                        value: tagDetail.category,
-                        editable: true,
-                        onSave: async (val) =>
-                            api.updateTag(itemId, tagDetail.name, val),
-                        onSearch: async (q) =>
-                            (await api.getTagCategories()).filter((c) =>
-                                c.toLowerCase().includes(q.toLowerCase()),
-                            ),
+                    fields: {
+                        name: {
+                            type: "text",
+                            label: "Name",
+                            value: tagDetail.name,
+                            onSave: async (val) =>
+                                api.updateTag(itemId, val, tagDetail.category),
+                        },
+                        category: {
+                            type: "search",
+                            label: "Category",
+                            value: tagDetail.category,
+                            editable: true,
+                            onSave: async (val) =>
+                                api.updateTag(itemId, tagDetail.name, val),
+                            onSearch: async (q) =>
+                                (await api.getTagCategories()).filter((c) =>
+                                    c.toLowerCase().includes(q.toLowerCase()),
+                                ),
+                        },
                     },
-                    children: null,
+                    onClose,
                 },
                 actionTarget,
             );

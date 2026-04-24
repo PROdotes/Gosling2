@@ -28,6 +28,7 @@ export function createAutocomplete({
     allowCreate = false,
     getCreateLabel = null,
     debounceMs = 200,
+    onEnterEmpty = null,
 }) {
     let options = [];
     let activeIndex = -1;
@@ -47,23 +48,21 @@ export function createAutocomplete({
         const html = opts.map((opt, i) => renderItem(opt, i, false)).join("");
 
         if (allowCreate && lastQuery.trim()) {
-            const createHtml = renderItem(
-                { id: null, label: lastQuery.trim(), isCreate: true },
-                opts.length,
-                true,
-            );
+            const createOpt = { id: null, label: lastQuery.trim(), isCreate: true };
+            options = [...opts, createOpt];
+            const createHtml = renderItem(createOpt, opts.length, true);
             dropdownEl.innerHTML = html + createHtml;
         } else {
             dropdownEl.innerHTML = html;
         }
 
-        dropdownEl.hidden = false;
+        dropdownEl.style.display = "block";
         if (options.length > 0) highlightIndex(0);
         attachOptionHandlers();
     }
 
     function hideDropdown() {
-        dropdownEl.hidden = true;
+        dropdownEl.style.display = "none";
         dropdownEl.innerHTML = "";
         options = [];
         activeIndex = -1;
@@ -71,7 +70,7 @@ export function createAutocomplete({
 
     function highlightIndex(index) {
         const opts = dropdownEl.querySelectorAll("[data-ac-index]");
-        opts.forEach((o, i) => o.classList.toggle("ac-option--active", i === index));
+        opts.forEach((o, i) => o.classList.toggle("link-dropdown-item--active", i === index));
         activeIndex = index;
     }
 
@@ -116,6 +115,8 @@ export function createAutocomplete({
                 selectByIndex(activeIndex);
             } else if (allowCreate && inputEl.value.trim()) {
                 onSelect({ id: null, label: inputEl.value.trim(), isCreate: true });
+            } else if (!inputEl.value.trim() && onEnterEmpty) {
+                onEnterEmpty();
             }
         } else if (e.key === "Escape") {
             hideDropdown();

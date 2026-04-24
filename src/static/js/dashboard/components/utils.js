@@ -15,6 +15,7 @@ document.addEventListener(
  * Use this in overlay click handlers to prevent closing when the user drags out.
  */
 export function wasMousedownInside(el) {
+    if (!el) return false;
     return el.contains(_lastMousedownTarget);
 }
 

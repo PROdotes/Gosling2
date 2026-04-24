@@ -1,36 +1,25 @@
 import { wasMousedownInside } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
+import { createAutocomplete } from "./autocomplete.js";
 
 /**
- * Generic edit modal — rename a record, optional category field, optional flat children list.
+ * Generic edit modal — form fields rendered from config schema.
+ *
+ * The modal doesn't know about "categories", "children", "toggles" — it just
+ * renders fields based on their type.
  *
  * Usage:
  *   openEditModal({
  *     title: "Edit Publisher",
- *     name: "Sony Music",
- *     onRename: async (newName) => {},          // null = not renameable
- *     toggle: {                                 // null = no toggle
- *       value: "person",                        // current value
- *       options: ["person", "group"],
- *       onSave: async (val) => {},
- *       disabledReason: "Remove members first", // optional tooltip when disabled
+ *     triggerEl: chipElement, // optional — updates chip label after rename
+ *     fields: {
+ *       name: { type: "text", value: "Sony", onSave: async (val) => {} },
+ *       type: { type: "toggle", value: "person", options: ["person", "group"], onSave, disabledReason: "..." },
+ *       category: { type: "search", value: "major", onSearch: (q) => [], onSave },
+ *       members: { type: "chipList", items: [{id, label}], onSearch, onAdd, onRemove, onRename: (item, newName) => {} },
+ *       subItems: { type: "chipList", items: [], ... },
  *     },
- *     category: {                               // null = no category section
- *       label: "Category",
- *       value: "major",
- *       editable: true,
- *       onSave: async (val) => {},
- *       onSearch: async (q) => ["Genre", "Mood"],  // optional — renders search dropdown instead of plain input
- *     },
- *     children: {                               // null = no children section
- *       label: "Sub-publishers",
- *       items: [{ id, label }],
- *       onSearch: async (q) => [{ id, label }],
- *       onAdd: async (opt) => {},               // opt = { id|null, label, rawInput? }
- *       onRemove: async (item) => {},
- *       createLabel: (q) => `Add "${q}"`,
- *     },
- *     secondChildren: { ... },                  // null = no second children section (same shape as children)
+ *     onClose: () => {},
  *   });
  */
 
@@ -38,602 +27,396 @@ const overlay = document.getElementById("edit-modal");
 const titleEl = document.getElementById("edit-modal-title");
 const bodyEl = document.getElementById("edit-modal-body");
 
-let _config = null;
-let _parentSnapshot = null; // saved state when drilling into a child edit
-let _isSelecting = false;
+let _fields = null;
+let _triggerEl = null;
+let _onClose = null;
+let _autocompletes = {};
 let modal;
 
-// ─── Children slot state ──────────────────────────────────────────────────────
-// Each slot is keyed by config key ("children" | "secondChildren") and holds
-// { items, debounce, dropdownItems, dropdownIndex, inputEl, dropdownEl, itemsEl }
-const _slots = {};
-
-// ─── Category dropdown state ──────────────────────────────────────────────────
-let _catDebounce = null;
-let _catDropdownItems = [];
-let _catDropdownIndex = -1;
-let _catInput = null;
-let _catDropdown = null;
-
-// ─── Children slot helpers ────────────────────────────────────────────────────
-
-function createSlot(key) {
-    const slot = {
-        key,
-        items: [],
-        debounce: null,
-        dropdownItems: [],
-        dropdownIndex: -1,
-        inputEl: null,
-        dropdownEl: null,
-        itemsEl: null,
-    };
-    _slots[key] = slot;
-    return slot;
+function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
 }
 
-function getSlotConfig(key) {
-    return _config[key];
+function camelToData(str) {
+    return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
 }
 
-// DOM id helpers — "children" → "child", "secondChildren" → "child2"
-const _domId = { children: "child", secondChildren: "child2" };
-const _dataAttr = { children: "editChildId", secondChildren: "editChild2Id" };
-const _removeAttr = {
-    children: "removeChildId",
-    secondChildren: "removeChild2Id",
-};
+// ─── Render fields ───────────────────────────────────────────────────────────
 
-function renderSlotItems(slot) {
-    const cfg = getSlotConfig(slot.key);
-    const editAttr = _dataAttr[slot.key];
-    const removeAttr = _removeAttr[slot.key];
+function renderFields() {
+    const sections = [];
 
-    if (!slot.items.length) {
-        slot.itemsEl.innerHTML =
-            '<span class="link-modal-empty">None linked</span>';
+    for (const [key, field] of Object.entries(_fields)) {
+        if (field.type === "text") {
+            sections.push(renderTextField(key, field));
+        } else if (field.type === "toggle") {
+            sections.push(renderToggleField(key, field));
+        } else if (field.type === "search") {
+            sections.push(renderSearchField(key, field));
+        } else if (field.type === "chipList") {
+            sections.push(renderChipListField(key, field));
+        }
+    }
+
+    bodyEl.innerHTML = sections.join("");
+    attachFieldHandlers();
+}
+
+function renderTextField(key, field) {
+    return `
+        <div class="edit-modal-field" id="edit-field-${key}">
+            <label>${escapeHtml(field.label || key)}</label>
+            <input type="text" class="link-modal-input" data-field-key="${key}"
+                value="${escapeHtml(field.value || "")}" autocomplete="off">
+        </div>
+    `;
+}
+
+function renderToggleField(key, field) {
+    const { value, options = [], disabledReason } = field;
+    const disabled = !!disabledReason;
+
+    return `
+        <div class="edit-modal-field" id="edit-field-${key}">
+            <label>${escapeHtml(field.label || key)}</label>
+            <div class="edit-modal-toggle" ${disabled ? `title="${escapeHtml(disabledReason)}"` : ""}>
+                ${options.map((opt) => `
+                    <button class="edit-modal-toggle-btn ${opt === value ? "active" : ""} ${disabled && opt !== value ? "disabled" : ""}"
+                        data-toggle-value="${escapeHtml(opt)}" ${disabled && opt !== value ? "disabled" : ""}>
+                        ${escapeHtml(opt)}
+                    </button>
+                `).join("")}
+            </div>
+        </div>
+    `;
+}
+
+function renderSearchField(key, field) {
+    const { value, editable = true, onSearch } = field;
+    const fieldId = `edit-field-${key}`;
+
+    if (editable && onSearch) {
+        return `
+            <div class="edit-modal-field" id="${fieldId}">
+                <label>${escapeHtml(field.label || key)}</label>
+                <div class="link-modal-add" style="position:relative">
+                    <input type="text" class="link-modal-input" data-field-key="${key}"
+                        value="${escapeHtml(value || "")}" autocomplete="off">
+                    <div class="link-modal-dropdown" data-field-key="${key}" style="display:none"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="edit-modal-field" id="${fieldId}">
+            <label>${escapeHtml(field.label || key)}</label>
+            <input type="text" class="link-modal-input" data-field-key="${key}"
+                value="${escapeHtml(value || "")}" ${!editable ? "readonly" : ""} autocomplete="off">
+        </div>
+    `;
+}
+
+function renderChipListField(key, field) {
+    const { label, items = [] } = field;
+
+    return `
+        <div class="edit-modal-section-title">${escapeHtml(label || key)}</div>
+        <div class="link-modal-items" data-field-key="${key}">
+            ${items.length ? items.map((item) => `
+                <span class="link-chip">
+                    <button class="link-chip-label" data-chip-id="${item.id}">${escapeHtml(item.label)}</button>
+                    <button class="link-chip-remove" data-chip-id="${item.id}" title="Remove">✕</button>
+                </span>
+            `).join("") : '<span class="link-modal-empty">None</span>'}
+        </div>
+        <div class="link-modal-add" style="position:relative">
+            <input type="text" class="link-modal-input" data-field-key="${key}"
+                placeholder="Type to search or add..." autocomplete="off">
+            <div class="link-modal-dropdown" data-field-key="${key}" style="display:none"></div>
+        </div>
+    `;
+}
+
+// ─── Attach handlers ──────────────────────────────────────────────────
+
+function attachFieldHandlers() {
+    for (const [key, field] of Object.entries(_fields)) {
+        if (field.type === "text") {
+            attachTextHandler(key, field);
+        } else if (field.type === "toggle") {
+            attachToggleHandler(key, field);
+        } else if (field.type === "search") {
+            attachSearchHandler(key, field);
+        } else if (field.type === "chipList") {
+            attachChipListHandler(key, field);
+        }
+    }
+}
+
+function attachTextHandler(key, field) {
+    const input = bodyEl.querySelector(`[data-field-key="${key}"]`);
+    if (!input || !field.onSave) return;
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            commitText(key, input.value);
+        }
+    });
+}
+
+async function commitText(key, value) {
+    const field = _fields[key];
+    const input = bodyEl.querySelector(`[data-field-key="${key}"]`);
+    if (!input || !field.onSave) return;
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+        closeEditModal();
         return;
     }
-    slot.itemsEl.innerHTML = slot.items
-        .map(
-            (item) => `
-        <span class="link-chip">
-            <button class="link-chip-label" data-${camelToData(editAttr)}="${item.id}">${escapeHtml(item.label)}</button>
-            ${cfg.onRemove ? `<button class="link-chip-remove" data-${camelToData(removeAttr)}="${item.id}" title="Remove">✕</button>` : ""}
-        </span>
-    `,
-        )
-        .join("");
+    if (trimmed === field.value) return;
 
-    slot.itemsEl
-        .querySelectorAll(`[data-${camelToData(editAttr)}]`)
-        .forEach((btn) => {
-            btn.addEventListener("click", () => {
-                const id = btn.dataset[editAttr];
-                const item = slot.items.find(
-                    (i) => String(i.id) === String(id),
-                );
-                if (item) openChildEdit(item, slot.key);
-            });
-        });
+    input.disabled = true;
+    try {
+        await field.onSave(trimmed);
+        field.value = trimmed;
+        if (key === "name" && _triggerEl) {
+            _triggerEl.textContent = trimmed;
+        }
+    } catch (err) {
+        showError(`Save failed: ${err.message}`);
+        input.value = field.value;
+    } finally {
+        input.disabled = false;
+    }
+}
 
-    slot.itemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
+async function commitSearch(key, value) {
+    const field = _fields[key];
+    const input = bodyEl.querySelector(`[data-field-key="${key}"]`);
+    if (!input || !field.onSave) return;
+
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === field.value) {
+        if (!trimmed) closeEditModal();
+        return;
+    }
+
+    input.disabled = true;
+    try {
+        await field.onSave(trimmed);
+        field.value = trimmed;
+    } catch (err) {
+        showError(`Save failed: ${err.message}`);
+        input.value = field.value;
+    } finally {
+        input.disabled = false;
+    }
+}
+
+function attachToggleHandler(key, field) {
+    const container = bodyEl.querySelector(`[id="edit-field-${key}"] .edit-modal-toggle`);
+    if (!container || !field.onSave) return;
+
+    container.querySelectorAll("button").forEach((btn) => {
         btn.addEventListener("click", async () => {
-            const id = btn.dataset[removeAttr];
-            const item = slot.items.find((i) => String(i.id) === String(id));
-            if (!item) return;
+            const newVal = btn.dataset.toggleValue;
+            if (newVal === field.value || btn.disabled) return;
+
             btn.disabled = true;
             try {
-                await cfg.onRemove(item);
-                const idx = slot.items.findIndex(
-                    (i) => String(i.id) === String(id),
-                );
-                if (idx >= 0) slot.items.splice(idx, 1);
-                renderSlotItems(slot);
+                await field.onSave(newVal);
+                field.value = newVal;
+                container.querySelectorAll("button").forEach((b) => {
+                    b.classList.toggle("active", b.dataset.toggleValue === newVal);
+                    b.disabled = (b.dataset.toggleValue !== newVal) && field.disabledReason;
+                });
+            } catch (err) {
+                showError(`Save failed: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    });
+}
+
+function attachSearchHandler(key, field) {
+    const input = bodyEl.querySelector(`[data-field-key="${key}"]`);
+    const dropdown = bodyEl.querySelector(`.link-modal-dropdown[data-field-key="${key}"]`);
+    if (!input || !field.onSearch) return;
+
+    // Enter key commits
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            commitSearch(key, input.value);
+        }
+    });
+
+    const renderItem = (opt, i, isCreate) => {
+        return `<div class="link-dropdown-item${isCreate ? " link-dropdown-create" : ""}" data-ac-index="${i}">${isCreate ? "✦ " : ""}${escapeHtml(opt.label)}</div>`;
+    };
+
+    const ac = createAutocomplete({
+        inputEl: input,
+        dropdownEl: dropdown,
+        onSearch: async (q) => {
+            const results = await field.onSearch(q);
+            const exactMatch = results.some((r) => r.label.toLowerCase() === q.toLowerCase());
+            const options = results.map((r) => ({ id: r.id, label: r.label }));
+            if (!exactMatch && field.createLabel) {
+                options.unshift({ id: null, label: field.createLabel(q), isCreate: true, rawInput: q });
+            }
+            return options;
+        },
+        onSelect: async (opt) => {
+            await field.onSave(opt.rawInput || opt.label);
+            field.value = opt.rawInput || opt.label;
+            input.value = field.value;
+        },
+        renderItem,
+        allowCreate: !!field.createLabel,
+        getCreateLabel: field.createLabel,
+        debounceMs: 200,
+    });
+
+    _autocompletes[key] = ac;
+}
+
+function attachChipButtons(key, field) {
+    const itemsEl = bodyEl.querySelector(`.link-modal-items[data-field-key="${key}"]`);
+    if (!itemsEl) return;
+
+    itemsEl.querySelectorAll(".link-chip-remove").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const id = btn.dataset.chipId;
+            const item = field.items.find((i) => String(i.id) === String(id));
+            if (!item || !field.onRemove) return;
+
+            btn.disabled = true;
+            try {
+                await field.onRemove(item);
+                field.items = field.items.filter((i) => String(i.id) !== String(id));
+                refreshChipList(key);
             } catch (err) {
                 btn.disabled = false;
                 showError(`Remove failed: ${err.message}`);
             }
         });
     });
-}
 
-async function runSlotSearch(slot, q) {
-    const cfg = getSlotConfig(slot.key);
-    const results = await cfg.onSearch(q);
-    const linkedIds = new Set(slot.items.map((i) => String(i.id)));
-    const options = results
-        .filter((r) => !linkedIds.has(String(r.id)))
-        .map((r) => ({ id: r.id, label: r.label }));
-    const exactMatch = results.some(
-        (r) => r.label.toLowerCase() === q.toLowerCase(),
-    );
-    if (!exactMatch && cfg.createLabel) {
-        options.unshift({
-            id: null,
-            label: cfg.createLabel(q),
-            isCreate: true,
-            rawInput: q,
+    itemsEl.querySelectorAll(".link-chip-label").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const id = btn.dataset.chipId;
+            const item = field.items.find((i) => String(i.id) === String(id));
+            if (item && field.onRename) {
+                openChildEdit(item, key);
+            }
         });
-    }
-    renderSlotDropdown(slot, options);
+    });
 }
 
-function renderSlotDropdown(slot, options) {
-    slot.dropdownItems = options;
-    slot.dropdownIndex = options.length > 0 ? 0 : -1;
+function attachChipListHandler(key, field) {
+    const input = bodyEl.querySelector(`.link-modal-add input[data-field-key="${key}"]`);
+    const dropdown = bodyEl.querySelector(`.link-modal-add .link-modal-dropdown[data-field-key="${key}"]`);
 
-    if (!options.length) {
-        slot.dropdownEl.style.display = "none";
+    if (!input || !field.onSearch) return;
+
+    attachChipButtons(key, field);
+
+    // Chip input autocomplete
+    const renderItem = (opt, i, isCreate) => {
+        return `<div class="link-dropdown-item${isCreate ? " link-dropdown-create" : ""}" data-ac-index="${i}">${isCreate ? "✦ " : ""}${escapeHtml(opt.label)}</div>`;
+    };
+
+    const ac = createAutocomplete({
+        inputEl: input,
+        dropdownEl: dropdown,
+        onSearch: async (q) => {
+            const results = await field.onSearch(q);
+            const linkedIds = new Set(field.items.map((i) => String(i.id)));
+            const filtered = results.filter((r) => !linkedIds.has(String(r.id)));
+            const options = filtered.map((r) => ({ id: r.id, label: r.label }));
+            const exactMatch = results.some((r) => r.label.toLowerCase() === q.toLowerCase());
+            if (!exactMatch && field.createLabel) {
+                options.unshift({ id: null, label: field.createLabel(q), isCreate: true, rawInput: q });
+            }
+            return options;
+        },
+        onSelect: async (opt) => {
+            const result = await field.onAdd(opt);
+            if (result) field.items.push(result);
+            refreshChipList(key);
+        },
+        renderItem,
+        allowCreate: !!field.createLabel,
+        getCreateLabel: field.createLabel,
+        debounceMs: 200,
+    });
+
+    _autocompletes[key] = ac;
+}
+
+function refreshChipList(key) {
+    const field = _fields[key];
+    const itemsEl = bodyEl.querySelector(`.link-modal-items[data-field-key="${key}"]`);
+    if (!itemsEl) return;
+
+    if (!field.items.length) {
+        itemsEl.innerHTML = '<span class="link-modal-empty">None</span>';
         return;
     }
 
-    slot.dropdownEl.innerHTML = options
-        .map(
-            (opt, i) => `
-        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
-            ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
-        </div>
-    `,
-        )
-        .join("");
+    itemsEl.innerHTML = field.items.map((item) => `
+        <span class="link-chip">
+            <button class="link-chip-label" data-chip-id="${item.id}">${escapeHtml(item.label)}</button>
+            <button class="link-chip-remove" data-chip-id="${item.id}" title="Remove">✕</button>
+        </span>
+    `).join("");
 
-    slot.dropdownEl.querySelectorAll(".link-dropdown-item").forEach((el) => {
-        el.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectSlotOption(slot, Number(el.dataset.index));
-        });
-    });
-
-    slot.dropdownEl.style.display = "block";
-    updateSlotDropdownHighlight(slot);
+    // Re-attach chip button handlers only — autocomplete stays alive on its input
+    attachChipButtons(key, field);
 }
 
-function updateSlotDropdownHighlight(slot) {
-    slot.dropdownEl.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle(
-            "link-dropdown-item--active",
-            i === slot.dropdownIndex,
-        );
-    });
-}
+// ─── Child edit (drill one level) ────────────────────────────────────────
 
-async function selectSlotOption(slot, index) {
-    const opt = slot.dropdownItems[index];
-    if (!opt) return;
-    const cfg = getSlotConfig(slot.key);
+function openChildEdit(item, fieldKey) {
+    const field = _fields[fieldKey];
+    const parentConfig = {
+        title: titleEl.textContent,
+        fields: _fields,
+        onClose: _onClose,
+    };
+    const parentTriggerEl = _triggerEl;
 
-    _isSelecting = true;
-    slot.inputEl.value = "";
-    slot.dropdownEl.style.display = "none";
-    slot.dropdownItems = [];
-    slot.dropdownIndex = -1;
-    slot.inputEl.disabled = true;
-
-    try {
-        const result = await cfg.onAdd(opt);
-        if (_config) {
-            if (result) slot.items.push(result);
-            renderSlotItems(slot);
-        }
-    } catch (err) {
-        if (_config) showError(`Add failed: ${err.message}`);
-    } finally {
-        if (slot.inputEl && _config) {
-            slot.inputEl.disabled = false;
-            slot.inputEl.focus();
-        }
-        setTimeout(() => {
-            _isSelecting = false;
-        }, 150);
-    }
-}
-
-function attachSlotHandlers(slot) {
-    slot.inputEl.addEventListener("input", () => {
-        clearTimeout(slot.debounce);
-        const q = slot.inputEl.value.trim();
-        if (!q) {
-            slot.dropdownEl.style.display = "none";
-            return;
-        }
-        slot.debounce = setTimeout(() => runSlotSearch(slot, q), 200);
-    });
-
-    slot.inputEl.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            slot.dropdownIndex = Math.min(
-                slot.dropdownIndex + 1,
-                slot.dropdownItems.length - 1,
-            );
-            updateSlotDropdownHighlight(slot);
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            slot.dropdownIndex = Math.max(slot.dropdownIndex - 1, 0);
-            updateSlotDropdownHighlight(slot);
-        } else if (e.key === "Enter") {
-            e.preventDefault();
-            const q = slot.inputEl.value.trim();
-            if (slot.dropdownIndex >= 0)
-                selectSlotOption(slot, slot.dropdownIndex);
-            else if (slot.dropdownItems.length === 1)
-                selectSlotOption(slot, 0);
-            else if (!q)
-                closeEditModal();
-        }
-    });
-
-    slot.inputEl.addEventListener("blur", () => {
-        setTimeout(() => {
-            slot.dropdownEl.style.display = "none";
-        }, 150);
+    openEditModal({
+        title: `Edit: ${item.label}`,
+        fields: {
+            name: {
+                type: "text",
+                label: "Name",
+                value: item.label,
+                onSave: async (newName) => {
+                    await field.onRename(item, newName);
+                    item.label = newName;
+                },
+            },
+        },
+        onClose: () => {
+            // Re-open parent modal, restoring all state
+            openEditModal(parentConfig, parentTriggerEl);
+        },
     });
 }
 
-// Convert camelCase data attribute name to kebab-case for HTML
-function camelToData(str) {
-    return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);
-}
-
-// ─── Render ───────────────────────────────────────────────────────────────────
-
-function renderBody() {
-    const sections = [];
-
-    // Name field
-    if (_config.onRename) {
-        sections.push(`
-            <div class="edit-modal-field" id="edit-modal-rename-field">
-                <label for="edit-modal-name-input">Name</label>
-                <input type="text" id="edit-modal-name-input" class="link-modal-input"
-                    value="${escapeHtml(_config.name)}" autocomplete="off">
-            </div>
-        `);
-    }
-
-    // Category field
-    if (_config.category) {
-        const { label, value, editable, onSearch } = _config.category;
-        if (editable && onSearch) {
-            sections.push(`
-                <div class="edit-modal-field" id="edit-modal-category-field">
-                    <label for="edit-modal-category-input">${escapeHtml(label)}</label>
-                    <div class="link-modal-add" style="position:relative">
-                        <input type="text" id="edit-modal-category-input" class="link-modal-input"
-                            value="${escapeHtml(value || "")}" autocomplete="off">
-                        <div id="edit-modal-category-dropdown" class="link-modal-dropdown" style="display:none"></div>
-                    </div>
-                </div>
-            `);
-        } else if (editable) {
-            sections.push(`
-                <div class="edit-modal-field" id="edit-modal-category-field">
-                    <label for="edit-modal-category-input">${escapeHtml(label)}</label>
-                    <input type="text" id="edit-modal-category-input" class="link-modal-input"
-                        value="${escapeHtml(value || "")}" autocomplete="off">
-                </div>
-            `);
-        } else {
-            sections.push(`
-                <div class="edit-modal-field">
-                    <label>${escapeHtml(label)}</label>
-                    <span style="font-size:0.88rem; color:var(--text-secondary)">${escapeHtml(value || "-")}</span>
-                </div>
-            `);
-        }
-    }
-
-    // Toggle field (e.g. person/group)
-    if (_config.toggle) {
-        const { value, options, disabledReason } = _config.toggle;
-        const disabled = !!disabledReason;
-        sections.push(`
-            <div class="edit-modal-field">
-                <label>Type</label>
-                <div class="edit-modal-toggle" ${disabled ? `title="${escapeHtml(disabledReason)}"` : ""}>
-                    ${options
-                        .map(
-                            (opt) => `
-                        <button class="edit-modal-toggle-btn ${opt === value ? "active" : ""} ${disabled && opt !== value ? "disabled" : ""}"
-                            data-toggle-value="${escapeHtml(opt)}"
-                            ${disabled && opt !== value ? "disabled" : ""}>
-                            ${escapeHtml(opt)}
-                        </button>
-                    `,
-                        )
-                        .join("")}
-                </div>
-            </div>
-        `);
-    }
-
-    // Children sections (generic — "children" then "secondChildren")
-    for (const key of ["children", "secondChildren"]) {
-        if (_config[key]) {
-            const domKey = _domId[key];
-            sections.push(`
-                <div class="edit-modal-section-title">${escapeHtml(_config[key].label)}</div>
-                <div id="edit-modal-${domKey}-items" class="link-modal-items"></div>
-                <div class="link-modal-add">
-                    <input type="text" id="edit-modal-${domKey}-input" class="link-modal-input"
-                        placeholder="Type to search or add..." autocomplete="off">
-                    <div id="edit-modal-${domKey}-dropdown" class="link-modal-dropdown" style="display:none"></div>
-                </div>
-            `);
-        }
-    }
-
-    bodyEl.innerHTML = sections.join("");
-    attachHandlers();
-}
-
-function attachHandlers() {
-    // Rename input — save on Enter
-    const nameInput = bodyEl.querySelector("#edit-modal-name-input");
-    if (nameInput) {
-        nameInput.addEventListener("input", () => {
-            const field = nameInput.closest(".edit-modal-field");
-            field.classList.toggle(
-                "edit-modal-field--dirty",
-                nameInput.value.trim() !== _lastCommittedName,
-            );
-        });
-        nameInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                if (!nameInput.value.trim()) closeEditModal();
-                else commitRename(nameInput);
-            }
-        });
-    }
-
-    // Category input — plain (save on Enter) or search dropdown
-    const catInput = bodyEl.querySelector("#edit-modal-category-input");
-    if (catInput) {
-        _catInput = catInput;
-        const hasSearch = !!_config.category?.onSearch;
-
-        catInput.addEventListener("input", () => {
-            const field = catInput.closest(".edit-modal-field");
-            field.classList.toggle(
-                "edit-modal-field--dirty",
-                catInput.value.trim() !== _lastCommittedCategory,
-            );
-
-            if (hasSearch) {
-                clearTimeout(_catDebounce);
-                const q = catInput.value.trim();
-                if (!q) {
-                    hideCatDropdown();
-                    return;
-                }
-                _catDebounce = setTimeout(() => runCatSearch(q), 200);
-            }
-        });
-
-        catInput.addEventListener("keydown", (e) => {
-            if (hasSearch) {
-                if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    _catDropdownIndex = Math.min(
-                        _catDropdownIndex + 1,
-                        _catDropdownItems.length - 1,
-                    );
-                    updateCatDropdownHighlight();
-                } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    _catDropdownIndex = Math.max(_catDropdownIndex - 1, 0);
-                    updateCatDropdownHighlight();
-                } else if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (_catDropdownIndex >= 0)
-                        selectCatOption(_catDropdownIndex);
-                    else {
-                        const q = catInput.value.trim();
-                        if (!q) closeEditModal();
-                        else commitCategory(catInput);
-                    }
-                }
-            } else {
-                if (e.key === "Enter") {
-                    e.preventDefault();
-                    if (!catInput.value.trim()) closeEditModal();
-                    else commitCategory(catInput);
-                }
-            }
-        });
-
-        catInput.addEventListener("blur", () => {
-            setTimeout(() => hideCatDropdown(), 150);
-        });
-
-        if (hasSearch) {
-            _catDropdown = bodyEl.querySelector(
-                "#edit-modal-category-dropdown",
-            );
-        }
-    }
-
-    // Toggle buttons
-    if (_config.toggle) {
-        bodyEl.querySelectorAll("[data-toggle-value]").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-                const newVal = btn.dataset.toggleValue;
-                if (newVal === _config.toggle.value || btn.disabled) return;
-                btn.disabled = true;
-                try {
-                    await _config.toggle.onSave(newVal);
-                    _config.toggle.value = newVal;
-                    bodyEl
-                        .querySelectorAll("[data-toggle-value]")
-                        .forEach((b) => {
-                            b.classList.toggle(
-                                "active",
-                                b.dataset.toggleValue === newVal,
-                            );
-                        });
-                } catch (err) {
-                    showError(`Save failed: ${err.message}`);
-                } finally {
-                    btn.disabled = false;
-                }
-            });
-        });
-    }
-
-    // Children slots
-    for (const key of ["children", "secondChildren"]) {
-        if (_config[key]) {
-            const domKey = _domId[key];
-            const slot = createSlot(key);
-            slot.items = [..._config[key].items];
-            slot.itemsEl = bodyEl.querySelector(`#edit-modal-${domKey}-items`);
-            slot.inputEl = bodyEl.querySelector(`#edit-modal-${domKey}-input`);
-            slot.dropdownEl = bodyEl.querySelector(
-                `#edit-modal-${domKey}-dropdown`,
-            );
-            renderSlotItems(slot);
-            attachSlotHandlers(slot);
-        }
-    }
-}
-
-// ─── Rename ───────────────────────────────────────────────────────────────────
-
-let _lastCommittedName = null;
-
-async function commitRename(input) {
-    const newName = input.value.trim();
-    if (!newName || newName === _lastCommittedName) return;
-    _lastCommittedName = newName;
-    input.disabled = true;
-    try {
-        await _config.onRename(newName);
-        _config.name = newName;
-        if (_config._triggerEl) _config._triggerEl.textContent = newName;
-        input
-            .closest(".edit-modal-field")
-            ?.classList.remove("edit-modal-field--dirty");
-        if (_parentSnapshot) {
-            closeEditModal();
-            return;
-        }
-    } catch (err) {
-        showError(`Rename failed: ${err.message}`);
-        input.value = _config.name;
-        _lastCommittedName = _config.name;
-    } finally {
-        input.disabled = false;
-    }
-}
-
-// ─── Category ─────────────────────────────────────────────────────────────────
-
-let _lastCommittedCategory = null;
-
-async function commitCategory(input) {
-    const newVal = input.value.trim();
-    if (newVal === _lastCommittedCategory) return;
-    _lastCommittedCategory = newVal;
-    input.disabled = true;
-    try {
-        await _config.category.onSave(newVal);
-        _config.category.value = newVal;
-        input
-            .closest(".edit-modal-field")
-            ?.classList.remove("edit-modal-field--dirty");
-    } catch (err) {
-        showError(`Save failed: ${err.message}`);
-        input.value = _config.category.value;
-        _lastCommittedCategory = _config.category.value;
-    } finally {
-        input.disabled = false;
-    }
-}
-
-async function runCatSearch(q) {
-    const results = await _config.category.onSearch(q);
-    const filtered = results.filter((c) =>
-        c.toLowerCase().includes(q.toLowerCase()),
-    );
-    const exactMatch = filtered.some(
-        (c) => c.toLowerCase() === q.toLowerCase(),
-    );
-    const options = filtered.map((c) => ({ label: c }));
-    if (!exactMatch) {
-        options.unshift({ label: `Use "${q}"`, rawInput: q, isCreate: true });
-    }
-    renderCatDropdown(options);
-}
-
-function renderCatDropdown(options) {
-    _catDropdownItems = options;
-    _catDropdownIndex = options.length > 0 ? 0 : -1;
-
-    if (!options.length) {
-        hideCatDropdown();
-        return;
-    }
-
-    _catDropdown.innerHTML = options
-        .map(
-            (opt, i) => `
-        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
-            ${opt.isCreate ? "✦ " : ""}${escapeHtml(opt.label)}
-        </div>
-    `,
-        )
-        .join("");
-
-    _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
-        el.addEventListener("mousedown", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            selectCatOption(Number(el.dataset.index));
-        });
-    });
-
-    _catDropdown.style.display = "block";
-    updateCatDropdownHighlight();
-}
-
-function updateCatDropdownHighlight() {
-    _catDropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle(
-            "link-dropdown-item--active",
-            i === _catDropdownIndex,
-        );
-    });
-}
-
-function selectCatOption(index) {
-    const opt = _catDropdownItems[index];
-    if (!opt) return;
-
-    _isSelecting = true;
-    const value = opt.rawInput || opt.label;
-    _catInput.value = value;
-
-    hideCatDropdown();
-    const field = _catInput.closest(".edit-modal-field");
-    field.classList.toggle(
-        "edit-modal-field--dirty",
-        value !== _lastCommittedCategory,
-    );
-    setTimeout(() => {
-        _isSelecting = false;
-    }, 150);
-}
-
-function hideCatDropdown() {
-    if (_catDropdown) _catDropdown.style.display = "none";
-    _catDropdownItems = [];
-    _catDropdownIndex = -1;
-}
-
-// ─── Error ────────────────────────────────────────────────────────────────────
+// ─── Error handling ───────────────────────────────────────────────
 
 function showError(msg) {
     let errEl = bodyEl.querySelector(".link-modal-error");
@@ -646,40 +429,43 @@ function showError(msg) {
     setTimeout(() => errEl.remove(), 6000);
 }
 
-// ─── Child edit (drill one level, no further) ────────────────────────────────
+// ─── Modal lifecycle ────────────────────────────────────────────
 
-function openChildEdit(item, slotKey) {
-    _parentSnapshot = {
-        config: _config,
-        lastCommittedName: _lastCommittedName,
-        lastCommittedCategory: _lastCommittedCategory,
-    };
+modal = createModalLifecycle(overlay, {
+    onOpen: (config, triggerEl) => {
+        _fields = config.fields || {};
+        _triggerEl = triggerEl || null;
+        _onClose = config.onClose || null;
+        _autocompletes = {};
 
-    openEditModal({
-        title: `Edit: ${item.label}`,
-        name: item.label,
-        onRename: async (newName) => {
-            await _parentSnapshot.config[slotKey].onRenameChild(item, newName);
-            item.label = newName;
-        },
-        onClose: null,
-        category: null,
-        children: null,
-    });
-}
+        titleEl.textContent = config.title;
+        renderFields();
 
-// ─── Utility ──────────────────────────────────────────────────────────────────
-
-function escapeHtml(str) {
-    if (str === null || str === undefined) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
-
-// ─── Public API ───────────────────────────────────────────────────────────────
+        const firstInput = bodyEl.querySelector("input");
+        if (firstInput) {
+            firstInput.focus();
+            firstInput.select();
+        }
+    },
+    onClose: () => {
+        const onClose = _onClose;
+        for (const ac of Object.values(_autocompletes)) {
+            ac.destroy();
+        }
+        _autocompletes = {};
+        _fields = null;
+        _triggerEl = null;
+        _onClose = null;
+        bodyEl.innerHTML = "";
+        if (onClose) onClose();
+    },
+    overlayClickCheck: (e) => {
+        const modalBox = overlay.querySelector(".link-modal");
+        if (!modalBox) return false;
+        if (wasMousedownInside(modalBox)) return false;
+        return e.target === overlay;
+    }
+});
 
 export function openEditModal(config, triggerEl = null) {
     modal.open(config, triggerEl);
@@ -688,50 +474,3 @@ export function openEditModal(config, triggerEl = null) {
 export function closeEditModal() {
     modal.close();
 }
-
-// ─── Modal Lifecycle ──────────────────────────────────────────────────
-
-modal = createModalLifecycle(overlay, {
-    onOpen: (config, triggerEl) => {
-        _config = { ...config, _triggerEl: triggerEl };
-        _lastCommittedName = config.name;
-        _lastCommittedCategory = config.category ? config.category.value : null;
-
-        // Clear all slot state
-        for (const key of Object.keys(_slots)) delete _slots[key];
-
-        _catDropdownItems = [];
-        _catDropdownIndex = -1;
-        _catInput = null;
-        _catDropdown = null;
-
-        titleEl.textContent = config.title;
-        renderBody();
-
-        const nameInput = bodyEl.querySelector("#edit-modal-name-input");
-        if (nameInput) {
-            nameInput.focus();
-            nameInput.select();
-        }
-    },
-    onClose: () => {
-        const onClose = _config && _config.onClose;
-        _config = null;
-        bodyEl.innerHTML = "";
-        if (onClose) onClose();
-    },
-    onBeforeClose: () => {
-        if (_parentSnapshot) {
-            const snap = _parentSnapshot;
-            _parentSnapshot = null;
-            openEditModal(snap.config, snap.config._triggerEl);
-            return false; // Cancel the close
-        }
-        return true; // Proceed with close
-    },
-    overlayClickCheck: (e) => {
-        if (_isSelecting) return false;
-        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
-        return e.target === overlay;
-    }
-});

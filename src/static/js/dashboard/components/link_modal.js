@@ -165,7 +165,7 @@ const modal = createModalLifecycle(overlay, {
         dropdown.style.display = "none";
         renderItems();
 
-        _ac = createAutocomplete({
+_ac = createAutocomplete({
             inputEl: input,
             dropdownEl: dropdown,
             onSearch: onSearchWrapper,
@@ -174,6 +174,7 @@ const modal = createModalLifecycle(overlay, {
             allowCreate: true,
             getCreateLabel: config.createLabel,
             debounceMs: 200,
+            onEnterEmpty: closeLinkModal,
         });
 
         // Quick-add button (e.g. "New album named after song")

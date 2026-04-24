@@ -20,7 +20,7 @@
 
 - [x] **9.** `escapeHtml` duplicated 3x — `utils.js:19`, `song_editor.js:10`, `chip_input.js:19`
 - [x] **10.** Modal lifecycle boilerplate — ~100 lines across 7 modals
-- [ ] **11.** Autocomplete dropdown logic duplicated — ~200 lines in `link_modal.js` + `edit_modal.js`
+- [x] **11.** Autocomplete dropdown logic duplicated — ~200 lines in link_modal.js + edit_modal.js + chip_input.js → extracted to autocomplete.js
 - [ ] **12.** Entity renderer boilerplate — ~80 lines across 4 renderers
 - [ ] **13.** `import * as api` in 5 files — prevents tree-shaking
 - [x] **14.** `processing_status` as bare integers — replaced with `ProcessingStatus(IntEnum)` + JS constants

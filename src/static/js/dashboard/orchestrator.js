@@ -320,69 +320,61 @@ export async function manageArtist(ctx, artistId, artistName) {
     const isGroup = identity.type === "group";
     const hasMembers = members.length > 0;
 
-    openEditModal({
-        title: `Edit Artist: ${primary.display_name}`,
-        name: primary.display_name,
-        toggle: {
+    const fields = {
+        name: {
+            type: "text",
+            label: "Name",
+            value: primary.display_name,
+            onSave: async (val) => {
+                try {
+                    await api.updateCreditName(0, primary.id, val);
+                    if (ctx.refreshLayout) ctx.refreshLayout();
+                } catch (err) {
+                    if (err.detail?.code === "MERGE_REQUIRED") {
+                        const { collision_name_id } = err.detail;
+                        const confirmed = await showConfirm(
+                            `"${val}" already exists. Merge into existing identity?`,
+                            { title: "Merge Identity", okLabel: "Merge" },
+                        );
+                        if (confirmed) {
+                            await api.mergeIdentity(primary.id, collision_name_id);
+                            if (ctx.refreshLayout) ctx.refreshLayout();
+                        }
+                    } else if (err.detail?.code === "UNSAFE_MERGE") {
+                        throw new Error(err.detail.message);
+                    } else {
+                        throw err;
+                    }
+                }
+            },
+        },
+        type: {
+            type: "toggle",
+            label: "Type",
             value: identity.type,
             options: ["person", "group"],
-            disabledReason: hasMembers
-                ? "Remove all members before converting to person"
-                : null,
-            onSave: async (newType) => {
-                await api.setIdentityType(artistId, newType);
+            disabledReason: hasMembers ? "Remove all members before converting to person" : null,
+            onSave: async (val) => {
+                await api.setIdentityType(artistId, val);
                 if (ctx.refreshLayout) ctx.refreshLayout();
             },
         },
-        onRename: async (newName) => {
-            try {
-                await api.updateCreditName(0, primary.id, newName);
-                if (ctx.refreshLayout) ctx.refreshLayout();
-            } catch (err) {
-                if (err.detail?.code === "MERGE_REQUIRED") {
-                    const { collision_name_id, source_identity_id: _sid } =
-                        err.detail;
-                    const confirmed = await showConfirm(
-                        `"${newName}" already exists. Merge into existing identity?`,
-                        { title: "Merge Identity", okLabel: "Merge" },
-                    );
-                    if (confirmed) {
-                        await api.mergeIdentity(primary.id, collision_name_id);
-                        if (ctx.refreshLayout) ctx.refreshLayout();
-                    }
-                } else if (err.detail?.code === "UNSAFE_MERGE") {
-                    throw new Error(err.detail.message);
-                } else {
-                    throw err;
-                }
-            }
-        },
-        category: null,
-        children: {
+        aliases: {
+            type: "chipList",
             label: "Aliases",
-            items: otherAliases.map((a) => ({
-                id: a.id,
-                label: a.display_name,
-            })),
+            items: otherAliases.map((a) => ({ id: a.id, label: a.display_name })),
             onSearch: async (q) => {
                 const results = await api.searchArtists(q);
-                return (results || []).map((a) => ({
-                    id: a.id,
-                    label: a.display_name || a.name,
-                }));
+                return (results || []).map((a) => ({ id: a.id, label: a.display_name || a.name }));
             },
             onAdd: async (opt) => {
-                const result = await api.addIdentityAlias(
-                    artistId,
-                    opt.rawInput || opt.label,
-                    opt.id,
-                );
+                const result = await api.addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
                 return { id: result.name_id, label: result.display_name };
             },
             onRemove: async (item) => {
                 await api.removeIdentityAlias(artistId, item.id);
             },
-            onRenameChild: async (item, newName) => {
+            onRename: async (item, newName) => {
                 try {
                     await api.updateCreditName(0, item.id, newName);
                 } catch (err) {
@@ -404,30 +396,30 @@ export async function manageArtist(ctx, artistId, artistName) {
                 }
             },
         },
-        secondChildren: isGroup
-            ? {
-                  label: "Members",
-                  items: members.map((m) => ({
-                      id: m.id,
-                      label: m.display_name,
-                  })),
-                  onSearch: async (q) => {
-                      const results = await api.searchArtists(q, { excludeGroups: true });
-                      return (results || [])
-                          .map((a) => ({
-                              id: a.id,
-                              label: a.display_name || a.name,
-                          }));
-                  },
-                  onAdd: async (opt) => {
-                      await api.addIdentityMember(artistId, opt.id);
-                      return { id: opt.id, label: opt.label };
-                  },
-                  onRemove: async (item) => {
-                      await api.removeIdentityMember(artistId, item.id);
-                  },
-              }
-            : null,
+    };
+
+    if (isGroup) {
+        fields.members = {
+            type: "chipList",
+            label: "Members",
+            items: members.map((m) => ({ id: m.id, label: m.display_name })),
+            onSearch: async (q) => {
+                const results = await api.searchArtists(q, { excludeGroups: true });
+                return (results || []).map((a) => ({ id: a.id, label: a.display_name || a.name }));
+            },
+            onAdd: async (opt) => {
+                await api.addIdentityMember(artistId, opt.id);
+                return { id: opt.id, label: opt.label };
+            },
+            onRemove: async (item) => {
+                await api.removeIdentityMember(artistId, item.id);
+            },
+        };
+    }
+
+    openEditModal({
+        title: `Edit Artist: ${primary.display_name}`,
+        fields,
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
         },
@@ -440,31 +432,37 @@ export async function managePublisher(ctx, publisherId, publisherName) {
 
     openEditModal({
         title: "Edit Publisher",
-        name: detail ? detail.name : publisherName,
-        onRename: async (newName) => {
-            await api.updatePublisher(publisherId, newName);
-        },
-        category: null,
-        children: {
-            label: "Sub-publishers",
-            items: subPubs.map((c) => ({ id: c.id, label: c.name })),
-            onSearch: async (q) => {
-                const results = await api.searchPublishers(q);
-                return (results || []).map((p) => ({
-                    id: p.id,
-                    label: p.name,
-                }));
+        fields: {
+            name: {
+                type: "text",
+                label: "Name",
+                value: detail ? detail.name : publisherName,
+                onSave: async (val) => {
+                    await api.updatePublisher(publisherId, val);
+                },
             },
-            onAdd: async (opt) => {
-                await api.setPublisherParent(opt.id, Number(publisherId));
+            subPublishers: {
+                type: "chipList",
+                label: "Sub-publishers",
+                items: subPubs.map((c) => ({ id: c.id, label: c.name })),
+                onSearch: async (q) => {
+                    const results = await api.searchPublishers(q);
+                    return (results || []).map((p) => ({
+                        id: p.id,
+                        label: p.name,
+                    }));
+                },
+                onAdd: async (opt) => {
+                    await api.setPublisherParent(opt.id, Number(publisherId));
+                },
+                onRemove: async (item) => {
+                    await api.setPublisherParent(item.id, null);
+                },
+                onRename: async (item, newName) => {
+                    await api.updatePublisher(item.id, newName);
+                },
+                createLabel: (q) => `Add "${q}" as sub-publisher`,
             },
-            onRemove: async (item) => {
-                await api.setPublisherParent(item.id, null);
-            },
-            onRenameChild: async (item, newName) => {
-                await api.updatePublisher(item.id, newName);
-            },
-            createLabel: (q) => `Add "${q}" as sub-publisher`,
         },
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
@@ -478,27 +476,33 @@ export async function manageTag(ctx, tagId) {
 
     openEditModal({
         title: "Edit Tag",
-        name: tagDetail.name,
-        onRename: async (newName) => {
-            await api.updateTag(tagId, newName, tagDetail.category);
-            tagDetail.name = newName;
-        },
-        category: {
-            label: "Category",
-            value: tagDetail.category,
-            editable: true,
-            onSave: async (val) => {
-                await api.updateTag(tagId, tagDetail.name, val);
-                tagDetail.category = val;
+        fields: {
+            name: {
+                type: "text",
+                label: "Name",
+                value: tagDetail.name,
+                onSave: async (val) => {
+                    await api.updateTag(tagId, val, tagDetail.category);
+                    tagDetail.name = val;
+                },
             },
-            onSearch: async (q) => {
-                const all = await api.getTagCategories();
-                return all.filter((c) =>
-                    c.toLowerCase().includes(q.toLowerCase()),
-                );
+            category: {
+                type: "search",
+                label: "Category",
+                value: tagDetail.category,
+                editable: true,
+                onSave: async (val) => {
+                    await api.updateTag(tagId, tagDetail.name, val);
+                    tagDetail.category = val;
+                },
+                onSearch: async (q) => {
+                    const all = await api.getTagCategories();
+                    return all.filter((c) =>
+                        c.toLowerCase().includes(q.toLowerCase()),
+                    );
+                },
             },
         },
-        children: null,
         onClose: () => {
             if (ctx.refreshActiveDetail) ctx.refreshActiveDetail();
         },
