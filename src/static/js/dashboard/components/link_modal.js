@@ -1,5 +1,6 @@
 import { wasMousedownInside } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
+import { createAutocomplete } from "./autocomplete.js";
 
 /**
  * Generic link modal — type-to-search autocomplete with existing item chips.
@@ -10,8 +11,8 @@ import { createModalLifecycle } from "./modal_lifecycle.js";
  *     items: [ { id, label } ],           // current links
  *     onSearch: async (q) => [...],       // returns [{ id, label }]
  *     onAdd: async (option) => {},        // option is { id|null, label }
- *     onRemove: async (item) => {},       // item is { id, label }
- *     createLabel: (q) => `Add "${q}"`,  // label for the create-new option
+ *     onRemove: async (item) => {},        // item is { id, label }
+ *     createLabel: (q) => `Add "${q}"`,   // label for the create-new option
  *   });
  */
 
@@ -22,10 +23,17 @@ const input = document.getElementById("link-modal-input");
 const dropdown = document.getElementById("link-modal-dropdown");
 
 let _config = null;
-let _debounce = null;
-let _dropdownItems = [];
-let _dropdownIndex = -1;
 let _isSelecting = false;
+let _ac = null;
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
 
 function renderItems() {
     if (!_config.items.length) {
@@ -36,7 +44,7 @@ function renderItems() {
         .map(
             (item) => `
         <span class="link-chip">
-            ${item.label}
+            ${escapeHtml(item.label)}
             <button class="link-chip-remove" data-remove-id="${item.id}" title="Remove">✕</button>
         </span>
     `,
@@ -63,95 +71,15 @@ function renderItems() {
     });
 }
 
-function renderDropdown(options) {
-    _dropdownItems = options;
-    _dropdownIndex = options.length > 0 ? 0 : -1;
-
-    if (!options.length) {
-        dropdown.style.display = "none";
-        return;
-    }
-
-    dropdown.innerHTML = options
-        .map(
-            (opt, i) => `
-        <div class="link-dropdown-item ${opt.isCreate ? "link-dropdown-create" : ""}" data-index="${i}">
-            ${opt.isCreate ? "✦ " : ""}${opt.label}
-        </div>
-    `,
-        )
-        .join("");
-
-    dropdown.querySelectorAll(".link-dropdown-item").forEach((el) => {
-        el.addEventListener("mousedown", (e) => {
-            e.preventDefault(); // prevent input blur
-            selectOption(Number(el.dataset.index));
-        });
-    });
-
-    dropdown.style.display = "block";
-    updateDropdownHighlight();
+function renderItem(opt, i, isCreate) {
+    return `<div class="link-dropdown-item${isCreate ? " link-dropdown-create" : ""}" data-ac-index="${i}">${isCreate ? "✦ " : ""}${escapeHtml(opt.label)}</div>`;
 }
 
-function updateDropdownHighlight() {
-    dropdown.querySelectorAll(".link-dropdown-item").forEach((el, i) => {
-        el.classList.toggle("link-dropdown-item--active", i === _dropdownIndex);
-    });
-}
-
-async function selectOption(index) {
-    if (_isSelecting) return;
-
-    const opt = _dropdownItems[index];
-    if (!opt) return;
-
-    _isSelecting = true;
-    input.value = "";
-    dropdown.style.display = "none";
-    _dropdownItems = [];
-    _dropdownIndex = -1;
-    input.disabled = true;
-
-    try {
-        // Optimistic UI update before initiating long network/DOM work
-        const newItem = { id: opt.id, label: opt.label };
-        if (!_config.items.some((i) => String(i.id) === String(opt.id))) {
-            _config.items.push(newItem);
-        }
-        renderItems();
-
-        // Perform the background addition and detail panel refresh
-        await _config.onAdd(opt);
-
-        // Final sync in case the server returned a different ID/Name (e.g. for new items)
-        newItem.id = opt.id;
-        newItem.label = opt.label;
-        renderItems();
-    } catch (err) {
-        showError(`Add failed: ${err.message}`);
-    } finally {
-        input.disabled = false;
-        input.focus();
-        setTimeout(() => {
-            _isSelecting = false;
-        }, 150);
-    }
-}
-
-function showError(msg) {
-    let errEl = overlay.querySelector(".link-modal-error");
-    if (!errEl) {
-        errEl = document.createElement("div");
-        errEl.className = "link-modal-error";
-        overlay.querySelector(".link-modal-body").prepend(errEl);
-    }
-    errEl.textContent = msg;
-    setTimeout(() => errEl.remove(), 3000);
-}
-
-async function runSearch(q) {
+async function onSearchWrapper(q) {
     const raw = q.trim();
-    const results = raw ? await _config.onSearch(raw) : [];
+    if (!raw) return [];
+
+    const results = await _config.onSearch(raw);
 
     // Filter out items already in the currentItems list
     const filteredResults = results.filter((r) => {
@@ -182,19 +110,71 @@ async function runSearch(q) {
         });
     }
 
-    renderDropdown(options);
+    return options;
+}
+
+async function onSelectWrapper(opt) {
+    if (_isSelecting) return;
+
+    _isSelecting = true;
+    input.value = "";
+    input.disabled = true;
+
+    try {
+        // Optimistic UI update
+        const newItem = { id: opt.id, label: opt.label };
+        if (!_config.items.some((i) => String(i.id) === String(opt.id))) {
+            _config.items.push(newItem);
+        }
+        renderItems();
+
+        await _config.onAdd(opt);
+
+        newItem.id = opt.id;
+        newItem.label = opt.label;
+        renderItems();
+    } catch (err) {
+        showError(`Add failed: ${err.message}`);
+    } finally {
+        input.disabled = false;
+        input.focus();
+        setTimeout(() => {
+            _isSelecting = false;
+        }, 150);
+    }
+}
+
+function showError(msg) {
+    let errEl = overlay.querySelector(".link-modal-error");
+    if (!errEl) {
+        errEl = document.createElement("div");
+        errEl.className = "link-modal-error";
+        overlay.querySelector(".link-modal-body").prepend(errEl);
+    }
+    errEl.textContent = msg;
+    setTimeout(() => errEl.remove(), 3000);
 }
 
 const modal = createModalLifecycle(overlay, {
     onOpen: (config) => {
         _config = config;
+        _isSelecting = false;
         titleEl.textContent = config.title;
         input.placeholder = config.placeholder || "Type to search or create...";
         input.value = "";
         dropdown.style.display = "none";
-        _dropdownItems = [];
-        _dropdownIndex = -1;
         renderItems();
+
+        _ac = createAutocomplete({
+            inputEl: input,
+            dropdownEl: dropdown,
+            onSearch: onSearchWrapper,
+            onSelect: onSelectWrapper,
+            renderItem,
+            allowCreate: true,
+            getCreateLabel: config.createLabel,
+            debounceMs: 200,
+        });
 
         // Quick-add button (e.g. "New album named after song")
         const existing = overlay.querySelector(".link-modal-quick-add");
@@ -230,6 +210,10 @@ const modal = createModalLifecycle(overlay, {
         input.focus();
     },
     onClose: () => {
+        if (_ac) {
+            _ac.destroy();
+            _ac = null;
+        }
         _config = null;
         input.value = "";
         dropdown.style.display = "none";
@@ -243,46 +227,3 @@ const modal = createModalLifecycle(overlay, {
 
 export const openLinkModal = modal.open;
 export const closeLinkModal = modal.close;
-
-// Input handler
-input.addEventListener("input", () => {
-    clearTimeout(_debounce);
-    const q = input.value.trim();
-    if (!q) {
-        dropdown.style.display = "none";
-        return;
-    }
-    _debounce = setTimeout(() => runSearch(q), 200);
-});
-
-input.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowDown") {
-        e.preventDefault();
-        _dropdownIndex = Math.min(
-            _dropdownIndex + 1,
-            _dropdownItems.length - 1,
-        );
-        updateDropdownHighlight();
-    } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        _dropdownIndex = Math.max(_dropdownIndex - 1, 0);
-        updateDropdownHighlight();
-    } else if (e.key === "Enter") {
-        e.preventDefault();
-        const q = input.value.trim();
-        if (_dropdownIndex >= 0) {
-            selectOption(_dropdownIndex);
-        } else if (_dropdownItems.length === 1) {
-            selectOption(0);
-        } else if (!q) {
-            closeLinkModal();
-        }
-    }
-});
-
-input.addEventListener("blur", () => {
-    // Small delay so mousedown on dropdown items fires first
-    setTimeout(() => {
-        dropdown.style.display = "none";
-    }, 150);
-});

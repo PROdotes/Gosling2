@@ -1,5 +1,6 @@
 import os
 import re
+import threading
 from src.services.metadata_frames_reader import (
     register_tag_category,
     unregister_tag_category,
@@ -1141,12 +1142,14 @@ class EditService:
         """Internal trigger for persistent ID3 writing."""
         if not AUTO_SAVE_ID3:
             return
-        try:
-            song = self._library_service.get_song(song_id)
-            if song:
-                self._metadata_writer.write_metadata(song)
-        except Exception as e:
-            logger.error(f"[EditService] ID3 sync failed: {e}")
+        def _write():
+            try:
+                song = self._library_service.get_song(song_id)
+                if song:
+                    self._metadata_writer.write_metadata(song)
+            except Exception as e:
+                logger.error(f"[EditService] ID3 sync failed: {e}")
+        threading.Thread(target=_write, daemon=True).start()
 
     def delete_original_source(self, song_id: int) -> bool:
         """Physical deletion of the original file linked to this song (e.g. in Downloads)."""

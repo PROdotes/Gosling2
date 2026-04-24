@@ -15,6 +15,7 @@
 
 import { ABORTED } from "../api.js";
 import { escapeHtml } from "./utils.js";
+import { createAutocomplete } from "./autocomplete.js";
 
 export function createChipInput({
     container,
@@ -25,16 +26,12 @@ export function createChipInput({
     onSplit,
     allowCreate = false,
     tagMode = false,
-    getCreateLabel = null, // (query) => string — custom label for the "+ Add" option
-    categoryColors = {},   // {Category: "#hexcolor"} — for tagMode chips
-    labelAttrs = null,     // (item) => {[attr]: value} — extra data-* attrs on chip label (for open-edit-modal wiring)
-    extraChipButtons = null, // (item) => [{html, onClick}] — buttons rendered before ×
+    getCreateLabel = null,
+    categoryColors = {},
+    labelAttrs = null,
+    extraChipButtons = null,
 }) {
     let items = [...initialItems];
-    let dropdownResults = [];
-    let activeIndex = -1;
-    let searchTimeout = null;
-    let pendingAdd = false;
 
     // ── Build DOM ──────────────────────────────────────────────────────────────
 
@@ -58,7 +55,16 @@ export function createChipInput({
     container.appendChild(inputEl);
     container.appendChild(dropdownEl);
 
-    // ── Render ─────────────────────────────────────────────────────────────────
+    // ── Chip rendering ────────────────────────────────────────────────────────
+
+    function escapeHtmlLocal(str) {
+        if (str === null || str === undefined) return "";
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
 
     function renderChips() {
         chipsEl.innerHTML = "";
@@ -68,14 +74,14 @@ export function createChipInput({
 
             const attrs = labelAttrs ? labelAttrs(item) : null;
             const attrStr = attrs
-                ? Object.entries(attrs).map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(" ")
+                ? Object.entries(attrs).map(([k, v]) => `${k}="${escapeHtmlLocal(String(v))}"`).join(" ")
                 : "";
             const labelTag = attrs ? "button" : "span";
-            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtml(item.label)}</${labelTag}>`;
+            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtmlLocal(item.label)}</${labelTag}>`;
 
             if (tagMode && item.category) {
                 const color = categoryColors[item.category] || "#888";
-                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)}">${escapeHtml(item.category)}</span>${labelHtml}`;
+                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtmlLocal(color)}">${escapeHtmlLocal(item.category)}</span>${labelHtml}`;
             } else {
                 chip.innerHTML = labelHtml;
             }
@@ -132,127 +138,49 @@ export function createChipInput({
         }
     }
 
-    function renderDropdown(results, query) {
-        dropdownEl.innerHTML = "";
-        activeIndex = -1;
+    // ── Dropdown rendering ─────────────────────────────────────────────────
 
-        const queryTrimmed = query.trim();
-        const exactMatch = results.some(
-            (r) => r.label.toLowerCase() === queryTrimmed.toLowerCase()
-        );
+    function renderItem(opt, i, isCreate) {
+        const el = document.createElement("div");
+        el.className = `chip-input__option${isCreate ? " chip-input__option--create" : ""}`;
+        el.dataset.acIndex = i;
 
-        if (results.length === 0 && (!allowCreate || !queryTrimmed)) {
-            dropdownEl.hidden = true;
-            return;
+        if (tagMode && opt.category && !isCreate) {
+            const color = categoryColors[opt.category] || "#888";
+            el.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtmlLocal(color)};border:none">${escapeHtmlLocal(opt.category)}</span>${escapeHtmlLocal(opt.label)}`;
+        } else if (isCreate) {
+            const label = getCreateLabel ? getCreateLabel(opt.label) : `+ Add "${opt.label}"`;
+            el.textContent = label;
+        } else {
+            el.textContent = opt.label;
         }
 
-        for (let i = 0; i < results.length; i++) {
-            const opt = results[i];
-            const row = document.createElement("div");
-            row.className = "chip-input__option";
-            row.dataset.index = i;
-            if (tagMode && opt.category) {
-                const color = categoryColors[opt.category] || "#888";
-                row.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)};border:none">${escapeHtml(opt.category)}</span>${escapeHtml(opt.label)}`;
-            } else {
-                row.textContent = opt.label;
-            }
-            row.addEventListener("mousedown", (e) => {
-                e.preventDefault(); // prevent blur before click
-                selectOption(opt);
-            });
-            dropdownEl.appendChild(row);
-        }
-
-        if (allowCreate && queryTrimmed && !exactMatch) {
-            const row = document.createElement("div");
-            row.className = "chip-input__option chip-input__option--create";
-            row.dataset.index = results.length;
-            row.textContent = getCreateLabel ? getCreateLabel(queryTrimmed) : `+ Add "${queryTrimmed}"`;
-            row.addEventListener("mousedown", (e) => {
-                e.preventDefault();
-                selectOption({ id: null, label: queryTrimmed });
-            });
-            dropdownEl.appendChild(row);
-        }
-
-        dropdownEl.hidden = dropdownEl.children.length === 0;
-        if (!dropdownEl.hidden) highlightOption(0);
-        dropdownResults = results;
+        return el.outerHTML;
     }
 
-    function closeDropdown() {
-        dropdownEl.hidden = true;
-        dropdownEl.innerHTML = "";
-        activeIndex = -1;
-        dropdownResults = [];
-    }
+    // ─── Autocomplete setup ───────────────────────────────────────────────
 
-    function highlightOption(index) {
-        const opts = dropdownEl.querySelectorAll(".chip-input__option");
-        opts.forEach((o, i) => o.classList.toggle("chip-input__option--active", i === index));
-        activeIndex = index;
-    }
-
-    // ── Actions ────────────────────────────────────────────────────────────────
-
-    async function selectOption(opt) {
-        if (pendingAdd) return;
-        pendingAdd = true;
-        inputEl.value = "";
-        closeDropdown();
-        try {
-            await onAdd(opt);
-        } finally {
-            pendingAdd = false;
-        }
-    }
-
-    // ── Input events ───────────────────────────────────────────────────────────
-
-    inputEl.addEventListener("input", () => {
-        clearTimeout(searchTimeout);
-        const q = inputEl.value;
-        if (!q.trim()) { closeDropdown(); return; }
-        searchTimeout = setTimeout(async () => {
+    const ac = createAutocomplete({
+        inputEl,
+        dropdownEl,
+        onSearch: async (q) => {
             const results = await onSearch(q);
-            if (results === ABORTED || results == null) return;
-            renderDropdown(results, q);
-        }, 180);
+            if (results === ABORTED || results == null) return [];
+            return results;
+        },
+        onSelect: async (opt) => {
+            await onAdd(opt);
+        },
+        renderItem,
+        allowCreate,
+        getCreateLabel,
+        debounceMs: 180,
     });
 
-    inputEl.addEventListener("keydown", (e) => {
-        const opts = dropdownEl.querySelectorAll(".chip-input__option");
-        const count = opts.length;
-
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            highlightOption((activeIndex + 1) % count);
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            highlightOption((activeIndex - 1 + count) % count);
-        } else if (e.key === "Enter") {
-            e.preventDefault();
-            if (activeIndex >= 0 && activeIndex < count) {
-                opts[activeIndex].dispatchEvent(new MouseEvent("mousedown"));
-            } else if (allowCreate && inputEl.value.trim()) {
-                selectOption({ id: null, label: inputEl.value.trim() });
-            }
-        } else if (e.key === "Escape") {
-            closeDropdown();
-        }
-    });
-
-    inputEl.addEventListener("blur", () => {
-        // Small delay so mousedown on option fires first
-        setTimeout(closeDropdown, 150);
-    });
-
-    // ── Init ───────────────────────────────────────────────────────────────────
+    // ── Init ─────────────────────────────────────────────────────────────────
 
     renderChips();
 
-    // Return a handle for the parent to refresh items after a server round-trip
     return {
         setItems(newItems) {
             items = [...newItems];
