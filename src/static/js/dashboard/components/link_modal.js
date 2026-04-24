@@ -1,4 +1,5 @@
 import { wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 /**
  * Generic link modal — type-to-search autocomplete with existing item chips.
@@ -184,57 +185,64 @@ async function runSearch(q) {
     renderDropdown(options);
 }
 
-export function openLinkModal(config) {
-    _config = config;
-    titleEl.textContent = config.title;
-    input.placeholder = config.placeholder || "Type to search or create...";
-    input.value = "";
-    dropdown.style.display = "none";
-    _dropdownItems = [];
-    _dropdownIndex = -1;
-    renderItems();
+const modal = createModalLifecycle(overlay, {
+    onOpen: (config) => {
+        _config = config;
+        titleEl.textContent = config.title;
+        input.placeholder = config.placeholder || "Type to search or create...";
+        input.value = "";
+        dropdown.style.display = "none";
+        _dropdownItems = [];
+        _dropdownIndex = -1;
+        renderItems();
 
-    // Quick-add button (e.g. "New album named after song")
-    const existing = overlay.querySelector(".link-modal-quick-add");
-    if (existing) existing.remove();
-    if (config.quickAdd) {
-        const btn = document.createElement("button");
-        btn.className = "link-modal-quick-add ingest-btn-secondary";
-        btn.textContent = config.quickAdd.label;
-        btn.style.cssText = "width:100%; margin-top:0.5rem; font-size:0.8rem;";
-        btn.addEventListener("click", async () => {
-            btn.disabled = true;
-            const opt = {
-                id: null,
-                label: config.quickAdd.rawInput,
-                isCreate: true,
-                rawInput: config.quickAdd.rawInput,
-            };
-            try {
-                _config.items.push({
+        // Quick-add button (e.g. "New album named after song")
+        const existing = overlay.querySelector(".link-modal-quick-add");
+        if (existing) existing.remove();
+        if (config.quickAdd) {
+            const btn = document.createElement("button");
+            btn.className = "link-modal-quick-add ingest-btn-secondary";
+            btn.textContent = config.quickAdd.label;
+            btn.style.cssText = "width:100%; margin-top:0.5rem; font-size:0.8rem;";
+            btn.addEventListener("click", async () => {
+                btn.disabled = true;
+                const opt = {
                     id: null,
                     label: config.quickAdd.rawInput,
-                });
-                renderItems();
-                await _config.onAdd(opt);
-            } catch (err) {
-                showError(`Add failed: ${err.message}`);
-                btn.disabled = false;
-            }
-        });
-        overlay.querySelector(".link-modal-body").appendChild(btn);
+                    isCreate: true,
+                    rawInput: config.quickAdd.rawInput,
+                };
+                try {
+                    _config.items.push({
+                        id: null,
+                        label: config.quickAdd.rawInput,
+                    });
+                    renderItems();
+                    await _config.onAdd(opt);
+                } catch (err) {
+                    showError(`Add failed: ${err.message}`);
+                    btn.disabled = false;
+                }
+            });
+            overlay.querySelector(".link-modal-body").appendChild(btn);
+        }
+
+        input.focus();
+    },
+    onClose: () => {
+        _config = null;
+        input.value = "";
+        dropdown.style.display = "none";
+    },
+    overlayClickCheck: (e) => {
+        if (_isSelecting) return false;
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
     }
+});
 
-    overlay.style.display = "flex";
-    input.focus();
-}
-
-export function closeLinkModal() {
-    overlay.style.display = "none";
-    _config = null;
-    input.value = "";
-    dropdown.style.display = "none";
-}
+export const openLinkModal = modal.open;
+export const closeLinkModal = modal.close;
 
 // Input handler
 input.addEventListener("input", () => {
@@ -245,14 +253,6 @@ input.addEventListener("input", () => {
         return;
     }
     _debounce = setTimeout(() => runSearch(q), 200);
-});
-
-// Escape from anywhere (even if nothing inside the modal has focus) closes it
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopImmediatePropagation();
-        closeLinkModal();
-    }
 });
 
 input.addEventListener("keydown", (e) => {
@@ -285,11 +285,4 @@ input.addEventListener("blur", () => {
     setTimeout(() => {
         dropdown.style.display = "none";
     }, 150);
-});
-
-// Close on overlay click outside modal box
-overlay.addEventListener("click", (e) => {
-    if (_isSelecting) return;
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeLinkModal();
 });

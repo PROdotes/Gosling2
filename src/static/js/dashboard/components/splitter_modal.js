@@ -13,7 +13,8 @@
  */
 
 import { splitterConfirm, splitterPreview, splitterTokenize } from "../api.js";
-import { wasMousedownInside } from "./utils.js";
+import { escapeHtml, wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 const overlay = document.getElementById("splitter-modal");
 const tokenRow = document.getElementById("splitter-token-row");
@@ -25,6 +26,7 @@ const addBtn = document.getElementById("splitter-add-btn");
 let _config = null;
 let _tokens = [];
 let _separators = [];
+let modal;
 
 // ---------------------------------------------------------------------------
 // Render
@@ -104,45 +106,16 @@ function resolveNames(tokens) {
     return names;
 }
 
-function escapeHtml(str) {
-    return String(str ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
-
 // ---------------------------------------------------------------------------
 // Open / Close
 // ---------------------------------------------------------------------------
 
 export async function openSplitterModal(config) {
-    _config = config;
-    _separators = [...(config.separators || [])];
-    _tokens = [];
-    tokenRow.innerHTML =
-        '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
-    previewEl.innerHTML = "";
-    customInput.value = "";
-    confirmBtn.disabled = false;
-    overlay.style.display = "flex";
-
-    try {
-        _tokens = await splitterTokenize(config.text, _separators);
-    } catch {
-        tokenRow.innerHTML =
-            '<span class="muted-note" style="color:red;">Tokenize failed</span>';
-        return;
-    }
-
-    renderTokenRow();
-    updatePreview();
+    modal.open(config);
 }
 
 export function closeSplitterModal() {
-    overlay.style.display = "none";
-    _config = null;
-    _tokens = [];
+    modal.close();
 }
 
 // ---------------------------------------------------------------------------
@@ -192,18 +165,39 @@ confirmBtn.addEventListener("click", async () => {
     }
 });
 
-// ---------------------------------------------------------------------------
-// Close handlers
-// ---------------------------------------------------------------------------
+// ─── Modal Lifecycle ──────────────────────────────────────────
 
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopImmediatePropagation();
-        closeSplitterModal();
+modal = createModalLifecycle(overlay, {
+    onOpen: (config) => {
+        _config = config;
+        _separators = [...(config.separators || [])];
+        _tokens = [];
+        tokenRow.innerHTML =
+            '<span class="muted-note" style="font-size:0.8rem;">Loading…</span>';
+        previewEl.innerHTML = "";
+        customInput.value = "";
+        confirmBtn.disabled = false;
+        overlay.style.display = "flex";
+
+        try {
+            _tokens = await splitterTokenize(config.text, _separators);
+        } catch {
+            tokenRow.innerHTML =
+                '<span class="muted-note" style="color:red;">Tokenize failed</span>';
+            return;
+        }
+
+        renderTokenRow();
+        updatePreview();
+    },
+    onClose: () => {
+        const onConfirm = _config?.onConfirm;
+        _config = null;
+        _tokens = [];
+        if (onConfirm) onConfirm();
+    },
+    overlayClickCheck: (e) => {
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
     }
-});
-
-overlay.addEventListener("click", (e) => {
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeSplitterModal();
 });

@@ -14,15 +14,7 @@
  */
 
 import { ABORTED } from "../api.js";
-
-function escHtml(str) {
-    if (str == null) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
+import { escapeHtml } from "./utils.js";
 
 export function createChipInput({
     container,
@@ -76,14 +68,14 @@ export function createChipInput({
 
             const attrs = labelAttrs ? labelAttrs(item) : null;
             const attrStr = attrs
-                ? Object.entries(attrs).map(([k, v]) => `${k}="${escHtml(String(v))}"`).join(" ")
+                ? Object.entries(attrs).map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(" ")
                 : "";
             const labelTag = attrs ? "button" : "span";
-            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escHtml(item.label)}</${labelTag}>`;
+            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtml(item.label)}</${labelTag}>`;
 
             if (tagMode && item.category) {
                 const color = categoryColors[item.category] || "#888";
-                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escHtml(color)}">${escHtml(item.category)}</span>${labelHtml}`;
+                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)}">${escapeHtml(item.category)}</span>${labelHtml}`;
             } else {
                 chip.innerHTML = labelHtml;
             }
@@ -161,7 +153,7 @@ export function createChipInput({
             row.dataset.index = i;
             if (tagMode && opt.category) {
                 const color = categoryColors[opt.category] || "#888";
-                row.innerHTML = `<span class="chip-input__tag-cat" style="color:${escHtml(color)};border:none">${escHtml(opt.category)}</span>${escHtml(opt.label)}`;
+                row.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)};border:none">${escapeHtml(opt.category)}</span>${escapeHtml(opt.label)}`;
             } else {
                 row.textContent = opt.label;
             }

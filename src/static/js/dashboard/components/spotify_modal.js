@@ -4,6 +4,7 @@ import {
     splitterPreview,
 } from "../api.js";
 import { escapeHtml, wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 const overlay = document.getElementById("spotify-modal");
 const textarea = document.getElementById("spotify-raw-text");
@@ -23,6 +24,7 @@ let _isSelecting = false;
 let _debounceTimer = null;
 let _parseResult = null;
 let _existence = { credits: [], publishers: [] };
+let modal;
 
 function getStatusBadge(type) {
     if (type === "linked") {
@@ -221,33 +223,40 @@ export function openSpotifyModal({
     existingPublishers,
     onComplete,
 }) {
-    _songId = songId;
-    _songTitle = title;
-    _onComplete = onComplete;
-    _existingCredits = existingCredits || [];
-    _existingPublishers = existingPublishers || [];
-    _parseResult = null;
-
-    textarea.value = "";
-    resultsSect.style.display = "none";
-    importBtn.disabled = true;
-    importBtn.textContent = "Import Credits";
-
-    overlay.style.display = "flex";
-    _isSelecting = false;
-    textarea.focus();
+    modal.open({ songId, title, existingCredits, existingPublishers, onComplete });
 }
 
 export function closeSpotifyModal() {
-    overlay.style.display = "none";
-    _songId = null;
-    _onComplete = null;
-    textarea.value = "";
+    modal.close();
 }
 
-// Overlay click to close
-overlay.addEventListener("click", (e) => {
-    if (_isSelecting) return;
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeSpotifyModal();
+// ─── Modal Lifecycle ──────────────────────────────────────────
+
+modal = createModalLifecycle(overlay, {
+    onOpen: ({ songId, title, existingCredits, existingPublishers, onComplete }) => {
+        _songId = songId;
+        _songTitle = title;
+        _onComplete = onComplete;
+        _existingCredits = existingCredits || [];
+        _existingPublishers = existingPublishers || [];
+        _parseResult = null;
+
+        textarea.value = "";
+        resultsSection.style.display = "none";
+        importBtn.disabled = true;
+        importBtn.textContent = "Import Credits";
+        overlay.style.display = "flex";
+        _isSelecting = false;
+        textarea.focus();
+    },
+    onClose: () => {
+        _songId = null;
+        _onComplete = null;
+        textarea.value = "";
+    },
+    overlayClickCheck: (e) => {
+        if (_isSelecting) return false;
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
+    }
 });

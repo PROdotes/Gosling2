@@ -7,18 +7,18 @@
 
 ## HIGH PRIORITY
 
-- [ ] **1.** `[DEBUG]` console.log statements in production — `song_editor.js:141,155,160,183,188`
-- [ ] **2.** Unused imports in `main.js` — 7 dead imports at lines 22,35,44,47,51,55,61
-- [ ] **3.** `getState()` ReferenceError — `main.js:299` called without `this.`
-- [ ] **4.** Duplicate `currentMode` property — `main.js:111` and `129`
-- [ ] **5.** Redundant `getCatalogSong` after `patchSongScalars` — `song_editor.js:277-280`
-- [ ] **6.** 18 silent `except Exception:` blocks — `edit_service.py` no logging on rollback
+- [x] **1.** `[DEBUG]` console.log statements in production — `song_editor.js:141,155,160,183,188`
+- [x] **2.** Unused imports in `main.js` — 7 dead imports at lines 22,35,44,47,51,55,61
+- [x] **3.** `getState()` ReferenceError — `main.js:299` called without `this.`
+- [x] **4.** Duplicate `currentMode` property — `main.js:111` and `129`
+- [x] **5.** Redundant `getCatalogSong` after `patchSongScalars` — `song_editor.js:277-280`
+- [x] **6.** 18 silent `except Exception:` blocks — `edit_service.py` no logging on rollback
 - [x] **7.** Stale TODO comment — `catalog_service.py:1`
 - [x] **8.** Unsafe `json.load(open(path))` — `catalog.py:575`
 
 ## MEDIUM PRIORITY
 
-- [ ] **9.** `escapeHtml` duplicated 3x — `utils.js:19`, `song_editor.js:10`, `chip_input.js:19`
+- [x] **9.** `escapeHtml` duplicated 3x — `utils.js:19`, `song_editor.js:10`, `chip_input.js:19`
 - [ ] **10.** Modal lifecycle boilerplate — ~100 lines across 7 modals
 - [ ] **11.** Autocomplete dropdown logic duplicated — ~200 lines in `link_modal.js` + `edit_modal.js`
 - [ ] **12.** Entity renderer boilerplate — ~80 lines across 4 renderers

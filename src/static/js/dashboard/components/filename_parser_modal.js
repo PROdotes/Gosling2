@@ -10,6 +10,7 @@
 
 import { applyFilenameParsing, previewFilenameParsing } from "../api.js";
 import { escapeHtml, wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 const overlay = document.getElementById("filename-parser-modal");
 const patternInput = document.getElementById("filename-pattern-input");
@@ -26,6 +27,7 @@ let _lastPreview = [];
 
 let _tokens = [];
 let _presets = [];
+let modal;
 
 // ---------------------------------------------------------------------------
 // Initialization
@@ -211,45 +213,45 @@ applyBtn.addEventListener("click", async () => {
 // ---------------------------------------------------------------------------
 
 export function openFilenameParserModal(config) {
-    _config = config;
-    overlay.style.display = "flex";
-    applyBtn.disabled = true;
-    applyBtn.textContent = "Apply Metadata";
-
-    // Show filename immediately before any pattern is typed
-    const firstEntry = config.entries?.[0];
-    if (firstEntry?.filename) {
-        previewThead.innerHTML = `<tr><th colspan="2" class="preview-filename" title="${escapeHtml(firstEntry.filename)}">${escapeHtml(firstEntry.filename)}</th></tr>`;
-        previewTbody.innerHTML = "";
-    } else {
-        previewThead.innerHTML = "";
-        previewTbody.innerHTML = "";
-    }
-
-    // Default pattern from storage or simple default
-    const saved = localStorage.getItem("gosling_last_pattern");
-    patternInput.value = saved || "{Artist} - {Title}";
-    presetSelect.value = patternInput.value;
-
-    updatePreview();
+    modal.open(config);
 }
 
 export function closeFilenameParserModal() {
-    overlay.style.display = "none";
-    localStorage.setItem("gosling_last_pattern", patternInput.value);
-    _config = null;
-    _lastPreview = [];
+    modal.close();
 }
 
-// Modal closing helpers
-overlay.addEventListener("click", (e) => {
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeFilenameParserModal();
-});
+// ─── Modal Lifecycle ──────────────────────────────────────────
 
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopImmediatePropagation();
-        closeFilenameParserModal();
+modal = createModalLifecycle(overlay, {
+    onOpen: (config) => {
+        _config = config;
+        applyBtn.disabled = true;
+        applyBtn.textContent = "Apply Metadata";
+
+        // Show filename immediately before any pattern is typed
+        const firstEntry = config.entries?.[0];
+        if (firstEntry?.filename) {
+            previewThead.innerHTML = `<tr><th colspan="2" class="preview-filename" title="${escapeHtml(firstEntry.filename)}">${escapeHtml(firstEntry.filename)}</th></tr>`;
+            previewTbody.innerHTML = "";
+        } else {
+            previewThead.innerHTML = "";
+            previewTbody.innerHTML = "";
+        }
+
+        // Default pattern from storage or simple default
+        const saved = localStorage.getItem("gosling_last_pattern");
+        patternInput.value = saved || "{Artist} - {Title}";
+        presetSelect.value = patternInput.value;
+
+        updatePreview();
+    },
+    onClose: () => {
+        localStorage.setItem("gosling_last_pattern", patternInput.value);
+        _config = null;
+        _lastPreview = [];
+    },
+    overlayClickCheck: (e) => {
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
     }
 });

@@ -3,6 +3,8 @@
  * Call initToastSystem() once at app startup before any showToast() calls.
  */
 
+import { escapeHtml } from "./utils.js";
+
 const CONTAINER_ID = "toast-container";
 
 export function initToastSystem() {
@@ -38,12 +40,6 @@ export function showToast(
 
     const prefixMap = { success: "OK", warning: "!", error: "!!" };
     const prefix = prefixMap[type] ?? "?";
-
-    const escapeHtml = (str) =>
-        String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
 
     let html = `
         <span class="toast-prefix">[${prefix}]</span>

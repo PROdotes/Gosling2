@@ -1,4 +1,5 @@
 import { wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 /**
  * Generic edit modal — rename a record, optional category field, optional flat children list.
@@ -40,6 +41,7 @@ const bodyEl = document.getElementById("edit-modal-body");
 let _config = null;
 let _parentSnapshot = null; // saved state when drilling into a child edit
 let _isSelecting = false;
+let modal;
 
 // ─── Children slot state ──────────────────────────────────────────────────────
 // Each slot is keyed by config key ("children" | "secondChildren") and holds
@@ -680,56 +682,56 @@ function escapeHtml(str) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function openEditModal(config, triggerEl = null) {
-    _config = { ...config, _triggerEl: triggerEl };
-    _lastCommittedName = config.name;
-    _lastCommittedCategory = config.category ? config.category.value : null;
-
-    // Clear all slot state
-    for (const key of Object.keys(_slots)) delete _slots[key];
-
-    _catDropdownItems = [];
-    _catDropdownIndex = -1;
-    _catInput = null;
-    _catDropdown = null;
-
-    titleEl.textContent = config.title;
-    renderBody();
-    overlay.style.display = "flex";
-
-    const nameInput = bodyEl.querySelector("#edit-modal-name-input");
-    if (nameInput) {
-        nameInput.focus();
-        nameInput.select();
-    }
+    modal.open(config, triggerEl);
 }
 
 export function closeEditModal() {
-    const onClose = _config && _config.onClose;
-
-    if (_parentSnapshot) {
-        const snap = _parentSnapshot;
-        _parentSnapshot = null;
-        openEditModal(snap.config, snap.config._triggerEl);
-        return;
-    }
-
-    overlay.style.display = "none";
-    _config = null;
-    bodyEl.innerHTML = "";
-    if (onClose) onClose();
+    modal.close();
 }
 
-// Close on overlay click outside modal box
-overlay.addEventListener("click", (e) => {
-    if (_isSelecting) return;
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeEditModal();
-});
+// ─── Modal Lifecycle ──────────────────────────────────────────────────
 
-// Escape from anywhere closes it
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && overlay.style.display === "flex") {
-        e.stopImmediatePropagation();
-        closeEditModal();
+modal = createModalLifecycle(overlay, {
+    onOpen: (config, triggerEl) => {
+        _config = { ...config, _triggerEl: triggerEl };
+        _lastCommittedName = config.name;
+        _lastCommittedCategory = config.category ? config.category.value : null;
+
+        // Clear all slot state
+        for (const key of Object.keys(_slots)) delete _slots[key];
+
+        _catDropdownItems = [];
+        _catDropdownIndex = -1;
+        _catInput = null;
+        _catDropdown = null;
+
+        titleEl.textContent = config.title;
+        renderBody();
+
+        const nameInput = bodyEl.querySelector("#edit-modal-name-input");
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+    },
+    onClose: () => {
+        const onClose = _config && _config.onClose;
+        _config = null;
+        bodyEl.innerHTML = "";
+        if (onClose) onClose();
+    },
+    onBeforeClose: () => {
+        if (_parentSnapshot) {
+            const snap = _parentSnapshot;
+            _parentSnapshot = null;
+            openEditModal(snap.config, snap.config._triggerEl);
+            return false; // Cancel the close
+        }
+        return true; // Proceed with close
+    },
+    overlayClickCheck: (e) => {
+        if (_isSelecting) return false;
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
     }
 });

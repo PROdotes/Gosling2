@@ -82,7 +82,6 @@ const elements = {
 };
 
 const state = {
-    currentMode: "songs",
     cachedSongs: [],
     cachedIdentities: [],
     cachedAlbums: [],

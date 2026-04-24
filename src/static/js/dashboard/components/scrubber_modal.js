@@ -1,4 +1,5 @@
 import { wasMousedownInside } from "./utils.js";
+import { createModalLifecycle } from "./modal_lifecycle.js";
 
 const overlay = document.getElementById("scrubber-modal");
 const titleEl = document.getElementById("scrubber-modal-title");
@@ -14,6 +15,7 @@ let _currentId = null;
 let _currentTitle = null;
 let _onTagsClick = null;
 let _onClose = null;
+let modal;
 
 // Playhead indicator inside the waveform box
 const playhead = document.createElement("div");
@@ -129,41 +131,48 @@ export function openScrubberModal(
     title,
     { autoPlay = false, onTagsClick = null, onClose = null } = {},
 ) {
-    _currentId = songId;
-    _currentTitle = title;
-    _onTagsClick = onTagsClick;
-    _onClose = onClose;
-
-    audio.pause();
-    audio.src = `/api/v1/songs/${songId}/audio`;
-    timeCurrent.textContent = "0:00";
-    timeTotal.textContent = "0:00";
-    updatePlayhead();
-    updatePlayBtn();
-    titleEl.textContent = title || "Player";
-    overlay.style.display = "flex";
-
-    if (autoPlay) {
-        audio
-            .play()
-            .catch((err) => console.warn("Auto-play blocked by browser:", err));
-    }
+    modal.open(songId, title, { autoPlay, onTagsClick, onClose });
 }
 
 export function closeScrubberModal() {
-    audio.pause();
-    audio.src = "";
-    _currentId = null;
-    _currentTitle = null;
-    _onTagsClick = null;
-    const cb = _onClose;
-    _onClose = null;
-    overlay.style.display = "none";
-    if (cb) cb();
+    modal.close();
 }
 
-// Close on overlay click outside modal box
-overlay.addEventListener("click", (e) => {
-    if (wasMousedownInside(overlay.querySelector(".link-modal"))) return;
-    if (e.target === overlay) closeScrubberModal();
+// ─── Modal Lifecycle ──────────────────────────────────────────
+
+modal = createModalLifecycle(overlay, {
+    onOpen: (songId, title, { autoPlay, onTagsClick, onClose }) => {
+        _currentId = songId;
+        _currentTitle = title;
+        _onTagsClick = onTagsClick;
+        _onClose = onClose;
+
+        audio.pause();
+        audio.src = `/api/v1/songs/${songId}/audio`;
+        timeCurrent.textContent = "0:00";
+        timeTotal.textContent = "0:00";
+        updatePlayhead();
+        updatePlayBtn();
+        titleEl.textContent = title || "Player";
+
+        if (autoPlay) {
+            audio
+                .play()
+                .catch((err) => console.warn("Auto-play blocked by browser:", err));
+        }
+    },
+    onClose: () => {
+        audio.pause();
+        audio.src = "";
+        _currentId = null;
+        _currentTitle = null;
+        _onTagsClick = null;
+        const cb = _onClose;
+        _onClose = null;
+        if (cb) cb();
+    },
+    overlayClickCheck: (e) => {
+        if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;
+        return e.target === overlay;
+    }
 });

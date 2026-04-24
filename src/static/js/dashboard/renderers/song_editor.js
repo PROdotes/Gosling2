@@ -29,16 +29,7 @@ import {
 import { createChipInput } from "../components/chip_input.js";
 import { PROCESSING_STATUS } from "../constants.js";
 import { parseTagInput } from "../utils/tag_input.js";
-
-
-function escapeHtml(str) {
-    if (str == null) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
+import { escapeHtml } from "../components/utils.js";
 
 function renderChips(items, emptyLabel) {
     if (!items || items.length === 0) {
@@ -443,9 +434,7 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             saving = true;
             input.disabled = true;
             try {
-                await patchSongScalars(song.id, { [field]: payload });
-                committedValue = raw;
-                const fresh = await getCatalogSong(song.id);
+                const fresh = await patchSongScalars(song.id, { [field]: payload });
                 updateListRowBlockers(song.id, fresh.review_blockers);
                 if (onUpdated) onUpdated(fresh);
             } catch (err) {
