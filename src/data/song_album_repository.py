@@ -231,8 +231,8 @@ class SongAlbumRepository(BaseRepository):
         self,
         source_id: int,
         album_id: int,
-        track_number: Optional[int],
-        disc_number: Optional[int],
+        track_number,
+        disc_number,
         conn: sqlite3.Connection,
     ) -> None:
         """
@@ -244,10 +244,10 @@ class SongAlbumRepository(BaseRepository):
 
         updates = []
         params = []
-        if track_number is not None:
+        if track_number is not ...:
             updates.append("TrackNumber = ?")
             params.append(track_number)
-        if disc_number is not None:
+        if disc_number is not ...:
             updates.append("DiscNumber = ?")
             params.append(disc_number)
 

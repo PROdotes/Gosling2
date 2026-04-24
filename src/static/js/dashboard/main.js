@@ -241,7 +241,7 @@ const ctx = {
                 "genre",
                 "is_reviewed",
             ]) {
-                state.scalarHandles.updateField(field, fresh);
+                state.scalarHandles.updateField(field, fresh[field]);
             }
             for (const field of [
                 "performer",

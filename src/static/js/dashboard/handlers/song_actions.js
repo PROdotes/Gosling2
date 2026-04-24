@@ -96,8 +96,6 @@ export class SongActionsHandler {
             "remove-album-publisher",
             "remove-album-credit",
             "cleanup-original",
-            "start-edit-album-scalar",
-            "start-edit-album-link",
             "sync-album-from-song",
             "change-album-type",
             "close-edit-modal",
@@ -771,71 +769,6 @@ export class SongActionsHandler {
             },
         });
     }
-    async handleStartEditAlbumScalar(actionTarget) {
-        const { albumId, songId, field } = actionTarget.dataset;
-        const state = this.ctx.getState();
-
-        activateInlineEdit(actionTarget, {
-            field,
-            validationRules: state.validationRules,
-            onCommit: async (val) => {
-                return await api.updateAlbum(albumId, { [field]: val });
-            },
-            onSave: async () => {
-                if (
-                    this.ctx.refreshActiveSongV2 &&
-                    state.currentMode === "songs"
-                ) {
-                    await this.ctx.refreshActiveSongV2(songId);
-                } else {
-                    this.ctx.refreshActiveDetail();
-                }
-            },
-        });
-    }
-
-    async handleStartEditAlbumLink(actionTarget) {
-        const { albumId, songId, field } = actionTarget.dataset;
-        const state = this.ctx.getState();
-
-        activateInlineEdit(actionTarget, {
-            field,
-            validationRules: state.validationRules,
-            onCommit: async (val) => {
-                const card = actionTarget.closest(".album-card-detail");
-                const otherField =
-                    field === "track_number" ? "disc_number" : "track_number";
-                const otherSpan = card?.querySelector(
-                    `[data-field="${otherField}"]`,
-                );
-                const otherVal = otherSpan
-                    ? otherSpan.textContent === "-"
-                        ? null
-                        : Number(otherSpan.textContent)
-                    : null;
-
-                const track = field === "track_number" ? val : otherVal;
-                const disc = field === "disc_number" ? val : otherVal;
-                return await api.updateSongAlbumLink(
-                    songId,
-                    albumId,
-                    track,
-                    disc,
-                );
-            },
-            onSave: async () => {
-                if (
-                    this.ctx.refreshActiveSongV2 &&
-                    state.currentMode === "songs"
-                ) {
-                    await this.ctx.refreshActiveSongV2(songId);
-                } else {
-                    this.ctx.refreshActiveDetail();
-                }
-            },
-        });
-    }
-
     async handleOpenSpotifyModal(actionTarget) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         const { title } = actionTarget.dataset;

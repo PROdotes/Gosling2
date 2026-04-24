@@ -366,7 +366,9 @@ A secondary bug was found: the tag delimiter default is `:` in JS but `::` in Py
 - [ ] **16.** Return `credits_by_role` as computed field — DT-8
 
 ### Phase 5: Replace DOM Scraping
-- [ ] **17.** Replace DOM-scraping in `navigation.js` with data model access — DS-1–DS-4
+- [x] **17.** Replace DOM-scraping in `navigation.js` with data model access — DS-1–DS-4
+  - DS-4 (track/disc paired DOM scrape in `handleStartEditAlbumLink`) eliminated: album link fields now use always-on `<input>` elements wired via `wireAlbumScalarInputs`, sending partial PATCH (one field at a time). `handleStartEditAlbumScalar` and `handleStartEditAlbumLink` deleted.
+  - DS-1–DS-3 (album/publisher/credit DOM scraping in `navigation.js`) deferred: these belong to the legacy song detail view link modal path, not the V2 editor.
 
 ### Phase 6: Config Consolidation
 - [ ] **18.** Expand `/api/v1/config` to include: PROCESSING_STATUS, ALBUM_TYPES, STATUS_FILTERS, credit roles, filter dimensions, default patterns — DE-1–DE-6

@@ -389,7 +389,8 @@ async def update_song_album_link(
 
     try:
         service.update_song_album_link(
-            song_id, album_id, body.track_number, body.disc_number
+            song_id, album_id, body.track_number, body.disc_number,
+            fields_set=body.model_fields_set,
         )
         logger.debug("[SongUpdates] <- update_song_album_link OK")
     except ValueError as e:

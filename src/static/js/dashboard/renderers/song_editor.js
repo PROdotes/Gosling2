@@ -23,6 +23,8 @@ import {
     searchArtists,
     searchPublishers,
     searchTags,
+    updateAlbum,
+    updateSongAlbumLink,
 } from "../api.js";
 import { createChipInput } from "../components/chip_input.js";
 import { PROCESSING_STATUS } from "../constants.js";
@@ -116,7 +118,7 @@ function renderAlbumSubCards(albums, songId) {
   <div class="editor-field">
     <label class="editor-label">Album Title</label>
     <div class="editor-input-row">
-      <span class="editable-scalar editor-input" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="title">${escapeHtml(title)}</span>
+      <input class="editor-input" data-album-scalar="title" data-album-id="${albumId}" data-song-id="${songId}" type="text" value="${escapeHtml(title)}" readonly>
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="sentence" title="Sentence case" type="button">S</button>
       <button class="editor-case-btn" data-action="format-case" data-entity-type="album" data-entity-id="${albumId}" data-song-id="${songId}" data-field="title" data-type="title" title="Title case" type="button">T</button>
     </div>
@@ -139,15 +141,15 @@ function renderAlbumSubCards(albums, songId) {
     </div>
     <div class="editor-field">
       <label class="editor-label">Year</label>
-      <span class="editable-scalar editor-input" data-action="start-edit-album-scalar" data-album-id="${albumId}" data-song-id="${songId}" data-field="release_year">${album.release_year || "-"}</span>
+      <input class="editor-input" data-album-scalar="release_year" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.release_year ?? ""}" readonly>
     </div>
     <div class="editor-field">
       <label class="editor-label">Disc</label>
-      <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="disc_number">${album.disc_number ?? "-"}</span>
+      <input class="editor-input" data-album-link="disc_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.disc_number ?? ""}" readonly>
     </div>
     <div class="editor-field">
       <label class="editor-label">Track</label>
-      <span class="editable-scalar editor-input" data-action="start-edit-album-link" data-album-id="${albumId}" data-song-id="${songId}" data-field="track_number">${album.track_number ?? "-"}</span>
+      <input class="editor-input" data-album-link="track_number" data-album-id="${albumId}" data-song-id="${songId}" type="number" value="${album.track_number ?? ""}" readonly>
     </div>
   </div>
   <button class="album-sub-sync-btn" data-action="sync-album-from-song" data-album-id="${albumId}" data-song-id="${songId}" type="button">↓ sync metadata from song</button>
@@ -163,6 +165,7 @@ function updateAlbumSubSection(freshSong, refreshCallback) {
     if (el) {
         el.innerHTML = renderAlbumSubCards(freshSong.albums, freshSong.id);
         wireAlbumSubChips(freshSong, refreshCallback);
+        wireAlbumScalarInputs(freshSong, refreshCallback);
     }
     // Sync missing state on the field
     const field = document.querySelector(`[data-chip-field="album"]`);
@@ -171,6 +174,100 @@ function updateAlbumSubSection(freshSong, refreshCallback) {
             "missing",
             (freshSong.albums || []).length === 0,
         );
+}
+
+function wireAlbumScalarInput(input, onCommit, refresh) {
+    input.removeAttribute("readonly");
+
+    const errorEl = document.createElement("div");
+    errorEl.className = "editor-input-error";
+    const inputRow = input.closest(".editor-input-row");
+    (inputRow ?? input).after(errorEl);
+
+    let saving = false;
+
+    function showError(msg) {
+        input.classList.add("editor-input--error");
+        errorEl.textContent = msg;
+    }
+
+    function clearError() {
+        input.classList.remove("editor-input--error");
+        errorEl.textContent = "";
+    }
+
+    function revert() {
+        input.value = input.defaultValue;
+        clearError();
+    }
+
+    async function commit() {
+        if (saving) return;
+        const raw = input.value.trim();
+        clearError();
+        if (raw === input.defaultValue) return;
+
+        const isNumeric = input.type === "number";
+        const payload = raw === "" ? null : isNumeric ? Number(raw) : raw;
+
+        saving = true;
+        input.blur();
+        input.disabled = true;
+        try {
+            await onCommit(payload);
+            input.defaultValue = raw;
+            await refresh();
+        } catch (err) {
+            input.value = input.defaultValue;
+            showError(`Save failed: ${err.message}`);
+        } finally {
+            input.disabled = false;
+            saving = false;
+        }
+    }
+
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && input.tagName !== "TEXTAREA") {
+            e.preventDefault();
+            e.stopPropagation();
+            commit();
+            input.blur();
+        }
+        if (e.key === "Escape") {
+            e.preventDefault();
+            e.stopPropagation();
+            revert();
+            input.blur();
+        }
+    });
+
+    input.addEventListener("blur", () => {
+        if (errorEl.textContent) {
+            revert();
+            return;
+        }
+        commit();
+    });
+}
+
+export function wireAlbumScalarInputs(song, refresh) {
+    const card = document.querySelector(`[data-album-sub-song="${song.id}"]`);
+    if (!card) return;
+
+    card.querySelectorAll("[data-album-scalar]").forEach((input) => {
+        const { albumScalar: field, albumId } = input.dataset;
+        wireAlbumScalarInput(input, (val) => updateAlbum(albumId, { [field]: val }), refresh);
+    });
+
+    card.querySelectorAll("[data-album-link]").forEach((input) => {
+        const { albumLink: field, albumId, songId } = input.dataset;
+        const onCommit = (val) => updateSongAlbumLink(
+            songId, albumId,
+            field === "track_number" ? val : undefined,
+            field === "disc_number" ? val : undefined,
+        );
+        wireAlbumScalarInput(input, onCommit, refresh);
+    });
 }
 
 function wireAlbumSubChips(song, refresh) {
@@ -750,8 +847,9 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
         }
     }
 
-    // Wire nested chips for existing albums
+    // Wire nested chips and scalar inputs for existing albums
     wireAlbumSubChips(song, refresh);
+    wireAlbumScalarInputs(song, refresh);
 
     return {
         updateField(fieldKey, freshSong) {

@@ -426,24 +426,29 @@ class EditService:
         album_id: int,
         track_number: Optional[int] = None,
         disc_number: Optional[int] = None,
+        fields_set: set = None,
     ) -> None:
         """Update track/disc numbers for a song-album link."""
         existing_links = self._album_repo.get_albums_for_songs([song_id])
         if not any(link.album_id == album_id for link in existing_links):
             raise LookupError(f"Song {song_id} is not linked to Album {album_id}")
 
-        fields = {}
+        fields_set = fields_set or set()
+        to_validate = {}
         if track_number is not None:
-            fields["track_number"] = track_number
+            to_validate["track_number"] = track_number
         if disc_number is not None:
-            fields["disc_number"] = disc_number
-        if fields:
-            self._validate_album_scalars(fields)
+            to_validate["disc_number"] = disc_number
+        if to_validate:
+            self._validate_album_scalars(to_validate)
 
         conn = self._album_repo.get_connection()
         try:
             self._album_repo.update_track_info(
-                song_id, album_id, track_number, disc_number, conn
+                song_id, album_id,
+                track_number if "track_number" in fields_set else ...,
+                disc_number if "disc_number" in fields_set else ...,
+                conn,
             )
             conn.commit()
             self._sync_id3_if_enabled(song_id)

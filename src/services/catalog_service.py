@@ -412,10 +412,11 @@ class CatalogService:
         album_id: int,
         track_number: Optional[int] = None,
         disc_number: Optional[int] = None,
+        fields_set: set = None,
     ) -> None:
         """Update link metadata via EditService."""
         return self._edit_service.update_song_album_link(
-            song_id, album_id, track_number, disc_number
+            song_id, album_id, track_number, disc_number, fields_set=fields_set,
         )
 
     def update_album(self, album_id: int, album_data: dict) -> Album:
