@@ -464,19 +464,24 @@ class IdentityRepository(BaseRepository):
         )
 
     def delete_alias(self, name_id: int, cursor: sqlite3.Cursor) -> None:
-        """Remove an alias link. Guard: primary names cannot be deleted."""
+        """Detach an alias from its identity by re-homing it to a new Identity row."""
         logger.debug(f"[IdentityRepository] -> delete_alias(name_id={name_id})")
-        # 1. Primary check
         row = cursor.execute(
-            "SELECT IsPrimaryName FROM ArtistNames WHERE NameID = ?", (name_id,)
+            "SELECT IsPrimaryName, DisplayName FROM ArtistNames WHERE NameID = ?", (name_id,)
         ).fetchone()
         if not row:
             return
         if row[0]:
-            raise ValueError("Cannot delete the primary name of an identity")
+            raise ValueError("Cannot detach the primary name of an identity")
 
+        cursor.execute("INSERT INTO Identities (IdentityType, IsDeleted) VALUES ('person', 0)")
+        new_identity_id = cursor.lastrowid
         cursor.execute(
-            "UPDATE ArtistNames SET IsDeleted = 1 WHERE NameID = ?", (name_id,)
+            "UPDATE ArtistNames SET OwnerIdentityID = ?, IsPrimaryName = 1, IsDeleted = 0 WHERE NameID = ?",
+            (new_identity_id, name_id),
+        )
+        logger.info(
+            f"[IdentityRepository] Detached name {name_id} ('{row[1]}') → new identity {new_identity_id}"
         )
 
     def merge_orphan_into(
