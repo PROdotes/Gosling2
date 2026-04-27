@@ -8,7 +8,6 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from src.engine.routers.catalog import router as catalog_router
 from src.engine.routers.metabolic import router as metabolic_router
-from src.engine.routers.audit import router as audit_router
 from src.engine.routers.ingest import router as ingest_router
 from src.engine.routers.song_updates import router as song_updates_router
 from src.engine.routers.album_updates import router as album_updates_router
@@ -76,7 +75,6 @@ async def get_dashboard():
 
 app.include_router(catalog_router)
 app.include_router(metabolic_router)
-app.include_router(audit_router)
 app.include_router(ingest_router)
 app.include_router(song_updates_router)
 app.include_router(album_updates_router)

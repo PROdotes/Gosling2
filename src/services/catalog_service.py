@@ -8,7 +8,6 @@ from src.data.publisher_repository import PublisherRepository
 from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
-from src.data.audit_repository import AuditRepository
 from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Song,
@@ -55,7 +54,6 @@ class CatalogService:
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
         self._staging_repo = StagingRepository(db_path)
-        self._audit_repo = AuditRepository(db_path)
         self._identity_service = IdentityService(
             db_path, identity_repo=self._identity_repo
         )
