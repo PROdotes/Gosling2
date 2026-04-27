@@ -647,7 +647,10 @@ function createResultCard(result, path) {
     const statusClass = result.status_severity || "error";
 
     const song = result.song;
-    const title = result.display_title || "Unknown Title";
+    const title =
+        status === "CONFLICT" && result.title
+            ? result.title
+            : song?.media_name || song?.title || result.display_title || "Unknown Title";
     const artist = song?.display_artist || "-";
 
     card.innerHTML = `
@@ -707,13 +710,13 @@ function createResultCard(result, path) {
             }
 
             ${
-                status === "INGESTED"
+                status === "INGESTED" || status === "ALREADY_EXISTS"
                     ? `
                 <div class="ingest-actions-row">
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
                     </button>
-                    <span class="muted-note">• UUID Staged</span>
+                    <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>
                 </div>
             `
                     : ""
