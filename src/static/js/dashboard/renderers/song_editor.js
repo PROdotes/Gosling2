@@ -92,7 +92,7 @@ function renderAlbumSubCards(albums, songId) {
     if (!albums || !albums.length) return "";
     return albums
         .map((album) => {
-            const title = album.display_title;
+            const title = album.album_title || album.display_title || "Unknown Album";
             const albumId = album.album_id || album.id;
             const typeOptions = ALBUM_TYPES.map(
                 (t) =>

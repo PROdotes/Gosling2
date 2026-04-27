@@ -96,12 +96,14 @@ class SongCreditRepository(BaseRepository):
         Get-or-create an ArtistName by display name, with optional explicit identity linking.
         Returns name_id. Reactivates soft-deleted records.
         """
+        logger.debug(f"[SongCreditRepository] get_or_create_credit_name('{display_name}', identity_id={identity_id})")
         if identity_id:
             # Identity is explicit — check if this name is already linked to it
             row = cursor.execute(
-                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ? AND OwnerIdentityID = ? COLLATE UTF8_NOCASE",
+                "SELECT NameID, IsDeleted FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE AND OwnerIdentityID = ?",
                 (display_name, identity_id),
             ).fetchone()
+            logger.debug(f"[SongCreditRepository] identity lookup '{display_name}' under {identity_id} -> {tuple(row) if row else 'NOT FOUND'}")
             if row:
                 name_id = row[0]
                 if row[1]:  # Reactivate
@@ -112,11 +114,11 @@ class SongCreditRepository(BaseRepository):
                 return name_id
 
             # Name not linked to this identity — create it
-            # First ensure identity is active
             cursor.execute(
                 "UPDATE Identities SET IsDeleted = 0 WHERE IdentityID = ? AND IsDeleted = 1",
                 (identity_id,),
             )
+            logger.debug(f"[SongCreditRepository] inserting ArtistName '{display_name}' under identity_id={identity_id}")
             cursor.execute(
                 "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 0)",
                 (identity_id, display_name),
@@ -128,6 +130,7 @@ class SongCreditRepository(BaseRepository):
             "SELECT NameID, IsDeleted, OwnerIdentityID FROM ArtistNames WHERE DisplayName = ? COLLATE UTF8_NOCASE",
             (display_name,),
         ).fetchone()
+        logger.debug(f"[SongCreditRepository] name-only lookup '{display_name}' -> {tuple(row) if row else 'NOT FOUND'}")
 
         if row:
             name_id = row[0]
@@ -146,6 +149,7 @@ class SongCreditRepository(BaseRepository):
             "SELECT IdentityID, IsDeleted FROM Identities WHERE LegalName = ?",
             (display_name,),
         ).fetchone()
+        logger.debug(f"[SongCreditRepository] LegalName lookup '{display_name}' -> {tuple(identity_row) if identity_row else 'NOT FOUND'}")
         if identity_row:
             owner_identity_id = identity_row[0]
             if identity_row[1]:
@@ -159,7 +163,9 @@ class SongCreditRepository(BaseRepository):
                 (display_name,),
             )
             owner_identity_id = cursor.lastrowid
+            logger.debug(f"[SongCreditRepository] created new identity_id={owner_identity_id} for '{display_name}'")
 
+        logger.debug(f"[SongCreditRepository] inserting ArtistName '{display_name}' under identity_id={owner_identity_id}")
         cursor.execute(
             "INSERT INTO ArtistNames (OwnerIdentityID, DisplayName, IsPrimaryName) VALUES (?, ?, 1)",
             (owner_identity_id, display_name),

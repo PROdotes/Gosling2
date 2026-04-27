@@ -80,9 +80,10 @@ class Logger:
 
     def __init__(self, log_file="gosling.log"):
         self.log_file = log_file
-        # Set level from env at init
         env_level = os.getenv("GOSLING_LOG_LEVEL", "DEBUG").upper()
         self.current_level = self.LEVELS.get(env_level, 20)
+        console_level = os.getenv("GOSLING_CONSOLE_LEVEL", "ERROR").upper()
+        self.console_level = self.LEVELS.get(console_level, 40)
         self.console_enabled = os.getenv("GOSLING_LOG_CONSOLE", "on").lower() != "off"
         self.file_enabled = os.getenv("GOSLING_LOG_FILE", "on").lower() != "off"
 
@@ -94,7 +95,7 @@ class Logger:
         timestamp = datetime.datetime.now().isoformat()
         line = f"{timestamp} [{level:8}] {msg}"
 
-        if self.console_enabled:
+        if self.console_enabled and level_val >= self.console_level:
             print(line)
 
         if self.file_enabled:
