@@ -26,7 +26,6 @@ import {
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {
-    basename,
     isModalOpen,
     renderEmptyState,
 } from "./components/utils.js";
@@ -213,7 +212,7 @@ const ctx = {
             state.chipHandles = wireChipInputs(
                 fresh,
                 () => ctx.refreshActiveSongV2(fresh.id),
-                state.chipHandles?.onSplit,
+                state.onSplit,
                 state.validationRules,
             );
             state.scalarHandles = wireScalarInputs(
@@ -715,36 +714,33 @@ async function openSelectedResult(index) {
                 ctx.refreshActiveSongV2(result.id);
             },
         );
+        state.onSplit = async ({ songId, text, role, creditId }) => {
+            const { openSplitterModal } = await import(
+                "./components/splitter_modal.js"
+            );
+            openSplitterModal({
+                songId,
+                text,
+                target: "credits",
+                classification: role,
+                remove: { type: "credit", id: creditId },
+                separators: state.validationRules?.credit_separators || [],
+                onConfirm: async () => {
+                    const fresh = await getCatalogSong(songId);
+                    state.activeSong = fresh;
+                    state.chipHandles?.updateField(role, fresh);
+                    wireDriftIndicators(fresh, state.activeSongFile);
+                    renderActionSidebar(fresh, {
+                        searchEngines: state.searchEngines,
+                        defaultSearchEngine: state.defaultSearchEngine,
+                    });
+                },
+            });
+        };
         state.chipHandles = wireChipInputs(
             result,
-            () => {
-                ctx.refreshActiveSongV2(result.id);
-            },
-            async ({ songId, text, role, creditId }) => {
-                const { openSplitterModal } = await import(
-                    "./components/splitter_modal.js"
-                );
-                openSplitterModal({
-                    songId,
-                    text,
-                    target: "credits",
-                    classification: role,
-                    remove: { type: "credit", id: creditId },
-                    separators: state.validationRules?.credit_separators || [],
-                    onConfirm: async () => {
-                        const fresh = await getCatalogSong(songId);
-                        state.activeSong = fresh;
-                        state.chipHandles?.updateField(role, fresh);
-                        // Fixed: wireDriftIndicators is now called in refreshActiveSongV2 path,
-                        // but keeping here for explicit confirmation logic.
-                        wireDriftIndicators(fresh, state.activeSongFile);
-                        renderActionSidebar(fresh, {
-                            searchEngines: state.searchEngines,
-                            defaultSearchEngine: state.defaultSearchEngine,
-                        });
-                    },
-                });
-            },
+            () => { ctx.refreshActiveSongV2(result.id); },
+            state.onSplit,
             state.validationRules,
         );
 
@@ -870,25 +866,10 @@ async function setupHeaderDropZone() {
 
                 const res = update.last_result;
                 if (res) {
-                    const title =
-                        res.song?.media_name ||
-                        res.title ||
-                        basename(res.staged_path) ||
-                        "Unknown File";
-                    if (res.status === "INGESTED")
-                        showToast(`Ingested: ${title}`, "success", 2000);
-                    else if (res.status === "ALREADY_EXISTS")
-                        showToast(`Already exists: ${title}`, "info", 2000);
-                    else if (res.status === "CONFLICT")
-                        showToast(`Conflict: ${title}`, "error", 5000);
-                    else if (res.status === "ERROR")
-                        showToast(
-                            `Error: ${res.message || title}`,
-                            "error",
-                            5000,
-                        );
-                    else if (res.status === "PENDING_CONVERT")
-                        showToast(`WAV Staged: ${title}`, "info", 3000);
+                    const title = res.display_title || "Unknown File";
+                    const severity = res.status_severity || "error";
+                    const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
+                    showToast(`${res.status_label}: ${title}`, severity, duration);
                 }
             });
         } catch (error) {

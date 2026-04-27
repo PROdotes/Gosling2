@@ -15,6 +15,7 @@
         { "label": "Artist - Title (...)", "value": "{Artist} - {Title} ({Ignore})" },
         { "label": "# - Artist - Title", "value": "{Ignore} - {Artist} - {Title}" },
         { "label": "Artist - Album - Title", "value": "{Artist} - {Album} - {Title}" },
-        { "label": "Album_Title_Artist_Publisher", "value": "{Album}_{Title}_{Artist}_{Publisher}" }
+        { "label": "Album_Title_Artist_Publisher", "value": "{Album}_{Title}_{Artist}_{Publisher}" },
+        { "label": "Artist - Title (feat. Artist)", "value": "{Artist} - {Title} (feat. {Artist})" }
     ]
 }

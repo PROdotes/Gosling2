@@ -182,9 +182,7 @@ function renderSongRows(ctx, songs) {
 
     panel.innerHTML = songs
         .map((song, index) => {
-            const title = escapeHtml(
-                song.title || song.media_name || "Untitled",
-            );
+            const title = escapeHtml(song.display_title);
             const artist = escapeHtml(song.display_artist || "Unknown Artist");
             const blockerLabels = {
                 media_name: "TTL",

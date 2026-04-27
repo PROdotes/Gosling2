@@ -97,7 +97,7 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
             ${items
                 .map(
                     (song) => `
-                <div class="song-row" ${buildNavigateAttrs("songs", song.media_name || song.title || "")}>
+                <div class="song-row" ${buildNavigateAttrs("songs", song.display_title)}>
                     <div class="col-check">
                          <label class="switch ${song.can_activate ? "" : "disabled"}"
                                 data-action="toggle-active"
@@ -110,7 +110,7 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                          </label>
                      </div>
                     <div class="col-info">
-                        <div class="row-title">${escapeHtml(song.media_name || song.title || "Untitled")}<span class="row-id"> #${song.id}</span></div>
+                        <div class="row-title">${escapeHtml(song.display_title)}<span class="row-id"> #${song.id}</span></div>
                         <div class="row-artist">${escapeHtml(song.display_artist || "Unknown Artist")}</div>
                     </div>
                     <div class="col-meta">

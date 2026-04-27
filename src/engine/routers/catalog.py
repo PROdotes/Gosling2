@@ -554,9 +554,13 @@ async def check_ingestion(request: IngestionCheckRequest) -> IngestionReportView
 @router.get("/config")
 def get_config():
     """Returns application configuration settings."""
+    from engine.config import ProcessingStatus, TAG_DEFAULT_CATEGORY
+
     return {
         "search_engines": SearchService.ENGINES,
         "default_search_engine": DEFAULT_SEARCH_ENGINE,
+        "processing_status": {s.name: s.value for s in ProcessingStatus},
+        "tag_default_category": TAG_DEFAULT_CATEGORY,
     }
 
 

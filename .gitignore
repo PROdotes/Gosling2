@@ -76,8 +76,7 @@ tests/fixtures/bananas.mp3
 tests/fixtures/test.mp3
 tests/test_repositories.py
 tools/
-# OpenCode artifact
-nul
+temp/library/staging/
 
 # FFmpeg binaries
 ffmpeg/

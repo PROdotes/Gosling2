@@ -54,6 +54,10 @@ EXPECTED_INGESTION_FIELDS = {
     "year",
     "isrc",
     "staged_path",
+    "status_label",
+    "status_severity",
+    "formatted_duration",
+    "display_title",
 }
 
 

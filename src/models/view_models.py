@@ -1,4 +1,5 @@
-from typing import List, Optional, Dict
+from pathlib import Path
+from typing import List, Optional, Dict, Tuple
 from pydantic import BaseModel, computed_field, ConfigDict
 from src.models.domain import (
     Album,
@@ -47,6 +48,33 @@ def compute_review_blockers(
     return blockers
 
 
+PROCESSING_STATUS_MAP: Dict[int, Tuple[str, str]] = {
+    ProcessingStatus.REVIEWED: ("Reviewed", "success"),
+    ProcessingStatus.NEEDS_REVIEW: ("Needs Review", "warning"),
+    ProcessingStatus.PENDING_ENRICHMENT: ("Enriching", "info"),
+    ProcessingStatus.CONVERTING: ("Converting", "info"),
+}
+
+INGESTION_STATUS_MAP: Dict[str, Tuple[str, str]] = {
+    "NEW": ("New File", "success"),
+    "INGESTED": ("Ingested", "success"),
+    "CONVERTING": ("Converting (WAV\u2192MP3)", "info"),
+    "PENDING_CONVERT": ("WAV \u2014 Awaiting Conversion", "info"),
+    "ALREADY_EXISTS": ("Already Exists", "warning"),
+    "CONFLICT": ("Conflict", "error"),
+    "ERROR": ("Error", "error"),
+}
+
+
+def format_file_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+
 class SongAlbumView(BaseModel):
     """View-model for Album associations."""
 
@@ -80,6 +108,7 @@ class SongAlbumView(BaseModel):
     @property
     def display_title(self) -> str:
         """Standardized presentation including track/disc context."""
+        resolved = self.album_title or "Unknown Album"
         context = ""
         if (self.disc_number or 1) > 1:
             context = f"{self.disc_number}-"
@@ -88,8 +117,8 @@ class SongAlbumView(BaseModel):
             context += f"{self.track_number:02d} "
 
         if context:
-            return f"[{context.strip()}] {self.album_title}"
-        return self.album_title
+            return f"[{context.strip()}] {resolved}"
+        return resolved
 
 
 class SongSlimView(BaseModel):
@@ -136,6 +165,23 @@ class SongSlimView(BaseModel):
         minutes = total_seconds // 60
         seconds = total_seconds % 60
         return f"{minutes}:{seconds:02d}"
+
+    @computed_field
+    @property
+    def display_title(self) -> str:
+        return self.title or self.media_name or "Untitled"
+
+    @computed_field
+    @property
+    def status_label(self) -> str:
+        entry = PROCESSING_STATUS_MAP.get(self.processing_status)
+        return entry[0] if entry else "Unknown"
+
+    @computed_field
+    @property
+    def status_severity(self) -> str:
+        entry = PROCESSING_STATUS_MAP.get(self.processing_status)
+        return entry[1] if entry else "neutral"
 
     @classmethod
     def from_row(cls, row: dict) -> "SongSlimView":
@@ -370,6 +416,35 @@ class SongView(BaseModel):
             duration_s=self.duration_s,
         )
 
+    @computed_field
+    @property
+    def display_title(self) -> str:
+        return self.title or self.media_name or "Untitled"
+
+    @computed_field
+    @property
+    def status_label(self) -> str:
+        if self.processing_status is None:
+            return "Unknown"
+        entry = PROCESSING_STATUS_MAP.get(self.processing_status)
+        return entry[0] if entry else "Unknown"
+
+    @computed_field
+    @property
+    def status_severity(self) -> str:
+        if self.processing_status is None:
+            return "neutral"
+        entry = PROCESSING_STATUS_MAP.get(self.processing_status)
+        return entry[1] if entry else "neutral"
+
+    @computed_field
+    @property
+    def credits_by_role(self) -> Dict[str, List[str]]:
+        grouped: Dict[str, List[str]] = {}
+        for c in self.credits:
+            grouped.setdefault(c.role_name, []).append(c.display_name)
+        return grouped
+
 
 class AlbumSlimView(BaseModel):
     """Lightweight view-model for album list results. No tracklist or full hydration."""
@@ -497,6 +572,13 @@ class PublisherView(BaseModel):
         """True if no songs or albums are linked to this publisher."""
         return self.song_count == 0 and self.album_count == 0
 
+    @computed_field
+    @property
+    def display_label(self) -> str:
+        if self.parent_name:
+            return f"{self.name} ({self.parent_name})"
+        return self.name
+
 
 class IdentityView(BaseModel):
     """View-model for the bidirectional artist tree."""
@@ -519,6 +601,11 @@ class IdentityView(BaseModel):
     def can_delete(self) -> bool:
         """True if no songs are linked to this identity."""
         return self.song_count == 0
+
+    @computed_field
+    @property
+    def resolved_name(self) -> str:
+        return self.display_name or self.legal_name or "Unknown"
 
     @classmethod
     def from_domain(cls, identity: Identity) -> "IdentityView":
@@ -640,6 +727,39 @@ class IngestionReportView(BaseModel):
     year: Optional[int] = None
     isrc: Optional[str] = None
     staged_path: Optional[str] = None
+
+    @computed_field
+    @property
+    def status_label(self) -> str:
+        entry = INGESTION_STATUS_MAP.get(self.status)
+        return entry[0] if entry else self.status
+
+    @computed_field
+    @property
+    def status_severity(self) -> str:
+        entry = INGESTION_STATUS_MAP.get(self.status)
+        return entry[1] if entry else "neutral"
+
+    @computed_field
+    @property
+    def formatted_duration(self) -> str:
+        if self.duration_s is None:
+            return "Unknown"
+        total_seconds = int(self.duration_s)
+        minutes = total_seconds // 60
+        seconds = total_seconds % 60
+        return f"{minutes}:{seconds:02d}"
+
+    @computed_field
+    @property
+    def display_title(self) -> str:
+        if self.status == "CONFLICT" and self.title:
+            return self.title
+        if self.song and self.song.media_name:
+            return self.song.media_name
+        if self.staged_path:
+            return Path(self.staged_path).name
+        return "Unknown Title"
 
 
 class FolderScanRequest(BaseModel):

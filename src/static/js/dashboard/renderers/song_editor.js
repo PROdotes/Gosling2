@@ -92,8 +92,7 @@ function renderAlbumSubCards(albums, songId) {
     if (!albums || !albums.length) return "";
     return albums
         .map((album) => {
-            const title =
-                album.album_title || album.display_title || "Unknown Album";
+            const title = album.display_title;
             const albumId = album.album_id || album.id;
             const typeOptions = ALBUM_TYPES.map(
                 (t) =>
@@ -645,7 +644,7 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 if (r === ABORTED || !r) return [];
                 return r.map((a) => ({
                     id: a.id,
-                    label: a.display_name || a.legal_name || a.name,
+                    label: a.resolved_name,
                 }));
             },
             onAdd: async (opt) => {
@@ -1017,12 +1016,7 @@ export function renderSongEditorV2(song, fileData = null) {
 
     const REQUIRED_ROLES = ["Performer", "Composer"];
     const OPTIONAL_ROLES = ["Lyricist", "Producer"];
-    const creditsByRole = {};
-    for (const role of [...REQUIRED_ROLES, ...OPTIONAL_ROLES]) {
-        creditsByRole[role] = song.credits
-            .filter((c) => c.role_name === role)
-            .map((c) => c.display_name);
-    }
+    const creditsByRole = song.credits_by_role || {};
     const publishers = song.publishers.map((p) => p.name);
     const albums = song.albums.map((a) => a.display_title);
     const tags = song.tags.map((t) =>

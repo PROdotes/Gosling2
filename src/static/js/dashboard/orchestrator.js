@@ -150,7 +150,7 @@ export function manageSongCredits(ctx, songId, role, currentCredits) {
             if (results === api.ABORTED) return [];
             return (results || []).map((a) => ({
                 id: a.id,
-                label: a.display_name || a.legal_name || a.name,
+                label: a.resolved_name,
             }));
         },
         onAdd: async (opt) => {
@@ -272,7 +272,7 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
             if (results === api.ABORTED) return [];
             return (results || []).map((a) => ({
                 id: a.id,
-                label: a.display_name || a.legal_name || a.name,
+                label: a.resolved_name,
             }));
         },
         onAdd: async (opt) => {
@@ -355,7 +355,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             items: otherAliases.map((a) => ({ id: a.id, label: a.display_name })),
             onSearch: async (q) => {
                 const results = await api.searchArtists(q);
-                return (results || []).map((a) => ({ id: a.id, label: a.display_name || a.name }));
+                return (results || []).map((a) => ({ id: a.id, label: a.resolved_name }));
             },
             onAdd: async (opt) => {
                 const result = await api.addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);

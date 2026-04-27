@@ -230,7 +230,7 @@ async function refreshOrphanList(body) {
                 (f) => `
             <div class="orphan-row" data-path="${escapeHtml(f.path)}">
                 <span class="orphan-name mono">${escapeHtml(f.filename)}</span>
-                <span class="muted-note orphan-size">${(f.size_bytes / 1024).toFixed(0)} KB</span>
+                <span class="muted-note orphan-size">${escapeHtml(f.display_size)}</span>
                 <div class="row-actions">
                     ${f.is_ghost ? `<button class="ingest-btn-primary orphan-reactivate-btn" data-path="${escapeHtml(f.path)}" data-ghost-id="${f.ghost_id}">Re-activate</button>` : ""}
                     <button class="ingest-btn-danger orphan-delete-btn" data-path="${escapeHtml(f.path)}">Delete</button>
@@ -585,59 +585,27 @@ function createResultCard(result, path) {
     const status = result.status;
     card.className = `result-card ingest-card ${status.toLowerCase()}`;
 
-    const statusConfig = {
-        NEW: { class: "found", icon: "&#10003;", text: "New File" },
-        INGESTED: { class: "found", icon: "&#10003;", text: "Ingested" },
-        CONVERTING: {
-            class: "loading",
-            icon: "&#8635;",
-            text: "Converting (WAV→MP3)",
-        },
-        PENDING_CONVERT: {
-            class: "loading",
-            icon: "&#9654;",
-            text: "WAV — Awaiting Conversion",
-        },
-        ALREADY_EXISTS: {
-            class: "loading",
-            icon: "&#9888;",
-            text: `Exists (${result.match_type})`,
-        },
-        CONFLICT: {
-            class: "loading",
-            icon: "&#9888;",
-            text: `Ghost (${result.match_type})`,
-        },
-        ERROR: { class: "missing", icon: "&#10007;", text: "Error" },
+    const SEVERITY_ICONS = {
+        success: "&#10003;",
+        info: "&#8635;",
+        warning: "&#9888;",
+        error: "&#10007;",
     };
 
-    const config = statusConfig[status] || statusConfig["ERROR"];
+    const icon = SEVERITY_ICONS[result.status_severity] || SEVERITY_ICONS.error;
+    const statusLabel = result.status_label || status;
+    const statusClass = result.status_severity || "error";
 
-    // For CONFLICT status, use ghost record data
     const song = result.song;
-    const title =
-        status === "CONFLICT" && result.title
-            ? result.title
-            : song?.media_name ||
-              song?.title ||
-              basename(result.staged_path) ||
-              "Unknown Title";
+    const title = result.display_title || "Unknown Title";
     const artist = song?.display_artist || "-";
 
-    // Helper to format duration (seconds to MM:SS)
-    const formatDuration = (seconds) => {
-        if (!seconds) return "Unknown";
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, "0")}`;
-    };
-
     card.innerHTML = `
-        <div class="card-icon ingest-icon">${config.icon}</div>
+        <div class="card-icon ingest-icon">${icon}</div>
         <div class="card-body">
             <div class="card-title-row">
                 <div class="card-title">${escapeHtml(title)}</div>
-                ${renderStatus(config.class, config.text)}
+                ${renderStatus(statusClass, statusLabel)}
             </div>
             <div class="card-subtitle">${escapeHtml(artist)}</div>
             <div class="detail-path">${escapeHtml(path)}</div>
@@ -654,7 +622,7 @@ function createResultCard(result, path) {
                         <div class="muted-note">Title:</div>
                         <div>${escapeHtml(result.title || "Unknown")}</div>
                         <div class="muted-note">Duration:</div>
-                        <div class="mono">${formatDuration(result.duration_s)}</div>
+                        <div class="mono">${result.formatted_duration || "Unknown"}</div>
                         <div class="muted-note">Year:</div>
                         <div class="mono">${result.year || "(none)"}</div>
                         <div class="muted-note">ISRC:</div>

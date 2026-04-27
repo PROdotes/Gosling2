@@ -15,6 +15,7 @@ from src.models.view_models import (
     IngestionReportView,
     CleanupOriginalRequest,
     IngestStatusModel,
+    format_file_size,
 )
 from src.services.catalog_service import CatalogService
 from src.services.converter import convert_to_mp3
@@ -425,6 +426,7 @@ async def get_staging_orphans():
                     "filename": fname,
                     "path": fpath,
                     "size_bytes": os.path.getsize(fpath),
+                    "display_size": format_file_size(os.path.getsize(fpath)),
                     "is_ghost": bool(existing and existing["is_deleted"]),
                     "ghost_id": existing["id"] if existing else None,
                 }
