@@ -1,4 +1,37 @@
-import * as api from "./api.js";
+import {
+    getSongDetail,
+    searchTags,
+    ABORTED,
+    addSongTag,
+    removeSongTag,
+    searchArtists,
+    addSongCredit,
+    removeSongCredit,
+    searchAlbums,
+    addSongAlbum,
+    removeSongAlbum,
+    searchPublishers,
+    addSongPublisher,
+    removeSongPublisher,
+    addAlbumPublisher,
+    removeAlbumPublisher,
+    addAlbumCredit,
+    removeAlbumCredit,
+    getArtistTree,
+    updateCreditName,
+    mergeIdentity,
+    setIdentityType,
+    addIdentityAlias,
+    removeIdentityAlias,
+    addIdentityMember,
+    removeIdentityMember,
+    getPublisherDetail,
+    updatePublisher,
+    setPublisherParent,
+    getTagDetail,
+    updateTag,
+    getTagCategories,
+} from "./api.js";
 import { showConfirm } from "./components/confirm_modal.js";
 import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
@@ -41,7 +74,7 @@ export async function orchestrateScrubber(ctx, songId, title) {
                 tags = state.activeSong.tags || [];
             } else {
                 // Otherwise fetch them
-                const detail = await api.getSongDetail(id);
+                const detail = await getSongDetail(id);
                 tags = detail.tags || [];
             }
             manageSongTags(ctx, id, name, tags);
@@ -77,8 +110,8 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             const { name: searchTerm, category: searchCategory } =
                 parseTagInput(q, rules);
             const hasCategory = q.includes(delimiter);
-            const results = await api.searchTags(searchTerm);
-            if (results === api.ABORTED) return [];
+            const results = await searchTags(searchTerm);
+            if (results === ABORTED) return [];
             const mapped = (results || []).map((t) => ({
                 id: t.id,
                 label: t.category ? `${t.name} (${t.category})` : t.name,
@@ -99,7 +132,7 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
         },
         onAdd: async (opt) => {
             const rawTag = opt.id == null ? (opt.rawInput || opt.name || opt.label) : null;
-            const tag = await api.addSongTag(
+            const tag = await addSongTag(
                 songId,
                 null,
                 null,
@@ -111,7 +144,7 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeSongTag(songId, item.id);
+            await removeSongTag(songId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => {
@@ -146,15 +179,15 @@ export function manageSongCredits(ctx, songId, role, currentCredits) {
             label: c.display_name,
         })),
         onSearch: async (q) => {
-            const results = await api.searchArtists(q);
-            if (results === api.ABORTED) return [];
+            const results = await searchArtists(q);
+            if (results === ABORTED) return [];
             return (results || []).map((a) => ({
                 id: a.id,
                 label: a.resolved_name,
             }));
         },
         onAdd: async (opt) => {
-            const credit = await api.addSongCredit(
+            const credit = await addSongCredit(
                 songId,
                 opt.rawInput || opt.label,
                 role,
@@ -165,7 +198,7 @@ export function manageSongCredits(ctx, songId, role, currentCredits) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeSongCredit(songId, item.id);
+            await removeSongCredit(songId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as ${role}`,
@@ -178,13 +211,13 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
         placeholder: "Search for album...",
         items: currentAlbums,
         onSearch: async (q) => {
-            const results = await api.searchAlbums(q);
-            if (results === api.ABORTED) return [];
+            const results = await searchAlbums(q);
+            if (results === ABORTED) return [];
             return (results || []).map((a) => ({ id: a.id, label: a.title }));
         },
         onAdd: async (opt) => {
             const isNew = !opt.id;
-            const res = await api.addSongAlbum(
+            const res = await addSongAlbum(
                 songId,
                 opt.id ?? null,
                 opt.rawInput || opt.label,
@@ -201,7 +234,7 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeSongAlbum(songId, item.id);
+            await removeSongAlbum(songId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as new album`,
@@ -213,11 +246,11 @@ export function manageSongPublishers(ctx, songId, currentPublishers) {
         title: "Song Publishers",
         items: currentPublishers,
         onSearch: async (q) => {
-            const results = await api.searchPublishers(q);
+            const results = await searchPublishers(q);
             return (results || []).map((p) => ({ id: p.id, label: p.name }));
         },
         onAdd: async (opt) => {
-            const publisher = await api.addSongPublisher(
+            const publisher = await addSongPublisher(
                 songId,
                 opt.rawInput || opt.label,
                 opt.id,
@@ -227,7 +260,7 @@ export function manageSongPublishers(ctx, songId, currentPublishers) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeSongPublisher(songId, item.id);
+            await removeSongPublisher(songId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as new publisher`,
@@ -241,11 +274,11 @@ export function manageAlbumPublishers(ctx, albumId, songId, currentChips) {
         title: "Album Publishers",
         items: currentChips,
         onSearch: async (q) => {
-            const results = await api.searchPublishers(q);
+            const results = await searchPublishers(q);
             return (results || []).map((p) => ({ id: p.id, label: p.name }));
         },
         onAdd: async (opt) => {
-            const publisher = await api.addAlbumPublisher(
+            const publisher = await addAlbumPublisher(
                 albumId,
                 opt.rawInput || opt.label,
                 opt.id ? Number(opt.id) : null,
@@ -255,7 +288,7 @@ export function manageAlbumPublishers(ctx, albumId, songId, currentChips) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeAlbumPublisher(albumId, item.id);
+            await removeAlbumPublisher(albumId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as album publisher`,
@@ -268,15 +301,15 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
         placeholder: "Search for artist name...",
         items: currentChips,
         onSearch: async (q) => {
-            const results = await api.searchArtists(q);
-            if (results === api.ABORTED) return [];
+            const results = await searchArtists(q);
+            if (results === ABORTED) return [];
             return (results || []).map((a) => ({
                 id: a.id,
                 label: a.resolved_name,
             }));
         },
         onAdd: async (opt) => {
-            const credit = await api.addAlbumCredit(
+            const credit = await addAlbumCredit(
                 albumId,
                 opt.rawInput || opt.label,
                 "Performer",
@@ -287,7 +320,7 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {
-            await api.removeAlbumCredit(albumId, item.id);
+            await removeAlbumCredit(albumId, item.id);
             await getUpdateCallback(ctx, songId)();
         },
         createLabel: (q) => `Add "${q}" as Performer`,
@@ -297,7 +330,7 @@ export function manageAlbumCredits(ctx, albumId, songId, currentChips) {
 // ─── ENTITY EDITING (EDIT MODAL) ─────────────────────────────────────────────
 
 export async function manageArtist(ctx, artistId, artistName) {
-    const identity = await api.getArtistTree(artistId);
+    const identity = await getArtistTree(artistId);
     if (!identity) return;
 
     const aliases = identity.aliases || [];
@@ -317,7 +350,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             value: primary.display_name,
             onSave: async (val) => {
                 try {
-                    await api.updateCreditName(0, primary.id, val);
+                    await updateCreditName(0, primary.id, val);
                     if (ctx.refreshLayout) ctx.refreshLayout();
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
@@ -327,7 +360,7 @@ export async function manageArtist(ctx, artistId, artistName) {
                             { title: "Merge Identity", okLabel: "Merge" },
                         );
                         if (confirmed) {
-                            await api.mergeIdentity(primary.id, collision_name_id);
+                            await mergeIdentity(primary.id, collision_name_id);
                             if (ctx.refreshLayout) ctx.refreshLayout();
                         }
                     } else if (err.detail?.code === "UNSAFE_MERGE") {
@@ -345,7 +378,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             options: ["person", "group"],
             disabledReason: hasMembers ? "Remove all members before converting to person" : null,
             onSave: async (val) => {
-                await api.setIdentityType(artistId, val);
+                await setIdentityType(artistId, val);
                 if (ctx.refreshLayout) ctx.refreshLayout();
             },
         },
@@ -354,19 +387,19 @@ export async function manageArtist(ctx, artistId, artistName) {
             label: "Aliases",
             items: otherAliases.map((a) => ({ id: a.id, label: a.display_name })),
             onSearch: async (q) => {
-                const results = await api.searchArtists(q);
+                const results = await searchArtists(q);
                 return (results || []).map((a) => ({ id: a.id, label: a.resolved_name }));
             },
             onAdd: async (opt) => {
-                const result = await api.addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
+                const result = await addIdentityAlias(artistId, opt.rawInput || opt.label, opt.id);
                 return { id: result.name_id, label: result.display_name };
             },
             onRemove: async (item) => {
-                await api.removeIdentityAlias(artistId, item.id);
+                await removeIdentityAlias(artistId, item.id);
             },
             onRename: async (item, newName) => {
                 try {
-                    await api.updateCreditName(0, item.id, newName);
+                    await updateCreditName(0, item.id, newName);
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
                         const { collision_name_id } = err.detail;
@@ -375,7 +408,7 @@ export async function manageArtist(ctx, artistId, artistName) {
                             { title: "Merge Identity", okLabel: "Merge" },
                         );
                         if (confirmed) {
-                            await api.mergeIdentity(item.id, collision_name_id);
+                            await mergeIdentity(item.id, collision_name_id);
                             if (ctx.refreshLayout) ctx.refreshLayout();
                         }
                     } else if (err.detail?.code === "UNSAFE_MERGE") {
@@ -394,15 +427,15 @@ export async function manageArtist(ctx, artistId, artistName) {
             label: "Members",
             items: members.map((m) => ({ id: m.id, label: m.display_name })),
             onSearch: async (q) => {
-                const results = await api.searchArtists(q, { excludeGroups: true });
+                const results = await searchArtists(q, { excludeGroups: true });
                 return (results || []).map((a) => ({ id: a.id, label: a.display_name || a.name }));
             },
             onAdd: async (opt) => {
-                await api.addIdentityMember(artistId, opt.id);
+                await addIdentityMember(artistId, opt.id);
                 return { id: opt.id, label: opt.label };
             },
             onRemove: async (item) => {
-                await api.removeIdentityMember(artistId, item.id);
+                await removeIdentityMember(artistId, item.id);
             },
         };
     }
@@ -417,7 +450,7 @@ export async function manageArtist(ctx, artistId, artistName) {
 }
 
 export async function managePublisher(ctx, publisherId, publisherName) {
-    const detail = await api.getPublisherDetail(publisherId).catch(() => null);
+    const detail = await getPublisherDetail(publisherId).catch(() => null);
     const subPubs = detail?.sub_publishers || [];
 
     openEditModal({
@@ -428,7 +461,7 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                 label: "Name",
                 value: detail ? detail.name : publisherName,
                 onSave: async (val) => {
-                    await api.updatePublisher(publisherId, val);
+                    await updatePublisher(publisherId, val);
                 },
             },
             subPublishers: {
@@ -436,20 +469,20 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                 label: "Sub-publishers",
                 items: subPubs.map((c) => ({ id: c.id, label: c.name })),
                 onSearch: async (q) => {
-                    const results = await api.searchPublishers(q);
+                    const results = await searchPublishers(q);
                     return (results || []).map((p) => ({
                         id: p.id,
                         label: p.name,
                     }));
                 },
                 onAdd: async (opt) => {
-                    await api.setPublisherParent(opt.id, Number(publisherId));
+                    await setPublisherParent(opt.id, Number(publisherId));
                 },
                 onRemove: async (item) => {
-                    await api.setPublisherParent(item.id, null);
+                    await setPublisherParent(item.id, null);
                 },
                 onRename: async (item, newName) => {
-                    await api.updatePublisher(item.id, newName);
+                    await updatePublisher(item.id, newName);
                 },
                 createLabel: (q) => `Add "${q}" as sub-publisher`,
             },
@@ -461,7 +494,7 @@ export async function managePublisher(ctx, publisherId, publisherName) {
 }
 
 export async function manageTag(ctx, tagId) {
-    const tagDetail = await api.getTagDetail(tagId).catch(() => null);
+    const tagDetail = await getTagDetail(tagId).catch(() => null);
     if (!tagDetail) return;
 
     openEditModal({
@@ -472,7 +505,7 @@ export async function manageTag(ctx, tagId) {
                 label: "Name",
                 value: tagDetail.name,
                 onSave: async (val) => {
-                    await api.updateTag(tagId, val, tagDetail.category);
+                    await updateTag(tagId, val, tagDetail.category);
                     tagDetail.name = val;
                 },
             },
@@ -482,11 +515,11 @@ export async function manageTag(ctx, tagId) {
                 value: tagDetail.category,
                 editable: true,
                 onSave: async (val) => {
-                    await api.updateTag(tagId, tagDetail.name, val);
+                    await updateTag(tagId, tagDetail.name, val);
                     tagDetail.category = val;
                 },
                 onSearch: async (q) => {
-                    const all = await api.getTagCategories();
+                    const all = await getTagCategories();
                     return all.filter((c) =>
                         c.toLowerCase().includes(q.toLowerCase()),
                     );

@@ -27,7 +27,7 @@
 - [x] **15.** `_SCALAR_ALLOWED` / `_METADATA_ALLOWED` duplicated — moved to `engine/config.py`
 - [ ] **16.** 6-8 sequential SQL queries for hydration/deep search — `library_service.py:269-345`
 - [ ] **17.** 5 permanent keydown listeners across modals — should register on open, remove on close
-- [ ] **18.** Private method access across services — `IngestionService` calls `LibraryService._hydrate_songs()`
+- [x] **18.** Private method access across services — `IngestionService` calls `LibraryService._hydrate_songs()`
 - [x] **19.** Pydantic models scattered in router files — moved to `view_models.py`
 - [x] ~~**20.** Duplicate `_get_service()` factory~~ — SKIPPED, not worth extracting
 - [x] ~~**22.** 5 bare `except: pass` blocks~~ — SKIPPED, all legitimate

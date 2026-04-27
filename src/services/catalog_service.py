@@ -316,7 +316,9 @@ class CatalogService:
         if current_value is None:
             raise LookupError(f"{entity_type} {entity_id} not found")
 
-        new_value = self._edit_service.format_entity_field(field, current_value)
+        new_value = self._edit_service.format_entity_field(
+            field, current_value, format_type=format_type
+        )
 
         if new_value != current_value:
             if entity_type == "song":

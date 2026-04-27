@@ -3,7 +3,23 @@
  * Handles navigation, mode switching, and non-song click actions.
  */
 
-import * as api from "../api.js";
+import {
+    resetIngestStatus,
+    updatePublisher,
+    searchPublishers,
+    setPublisherParent,
+    getTagDetail,
+    updateTag,
+    getTagCategories,
+    deleteTag,
+    bulkDeleteUnlinkedTags,
+    deleteAlbum,
+    bulkDeleteUnlinkedAlbums,
+    deletePublisher,
+    bulkDeleteUnlinkedPublishers,
+    deleteIdentity,
+    bulkDeleteUnlinkedIdentities,
+} from "../api.js";
 import { showConfirm } from "../components/confirm_modal.js";
 import { openEditModal } from "../components/edit_modal.js";
 import { isModalOpen } from "../components/utils.js";
@@ -68,7 +84,7 @@ export class NavigationHandler {
     async handleRefreshResults(actionTarget) {
         const state = this.ctx.getState();
         actionTarget.classList.add("spinning");
-        await api.resetIngestStatus().catch((e) =>
+        await resetIngestStatus().catch((e) =>
             console.error("Ingest reset failed", e),
         );
         await Promise.all([
@@ -135,28 +151,28 @@ export class NavigationHandler {
                             type: "text",
                             label: "Name",
                             value: publisherDetail?.name || publisherName,
-                            onSave: async (val) => api.updatePublisher(itemId, val),
+                            onSave: async (val) => updatePublisher(itemId, val),
                         },
                         subPublishers: {
                             type: "chipList",
                             label: "Sub-publishers",
                             items: childItems,
                             onSearch: async (q) =>
-                                (await api.searchPublishers(q))?.map((p) => ({
+                                (await searchPublishers(q))?.map((p) => ({
                                     id: p.id,
                                     label: p.name,
                                 })) || [],
                             onAdd: async (opt) => {
-                                await api.setPublisherParent(
+                                await setPublisherParent(
                                     opt.id,
                                     Number(itemId),
                                 );
                                 childItems.push({ id: opt.id, label: opt.label });
                             },
                             onRemove: async (item) =>
-                                api.setPublisherParent(item.id, null),
+                                setPublisherParent(item.id, null),
                             onRename: async (item, newName) =>
-                                api.updatePublisher(item.id, newName),
+                                updatePublisher(item.id, newName),
                             createLabel: (q) => `Add "${q}" as sub-publisher`,
                         },
                     },
@@ -165,7 +181,7 @@ export class NavigationHandler {
                 actionTarget,
             );
         } else if (chipType === "tag") {
-            const tagDetail = await api.getTagDetail(itemId).catch(() => null);
+            const tagDetail = await getTagDetail(itemId).catch(() => null);
             if (!tagDetail) return;
 
             openEditModal(
@@ -177,7 +193,7 @@ export class NavigationHandler {
                             label: "Name",
                             value: tagDetail.name,
                             onSave: async (val) =>
-                                api.updateTag(itemId, val, tagDetail.category),
+                                updateTag(itemId, val, tagDetail.category),
                         },
                         category: {
                             type: "search",
@@ -185,9 +201,9 @@ export class NavigationHandler {
                             value: tagDetail.category,
                             editable: true,
                             onSave: async (val) =>
-                                api.updateTag(itemId, tagDetail.name, val),
+                                updateTag(itemId, tagDetail.name, val),
                             onSearch: async (q) =>
-                                (await api.getTagCategories()).filter((c) =>
+                                (await getTagCategories()).filter((c) =>
                                     c.toLowerCase().includes(q.toLowerCase()),
                                 ),
                         },
@@ -439,7 +455,7 @@ export class NavigationHandler {
         if (!(await showConfirm("Delete this tag? This cannot be undone.")))
             return;
         try {
-            await api.deleteTag(tagId);
+            await deleteTag(tagId);
             this.ctx.closeDetailPanel?.();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
@@ -458,7 +474,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.bulkDeleteUnlinkedTags();
+            await bulkDeleteUnlinkedTags();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, {
@@ -473,7 +489,7 @@ export class NavigationHandler {
         if (!(await showConfirm("Delete this album? This cannot be undone.")))
             return;
         try {
-            await api.deleteAlbum(albumId);
+            await deleteAlbum(albumId);
             if (
                 songId &&
                 this.ctx.refreshActiveSongV2 &&
@@ -500,7 +516,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.bulkDeleteUnlinkedAlbums();
+            await bulkDeleteUnlinkedAlbums();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, {
@@ -519,7 +535,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.deletePublisher(publisherId);
+            await deletePublisher(publisherId);
             this.ctx.closeDetailPanel?.();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
@@ -538,7 +554,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.bulkDeleteUnlinkedPublishers();
+            await bulkDeleteUnlinkedPublishers();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, {
@@ -555,7 +571,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.deleteIdentity(identityId);
+            await deleteIdentity(identityId);
             this.ctx.closeDetailPanel?.();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
@@ -574,7 +590,7 @@ export class NavigationHandler {
         )
             return;
         try {
-            await api.bulkDeleteUnlinkedIdentities();
+            await bulkDeleteUnlinkedIdentities();
             this.ctx.performSearch?.(this.ctx.getState().currentQuery);
         } catch (err) {
             await showConfirm(`Bulk delete failed: ${err.message}`, {

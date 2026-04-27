@@ -4,6 +4,7 @@ import {
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
+import { renderEntityList, renderDetailLoading, renderDeleteSection } from "./entity_renderer.js";
 
 function renderCategoryBadge(category) {
     if (!category) {
@@ -14,29 +15,11 @@ function renderCategoryBadge(category) {
 }
 
 export function renderTags(ctx, tags) {
-    ctx.setState({ selectedIndex: -1, displayedItems: tags });
-    ctx.updateResultsSummary(tags.length, "tag");
-
-    const listTitle = document.getElementById("entity-list-title");
-    if (listTitle) listTitle.textContent = `Tags (${tags.length})`;
-
-    const actionsSlot = document.getElementById("entity-list-actions");
-    if (actionsSlot) {
-        const unlinkedCount = tags.filter((t) => t.can_delete).length;
-        actionsSlot.innerHTML = unlinkedCount > 0
-            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-tags">Delete ${unlinkedCount} unlinked</button>`
-            : "";
-    }
-
-    if (!tags.length) {
-        ctx.elements.resultsContainer.innerHTML =
-            '<div class="entity-empty-state">No tags found</div>';
-        return;
-    }
-
-    ctx.elements.resultsContainer.innerHTML = tags
-        .map(
-            (tag, index) => `
+    const empty = renderEntityList(ctx, tags, {
+        entityType: "tag",
+        listTitle: "Tags",
+        emptyMessage: "No tags found",
+        renderRow: (tag, index) => `
         <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="entity-row-info">
                 <div class="entity-row-title">
@@ -50,20 +33,19 @@ export function renderTags(ctx, tags) {
             </div>
         </div>
     `,
-        )
-        .join("");
+        getUnlinkedCount: (items) => items.filter((t) => t.can_delete).length,
+        deleteAction: "bulk-delete-unlinked-tags",
+    });
+    if (empty) return;
 }
 
 export function renderTagDetailLoading(ctx, tag) {
-    ctx.showDetailPanel(`
-        <div class="detail-header">
-            <div class="detail-title">${escapeHtml(tag.name || "Unnamed Tag")} <span class="pill mono">#${escapeHtml(tag.id || "-")}</span></div>
-            <div class="detail-subtitle">TAG</div>
-        </div>
-        <div class="detail-content">
-            ${renderStatus("loading", "Loading songs...")}
-        </div>
-    `);
+    renderDetailLoading(
+        ctx,
+        tag,
+        "TAG",
+        escapeHtml(tag.name || "Unnamed Tag"),
+    );
 }
 
 export function renderTagDetailComplete(ctx, tag, songs) {
@@ -87,15 +69,7 @@ export function renderTagDetailComplete(ctx, tag, songs) {
                 ${renderSongList(songs, "No songs linked to this tag")}
             </div>
 
-            <div class="detail-section">
-                <button
-                    type="button"
-                    class="btn danger"
-                    data-action="delete-tag"
-                    data-tag-id="${tag.id}"
-                    ${!tag.can_delete ? 'disabled title="Cannot delete — tag is linked to songs"' : ""}
-                >Delete Tag</button>
-            </div>
+            ${renderDeleteSection("delete-tag", tag.id, tag.can_delete, "Cannot delete — tag is linked to songs")}
         </div>
     `);
 }

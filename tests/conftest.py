@@ -35,6 +35,33 @@ def disable_side_effects(monkeypatch):
     monkeypatch.setattr(config, "AUTO_SAVE_ID3", False)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def hermetic_logging(tmp_path_factory):
+    """
+    Ensure tests do not pollute the production log file or console.
+    Redirects all logs to a temporary file in the pytest session directory.
+    """
+    from src.services.logger import logger
+
+    # Create a session-specific log file
+    test_log_dir = tmp_path_factory.mktemp("logs")
+    test_log_file = test_log_dir / "test_gosling.log"
+
+    # Backup original settings
+    orig_file = logger.log_file
+    orig_console = logger.console_enabled
+
+    # Apply hermetic settings
+    logger.log_file = str(test_log_file)
+    logger.console_enabled = False
+
+    yield
+
+    # Restore
+    logger.log_file = orig_file
+    logger.console_enabled = orig_console
+
+
 
 # ---------------------------------------------------------------------------
 # Helper: Create a hermetic DB with schema + custom collation

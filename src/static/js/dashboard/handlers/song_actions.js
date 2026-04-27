@@ -3,7 +3,28 @@
  * Offloads business logic for song-related click actions from main.js.
  */
 
-import * as api from "../api.js";
+import {
+    getSongSyncStatus,
+    syncAlbumFromSong,
+    deleteSong,
+    patchSongScalars,
+    moveSongToLibrary,
+    cleanupOriginalFile,
+    syncSongId3,
+    setPrimarySongTag,
+    removeSongTag,
+    removeSongCredit,
+    removeSongAlbum,
+    formatMetadataCase,
+    getSongWebSearch,
+    resolveConflict,
+    getIngestStatus,
+    removeSongPublisher,
+    removeAlbumPublisher,
+    removeAlbumCredit,
+    updateAlbum,
+    quickCreateAlbum,
+} from "../api.js";
 import { showToast } from "../components/toast.js";
 import { isModalOpen } from "../components/utils.js";
 import { PROCESSING_STATUS } from "../constants.js";
@@ -18,7 +39,7 @@ export async function updateSyncLed(songId) {
     );
     if (mismatchEl) mismatchEl.textContent = "";
     try {
-        const result = await api.getSongSyncStatus(songId);
+        const result = await getSongSyncStatus(songId);
         led.style.background = result.in_sync ? "#4caf50" : "#f44336";
         led.title = result.in_sync
             ? "In sync"
@@ -38,7 +59,7 @@ export async function updateSyncLed(songId) {
 import { activateInlineEdit } from "../components/inline_editor.js";
 
 export async function syncAlbumWithSong(albumId, songId) {
-    await api.syncAlbumFromSong(albumId, songId);
+    await syncAlbumFromSong(albumId, songId);
 }
 
 import { showConfirm } from "../components/confirm_modal.js";
@@ -164,7 +185,7 @@ export class SongActionsHandler {
         actionTarget.textContent = "Deleting...";
 
         try {
-            await api.deleteSong(id);
+            await deleteSong(id);
             if (
                 this.ctx.getState().currentMode === "songs" &&
                 this.ctx.clearSongEditorV2
@@ -210,7 +231,7 @@ export class SongActionsHandler {
             event?.target === input ? input.checked : !input.checked;
 
         try {
-            await api.patchSongScalars(id, { is_active: isChecked });
+            await patchSongScalars(id, { is_active: isChecked });
 
             // Sync current items in any list results
             const state = this.ctx.getState();
@@ -263,7 +284,7 @@ export class SongActionsHandler {
     async _handleReviewStatus(actionTarget, newStatus) {
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            await api.patchSongScalars(id, { processing_status: newStatus });
+            await patchSongScalars(id, { processing_status: newStatus });
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(id);
             }
@@ -284,7 +305,7 @@ export class SongActionsHandler {
         actionTarget.textContent = "Organizing...";
 
         try {
-            await api.moveSongToLibrary(id);
+            await moveSongToLibrary(id);
             
             // Check for original file cleanup reminder
             const state = this.ctx.getState();
@@ -312,7 +333,7 @@ export class SongActionsHandler {
                     );
                     if (cleanNow) {
                         try {
-                            await api.cleanupOriginalFile(null, id);
+                            await cleanupOriginalFile(null, id);
                             showToast("Original file deleted.", "success");
                             await this.ctx.refreshActiveSongV2(id);
                         } catch (cleanErr) {
@@ -355,7 +376,7 @@ export class SongActionsHandler {
         const originalText = actionTarget.textContent;
         actionTarget.textContent = "Syncing...";
         try {
-            await api.syncSongId3(id);
+            await syncSongId3(id);
             if (this.ctx.showBanner)
                 this.ctx.showBanner("ID3 tags updated.", "success");
             await updateSyncLed(id);
@@ -376,7 +397,7 @@ export class SongActionsHandler {
             field,
             validationRules: state.validationRules,
             onCommit: async (val) => {
-                return await api.patchSongScalars(songId, { [field]: val });
+                return await patchSongScalars(songId, { [field]: val });
             },
             onSave: async (updatedSong, savedField) => {
                 if (savedField === "media_name" || savedField === "title") {
@@ -398,7 +419,7 @@ export class SongActionsHandler {
     async handleSetPrimaryTag(actionTarget) {
         const { songId, tagId } = actionTarget.dataset;
         try {
-            await api.setPrimarySongTag(songId, tagId);
+            await setPrimarySongTag(songId, tagId);
             if (
                 this.ctx.refreshActiveSongV2 &&
                 this.ctx.getState().currentMode === "songs"
@@ -420,7 +441,7 @@ export class SongActionsHandler {
     async handleRemoveTag(actionTarget) {
         const { songId, tagId } = actionTarget.dataset;
         try {
-            await api.removeSongTag(songId, tagId);
+            await removeSongTag(songId, tagId);
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
@@ -435,7 +456,7 @@ export class SongActionsHandler {
     async handleRemoveCredit(actionTarget) {
         const { songId, creditId } = actionTarget.dataset;
         try {
-            await api.removeSongCredit(songId, creditId);
+            await removeSongCredit(songId, creditId);
             this.ctx.refreshActiveDetail();
         } catch (err) {
             if (this.ctx.showBanner) {
@@ -450,7 +471,7 @@ export class SongActionsHandler {
     async handleRemoveAlbum(actionTarget) {
         const { songId, albumId } = actionTarget.dataset;
         try {
-            await api.removeSongAlbum(songId, albumId);
+            await removeSongAlbum(songId, albumId);
             if (
                 this.ctx.refreshActiveSongV2 &&
                 this.ctx.getState().currentMode === "songs"
@@ -479,7 +500,7 @@ export class SongActionsHandler {
     async handleFormatCase(actionTarget) {
         const { entityId, entityType, field, type } = actionTarget.dataset; // type = title or sentence
         try {
-            const updatedSong = await api.formatMetadataCase(
+            const updatedSong = await formatMetadataCase(
                 entityType,
                 entityId,
                 field,
@@ -509,7 +530,7 @@ export class SongActionsHandler {
                 .closest(".web-search-split")
                 ?.querySelector(".web-search-main")?.dataset.songId;
         try {
-            const data = await api.getSongWebSearch(songId, engine || null);
+            const data = await getSongWebSearch(songId, engine || null);
             if (data && data.url) {
                 this._window.open(data.url, "_blank");
             }
@@ -593,7 +614,7 @@ export class SongActionsHandler {
         actionTarget.textContent = "Processing...";
 
         try {
-            const data = await api.resolveConflict(ghostId, stagedPath);
+            const data = await resolveConflict(ghostId, stagedPath);
 
             showToast("Song reactivated successfully!", "success");
 
@@ -615,7 +636,7 @@ export class SongActionsHandler {
                 }
 
                 if (this.ctx.updateIngestBadges) {
-                    const status = await api.getIngestStatus();
+                    const status = await getIngestStatus();
                     this.ctx.updateIngestBadges({
                         success: status.success,
                         action: status.action,
@@ -667,7 +688,7 @@ export class SongActionsHandler {
         actionTarget.style.pointerEvents = "none";
         const songId = actionTarget.dataset.id || actionTarget.dataset.songId;
         try {
-            await api.cleanupOriginalFile(path, songId);
+            await cleanupOriginalFile(path, songId);
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(songId);
             } else {
@@ -822,7 +843,7 @@ export class SongActionsHandler {
         const { songId, publisherId } = actionTarget.dataset;
         actionTarget.disabled = true;
         try {
-            await api.removeSongPublisher(songId, publisherId);
+            await removeSongPublisher(songId, publisherId);
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
@@ -838,7 +859,7 @@ export class SongActionsHandler {
         const { albumId, publisherId, songId } = actionTarget.dataset;
         actionTarget.disabled = true;
         try {
-            await api.removeAlbumPublisher(albumId, publisherId);
+            await removeAlbumPublisher(albumId, publisherId);
             if (
                 songId &&
                 this.ctx.refreshActiveSongV2 &&
@@ -862,7 +883,7 @@ export class SongActionsHandler {
         const { albumId, creditId, songId } = actionTarget.dataset;
         actionTarget.disabled = true;
         try {
-            await api.removeAlbumCredit(albumId, creditId);
+            await removeAlbumCredit(albumId, creditId);
             if (
                 songId &&
                 this.ctx.refreshActiveSongV2 &&
@@ -901,7 +922,7 @@ export class SongActionsHandler {
         const { albumId } = actionTarget.dataset;
         const newType = actionTarget.value;
         try {
-            await api.updateAlbum(albumId, { album_type: newType });
+            await updateAlbum(albumId, { album_type: newType });
         } catch (err) {
             if (this.ctx.showBanner)
                 this.ctx.showBanner(`Update failed: ${err.message}`, "error");
@@ -921,7 +942,7 @@ export class SongActionsHandler {
         actionTarget.innerHTML = "Creating...";
 
         try {
-            await api.quickCreateAlbum(songId, song.media_name);
+            await quickCreateAlbum(songId, song.media_name);
             await this.ctx.refreshActiveDetail();
             showToast(`Album "${song.media_name}" created & synced.`, "success");
 

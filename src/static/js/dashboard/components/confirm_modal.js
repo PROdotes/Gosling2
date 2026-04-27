@@ -5,9 +5,14 @@ const okBtn = document.getElementById("confirm-modal-ok");
 const cancelBtn = document.getElementById("confirm-modal-cancel");
 
 let _resolve = null;
+let _keydownHandler = null;
 
 function close(result) {
     overlay.style.display = "none";
+    if (_keydownHandler) {
+        document.removeEventListener("keydown", _keydownHandler);
+        _keydownHandler = null;
+    }
     if (_resolve) {
         _resolve(result);
         _resolve = null;
@@ -18,9 +23,6 @@ okBtn.addEventListener("click", () => close(true));
 cancelBtn.addEventListener("click", () => close(false));
 overlay.addEventListener("click", (e) => {
     if (e.target === overlay) close(false);
-});
-document.addEventListener("keydown", (e) => {
-    if (overlay.style.display !== "none" && e.key === "Escape") close(false);
 });
 
 /**
@@ -40,6 +42,12 @@ export function showConfirm(
     okBtn.textContent = okLabel;
     overlay.style.display = "flex";
     okBtn.focus();
+
+    _keydownHandler = (e) => {
+        if (e.key === "Escape") close(false);
+    };
+    document.addEventListener("keydown", _keydownHandler);
+
     return new Promise((resolve) => {
         _resolve = resolve;
     });

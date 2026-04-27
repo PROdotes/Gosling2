@@ -3,7 +3,7 @@
  * Handles web search functionality including long-press engine picker and search execution.
  */
 
-import * as api from "../api.js";
+import { getSongWebSearch } from "../api.js";
 
 export class WebSearchHandler {
     constructor(ctx, _window = typeof window !== "undefined" ? window : null) {
@@ -108,7 +108,7 @@ export class WebSearchHandler {
                     .join("");
 
                 try {
-                    const data = await api.getSongWebSearch(
+                    const data = await getSongWebSearch(
                         songId,
                         opt.dataset.engine,
                     );

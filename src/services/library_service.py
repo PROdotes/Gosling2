@@ -59,7 +59,7 @@ class LibraryService:
                 logger.warning(f"[LibraryService] <- get_song(id={song_id}) NOT_FOUND")
                 return None
 
-            hydrated = self._hydrate_songs([song], conn=conn)
+            hydrated = self.hydrate_songs([song], conn=conn)
             if not hydrated:
                 return None
 
@@ -161,7 +161,7 @@ class LibraryService:
                 return []
 
             songs = self._song_repo.get_by_ids(song_ids, conn=conn)
-            result = self._hydrate_songs(songs, conn=conn)
+            result = self.hydrate_songs(songs, conn=conn)
             logger.debug(f"[LibraryService] <- Return count={len(result)}")
             return result
 
@@ -206,7 +206,7 @@ class LibraryService:
                 return []
 
             songs = self._song_repo.get_by_ids(song_ids, conn=conn)
-            result = self._hydrate_songs(songs, conn=conn)
+            result = self.hydrate_songs(songs, conn=conn)
             logger.debug(f"[LibraryService] <- Return count={len(result)}")
             return result
 
@@ -238,7 +238,7 @@ class LibraryService:
                 related_ids.add(group.id)
 
             songs = self._song_repo.get_by_identity_ids(list(related_ids), conn=conn)
-            result = self._hydrate_songs(songs, conn=conn)
+            result = self.hydrate_songs(songs, conn=conn)
             logger.debug(f"[LibraryService] <- Return count={len(result)}")
             return result
 
@@ -320,7 +320,7 @@ class LibraryService:
         )
         return base_rows
 
-    def _hydrate_songs(
+    def hydrate_songs(
         self,
         songs: List[Song],
         pre_albums: Optional[Dict[int, List[SongAlbum]]] = None,
@@ -589,7 +589,7 @@ class LibraryService:
                 pre_mapped_assocs.setdefault(a.source_id, []).append(a)
 
         all_songs = self._song_repo.get_by_ids(unique_song_ids, conn=conn)
-        hydrated_songs = self._hydrate_songs(
+        hydrated_songs = self.hydrate_songs(
             all_songs, pre_albums=pre_mapped_assocs, conn=conn
         )
 

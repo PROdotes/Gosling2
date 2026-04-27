@@ -16,19 +16,6 @@
  */
 
 export function createModalLifecycle(overlayEl, { onOpen, onClose, onBeforeClose, overlayClickCheck } = {}) {
-    function open(...args) {
-        overlayEl.style.display = "flex";
-        if (onOpen) onOpen(...args);
-    }
-
-    function close(...args) {
-        if (onBeforeClose && onBeforeClose(...args) === false) {
-            return;
-        }
-        overlayEl.style.display = "none";
-        if (onClose) onClose(...args);
-    }
-
     // Escape key handler — closes modal if open
     function handleKeydown(e) {
         if (e.key === "Escape" && overlayEl.style.display === "flex") {
@@ -44,9 +31,22 @@ export function createModalLifecycle(overlayEl, { onOpen, onClose, onBeforeClose
         }
     }
 
-    // Setup (once per modal)
-    document.addEventListener("keydown", handleKeydown);
-    overlayEl.addEventListener("click", handleOverlayClick);
+    function open(...args) {
+        overlayEl.style.display = "flex";
+        document.addEventListener("keydown", handleKeydown);
+        overlayEl.addEventListener("click", handleOverlayClick);
+        if (onOpen) onOpen(...args);
+    }
+
+    function close(...args) {
+        if (onBeforeClose && onBeforeClose(...args) === false) {
+            return;
+        }
+        overlayEl.style.display = "none";
+        document.removeEventListener("keydown", handleKeydown);
+        overlayEl.removeEventListener("click", handleOverlayClick);
+        if (onClose) onClose(...args);
+    }
 
     return { open, close };
 }

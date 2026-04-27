@@ -5,6 +5,20 @@
 
 ---
 
+## Shared Entity Rendering
+*Location: `src/static/js/dashboard/renderers/entity_renderer.js`*
+
+### renderEntityList(ctx, items, options)
+Renders the entity list with common wrapper logic. Handles setState, results summary, list title, actions slot, and empty state.
+
+### renderDetailLoading(ctx, entity, entityType, entityName, subtitle = "")
+Renders the skeleton loader/header for an entity detail panel.
+
+### renderDeleteSection(action, entityId, canDelete, reason = "")
+Renders a standardized delete button section for the detail panel.
+
+---
+
 ## Song Rendering
 *Location: `src/static/js/dashboard/renderers/songs.js`*
 

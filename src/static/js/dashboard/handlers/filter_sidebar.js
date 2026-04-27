@@ -3,7 +3,7 @@
  * Manages filter sidebar state, rendering, and song filtering.
  */
 
-import * as api from "../api.js";
+import { getFilterValues, filterSongs } from "../api.js";
 
 const FILTER_STORAGE_KEY = "gosling_filter_state";
 
@@ -73,7 +73,7 @@ export class FilterSidebarHandler {
 
     async load() {
         try {
-            this._filterValues = await api.getFilterValues();
+            this._filterValues = await getFilterValues();
             this._render();
             if (this.hasActiveFilters()) {
                 this._applyFilters();
@@ -289,7 +289,7 @@ export class FilterSidebarHandler {
         }
         if (tagPairs.length) filters["tags"] = tagPairs;
 
-        const result = api.filterSongs(filters, this._mode, this._liveOnly);
+        const result = filterSongs(filters, this._mode, this._liveOnly);
         this.ctx.onFilterResults?.(result);
     }
 

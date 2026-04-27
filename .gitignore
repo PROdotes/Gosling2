@@ -62,8 +62,6 @@ env/
 
 # Database
 sqldb/
-*.sqlite3
-*.db
 
 # Application specific
 *.log

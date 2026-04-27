@@ -147,7 +147,7 @@ class IngestionService:
                 f"[IngestionService] <- check_ingestion(file_path='{file_path}') PATH_COLLISION"
             )
             # Use LibraryService for hydration to maintain bit-perfect domain models
-            hydrated = self._library_service._hydrate_songs([existing_by_path])
+            hydrated = self._library_service.hydrate_songs([existing_by_path])
 
             return {
                 "status": "ALREADY_EXISTS",
@@ -170,7 +170,7 @@ class IngestionService:
             logger.info(
                 f"[IngestionService] <- check_ingestion(file_path='{file_path}') HASH_COLLISION"
             )
-            hydrated = self._library_service._hydrate_songs([existing_by_hash])
+            hydrated = self._library_service.hydrate_songs([existing_by_hash])
 
             return {
                 "status": "ALREADY_EXISTS",
@@ -216,7 +216,7 @@ class IngestionService:
                     logger.info(
                         f"[IngestionService] <- check_ingestion(file_path='{file_path}') METADATA_COLLISION"
                     )
-                    hydrated = self._library_service._hydrate_songs(matches)
+                    hydrated = self._library_service.hydrate_songs(matches)
 
                     return {
                         "status": "ALREADY_EXISTS",

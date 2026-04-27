@@ -5,6 +5,7 @@ import {
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
+import { renderEntityList, renderDetailLoading, renderDeleteSection } from "./entity_renderer.js";
 
 function renderSubPublishers(items) {
     const publishers = asArray(items);
@@ -26,29 +27,11 @@ function renderSubPublishers(items) {
 }
 
 export function renderPublishers(ctx, publishers) {
-    ctx.setState({ selectedIndex: -1, displayedItems: publishers });
-    ctx.updateResultsSummary(publishers.length, "publisher");
-
-    const listTitle = document.getElementById("entity-list-title");
-    if (listTitle) listTitle.textContent = `Publishers (${publishers.length})`;
-
-    const actionsSlot = document.getElementById("entity-list-actions");
-    if (actionsSlot) {
-        const unlinkedCount = publishers.filter((p) => p.can_delete).length;
-        actionsSlot.innerHTML = unlinkedCount > 0
-            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-publishers">Delete ${unlinkedCount} unlinked</button>`
-            : "";
-    }
-
-    if (!publishers.length) {
-        ctx.elements.resultsContainer.innerHTML =
-            '<div class="entity-empty-state">No publishers found</div>';
-        return;
-    }
-
-    ctx.elements.resultsContainer.innerHTML = publishers
-        .map(
-            (publisher, index) => `
+    const empty = renderEntityList(ctx, publishers, {
+        entityType: "publisher",
+        listTitle: "Publishers",
+        emptyMessage: "No publishers found",
+        renderRow: (publisher, index) => `
         <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="entity-row-info">
                 <div class="entity-row-title">
@@ -64,20 +47,19 @@ export function renderPublishers(ctx, publishers) {
             </div>
         </div>
     `,
-        )
-        .join("");
+        getUnlinkedCount: (items) => items.filter((p) => p.can_delete).length,
+        deleteAction: "bulk-delete-unlinked-publishers",
+    });
+    if (empty) return;
 }
 
 export function renderPublisherDetailLoading(ctx, publisher) {
-    ctx.showDetailPanel(`
-        <div class="detail-header">
-            <div class="detail-title">${escapeHtml(publisher.name || "Unnamed Publisher")} <span class="pill mono">#${escapeHtml(publisher.id || "-")}</span></div>
-            <div class="detail-subtitle">PUBLISHER</div>
-        </div>
-        <div class="detail-content">
-            ${renderStatus("loading", "Loading repertoire...")}
-        </div>
-    `);
+    renderDetailLoading(
+        ctx,
+        publisher,
+        "PUBLISHER",
+        escapeHtml(publisher.name || "Unnamed Publisher"),
+    );
 }
 
 export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
@@ -105,15 +87,7 @@ export function renderPublisherDetailComplete(ctx, publisher, repertoire) {
                 ${renderSongList(repertoire, "No songs explicitly linked as master")}
             </div>
 
-            <div class="detail-section">
-                <button
-                    type="button"
-                    class="btn danger"
-                    data-action="delete-publisher"
-                    data-publisher-id="${publisher.id}"
-                    ${!publisher.can_delete ? 'disabled title="Cannot delete — publisher is linked to songs or albums"' : ""}
-                >Delete Publisher</button>
-            </div>
+            ${renderDeleteSection("delete-publisher", publisher.id, publisher.can_delete, "Cannot delete — publisher is linked to songs or albums")}
         </div>
     `);
 }

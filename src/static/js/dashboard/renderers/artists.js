@@ -6,6 +6,7 @@ import {
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
+import { renderEntityList, renderDetailLoading, renderDeleteSection } from "./entity_renderer.js";
 
 function renderIdentityTags(items) {
     const identities = asArray(items);
@@ -46,29 +47,11 @@ function renderAliasTags(items) {
 }
 
 export function renderArtists(ctx, artists) {
-    ctx.setState({ selectedIndex: -1, displayedItems: artists });
-    ctx.updateResultsSummary(artists.length, "artist");
-
-    const listTitle = document.getElementById("entity-list-title");
-    if (listTitle) listTitle.textContent = `Artists (${artists.length})`;
-
-    const actionsSlot = document.getElementById("entity-list-actions");
-    if (actionsSlot) {
-        const unlinkedCount = artists.filter((a) => a.can_delete).length;
-        actionsSlot.innerHTML = unlinkedCount > 0
-            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-identities">Delete ${unlinkedCount} unlinked</button>`
-            : "";
-    }
-
-    if (!artists.length) {
-        ctx.elements.resultsContainer.innerHTML =
-            '<div class="entity-empty-state">No artists found</div>';
-        return;
-    }
-
-    ctx.elements.resultsContainer.innerHTML = artists
-        .map(
-            (artist, index) => `
+    const empty = renderEntityList(ctx, artists, {
+        entityType: "artist",
+        listTitle: "Artists",
+        emptyMessage: "No artists found",
+        renderRow: (artist, index) => `
         <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="entity-row-info">
                 <div class="entity-row-title">
@@ -83,20 +66,20 @@ export function renderArtists(ctx, artists) {
             </div>
         </div>
     `,
-        )
-        .join("");
+        getUnlinkedCount: (items) => items.filter((a) => a.can_delete).length,
+        deleteAction: "bulk-delete-unlinked-identities",
+    });
+    if (empty) return;
 }
 
 export function renderArtistDetailLoading(ctx, artist) {
-    ctx.showDetailPanel(`
-        <div class="detail-header">
-            <div class="detail-title">${escapeHtml(artist.display_name || "Unnamed Identity")} <span class="pill mono">#${escapeHtml(artist.id || "-")}</span></div>
-            <div class="detail-subtitle">${escapeHtml(String(artist.type || "identity").toUpperCase())}${artist.legal_name ? ` • Legal: ${escapeHtml(artist.legal_name)}` : ""}</div>
-        </div>
-        <div class="detail-content">
-            ${renderStatus("loading", "Loading artist catalog...")}
-        </div>
-    `);
+    renderDetailLoading(
+        ctx,
+        artist,
+        escapeHtml(String(artist.type || "identity").toUpperCase()),
+        escapeHtml(artist.display_name || "Unnamed Identity"),
+        artist.legal_name ? ` • Legal: ${escapeHtml(artist.legal_name)}` : "",
+    );
 }
 
 export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
@@ -125,15 +108,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
                 ${renderAuditTimeline(auditHistory)}
             </div>
 
-            <div class="detail-section">
-                <button
-                    type="button"
-                    class="btn danger"
-                    data-action="delete-identity"
-                    data-identity-id="${tree.id}"
-                    ${!tree.can_delete ? 'disabled title="Cannot delete — identity is linked to songs or albums"' : ""}
-                >Delete Identity</button>
-            </div>
+            ${renderDeleteSection("delete-identity", tree.id, tree.can_delete, "Cannot delete — identity is linked to songs or albums")}
         </div>
     `);
 }

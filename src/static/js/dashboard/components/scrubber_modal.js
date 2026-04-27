@@ -88,7 +88,8 @@ function seek(delta) {
     );
 }
 
-document.addEventListener("keydown", (e) => {
+// Scrubber keydown handler — only active when modal is open
+function handleScrubberKeydown(e) {
     if (overlay.style.display === "none") return;
     if (e.target.tagName === "INPUT") return;
 
@@ -120,7 +121,7 @@ document.addEventListener("keydown", (e) => {
         e.stopImmediatePropagation();
         closeScrubberModal();
     }
-});
+}
 
 tagsBtn?.addEventListener("click", () => {
     if (_onTagsClick && _currentId) _onTagsClick(_currentId, _currentTitle);
@@ -155,6 +156,8 @@ modal = createModalLifecycle(overlay, {
         updatePlayBtn();
         titleEl.textContent = title || "Player";
 
+        document.addEventListener("keydown", handleScrubberKeydown);
+
         if (autoPlay) {
             audio
                 .play()
@@ -162,6 +165,7 @@ modal = createModalLifecycle(overlay, {
         }
     },
     onClose: () => {
+        document.removeEventListener("keydown", handleScrubberKeydown);
         audio.pause();
         audio.src = "";
         _currentId = null;

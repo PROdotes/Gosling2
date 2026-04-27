@@ -161,6 +161,12 @@ Deletes an album.
 ### bulkDeleteUnlinkedAlbums()
 Deletes all albums with no associated songs.
 
+### quickCreateAlbum(songId, title = null)
+Quick-create an album from a song. Creates album with song's media_name, defaults disc=1, track=1, then syncs metadata atomically.
+
+### syncAlbumFromSong(albumId, songId)
+Triggers a metadata sync from a song to its parent album.
+
 ---
 
 ## Relationship Management (Links)

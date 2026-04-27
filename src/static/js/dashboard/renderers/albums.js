@@ -7,6 +7,7 @@ import {
     renderStatus,
     textOrDash,
 } from "../components/utils.js";
+import { renderEntityList, renderDetailLoading, renderDeleteSection } from "./entity_renderer.js";
 
 function renderAlbumCredits(credits, albumId) {
     const items = asArray(credits);
@@ -72,29 +73,11 @@ function renderAlbumPublishers(publishers, albumId) {
 }
 
 export function renderAlbums(ctx, albums) {
-    ctx.setState({ selectedIndex: -1, displayedItems: albums });
-    ctx.updateResultsSummary(albums.length, "album");
-
-    const listTitle = document.getElementById("entity-list-title");
-    if (listTitle) listTitle.textContent = `Albums (${albums.length})`;
-
-    const actionsSlot = document.getElementById("entity-list-actions");
-    if (actionsSlot) {
-        const unlinkedCount = albums.filter((a) => a.can_delete).length;
-        actionsSlot.innerHTML = unlinkedCount > 0
-            ? `<button type="button" class="btn danger small" data-action="bulk-delete-unlinked-albums">Delete ${unlinkedCount} unlinked</button>`
-            : "";
-    }
-
-    if (!albums.length) {
-        ctx.elements.resultsContainer.innerHTML =
-            '<div class="entity-empty-state">No albums found</div>';
-        return;
-    }
-
-    ctx.elements.resultsContainer.innerHTML = albums
-        .map(
-            (album, index) => `
+    const empty = renderEntityList(ctx, albums, {
+        entityType: "album",
+        listTitle: "Albums",
+        emptyMessage: "No albums found",
+        renderRow: (album, index) => `
         <div class="entity-row" data-action="select-result" data-index="${index}" data-selectable="true">
             <div class="entity-row-info">
                 <div class="entity-row-title">
@@ -110,20 +93,20 @@ export function renderAlbums(ctx, albums) {
             </div>
         </div>
     `,
-        )
-        .join("");
+        getUnlinkedCount: (items) => items.filter((a) => a.can_delete).length,
+        deleteAction: "bulk-delete-unlinked-albums",
+    });
+    if (empty) return;
 }
 
 export function renderAlbumDetailLoading(ctx, album) {
-    ctx.showDetailPanel(`
-        <div class="detail-header">
-            <div class="detail-title">${escapeHtml(album.title || "Untitled Album")} <span class="pill mono">#${escapeHtml(album.id || "-")}</span></div>
-            <div class="detail-subtitle">ALBUM${album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : ""}</div>
-        </div>
-        <div class="detail-content">
-            ${renderStatus("loading", "Loading album detail...")}
-        </div>
-    `);
+    renderDetailLoading(
+        ctx,
+        album,
+        "ALBUM",
+        escapeHtml(album.title || "Untitled Album"),
+        album.album_type ? ` • ${escapeHtml(String(album.album_type).toUpperCase())}` : "",
+    );
 }
 
 export function renderAlbumDetailComplete(ctx, album, auditHistory) {
@@ -174,15 +157,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
                 ${renderAuditTimeline(auditHistory)}
             </div>
 
-            <div class="detail-section">
-                <button
-                    type="button"
-                    class="btn danger"
-                    data-action="delete-album"
-                    data-album-id="${albumId}"
-                    ${!album.can_delete ? 'disabled title="Cannot delete — album has songs"' : ""}
-                >Delete Album</button>
-            </div>
+            ${renderDeleteSection("delete-album", albumId, album.can_delete, "Cannot delete — album has songs")}
         </div>
     `);
 }

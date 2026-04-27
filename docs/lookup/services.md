@@ -106,6 +106,9 @@ Fetch the full directory of publishers with resolved hierarchy chains.
 ### get_all_albums() -> List[Album]
 Fetch the full directory of albums with hydrated publishers, credits, and songs.
 
+### hydrate_songs(songs: List[Song], pre_albums: Optional[Dict[int, List[SongAlbum]]] = None) -> List[Song]
+Centralized batch hydration for songs and their relations (Credits, Albums, Publishers, Tags, Staging Origins). Handles Desired State Sync (physical organization).
+
 ### search_albums_slim(query: str) -> List[dict]
 Slim list-view album search. No tracklist hydration.
 
