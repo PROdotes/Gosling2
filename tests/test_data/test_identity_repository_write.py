@@ -80,8 +80,8 @@ def test_add_alias_duplicate_ignore(populated_db):
         assert before == after, "Duplicate alias should not have been added"
 
 
-def test_soft_delete_newly_added_alias(populated_db):
-    """Repo should successfully remove an alias that is not in use."""
+def test_detach_newly_added_alias(populated_db):
+    """Repo should successfully detach an alias by re-homing it to a new identity."""
     repo = IdentityRepository(populated_db)
     identity_id = 1
     new_alias = "Unused Alias"
@@ -91,40 +91,42 @@ def test_soft_delete_newly_added_alias(populated_db):
         alias_id = repo.add_alias(identity_id, new_alias, cursor)
         conn.commit()
 
-        # Verify it exists
+        # Verify it belongs to identity 1
         row = cursor.execute(
-            "SELECT NameID FROM ArtistNames WHERE NameID = ?", (alias_id,)
+            "SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)
         ).fetchone()
-        assert row is not None
+        assert row[0] == identity_id
 
-        # Delete it
+        # Delete (Detach) it
         repo.delete_alias(alias_id, cursor)
         conn.commit()
 
-        # Verify gone
+        # Verify it now belongs to a NEW identity and is primary/active
         row = cursor.execute(
-            "SELECT IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
+            "SELECT OwnerIdentityID, IsPrimaryName, IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
         ).fetchone()
-        assert row[0] == 1, f"Expected IsDeleted=1, got {row[0]}"
+        assert row[0] != identity_id, "Alias was not re-homed to a new identity"
+        assert row[1] == 1, f"Expected IsPrimaryName=1, got {row[1]}"
+        assert row[2] == 0, f"Expected IsDeleted=0, got {row[2]}"
 
 
-def test_soft_delete_alias_in_use(populated_db):
-    """Repo mutations MUST NOT orphan credits; they use soft-deletion."""
+def test_detach_alias_in_use(populated_db):
+    """Repo detachment MUST NOT delete names; they are re-homed to protect historical credits."""
     repo = IdentityRepository(populated_db)
     alias_id = 11  # 'Grohlton' (used in populated_db)
 
     with repo._get_connection() as conn:
         cursor = conn.cursor()
-        # Delete it (Soft-delete)
+        # Delete (Detach) it
         repo.delete_alias(alias_id, cursor)
         conn.commit()
 
-        # Verify it still exists in DB but is marked deleted
+        # Verify it was re-homed, NOT soft-deleted
         row = cursor.execute(
-            "SELECT IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
+            "SELECT OwnerIdentityID, IsDeleted FROM ArtistNames WHERE NameID = ?", (alias_id,)
         ).fetchone()
-        assert row is not None
-        assert row[0] == 1, f"Expected IsDeleted=1, got {row[0]}"
+        assert row[0] != 1, "Alias should have been moved from identity 1"
+        assert row[1] == 0, f"Expected IsDeleted=0 (reactivated/active), got {row[1]}"
 
 
 def test_delete_alias_primary_forbidden(populated_db):
@@ -134,8 +136,44 @@ def test_delete_alias_primary_forbidden(populated_db):
 
     with repo._get_connection() as conn:
         cursor = conn.cursor()
-        with pytest.raises(ValueError, match="Cannot delete the primary name"):
+        with pytest.raises(ValueError, match="Cannot detach the primary name of an identity"):
             repo.delete_alias(primary_alias, cursor)
+
+
+def test_detach_alias_preserves_credits(populated_db):
+    """
+    Contract: Detaching an alias must preserve song credits linked to that name.
+    Scenario: 'Grohlton' (11) is alias of 'Dave Grohl' (1) and credited on 'Song A' (1).
+    After detaching 'Grohlton', the credit must still point to 'Grohlton' (11).
+    """
+    repo = IdentityRepository(populated_db)
+    alias_id = 11  # 'Grohlton'
+    original_owner_id = 1
+    song_id = 4
+
+    with repo._get_connection() as conn:
+        cursor = conn.cursor()
+
+        # 1. Verify initial state: Grohlton belongs to identity 1 and is credited on song 1
+        row = cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)).fetchone()
+        assert row[0] == original_owner_id
+
+        row = cursor.execute("SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?", (song_id, alias_id)).fetchone()
+        assert row is not None, "Initial credit not found"
+
+        # 2. Detach 'Grohlton'
+        repo.delete_alias(alias_id, cursor)
+        conn.commit()
+
+        # 3. Verify: Grohlton has a NEW owner
+        row = cursor.execute("SELECT OwnerIdentityID FROM ArtistNames WHERE NameID = ?", (alias_id,)).fetchone()
+        new_owner_id = row[0]
+        assert new_owner_id != original_owner_id
+
+        # 4. Verify: Song 1 STILL credits 'Grohlton' (NameID 11)
+        row = cursor.execute("SELECT CreditedNameID FROM SongCredits WHERE SourceID = ? AND CreditedNameID = ?", (song_id, alias_id)).fetchone()
+        assert row is not None, "Credit was lost during detachment"
+        assert row[0] == alias_id, f"Expected credit to still point to NameID {alias_id}, got {row[0]}"
 
 
 def test_add_alias_rollback(populated_db):

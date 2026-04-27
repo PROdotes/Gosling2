@@ -517,7 +517,7 @@ Link a name to an identity. ID-First: If `name_id` is provided, prioritize it. H
 
 ### delete_alias(name_id: int, cursor: sqlite3.Cursor) -> None
 
-Soft-delete an alias link. Guard: primary names cannot be deleted.
+Detach an alias from its identity. This creates a fresh Identity record and re-homes the name to it as its primary name. Guard: primary names cannot be detached.
 
 ### update_legal_name(identity_id: int, legal_name: Optional[str], conn: sqlite3.Connection) -> None
 

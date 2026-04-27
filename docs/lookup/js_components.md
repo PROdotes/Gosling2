@@ -75,6 +75,10 @@ Replaces a text span with an input field and handles commit/revert.
 *Location: `src/static/js/dashboard/components/chip_input.js`*
 Renders a collection of removable chips with an add-input.
 
+### createAutocomplete({ inputEl, dropdownEl, onSearch, onSelect, renderItem, allowCreate, getCreateLabel, debounceMs, onEnterEmpty })
+*Location: `src/static/js/dashboard/components/autocomplete.js`*
+Shared dropdown behavior for inputs. Handles debouncing, keyboard navigation (arrows/enter), and custom rendering. Returns `{ destroy, setOptions }`.
+
 ### initToastSystem()
 *Location: `src/static/js/dashboard/components/toast.js`*
 Bootstraps the toast container.
