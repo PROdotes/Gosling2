@@ -168,7 +168,7 @@ confirmBtn.addEventListener("click", async () => {
 // ─── Modal Lifecycle ──────────────────────────────────────────
 
 modal = createModalLifecycle(overlay, {
-    onOpen: (config) => {
+    onOpen: async (config) => {
         _config = config;
         _separators = [...(config.separators || [])];
         _tokens = [];
@@ -191,10 +191,8 @@ modal = createModalLifecycle(overlay, {
         updatePreview();
     },
     onClose: () => {
-        const onConfirm = _config?.onConfirm;
         _config = null;
         _tokens = [];
-        if (onConfirm) onConfirm();
     },
     overlayClickCheck: (e) => {
         if (wasMousedownInside(overlay.querySelector(".link-modal"))) return false;

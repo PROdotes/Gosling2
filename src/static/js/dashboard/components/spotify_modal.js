@@ -138,31 +138,9 @@ async function handleImport() {
     importBtn.textContent = "Importing...";
 
     try {
-        // Enrich credits with resolved identity IDs.
-        const enrichedCredits = (_parseResult.credits || []).map((c) => {
-            // Priority 1: already linked on this song
-            const existing = _existingCredits.find(
-                (ec) =>
-                    (ec.display_name?.toLowerCase() === c.name?.toLowerCase() ||
-                        ec.name?.toLowerCase() === c.name?.toLowerCase()) &&
-                    ec.role_name === c.role,
-            );
-            if (existing?.identity_id)
-                return { ...c, identity_id: existing.identity_id };
-
-            // Priority 2: known in DB via preview with resolved identity
-            const found = (_existence.credits || []).find(
-                (e) => e.name === c.name,
-            );
-            if (found?.identity_id)
-                return { ...c, identity_id: found.identity_id };
-
-            return c;
-        });
-
         await importSpotifyCredits(
             _songId,
-            enrichedCredits,
+            _parseResult.credits || [],
             _parseResult.publishers,
         );
         const onComplete = _onComplete;
@@ -242,7 +220,7 @@ modal = createModalLifecycle(overlay, {
         _parseResult = null;
 
         textarea.value = "";
-        resultsSection.style.display = "none";
+        resultsSect.style.display = "none";
         importBtn.disabled = true;
         importBtn.textContent = "Import Credits";
         overlay.style.display = "flex";

@@ -354,10 +354,10 @@ A secondary bug was found: the tag delimiter default is `:` in JS but `::` in Py
 - [x] **8.** Add `available_actions: [...]` to song responses — BR-2
 
 ### Phase 3: Atomic Backend Operations
-- [x] **9.** Create `POST /albums/{id}/sync-from-song/{songId}` — eliminates CW-1, CW-2, CW-6, HC-3 **(backend done, frontend pending)**
-- [x] **10.** Create `POST /songs/{id}/quick-create-album` — eliminates CW-2 **(backend done, frontend pending)**
-- [x] **11.** Move identity resolution to backend — eliminates CW-3 **(backend done, frontend pending)**
-- [x] **12.** Backend tag parsing on `POST /songs/{id}/tags` — eliminates DT-1, DT-2 **(backend done, frontend pending)**
+- [x] **9.** Create `POST /albums/{id}/sync-from-song/{songId}` — eliminates CW-1, CW-2, CW-6, HC-3 **(backend + frontend done)**
+- [x] **10.** Create `POST /songs/{id}/quick-create-album` — eliminates CW-2 **(backend + frontend done)**
+- [x] **11.** Move identity resolution to backend — eliminates CW-3 **(backend + frontend done)**
+- [x] **12.** Backend tag parsing on `POST /songs/{id}/tags` — eliminates DT-1, DT-2 **(backend + frontend done)**
 
 ### Phase 4: Computed Display Fields
 - [ ] **13.** Guarantee `display_title`, `display_artist`, `display_name` in all API responses — FB-1–FB-6

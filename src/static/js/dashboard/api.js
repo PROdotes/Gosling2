@@ -465,9 +465,15 @@ export function bulkDeleteUnlinkedIdentities() {
     return fetchJson("/api/v1/identities?unlinked=true", { method: "DELETE" });
 }
 
-export function addSongTag(songId, tagName, category, tagId = null) {
-    const body =
-        tagId !== null ? { tag_id: tagId } : { tag_name: tagName, category };
+export function addSongTag(songId, tagName, category, tagId = null, rawTag = null) {
+    let body;
+    if (tagId !== null) {
+        body = { tag_id: tagId };
+    } else if (rawTag !== null) {
+        body = { raw_tag: rawTag };
+    } else {
+        body = { tag_name: tagName, category };
+    }
     return fetchJson(`/api/v1/songs/${songId}/tags`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -512,6 +518,21 @@ export function updateSongAlbumLink(songId, albumId, trackNumber, discNumber) {
             track_number: trackNumber,
             disc_number: discNumber,
         }),
+    });
+}
+
+export function syncAlbumFromSong(albumId, songId) {
+    return fetchJson(`/api/v1/albums/${albumId}/sync-from-song/${songId}`, {
+        method: "POST",
+    });
+}
+
+export function quickCreateAlbum(songId, title = null) {
+    const params = new URLSearchParams();
+    if (title) params.set("title", title);
+    const qs = params.toString();
+    return fetchJson(`/api/v1/songs/${songId}/quick-create-album${qs ? `?${qs}` : ""}`, {
+        method: "POST",
     });
 }
 

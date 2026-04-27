@@ -98,23 +98,13 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
             return mapped;
         },
         onAdd: async (opt) => {
-            let name, category;
-            if (opt.id != null) {
-                name = null;
-                category = null;
-            } else {
-                const parsed = parseTagInput(
-                    opt.rawInput || opt.name || opt.label,
-                    rules,
-                );
-                name = parsed.name;
-                category = parsed.category;
-            }
+            const rawTag = opt.id == null ? (opt.rawInput || opt.name || opt.label) : null;
             const tag = await api.addSongTag(
                 songId,
-                name,
-                category,
-                opt.id != null ? opt.id : null,
+                null,
+                null,
+                opt.id ?? null,
+                rawTag,
             );
             opt.id = tag.id;
             opt.label = tag.name;

@@ -38,39 +38,7 @@ export async function updateSyncLed(songId) {
 import { activateInlineEdit } from "../components/inline_editor.js";
 
 export async function syncAlbumWithSong(albumId, songId) {
-    const [song, albumDetail] = await Promise.all([
-        api.getCatalogSong(songId),
-        api.getAlbumDetail(albumId),
-    ]);
-    const ops = [];
-    if (!albumDetail.release_year && song.year) {
-        ops.push(api.updateAlbum(albumId, { release_year: song.year }));
-    }
-    const existingNameIds = new Set(
-        (albumDetail.credits || []).map((c) => String(c.name_id)),
-    );
-    for (const credit of song.credits || []) {
-        if (credit.role_name !== "Performer") continue;
-        if (!existingNameIds.has(String(credit.name_id))) {
-            ops.push(
-                api.addAlbumCredit(
-                    albumId,
-                    credit.display_name,
-                    credit.role_name,
-                    credit.identity_id ?? null,
-                ),
-            );
-        }
-    }
-    const existingPubIds = new Set(
-        (albumDetail.publishers || []).map((p) => String(p.id)),
-    );
-    for (const pub of song.publishers || []) {
-        if (!existingPubIds.has(String(pub.id))) {
-            ops.push(api.addAlbumPublisher(albumId, pub.name, pub.id));
-        }
-    }
-    await Promise.all(ops);
+    await api.syncAlbumFromSong(albumId, songId);
 }
 
 import { showConfirm } from "../components/confirm_modal.js";
@@ -920,8 +888,6 @@ export class SongActionsHandler {
         actionTarget.textContent = "syncing...";
         try {
             await syncAlbumWithSong(albumId, songId);
-            // Settle delay for aggregate views
-            await new Promise((r) => setTimeout(r, 600));
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;
@@ -955,29 +921,10 @@ export class SongActionsHandler {
         actionTarget.innerHTML = "Creating...";
 
         try {
-            // 1. Create and Link Album
-            const res = await api.addSongAlbum(
-                songId,
-                null,           /* albumId (null for new) */
-                song.media_name,/* albumTitle */
-                1,              /* disc_number */
-                1               /* track_number */
-            );
-
-            const albumId = res.album_id;
-
-            // 2. Sync metadata (Artist, Publisher, Year)
-            await syncAlbumWithSong(albumId, songId);
-
-            // 3. Settle delay for DB views
-            await new Promise((r) => setTimeout(r, 600));
-
-            // 4. Structural Refresh
+            await api.quickCreateAlbum(songId, song.media_name);
             await this.ctx.refreshActiveDetail();
-
             showToast(`Album "${song.media_name}" created & synced.`, "success");
 
-            // Reset button state
             actionTarget.disabled = false;
             actionTarget.classList.remove("loading");
             actionTarget.innerHTML = originalHtml;
