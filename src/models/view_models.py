@@ -30,21 +30,21 @@ def compute_review_blockers(
     """
     blockers = []
     if not media_name:
-        blockers.append("media_name")
+        blockers.append({"name": "title", "pill": "TTL"})
     if not year:
-        blockers.append("year")
+        blockers.append({"name": "year", "pill": "YR"})
     if not has_performer:
-        blockers.append("performers")
+        blockers.append({"name": "performers", "pill": "ART"})
     if not has_composer:
-        blockers.append("composers")
+        blockers.append({"name": "composers", "pill": "CMP"})
     if not has_genre:
-        blockers.append("genres")
+        blockers.append({"name": "genres", "pill": "GNR"})
     if not has_publisher:
-        blockers.append("publishers")
+        blockers.append({"name": "publishers", "pill": "PUB"})
     if not has_album:
-        blockers.append("albums")
+        blockers.append({"name": "albums", "pill": "ALB"})
     if (duration_s or 0) <= 0:
-        blockers.append("duration")
+        blockers.append({"name": "duration", "pill": "DUR"})
     return blockers
 
 
@@ -188,7 +188,7 @@ class SongSlimView(BaseModel):
         return cls(
             id=row["SourceID"],
             media_name=row["MediaName"],
-            title=row["MediaName"],
+            title=row["MediaName"],  # TODO: needs looking into, same for other titles
             source_path=row["SourcePath"],
             duration_s=float(row["SourceDuration"] or 0),
             year=row["RecordingYear"],
@@ -216,7 +216,7 @@ class SongView(BaseModel):
     source_path: str
     duration_s: float
     audio_hash: Optional[str] = None
-    processing_status: Optional[int] = ProcessingStatus.REVIEWED
+    processing_status: Optional[int] = None
     is_active: bool = False
     notes: Optional[str] = None
     bpm: Optional[int] = None

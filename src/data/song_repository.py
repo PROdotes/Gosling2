@@ -751,7 +751,7 @@ class SongRepository(MediaSourceRepository):
             SELECT
                 m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
                 s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
-                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                GROUP_CONCAT(DISTINCT an.DisplayName, ', ') FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
                 EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
                 EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album,

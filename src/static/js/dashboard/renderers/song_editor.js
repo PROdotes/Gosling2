@@ -344,17 +344,6 @@ function wireAlbumSubChips(song, refresh) {
     });
 }
 
-const BLOCKER_LABELS = {
-    media_name: "TTL",
-    year: "YR",
-    performers: "ART",
-    composers: "COMP",
-    genres: "GNR",
-    publishers: "PUB",
-    albums: "ALB",
-    duration: "DUR",
-};
-
 function updateListRowBlockers(songId, reviewBlockers) {
     const row = document.querySelector(`.song-row[data-id="${songId}"]`);
     if (!row) return;
@@ -363,7 +352,7 @@ function updateListRowBlockers(songId, reviewBlockers) {
     colMissing.innerHTML = (reviewBlockers || [])
         .map(
             (b) =>
-                `<span class="pill miss" title="Missing: ${b}">${BLOCKER_LABELS[b] || b}</span>`,
+                `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`,
         )
         .join("");
 }

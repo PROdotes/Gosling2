@@ -141,55 +141,22 @@ class Song(MediaSource):
 
     # Filing Context (Hydrated)
     projected_path: Optional[str] = None
-    needs_organization: bool = False
 
     # Storage for every raw ID3 frame found that wasn't explicitly mapped.
     # Format: { "TIT2": ["Title"], "TXXX:STATUS": ["Ready"] }
     raw_tags: Dict[str, List[str]] = {}
 
     @property
+    def needs_organization(self) -> bool:
+        """True if the song is not located at its projected path."""
+        if not self.estimated_original_path or not self.projected_path:
+            return False
+        return self.estimated_original_path != self.projected_path
+
+    @property
     def title(self) -> str:
         """Domain-level title alias for media_name."""
         return self.media_name
-
-
-class AuditAction(DomainModel):
-    """A high-level event log (IMPORT, DELETE, etc.)."""
-
-    id: Optional[int] = None
-    action_type: str
-    target_table: Optional[str] = None
-    target_id: Optional[str] = None
-    details: Optional[str] = None
-    timestamp: Optional[str] = None
-    user_id: Optional[str] = None
-    batch_id: Optional[str] = None
-
-
-class AuditChange(DomainModel):
-    """A field-level modification log."""
-
-    id: Optional[int] = None
-    table_name: str
-    record_id: str
-    field_name: str
-    old_value: Optional[str] = None
-    new_value: Optional[str] = None
-    timestamp: Optional[str] = None
-    batch_id: Optional[str] = None
-
-
-class DeletedRecord(DomainModel):
-    """A JSON snapshot of a purged record."""
-
-    id: Optional[int] = None
-    table_name: str
-    record_id: str
-    snapshot: str
-    deleted_at: Optional[str] = None
-    restored_at: Optional[str] = None
-    batch_id: Optional[str] = None
-
 
 # Recursive model rebuilding for Pydantic v2
 Publisher.model_rebuild()

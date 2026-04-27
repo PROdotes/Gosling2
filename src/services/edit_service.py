@@ -125,8 +125,9 @@ class EditService:
                 view = SongView.from_domain(song)
                 blockers = view.review_blockers
                 if blockers:
+                    missing_list = ", ".join(b["name"] for b in blockers)
                     raise ValueError(
-                        f"Cannot mark as reviewed, missing: {', '.join(blockers)}"
+                        f"Cannot mark as reviewed, missing: {missing_list}"
                     )
 
             if fields.get("is_active") is True:

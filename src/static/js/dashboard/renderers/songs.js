@@ -121,7 +121,7 @@ function saveSort(field, direction) {
             SORT_STORAGE_KEY,
             JSON.stringify({ field, direction }),
         );
-    } catch {}
+    } catch { }
 }
 let currentSort = loadSavedSort();
 
@@ -184,23 +184,10 @@ function renderSongRows(ctx, songs) {
         .map((song, index) => {
             const title = escapeHtml(song.display_title);
             const artist = escapeHtml(song.display_artist || "Unknown Artist");
-            const blockerLabels = {
-                media_name: "TTL",
-                year: "YR",
-                performers: "ART",
-                composers: "COMP",
-                genres: "GNR",
-                publishers: "PUB",
-                albums: "ALB",
-                duration: "DUR",
-            };
             const ext = (song.source_path || "").split(".").pop()?.toUpperCase() || "";
             const formatPill = ext ? `<span class="pill" title="Format">${escapeHtml(ext)}</span>` : "";
             const pills = formatPill + (song.review_blockers || [])
-                .map(
-                    (b) =>
-                        `<span class="pill miss" title="Missing: ${b}">${blockerLabels[b] || b}</span>`,
-                )
+                .map((b) => `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`)
                 .join("");
             const selectedClass = song.id === selectedId ? " selected" : "";
             return `<div class="song-row${selectedClass}" data-action="select-result" data-id="${song.id}" data-index="${index}" data-selectable="true">
