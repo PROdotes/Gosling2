@@ -52,7 +52,11 @@ async def _stream_ingestion(service, work_items):
         await asyncio.sleep(0)
 
         for staged_path, original_path in work_items:
-            if Path(staged_path).suffix.lower() == ".wav":
+            is_wav = Path(staged_path).suffix.lower() == ".wav"
+            yield f"{json.dumps({'started': True, 'filename': Path(staged_path).name, 'is_wav': is_wav})}\n"
+            await asyncio.sleep(0)
+
+            if is_wav:
                 if WAV_AUTO_CONVERT:
                     try:
                         mp3 = await run_in_threadpool(convert_to_mp3, Path(staged_path))
@@ -85,7 +89,7 @@ async def _stream_ingestion(service, work_items):
 
             service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
-            yield f"{json.dumps(jsonable_encoder({**status, 'last_result': res}))}\n"
+            yield f"{json.dumps(jsonable_encoder({**status, 'filename': Path(staged_path).name, 'last_result': res}))}\n"
             await asyncio.sleep(0)
 
     except Exception as e:

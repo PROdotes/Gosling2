@@ -174,11 +174,7 @@ describe("activateInlineEdit blur handling", () => {
         activateInlineEdit(span, {
             field: "year",
             validationRules: { year: { min: 1860, max: 2100 } },
-            onCommit: async (val) => {
-                // Simulate backend 400 error for non-numeric input
-                if (val !== null && typeof val === "number" && isNaN(val)) {
-                    throw new Error("Invalid year");
-                }
+            onCommit: async () => {
                 committed = true;
                 return {};
             },

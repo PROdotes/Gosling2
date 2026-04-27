@@ -775,17 +775,34 @@ function updateIngestBadges(counts = {}) {
     state.successCount = counts.success ?? state.successCount;
     state.actionCount = counts.action ?? state.actionCount;
     state.pendingCount = counts.pending ?? state.pendingCount;
+    if ("currentFile" in counts) state.ingestCurrentFile = counts.currentFile;
 
     // Remove old badge container
     tab.querySelector(".ingest-badge-container")?.remove();
 
     const total = state.pendingCount + state.successCount + state.actionCount;
-    if (total === 0) return;
+    if (total === 0 && !state.ingestCurrentFile) return;
 
     const container = document.createElement("div");
     container.className = "ingest-badge-container";
 
-    if (state.pendingCount > 0) {
+    if (state.ingestCurrentFile) {
+        const currentFile = state.ingestCurrentFile;
+        const ext = currentFile.split(".").pop()?.toUpperCase() || "";
+        const b = document.createElement("span");
+        b.className = "ingest-badge pending";
+        b.title = `Processing: ${currentFile}`;
+        b.textContent = ext ? `${ext}…` : "…";
+        container.appendChild(b);
+
+        if (state.pendingCount > 0) {
+            const p = document.createElement("span");
+            p.className = "ingest-badge pending";
+            p.title = `${state.pendingCount} more files in queue`;
+            p.textContent = String(state.pendingCount);
+            container.appendChild(p);
+        }
+    } else if (state.pendingCount > 0) {
         const b = document.createElement("span");
         b.className = "ingest-badge pending";
         b.title = `${state.pendingCount} files currently processing`;
@@ -857,11 +874,15 @@ async function setupHeaderDropZone() {
                     showToast(update.error, "error");
                     return;
                 }
-
+                if (update.started) {
+                    updateIngestBadges({ currentFile: update.filename });
+                    return;
+                }
                 updateIngestBadges({
                     success: update.success,
                     action: update.action,
                     pending: update.pending,
+                    currentFile: null,
                 });
 
                 const res = update.last_result;

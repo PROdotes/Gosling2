@@ -194,7 +194,9 @@ function renderSongRows(ctx, songs) {
                 albums: "ALB",
                 duration: "DUR",
             };
-            const pills = (song.review_blockers || [])
+            const ext = (song.source_path || "").split(".").pop()?.toUpperCase() || "";
+            const formatPill = ext ? `<span class="pill" title="Format">${escapeHtml(ext)}</span>` : "";
+            const pills = formatPill + (song.review_blockers || [])
                 .map(
                     (b) =>
                         `<span class="pill miss" title="Missing: ${b}">${blockerLabels[b] || b}</span>`,

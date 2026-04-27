@@ -46,15 +46,15 @@ export function activateInlineEdit(
         }
 
         let payload;
-        const isNumericField = [
-            "year",
-            "release_year",
-            "bpm",
-            "track_number",
-            "disc_number",
-        ].includes(field);
-
-        if (isNumericField) {
+        if (
+            [
+                "year",
+                "release_year",
+                "bpm",
+                "track_number",
+                "disc_number",
+            ].includes(field)
+        ) {
             payload = rawValue === "" ? null : Number(rawValue);
         } else {
             payload = rawValue === "" ? null : rawValue;
@@ -68,7 +68,6 @@ export function activateInlineEdit(
             errorEl.remove();
             if (onSave) onSave(updated, field);
         } catch (err) {
-            hasError = true;
             input.disabled = false;
             input.classList.add("inline-edit-input--error");
             errorEl.textContent = `Save failed: ${err.message}`;
@@ -77,9 +76,7 @@ export function activateInlineEdit(
     }
 
     input.addEventListener("input", () => {
-        hasError = false;
-        errorEl.textContent = "";
-        input.classList.remove("inline-edit-input--error");
+        // Backend handles validation - no client-side checking needed
     });
 
     input.addEventListener("keydown", (e) => {

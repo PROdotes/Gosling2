@@ -342,10 +342,16 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                     showToast(update.error, "error");
                     return;
                 }
+                if (update.started) {
+                    insertPendingCard(resultsId, update.filename, update.is_wav);
+                    ctx.updateIngestBadges?.({ currentFile: update.filename });
+                    return;
+                }
                 ctx.updateIngestBadges?.({
                     success: update.success,
                     action: update.action,
                     pending: update.pending,
+                    currentFile: null,
                 });
                 const res = update.last_result;
                 if (res) {
@@ -353,7 +359,8 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                         basename(res.song?.source_path) ||
                         basename(res.staged_path) ||
                         "Unknown";
-                    appendResult(resultsId, res, fileName, ctx);
+                    resolvePendingCard(resultsId, res, fileName, update.filename);
+                    _trackResult(res, fileName, ctx);
                 }
             });
         } catch (error) {
@@ -441,10 +448,16 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
                     showToast(update.error, "error");
                     return;
                 }
+                if (update.started) {
+                    insertPendingCard(resultsId, update.filename, update.is_wav);
+                    ctx.updateIngestBadges?.({ currentFile: update.filename });
+                    return;
+                }
                 ctx.updateIngestBadges?.({
                     success: update.success,
                     action: update.action,
                     pending: update.pending,
+                    currentFile: null,
                 });
                 const res = update.last_result;
                 if (res) {
@@ -452,7 +465,8 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
                         basename(res.song?.source_path) ||
                         basename(res.staged_path) ||
                         "Unknown";
-                    appendResult(resultsId, res, fileName, ctx);
+                    resolvePendingCard(resultsId, res, fileName, update.filename);
+                    _trackResult(res, fileName, ctx);
                 }
             });
         } catch (error) {
@@ -477,11 +491,7 @@ function setLoading(btn, loading) {
     btn.disabled = loading;
 }
 
-function appendResult(resultsId, result, path, ctx) {
-    const list = document.getElementById(resultsId);
-    if (!list) return;
-
-    // Track in state for bulk tools
+function _trackResult(result, path, ctx) {
     const state = ctx.getState();
     if (state.ingestTasks) {
         state.ingestTasks.push({
@@ -491,8 +501,6 @@ function appendResult(resultsId, result, path, ctx) {
             path: path,
         });
     }
-
-    // Persist to cache
     if (state.cachedIngestResults) {
         state.cachedIngestResults.unshift({
             isBatch: false,
@@ -501,7 +509,12 @@ function appendResult(resultsId, result, path, ctx) {
             stagedPath: result.staged_path || null,
         });
     }
+}
 
+function appendResult(resultsId, result, path, ctx) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+    _trackResult(result, path, ctx);
     _appendResultToDom(list, result, path, false);
 }
 
@@ -511,6 +524,43 @@ function _appendResultToDom(list, result, path, appendAtEnd = false) {
         list.appendChild(item);
     } else {
         list.insertBefore(item, list.firstChild);
+    }
+}
+
+function createPendingCard(filename, isWav) {
+    const card = document.createElement("article");
+    card.className = "result-card ingest-card pending-ingest";
+    card.dataset.pendingFile = filename;
+    const label = isWav ? "Converting WAV→MP3…" : "Ingesting…";
+    card.innerHTML = `
+        <div class="card-icon ingest-icon">&#8635;</div>
+        <div class="card-body">
+            <div class="card-title-row">
+                <div class="card-title">${escapeHtml(filename)}</div>
+                ${renderStatus("loading", label)}
+            </div>
+        </div>
+    `;
+    return card;
+}
+
+function insertPendingCard(resultsId, filename, isWav) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+    const card = createPendingCard(filename, isWav);
+    list.insertBefore(card, list.firstChild);
+}
+
+function resolvePendingCard(resultsId, result, path, stagedFilename) {
+    const list = document.getElementById(resultsId);
+    if (!list) return;
+    const lookupKey = stagedFilename || basename(path) || path;
+    const pending = list.querySelector(`[data-pending-file="${CSS.escape(lookupKey)}"]`);
+    const newCard = createResultCard(result, path);
+    if (pending) {
+        list.replaceChild(newCard, pending);
+    } else {
+        list.insertBefore(newCard, list.firstChild);
     }
 }
 
@@ -679,17 +729,12 @@ function createResultCard(result, path) {
                     : ""
             }
         </div>
-        ${
-            song
-                ? `
-            <div class="ingest-meta">
-                ${song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
-                ${song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
-                ${song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
-            </div>
-        `
-                : ""
-        }
+        <div class="ingest-meta">
+            <span class="pill mono">${escapeHtml(path.split(".").pop()?.toUpperCase() || "?")}</span>
+            ${song && song.bpm ? `<span class="pill mono">${escapeHtml(song.bpm)} BPM</span>` : ""}
+            ${song && song.year ? `<span class="pill mono">${escapeHtml(song.year)}</span>` : ""}
+            ${song && song.id ? `<span class="pill mono">#${escapeHtml(song.id)}</span>` : ""}
+        </div>
     `;
 
     return card;
