@@ -541,7 +541,9 @@ function insertPendingCard(resultsId, filename, isWav) {
     list.insertBefore(card, list.firstChild);
 }
 
-function resolvePendingCard(resultsId, result, path, stagedFilename) {
+export const INGEST_RESULTS_LIST_ID = "ingest-results";
+
+export function resolvePendingCard(resultsId, result, path, stagedFilename) {
     const list = document.getElementById(resultsId);
     if (!list) return;
     const lookupKey = stagedFilename || basename(path) || path;

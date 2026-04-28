@@ -29,6 +29,7 @@ import {
 import { showToast } from "../components/toast.js";
 import { isModalOpen } from "../components/utils.js";
 import { PROCESSING_STATUS } from "../constants.js";
+import { resolvePendingCard, INGEST_RESULTS_LIST_ID } from "../renderers/ingestion.js";
 
 export async function updateSyncLed(songId) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
@@ -641,13 +642,24 @@ export class SongActionsHandler {
                 `/api/v1/ingest/convert-wav?staged_path=${encodeURIComponent(stagedPath)}`,
                 { method: "POST" },
             );
-            if (!res.ok) throw new Error("Conversion failed");
-            showToast("Conversion started...", "info");
-            if (this.ctx.updateCachedIngestResult) {
-                this.ctx.updateCachedIngestResult(stagedPath, {
-                    status: "CONVERTING",
-                });
+            const data = await res.json();
+            if (!res.ok || data.status === "ERROR") throw new Error(data.message || "Conversion failed");
+
+            const card = actionTarget.closest(".result-card");
+            const path = data.song?.source_path || stagedPath;
+            if (card) {
+                const filename = stagedPath.split(/[\\/]/).pop();
+                card.dataset.pendingFile = filename;
+                resolvePendingCard(INGEST_RESULTS_LIST_ID, data, path, filename);
             }
+            if (this.ctx.updateCachedIngestResult) {
+                this.ctx.updateCachedIngestResult(stagedPath, { ...data });
+            }
+            if (this.ctx.updateIngestBadges) {
+                const status = await getIngestStatus();
+                this.ctx.updateIngestBadges({ success: status.success, action: status.action, pending: status.pending });
+            }
+            showToast("Conversion complete!", "success");
         } catch (err) {
             actionTarget.disabled = false;
             actionTarget.textContent = originalText;
