@@ -1,3 +1,4 @@
+import os
 from typing import Optional, List, Dict
 from pydantic import BaseModel, ConfigDict
 
@@ -149,9 +150,9 @@ class Song(MediaSource):
     @property
     def needs_organization(self) -> bool:
         """True if the song is not located at its projected path."""
-        if not self.estimated_original_path or not self.projected_path:
+        if not self.source_path or not self.projected_path:
             return False
-        return self.estimated_original_path != self.projected_path
+        return os.path.normpath(self.source_path) != os.path.normpath(self.projected_path)
 
     @property
     def title(self) -> str:

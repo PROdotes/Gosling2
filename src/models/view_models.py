@@ -144,7 +144,7 @@ class SongSlimView(BaseModel):
 
     @computed_field
     @property
-    def review_blockers(self) -> list[str]:
+    def review_blockers(self) -> list[dict]:
         return compute_review_blockers(
             media_name=self.media_name,
             year=self.year,
@@ -402,7 +402,7 @@ class SongView(BaseModel):
 
     @computed_field
     @property
-    def review_blockers(self) -> list[str]:
+    def review_blockers(self) -> list[dict]:
         return compute_review_blockers(
             media_name=self.media_name,
             year=self.year,

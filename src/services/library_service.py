@@ -366,7 +366,6 @@ class LibraryService:
 
             # --- 2. Desired State Sync (Declarative Physical Move) ---
             projected_path = None
-            needs_organization = False
 
             # Optimization: Only calculate paths and check moves if song is Reviewed
             # This prevents 500+ exists() checks during a simple library search
@@ -378,7 +377,6 @@ class LibraryService:
                     if song.source_path and os.path.normpath(
                         song.source_path
                     ) != os.path.normpath(projected_path):
-                        needs_organization = True
                         if config.AUTO_MOVE_ON_APPROVE:
                             new_path = self._filing_service.move_to_library(
                                 song, self._library_root
@@ -386,23 +384,17 @@ class LibraryService:
                             self._song_repo.update_scalars(
                                 song.id, {"source_path": str(new_path)}, conn
                             )
-                            # Re-sync path on the object
                             song = song.model_copy(
                                 update={"source_path": str(new_path)}
                             )
-                            needs_organization = False
+                            projected_path = str(new_path)
                 except Exception as e:
                     logger.error(
                         f"[LibraryService] Desired State Sync failed for {song.id}: {e}"
                     )
 
             hydrated_songs.append(
-                song.model_copy(
-                    update={
-                        "projected_path": projected_path,
-                        "needs_organization": needs_organization,
-                    }
-                )
+                song.model_copy(update={"projected_path": projected_path})
             )
 
         logger.debug(f"[LibraryService] <- hydrated {len(hydrated_songs)} songs.")
