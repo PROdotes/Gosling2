@@ -1072,6 +1072,11 @@ class EditService:
                 is_same_file = False
 
             if source_abs_path.exists() and not is_same_file:
+                if not new_abs_path.exists() or new_abs_path.stat().st_size != source_abs_path.stat().st_size:
+                    raise RuntimeError(
+                        f"Copy verification failed: destination size mismatch or missing. "
+                        f"Source: {source_abs_path}, Dest: {new_abs_path}"
+                    )
                 source_abs_path.unlink()
 
             # Origin stays until user confirms deletion OR it's been handled manually.
