@@ -1,4 +1,4 @@
-import { wasMousedownInside } from "./utils.js";
+import { wasMousedownInside, escapeHtml } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
 import { createAutocomplete } from "./autocomplete.js";
 
@@ -32,15 +32,6 @@ let _triggerEl = null;
 let _onClose = null;
 let _autocompletes = {};
 let modal;
-
-function escapeHtml(str) {
-    if (str === null || str === undefined) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
 
 function camelToData(str) {
     return str.replace(/([A-Z])/g, (m) => `-${m.toLowerCase()}`);

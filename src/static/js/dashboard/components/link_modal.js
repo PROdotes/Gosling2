@@ -1,4 +1,4 @@
-import { wasMousedownInside } from "./utils.js";
+import { wasMousedownInside, escapeHtml } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
 import { createAutocomplete } from "./autocomplete.js";
 
@@ -25,15 +25,6 @@ const dropdown = document.getElementById("link-modal-dropdown");
 let _config = null;
 let _isSelecting = false;
 let _ac = null;
-
-function escapeHtml(str) {
-    if (str === null || str === undefined) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
 
 function renderItems() {
     if (!_config.items.length) {

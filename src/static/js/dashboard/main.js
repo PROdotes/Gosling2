@@ -20,6 +20,7 @@ import {
     searchPublishers,
     searchSongs,
     searchTags,
+    getTagSongs,
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {

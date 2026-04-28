@@ -41,9 +41,10 @@ class SongRepository(MediaSourceRepository):
     _COLUMNS = """
         m.SourceID, m.TypeID, m.SourcePath, m.SourceDuration, m.AudioHash,
         m.ProcessingStatus, m.IsActive, m.SourceNotes, m.MediaName,
-        s.TempoBPM, s.RecordingYear, s.ISRC
+        s.TempoBPM, s.RecordingYear, s.ISRC,
+        so.OriginPath
     """
-    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song') AND m.IsDeleted = 0"
+    _JOIN = "FROM MediaSources m JOIN Songs s ON m.SourceID = s.SourceID AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song') AND m.IsDeleted = 0 LEFT JOIN StagingOrigins so ON so.SourceID = m.SourceID"
 
     def insert(self, song: Song, conn: sqlite3.Connection) -> int:
         """
@@ -796,4 +797,5 @@ class SongRepository(MediaSourceRepository):
             bpm=row["TempoBPM"],
             year=row["RecordingYear"],
             isrc=row["ISRC"],
+            estimated_original_path=row["OriginPath"],
         )

@@ -28,6 +28,8 @@ import {
 } from "../api.js";
 import { showToast } from "../components/toast.js";
 import { isModalOpen } from "../components/utils.js";
+import { closeEditModal } from "../components/edit_modal.js";
+import { closeLinkModal } from "../components/link_modal.js";
 import { PROCESSING_STATUS } from "../constants.js";
 import { resolvePendingCard, INGEST_RESULTS_LIST_ID } from "../renderers/ingestion.js";
 
@@ -59,10 +61,6 @@ export async function updateSyncLed(songId) {
 }
 
 import { activateInlineEdit } from "../components/inline_editor.js";
-
-export async function syncAlbumWithSong(albumId, songId) {
-    await syncAlbumFromSong(albumId, songId);
-}
 
 import { showConfirm } from "../components/confirm_modal.js";
 
@@ -880,21 +878,11 @@ export class SongActionsHandler {
     }
 
     handleCloseEditModal() {
-        if (typeof closeEditModal === "function") {
-            closeEditModal();
-        } else {
-            const el = document.getElementById("edit-modal");
-            if (el) el.style.display = "none";
-        }
+        closeEditModal();
     }
 
     handleCloseLinkModal() {
-        if (typeof closeLinkModal === "function") {
-            closeLinkModal();
-        } else {
-            const el = document.getElementById("link-modal");
-            if (el) el.style.display = "none";
-        }
+        closeLinkModal();
     }
 
     async handleCloseSpotifyModal() {
@@ -995,7 +983,7 @@ export class SongActionsHandler {
         actionTarget.disabled = true;
         actionTarget.textContent = "syncing...";
         try {
-            await syncAlbumWithSong(albumId, songId);
+            await syncAlbumFromSong(albumId, songId);
             this.ctx.refreshActiveDetail();
         } catch (err) {
             actionTarget.disabled = false;

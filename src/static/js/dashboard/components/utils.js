@@ -32,14 +32,6 @@ export function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
-export function pluralize(count, singular, plural = `${singular}s`) {
-    return count === 1 ? singular : plural;
-}
-
-export function formatCountLabel(count, singular, plural) {
-    return `${count} ${pluralize(count, singular, plural)}`;
-}
-
 export function basename(path) {
     return path?.split(/[/\\]/).pop() ?? "";
 }

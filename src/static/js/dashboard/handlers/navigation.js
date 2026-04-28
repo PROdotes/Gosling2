@@ -5,12 +5,6 @@
 
 import {
     resetIngestStatus,
-    updatePublisher,
-    searchPublishers,
-    setPublisherParent,
-    getTagDetail,
-    updateTag,
-    getTagCategories,
     deleteTag,
     bulkDeleteUnlinkedTags,
     deleteAlbum,
@@ -21,7 +15,6 @@ import {
     bulkDeleteUnlinkedIdentities,
 } from "../api.js";
 import { showConfirm } from "../components/confirm_modal.js";
-import { openEditModal } from "../components/edit_modal.js";
 import { isModalOpen } from "../components/utils.js";
 import * as orch from "../orchestrator.js";
 
@@ -134,84 +127,9 @@ export class NavigationHandler {
 
         if (chipType === "publisher") {
             const publisherName = actionTarget.textContent.trim();
-            const publisherDetail = await api
-                .getPublisherDetail(itemId)
-                .catch(() => null);
-            const childItems =
-                publisherDetail?.sub_publishers?.map((c) => ({
-                    id: c.id,
-                    label: c.name,
-                })) || [];
-
-            openEditModal(
-                {
-                    title: "Edit Publisher",
-                    fields: {
-                        name: {
-                            type: "text",
-                            label: "Name",
-                            value: publisherDetail?.name || publisherName,
-                            onSave: async (val) => updatePublisher(itemId, val),
-                        },
-                        subPublishers: {
-                            type: "chipList",
-                            label: "Sub-publishers",
-                            items: childItems,
-                            onSearch: async (q) =>
-                                (await searchPublishers(q))?.map((p) => ({
-                                    id: p.id,
-                                    label: p.name,
-                                })) || [],
-                            onAdd: async (opt) => {
-                                await setPublisherParent(
-                                    opt.id,
-                                    Number(itemId),
-                                );
-                                childItems.push({ id: opt.id, label: opt.label });
-                            },
-                            onRemove: async (item) =>
-                                setPublisherParent(item.id, null),
-                            onRename: async (item, newName) =>
-                                updatePublisher(item.id, newName),
-                            createLabel: (q) => `Add "${q}" as sub-publisher`,
-                        },
-                    },
-                    onClose,
-                },
-                actionTarget,
-            );
+            await orch.managePublisher(this.ctx, itemId, publisherName);
         } else if (chipType === "tag") {
-            const tagDetail = await getTagDetail(itemId).catch(() => null);
-            if (!tagDetail) return;
-
-            openEditModal(
-                {
-                    title: "Edit Tag",
-                    fields: {
-                        name: {
-                            type: "text",
-                            label: "Name",
-                            value: tagDetail.name,
-                            onSave: async (val) =>
-                                updateTag(itemId, val, tagDetail.category),
-                        },
-                        category: {
-                            type: "search",
-                            label: "Category",
-                            value: tagDetail.category,
-                            editable: true,
-                            onSave: async (val) =>
-                                updateTag(itemId, tagDetail.name, val),
-                            onSearch: async (q) =>
-                                (await getTagCategories()).filter((c) =>
-                                    c.toLowerCase().includes(q.toLowerCase()),
-                                ),
-                        },
-                    },
-                    onClose,
-                },
-                actionTarget,
-            );
+            await orch.manageTag(this.ctx, itemId);
         } else if (chipType === "credit") {
             const identityId = actionTarget.dataset.identityId;
             if (!identityId) return;

@@ -181,14 +181,6 @@ export function removeIdentityAlias(identityId, nameId) {
     });
 }
 
-export function updateIdentityLegalName(identityId, legalName) {
-    return fetchVoid(`/api/v1/identities/${identityId}/legal-name`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ legal_name: legalName }),
-    });
-}
-
 export function setIdentityType(identityId, type) {
     return fetchVoid(`/api/v1/identities/${identityId}/type`, {
         method: "PATCH",

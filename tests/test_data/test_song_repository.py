@@ -621,6 +621,7 @@ class TestRowToSong:
             "SourceNotes": None,
             "TempoBPM": 120,
             "ISRC": "USRC12345678",
+            "OriginPath": None,
         }
         repo = SongRepository(populated_db)
         song = repo._row_to_song(mock_row)
@@ -666,6 +667,7 @@ class TestRowToSong:
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,
+            "OriginPath": None,
         }
         repo = SongRepository(populated_db)
         song = repo._row_to_song(mock_row)
@@ -700,6 +702,7 @@ class TestRowToSong:
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,
+            "OriginPath": None,
         }
         assert repo._row_to_song(row_active).is_active is True
 
@@ -728,6 +731,7 @@ class TestRowToSong:
             "SourceNotes": None,
             "TempoBPM": None,
             "ISRC": None,
+            "OriginPath": None,
         }
 
         row["SourceDuration"] = 200

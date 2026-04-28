@@ -57,15 +57,6 @@ export function createChipInput({
 
     // ── Chip rendering ────────────────────────────────────────────────────────
 
-    function escapeHtmlLocal(str) {
-        if (str === null || str === undefined) return "";
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;");
-    }
-
     function renderChips() {
         chipsEl.innerHTML = "";
         for (const item of items) {
@@ -74,14 +65,14 @@ export function createChipInput({
 
             const attrs = labelAttrs ? labelAttrs(item) : null;
             const attrStr = attrs
-                ? Object.entries(attrs).map(([k, v]) => `${k}="${escapeHtmlLocal(String(v))}"`).join(" ")
+                ? Object.entries(attrs).map(([k, v]) => `${k}="${escapeHtml(String(v))}"`).join(" ")
                 : "";
             const labelTag = attrs ? "button" : "span";
-            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtmlLocal(item.label)}</${labelTag}>`;
+            const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtml(item.label)}</${labelTag}>`;
 
             if (tagMode && item.category) {
                 const color = categoryColors[item.category] || "#888";
-                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtmlLocal(color)}">${escapeHtmlLocal(item.category)}</span>${labelHtml}`;
+                chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)}">${escapeHtml(item.category)}</span>${labelHtml}`;
             } else {
                 chip.innerHTML = labelHtml;
             }
@@ -147,7 +138,7 @@ export function createChipInput({
 
         if (tagMode && opt.category && !isCreate) {
             const color = categoryColors[opt.category] || "#888";
-            el.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtmlLocal(color)};border:none">${escapeHtmlLocal(opt.category)}</span>${escapeHtmlLocal(opt.label)}`;
+            el.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)};border:none">${escapeHtml(opt.category)}</span>${escapeHtml(opt.label)}`;
         } else if (isCreate) {
             const label = getCreateLabel ? getCreateLabel(opt.label) : `+ Add "${opt.label}"`;
             el.textContent = label;

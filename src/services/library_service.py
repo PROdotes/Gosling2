@@ -10,7 +10,6 @@ from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.publisher_repository import PublisherRepository
 from src.data.tag_repository import TagRepository
 from src.data.identity_repository import IdentityRepository
-from src.data.staging_repository import StagingRepository
 from src.models.domain import (
     Song,
     Album,
@@ -44,7 +43,6 @@ class LibraryService:
         self._pub_repo = PublisherRepository(db_path)
         self._tag_repo = TagRepository(db_path)
         self._identity_repo = IdentityRepository(db_path)
-        self._staging_repo = StagingRepository(db_path)
 
         # Determine rules path
         actual_rules_path = rules_path or config.RENAME_RULES_PATH
@@ -347,17 +345,14 @@ class LibraryService:
             if song.id is None:
                 continue
 
-            # Origin check
-            origin_path = self._staging_repo.get_origin(song.id, conn)
-
             # --- 1. Hydrate full domain object ---
+            origin_path = song.estimated_original_path
             song = song.model_copy(
                 update={
                     "credits": credits_by_song.get(song.id, []),
                     "albums": assocs_by_song.get(song.id, []),
                     "publishers": pubs_by_song.get(song.id, []),
                     "tags": tags_by_song.get(song.id, []),
-                    "estimated_original_path": origin_path,
                     "original_exists": bool(
                         origin_path and os.path.exists(origin_path)
                     ),

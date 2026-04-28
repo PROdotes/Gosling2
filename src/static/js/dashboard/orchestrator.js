@@ -31,12 +31,12 @@ import {
     getTagDetail,
     updateTag,
     getTagCategories,
+    syncAlbumFromSong,
 } from "./api.js";
 import { showConfirm } from "./components/confirm_modal.js";
 import { openEditModal } from "./components/edit_modal.js";
 import { openLinkModal } from "./components/link_modal.js";
 import { openScrubberModal } from "./components/scrubber_modal.js";
-import { syncAlbumWithSong } from "./handlers/song_actions.js";
 import { parseTagInput } from "./utils/tag_input.js";
 
 /**
@@ -226,7 +226,7 @@ export function manageSongAlbums(ctx, songId, songTitle, currentAlbums) {
             );
             if (isNew && res?.album_id) {
                 try {
-                    await syncAlbumWithSong(res.album_id, songId);
+                    await syncAlbumFromSong(res.album_id, songId);
                 } catch (err) {
                     console.warn("Auto-sync failed:", err);
                 }
