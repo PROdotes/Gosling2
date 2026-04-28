@@ -8,21 +8,18 @@ import {
     getAcceptedFormats,
     getAlbumDetail,
     getArtistSongs,
-    getAuditHistory,
     getCatalogSong,
     getIngestStatus,
     getPublisherDetail,
     getPublisherSongs,
     getSongDetail,
     isAbortError,
-    readNdjsonStream,
     resetIngestStatus,
     searchAlbums,
     searchArtists,
     searchPublishers,
     searchSongs,
     searchTags,
-    uploadFiles,
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {
@@ -43,7 +40,7 @@ import {
     renderArtistDetailLoading,
     renderArtists,
 } from "./renderers/artists.js";
-import { collectFilesFromItems } from "./renderers/ingestion.js";
+import { handleIngestDrop } from "./renderers/ingestion.js";
 import {
     renderPublisherDetailComplete,
     renderPublisherDetailLoading,
@@ -54,7 +51,6 @@ import {
     renderSongEditorEmpty,
     renderSongEditorMultiSelect,
     renderSongEditorV2,
-    wireAuditHistory,
     wireChipInputs,
     wireDriftIndicators,
     wireScalarInputs,
@@ -227,7 +223,6 @@ const ctx = {
             defaultSearchEngine: state.defaultSearchEngine,
         });
         updateSyncLed(fresh.id);
-        wireAuditHistory(fresh.id, () => getAuditHistory("Songs", fresh.id));
 
         if (!structuralChange && state.chipHandles && state.scalarHandles) {
             // Surgical updates for performance and focus preservation
@@ -537,16 +532,11 @@ async function openAlbumDetail(album) {
     const request = beginDetailRequest("albums", album.id);
     renderAlbumDetailLoading(ctx, album);
 
-    const [albumResult, auditResult] = await Promise.allSettled([
+    const [albumResult] = await Promise.allSettled([
         getAlbumDetail(album.id, { signal: request.signal }),
-        getAuditHistory("Albums", album.id, { signal: request.signal }),
     ]);
 
-    if (
-        (albumResult.status === "rejected" &&
-            isAbortError(albumResult.reason)) ||
-        (auditResult.status === "rejected" && isAbortError(auditResult.reason))
-    ) {
+    if (albumResult.status === "rejected" && isAbortError(albumResult.reason)) {
         return;
     }
     if (!isActiveDetail("albums", album.id)) {
@@ -559,28 +549,21 @@ async function openAlbumDetail(album) {
         return;
     }
 
-    renderAlbumDetailComplete(
-        ctx,
-        albumResult.value,
-        auditResult.status === "fulfilled" ? auditResult.value : [],
-    );
+    renderAlbumDetailComplete(ctx, albumResult.value, []);
 }
 
 async function openArtistDetail(artist) {
     const request = beginDetailRequest("artists", artist.id);
     renderArtistDetailLoading(ctx, artist);
 
-    const [treeResult, songsResult, auditResult] = await Promise.allSettled([
+    const [treeResult, songsResult] = await Promise.allSettled([
         getArtistTree(artist.id, { signal: request.signal }),
         getArtistSongs(artist.id, { signal: request.signal }),
-        getAuditHistory("Identities", artist.id, { signal: request.signal }),
     ]);
 
     if (
         (treeResult.status === "rejected" && isAbortError(treeResult.reason)) ||
-        (songsResult.status === "rejected" &&
-            isAbortError(songsResult.reason)) ||
-        (auditResult.status === "rejected" && isAbortError(auditResult.reason))
+        (songsResult.status === "rejected" && isAbortError(songsResult.reason))
     ) {
         return;
     }
@@ -595,12 +578,7 @@ async function openArtistDetail(artist) {
     }
 
     const tree = treeResult.status === "fulfilled" ? treeResult.value : artist;
-    renderArtistDetailComplete(
-        ctx,
-        tree,
-        songsResult.value,
-        auditResult.status === "fulfilled" ? auditResult.value : [],
-    );
+    renderArtistDetailComplete(ctx, tree, songsResult.value, []);
 }
 
 async function openPublisherDetail(publisher) {
@@ -701,7 +679,6 @@ async function openSelectedResult(index) {
         if (!result || !isActiveDetail("songs", selected.id)) return;
         state.activeSong = result;
         renderSongEditorV2(result, null);
-        wireAuditHistory(result.id, () => getAuditHistory("Songs", result.id));
         renderActionSidebar(result, {
             searchEngines: state.searchEngines,
             defaultSearchEngine: state.defaultSearchEngine,
@@ -853,38 +830,15 @@ async function setupHeaderDropZone() {
         const items = e.dataTransfer?.items;
         if (!items || items.length === 0) return;
 
-        const allFiles = await collectFilesFromItems(
-            items,
-            state.allowedExtensions,
-        );
-        if (allFiles.length === 0) {
-            showToast("No valid audio files found in drop", "error", 3000);
-            return;
-        }
-
-        const formData = new FormData();
-        allFiles.forEach((f) => formData.append("files", f));
-
-        try {
-            const response = await uploadFiles(allFiles);
-            if (!response.ok) throw new Error("Upload failed");
-
-            await readNdjsonStream(response, (update) => {
-                if (update.error) {
-                    showToast(update.error, "error");
-                    return;
-                }
-                if (update.started) {
-                    updateIngestBadges({ currentFile: update.filename });
-                    return;
-                }
-                updateIngestBadges({
-                    success: update.success,
-                    action: update.action,
-                    pending: update.pending,
-                    currentFile: null,
-                });
-
+        await handleIngestDrop(items, state.allowedExtensions, {
+            onEmpty() {
+                showToast("No valid audio files found in drop", "error", 3000);
+            },
+            onStarted(update) {
+                updateIngestBadges({ currentFile: update.filename });
+            },
+            onUpdate(update) {
+                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
                 const res = update.last_result;
                 if (res) {
                     const title = res.display_title || "Unknown File";
@@ -892,11 +846,12 @@ async function setupHeaderDropZone() {
                     const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
                     showToast(`${res.status_label}: ${title}`, severity, duration);
                 }
-            });
-        } catch (error) {
-            console.error("Ingestion failed:", error);
-            showToast("Ingestion failed: " + error.message, "error", 5000);
-        }
+            },
+            onError(err) {
+                console.error("Ingestion failed:", err);
+                showToast("Ingestion failed: " + err.message, "error", 5000);
+            },
+        });
     });
 }
 

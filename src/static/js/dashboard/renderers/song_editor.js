@@ -955,38 +955,6 @@ export function renderSongEditorMultiSelect(count) {
     if (sidebar) sidebar.innerHTML = "";
 }
 
-export function wireAuditHistory(songId, fetchAuditHistory) {
-    const details = document.querySelector(
-        `.editor-audit-details[data-song-id="${songId}"]`,
-    );
-    if (!details) return;
-    let loaded = false;
-    details.addEventListener("toggle", async () => {
-        if (!details.open || loaded) return;
-        loaded = true;
-        const body = details.querySelector(".editor-audit-body");
-        try {
-            const history = await fetchAuditHistory();
-            if (!history || history.length === 0) {
-                body.innerHTML = `<div class="audit-empty">No history found.</div>`;
-                return;
-            }
-            body.innerHTML = history
-                .map(
-                    (entry) => `
-<div class="audit-entry">
-  <span class="audit-ts">${escapeHtml(entry.timestamp || "")}</span>
-  <span class="audit-action">${escapeHtml(entry.type || "")}</span>
-  <span class="audit-details">${escapeHtml(entry.label || "")}${entry.old != null ? ` (${escapeHtml(String(entry.old))} → ${escapeHtml(String(entry.new ?? ""))})` : ""}</span>
-</div>`,
-                )
-                .join("");
-        } catch {
-            body.innerHTML = `<div class="audit-empty">Failed to load history.</div>`;
-        }
-    });
-}
-
 export function renderSongEditorEmpty() {
     const panel = document.getElementById("editor-panel");
     if (!panel) return;

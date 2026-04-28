@@ -184,9 +184,7 @@ function renderSongRows(ctx, songs) {
         .map((song, index) => {
             const title = escapeHtml(song.display_title);
             const artist = escapeHtml(song.display_artist || "Unknown Artist");
-            const ext = (song.source_path || "").split(".").pop()?.toUpperCase() || "";
-            const formatPill = ext ? `<span class="pill" title="Format">${escapeHtml(ext)}</span>` : "";
-            const pills = formatPill + (song.review_blockers || [])
+            const pills = (song.review_blockers || [])
                 .map((b) => `<span class="pill miss" title="Missing: ${b.name}">${b.pill}</span>`)
                 .join("");
             const selectedClass = song.id === selectedId ? " selected" : "";

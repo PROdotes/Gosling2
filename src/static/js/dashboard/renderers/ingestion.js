@@ -69,6 +69,37 @@ export async function collectFilesFromItems(items, allowedExtensions) {
     return files;
 }
 
+/**
+ * Shared ingest drop pipeline: collect → upload → stream.
+ * @param {DataTransferItemList} items
+ * @param {string[]} allowedExtensions
+ * @param {{ onStarted(update): void, onUpdate(update): void, onError(err): void, onEmpty(): void }} callbacks
+ */
+export async function handleIngestDrop(items, allowedExtensions, { onStarted, onUpdate, onError, onEmpty }) {
+    const allFiles = await collectFilesFromItems(items, allowedExtensions);
+    if (allFiles.length === 0) {
+        onEmpty();
+        return;
+    }
+    try {
+        const response = await uploadFiles(allFiles);
+        if (!response.ok) throw new Error("Upload failed");
+        await readNdjsonStream(response, (update) => {
+            if (update.error) {
+                onError(new Error(update.error));
+                return;
+            }
+            if (update.started) {
+                onStarted(update);
+                return;
+            }
+            onUpdate(update);
+        });
+    } catch (err) {
+        onError(err);
+    }
+}
+
 export async function renderIngestionPanel(ctx) {
     ctx.updateResultsSummary(0, "ingestion check");
 
@@ -306,74 +337,33 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
         zone.classList.remove("drag-over");
 
         const items = e.dataTransfer?.items;
-
-        if (!items || items.length === 0) {
-            return;
-        }
+        if (!items || items.length === 0) return;
 
         showLoading(true);
-        try {
-            // Recursively collect all files from dropped items (supports folders)
-            const allFiles = await collectFilesFromItems(
-                items,
-                allowedExtensions,
-            );
-
-            if (allFiles.length === 0) {
-                appendResult(
-                    resultsId,
-                    {
-                        status: "ERROR",
-                        message: "No audio files found in dropped folder(s)",
-                    },
-                    "Drag and Drop",
-                    ctx,
-                );
+        await handleIngestDrop(items, allowedExtensions, {
+            onEmpty() {
+                appendResult(resultsId, { status: "ERROR", message: "No audio files found in dropped folder(s)" }, "Drag and Drop", ctx);
                 showLoading(false);
-                return;
-            }
-
-            // Upload all collected files
-            const response = await uploadFiles(allFiles);
-            if (!response.ok) throw new Error("Upload failed");
-
-            await readNdjsonStream(response, (update) => {
-                if (update.error) {
-                    showToast(update.error, "error");
-                    return;
-                }
-                if (update.started) {
-                    insertPendingCard(resultsId, update.filename, update.is_wav);
-                    ctx.updateIngestBadges?.({ currentFile: update.filename });
-                    return;
-                }
-                ctx.updateIngestBadges?.({
-                    success: update.success,
-                    action: update.action,
-                    pending: update.pending,
-                    currentFile: null,
-                });
+            },
+            onStarted(update) {
+                insertPendingCard(resultsId, update.filename, update.is_wav);
+                ctx.updateIngestBadges?.({ currentFile: update.filename });
+            },
+            onUpdate(update) {
+                ctx.updateIngestBadges?.({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
                 const res = update.last_result;
                 if (res) {
-                    const fileName =
-                        basename(res.song?.source_path) ||
-                        basename(res.staged_path) ||
-                        "Unknown";
+                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
                     resolvePendingCard(resultsId, res, fileName, update.filename);
                     _trackResult(res, fileName, ctx);
                 }
-            });
-        } catch (error) {
-            console.error("Drop error:", error);
-            appendResult(
-                resultsId,
-                { status: "ERROR", message: error.message },
-                "Batch Upload",
-                ctx,
-            );
-        } finally {
-            showLoading(false);
-        }
+            },
+            onError(err) {
+                console.error("Drop error:", err);
+                appendResult(resultsId, { status: "ERROR", message: err.message }, "Batch Upload", ctx);
+            },
+        });
+        showLoading(false);
     });
 }
 
