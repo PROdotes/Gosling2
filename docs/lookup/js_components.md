@@ -95,8 +95,6 @@ Displays a temporary banner (info, success, error).
 ### renderSongList(songs, emptyMessage)
 Renders a vertical list of song rows with standardized metadata layout.
 
-### renderAuditTimeline(history)
-Renders a vertical chronological list of audit entries.
 
 ### renderEmptyState(container, message)
 Renders a centered placeholder view.

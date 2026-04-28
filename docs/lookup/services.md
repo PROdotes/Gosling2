@@ -535,12 +535,6 @@ Converts text to Sentence Case (First letter capitalized, the rest lowercase).
 
 ---
 
-## AuditService
-*Location: `src/services/audit_service.py`*
-
-### get_history(record_id: int, table: str) -> List[Dict[str, Any]]
-Unified timeline of actions and changes for a record.
-
 ---
 
 ## FilingService

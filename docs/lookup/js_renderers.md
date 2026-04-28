@@ -53,8 +53,6 @@ Attaches inline-edit triggers to scalar fields on album cards (track number, dis
 ### wireChipInputs(container, song)
 Attaches link-modal triggers to all relationship chips (Artists, Albums, Tags).
 
-### wireAuditHistory(container, song)
-Triggers lazy-loading and rendering of the audit trail.
 
 ### wireDriftIndicators(container, song)
 Initializes ID3 sync status indicators (LEDs).
@@ -122,6 +120,9 @@ Renders the skeleton loader for tag details.
 
 ### renderIngestionPanel(container, history)
 Renders the file staging workflow (drop-zone, path input, verification results).
+
+### handleIngestDrop(items, allowedExtensions, callbacks)
+Orchestrates the drag-and-drop ingestion pipeline.
 
 ### collectFilesFromItems(dataTransferItems)
 Utility to recursively collect files from a drag-and-drop event.

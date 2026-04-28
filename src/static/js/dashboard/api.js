@@ -219,9 +219,6 @@ export function getPublisherSongs(id, options = {}) {
     return fetchJson(`/api/v1/publishers/${id}/songs`, options);
 }
 
-export function getAuditHistory(table, id, options = {}) {
-    return fetchJson(`/api/v1/audit/history/${table}/${id}`, options);
-}
 
 export function checkIngestion(filePath) {
     return fetchJson("/api/v1/catalog/ingest/check", {

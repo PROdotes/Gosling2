@@ -8,8 +8,8 @@
 
 ## BaseRepository
 
-*Location: `src/data/base_repository.py`_
-**Responsibility**: The connection owner and audit spine for all repositories.
+*Location: `src/data/base_repository.py`*
+**Responsibility**: The connection owner for all repositories.
 
 ### _get_connection() -> sqlite3.Connection
 
@@ -573,32 +573,7 @@ Merges a solo (orphan) identity into another by repointing all credits and soft-
 
 ---
 
-## AuditRepository
 
-*Location: `src/data/audit_repository.py`_
-**Responsibility**: Low-level database access for Audit tables (`ActionLog`, `ChangeLog`, `DeletedRecords`).
-
-### get_actions_for_target(target_id: int, table: str) -> List[AuditAction]
-
-Fetch high-level events (IMPORT, DELETE) for a specific record.
-
-### get_changes_for_record(record_id: int, table: str) -> List[AuditChange]
-
-Fetch field-level modifications for a specific record.
-
-### get_deleted_snapshot(record_id: int, table: str) -> Optional[DeletedRecord]
-
-Fetch the last JSON snapshot of a deleted record.
-
-### _row_to_action(row: sqlite3.Row) -> AuditAction
-
-### _row_to_change(row: sqlite3.Row) -> AuditChange
-
-### _row_to_deleted(row: sqlite3.Row) -> DeletedRecord
-
-**Internal**: Maps physical database rows to the `Audit*` domain models.
-
----
 
 ## StagingRepository
 

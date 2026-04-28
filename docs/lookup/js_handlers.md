@@ -22,6 +22,9 @@ Checks ID3 sync status and updates the UI indicator.
 ### handleDeleteSong(actionTarget)
 Handles song deletion.
 
+### handleRejectSong(actionTarget, event)
+Handles song rejection.
+
 ### handleToggleActive(actionTarget, event)
 Toggles song active status.
 

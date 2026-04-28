@@ -566,34 +566,34 @@ class TestSongViewReviewWorkflow:
         view = self._make_song_view(
             credits=[SongCredit(role_name="Composer", display_name="Artist B")]
         )
-        assert "performers" in view.review_blockers
+        assert any(b["name"] == "performers" for b in view.review_blockers)
 
     def test_ready_flow_missing_composer(self):
         """Required: at least 1 Composer."""
         view = self._make_song_view(
             credits=[SongCredit(role_name="Performer", display_name="Artist A")]
         )
-        assert "composers" in view.review_blockers
+        assert any(b["name"] == "composers" for b in view.review_blockers)
 
     def test_ready_flow_missing_genre(self):
         """Required: at least 1 Genre tag."""
         view = self._make_song_view(tags=[Tag(name="Fast", category="Tempo")])
-        assert "genres" in view.review_blockers
+        assert any(b["name"] == "genres" for b in view.review_blockers)
 
     def test_ready_flow_missing_publisher(self):
         """Required: at least 1 Publisher."""
         view = self._make_song_view(publishers=[])
-        assert "publishers" in view.review_blockers
+        assert any(b["name"] == "publishers" for b in view.review_blockers)
 
     def test_ready_flow_missing_year(self):
         """Required: Year."""
         view = self._make_song_view(year=None)
-        assert "year" in view.review_blockers
+        assert any(b["name"] == "year" for b in view.review_blockers)
 
     def test_ready_flow_missing_duration(self):
         """Required: at least 1 second duration."""
         view = self._make_song_view(duration_s=0.0)
-        assert "duration" in view.review_blockers
+        assert any(b["name"] == "duration" for b in view.review_blockers)
 
     def test_ready_flow_already_approved(self):
         """Songs already at status 0 still report blockers correctly."""

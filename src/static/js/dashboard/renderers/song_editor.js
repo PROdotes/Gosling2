@@ -1052,10 +1052,6 @@ export function renderSongEditorV2(song, fileData = null) {
   </div>`
           : ""
   }
-  <details class="editor-audit-details" data-song-id="${escapeHtml(String(song.id))}">
-    <summary class="editor-audit-summary">Audit History</summary>
-    <div class="editor-audit-body">Loading…</div>
-  </details>
 </div>
 `;
 }

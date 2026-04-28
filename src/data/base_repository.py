@@ -3,7 +3,7 @@ import sqlite3
 
 class BaseRepository:
     """
-    The connection owner and audit spine for all v3core repositories.
+    The connection owner for all v3core repositories.
     All concrete repositories inherit from this.
     """
 

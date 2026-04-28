@@ -24,7 +24,7 @@ import sqlite3  # noqa: E402
 import pytest  # noqa: E402
 from src.data.schema import SCHEMA_SQL  # noqa: E402
 from src.services.catalog_service import CatalogService  # noqa: E402
-from src.services.audit_service import AuditService  # noqa: E402
+# from src.services.audit_service import AuditService  # REMOVED
 from src.engine import config  # noqa: E402
 
 
@@ -174,11 +174,6 @@ def mock_db_path(empty_db):
 #
 # RECORDING PUBLISHERS:
 #   Song 1 -> DGC Records(10)
-#
-# AUDIT DATA:
-#   ActionLog: ActionID=1, RENAME on ArtistNames ID=33, "User updated artist name"
-#   ChangeLog: LogID=1, ArtistNames record 33, DisplayName: "PinkPantheress" -> "Ines Prajo"
-#   DeletedRecords: DeleteID=1, Songs record 99, snapshot='{"Title": "Deleted Song", "Type": "Song"}'
 #
 # ROLES:
 #   1: Performer, 2: Composer, 3: Lyricist, 4: Producer
@@ -407,22 +402,7 @@ def _populate_db_data(db_path):
             (source_id, tag_id, is_primary),
         )
 
-    # --- Audit Data ---
-    cursor.execute(
-        "INSERT INTO ActionLog (ActionID, ActionLogType, TargetTable, ActionTargetID, ActionDetails) "
-        "VALUES (1, 'RENAME', 'ArtistNames', 33, 'User updated artist name')"
-    )
-    cursor.execute(
-        "INSERT INTO ChangeLog (LogID, LogTableName, RecordID, LogFieldName, OldValue, NewValue) "
-        "VALUES (1, 'ArtistNames', 33, 'DisplayName', 'PinkPantheress', 'Ines Prajo')"
-    )
-
-    # --- Deleted Records ---
-    cursor.execute(
-        "INSERT INTO DeletedRecords (DeleteID, DeletedFromTable, RecordID, FullSnapshot) "
-        """VALUES (1, 'Songs', 99, '{"Title": "Deleted Song", "Type": "Song"}')"""
-    )
-
+    # --- Finalize ---
     conn.commit()
     conn.close()
 
@@ -533,17 +513,6 @@ def catalog_service_empty(empty_db):
     """CatalogService wired to an empty test DB."""
     return CatalogService(empty_db)
 
-
-@pytest.fixture
-def audit_service(populated_db):
-    """AuditService wired to the populated test DB."""
-    return AuditService(populated_db)
-
-
-@pytest.fixture
-def audit_service_empty(empty_db):
-    """AuditService wired to an empty test DB."""
-    return AuditService(empty_db)
 
 
 @pytest.fixture

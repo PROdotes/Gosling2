@@ -21,6 +21,9 @@ from src.data.schema import SCHEMA_SQL
 
 def _ensure_db():
     db_path = get_db_path()
+    abs_path = db_path.resolve()
+    cwd = os.getcwd()
+    logger.info(f"[EngineServer] DB init: raw={db_path} resolved={abs_path} cwd={cwd}")
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     conn.create_collation(
@@ -31,7 +34,7 @@ def _ensure_db():
     conn.execute("INSERT OR IGNORE INTO Types (TypeID, TypeName) VALUES (1, 'Song')")
     conn.commit()
     conn.close()
-    logger.info(f"[EngineServer] DB ready at {db_path}")
+    logger.info(f"[EngineServer] DB ready at {abs_path}")
 
 
 @asynccontextmanager

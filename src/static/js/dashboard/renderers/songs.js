@@ -2,7 +2,6 @@ import {
     asArray,
     buildNavigateAttrs,
     escapeHtml,
-    renderAuditTimeline,
     renderEmptyState,
     renderStatus,
     textOrDash,

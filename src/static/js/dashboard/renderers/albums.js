@@ -2,7 +2,6 @@ import {
     asArray,
     buildNavigateAttrs,
     escapeHtml,
-    renderAuditTimeline,
     renderSongList,
     renderStatus,
     textOrDash,
@@ -109,7 +108,7 @@ export function renderAlbumDetailLoading(ctx, album) {
     );
 }
 
-export function renderAlbumDetailComplete(ctx, album, auditHistory) {
+export function renderAlbumDetailComplete(ctx, album) {
     const credits = asArray(album.credits);
     const songs = asArray(album.songs);
     const publishers = asArray(album.publishers);
@@ -152,10 +151,7 @@ export function renderAlbumDetailComplete(ctx, album, auditHistory) {
                 ${renderSongList(songs)}
             </div>
 
-            <div class="detail-section">
-                <div class="title">Lifecycle & History</div>
-                ${renderAuditTimeline(auditHistory)}
-            </div>
+
 
             ${renderDeleteSection("delete-album", albumId, album.can_delete, "Cannot delete — album has songs")}
         </div>

@@ -141,48 +141,4 @@ export function isModalOpen() {
     });
 }
 
-export function renderAuditTimeline(history) {
-    const items = asArray(history);
-    if (!items.length) {
-        return '<div class="audit-empty">No history found for this record</div>';
-    }
 
-    return `
-        <div class="audit-list">
-            ${items
-                .map((item) => {
-                    const type = (item.type || "ACTION").toUpperCase();
-                    const typeClass = escapeHtml(type);
-                    let detailsHtml = escapeHtml(
-                        item.details || item.label || "",
-                    );
-
-                    if (item.type === "CHANGE" && item.new !== undefined) {
-                        const oldValue =
-                            item.old === null || item.old === ""
-                                ? "(empty)"
-                                : item.old;
-                        const newValue =
-                            item.new === null || item.new === ""
-                                ? "(empty)"
-                                : item.new;
-                        const label = item.label
-                            ? `${escapeHtml(item.label)}: `
-                            : "";
-                        detailsHtml = `${label}<span class="audit-old">${escapeHtml(oldValue)}</span><span class="audit-new">${escapeHtml(newValue)}</span>`;
-                    } else if (item.type === "LIFECYCLE" && item.snapshot) {
-                        detailsHtml = `${escapeHtml(item.label || "Lifecycle")} — ${escapeHtml(item.snapshot)}`;
-                    }
-
-                    return `
-                    <div class="audit-entry">
-                        <span class="audit-ts">${escapeHtml(item.timestamp || "")}</span>
-                        <span class="audit-action ${typeClass}">${typeClass}</span>
-                        <span class="audit-details">${detailsHtml}</span>
-                    </div>
-                `;
-                })
-                .join("")}
-        </div>
-    `;
-}

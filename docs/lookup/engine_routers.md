@@ -327,18 +327,6 @@ Used by `update_identity_legal_name`.
 
 ---
 
-## Audit Router
-*Location: `src/engine/routers/audit.py`*
-**Responsibility**: HTTP interface for unified history logs.
-
-### def _get_service() -> AuditService
-**Internal**: Centralized service factory for the router.
-
-### async def get_history(table: str, record_id: int) -> List[Dict[str, Any]]
-**HTTP**: `GET /api/v1/audit/history/{table}/{record_id}`
-- Fetches the complete unified audit timeline for a record.
-- Matches `ActionLog`, `ChangeLog`, and `DeletedRecords` snapshots.
-
 ---
 
 

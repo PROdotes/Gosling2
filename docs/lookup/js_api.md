@@ -72,8 +72,6 @@ Fetches all songs associated with a tag.
 ### getTagCategories()
 Fetches list of unique tag categories.
 
-### getAuditHistory(table, id, options)
-Fetches audit trail for a specific record.
 
 ---
 
@@ -84,6 +82,9 @@ Updates scalar fields (BPM, Year, ISRC, etc).
 
 ### deleteSong(id)
 Soft-deletes a song.
+
+### rejectSong(id)
+Marks a song as rejected and removes it from staging.
 
 ### moveSongToLibrary(id)
 Moves song from staging to organized library.

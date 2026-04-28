@@ -2,7 +2,6 @@ import {
     asArray,
     buildNavigateAttrs,
     escapeHtml,
-    renderAuditTimeline,
     renderSongList,
     renderStatus,
 } from "../components/utils.js";
@@ -82,7 +81,7 @@ export function renderArtistDetailLoading(ctx, artist) {
     );
 }
 
-export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
+export function renderArtistDetailComplete(ctx, tree, songs) {
     const aliases = renderAliasTags(tree.aliases);
     const members = renderIdentityTags(tree.members);
     const groups = renderIdentityTags(tree.groups);
@@ -103,10 +102,7 @@ export function renderArtistDetailComplete(ctx, tree, songs, auditHistory) {
                 ${catalogHtml}
             </div>
 
-            <div class="detail-section">
-                <div class="title">Lifecycle & History</div>
-                ${renderAuditTimeline(auditHistory)}
-            </div>
+
 
             ${renderDeleteSection("delete-identity", tree.id, tree.can_delete, "Cannot delete — identity is linked to songs or albums")}
         </div>
