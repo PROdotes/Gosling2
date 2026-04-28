@@ -1055,3 +1055,17 @@
     border-top: 1px solid var(--border-subtle);
     padding-top: 8px;
 }
+
+#songs-workspace {
+    position: relative;
+}
+
+#songs-workspace.drop-target::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 2px dashed var(--accent);
+    box-shadow: inset 0 0 24px var(--accent-glow);
+    pointer-events: none;
+    z-index: 9999;
+}

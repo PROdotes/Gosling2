@@ -855,6 +855,56 @@ async function setupHeaderDropZone() {
     });
 }
 
+async function setupSongsWorkspaceDropZone() {
+    const workspace = document.getElementById("songs-workspace");
+    if (!workspace) return;
+
+    workspace.addEventListener("dragover", (e) => {
+        if (state.currentMode !== "songs") return;
+        e.preventDefault();
+        workspace.classList.add("drop-target");
+    });
+
+    workspace.addEventListener("dragleave", (e) => {
+        if (!workspace.contains(e.relatedTarget)) {
+            workspace.classList.remove("drop-target");
+        }
+    });
+
+    workspace.addEventListener("drop", async (e) => {
+        if (state.currentMode !== "songs") return;
+        e.preventDefault();
+        e.stopPropagation();
+        workspace.classList.remove("drop-target");
+
+        const items = e.dataTransfer?.items;
+        if (!items || items.length === 0) return;
+
+        await handleIngestDrop(items, state.allowedExtensions, {
+            onEmpty() {
+                showToast("No valid audio files found in drop", "error", 3000);
+            },
+            onStarted(update) {
+                updateIngestBadges({ currentFile: update.filename });
+            },
+            onUpdate(update) {
+                updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
+                const res = update.last_result;
+                if (res) {
+                    const title = res.display_title || "Unknown File";
+                    const severity = res.status_severity || "error";
+                    const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
+                    showToast(`${res.status_label}: ${title}`, severity, duration);
+                }
+            },
+            onError(err) {
+                console.error("Ingestion failed:", err);
+                showToast("Ingestion failed: " + err.message, "error", 5000);
+            },
+        });
+    });
+}
+
 document.addEventListener("checkchange", () => {
     if (state.currentMode !== "songs") return;
     const panel = document.getElementById("song-list-panel");
@@ -946,6 +996,7 @@ Promise.all([
     }
 });
 setupHeaderDropZone();
+setupSongsWorkspaceDropZone();
 filterLoadPromise.then(() => {
     if (!filterSidebar.hasActiveFilters()) performSearch("");
 });
