@@ -180,7 +180,7 @@ class MediaSourceRepository(BaseRepository):
             notes=row["SourceNotes"] if "SourceNotes" in row.keys() else None,
         )
 
-    def soft_delete(self, source_id: int, conn: sqlite3.Connection) -> bool:
+    def soft_delete(self, source_id: int, conn: sqlite3.Connection, notes: str = None) -> bool:
         """
         Soft-delete a MediaSource by setting IsDeleted = 1.
         Returns True if a record was updated, False if not found or already deleted.
@@ -188,10 +188,16 @@ class MediaSourceRepository(BaseRepository):
         logger.debug(f"[MediaSourceRepository] -> soft_delete(id={source_id})")
         cursor = conn.cursor()
 
-        cursor.execute(
-            "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ? AND IsDeleted = 0",
-            (source_id,),
-        )
+        if notes is not None:
+            cursor.execute(
+                "UPDATE MediaSources SET IsDeleted = 1, SourceNotes = ? WHERE SourceID = ? AND IsDeleted = 0",
+                (notes, source_id),
+            )
+        else:
+            cursor.execute(
+                "UPDATE MediaSources SET IsDeleted = 1 WHERE SourceID = ? AND IsDeleted = 0",
+                (source_id,),
+            )
         count = cursor.rowcount
 
         if count > 0:

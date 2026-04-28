@@ -1,17 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from src.services.edit_service import EditService
 from src.models.domain import Album
-from src.engine.routers.song_updates import _get_service
 from src.services.logger import logger
 
-router = APIRouter(prefix="/albums", tags=["albums", "write"])
+router = APIRouter(prefix="/api/v1/albums", tags=["albums", "write"])
+
+
+def _get_edit_service() -> EditService:
+    return EditService()
 
 
 @router.post("/{album_id}/sync-from-song/{song_id}", response_model=Album)
 async def sync_album_with_song(
     album_id: int,
     song_id: int,
-    service: EditService = Depends(_get_service),
+    service: EditService = Depends(_get_edit_service),
 ) -> Album:
     """
     Sync album metadata from a song (backend implementation of CW-1).

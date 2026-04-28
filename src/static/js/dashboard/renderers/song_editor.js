@@ -941,7 +941,10 @@ ${targetPath}
 <div class="sidebar-divider"></div>
 
 ${deleteOriginalBtn}
-<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}" style="margin-top:auto">🗑 Delete Record</button>
+<div style="margin-top:auto; display:flex; flex-direction:column; gap:6px;">
+<button class="sidebar-btn sidebar-btn--warning" data-action="reject-song" data-id="${song.id}">Reject Song</button>
+<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}">Delete Record</button>
+</div>
 `;
 }
 

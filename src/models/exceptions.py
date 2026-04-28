@@ -20,12 +20,14 @@ class ReingestionConflictError(IngestionError):
         duration_s: float,
         year: int = None,
         isrc: str = None,
+        notes: str = None,
     ):
         self.ghost_id = ghost_id
         self.title = title
         self.duration_s = duration_s
         self.year = year
         self.isrc = isrc
+        self.notes = notes
         # User requested specific message format
         message = f"song with that hash already exists, {title}, {duration_s}"
         super().__init__(message, status_code=409)

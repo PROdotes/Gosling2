@@ -656,9 +656,11 @@ function createResultCard(result, path) {
 
             ${
                 status === "CONFLICT"
-                    ? `
+                    ? (() => {
+                        const isRejected = result.notes && result.notes.startsWith("REJECTED");
+                        return `
                 <div class="pending-convert-box" data-ghost-box>
-                    <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: var(--accent-amber); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Existing Ghost Record (Soft-Deleted)</div>
+                    <div class="muted-note" style="font-size: 10px; margin-bottom: 6px; color: ${isRejected ? "var(--danger)" : "var(--accent-amber)"}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${isRejected ? "Rejected Song" : "Existing Ghost Record (Soft-Deleted)"}</div>
                     <div style="display: grid; grid-template-columns: 70px 1fr; gap: 4px 8px; font-size: 12px;">
                         <div class="muted-note">ID:</div>
                         <div class="mono">#${result.ghost_id}</div>
@@ -671,16 +673,16 @@ function createResultCard(result, path) {
                         <div class="muted-note">ISRC:</div>
                         <div class="mono">${result.isrc ? escapeHtml(result.isrc) : "(none)"}</div>
                     </div>
-                    <div class="muted-note" style="font-size: 11px; margin-top: 8px; font-style: italic;">
-                        This file matches a previously deleted record. Re-activate with new metadata.
+                    <div class="muted-note" style="font-size: 11px; margin-top: 8px; font-style: italic; color: ${isRejected ? "var(--danger)" : "inherit"};">
+                        ${isRejected ? "This song was previously rejected — it is not suitable for this station. Re-ingest only if you are sure." : "This file matches a previously deleted record. Re-activate with new metadata."}
                     </div>
                     <div style="margin-top: 8px;">
                         <button type="button" class="ingest-btn-primary" data-action="resolve-conflict" data-ghost-id="${result.ghost_id}" data-staged-path="${escapeHtml(result.staged_path)}">
                             Re-ingest & Activate
                         </button>
                     </div>
-                </div>
-            `
+                </div>`;
+                    })()
                     : ""
             }
 

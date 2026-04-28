@@ -1007,7 +1007,7 @@ class EditService:
             return CasingService.to_sentence_case(value)
         return value.strip()
 
-    def delete_song(self, song_id: int, staging_dir: Optional[Path] = None) -> bool:
+    def delete_song(self, song_id: int, staging_dir: Optional[Path] = None, notes: str = None) -> bool:
         """Soft-delete a single song. Handles physical cleanup if in staging."""
         song = self._song_repo.get_by_id(song_id)
         if not song:
@@ -1018,7 +1018,7 @@ class EditService:
         conn = self._song_repo.get_connection()
         try:
             self._song_repo.delete_song_links(song_id, conn)
-            success = self._song_repo.soft_delete(song_id, conn)
+            success = self._song_repo.soft_delete(song_id, conn, notes=notes)
             if not success:
                 conn.rollback()
                 return False

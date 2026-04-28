@@ -390,6 +390,7 @@ class IngestionService:
                     duration_s=check["ghost_song"]["duration_s"],
                     year=check["ghost_song"].get("year"),
                     isrc=check["ghost_song"].get("isrc"),
+                    notes=check["ghost_song"].get("notes"),
                 )
 
             if os.path.exists(staged_path) and check["status"] not in (
@@ -427,6 +428,7 @@ class IngestionService:
                     duration_s=ghost_meta["duration_s"],
                     year=ghost_meta.get("year"),
                     isrc=ghost_meta.get("isrc"),
+                    notes=ghost_meta.get("notes"),
                 )
 
             if os.path.exists(staged_path):
@@ -563,6 +565,7 @@ class IngestionService:
                 "duration_s": e.duration_s,
                 "year": e.year,
                 "isrc": e.isrc,
+                "notes": e.notes,
                 "staged_path": file_path,
                 "song": None,
             }

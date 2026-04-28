@@ -7,6 +7,7 @@ import {
     getSongSyncStatus,
     syncAlbumFromSong,
     deleteSong,
+    rejectSong,
     patchSongScalars,
     moveSongToLibrary,
     cleanupOriginalFile,
@@ -98,6 +99,7 @@ export class SongActionsHandler {
             "unreview-song",
             "toggle-active",
             "delete-song",
+            "reject-song",
             "close-spotify-modal",
             "close-splitter-modal",
             "close-filename-parser-modal",
@@ -208,6 +210,55 @@ export class SongActionsHandler {
             actionTarget.textContent = "Delete";
             if (this.ctx.showBanner) {
                 this.ctx.showBanner(`Deletion failed: ${err.message}`, "error");
+            }
+        }
+    }
+
+    async handleRejectSong(actionTarget) {
+        const id = actionTarget.dataset.id || actionTarget.dataset.songId;
+
+        if (!actionTarget.classList.contains("confirming")) {
+            const originalText = actionTarget.textContent;
+            actionTarget.classList.add("confirming");
+            actionTarget.textContent = "Confirm Reject?";
+
+            setTimeout(() => {
+                if (
+                    actionTarget.classList.contains("confirming") &&
+                    !actionTarget.disabled
+                ) {
+                    actionTarget.classList.remove("confirming");
+                    actionTarget.textContent = originalText;
+                }
+            }, 3000);
+            return;
+        }
+
+        actionTarget.disabled = true;
+        actionTarget.textContent = "Rejecting...";
+
+        try {
+            await rejectSong(id);
+            if (
+                this.ctx.getState().currentMode === "songs" &&
+                this.ctx.clearSongEditorV2
+            ) {
+                this.ctx.clearSongEditorV2();
+            } else if (this.ctx.hideDetailPanel) {
+                this.ctx.hideDetailPanel();
+            }
+
+            if (typeof performSearch === "function") {
+                performSearch();
+            } else if (this.ctx.performSearch) {
+                this.ctx.performSearch();
+            }
+        } catch (err) {
+            actionTarget.disabled = false;
+            actionTarget.classList.remove("confirming");
+            actionTarget.textContent = "Reject Song";
+            if (this.ctx.showBanner) {
+                this.ctx.showBanner(`Rejection failed: ${err.message}`, "error");
             }
         }
     }

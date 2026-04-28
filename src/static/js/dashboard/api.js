@@ -367,6 +367,12 @@ export function deleteSong(id) {
     });
 }
 
+export function rejectSong(id) {
+    return fetchJson(`/api/v1/ingest/songs/${id}?notes=REJECTED`, {
+        method: "DELETE",
+    });
+}
+
 export function moveSongToLibrary(id) {
     return fetchJson(`/api/v1/songs/${id}/move`, {
         method: "POST",

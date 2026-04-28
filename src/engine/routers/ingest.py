@@ -2,6 +2,7 @@ import os
 import shutil
 from uuid import uuid4
 from pathlib import Path
+from typing import Optional
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
@@ -294,14 +295,14 @@ async def scan_folder(request: FolderScanRequest):
 
 
 @router.delete("/songs/{song_id:int}")
-async def delete_song(song_id: int):
+async def delete_song(song_id: int, notes: Optional[str] = None):
     """
     Atomic hard-delete of a song by ID.
     Triggers DB cascade and physical cleanup if in staging.
     """
     logger.info(f"[IngestRouter] -> delete_song(id={song_id})")
     service = _get_service()
-    success = service.delete_song(song_id)
+    success = service.delete_song(song_id, notes=notes)
 
     if not success:
         logger.warning(f"[IngestRouter] Delete failed: Song ID {song_id} not found.")

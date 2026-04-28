@@ -128,9 +128,9 @@ class CatalogService:
         """Internal wrapper for thread-safe single file ingestion (Delegated)."""
         return self._ingestion_service._ingest_single(file_path)
 
-    def delete_song(self, song_id: int) -> bool:
+    def delete_song(self, song_id: int, notes: str = None) -> bool:
         """Soft-delete a single song. Handles physical cleanup if in staging."""
-        return self._edit_service.delete_song(song_id, staging_dir=STAGING_DIR)
+        return self._edit_service.delete_song(song_id, staging_dir=STAGING_DIR, notes=notes)
 
     def resolve_conflict(
         self, ghost_id: int, staged_path: str, original_path: Optional[str] = None
