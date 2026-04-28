@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 from pathlib import Path
 from typing import Optional, List, Dict, Any
@@ -403,8 +404,11 @@ class IngestionService:
             if os.path.exists(staged_path) and check["status"] not in (
                 "CONFLICT",
                 "PENDING_CONVERT",
+                "ALREADY_EXISTS",
             ) and self._is_staged(staged_path):
                 os.remove(staged_path)
+            if check["status"] == "ALREADY_EXISTS":
+                check["staged_path"] = staged_path
             return check
 
         # 2. Atomic Write
@@ -499,6 +503,48 @@ class IngestionService:
             return {"status": "ERROR", "message": str(e)}
         finally:
             conn.close()
+
+    def recover_file(self, song_id: int, recovery_path: str) -> Dict[str, Any]:
+        """
+        Overwrite the existing song's SourcePath with the recovered file and rehash.
+        Used when the original file was zeroed out (e.g. failed Recuva restore).
+        Does not touch any DB metadata — only SourcePath content and AudioHash.
+        """
+        logger.info(
+            f"[IngestionService] -> recover_file(song_id={song_id}, recovery='{recovery_path}')"
+        )
+
+        if not os.path.exists(recovery_path):
+            return {"status": "ERROR", "message": "Recovery file not found"}
+
+        existing = self._song_repo.get_by_id(song_id)
+        if not existing:
+            return {"status": "ERROR", "message": f"Song #{song_id} not found"}
+
+        dest_path = existing.source_path
+        if not dest_path:
+            return {"status": "ERROR", "message": f"Song #{song_id} has no source path"}
+
+        try:
+            shutil.copy2(recovery_path, dest_path)
+            new_hash = calculate_audio_hash(dest_path)
+            conn = self._song_repo.get_connection()
+            try:
+                self._song_repo.update_scalars(song_id, {"audio_hash": new_hash}, conn)
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                raise e
+            finally:
+                conn.close()
+
+            logger.info(
+                f"[IngestionService] <- recover_file(song_id={song_id}) OK, dest='{dest_path}'"
+            )
+            return {"status": "RECOVERED", "song_id": song_id, "dest_path": dest_path}
+        except Exception as e:
+            logger.error(f"[IngestionService] <- recover_file FAILED: {e}")
+            return {"status": "ERROR", "message": str(e)}
 
     def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
         """

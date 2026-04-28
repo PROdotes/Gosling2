@@ -41,7 +41,7 @@
             "target_path": "Cro {genre}/{year}/{artist} - {title}"
         },
         {
-            "match_genres": ["cro"],
+            "match_genres": ["cro", "instrumental"],
             "target_path": "{genre}/{year}/{artist} - {title}"
         }
     ]

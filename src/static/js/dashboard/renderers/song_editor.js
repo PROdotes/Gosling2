@@ -914,7 +914,10 @@ export function renderActionSidebar(
            <div class="sidebar-path" style="opacity:0.6">${escapeHtml(song.estimated_original_path)}</div>`
         : "";
 
-    const playBtn = `<button class="sidebar-btn" data-action="open-scrubber" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">▶ Play</button>`;
+    const fileIndicator = song.file_exists
+        ? `<span class="file-indicator file-indicator--ok" title="File found"></span>`
+        : `<span class="file-indicator file-indicator--missing" title="File not found"></span>`;
+    const playBtn = `<button class="sidebar-btn" data-action="open-scrubber" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">${fileIndicator} Play</button>`;
 
     const syncLedHtml = `<span class="sync-led" data-song-id="${song.id}" title="Checking sync..."></span><span class="sync-mismatch-list" data-song-id="${song.id}"></span>`;
 

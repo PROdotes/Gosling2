@@ -841,6 +841,18 @@
     width: auto;
 }
 
+#songs-workspace .file-indicator {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 4px;
+    flex-shrink: 0;
+}
+#songs-workspace .file-indicator--ok { background: #4ade80; }
+#songs-workspace .file-indicator--missing { background: #f87171; }
+
 #songs-workspace .web-search-dropdown {
     position: absolute;
     top: calc(100% + 4px);

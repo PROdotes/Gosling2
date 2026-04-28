@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
 from pydantic import BaseModel, computed_field, ConfigDict
@@ -183,6 +184,11 @@ class SongSlimView(BaseModel):
         entry = PROCESSING_STATUS_MAP.get(self.processing_status)
         return entry[1] if entry else "neutral"
 
+    @computed_field
+    @property
+    def file_exists(self) -> bool:
+        return bool(self.source_path and os.path.exists(self.source_path))
+
     @classmethod
     def from_row(cls, row: dict) -> "SongSlimView":
         return cls(
@@ -235,6 +241,11 @@ class SongView(BaseModel):
     original_exists: bool = False
 
     # Computed backend fields for frontend logic
+    @computed_field
+    @property
+    def file_exists(self) -> bool:
+        return bool(self.source_path and os.path.exists(self.source_path))
+
     @computed_field
     @property
     def is_in_staging(self) -> bool:

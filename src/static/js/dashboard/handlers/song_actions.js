@@ -74,6 +74,7 @@ export class SongActionsHandler {
         this.songActions = new Set([
             "convert-wav",
             "resolve-conflict",
+            "recover-file",
             "format-case",
             "remove-publisher",
             "open-spotify-modal",
@@ -363,9 +364,7 @@ export class SongActionsHandler {
             const song = state.activeSong;
             const hadOriginal = song && song.original_exists && song.id == id;
 
-            if (this.ctx.showBanner) {
-                this.ctx.showBanner("Organized successfully!", "success");
-            }
+            showToast("Organized successfully!", "success");
             if (this.ctx.refreshActiveSongV2) {
                 await this.ctx.refreshActiveSongV2(id);
             }
@@ -415,9 +414,7 @@ export class SongActionsHandler {
                 return;
             }
 
-            if (this.ctx.showBanner) {
-                this.ctx.showBanner(msg, "error");
-            }
+            showToast(msg, "error");
         }
     }
 
@@ -716,6 +713,33 @@ export class SongActionsHandler {
                         `;
                     }
                 }
+            }
+        } catch (err) {
+            actionTarget.disabled = false;
+            actionTarget.textContent = originalText;
+            showToast(`Error: ${err.message}`, "error");
+        }
+    }
+
+    async handleRecoverFile(actionTarget) {
+        const { songId, stagedPath } = actionTarget.dataset;
+        actionTarget.disabled = true;
+        const originalText = actionTarget.textContent;
+        actionTarget.textContent = "Recovering...";
+
+        try {
+            const res = await fetch(
+                `/api/v1/ingest/recover-file?song_id=${encodeURIComponent(songId)}&staged_path=${encodeURIComponent(stagedPath)}`,
+                { method: "POST" },
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || "Recovery failed");
+            }
+            showToast("File recovered successfully!", "success");
+            const card = actionTarget.closest(".result-card");
+            if (card) {
+                actionTarget.textContent = "Recovered";
             }
         } catch (err) {
             actionTarget.disabled = false;

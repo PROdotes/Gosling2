@@ -708,6 +708,11 @@ function createResultCard(result, path) {
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
                     </button>
+                    ${status === "ALREADY_EXISTS" && song?.id && result.staged_path ? `
+                    <button class="ingest-btn-primary" data-action="recover-file" data-song-id="${song.id}" data-staged-path="${escapeHtml(result.staged_path)}" style="margin-left: 8px;">
+                        Recover File
+                    </button>
+                    ` : ""}
                     <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>
                 </div>
             `

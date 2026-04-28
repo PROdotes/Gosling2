@@ -262,7 +262,13 @@ const ctx = {
             }
         }
     },
-    performSearch: (query) => performSearch(query),
+    performSearch: (query) => {
+        if (state.currentMode === "songs" && filterSidebar?.hasActiveFilters()) {
+            filterSidebar.reapply();
+        } else {
+            performSearch(query);
+        }
+    },
     reloadFilters: () => filterSidebar.load(),
     syncIngestBadges: async () => {
         try {
@@ -339,20 +345,37 @@ navigationHandler.setupKeyboardHandler(songActions);
 const webSearchHandler = new WebSearchHandler(ctx);
 webSearchHandler.setupListeners();
 
+let lastFilteredItems = null;
+
+function applySearchToFilteredItems(items, query) {
+    if (!query) return items;
+    const q = query.toLowerCase();
+    return items.filter((s) =>
+        (s.display_title || s.media_name || "").toLowerCase().includes(q) ||
+        (s.display_artist || "").toLowerCase().includes(q) ||
+        (s.primary_genre || "").toLowerCase().includes(q)
+    );
+}
+
 const filterSidebar = new FilterSidebarHandler({
     ...ctx,
     onFilterResults: async (resultPromise) => {
         try {
             const items = await resultPromise;
-            setActiveCache("songs", items);
-            renderSongs(ctx, items);
+            lastFilteredItems = items;
+            const visible = applySearchToFilteredItems(items, state.currentQuery);
+            setActiveCache("songs", visible);
+            renderSongs(ctx, visible);
         } catch (err) {
             elements.resultsContainer.innerHTML = renderEmptyState(
                 `Filter error: ${err.message}`,
             );
         }
     },
-    onFilterCleared: () => performSearch(state.currentQuery),
+    onFilterCleared: () => {
+        lastFilteredItems = null;
+        performSearch(state.currentQuery);
+    },
 });
 filterSidebar.setupListeners();
 const filterLoadPromise = filterSidebar.load();
@@ -967,6 +990,12 @@ elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
     filterSidebar.setSearchText(state.currentQuery);
+    if (filterSidebar.hasActiveFilters() && lastFilteredItems !== null) {
+        const visible = applySearchToFilteredItems(lastFilteredItems, state.currentQuery);
+        setActiveCache("songs", visible);
+        renderSongs(ctx, visible);
+        return;
+    }
     state.debounceTimer = setTimeout(() => {
         performSearch(state.currentQuery);
     }, 250);

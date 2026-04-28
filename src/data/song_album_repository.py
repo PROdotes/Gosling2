@@ -82,6 +82,10 @@ class SongAlbumRepository(BaseRepository):
 
         cursor = conn.cursor()
         for album in albums:
+            title = (album.album_title or "").strip()
+            if not title or title.upper() == "N/A":
+                logger.debug(f"[SongAlbumRepository] <- insert_albums() skipping blank/N/A album for source_id={source_id}")
+                continue
             album_id, was_deleted = self._find_matching_album(cursor, album)
 
             if album_id is None:

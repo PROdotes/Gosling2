@@ -140,6 +140,10 @@ class CatalogService:
             ghost_id, staged_path, original_path
         )
 
+    def recover_file(self, song_id: int, recovery_path: str) -> Dict[str, Any]:
+        """Overwrite zeroed-out file at SourcePath with recovered file and rehash."""
+        return self._ingestion_service.recover_file(song_id, recovery_path)
+
     def get_song(self, song_id: int) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
         return self._library_service.get_song(song_id)

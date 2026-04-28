@@ -71,6 +71,8 @@ async def _stream_ingestion(service, work_items):
                     except RuntimeError as e:
                         logger.error(f"[IngestRouter] WAV conversion failed for '{staged_path}': {e}")
                         res = {"status": "ERROR", "message": str(e)}
+                    if res.get("song"):
+                        res["song"] = SongView.from_domain(res["song"])
                 else:
                     res = await run_in_threadpool(
                         service.ingest_wav_as_converting,
@@ -295,6 +297,20 @@ async def scan_folder(request: FolderScanRequest):
         _stream_ingestion(service, work_items),
         media_type="application/x-ndjson",
     )
+
+
+@router.post("/recover-file")
+async def recover_file(song_id: int, staged_path: str):
+    """
+    Overwrite the zeroed-out file at SourcePath with the recovered file and rehash.
+    Used for data-loss recovery: DB record is preserved, only physical file + AudioHash updated.
+    """
+    logger.info(f"[IngestRouter] -> recover_file(song_id={song_id}, staged='{staged_path}')")
+    service = _get_service()
+    result = await run_in_threadpool(service.recover_file, song_id, staged_path)
+    if result["status"] == "ERROR":
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
 
 
 @router.delete("/songs/{song_id:int}")

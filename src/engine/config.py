@@ -82,7 +82,7 @@ BLUR_SAVES_SCALARS = True
 
 # FFmpeg
 FFMPEG_PATH = Path("ffmpeg/ffmpeg.exe")
-WAV_AUTO_CONVERT = True
+WAV_AUTO_CONVERT = False
 
 # Song Approval Pipeline
 AUTO_MOVE_ON_APPROVE = True
