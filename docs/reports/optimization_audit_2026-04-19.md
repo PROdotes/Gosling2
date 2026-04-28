@@ -21,12 +21,12 @@
 - [x] **9.** `escapeHtml` duplicated 3x — `utils.js:19`, `song_editor.js:10`, `chip_input.js:19`
 - [x] **10.** Modal lifecycle boilerplate — ~100 lines across 7 modals
 - [x] **11.** Autocomplete dropdown logic duplicated — ~200 lines in link_modal.js + edit_modal.js + chip_input.js → extracted to autocomplete.js
-- [ ] **12.** Entity renderer boilerplate — ~80 lines across 4 renderers
-- [ ] **13.** `import * as api` in 5 files — prevents tree-shaking
+- [x] **12.** Entity renderer boilerplate — ~80 lines across 4 renderers
+- [x] **13.** `import * as api` in 5 files — prevents tree-shaking
 - [x] **14.** `processing_status` as bare integers — replaced with `ProcessingStatus(IntEnum)` + JS constants
 - [x] **15.** `_SCALAR_ALLOWED` / `_METADATA_ALLOWED` duplicated — moved to `engine/config.py`
 - [ ] **16.** 6-8 sequential SQL queries for hydration/deep search — `library_service.py:269-345`
-- [ ] **17.** 5 permanent keydown listeners across modals — should register on open, remove on close
+- [x] **17.** 5 permanent keydown listeners across modals — should register on open, remove on close
 - [x] **18.** Private method access across services — `IngestionService` calls `LibraryService._hydrate_songs()`
 - [x] **19.** Pydantic models scattered in router files — moved to `view_models.py`
 - [x] ~~**20.** Duplicate `_get_service()` factory~~ — SKIPPED, not worth extracting

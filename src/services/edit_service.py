@@ -41,6 +41,7 @@ from src.engine.config import (
     METADATA_ALLOWED,
     AUTO_SAVE_ID3,
     ProcessingStatus,
+    ALBUM_DEFAULT_TYPE,
 )
 from src.engine.models.spotify import SpotifyCredit
 
@@ -192,7 +193,7 @@ class EditService:
             print(f"DEBUG: update_song_scalars called for {song_id}")
             self._song_repo.update_scalars(song_id, fields, conn)
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
 
             new_status = fields.get("processing_status", song.processing_status)
             return self._library_service.get_song(song_id)
@@ -223,7 +224,7 @@ class EditService:
                 song_id, display_name, role_name, conn, identity_id
             )
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
             return credit
         except Exception as e:
             conn.rollback()
@@ -241,7 +242,7 @@ class EditService:
         try:
             self._credit_repo.remove_credit(credit_id, conn)
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- remove_song_credit FAILED: {e}")
@@ -354,7 +355,7 @@ class EditService:
                 song_id, album_id, track_number, disc_number, conn
             )
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- add_song_album FAILED: {e}")
@@ -401,7 +402,7 @@ class EditService:
                 song_id, album_id, track_number, disc_number, conn
             )
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
 
             links = self._album_repo.get_albums_for_songs([song_id])
             return next((link for link in links if link.album_id == album_id), None)
@@ -418,7 +419,7 @@ class EditService:
         try:
             self._album_repo.remove_album(song_id, album_id, conn)
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- remove_song_album FAILED: {e}")
@@ -459,7 +460,7 @@ class EditService:
                 conn,
             )
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             conn.rollback()
             logger.error(f"[EditService] <- update_song_album_link FAILED: {e}")
@@ -484,7 +485,7 @@ class EditService:
             # ID3 sync for all linked songs
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
             return self._library_service.get_album(album_id)
         except Exception as e:
             conn.rollback()
@@ -512,7 +513,7 @@ class EditService:
             # ID3 sync for all linked songs
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
             return name_id
         except Exception as e:
             logger.error(f"[EditService] add_album_credit FAILED: {e}")
@@ -529,7 +530,7 @@ class EditService:
             conn.commit()
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
         except Exception as e:
             logger.error(f"[EditService] remove_album_credit FAILED: {e}")
             conn.rollback()
@@ -560,7 +561,7 @@ class EditService:
             conn.commit()
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
             return publisher
         except Exception as e:
             logger.error(f"[EditService] add_album_publisher FAILED: {e}")
@@ -577,7 +578,7 @@ class EditService:
             conn.commit()
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
         except Exception as e:
             logger.error(f"[EditService] remove_album_publisher FAILED: {e}")
             conn.rollback()
@@ -643,7 +644,7 @@ class EditService:
             # ID3 sync for all linked songs
             song_ids = self._album_repo_dir.get_song_ids_by_album(album_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
 
             result = self._library_service.get_album(album_id)
             logger.info(f"[EditService] <- sync_album_with_song() OK '{result.title}'")
@@ -678,7 +679,7 @@ class EditService:
         try:
             # Create album
             album_id = self._album_repo_dir.create_album(
-                album_title, "Album", song.year, conn
+                album_title, ALBUM_DEFAULT_TYPE, song.year, conn
             )
             # Link to song with defaults
             self._album_repo.add_album(song_id, album_id, 1, 1, conn)
@@ -711,7 +712,7 @@ class EditService:
 
             conn.commit()
             # ID3 sync
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
 
             # Return the link info
             links = self._album_repo.get_albums_for_songs([song_id], conn)
@@ -799,7 +800,7 @@ class EditService:
             conn.commit()
             if category not in load_tag_categories():
                 register_tag_category(category)
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
             return tag
         except Exception as e:
             logger.error(f"[EditService] add_song_tag FAILED: {e}")
@@ -826,7 +827,7 @@ class EditService:
                 ).fetchone()[0]
                 if remaining == 0:
                     unregister_tag_category(category)
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             logger.error(f"[EditService] remove_song_tag FAILED: {e}")
             conn.rollback()
@@ -845,7 +846,7 @@ class EditService:
             conn.commit()
             song_ids = self._tag_repo.get_song_ids_by_tag(tag_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
         except Exception as e:
             logger.error(f"[EditService] update_tag FAILED: {e}")
             conn.rollback()
@@ -863,7 +864,7 @@ class EditService:
         try:
             self._tag_repo.set_primary_tag(song_id, tag_id, conn)
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             logger.error(f"[EditService] set_primary_song_tag FAILED: {e}")
             conn.rollback()
@@ -897,7 +898,7 @@ class EditService:
                 song_id, publisher_name, conn, publisher_id=publisher_id
             )
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
             return publisher
         except Exception as e:
             logger.error(f"[EditService] add_song_publisher FAILED: {e}")
@@ -912,7 +913,7 @@ class EditService:
         try:
             self._pub_repo.remove_song_publisher(song_id, publisher_id, conn)
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             logger.error(f"[EditService] remove_song_publisher FAILED: {e}")
             conn.rollback()
@@ -930,7 +931,7 @@ class EditService:
             conn.commit()
             song_ids = self._pub_repo.get_song_ids_by_publisher(publisher_id, conn)
             for sid in song_ids:
-                self._sync_id3_if_enabled(sid)
+                self.sync_id3_if_enabled(sid)
         except Exception as e:
             logger.error(f"[EditService] update_publisher FAILED: {e}")
             conn.rollback()
@@ -986,7 +987,7 @@ class EditService:
                 self._pub_repo.insert_song_publishers(song_id, domain_pubs, conn=conn)
 
             conn.commit()
-            self._sync_id3_if_enabled(song_id)
+            self.sync_id3_if_enabled(song_id)
         except Exception as e:
             logger.error(f"[EditService] import_credits_bulk FAILED: {e}")
             conn.rollback()
@@ -1139,7 +1140,7 @@ class EditService:
         finally:
             conn.close()
 
-    def _sync_id3_if_enabled(self, song_id: int) -> None:
+    def sync_id3_if_enabled(self, song_id: int) -> None:
         """Internal trigger for persistent ID3 writing."""
         if not AUTO_SAVE_ID3:
             return

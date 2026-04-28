@@ -22,6 +22,7 @@ from src.services.metadata_writer import MetadataWriter
 from src.services.library_service import LibraryService
 from src.engine.config import (
     RENAME_RULES_PATH,
+    STAGING_DIR,
     get_db_path,
     ProcessingStatus,
 )
@@ -249,7 +250,7 @@ class IngestionService:
             logger.info(
                 f"[IngestionService] <- ingest_wav_as_converting(path='{staged_path}') REJECTED: {check['status']}"
             )
-            if check["status"] != "CONFLICT" and os.path.exists(staged_path):
+            if check["status"] != "CONFLICT" and os.path.exists(staged_path) and self._is_staged(staged_path):
                 os.remove(staged_path)
             return check
 
@@ -273,7 +274,7 @@ class IngestionService:
             logger.error(
                 f"[IngestionService] <- ingest_wav_as_converting() FAILED: {e}"
             )
-            if os.path.exists(staged_path):
+            if os.path.exists(staged_path) and self._is_staged(staged_path):
                 os.remove(staged_path)
             return {"status": "ERROR", "message": f"Ingestion failed: {str(e)}"}
         finally:
@@ -353,7 +354,7 @@ class IngestionService:
                 },
                 conn,
             )
-            self._enrich_metadata(song_id, conn)
+            self.enrich_metadata(song_id, conn)
             conn.commit()
             logger.info(
                 f"[IngestionService] <- finalize_wav_conversion(id={song_id}) Status now {ProcessingStatus.NEEDS_REVIEW}"
@@ -365,6 +366,12 @@ class IngestionService:
             return song_id
         finally:
             conn.close()
+
+    def _is_staged(self, path: str) -> bool:
+        try:
+            return Path(path).resolve().is_relative_to(Path(STAGING_DIR).resolve())
+        except Exception:
+            return False
 
     def ingest_file(
         self, staged_path: str, original_path: Optional[str] = None
@@ -396,7 +403,7 @@ class IngestionService:
             if os.path.exists(staged_path) and check["status"] not in (
                 "CONFLICT",
                 "PENDING_CONVERT",
-            ):
+            ) and self._is_staged(staged_path):
                 os.remove(staged_path)
             return check
 
@@ -406,7 +413,7 @@ class IngestionService:
         try:
             new_id = self._song_repo.insert(song, conn)
             hydrated_song = song.model_copy(update={"id": new_id})
-            self._enrich_metadata(new_id, conn)
+            self.enrich_metadata(new_id, conn)
             hydrated_song = hydrated_song.model_copy(
                 update={"processing_status": ProcessingStatus.NEEDS_REVIEW}
             )
@@ -431,7 +438,7 @@ class IngestionService:
                     notes=ghost_meta.get("notes"),
                 )
 
-            if os.path.exists(staged_path):
+            if os.path.exists(staged_path) and self._is_staged(staged_path):
                 os.remove(staged_path)
             return {
                 "status": "ERROR",
@@ -529,7 +536,7 @@ class IngestionService:
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_path = {
-                executor.submit(self._ingest_single, p): p for p in file_paths
+                executor.submit(self.ingest_single, p): p for p in file_paths
             }
             for future in as_completed(future_to_path):
                 try:
@@ -550,7 +557,7 @@ class IngestionService:
             "results": results,
         }
 
-    def _ingest_single(
+    def ingest_single(
         self, file_path: str, original_path: Optional[str] = None
     ) -> Dict[str, Any]:
         """Thread-safe single file ingestion wrapper."""
@@ -577,7 +584,7 @@ class IngestionService:
                 "staged_path": file_path,
             }
 
-    def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
+    def enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (SIMULATED)."""
         logger.debug(f"[IngestionService] -> _enrich_metadata(id={song_id})")
         self._song_repo.update_scalars(

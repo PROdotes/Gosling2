@@ -84,9 +84,9 @@ class CatalogService:
 
         self._metadata_parser = MetadataParser()
 
-    def _sync_id3_if_enabled(self, song_id: int) -> None:
+    def sync_id3_if_enabled(self, song_id: int) -> None:
         """Internal trigger for persistent ID3 writing (Delegated)."""
-        return self._edit_service._sync_id3_if_enabled(song_id)
+        return self._edit_service.sync_id3_if_enabled(song_id)
 
     def check_ingestion(self, file_path: str) -> Dict[str, Any]:
         """Dry-run ingestion check for path, hash, and metadata collisions."""
@@ -110,9 +110,9 @@ class CatalogService:
         """Write path for a staged file. Handles collisions and reingestion errors."""
         return self._ingestion_service.ingest_file(staged_path, original_path)
 
-    def _enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
+    def enrich_metadata(self, song_id: int, conn: sqlite3.Connection) -> None:
         """Internal sink for metadata enrichment (Delegated)."""
-        return self._ingestion_service._enrich_metadata(song_id, conn)
+        return self._ingestion_service.enrich_metadata(song_id, conn)
 
     def scan_folder(self, folder_path: str, recursive: bool = True) -> List[str]:
         """Scan a folder for audio files and return their paths."""
@@ -124,9 +124,9 @@ class CatalogService:
         """Ingest multiple already-staged files in parallel."""
         return self._ingestion_service.ingest_batch(file_paths, max_workers)
 
-    def _ingest_single(self, file_path: str) -> Dict[str, Any]:
+    def ingest_single(self, file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]:
         """Internal wrapper for thread-safe single file ingestion (Delegated)."""
-        return self._ingestion_service._ingest_single(file_path)
+        return self._ingestion_service.ingest_single(file_path, original_path)
 
     def delete_song(self, song_id: int, notes: str = None) -> bool:
         """Soft-delete a single song. Handles physical cleanup if in staging."""

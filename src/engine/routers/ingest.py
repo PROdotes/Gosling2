@@ -60,13 +60,16 @@ async def _stream_ingestion(service, work_items):
             if is_wav:
                 if WAV_AUTO_CONVERT:
                     try:
+                        logger.info(f"[IngestRouter] Converting WAV: '{staged_path}'")
                         mp3 = await run_in_threadpool(convert_to_mp3, Path(staged_path))
+                        logger.info(f"[IngestRouter] WAV converted, ingesting: '{mp3}'")
                         res = await run_in_threadpool(
-                            service._ingestion_service._ingest_single,
+                            service.ingest_single,
                             str(mp3),
                             original_path=original_path,
                         )
                     except RuntimeError as e:
+                        logger.error(f"[IngestRouter] WAV conversion failed for '{staged_path}': {e}")
                         res = {"status": "ERROR", "message": str(e)}
                 else:
                     res = await run_in_threadpool(
@@ -81,7 +84,7 @@ async def _stream_ingestion(service, work_items):
                     res["staged_path"] = staged_path
             else:
                 res = await run_in_threadpool(
-                    service._ingestion_service._ingest_single,
+                    service.ingest_single,
                     staged_path,
                     original_path=original_path,
                 )
