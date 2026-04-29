@@ -355,7 +355,7 @@ function setupDropZone(zoneId, resultsId, allowedExtensions, ctx) {
                 if (res) {
                     const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
                     resolvePendingCard(resultsId, res, fileName, update.filename);
-                    _trackResult(res, fileName, ctx);
+                    trackIngestResult(res, fileName, ctx);
                 }
             },
             onError(err) {
@@ -456,7 +456,7 @@ function setupScanFolderButton(btnId, inputId, resultsId, ctx) {
                         basename(res.staged_path) ||
                         "Unknown";
                     resolvePendingCard(resultsId, res, fileName, update.filename);
-                    _trackResult(res, fileName, ctx);
+                    trackIngestResult(res, fileName, ctx);
                 }
             });
         } catch (error) {
@@ -481,7 +481,7 @@ function setLoading(btn, loading) {
     btn.disabled = loading;
 }
 
-function _trackResult(result, path, ctx) {
+export function trackIngestResult(result, path, ctx) {
     const state = ctx.getState();
     if (state.ingestTasks) {
         state.ingestTasks.push({
@@ -504,7 +504,7 @@ function _trackResult(result, path, ctx) {
 function appendResult(resultsId, result, path, ctx) {
     const list = document.getElementById(resultsId);
     if (!list) return;
-    _trackResult(result, path, ctx);
+    trackIngestResult(result, path, ctx);
     _appendResultToDom(list, result, path, false);
 }
 
@@ -534,7 +534,7 @@ function createPendingCard(filename, isWav) {
     return card;
 }
 
-function insertPendingCard(resultsId, filename, isWav) {
+export function insertPendingCard(resultsId, filename, isWav) {
     const list = document.getElementById(resultsId);
     if (!list) return;
     const card = createPendingCard(filename, isWav);

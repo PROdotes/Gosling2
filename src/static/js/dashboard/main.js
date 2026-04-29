@@ -24,6 +24,7 @@ import {
 } from "./api.js";
 import { initToastSystem, showToast } from "./components/toast.js";
 import {
+    basename,
     isModalOpen,
     renderEmptyState,
 } from "./components/utils.js";
@@ -41,7 +42,7 @@ import {
     renderArtistDetailLoading,
     renderArtists,
 } from "./renderers/artists.js";
-import { handleIngestDrop } from "./renderers/ingestion.js";
+import { handleIngestDrop, insertPendingCard, trackIngestResult, resolvePendingCard, INGEST_RESULTS_LIST_ID } from "./renderers/ingestion.js";
 import {
     renderPublisherDetailComplete,
     renderPublisherDetailLoading,
@@ -871,12 +872,16 @@ async function setupHeaderDropZone() {
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
+                insertPendingCard(INGEST_RESULTS_LIST_ID, update.filename, update.is_wav);
                 updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
                 updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
                 const res = update.last_result;
                 if (res) {
+                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
+                    resolvePendingCard(INGEST_RESULTS_LIST_ID, res, fileName, update.filename);
+                    trackIngestResult(res, fileName, { getState: () => state });
                     const title = res.display_title || "Unknown File";
                     const severity = res.status_severity || "error";
                     const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
@@ -921,12 +926,16 @@ async function setupSongsWorkspaceDropZone() {
                 showToast("No valid audio files found in drop", "error", 3000);
             },
             onStarted(update) {
+                insertPendingCard(INGEST_RESULTS_LIST_ID, update.filename, update.is_wav);
                 updateIngestBadges({ currentFile: update.filename });
             },
             onUpdate(update) {
                 updateIngestBadges({ success: update.success, action: update.action, pending: update.pending, currentFile: null });
                 const res = update.last_result;
                 if (res) {
+                    const fileName = basename(res.song?.source_path) || basename(res.staged_path) || "Unknown";
+                    resolvePendingCard(INGEST_RESULTS_LIST_ID, res, fileName, update.filename);
+                    trackIngestResult(res, fileName, { getState: () => state });
                     const title = res.display_title || "Unknown File";
                     const severity = res.status_severity || "error";
                     const duration = severity === "error" ? 5000 : severity === "success" ? 2000 : 3000;
