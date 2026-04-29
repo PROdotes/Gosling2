@@ -533,29 +533,180 @@ HTTP 200 + JSON response
 
 ---
 
+## Transaction Coordinator Pattern
+
+**Important Design Decision (2026-04-29 evening):**
+
+SongMutator is part of a larger pattern. Don't build a self-contained `SongMutator.apply()` that owns its own connection. Instead, build a **MutationCoordinator** that owns the transaction and delegates to specific mutators.
+
+### Why
+
+Spotify import might need:
+1. Song scalars updated (SongMutator)
+2. Credits added (CreditMutator, future)
+3. Tags added (TagMutator, future)
+
+All must commit atomically in one transaction. If SongMutator owns its connection, each mutation opens/closes separately. Half-commits are possible.
+
+### Architecture
+
+```python
+# ROUTER
+@router.post("/songs/mutate")
+async def mutate(request):
+    command = SongMutationCommand.from_request(request)
+    result = coordinator.apply(command)  # ← One entry point
+    return SongView.from_domain(result)
+
+# COORDINATOR (owns transaction + connection)
+class MutationCoordinator:
+    def apply(self, command: SongMutationCommand) -> Song:
+        conn = self._get_connection()
+        batch_id = uuid4()
+        
+        try:
+            # Delegate to specific mutators
+            song_post = self._song_mutator.apply_within(
+                command,
+                conn,
+                batch_id
+            )
+            
+            # Future: other mutators
+            # tag_post = self._tag_mutator.apply_within(...)
+            # credit_post = self._credit_mutator.apply_within(...)
+            
+            # ONE atomic commit for all mutations + audits
+            conn.commit()
+            
+            # Side effects (outside transaction)
+            self._id3_writer.write_metadata(song_post)
+            self._filing_service.move_if_needed(pre, song_post)
+            
+            return song_post
+            
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
+# SONG MUTATOR (works within transaction)
+class SongMutator:
+    def apply_within(self, command, conn, batch_id):
+        """Apply song mutations. Does NOT own connection or transaction."""
+        pre = self._repo.get_song(command.song_ids[0], conn)
+        
+        # ... apply mutations via EditService
+        
+        post = self._repo.get_song(command.song_ids[0], conn)
+        
+        # Audit within same transaction
+        self._audit_service.log_update(pre, post, conn, batch_id)
+        
+        return post
+```
+
+### Seam Diagram (Updated)
+
+```
+HTTP Request (JSON)
+    ↓
+[SEAM 1: Router Adapter]
+(parse + validate + build command)
+    ↓
+SongMutationCommand
+    ↓
+[SEAM 2: MutationCoordinator.apply()]
+(owns transaction + connection + routing)
+    │
+    ├─ [SEAM 2a: SongMutator.apply_within()]
+    │  ├─ Pre-hydrate
+    │  ├─ Apply mutations (EditService)
+    │  ├─ Post-hydrate
+    │  └─ [SEAM 4: SongAudit.log_update()] ← inside transaction
+    │
+    ├─ [SEAM 2b: TagMutator.apply_within()] ← future
+    │  └─ [SEAM 4b: TagAudit.log_update()]
+    │
+    └─ [SEAM 2c: CreditMutator.apply_within()] ← future
+       └─ [SEAM 4c: CreditAudit.log_update()]
+    │
+    ├─ conn.commit() ← ONE atomic commit, all audits persisted
+    │
+    ├─ [SEAM 5: FilingService.move_if_needed()]
+    ├─ [SEAM 6: ID3Writer.write_metadata()]
+    │
+    └─ return Song post-state
+        ↓
+    [SEAM 7: Router Response]
+        ↓
+    HTTP 200 + JSON
+```
+
+### For Now (SongMutator Phase)
+
+- Coordinator only calls SongMutator
+- SongMutator.apply_within() is the actual implementation
+- Future mutators (Tag, Credit, Album, Publisher) follow same pattern
+- Each gets its own audit seam (SongAudit, TagAudit, etc.)
+- Coordinator handles all the wiring
+
+### Why This Wins
+
+- **One transaction:** All-or-nothing. Coordinator owns it.
+- **One batch UUID:** All audits grouped together, even if multiple mutators run.
+- **Clean separation:** SongMutator only knows about songs. TagMutator only knows about tags.
+- **Easy expansion:** Add CreditMutator later? Add one more `apply_within` call, nothing else changes.
+- **Optional mutations:** If command only has song scalars, only SongMutator runs. Others are no-ops.
+
+---
+
 ## Implementation Checklist
 
-- [ ] Create `src/services/song_mutator.py`
+- [ ] Create `src/services/mutation_coordinator.py`
+- [ ] Create `src/services/song_mutator.py` (implements `apply_within()`)
 - [ ] Migrate `EditService` methods to accept `conn` parameter (required, no fallback)
-- [ ] Wiring: Audit logging (line 89 TODO)
-- [ ] Wiring: Filing service (lines 100-101)
-- [ ] Wiring: ID3 writer (line 96)
-- [ ] Create router adapters (6 mutations endpoints → 1 `/songs/mutate` endpoint)
+- [ ] Wiring: Audit logging (audit_service.log_update inside SongMutator.apply_within)
+- [ ] Wiring: Filing service (lines 100-101, after commit)
+- [ ] Wiring: ID3 writer (line 96, after commit)
+- [ ] Create router adapter (parse request → build command → call coordinator)
 - [ ] Migrate frontend to use new command shape
 - [ ] Delete old mutation endpoints
-- [ ] Tests: Command → Song (happy path, errors)
+- [ ] Tests: Command → Song (happy path, errors) via coordinator
 - [ ] Tests: Multi-song atomicity
-- [ ] Tests: Side effect error handling
+- [ ] Tests: Side effect error handling (ID3/filing errors don't break transaction)
 
 ---
 
 ## Next Steps
 
-Once SongMutator is implemented, the architecture gains a foundation for **other seam-based modules**:
+Once MutationCoordinator + SongMutator are implemented:
 
-- Entity mutators (Album, Publisher, Tag, Alias) following same pattern
-- Query strategy modules (hydration, N+1 prevention)
-- Filing/routing modules (deep module with decision logic)
-- Audit modules (diffs, restoration, undo)
+1. **Verify atomicity:** Test that failed audit write causes rollback
+2. **Verify batch UUID:** Multiple songs get same batch_id
+3. **Then design other mutators** (Tag, Credit, Album, Publisher) following same pattern
+4. **Then expand coordinator** to route to multiple mutators based on command shape
 
-But those are separate projects. SongMutator establishes the pattern.
+Each new mutator is isolated—coordinator just adds another `apply_within` call.
+
+---
+
+## File Structure (Future)
+
+```
+src/services/
+  mutation_coordinator.py    # Owns transaction, routes to mutators
+  song_mutator.py            # Song-specific mutations (apply_within)
+  tag_mutator.py             # Tag-specific mutations (future)
+  credit_mutator.py          # Credit-specific mutations (future)
+  album_mutator.py           # Album-specific mutations (future)
+  publisher_mutator.py       # Publisher-specific mutations (future)
+
+src/services/audit/
+  song_audit.py              # log_update(pre: Song, post: Song, conn, batch_id)
+  tag_audit.py               # log_update(pre: Tag, post: Tag, conn, batch_id) (future)
+  credit_audit.py            # log_update(pre: Credit, post: Credit, conn, batch_id) (future)
+```
+
+Each mutator pairs with its audit. Coordinator glues them together.
