@@ -25,7 +25,7 @@
 - [x] **13.** `import * as api` in 5 files — prevents tree-shaking
 - [x] **14.** `processing_status` as bare integers — replaced with `ProcessingStatus(IntEnum)` + JS constants
 - [x] **15.** `_SCALAR_ALLOWED` / `_METADATA_ALLOWED` duplicated — moved to `engine/config.py`
-- [ ] **16.** 6-8 sequential SQL queries for hydration/deep search — `library_service.py:269-345`
+- [x] **16.** 6-8 sequential SQL queries for hydration/deep search — `library_service.py:269-345`
 - [x] **17.** 5 permanent keydown listeners across modals — should register on open, remove on close
 - [x] **18.** Private method access across services — `IngestionService` calls `LibraryService._hydrate_songs()`
 - [x] **19.** Pydantic models scattered in router files — moved to `view_models.py`
@@ -34,11 +34,11 @@
 
 ## LOW PRIORITY
 
-- [ ] **21.** God-files needing splitting — `main.js` (999 lines), `song_actions.js` (954 lines)
-- [ ] **22.** 5 bare `except: pass` blocks — `metadata_service.py`, `metadata_parser.py`, `tools.py`
-- [ ] **23.** Full innerHTML rebuilds on every update — `songs.js`, `song_editor.js`, `filter_sidebar.js`
-- [ ] **24.** Hardcoded color values in JS — `#888`, `#4caf50`, `#f44336`
-- [ ] **25.** 8 untested Python services — `edit_service`, `catalog_service`, `identity_service`, `library_service`, `logger`, `metadata_frames_reader`, `filing_service`, `audit_service`
-- [ ] **26.** 23 of 27 JS source files have zero tests
-- [ ] **27.** Inconsistent test directory structure — `tests/data/` vs `tests/test_data/`
-- [ ] **28.** No SQLite connection pooling — `base_repository.py:13-28`
+- [x] ~~**21.** God-files needing splitting — `main.js` (999 lines), `song_actions.js` (954 lines)~~ — DEFERRED, low ROI
+- [x] ~~**22.** 5 bare `except: pass` blocks~~ — SKIPPED, all legitimate
+- [x] ~~**23.** Full innerHTML rebuilds on every update — `songs.js`, `song_editor.js`, `filter_sidebar.js`~~ — DEFERRED, needs incremental DOM refactor
+- [x] **24.** Hardcoded color values in JS — replaced with `var(--text-mute)`, `var(--success)`, `var(--danger)`
+- [x] ~~**25.** 8 untested Python services~~ — DEFERRED, testing backlog
+- [x] ~~**26.** 23 of 27 JS source files have zero tests~~ — DEFERRED, testing backlog
+- [x] **27.** Inconsistent test directory structure — merged `tests/data/` into `tests/test_data/`, deleted `tests/data/`
+- [x] ~~**28.** No SQLite connection pooling — `base_repository.py:13-28`~~ — DEFERRED, architectural change

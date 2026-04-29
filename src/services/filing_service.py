@@ -180,8 +180,8 @@ class FilingService:
                         f"[FilingService] File already natively exists at perfect target path, bypassing physical copy: {target_absolute}"
                     )
                     return target_absolute
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"[FilingService] samefile() check failed for {source_path} vs {target_absolute}: {e}")
             raise FileExistsError(
                 f"Target path already exists in library: {target_absolute}"
             )
@@ -205,8 +205,8 @@ class FilingService:
         try:
             if source_path.exists() and target_path.exists():
                 is_same = source_path.samefile(target_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"[FilingService] samefile() check failed for {source_path} vs {target_path}: {e}")
 
         if source_path.exists() and not is_same:
             source_path.unlink()

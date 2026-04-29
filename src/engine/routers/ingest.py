@@ -95,7 +95,8 @@ async def _stream_ingestion(service, work_items):
 
             service._ingestion_service._update_task(task_id, res["status"])
             status = service._ingestion_service.get_session_status()
-            yield f"{json.dumps(jsonable_encoder({**status, 'filename': Path(staged_path).name, 'last_result': res}))}\n"
+            report = IngestionReportView(**res) if not isinstance(res, IngestionReportView) else res
+            yield f"{json.dumps(jsonable_encoder({**status, 'filename': Path(staged_path).name, 'last_result': report}))}\n"
             await asyncio.sleep(0)
 
     except Exception as e:

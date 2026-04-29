@@ -42,7 +42,8 @@
       "PowerShell(yt-dlp --version 2>&1)",
       "PowerShell(pip show yt-dlp 2>&1)",
       "PowerShell(yt-dlp -x --audio-format mp3 --audio-quality 0 -o \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\temp\\\\recovery\\\\%\\(title\\)s.%\\(ext\\)s\" \"https://www.youtube.com/watch?v=WFJ784fkjFI\")",
-      "PowerShell(yt-dlp -x --audio-format mp3 --audio-quality 0 --ffmpeg-location \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\ffmpeg\\\\ffmpeg.exe\" -o \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\temp\\\\recovery\\\\%\\(title\\)s.%\\(ext\\)s\" \"https://www.youtube.com/watch?v=WFJ784fkjFI\")"
+      "PowerShell(yt-dlp -x --audio-format mp3 --audio-quality 0 --ffmpeg-location \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\ffmpeg\\\\ffmpeg.exe\" -o \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\temp\\\\recovery\\\\%\\(title\\)s.%\\(ext\\)s\" \"https://www.youtube.com/watch?v=WFJ784fkjFI\")",
+      "Bash(grep -rn \"tests/data\\\\|test_data\\\\|tests\\\\\\\\\\\\\\\\data\" c:/Users/glazb/PycharmProjects/gosling2/tests/ --include=\"*.py\")"
     ]
   }
 }

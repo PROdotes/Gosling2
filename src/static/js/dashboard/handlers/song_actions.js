@@ -37,14 +37,14 @@ export async function updateSyncLed(songId) {
     const led = document.querySelector(`.sync-led[data-song-id="${songId}"]`);
     if (!led) return;
     led.title = "Checking sync...";
-    led.style.background = "#888";
+    led.style.background = "var(--text-mute)";
     const mismatchEl = document.querySelector(
         `.sync-mismatch-list[data-song-id="${songId}"]`,
     );
     if (mismatchEl) mismatchEl.textContent = "";
     try {
         const result = await getSongSyncStatus(songId);
-        led.style.background = result.in_sync ? "#4caf50" : "#f44336";
+        led.style.background = result.in_sync ? "var(--success)" : "var(--danger)";
         led.title = result.in_sync
             ? "In sync"
             : `Out of sync:\n${result.mismatches.join("\n")}`;
@@ -55,7 +55,7 @@ export async function updateSyncLed(songId) {
             mismatchEl.textContent = result.in_sync ? "" : labels.join(" · ");
         }
     } catch {
-        led.style.background = "#888";
+        led.style.background = "var(--text-mute)";
         led.title = "Sync status unavailable";
     }
 }

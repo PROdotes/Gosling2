@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List, Literal, Optional
 from src.services.tokenizer import tokenize_credits, resolve_names
 from src.services.filename_parser import parse_with_pattern
 from src.services.catalog_service import CatalogService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/tools", tags=["Tools"])
 
@@ -146,12 +149,12 @@ def filename_parser_apply(
             try:
                 scalars["year"] = int(metadata["Year"])
             except ValueError:
-                pass
+                logger.warning(f"[tools] Non-numeric Year tag for song {item.song_id}: {metadata['Year']!r}")
         if "BPM" in metadata:
             try:
                 scalars["bpm"] = int(metadata["BPM"])
             except ValueError:
-                pass
+                logger.warning(f"[tools] Non-numeric BPM tag for song {item.song_id}: {metadata['BPM']!r}")
         if "ISRC" in metadata:
             scalars["isrc"] = metadata["ISRC"]
 

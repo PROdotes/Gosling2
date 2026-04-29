@@ -71,7 +71,7 @@ export function createChipInput({
             const labelHtml = `<${labelTag} class="chip-input__chip-label" ${attrStr} type="button">${escapeHtml(item.label)}</${labelTag}>`;
 
             if (tagMode && item.category) {
-                const color = categoryColors[item.category] || "#888";
+                const color = categoryColors[item.category] || "var(--text-mute)";
                 chip.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)}">${escapeHtml(item.category)}</span>${labelHtml}`;
             } else {
                 chip.innerHTML = labelHtml;
@@ -137,7 +137,7 @@ export function createChipInput({
         el.dataset.acIndex = i;
 
         if (tagMode && opt.category && !isCreate) {
-            const color = categoryColors[opt.category] || "#888";
+            const color = categoryColors[opt.category] || "var(--text-mute)";
             el.innerHTML = `<span class="chip-input__tag-cat" style="color:${escapeHtml(color)};border:none">${escapeHtml(opt.category)}</span>${escapeHtml(opt.label)}`;
         } else if (isCreate) {
             const label = getCreateLabel ? getCreateLabel(opt.label) : `+ Add "${opt.label}"`;
