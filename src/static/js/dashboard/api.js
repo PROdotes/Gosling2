@@ -350,6 +350,14 @@ export function formatMetadataCase(entityType, entityId, field, formatType) {
     return fetchJson(url, { method: "PATCH" });
 }
 
+export function formatText(text, type) {
+    return fetchJson("/api/v1/tools/format-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, type }),
+    });
+}
+
 export function deleteSong(id, deleteFile = false) {
     const url = deleteFile
         ? `/api/v1/ingest/songs/${id}?delete_file=true`

@@ -180,3 +180,20 @@ def filename_parser_apply(
             )
 
     return {"ok": True, "count": len(body.items)}
+
+
+# --- Text Formatting ---
+
+from src.services.casing_service import CasingService
+
+
+class FormatTextRequest(BaseModel):
+    text: str
+    type: Literal["title", "sentence"]
+
+
+@router.post("/format-text")
+def format_text(body: FormatTextRequest) -> dict:
+    if body.type == "title":
+        return {"result": CasingService.to_title_case(body.text)}
+    return {"result": CasingService.to_sentence_case(body.text)}

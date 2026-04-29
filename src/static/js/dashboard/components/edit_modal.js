@@ -1,6 +1,7 @@
 import { wasMousedownInside, escapeHtml } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
 import { createAutocomplete } from "./autocomplete.js";
+import { formatText } from "../api.js";
 
 /**
  * Generic edit modal — form fields rendered from config schema.
@@ -59,11 +60,16 @@ function renderFields() {
 }
 
 function renderTextField(key, field) {
+    const caseBtn = field.caseButton
+        ? `<button class="edit-modal-case-btn" data-case-field="${key}" title="Title Case" type="button">T</button>`
+        : "";
     return `
         <div class="edit-modal-field" id="edit-field-${key}">
             <label>${escapeHtml(field.label || key)}</label>
-            <input type="text" class="link-modal-input" data-field-key="${key}"
-                value="${escapeHtml(field.value || "")}" autocomplete="off">
+            <div class="edit-modal-input-row">
+                <input type="text" class="link-modal-input" data-field-key="${key}"
+                    value="${escapeHtml(field.value || "")}" autocomplete="off">${caseBtn}
+            </div>
         </div>
     `;
 }
@@ -160,6 +166,22 @@ function attachTextHandler(key, field) {
             commitText(key, input.value);
         }
     });
+
+    const caseBtn = bodyEl.querySelector(`.edit-modal-case-btn[data-case-field="${key}"]`);
+    if (caseBtn) {
+        caseBtn.addEventListener("click", async () => {
+            const current = input.value.trim();
+            if (!current) return;
+            caseBtn.disabled = true;
+            try {
+                const { result } = await formatText(current, "title");
+                input.value = result;
+                await commitText(key, result);
+            } finally {
+                caseBtn.disabled = false;
+            }
+        });
+    }
 }
 
 async function commitText(key, value) {

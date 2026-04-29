@@ -348,6 +348,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             type: "text",
             label: "Name",
             value: primary.display_name,
+            caseButton: true,
             onSave: async (val) => {
                 try {
                     await updateCreditName(0, primary.id, val);
@@ -460,6 +461,7 @@ export async function managePublisher(ctx, publisherId, publisherName) {
                 type: "text",
                 label: "Name",
                 value: detail ? detail.name : publisherName,
+                caseButton: true,
                 onSave: async (val) => {
                     await updatePublisher(publisherId, val);
                 },

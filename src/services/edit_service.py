@@ -269,6 +269,9 @@ class EditService:
             if collision:
                 collision_name_id, collision_identity_id = collision
                 if collision_name_id == name_id:
+                    # Same record — only a case change, still need to update
+                    self._credit_repo.update_credit_name(name_id, new_name, conn)
+                    conn.commit()
                     return
                 alias_count = cursor.execute(
                     "SELECT COUNT(*) FROM ArtistNames WHERE OwnerIdentityID = ? AND IsDeleted = 0",

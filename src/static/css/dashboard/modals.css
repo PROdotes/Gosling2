@@ -382,6 +382,35 @@
     border-color: var(--accent);
 }
 
+.edit-modal-input-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.edit-modal-input-row .link-modal-input {
+    flex: 1;
+    width: auto;
+}
+
+.edit-modal-case-btn {
+    background: var(--bg-element);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-sec);
+    border-radius: 4px;
+    padding: 0 10px;
+    height: 32px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.edit-modal-case-btn:hover {
+    color: var(--text-pure);
+    border-color: var(--border-focus);
+}
+
 .edit-modal-field--dirty input {
     border-color: var(--warning);
 }
