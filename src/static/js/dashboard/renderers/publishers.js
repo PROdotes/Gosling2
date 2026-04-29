@@ -43,7 +43,7 @@ export function renderPublishers(ctx, publishers) {
             <div class="entity-row-meta">
                 ${publisher.can_delete
                     ? '<span class="pill unlinked">0</span>'
-                    : `<span class="pill">${publisher.song_count}S</span><span class="pill">${publisher.album_count}A</span>`}
+                    : `<span class="pill">${publisher.song_count} songs</span><span class="pill">${publisher.album_count} albums</span>`}
             </div>
         </div>
     `,

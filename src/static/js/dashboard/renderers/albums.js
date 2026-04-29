@@ -87,8 +87,8 @@ export function renderAlbums(ctx, albums) {
             </div>
             <div class="entity-row-meta">
                 <span class="pill mono">${escapeHtml(album.release_year || "-")}</span>
-                ${album.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count}</span>`}
                 ${album.display_publisher ? `<span class="pill publisher">${escapeHtml(album.display_publisher)}</span>` : ""}
+                ${album.can_delete ? '<span class="pill unlinked">0</span>' : `<span class="pill">${album.song_count}</span>`}
             </div>
         </div>
     `,

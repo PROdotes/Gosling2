@@ -338,54 +338,6 @@ class SongView(BaseModel):
 
     @computed_field
     @property
-    def display_composer(self) -> Optional[str]:
-        """Joined composer names."""
-        if not self.credits:
-            return None
-        composers = [c.display_name for c in self.credits if c.role_name == "Composer"]
-        if not composers:
-            return None
-        unique = []
-        for name in composers:
-            if name not in unique:
-                unique.append(name)
-        return ", ".join(unique) if len(unique) > 1 else unique[0]
-
-    @computed_field
-    @property
-    def display_genres(self) -> Optional[str]:
-        """Joined names of all Genre tags."""
-        if not self.tags:
-            return None
-        genres = [
-            t.name for t in self.tags if t.category and t.category.lower() == "genre"
-        ]
-        if not genres:
-            return None
-        unique = []
-        for name in genres:
-            if name not in unique:
-                unique.append(name)
-        return ", ".join(unique) if len(unique) > 1 else unique[0]
-
-    @computed_field
-    @property
-    def display_master_publisher(self) -> str:
-        """Joined names of the master rights holders with parent hierarchy."""
-        if not self.publishers:
-            return ""
-
-        display_names = []
-        for p in self.publishers:
-            name = p.name
-            if p.parent_name:
-                name = f"{name} ({p.parent_name})"
-            display_names.append(name)
-
-        return ", ".join(display_names)
-
-    @computed_field
-    @property
     def primary_genre(self) -> Optional[str]:
         """
         Picks the headline genre for the UI badge.

@@ -533,6 +533,7 @@ async function switchMode(mode) {
         }
     }
     elements.searchInput.value = "";
+    filterSidebar.setSearchText("");
     syncModeUi();
     ctx.hideDetailPanel();
     if (mode === "songs" && filterSidebar.hasActiveFilters()) {

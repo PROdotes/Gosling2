@@ -932,8 +932,8 @@ ${playBtn}
 <div class="sidebar-divider"></div>
 
 <div class="sidebar-group-label">Research</div>
-<button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
 ${searchSplitBtn}
+<button class="sidebar-btn sidebar-btn--spotify" data-action="open-spotify-modal" data-id="${song.id}" data-title="${escapeHtml(song.media_name || "")}">Spotify ⇅</button>
 
 <div class="sidebar-divider"></div>
 
