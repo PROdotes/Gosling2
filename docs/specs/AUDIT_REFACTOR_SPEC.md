@@ -746,4 +746,27 @@ Before marking complete, run:
 
 ---
 
+---
+
+## Critical Note: Testing Scope for Delete Operations
+
+**2026-04-29 evening note:**
+
+Once the audit framework is complete and integrated with `SongMutator`, **every CRUD operation must be tested with audit logging enabled**, especially deletes:
+
+- **Audit coverage:** Every insert, update, remove link, delete must generate ChangeLog + ActionLog entries
+- **Delete is destructive:** Song deletes cascade to all related links (credits, albums, publishers, tags). Test that:
+  - Pre-audit captures full entity state with all nested relations
+  - Cascade deletes are properly exploded into individual ChangeLog entries
+  - Post-audit correctly shows "void" state (all fields → NULL)
+  - Batch UUID groups all cascade deletes together
+- **Multi-song deletes:** Test atomicity — if delete fails on song N of 50, all 50 are rolled back including audit writes
+- **Soft-delete visibility:** Test that soft-deleted records don't appear in normal queries but audit logs remain readable
+
+This is not a simple "add audit calls" task. Audit is the only record of what was deleted, so the testing must be exhaustive before any delete goes to production.
+
+**Recommended:** Run full audit test suite after integrating song deletion into the mutator, before deploying.
+
+---
+
 **Ready for review Monday. Ping me with questions or required changes.**

@@ -245,3 +245,26 @@ Standard contract per endpoint — at minimum: 200, 400, 404, 500. Some operatio
 - A 50-song multi-edit triggers exactly 2 `get_song()` calls per song (100 total), not 500.
 - All existing tests pass.
 - Frontend stops sending redundant GET requests after mutations.
+
+---
+
+## Future Scope: Entity Mutators & Consistent Delete Auditing
+
+**2026-04-29 evening brainstorm note:**
+
+This spec solves song mutations, but the pattern should apply to *all* DB mutations that require auditing. Currently unhandled:
+
+- **Song deletion** — not in scope for this pass, but must go through the mutator. Command shape needs `action: "delete"` or similar. Pre-audit (what's being deleted + all cascade links), soft-delete + cascade, post-audit (void state).
+- **Other entity deletions** — alias delete, tag delete, publisher delete, album delete. If every DB change is audited, these need the same treatment.
+- **Cascade auditing** — when deleting a song cascades to remove links, should each link deletion be a separate audit entry, or one audit entry covering the whole cascade?
+
+**Implications:**
+1. Song deletion can't be a separate endpoint—it must be a command type in the mutator.
+2. Other entities (Alias, Tag, Publisher, Album) likely need their own mutators following the same pattern.
+3. Audit log structure needs to handle cascades—either as a single "batch" entry or as linked parent/child entries.
+4. Delete operations may need extra validation/confirmation at the API level (safety guardrail).
+
+**Next steps (not in this pass):**
+- Extend song mutator to handle `action: "delete"` commands.
+- Design entity mutators for Alias, Tag, Publisher, Album.
+- Finalize audit log schema for cascade deletes.
