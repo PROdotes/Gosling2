@@ -37,7 +37,12 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git show *)",
-      "Bash(sed -n *)"
+      "Bash(sed -n *)",
+      "Bash(yt-dlp --version)",
+      "PowerShell(yt-dlp --version 2>&1)",
+      "PowerShell(pip show yt-dlp 2>&1)",
+      "PowerShell(yt-dlp -x --audio-format mp3 --audio-quality 0 -o \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\temp\\\\recovery\\\\%\\(title\\)s.%\\(ext\\)s\" \"https://www.youtube.com/watch?v=WFJ784fkjFI\")",
+      "PowerShell(yt-dlp -x --audio-format mp3 --audio-quality 0 --ffmpeg-location \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\ffmpeg\\\\ffmpeg.exe\" -o \"c:\\\\Users\\\\glazb\\\\PycharmProjects\\\\gosling2\\\\temp\\\\recovery\\\\%\\(title\\)s.%\\(ext\\)s\" \"https://www.youtube.com/watch?v=WFJ784fkjFI\")"
     ]
   }
 }

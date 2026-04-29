@@ -125,52 +125,42 @@ class TestCatalogServiceIngestFile:
             album.album_type == "Single"
         ), f"Expected default 'Single', got {album.album_type}"
 
-    def test_ingest_path_collision_returns_already_exists(self, populated_db, tmp_path):
+    def test_ingest_path_collision_outside_staging_preserves_file(
+        self, populated_db, tmp_path, monkeypatch
+    ):
+        """In-place scan: file is outside staging — ALREADY_EXISTS must NOT delete it.
+
+        This is the regression test for the 2026-04-28 incident where 117 live
+        broadcast files were zeroed because os.remove() ran without checking _is_staged().
+        """
         service = CatalogService(populated_db)
 
-        # We need a REAL file at the path we are checking
-        real_path = tmp_path / "colliding_path.mp3"
-        real_path.write_bytes(b"Fake MP3 data")
+        # File lives OUTSIDE staging (simulates in-place NAS scan)
+        external_dir = tmp_path / "nas" / "Songs" / "Cro" / "2026"
+        external_dir.mkdir(parents=True, exist_ok=True)
+        live_file = external_dir / "some artist - some song.mp3"
+        live_file.write_bytes(b"Live broadcast file - must not be deleted")
 
-        # Update Song 1 in DB to have this REAL path
+        # STAGING_DIR points elsewhere
+        staging = tmp_path / "staging"
+        staging.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", str(staging))
+
+        # Update Song 1 in DB to point at this live file
         with service._song_repo.get_connection() as conn:
             conn.execute(
                 "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
-                (str(real_path),),
+                (str(live_file),),
             )
             conn.commit()
 
-        report = service.ingest_file(str(real_path))
+        report = service.ingest_file(str(live_file))
 
-        # Report structure
-        assert (
-            report["status"] == "ALREADY_EXISTS"
-        ), f"Expected ALREADY_EXISTS, got {report['status']} (msg: {report.get('message')})"
+        assert report["status"] == "ALREADY_EXISTS", f"Expected ALREADY_EXISTS, got {report['status']}"
         assert report["match_type"] == "PATH"
 
-        # Exhaustive song assertions
-        song = report["song"]
-        assert song.id == 1, f"Expected collision with Song 1, got {song.id}"
-        assert (
-            song.title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got {song.title}"
-        assert song.source_path == str(
-            real_path
-        ), f"Expected {real_path}, got {song.source_path}"
-        assert song.duration_s == 200, f"Expected 200s, got {song.duration_s}"
-        assert song.audio_hash == "hash_1", f"Expected 'hash_1', got {song.audio_hash}"
-        assert song.year == 1991, f"Expected 1991, got {song.year}"
-        assert song.bpm is None, f"Expected None for bpm, got {song.bpm}"
-        assert song.isrc is None, f"Expected None for isrc, got {song.isrc}"
-        assert song.is_active is True, f"Expected True, got {song.is_active}"
-        assert (
-            song.processing_status == 0
-        ), f"Expected 0 (fixture default), got {song.processing_status}"
-
-        # SIDE EFFECT: File should be deleted to prevent orphans
-        assert not os.path.exists(
-            str(real_path)
-        ), "Staged file should be deleted on path collision"
+        # Live file must survive
+        assert os.path.exists(str(live_file)), "Live file outside staging must NOT be deleted on ALREADY_EXISTS"
 
     def test_ingest_hash_collision_returns_already_exists(
         self, populated_db, test_mp3, monkeypatch

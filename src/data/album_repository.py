@@ -45,18 +45,23 @@ class AlbumRepository(BaseRepository):
             LEFT JOIN Roles r ON ac.RoleID = r.RoleID
             LEFT JOIN AlbumPublishers ap ON a.AlbumID = ap.AlbumID
             LEFT JOIN Publishers p ON ap.PublisherID = p.PublisherID AND p.IsDeleted = 0
-            WHERE a.AlbumTitle LIKE ? AND a.IsDeleted = 0
+            WHERE a.IsDeleted = 0
+              AND (a.AlbumTitle LIKE ? OR EXISTS (
+                SELECT 1 FROM AlbumCredits ac2
+                JOIN ArtistNames an2 ON ac2.CreditedNameID = an2.NameID AND an2.IsDeleted = 0
+                WHERE ac2.AlbumID = a.AlbumID AND an2.DisplayName LIKE ?
+              ))
             GROUP BY a.AlbumID
             ORDER BY a.AlbumTitle COLLATE NOCASE ASC
         """
         if conn:
             conn.row_factory = sqlite3.Row
-            rows = conn.execute(sql, (f"%{query}%",)).fetchall()
+            rows = conn.execute(sql, (f"%{query}%", f"%{query}%")).fetchall()
             return [dict(row) for row in rows]
 
         with self._get_connection() as new_conn:
             new_conn.row_factory = sqlite3.Row
-            rows = new_conn.execute(sql, (f"%{query}%",)).fetchall()
+            rows = new_conn.execute(sql, (f"%{query}%", f"%{query}%")).fetchall()
             result = [dict(row) for row in rows]
             logger.debug(
                 f"[AlbumRepository] <- search_slim(q='{query}') count={len(result)}"

@@ -991,7 +991,7 @@ elements.searchInput.addEventListener("input", (event) => {
     clearTimeout(state.debounceTimer);
     state.currentQuery = event.target.value.trim();
     filterSidebar.setSearchText(state.currentQuery);
-    if (filterSidebar.hasActiveFilters() && lastFilteredItems !== null) {
+    if (state.currentMode === "songs" && filterSidebar.hasActiveFilters() && lastFilteredItems !== null) {
         const visible = applySearchToFilteredItems(lastFilteredItems, state.currentQuery);
         setActiveCache("songs", visible);
         renderSongs(ctx, visible);
