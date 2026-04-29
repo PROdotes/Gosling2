@@ -750,6 +750,18 @@ async function openSelectedResult(index) {
             .then((fileData) => {
                 if (!fileData || !isActiveDetail("songs", selected.id)) return;
                 state.activeSongFile = fileData;
+                renderSongEditorV2(state.activeSong, fileData);
+                state.scalarHandles = wireScalarInputs(
+                    state.activeSong,
+                    state.validationRules,
+                    () => { ctx.refreshActiveSongV2(state.activeSong.id); },
+                );
+                state.chipHandles = wireChipInputs(
+                    state.activeSong,
+                    () => { ctx.refreshActiveSongV2(state.activeSong.id); },
+                    state.onSplit,
+                    state.validationRules,
+                );
                 wireDriftIndicators(state.activeSong, fileData);
             });
     } else if (state.currentMode === "albums") {

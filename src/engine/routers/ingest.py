@@ -314,14 +314,15 @@ async def recover_file(song_id: int, staged_path: str):
 
 
 @router.delete("/songs/{song_id:int}")
-async def delete_song(song_id: int, notes: Optional[str] = None):
+async def delete_song(song_id: int, notes: Optional[str] = None, delete_file: bool = False):
     """
     Atomic hard-delete of a song by ID.
     Triggers DB cascade and physical cleanup if in staging.
+    Pass delete_file=true to also remove the library file from disk.
     """
-    logger.info(f"[IngestRouter] -> delete_song(id={song_id})")
+    logger.info(f"[IngestRouter] -> delete_song(id={song_id}, delete_file={delete_file})")
     service = _get_service()
-    success = service.delete_song(song_id, notes=notes)
+    success = service.delete_song(song_id, notes=notes, delete_file=delete_file)
 
     if not success:
         logger.warning(f"[IngestRouter] Delete failed: Song ID {song_id} not found.")

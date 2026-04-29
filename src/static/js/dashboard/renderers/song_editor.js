@@ -946,7 +946,7 @@ ${targetPath}
 ${deleteOriginalBtn}
 <div style="margin-top:auto; display:flex; flex-direction:column; gap:6px;">
 <button class="sidebar-btn sidebar-btn--warning" data-action="reject-song" data-id="${song.id}">Reject Song</button>
-<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}">Delete Record</button>
+<button class="sidebar-btn sidebar-btn--danger" data-action="delete-song" data-id="${song.id}" data-processing-status="${song.processing_status}">Delete Record</button>
 </div>
 `;
 }
@@ -1024,8 +1024,91 @@ export function renderSongEditorV2(song, fileData = null) {
   </div>
 </div>
 
+${(() => {
+    if (!fileData) return "";
+
+    const dbIsrc = (song.isrc || "").trim();
+    const fileIsrc = (fileData.isrc || "").trim();
+    const dbBpm = song.bpm != null ? String(song.bpm).trim() : "";
+    const fileBpm = fileData.bpm != null ? String(fileData.bpm).trim() : "";
+
+    const dbCreditsByRole = song.credits_by_role || {};
+    const fileCreditsByRole = fileData.credits_by_role || {};
+    const dbPublisherNames = new Set((song.publishers || []).map((p) => p.name.trim()));
+    const filePublisherNames = (fileData.publishers || []).map((p) => p.name.trim());
+    const dbTagKeys = new Set(
+        (song.tags || []).map((t) => (t.category ? `${t.category}::${t.name}` : t.name)),
+    );
+    const fileTagKeys = (fileData.tags || []).map((t) =>
+        t.category ? `${t.category}::${t.name}` : t.name,
+    );
+
+    const rows = [];
+
+    if (fileIsrc && fileIsrc !== dbIsrc) {
+        rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">ISRC</span>
+        <span class="raw-tag-val">${escapeHtml(fileIsrc)}</span>
+      </div>`);
+    }
+    if (fileBpm && fileBpm !== dbBpm) {
+        rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">BPM</span>
+        <span class="raw-tag-val">${escapeHtml(fileBpm)}</span>
+      </div>`);
+    }
+
+    for (const [role, fileNames] of Object.entries(fileCreditsByRole)) {
+        const dbNames = new Set((dbCreditsByRole[role] || []).map((n) => n.trim()));
+        const missing = (fileNames || []).map((n) => n.trim()).filter((n) => !dbNames.has(n));
+        if (missing.length > 0) {
+            rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">${escapeHtml(role)}</span>
+        <span class="raw-tag-val">${escapeHtml(missing.join(", "))}</span>
+      </div>`);
+        }
+    }
+
+    const missingTags = fileTagKeys.filter((k) => !dbTagKeys.has(k));
+    if (missingTags.length > 0) {
+        rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">Tags</span>
+        <span class="raw-tag-val">${escapeHtml(missingTags.join(", "))}</span>
+      </div>`);
+    }
+
+    const missingPublishers = filePublisherNames.filter((n) => !dbPublisherNames.has(n));
+    if (missingPublishers.length > 0) {
+        rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">Publisher</span>
+        <span class="raw-tag-val">${escapeHtml(missingPublishers.join(", "))}</span>
+      </div>`);
+    }
+
+    if (fileData.raw_tags) {
+        for (const [k, vals] of Object.entries(fileData.raw_tags)) {
+            rows.push(`<div class="raw-tag-row">
+        <span class="raw-tag-key">${escapeHtml(k)}</span>
+        <span class="raw-tag-val">${escapeHtml(Array.isArray(vals) ? vals.join(", ") : String(vals))}</span>
+      </div>`);
+        }
+    }
+
+    if (rows.length === 0) return "";
+
+    return `
 <div class="editor-section">
-  <div class="editor-section-title">Raw / File Data</div>
+  <div class="editor-section-title">File-Only Data</div>
+  <div class="editor-field">
+    <div class="editor-raw-tags">
+      ${rows.join("")}
+    </div>
+  </div>
+</div>`;
+})()}
+
+<div class="editor-section">
+  <div class="editor-section-title">Notes</div>
   <div class="editor-field">
     <label class="sidebar-toggle" data-action="toggle-active" data-id="${song.id}">
       <input type="checkbox" ${song.is_active ? "checked" : ""} ${song.can_activate ? "" : "disabled"}>
@@ -1036,25 +1119,6 @@ export function renderSongEditorV2(song, fileData = null) {
     <label class="editor-label" for="ef-notes">Comments</label>
     <textarea class="editor-input editor-textarea" id="ef-notes" rows="3">${escapeHtml(song.notes ?? "")}</textarea>
   </div>
-  ${
-      fileData && fileData.raw_tags && Object.keys(fileData.raw_tags).length > 0
-          ? `
-  <div class="editor-field">
-    <label class="editor-label">Raw ID3 Tags</label>
-    <div class="editor-raw-tags">
-      ${Object.entries(fileData.raw_tags)
-          .map(
-              ([k, vals]) => `
-      <div class="raw-tag-row">
-        <span class="raw-tag-key">${escapeHtml(k)}</span>
-        <span class="raw-tag-val">${escapeHtml(Array.isArray(vals) ? vals.join(", ") : String(vals))}</span>
-      </div>`,
-          )
-          .join("")}
-    </div>
-  </div>`
-          : ""
-  }
 </div>
 `;
 }

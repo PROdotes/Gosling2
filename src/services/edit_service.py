@@ -1008,8 +1008,8 @@ class EditService:
             return CasingService.to_sentence_case(value)
         return value.strip()
 
-    def delete_song(self, song_id: int, staging_dir: Optional[Path] = None, notes: str = None) -> bool:
-        """Soft-delete a single song. Handles physical cleanup if in staging."""
+    def delete_song(self, song_id: int, staging_dir: Optional[Path] = None, notes: str = None, delete_file: bool = False) -> bool:
+        """Soft-delete a single song. Handles physical cleanup if in staging or if delete_file=True."""
         song = self._song_repo.get_by_id(song_id)
         if not song:
             return False
@@ -1025,8 +1025,9 @@ class EditService:
                 return False
             conn.commit()
 
-            if source_path.startswith(str(staging)):
+            if delete_file or source_path.startswith(str(staging)):
                 if os.path.exists(source_path):
+                    logger.info(f"[EditService] Deleting file from disk: {source_path}")
                     os.remove(source_path)
 
             # 4. Cleanup transient staging origin link

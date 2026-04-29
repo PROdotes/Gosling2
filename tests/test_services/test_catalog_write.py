@@ -393,3 +393,59 @@ class TestCatalogServiceDeleteSong:
         assert (
             identity.display_name == "Nirvana"
         ), f"Expected 'Nirvana', got {identity.display_name}"
+
+    def test_delete_with_delete_file_true_removes_library_file(
+        self, populated_db, tmp_path, monkeypatch
+    ):
+        service = CatalogService(populated_db)
+        real_temp_path = tmp_path / "external_library" / "song1.mp3"
+        real_temp_path.parent.mkdir(parents=True, exist_ok=True)
+        real_temp_path.write_bytes(b"External song data")
+
+        with service._song_repo.get_connection() as conn:
+            conn.execute(
+                "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
+                (str(real_temp_path),),
+            )
+            conn.commit()
+
+        staging_dir = str(tmp_path / "staging")
+        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
+
+        assert os.path.exists(real_temp_path)
+
+        success = service.delete_song(1, delete_file=True)
+        assert success is True
+
+        assert service.get_song(1) is None
+        assert not os.path.exists(
+            real_temp_path
+        ), "Library file should be deleted when delete_file=True"
+
+    def test_delete_with_delete_file_false_preserves_library_file(
+        self, populated_db, tmp_path, monkeypatch
+    ):
+        service = CatalogService(populated_db)
+        real_temp_path = tmp_path / "external_library" / "song1.mp3"
+        real_temp_path.parent.mkdir(parents=True, exist_ok=True)
+        real_temp_path.write_bytes(b"External song data")
+
+        with service._song_repo.get_connection() as conn:
+            conn.execute(
+                "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
+                (str(real_temp_path),),
+            )
+            conn.commit()
+
+        staging_dir = str(tmp_path / "staging")
+        monkeypatch.setattr("src.services.catalog_service.STAGING_DIR", staging_dir)
+
+        assert os.path.exists(real_temp_path)
+
+        success = service.delete_song(1, delete_file=False)
+        assert success is True
+
+        assert service.get_song(1) is None
+        assert os.path.exists(
+            real_temp_path
+        ), "Library file should be preserved when delete_file=False"

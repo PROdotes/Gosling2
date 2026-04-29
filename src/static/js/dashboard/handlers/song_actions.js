@@ -186,8 +186,13 @@ export class SongActionsHandler {
         actionTarget.disabled = true;
         actionTarget.textContent = "Deleting...";
 
+        const processingStatus = parseInt(actionTarget.dataset.processingStatus ?? "-1", 10);
+        const deleteFile = processingStatus === 0
+            ? await showConfirm("Also delete the file from disk?", { title: "Delete File", okLabel: "Delete File" })
+            : false;
+
         try {
-            await deleteSong(id);
+            await deleteSong(id, deleteFile);
             if (
                 this.ctx.getState().currentMode === "songs" &&
                 this.ctx.clearSongEditorV2

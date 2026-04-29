@@ -223,3 +223,29 @@ class TestCatalogWriteApi:
         resp = api_client.delete("/api/v1/ingest/songs/99999")
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
         assert "not found" in resp.json()["detail"].lower()
+
+    def test_delete_song_with_delete_file_true_removes_file_from_disk(
+        self, api_client, sample_mp3, tmp_path
+    ):
+        """DELETE /songs/{id}?delete_file=true: also removes the physical file."""
+        with open(sample_mp3, "rb") as f:
+            up_resp = api_client.post(
+                "/api/v1/ingest/upload",
+                files=[("files", (sample_mp3.name, f, "audio/mpeg"))],
+            )
+        batch_result = collect_upload_stream(up_resp)
+        song_id = batch_result["results"][0]["song"]["id"]
+        source_path = batch_result["results"][0]["song"]["source_path"]
+
+        assert os.path.exists(source_path), "File should exist before delete"
+
+        del_resp = api_client.delete(
+            f"/api/v1/ingest/songs/{song_id}?delete_file=true"
+        )
+        assert del_resp.status_code == 200
+        assert del_resp.json()["status"] == "DELETED"
+
+        assert not os.path.exists(
+            source_path
+        ), "Physical file should be deleted when delete_file=true"
+
