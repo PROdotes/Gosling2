@@ -167,6 +167,7 @@ export async function renderIngestionPanel(ctx) {
             <div class="ingest-actions">
                 <button class="ingest-btn-secondary" id="ingest-scan-folder-btn">Scan Server Folder</button>
                 <button class="ingest-btn-secondary" id="ingest-bulk-parse-btn">Fix Metadata (Bulk)</button>
+                <button class="ingest-btn-secondary" id="ingest-clear-ingested-btn">Clear Ingested</button>
                 <button class="ingest-btn-secondary" id="ingest-clear-btn">Clear Results</button>
                 <span class="ingest-hint muted-note">Press Enter to check</span>
             </div>
@@ -183,6 +184,7 @@ export async function renderIngestionPanel(ctx) {
 
     setupDropZone(DROP_ZONE_ID, RESULTS_LIST_ID, allowedExtensions, ctx);
     setupInputHandlers(PATH_INPUT_ID, CHECK_BTN_ID, RESULTS_LIST_ID, ctx);
+    setupClearIngestedButton("ingest-clear-ingested-btn", RESULTS_LIST_ID, ctx);
     setupClearButton("ingest-clear-btn", RESULTS_LIST_ID, ctx);
     setupScanFolderButton(
         "ingest-scan-folder-btn",
@@ -397,6 +399,25 @@ function setupInputHandlers(inputId, btnId, resultsId, ctx) {
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
             performCheck();
+        }
+    });
+}
+
+function setupClearIngestedButton(btnId, resultsId, ctx) {
+    const btn = document.getElementById(btnId);
+    const list = document.getElementById(resultsId);
+    if (!btn || !list) return;
+
+    btn.addEventListener("click", () => {
+        list.querySelectorAll(".result-card.ingested").forEach((card) => card.remove());
+        const state = ctx.getState();
+        if (state.cachedIngestResults) {
+            state.cachedIngestResults = state.cachedIngestResults.filter(
+                (r) => r.result?.status !== "INGESTED",
+            );
+        }
+        if (state.ingestTasks) {
+            state.ingestTasks = state.ingestTasks.filter((t) => t.status !== "INGESTED");
         }
     });
 }
@@ -710,11 +731,6 @@ function createResultCard(result, path) {
                     <button class="ingest-btn-link" data-action="navigate-search" data-mode="songs" data-query="${escapeHtml(title)}">
                         View in Library
                     </button>
-                    ${status === "ALREADY_EXISTS" && song?.id && result.staged_path ? `
-                    <button class="ingest-btn-primary" data-action="recover-file" data-song-id="${song.id}" data-staged-path="${escapeHtml(result.staged_path)}" style="margin-left: 8px;">
-                        Recover File
-                    </button>
-                    ` : ""}
                     <span class="muted-note">• ${status === "INGESTED" ? "UUID Staged" : "Already In Library"}</span>
                 </div>
             `

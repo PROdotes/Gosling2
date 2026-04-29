@@ -580,7 +580,7 @@ function appendDot(labelEl, title) {
     labelEl.appendChild(dot);
 }
 
-export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
+export function wireChipInputs(song, onUpdated, onSplit, validationRules, onSplitPublisher) {
     const handles = {};
     const getItemsByField = {};
 
@@ -774,6 +774,9 @@ export function wireChipInputs(song, onUpdated, onSplit, validationRules) {
                 await refresh();
             },
             allowCreate: true,
+            onSplit: onSplitPublisher
+                ? (item) => onSplitPublisher({ songId: song.id, text: item.label, publisherId: item.id })
+                : null,
             labelAttrs: (item) => ({
                 "data-action": "open-edit-modal",
                 "data-chip-type": "publisher",

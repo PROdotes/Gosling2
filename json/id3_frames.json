@@ -3,6 +3,7 @@
         "Category",
         "Festival",
         "Genre",
+        "Jezik",
         "Type"
     ],
     "Status": {

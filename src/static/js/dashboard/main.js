@@ -212,6 +212,7 @@ const ctx = {
                 () => ctx.refreshActiveSongV2(fresh.id),
                 state.onSplit,
                 state.validationRules,
+                state.onSplitPublisher,
             );
             state.scalarHandles = wireScalarInputs(
                 fresh,
@@ -739,11 +740,35 @@ async function openSelectedResult(index) {
                 },
             });
         };
+        state.onSplitPublisher = async ({ songId, text, publisherId }) => {
+            const { openSplitterModal } = await import(
+                "./components/splitter_modal.js"
+            );
+            openSplitterModal({
+                songId,
+                text,
+                target: "publishers",
+                classification: null,
+                remove: { type: "publisher", id: publisherId },
+                separators: state.validationRules?.credit_separators || [],
+                onConfirm: async () => {
+                    const fresh = await getCatalogSong(songId);
+                    state.activeSong = fresh;
+                    state.chipHandles?.updateField("publisher", fresh);
+                    wireDriftIndicators(fresh, state.activeSongFile);
+                    renderActionSidebar(fresh, {
+                        searchEngines: state.searchEngines,
+                        defaultSearchEngine: state.defaultSearchEngine,
+                    });
+                },
+            });
+        };
         state.chipHandles = wireChipInputs(
             result,
             () => { ctx.refreshActiveSongV2(result.id); },
             state.onSplit,
             state.validationRules,
+            state.onSplitPublisher,
         );
 
         getSongDetail(selected.id, { signal: request.signal })
@@ -762,6 +787,7 @@ async function openSelectedResult(index) {
                     () => { ctx.refreshActiveSongV2(state.activeSong.id); },
                     state.onSplit,
                     state.validationRules,
+                    state.onSplitPublisher,
                 );
                 wireDriftIndicators(state.activeSong, fileData);
             });
