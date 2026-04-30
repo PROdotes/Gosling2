@@ -90,17 +90,6 @@ export function renderSongList(songs, emptyMessage = "No songs linked yet") {
                 .map(
                     (song) => `
                 <div class="song-row" ${buildNavigateAttrs("songs", song.display_title)}>
-                    <div class="col-check">
-                         <label class="switch ${song.can_activate ? "" : "disabled"}"
-                                data-action="toggle-active"
-                                data-id="${song.id}"
-                                title="${song.can_activate ? (song.is_active ? "Deactivate" : "Activate") : "Only reviewed songs can be active for airplay"}">
-                             <input type="checkbox"
-                                    ${song.is_active ? "checked" : ""}
-                                    ${song.can_activate ? "" : "disabled"}>
-                             <span class="slider"></span>
-                         </label>
-                     </div>
                     <div class="col-info">
                         <div class="row-title">${escapeHtml(song.display_title)}<span class="row-id"> #${song.id}</span></div>
                         <div class="row-artist">${escapeHtml(song.display_artist || "Unknown Artist")}</div>

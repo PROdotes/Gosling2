@@ -40,11 +40,11 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Searches identities by name or alias.
 - Wraps `CatalogService.search_identities`.
 
-### async def get_songs_by_identity(identity_id: int) -> List[SongView]
+### async def get_songs_by_identity(identity_id: int) -> List[SongSlimView]
 **HTTP**: `GET /api/v1/identities/{identity_id}/songs`
-- Fetches all songs credited to this identity or its group/members.
+- Fetches slim song list for this identity or its group/members.
 - Raises `HTTPException(404)` if the identity is not found.
-- Wraps `CatalogService.get_songs_by_identity`.
+- Wraps `CatalogService.get_songs_slim_by_identity`.
 
 ### async def get_filter_values() -> dict
 **HTTP**: `GET /api/v1/songs/filter-values`
@@ -96,10 +96,10 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Wraps `CatalogService.get_album`.
 - Maps to `AlbumView` for dashboard rendering.
 
-### async def get_songs_by_publisher(publisher_id: int) -> List[SongView]
+### async def get_songs_by_publisher(publisher_id: int) -> List[SongSlimView]
 **HTTP**: `GET /api/v1/publishers/{publisher_id}/songs`
-- Fetches the full repertoire (Master rights) for a given publisher.
-- Wraps `CatalogService.get_songs_by_publisher`.
+- Fetches slim song repertoire for a given publisher.
+- Wraps `CatalogService.get_songs_slim_by_publisher`.
 
 ### async def get_all_tags() -> List[Tag]
 **HTTP**: `GET /api/v1/tags`
@@ -116,11 +116,10 @@ Fetches a single Song domain model by its unique ID with full hydration.
 - Fetches a single tag by ID.
 - Wraps `CatalogService.get_tag`.
 
-### async def get_songs_by_tag(tag_id: int) -> List[SongView]
+### async def get_songs_by_tag(tag_id: int) -> List[SongSlimView]
 **HTTP**: `GET /api/v1/tags/{tag_id}/songs`
-- Fetches the full hydrated song repertoire linked to this tag.
-- Wraps `CatalogService.get_songs_by_tag`.
-- Returns `List[SongView]`.
+- Fetches slim song list linked to this tag.
+- Wraps `CatalogService.get_songs_slim_by_tag`.
 
 ### async def delete_tag(tag_id: int) -> None
 **HTTP**: `DELETE /api/v1/tags/{tag_id}`
@@ -494,12 +493,6 @@ Used by `update_identity_legal_name`.
 - Moves a 'Reviewed' song from staging to the organized library.
 - Wraps `CatalogService.move_song_to_library`.
 
-### async def format_metadata_case(entity_type: str, entity_id: int, field: str, format_type: str, service: CatalogService = Depends(_get_service)) -> Any
-**HTTP**: `PATCH /api/v1/formatting/case?entity_type={type}&entity_id={id}&field={field}&format_type={type}`
-- Action endpoint to manually fix casing of a song or album field.
-- Returns the updated hydrated entity (SongView or AlbumView).
-- Wraps `CatalogService.format_entity_field`.
-
 ---
 
 ## Album Updates Router
@@ -547,6 +540,14 @@ Used by `update_identity_legal_name`.
 
 ### ConfirmRequest
 `{ song_id: int, tokens: List[dict], target: "credits"|"publishers", classification: str|null, remove: RemoveRef }`
+
+### FormatTextRequest
+`{ text: str, type: "title"|"sentence" }`
+
+### format_text(body: FormatTextRequest) -> dict
+**HTTP**: `POST /api/v1/tools/format-text`
+- Stateless text casing utility. Returns `{ result: str }`.
+- `type="title"` → `CasingService.to_title_case`; `type="sentence"` → `CasingService.to_sentence_case`.
 
 ### filename_parser_preview(body: FilenamePreviewRequest) -> dict
 **HTTP**: `POST /api/v1/tools/filename-parser/preview`

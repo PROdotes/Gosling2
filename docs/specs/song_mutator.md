@@ -184,6 +184,12 @@ The splitter is the only adapter with a pre-step (identity creation for unresolv
 
 ---
 
+## Post-Mutator Frontend Touchup
+
+**S/T case buttons** (`handleFormatCase` in `song_actions.js`) currently call `formatText()` to get the transformed value, set the input, and fire blur to trigger the normal scalar save. Once the mutator is live and the frontend sends commands to `POST /songs/mutate`, this handler should instead: call `formatText()`, then POST a command with `{ song_ids: [id], scalars: { [field]: result } }` directly — skipping the blur trigger entirely.
+
+---
+
 ## Router Strategy
 
 Old song mutation endpoints are **replaced** by a single `POST /api/v1/songs/mutate` endpoint that accepts the command shape directly. Old endpoints are deleted once the frontend migrates.

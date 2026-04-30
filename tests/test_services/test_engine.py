@@ -134,9 +134,6 @@ class TestGetSong:
         assert (
             data["publishers"][0]["name"] == "DGC Records"
         ), f"Expected publisher name='DGC Records', got {data['publishers'][0]['name']!r}"
-        assert (
-            data["display_master_publisher"] == "DGC Records (Universal Music Group)"
-        ), f"Expected display_master_publisher='DGC Records (Universal Music Group)', got {data['display_master_publisher']!r}"
 
     def test_song_with_tags(self, client):
         """Song 1 has tags: Grunge, Energetic, English."""
@@ -499,22 +496,14 @@ class TestGetSongsByIdentity:
         resp = client.get("/api/v1/identities/999/songs")
         assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
 
-    def test_results_are_hydrated(self, client):
-        """Songs from identity endpoint include credits and albums."""
+    def test_results_are_slim(self, client):
+        """Songs from identity endpoint are slim — include display_artist and has_album flags."""
         data = client.get("/api/v1/identities/2/songs").json()
         slts = next(s for s in data if s["title"] == "Smells Like Teen Spirit")
         assert (
-            len(slts["credits"]) == 1
-        ), f"Expected 1 credit on SLTS, got {len(slts['credits'])}"
-        assert (
-            slts["credits"][0]["display_name"] == "Nirvana"
-        ), f"Expected credit='Nirvana', got {slts['credits'][0]['display_name']!r}"
-        assert (
-            len(slts["albums"]) == 1
-        ), f"Expected 1 album on SLTS, got {len(slts['albums'])}"
-        assert (
-            slts["albums"][0]["album_title"] == "Nevermind"
-        ), f"Expected album='Nevermind', got {slts['albums'][0]['album_title']!r}"
+            slts["display_artist"] == "Nirvana"
+        ), f"Expected display_artist='Nirvana', got {slts['display_artist']!r}"
+        assert slts["has_album"] is True, "Expected has_album=True on SLTS"
 
 
 # ===========================================================================

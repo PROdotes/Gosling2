@@ -474,16 +474,16 @@ class TestGetByPath:
         assert song is None, f"Expected None for empty path, got {song}"
 
 
-class TestGetByIdentityIds:
-    """SongRepository.get_by_identity_ids contracts."""
+class TestSearchSlimByIdentityIds:
+    """Test `SongRepository.search_slim_by_identity_ids`."""
 
     def test_dave_grohl_identity(self, populated_db):
         """Identity 1 (Dave Grohl) has songs: 4, 5, 6, 8."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([1])
-
-        assert len(songs) == 4, f"Expected 4 songs, got {len(songs)}"
-        titles = {s.title for s in songs}
+        songs = repo.search_slim_by_identity_ids([1])
+        assert len(songs) == 4
+        ids = sorted([s["SourceID"] for s in songs])
+        titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Grohlton Theme",
             "Pocketwatch Demo",
@@ -494,21 +494,21 @@ class TestGetByIdentityIds:
     def test_nirvana_identity(self, populated_db):
         """Identity 2 (Nirvana) has NameID 20. Song 1 is credited to NameID 20."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([2])
-
-        assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
-        assert songs[0].id == 1, f"Expected 1, got {songs[0].id}"
+        songs = repo.search_slim_by_identity_ids([2])
+        assert len(songs) == 1
+        ids = sorted([s["SourceID"] for s in songs])
+        assert songs[0]["SourceID"] == 1, f"Expected 1, got {songs[0]['SourceID']}"
         assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0].title}'"
+            songs[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected 'Smells Like Teen Spirit', got '{songs[0]['MediaName']}'"
 
     def test_taylor_identity(self, populated_db):
         """Identity 4 (Taylor) has NameID 40. Songs 3, 6, 8 credited to NameID 40."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([4])
-
-        assert len(songs) == 3, f"Expected 3 songs, got {len(songs)}"
-        titles = {s.title for s in songs}
+        songs = repo.search_slim_by_identity_ids([4])
+        assert len(songs) == 3
+        ids = sorted([s["SourceID"] for s in songs])
+        titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Range Rover Bitch",
             "Dual Credit Track",
@@ -518,10 +518,10 @@ class TestGetByIdentityIds:
     def test_multiple_identities(self, populated_db):
         """Passing Nirvana(2) + Foo Fighters(3) should return songs 1 and 2."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([2, 3])
-
-        assert len(songs) == 2, f"Expected 2 songs, got {len(songs)}"
-        titles = {s.title for s in songs}
+        songs = repo.search_slim_by_identity_ids([2, 3])
+        assert len(songs) == 2
+        ids = sorted([s["SourceID"] for s in songs])
+        titles = {s["MediaName"] for s in songs}
         assert titles == {
             "Smells Like Teen Spirit",
             "Everlong",
@@ -530,13 +530,13 @@ class TestGetByIdentityIds:
     def test_empty_ids_returns_empty(self, populated_db):
         """Test that empty identity list returns empty."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([])
+        songs = repo.search_slim_by_identity_ids([])
         assert songs == [], f"Expected empty list, got {songs}"
 
     def test_nonexistent_identity(self, populated_db):
         """Test that non-existent identity returns empty."""
         repo = SongRepository(populated_db)
-        songs = repo.get_by_identity_ids([999])
+        songs = repo.search_slim_by_identity_ids([999])
         assert songs == [], f"Expected empty list for nonexistent identity, got {songs}"
 
 

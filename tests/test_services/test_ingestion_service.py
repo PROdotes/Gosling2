@@ -649,3 +649,47 @@ class TestIngestBatch:
         # This would need real staged files to test properly
         # Placeholder for now
         pass
+
+
+class TestIngestFileStagedCleanup:
+    """ingest_file must delete staged duplicates but never touch files outside staging."""
+
+    def test_duplicate_outside_staging_is_not_deleted(
+        self, empty_db, tmp_path, monkeypatch, test_audio_file
+    ):
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        service = CatalogService(empty_db)
+
+        staging = tmp_path / "staging"
+        staging.mkdir(parents=True, exist_ok=True)
+        staged = staging / "silence.mp3"
+        shutil.copy(test_audio_file, staged)
+        service.ingest_file(str(staged))
+
+        library = tmp_path / "library"
+        library.mkdir(parents=True, exist_ok=True)
+        live = library / "silence.mp3"
+        shutil.copy(test_audio_file, live)
+        service.ingest_file(str(live))
+
+        assert live.exists(), "Duplicate MP3 outside staging must not be deleted"
+
+    def test_duplicate_in_staging_is_cleaned_up(
+        self, empty_db, tmp_path, monkeypatch, test_audio_file
+    ):
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
+        service = CatalogService(empty_db)
+
+        staging = tmp_path / "staging"
+        staging.mkdir(parents=True, exist_ok=True)
+        first = staging / "silence.mp3"
+        shutil.copy(test_audio_file, first)
+        service.ingest_file(str(first))
+
+        staging2 = tmp_path / "staging" / "sub"
+        staging2.mkdir(parents=True, exist_ok=True)
+        dup = staging2 / "silence.mp3"
+        shutil.copy(test_audio_file, dup)
+        service.ingest_file(str(dup))
+
+        assert not dup.exists(), "Duplicate MP3 inside staging should be cleaned up"

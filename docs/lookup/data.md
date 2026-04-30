@@ -97,9 +97,9 @@ Fast list-view search. Returns raw dicts with keys: SourceID, MediaName, SourceP
 
 Fetch slim list-view rows for a specific set of SourceIDs. Same column set as `search_slim`. Supports optional shared connection.
 
-### get_by_identity_ids(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[Song]
+### search_slim_by_identity_ids(identity_ids: List[int], conn: Optional[sqlite3.Connection] = None) -> List[dict]
 
-Retrieves songs where any given Identity ID is credited. Forms the base of the \"Grohlton Check\". Supports optional shared connection.
+Slim list-view rows for songs credited to any of the given identity IDs. Same column set as `search_slim_by_ids` but filters by identity subquery instead of explicit IDs.
 
 ### get_filter_values(conn: Optional[sqlite3.Connection] = None) -> dict
 

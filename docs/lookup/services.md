@@ -89,6 +89,12 @@ Resolve a 409 conflict by reactivating a soft-deleted record with new file data.
 ### ingest_batch(file_paths: List[str], max_workers: int = 10) -> Dict[str, Any]
 Parallel ingestion of multiple staged files. Each file has its own transaction.
 
+### ingest_single(file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]
+Thread-safe single-file ingestion wrapper around `ingest_file`. Catches `ReingestionConflictError` and returns it as a `CONFLICT` dict instead of raising.
+
+### enrich_metadata(song_id: int, conn: sqlite3.Connection) -> None
+Internal post-insert metadata enrichment hook (currently simulated).
+
 ### scan_folder(folder_path: str, recursive: bool = True) -> List[str]
 Scan a directory for supported audio formats. Pure discovery path.
 
@@ -121,8 +127,9 @@ Search publishers by name (base layer).
 ### get_publisher(publisher_id: int) -> Optional[Publisher]
 Fetch a single publisher by ID and resolve its full ancestry.
 
-### get_songs_by_publisher(publisher_id: int) -> List[Song]
-Fetch the full repertoire associated with a given publisher.
+
+### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
+Fetch slim list-view rows for all songs linked to a publisher.
 
 ### get_all_tags() -> List[Tag]
 Fetch the full directory of tags.
@@ -136,11 +143,13 @@ Search tags by name match.
 ### get_tag(tag_id: int) -> Optional[Tag]
 Fetch a single tag by ID.
 
-### get_songs_by_tag(tag_id: int) -> List[Song]
-Fetch the full hydrated song repertoire linked to a specific tag.
 
-### get_songs_by_identity(identity_id: int) -> List[Song]
-Reverse Credit lookup starting from a seed identity.
+### get_songs_slim_by_tag(tag_id: int) -> List[dict]
+Fetch slim list-view rows for all songs linked to a tag.
+
+
+### get_songs_slim_by_identity(identity_id: int) -> List[dict]
+Slim reverse credit lookup — resolves aliases/members/groups, returns slim rows.
 
 ### get_filter_values() -> dict
 Returns all distinct filter sidebar values.
@@ -158,6 +167,9 @@ Deep slim search. Base matches + identity/publisher expansion, no hydration.
 
 ## EditService
 *Location: `src/services/edit_service.py`*
+
+### sync_id3_if_enabled(song_id: int) -> None
+Writes ID3 tags for a song after an edit if the metadata writer is enabled.
 
 ### update_song_scalars(song_id: int, fields: Dict[str, Any]) -> None
 Partial update of core song metadata with validation.
@@ -265,6 +277,14 @@ Soft-delete publishers from the given list that have zero active songs AND zero 
 ### ingest_file(staged_path: str) -> Dict[str, Any]
 (-> `IngestionService.ingest_file`)
 
+### ingest_single(file_path: str, original_path: Optional[str] = None) -> Dict[str, Any]
+(-> `IngestionService.ingest_single`)
+
+### enrich_metadata(song_id: int, conn: sqlite3.Connection) -> None
+(-> `IngestionService.enrich_metadata`)
+
+### sync_id3_if_enabled(song_id: int) -> None
+Writes ID3 tags for a song if the metadata writer is enabled. No-op if disabled.
 
 ### scan_folder(folder_path: str, recursive: bool = True) -> List[str]
 (-> `IngestionService.scan_folder`)
@@ -359,9 +379,9 @@ Returns True if a Publisher with this exact name exists in the DB.
 (-> `LibraryService.get_publisher`)
 
 
-### get_songs_by_publisher(publisher_id: int) -> List[Song]
-(-> `LibraryService.get_songs_by_publisher`)
 
+### get_songs_slim_by_publisher(publisher_id: int) -> List[dict]
+(-> `LibraryService.get_songs_slim_by_publisher`)
 
 ### get_all_tags() -> List[Tag]
 (-> `LibraryService.get_all_tags`)
@@ -382,12 +402,13 @@ Returns a list of all distinct role names (e.g., Performer, Author, Publisher).
 (-> `LibraryService.get_tag`)
 
 
-### get_songs_by_tag(tag_id: int) -> List[Song]
-(-> `LibraryService.get_songs_by_tag`)
+
+### get_songs_slim_by_tag(tag_id: int) -> List[dict]
+(-> `LibraryService.get_songs_slim_by_tag`)
 
 
-### get_songs_by_identity(identity_id: int) -> List[Song]
-(-> `LibraryService.get_songs_by_identity`)
+### get_songs_slim_by_identity(identity_id: int) -> List[dict]
+(-> `LibraryService.get_songs_slim_by_identity`)
 
 
 ### merge_identity_into(source_name_id: int, target_name_id: int) -> None

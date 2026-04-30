@@ -233,12 +233,11 @@ async def update_identity_legal_name(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/identities/{identity_id:int}/songs", response_model=List[SongView])
-async def get_songs_by_identity(identity_id: int) -> List[SongView]:
-    """Fetch all complete songs associated with a full universal identity tree."""
+@router.get("/identities/{identity_id:int}/songs", response_model=List[SongSlimView])
+async def get_songs_by_identity(identity_id: int) -> List[SongSlimView]:
+    """Fetch slim song list for a full universal identity tree."""
     logger.debug(f"[CatalogRouter] get_songs_by_identity(id={identity_id})")
 
-    # We first ensure the identity exists
     identity = _get_service().get_identity(identity_id)
     if not identity:
         logger.warning(
@@ -248,8 +247,8 @@ async def get_songs_by_identity(identity_id: int) -> List[SongView]:
             status_code=404, detail=f"Identity ID {identity_id} not found"
         )
 
-    songs = _get_service().get_songs_by_identity(identity_id)
-    return [SongView.from_domain(s) for s in songs]
+    rows = _get_service().get_songs_slim_by_identity(identity_id)
+    return [SongSlimView.from_row(r) for r in rows]
 
 
 @router.delete("/identities/{identity_id:int}", status_code=204)
@@ -330,17 +329,16 @@ async def get_publisher(publisher_id: int) -> PublisherView:
     return PublisherView.model_validate(publisher.model_dump())
 
 
-@router.get("/publishers/{publisher_id:int}/songs", response_model=List[SongView])
-async def get_songs_by_publisher(publisher_id: int) -> List[SongView]:
-    """Fetch the full repertoire associated with a given publisher."""
+@router.get("/publishers/{publisher_id:int}/songs", response_model=List[SongSlimView])
+async def get_songs_by_publisher(publisher_id: int) -> List[SongSlimView]:
+    """Fetch slim song repertoire for a given publisher."""
     logger.debug(f"[CatalogRouter] get_songs_by_publisher(id={publisher_id})")
-    # Verify existence
     pub = _get_service().get_publisher(publisher_id)
     if not pub:
         raise HTTPException(status_code=404, detail="Publisher not found")
 
-    songs = _get_service().get_songs_by_publisher(publisher_id)
-    return [SongView.from_domain(s) for s in songs]
+    rows = _get_service().get_songs_slim_by_publisher(publisher_id)
+    return [SongSlimView.from_row(r) for r in rows]
 
 
 @router.delete("/publishers/{publisher_id:int}", status_code=204)
@@ -473,17 +471,16 @@ async def get_tag(tag_id: int) -> TagView:
     return TagView.model_validate(tag.model_dump())
 
 
-@router.get("/tags/{tag_id:int}/songs", response_model=List[SongView])
-async def get_songs_by_tag(tag_id: int) -> List[SongView]:
-    """Fetch all complete songs linked to this tag."""
+@router.get("/tags/{tag_id:int}/songs", response_model=List[SongSlimView])
+async def get_songs_by_tag(tag_id: int) -> List[SongSlimView]:
+    """Fetch slim song list linked to this tag."""
     logger.debug(f"[CatalogRouter] get_songs_by_tag(id={tag_id})")
-    # Verify existence
     tag = _get_service().get_tag(tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    songs = _get_service().get_songs_by_tag(tag_id)
-    return [SongView.from_domain(s) for s in songs]
+    rows = _get_service().get_songs_slim_by_tag(tag_id)
+    return [SongSlimView.from_row(r) for r in rows]
 
 
 @router.delete("/tags/{tag_id:int}", status_code=204)

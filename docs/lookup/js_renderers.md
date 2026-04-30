@@ -126,3 +126,15 @@ Orchestrates the drag-and-drop ingestion pipeline.
 
 ### collectFilesFromItems(dataTransferItems)
 Utility to recursively collect files from a drag-and-drop event.
+
+### INGEST_RESULTS_LIST_ID
+Constant — DOM id of the ingest results list (`"ingest-results"`).
+
+### insertPendingCard(resultsId, filename, isWav)
+Inserts a "pending" spinner card into the results list while a file is being ingested.
+
+### resolvePendingCard(resultsId, result, path, stagedFilename)
+Replaces the pending card with the final result card after ingestion completes.
+
+### trackIngestResult(result, path, ctx)
+Records an ingest result into `ctx` state (`ingestTasks` and `cachedIngestResults`).

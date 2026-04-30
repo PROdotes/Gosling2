@@ -174,8 +174,9 @@ class TestIngestWavAsConverting:
         ), f"Expected duplicate to be rejected, got {result['status']}"
 
     def test_duplicate_wav_staged_file_is_cleaned_up(
-        self, ingest_db, staged_wav, tmp_path
+        self, ingest_db, staged_wav, tmp_path, monkeypatch
     ):
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path))
         service = CatalogService(ingest_db)
         service.ingest_wav_as_converting(str(staged_wav))
         staging = tmp_path / "staging2"
@@ -184,6 +185,18 @@ class TestIngestWavAsConverting:
         shutil.copy(staged_wav, dup)
         service.ingest_wav_as_converting(str(dup))
         assert not dup.exists(), "Duplicate staged WAV should be cleaned up"
+
+    def test_duplicate_wav_outside_staging_is_not_deleted(
+        self, ingest_db, staged_wav, tmp_path
+    ):
+        service = CatalogService(ingest_db)
+        service.ingest_wav_as_converting(str(staged_wav))
+        outside = tmp_path / "library"
+        outside.mkdir(parents=True, exist_ok=True)
+        dup = outside / "Cool Song Name.wav"
+        shutil.copy(staged_wav, dup)
+        service.ingest_wav_as_converting(str(dup))
+        assert dup.exists(), "Duplicate WAV outside staging must not be deleted"
 
 
 # ---------------------------------------------------------------------------

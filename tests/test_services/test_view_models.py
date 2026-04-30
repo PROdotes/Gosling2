@@ -288,57 +288,6 @@ class TestSongViewFromDomain:
         ), f"Expected 'Alice', got {view.display_artist}"
 
     # --- display_composer ---
-    def test_display_composer_single(self):
-        """Single Composer credit yields that composer's name."""
-        song = self._make_song(
-            credits=[
-                SongCredit(
-                    source_id=1,
-                    name_id=20,
-                    identity_id=2,
-                    role_id=2,
-                    role_name="Composer",
-                    display_name="Charlie",
-                )
-            ]
-        )
-        view = SongView.from_domain(song)
-        assert (
-            view.display_composer == "Charlie"
-        ), f"Expected 'Charlie', got {view.display_composer}"
-
-    def test_display_composer_multiple(self):
-        """Multiple Composer credits are joined with ', '."""
-        song = self._make_song(
-            credits=[
-                SongCredit(
-                    source_id=1,
-                    name_id=10,
-                    identity_id=1,
-                    role_id=2,
-                    role_name="Composer",
-                    display_name="Alice",
-                ),
-                SongCredit(
-                    source_id=1,
-                    name_id=20,
-                    identity_id=2,
-                    role_id=2,
-                    role_name="Composer",
-                    display_name="Bob",
-                ),
-            ]
-        )
-        view = SongView.from_domain(song)
-        assert (
-            view.display_composer == "Alice, Bob"
-        ), f"Expected 'Alice, Bob', got {view.display_composer}"
-
-    def test_display_composer_none(self):
-        """No composers yields None."""
-        view = SongView.from_domain(self._make_song(credits=[]))
-        assert view.display_composer is None
-
     # --- primary_genre ---
     def test_primary_genre_explicit_primary(self):
         """A Genre tag with is_primary=True is selected over other Genre tags."""
@@ -394,70 +343,6 @@ class TestSongViewFromDomain:
         assert (
             view.primary_genre == "Rock"
         ), f"Expected 'Rock', got {view.primary_genre}"
-
-    # --- display_genres ---
-    def test_display_genres_single(self):
-        """Single Genre tag yields its name."""
-        song = self._make_song(tags=[Tag(id=1, name="Rock", category="Genre")])
-        view = SongView.from_domain(song)
-        assert view.display_genres == "Rock"
-
-    def test_display_genres_multiple(self):
-        """Multiple Genre tags are joined with ', '."""
-        song = self._make_song(
-            tags=[
-                Tag(id=1, name="Rock", category="Genre"),
-                Tag(id=2, name="Pop", category="Genre"),
-            ]
-        )
-        view = SongView.from_domain(song)
-        assert view.display_genres == "Rock, Pop"
-
-    def test_display_genres_none(self):
-        """No Genre tags yields None."""
-        view = SongView.from_domain(self._make_song(tags=[]))
-        assert view.display_genres is None
-
-    # --- display_master_publisher ---
-    def test_display_master_publisher_single(self):
-        """Single publisher without parent yields just the name."""
-        song = self._make_song(
-            publishers=[Publisher(id=1, name="Universal", parent_name=None)]
-        )
-        view = SongView.from_domain(song)
-        assert (
-            view.display_master_publisher == "Universal"
-        ), f"Expected 'Universal', got {view.display_master_publisher}"
-
-    def test_display_master_publisher_with_parent(self):
-        """Publisher with parent yields 'Name (Parent)'."""
-        song = self._make_song(
-            publishers=[Publisher(id=10, name="DGC Records", parent_name="Universal")]
-        )
-        view = SongView.from_domain(song)
-        assert (
-            view.display_master_publisher == "DGC Records (Universal)"
-        ), f"Expected 'DGC Records (Universal)', got {view.display_master_publisher}"
-
-    def test_display_master_publisher_multiple(self):
-        """Multiple publishers are joined with ', '."""
-        song = self._make_song(
-            publishers=[
-                Publisher(id=10, name="DGC Records", parent_name="Universal"),
-                Publisher(id=5, name="Sub Pop", parent_name=None),
-            ]
-        )
-        view = SongView.from_domain(song)
-        assert (
-            view.display_master_publisher == "DGC Records (Universal), Sub Pop"
-        ), f"Expected 'DGC Records (Universal), Sub Pop', got {view.display_master_publisher}"
-
-    def test_display_master_publisher_empty(self):
-        """No publishers yields empty string."""
-        view = SongView.from_domain(self._make_song(publishers=[]))
-        assert (
-            view.display_master_publisher == ""
-        ), f"Expected '', got {view.display_master_publisher}"
 
     # --- albums mapping ---
     def test_albums_mapped_to_song_album_views(self):
@@ -759,15 +644,15 @@ class TestAlbumViewFromDomain:
         view = AlbumView.from_domain(self._make_album(songs=[]))
         assert view.song_count == 0, f"Expected song_count=0, got {view.song_count}"
 
-    def test_songs_are_song_views(self):
-        """Domain Songs are converted to SongView objects."""
+    def test_songs_are_slim_views(self):
+        """Domain Songs are converted to SongSlimView objects."""
         album = self._make_album(songs=[self._make_song(id=1, media_name="Track One")])
         view = AlbumView.from_domain(album)
         assert len(view.songs) == 1, f"Expected 1 song, got {len(view.songs)}"
         song_view = view.songs[0]
         assert isinstance(
-            song_view, SongView
-        ), f"Expected SongView, got {type(song_view)}"
+            song_view, SongSlimView
+        ), f"Expected SongSlimView, got {type(song_view)}"
         assert song_view.id == 1, f"Expected song id=1, got {song_view.id}"
         assert (
             song_view.title == "Track One"

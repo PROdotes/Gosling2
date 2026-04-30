@@ -16,7 +16,7 @@ import {
     removeSongTag,
     removeSongCredit,
     removeSongAlbum,
-    formatMetadataCase,
+    formatText,
     getSongWebSearch,
     resolveConflict,
     getIngestStatus,
@@ -549,25 +549,21 @@ export class SongActionsHandler {
     }
 
     async handleFormatCase(actionTarget) {
-        const { entityId, entityType, field, type } = actionTarget.dataset; // type = title or sentence
+        const { entityType, entityId, field, type } = actionTarget.dataset;
+        let input;
+        if (entityType === "song") {
+            input = document.getElementById("ef-title");
+        } else if (entityType === "album") {
+            input = document.querySelector(`[data-album-scalar="${field}"][data-album-id="${entityId}"]`);
+        }
+        if (!input || !input.value.trim()) return;
         try {
-            const updatedSong = await formatMetadataCase(
-                entityType,
-                entityId,
-                field,
-                type,
-            );
-            if (this.ctx.refreshActiveSongV2 && entityType === "song") {
-                await this.ctx.refreshActiveSongV2(entityId);
-            } else {
-                this.ctx.refreshActiveDetail();
-            }
+            const { result } = await formatText(input.value.trim(), type);
+            input.value = result;
+            input.dispatchEvent(new Event("blur"));
         } catch (err) {
             if (this.ctx.showBanner) {
-                this.ctx.showBanner(
-                    `Formatting failed: ${err.message}`,
-                    "error",
-                );
+                this.ctx.showBanner(`Formatting failed: ${err.message}`, "error");
             }
         }
     }

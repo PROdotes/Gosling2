@@ -60,10 +60,6 @@ class TestPublisherLogic:
         assert (
             view.source_path == "test/path.mp3"
         ), f"Expected source_path='test/path.mp3', got '{view.source_path}'"
-        assert (
-            view.display_master_publisher == "Publisher A, Publisher B"
-        ), f"Expected display_master_publisher='Publisher A, Publisher B', got '{view.display_master_publisher}'"
-
         assert len(view.albums) == 3, f"Expected 3 albums, got {len(view.albums)}"
 
         # Album 1: no publishers
@@ -134,10 +130,6 @@ class TestPublisherLogic:
         assert (
             view.source_path == "test/path2.mp3"
         ), f"Expected source_path='test/path2.mp3', got '{view.source_path}'"
-        assert (
-            view.display_master_publisher == ""
-        ), f"Expected display_master_publisher='', got '{view.display_master_publisher}'"
-
         assert len(view.albums) == 1, f"Expected 1 album, got {len(view.albums)}"
         assert (
             view.albums[0].album_title == "Album A"

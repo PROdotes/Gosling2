@@ -190,6 +190,31 @@ class SongSlimView(BaseModel):
         return bool(self.source_path and os.path.exists(self.source_path))
 
     @classmethod
+    def from_domain(cls, song: "Song") -> "SongSlimView":
+        performers = [c for c in song.credits if c.role_name == "Performer"]
+        composers = [c for c in song.credits if c.role_name == "Composer"]
+        primary_genre_tag = next((t for t in song.tags if t.category == "Genre"), None)
+        return cls(
+            id=song.id,
+            media_name=song.media_name,
+            title=song.media_name,
+            source_path=song.source_path,
+            duration_s=song.duration_s,
+            year=song.year,
+            bpm=song.bpm,
+            isrc=song.isrc,
+            is_active=song.is_active,
+            processing_status=song.processing_status,
+            display_artist=performers[0].display_name if performers else None,
+            primary_genre=primary_genre_tag.name if primary_genre_tag else None,
+            has_performer=bool(performers),
+            has_composer=bool(composers),
+            has_genre=primary_genre_tag is not None,
+            has_publisher=bool(song.publishers),
+            has_album=bool(song.albums),
+        )
+
+    @classmethod
     def from_row(cls, row: dict) -> "SongSlimView":
         return cls(
             id=row["SourceID"],
@@ -448,13 +473,13 @@ class AlbumView(BaseModel):
     release_year: Optional[int] = None
     publishers: List[Publisher] = []
     credits: List[AlbumCredit] = []
-    songs: List[SongView] = []
+    songs: List[SongSlimView] = []
 
     @classmethod
     def from_domain(cls, album: Album) -> "AlbumView":
-        """Maps a domain Album to its view-model. Note: excludes 'songs' from base dump but re-attaches hydrated views."""
+        """Maps a domain Album to its view-model. Note: excludes 'songs' from base dump but re-attaches slim views."""
         data = album.model_dump(exclude={"songs"})
-        data["songs"] = [SongView.from_domain(song) for song in album.songs]
+        data["songs"] = [SongSlimView.from_domain(song) for song in album.songs]
         return cls(**data)
 
     @computed_field

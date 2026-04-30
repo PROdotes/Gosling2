@@ -345,11 +345,6 @@ export function patchSongScalars(songId, fields) {
     });
 }
 
-export function formatMetadataCase(entityType, entityId, field, formatType) {
-    const url = `/api/v1/formatting/case?entity_type=${entityType}&entity_id=${entityId}&field=${encodeURIComponent(field)}&format_type=${formatType}`;
-    return fetchJson(url, { method: "PATCH" });
-}
-
 export function formatText(text, type) {
     return fetchJson("/api/v1/tools/format-text", {
         method: "POST",

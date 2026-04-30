@@ -163,8 +163,9 @@ class TestCatalogServiceIngestFile:
         assert os.path.exists(str(live_file)), "Live file outside staging must NOT be deleted on ALREADY_EXISTS"
 
     def test_ingest_hash_collision_returns_already_exists(
-        self, populated_db, test_mp3, monkeypatch
+        self, populated_db, test_mp3, tmp_path, monkeypatch
     ):
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
         service = CatalogService(populated_db)
         # Mock calculate_audio_hash to return Song 1's hash "hash_1"
         monkeypatch.setattr(
@@ -245,8 +246,9 @@ class TestCatalogServiceIngestFile:
         ), f"Expected processing_status=1 after enrichment, got {song.processing_status}"
 
     def test_ingest_failure_rolls_back_and_deletes_staged_file(
-        self, ingest_db, test_mp3, monkeypatch
+        self, ingest_db, test_mp3, tmp_path, monkeypatch
     ):
+        monkeypatch.setattr("src.services.ingestion_service.STAGING_DIR", str(tmp_path / "staging"))
         service = CatalogService(ingest_db)
 
         # Induce a DB failure during insert by monkeypatching the repo's insert to raise

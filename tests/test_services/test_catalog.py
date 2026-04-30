@@ -328,16 +328,16 @@ class TestSearchSongsDeepSlim:
 
 
 # ===================================================================
-# CatalogService.get_songs_by_identity
+# CatalogService.get_songs_slim_by_identity
 # ===================================================================
-class TestGetSongsByIdentity:
-    """CatalogService.get_songs_by_identity contracts (reverse credit lookup)."""
+class TestGetSongsSlimByIdentity:
+    """CatalogService.get_songs_slim_by_identity contracts (reverse credit lookup)."""
 
     def test_dave_grohl_full_tree(self, catalog_service):
         """Dave Grohl (ID=1): person in Nirvana(2) and Foo Fighters(3).
         Should return all songs credited to Dave, his aliases, AND his groups."""
-        songs = catalog_service.get_songs_by_identity(1)
-        song_ids = {s.id for s in songs}
+        songs = catalog_service.get_songs_slim_by_identity(1)
+        song_ids = {s["SourceID"] for s in songs}
 
         # Direct/alias credits: 4, 5, 6, 8
         assert (
@@ -365,8 +365,8 @@ class TestGetSongsByIdentity:
     def test_taylor_hawkins(self, catalog_service):
         """Taylor (ID=4): person in Foo Fighters(3).
         Solo + Foo Fighters songs + any credited."""
-        songs = catalog_service.get_songs_by_identity(4)
-        song_ids = {s.id for s in songs}
+        songs = catalog_service.get_songs_slim_by_identity(4)
+        song_ids = {s["SourceID"] for s in songs}
 
         assert (
             3 in song_ids
@@ -382,8 +382,8 @@ class TestGetSongsByIdentity:
     def test_nirvana_as_group(self, catalog_service):
         """Nirvana (ID=2, group): has member Dave(1).
         Should return Nirvana songs + Dave's solo/alias songs."""
-        songs = catalog_service.get_songs_by_identity(2)
-        song_ids = {s.id for s in songs}
+        songs = catalog_service.get_songs_slim_by_identity(2)
+        song_ids = {s["SourceID"] for s in songs}
 
         assert 1 in song_ids, f"Expected song 1 (SLTS) in results, got {song_ids}"
         # Members expanded: Dave (1)
@@ -402,28 +402,10 @@ class TestGetSongsByIdentity:
 
     def test_not_found_identity(self, catalog_service):
         """Non-existent identity ID returns empty list."""
-        songs = catalog_service.get_songs_by_identity(999)
+        songs = catalog_service.get_songs_slim_by_identity(999)
         assert (
             songs == []
         ), f"Expected empty list for non-existent identity, got {songs}"
-
-    def test_results_are_hydrated(self, catalog_service):
-        """Songs returned by get_songs_by_identity should be fully hydrated."""
-        songs = catalog_service.get_songs_by_identity(2)  # Nirvana
-        slts = next((s for s in songs if s.id == 1), None)
-        assert slts is not None, "Song 1 (SLTS) should be in Nirvana results"
-        assert (
-            len(slts.credits) == 1
-        ), f"Expected 1 credit for SLTS, got {len(slts.credits)}"
-        assert (
-            slts.credits[0].display_name == "Nirvana"
-        ), f"Expected credit 'Nirvana', got {slts.credits[0].display_name}"
-        assert (
-            len(slts.albums) == 1
-        ), f"Expected 1 album for SLTS, got {len(slts.albums)}"
-        assert (
-            slts.albums[0].album_title == "Nevermind"
-        ), f"Expected album 'Nevermind', got {slts.albums[0].album_title}"
 
 
 # ===================================================================
@@ -792,24 +774,20 @@ class TestSearchPublishers:
         assert result == [], f"Expected empty list, got {result}"
 
 
-class TestGetPublisherSongs:
-    """CatalogService.get_songs_by_publisher contracts."""
+class TestGetSongsSlimByPublisher:
+    """CatalogService.get_songs_slim_by_publisher contracts."""
 
     def test_dgc_songs(self, catalog_service):
         """DGC Records (10) has Song 1 via RecordingPublishers."""
-        songs = catalog_service.get_songs_by_publisher(10)
+        songs = catalog_service.get_songs_slim_by_publisher(10)
         assert len(songs) == 1, f"Expected 1 song, got {len(songs)}"
         assert (
-            songs[0].title == "Smells Like Teen Spirit"
-        ), f"Expected title 'Smells Like Teen Spirit', got {songs[0].title}"
-        # Song should be hydrated
-        assert (
-            len(songs[0].credits) == 1
-        ), f"Expected 1 credit, got {len(songs[0].credits)}"
+            songs[0]["MediaName"] == "Smells Like Teen Spirit"
+        ), f"Expected title 'Smells Like Teen Spirit', got {songs[0]['MediaName']}"
 
     def test_publisher_with_no_songs(self, catalog_service):
         """Sub Pop (5) has no RecordingPublisher entries."""
-        songs = catalog_service.get_songs_by_publisher(5)
+        songs = catalog_service.get_songs_slim_by_publisher(5)
         assert songs == [], f"Expected empty list, got {songs}"
 
 
@@ -899,21 +877,6 @@ class TestSongViewFromCatalog:
             view.primary_genre is None
         ), f"Expected primary_genre None, got {view.primary_genre}"
 
-    def test_master_publisher_display(self, catalog_service):
-        """Song 1: DGC Records (parent UMG) -> 'DGC Records (Universal Music Group)'."""
-        song = catalog_service.get_song(1)
-        view = SongView.from_domain(song)
-        assert (
-            view.display_master_publisher == "DGC Records (Universal Music Group)"
-        ), f"Expected display_master_publisher 'DGC Records (Universal Music Group)', got {view.display_master_publisher}"
-
-    def test_master_publisher_empty(self, catalog_service):
-        """Song 2: no recording publisher -> empty string."""
-        song = catalog_service.get_song(2)
-        view = SongView.from_domain(song)
-        assert (
-            view.display_master_publisher == ""
-        ), f"Expected display_master_publisher '', got {view.display_master_publisher}"
 
 
 class TestAlbumViewFromCatalog:

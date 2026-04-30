@@ -370,35 +370,54 @@ class SongRepository(MediaSourceRepository):
             logger.debug(f"[SongRepository] <- search_slim_by_ids() found {len(rows)}")
             return [dict(row) for row in rows]
 
-    def get_by_identity_ids(
+
+    def search_slim_by_identity_ids(
         self,
         identity_ids: List[int],
         conn: Optional[sqlite3.Connection] = None,
-    ) -> List[Song]:
-        """Retrieves songs where any given Identity ID is credited (The Grohlton Check base)."""
+    ) -> List[dict]:
+        """Slim list-view rows for songs credited to any of the given identity IDs."""
         if not identity_ids:
             return []
 
-        logger.debug(f"[SongRepository] get_by_identity_ids entry: ids={identity_ids}")
         placeholders = ",".join(["?" for _ in identity_ids])
         query_sql = f"""
-            SELECT {self._COLUMNS} {self._JOIN}
+            SELECT
+                m.SourceID, m.MediaName, m.SourcePath, m.SourceDuration, m.ProcessingStatus,
+                s.RecordingYear, s.TempoBPM, s.ISRC, m.IsActive,
+                GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
+                MIN(t.TagName) FILTER (WHERE t.TagCategory = 'Genre' AND mst.IsPrimary = 1) AS PrimaryGenre,
+                EXISTS (SELECT 1 FROM RecordingPublishers rp WHERE rp.SourceID = m.SourceID) AS has_publisher,
+                EXISTS (SELECT 1 FROM SongAlbums sa WHERE sa.SourceID = m.SourceID) AS has_album,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Performer') > 0 AS has_performer,
+                COUNT(DISTINCT sc.CreditID) FILTER (WHERE r.RoleName = 'Composer') > 0 AS has_composer
+            FROM MediaSources m
+            JOIN Songs s ON m.SourceID = s.SourceID
+                AND m.TypeID = (SELECT TypeID FROM Types WHERE TypeName = 'Song')
+                AND m.IsDeleted = 0
+            LEFT JOIN SongCredits sc ON m.SourceID = sc.SourceID
+            LEFT JOIN ArtistNames an ON sc.CreditedNameID = an.NameID AND an.IsDeleted = 0
+            LEFT JOIN Roles r ON sc.RoleID = r.RoleID
+            LEFT JOIN MediaSourceTags mst ON m.SourceID = mst.SourceID
+            LEFT JOIN Tags t ON mst.TagID = t.TagID AND t.IsDeleted = 0
             WHERE m.SourceID IN (
-                SELECT sc.SourceID FROM SongCredits sc
-                JOIN ArtistNames an ON sc.CreditedNameID = an.NameID
-                WHERE an.OwnerIdentityID IN ({placeholders}) AND an.IsDeleted = 0
+                SELECT sc2.SourceID FROM SongCredits sc2
+                JOIN ArtistNames an2 ON sc2.CreditedNameID = an2.NameID
+                WHERE an2.OwnerIdentityID IN ({placeholders}) AND an2.IsDeleted = 0
             )
+            GROUP BY m.SourceID
         """
 
         if conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(query_sql, identity_ids).fetchall()
-            return [self._row_to_song(row) for row in rows]
+            return [dict(row) for row in rows]
 
         with self._get_connection() as new_conn:
             new_conn.row_factory = sqlite3.Row
             rows = new_conn.execute(query_sql, identity_ids).fetchall()
-            return [self._row_to_song(row) for row in rows]
+            logger.debug(f"[SongRepository] <- search_slim_by_identity_ids() found {len(rows)}")
+            return [dict(row) for row in rows]
 
     def get_by_hash(
         self, audio_hash: str, conn: Optional[sqlite3.Connection] = None

@@ -257,8 +257,8 @@ Deletes an orphan file from staging.
 ### cleanupOriginalFile(filePath)
 Deletes the original source file after successful processing.
 
-### formatMetadataCase(entityType, entityId, field, formatType)
-Applies title/sentence casing to a metadata field.
+### formatText(text, type)
+Stateless text casing via `POST /api/v1/tools/format-text`. `type` is `"title"` or `"sentence"`. Returns `{ result }`.
 
 ### readNdjsonStream(response, onUpdate)
 Helper to parse streaming NDJSON responses.

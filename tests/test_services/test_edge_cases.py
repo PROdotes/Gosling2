@@ -252,9 +252,6 @@ class TestSongEdgeCases:
             view.display_artist is None
         ), f"Expected display_artist=None, got {view.display_artist}"
         assert (
-            view.display_master_publisher == ""
-        ), f"Expected display_master_publisher='', got {view.display_master_publisher}"
-        assert (
             view.primary_genre is None
         ), f"Expected primary_genre=None, got {view.primary_genre}"
 

@@ -220,9 +220,9 @@ class CatalogService:
         """Fetch a single publisher by ID."""
         return self._library_service.get_publisher(publisher_id)
 
-    def get_songs_by_publisher(self, publisher_id: int) -> List[Song]:
-        """Fetch song repertoire for a publisher."""
-        return self._library_service.get_songs_by_publisher(publisher_id)
+    def get_songs_slim_by_publisher(self, publisher_id: int) -> List[dict]:
+        """Fetch slim song rows for a publisher."""
+        return self._library_service.get_songs_slim_by_publisher(publisher_id)
 
     def get_all_tags(self) -> List[Tag]:
         """Fetch the full directory of tags."""
@@ -240,13 +240,13 @@ class CatalogService:
         """Fetch a single tag by ID."""
         return self._library_service.get_tag(tag_id)
 
-    def get_songs_by_tag(self, tag_id: int) -> List[Song]:
-        """Fetch all songs linked to this tag."""
-        return self._library_service.get_songs_by_tag(tag_id)
+    def get_songs_slim_by_tag(self, tag_id: int) -> List[dict]:
+        """Fetch slim song rows for a tag."""
+        return self._library_service.get_songs_slim_by_tag(tag_id)
 
-    def get_songs_by_identity(self, identity_id: int) -> List[Song]:
-        """Reversed credit lookup from identity."""
-        return self._library_service.get_songs_by_identity(identity_id)
+    def get_songs_slim_by_identity(self, identity_id: int) -> List[dict]:
+        """Slim reversed credit lookup from identity."""
+        return self._library_service.get_songs_slim_by_identity(identity_id)
 
     def get_filter_values(self) -> dict:
         """Returns all distinct filter sidebar values."""
