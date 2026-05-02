@@ -92,24 +92,24 @@ class ConfirmRequest(BaseModel):
 
 
 @router.post("/splitter/confirm")
-def confirm(
-    body: ConfirmRequest, service: CatalogService = Depends(_get_service)
-) -> dict:
-    """Atomic replacement of one credit/publisher with multiple split results."""
+def confirm(body: ConfirmRequest) -> dict:
+    """Returns add/remove payload for splitter confirmation. Does not write."""
     names = resolve_names(body.tokens)
+    add = []
+    remove = [{"type": body.remove.type, "song_id": body.song_id, "id": body.remove.id}]
+
     if body.target == "credits":
         if not body.classification:
             raise HTTPException(
                 status_code=422, detail="classification is required for credits"
             )
         for name in names:
-            service.add_song_credit(body.song_id, name, body.classification)
-        service.remove_song_credit(body.song_id, body.remove.id)
+            add.append({"type": "credit", "song_id": body.song_id, "name": name, "id": None, "role": body.classification})
     elif body.target == "publishers":
         for name in names:
-            service.add_song_publisher(body.song_id, publisher_name=name)
-        service.remove_song_publisher(body.song_id, body.remove.id)
-    return {"ok": True}
+            add.append({"type": "publisher", "song_id": body.song_id, "name": name, "id": None})
+
+    return {"add": add, "remove": remove}
 
 
 class FilenameApplyItem(BaseModel):
@@ -123,25 +123,19 @@ class FilenameApplyRequest(BaseModel):
 
 
 @router.post("/filename-parser/apply")
-def filename_parser_apply(
-    body: FilenameApplyRequest, service: CatalogService = Depends(_get_service)
-) -> dict:
+def filename_parser_apply(body: FilenameApplyRequest) -> dict:
     """
-    Parses each filename and applies the resulting metadata to the database.
-    - {Artist} -> Adds a 'Performer' credit (if not exists)
-    - {Title} -> Updates the song title scalar
-    - {Year} -> Updates the recording year scalar
-    - {BPM} -> Updates the tempo bpm scalar
-    - {ISRC} -> Updates the ISRC scalar
-    - {Genre} -> Adds a 'Genre' tag
-    - {Publisher} -> Adds a publisher link
+    Resolves filenames into structured add/update/remove items for the mutator.
+    Does not write to the database.
     """
+    add = []
+    update = []
+
     for item in body.items:
         metadata = parse_with_pattern(item.filename, body.pattern)
         if not metadata:
             continue
 
-        # 1. Scalar updates (Title, Year, BPM, ISRC)
         scalars = {}
         if "Title" in metadata:
             scalars["media_name"] = metadata["Title"]
@@ -149,37 +143,33 @@ def filename_parser_apply(
             try:
                 scalars["year"] = int(metadata["Year"])
             except ValueError:
-                logger.warning(f"[tools] Non-numeric Year tag for song {item.song_id}: {metadata['Year']!r}")
+                logger.warning(f"[tools] Non-numeric Year for song {item.song_id}: {metadata['Year']!r}")
         if "BPM" in metadata:
             try:
                 scalars["bpm"] = int(metadata["BPM"])
             except ValueError:
-                logger.warning(f"[tools] Non-numeric BPM tag for song {item.song_id}: {metadata['BPM']!r}")
+                logger.warning(f"[tools] Non-numeric BPM for song {item.song_id}: {metadata['BPM']!r}")
         if "ISRC" in metadata:
             scalars["isrc"] = metadata["ISRC"]
 
         if scalars:
-            service.update_song_scalars(item.song_id, scalars)
+            update.append({"type": "song", "id": item.song_id, **scalars})
 
-        # 2. Credits (Artist)
         if "Artist" in metadata:
-            service.add_song_credit(
-                item.song_id, metadata["Artist"], role_name="Performer"
-            )
+            add.append({"type": "credit", "song_id": item.song_id, "name": metadata["Artist"], "role": "Performer"})
 
-        # 3. Tags (Genre)
         if "Genre" in metadata:
-            service.add_song_tag(
-                item.song_id, tag_name=metadata["Genre"], category="Genre"
-            )
+            add.append({"type": "tag", "song_id": item.song_id, "name": metadata["Genre"], "category": "Genre"})
 
-        # 4. Publishers
         if "Publisher" in metadata:
-            service.add_song_publisher(
-                item.song_id, publisher_name=metadata["Publisher"]
-            )
+            add.append({"type": "publisher", "song_id": item.song_id, "name": metadata["Publisher"]})
 
-    return {"ok": True, "count": len(body.items)}
+    result = {}
+    if add:
+        result["add"] = add
+    if update:
+        result["update"] = update
+    return result
 
 
 # --- Text Formatting ---

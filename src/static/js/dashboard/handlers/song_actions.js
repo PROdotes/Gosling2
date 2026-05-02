@@ -288,9 +288,7 @@ export class SongActionsHandler {
 
         try {
             await mutate({
-                command_type: "song_mutation",
-                song_ids: [Number(id)],
-                scalars: { is_active: isChecked },
+                update: [{ type: "song", id: Number(id), is_active: isChecked }],
             });
 
             // Sync current items in any list results

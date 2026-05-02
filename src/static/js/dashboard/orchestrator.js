@@ -351,7 +351,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             caseButton: true,
             onSave: async (val) => {
                 try {
-                    await updateCreditName(0, primary.id, val);
+                    await updateCreditName(primary.id, val);
                     if (ctx.refreshLayout) ctx.refreshLayout();
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
@@ -400,7 +400,7 @@ export async function manageArtist(ctx, artistId, artistName) {
             },
             onRename: async (item, newName) => {
                 try {
-                    await updateCreditName(0, item.id, newName);
+                    await updateCreditName(item.id, newName);
                 } catch (err) {
                     if (err.detail?.code === "MERGE_REQUIRED") {
                         const { collision_name_id } = err.detail;

@@ -30,28 +30,6 @@ async function fetchJson(url, options = {}) {
     return response.json();
 }
 
-async function fetchVoid(url, options = {}) {
-    const response = await fetch(url, options);
-    if (!response.ok) {
-        let errorMsg = `Request failed: ${response.status}`;
-        let errorDetail = null;
-        try {
-            const errorData = await response.json();
-            if (errorData && errorData.detail) {
-                errorDetail = errorData.detail;
-                errorMsg =
-                    typeof errorDetail === "string"
-                        ? errorDetail
-                        : `Request failed: ${response.status}`;
-            }
-        } catch (e) {
-            // No JSON body
-        }
-        const err = new Error(errorMsg);
-        err.detail = errorDetail;
-        throw err;
-    }
-}
 
 export async function fetchValidationRules() {
     return fetchJson("/api/v1/validation-rules");
@@ -168,39 +146,23 @@ export function getArtistSongs(id, options = {}) {
 }
 
 export function addIdentityAlias(identityId, displayName, nameId = null) {
-    return fetchJson(`/api/v1/identities/${identityId}/aliases`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName, name_id: nameId }),
-    });
+    return mutate({ add: [{ type: "identity_alias", identity_id: identityId, display_name: displayName, name_id: nameId }] });
 }
 
 export function removeIdentityAlias(identityId, nameId) {
-    return fetchVoid(`/api/v1/identities/${identityId}/aliases/${nameId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "identity_alias", identity_id: identityId, name_id: nameId }] });
 }
 
-export function setIdentityType(identityId, type) {
-    return fetchVoid(`/api/v1/identities/${identityId}/type`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type }),
-    });
+export function setIdentityType(identityId, identityType) {
+    return mutate({ update: [{ type: "identity", id: identityId, identity_type: identityType }] });
 }
 
 export function addIdentityMember(groupId, memberId) {
-    return fetchVoid(`/api/v1/identities/${groupId}/members`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ member_id: memberId }),
-    });
+    return mutate({ add: [{ type: "identity_member", group_id: groupId, member_id: memberId }] });
 }
 
 export function removeIdentityMember(groupId, memberId) {
-    return fetchVoid(`/api/v1/identities/${groupId}/members/${memberId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "identity_member", group_id: groupId, member_id: memberId }] });
 }
 
 export function getPublisherDetail(id, options = {}) {
@@ -244,13 +206,11 @@ export function getIngestStatus() {
 }
 
 export function resetIngestStatus() {
-    return fetchJson("/api/v1/ingest/reset-status", { method: "POST" });
+    return mutate({ update: [{ type: "ingest_status", reset: true }] });
 }
 
 export function resolveConflict(ghostId, stagedPath) {
-    return fetchJson(`/api/v1/ingest/resolve-conflict?ghost_id=${ghostId}&staged_path=${encodeURIComponent(stagedPath)}`, {
-        method: "POST",
-    });
+    return mutate({ update: [{ type: "ingest_conflict", ghost_id: ghostId, staged_path: stagedPath }] });
 }
 
 /**
@@ -287,62 +247,31 @@ export function scanFolder(folderPath, recursive = true, inPlace = false) {
 }
 
 export function addSongPublisher(songId, publisherName, publisherId = null) {
-    const body =
-        publisherId !== null
-            ? { publisher_id: publisherId }
-            : { publisher_name: publisherName };
-    return fetchJson(`/api/v1/songs/${songId}/publishers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+    return mutate({ add: [{ type: "publisher", song_id: songId, name: publisherName, id: publisherId }] });
 }
 
 export function removeSongPublisher(songId, publisherId) {
-    return fetchVoid(`/api/v1/songs/${songId}/publishers/${publisherId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "publisher", song_id: songId, id: publisherId }] });
 }
 
 export function fetchRoles() {
     return fetchJson("/api/v1/roles");
 }
 
-export function addSongCredit(
-    songId,
-    displayName,
-    roleName,
-    identityId = null,
-) {
-    const body = { display_name: displayName, role_name: roleName };
-    if (identityId !== null) body.identity_id = identityId;
-    return fetchJson(`/api/v1/songs/${songId}/credits`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+export function addSongCredit(songId, displayName, roleName, identityId = null) {
+    return mutate({ add: [{ type: "credit", song_id: songId, name: displayName, id: identityId, role: roleName }] });
 }
 
 export function removeSongCredit(songId, creditId) {
-    return fetchVoid(`/api/v1/songs/${songId}/credits/${creditId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "credit", song_id: songId, id: creditId }] });
 }
 
-export function updateCreditName(songId, nameId, displayName) {
-    return fetchVoid(`/api/v1/songs/${songId}/credits/${nameId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ display_name: displayName }),
-    });
+export function updateCreditName(nameId, displayName) {
+    return mutate({ update: [{ type: "credit", id: nameId, display_name: displayName }] });
 }
 
 export function patchSongScalars(songId, fields) {
-    return fetchJson(`/api/v1/songs/${songId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-    });
+    return mutate({ update: [{ type: "song", id: songId, ...fields }] });
 }
 
 export function mutate(command) {
@@ -362,31 +291,22 @@ export function formatText(text, type) {
 }
 
 export function deleteSong(id, deleteFile = false) {
-    const url = deleteFile
-        ? `/api/v1/ingest/songs/${id}?delete_file=true`
-        : `/api/v1/ingest/songs/${id}`;
-    return fetchJson(url, { method: "DELETE" });
+    return mutate({ remove: [{ type: "song", id: Number(id), delete_file: deleteFile }] });
 }
 
 export function rejectSong(id) {
-    return fetchJson(`/api/v1/ingest/songs/${id}?notes=REJECTED`, {
-        method: "DELETE",
+    return mutate({
+        update: [{ type: "song", id: Number(id), notes: "REJECTED" }],
+        remove: [{ type: "song", id: Number(id) }],
     });
 }
 
 export function moveSongToLibrary(id) {
-    return fetchJson(`/api/v1/songs/${id}/move`, {
-        method: "POST",
-    });
+    return mutate({ update: [{ type: "song", id: Number(id), move_to_library: true }] });
 }
 
 export function mergeIdentity(sourceNameId, targetNameId) {
-    return fetchVoid(
-        `/api/v1/identities/merge?source_name_id=${sourceNameId}&target_name_id=${targetNameId}`,
-        {
-            method: "POST",
-        },
-    );
+    return mutate({ update: [{ type: "identity", source_name_id: sourceNameId, target_name_id: targetNameId, merge: true }] });
 }
 
 export function syncSongId3(id) {
@@ -398,19 +318,11 @@ export function getSongSyncStatus(id) {
 }
 
 export function setPublisherParent(publisherId, parentId) {
-    return fetchVoid(`/api/v1/publishers/${publisherId}/parent`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parent_id: parentId }),
-    });
+    return mutate({ update: [{ type: "publisher", id: publisherId, parent_id: parentId }] });
 }
 
 export function updatePublisher(publisherId, name) {
-    return fetchVoid(`/api/v1/publishers/${publisherId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publisher_name: name }),
-    });
+    return mutate({ update: [{ type: "publisher", id: publisherId, name }] });
 }
 
 export function searchTags(query = "") {
@@ -433,161 +345,99 @@ export function getTagCategories() {
 }
 
 export function updateTag(tagId, name, category) {
-    return fetchVoid(`/api/v1/tags/${tagId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tag_name: name, category: category }),
-    });
+    return mutate({ update: [{ type: "tag", id: tagId, name, category }] });
 }
 
 export function deleteTag(tagId) {
-    return fetchVoid(`/api/v1/tags/${tagId}`, { method: "DELETE" });
+    return mutate({ remove: [{ type: "tag", id: tagId }] });
 }
 
 export function bulkDeleteUnlinkedTags() {
-    return fetchJson("/api/v1/tags?unlinked=true", { method: "DELETE" });
+    return mutate({ remove: [{ type: "tag", unlinked: true }] });
 }
 
 export function deleteAlbum(albumId) {
-    return fetchVoid(`/api/v1/albums/${albumId}`, { method: "DELETE" });
+    return mutate({ remove: [{ type: "album", id: albumId }] });
 }
 
 export function bulkDeleteUnlinkedAlbums() {
-    return fetchJson("/api/v1/albums?unlinked=true", { method: "DELETE" });
+    return mutate({ remove: [{ type: "album", unlinked: true }] });
 }
 
 export function deletePublisher(publisherId) {
-    return fetchVoid(`/api/v1/publishers/${publisherId}`, { method: "DELETE" });
+    return mutate({ remove: [{ type: "publisher", id: publisherId }] });
 }
 
 export function bulkDeleteUnlinkedPublishers() {
-    return fetchJson("/api/v1/publishers?unlinked=true", { method: "DELETE" });
+    return mutate({ remove: [{ type: "publisher", unlinked: true }] });
 }
 
 export function deleteIdentity(identityId) {
-    return fetchVoid(`/api/v1/identities/${identityId}`, { method: "DELETE" });
+    return mutate({ remove: [{ type: "identity", id: identityId }] });
 }
 
 export function bulkDeleteUnlinkedIdentities() {
-    return fetchJson("/api/v1/identities?unlinked=true", { method: "DELETE" });
+    return mutate({ remove: [{ type: "identity", unlinked: true }] });
 }
 
 export function addSongTag(songId, tagName, category, tagId = null, rawTag = null) {
-    let body;
-    if (tagId !== null) {
-        body = { tag_id: tagId };
-    } else if (rawTag !== null) {
-        body = { raw_tag: rawTag };
-    } else {
-        body = { tag_name: tagName, category };
-    }
-    return fetchJson(`/api/v1/songs/${songId}/tags`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+    return mutate({ add: [{ type: "tag", song_id: songId, name: tagName, category, id: tagId, raw_tag: rawTag }] });
 }
 
 export function removeSongTag(songId, tagId) {
-    return fetchVoid(`/api/v1/songs/${songId}/tags/${tagId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "tag", song_id: songId, id: tagId }] });
 }
 
 export function setPrimarySongTag(songId, tagId) {
-    return fetchJson(`/api/v1/songs/${songId}/tags/${tagId}/primary`, {
-        method: "PATCH",
-    });
+    return mutate({ update: [{ type: "song_tag", song_id: songId, tag_id: tagId, is_primary: true }] });
 }
 
 export function addSongAlbum(songId, albumId, title, trackNumber, discNumber) {
-    const body = albumId !== null ? { album_id: albumId } : { title };
-    if (trackNumber !== null) body.track_number = trackNumber;
-    if (discNumber !== null) body.disc_number = discNumber;
-    return fetchJson(`/api/v1/songs/${songId}/albums`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+    return mutate({ add: [{ type: "album", song_id: songId, id: albumId, name: title, track_number: trackNumber, disc_number: discNumber }] });
 }
 
 export function removeSongAlbum(songId, albumId) {
-    return fetchVoid(`/api/v1/songs/${songId}/albums/${albumId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "album", song_id: songId, id: albumId }] });
 }
 
 export function updateSongAlbumLink(songId, albumId, trackNumber, discNumber) {
-    return fetchVoid(`/api/v1/songs/${songId}/albums/${albumId}`, {
-        method: "PATCH",
+    return mutate({ update: [{ type: "song_album", song_id: songId, album_id: albumId, track_number: trackNumber, disc_number: discNumber }] });
+}
+
+export async function syncAlbumFromSong(albumId, songId) {
+    const payload = await fetchJson(`/api/v1/albums/${albumId}/sync-from-song/${songId}`);
+    if (!payload.add && !payload.update) return {};
+    return mutate(payload);
+}
+
+export async function quickCreateAlbum(songId, title = null) {
+    const payload = await fetchJson("/api/v1/albums/prepare-from-song", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            track_number: trackNumber,
-            disc_number: discNumber,
-        }),
+        body: JSON.stringify({ song_id: songId, title }),
     });
-}
-
-export function syncAlbumFromSong(albumId, songId) {
-    return fetchJson(`/api/v1/albums/${albumId}/sync-from-song/${songId}`, {
-        method: "POST",
-    });
-}
-
-export function quickCreateAlbum(songId, title = null) {
-    const params = new URLSearchParams();
-    if (title) params.set("title", title);
-    const qs = params.toString();
-    return fetchJson(`/api/v1/songs/${songId}/quick-create-album${qs ? `?${qs}` : ""}`, {
-        method: "POST",
-    });
+    if (!payload.add && !payload.update) return {};
+    return mutate(payload);
 }
 
 export function updateAlbum(albumId, fields) {
-    return fetchJson(`/api/v1/albums/${albumId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(fields),
-    });
+    return mutate({ update: [{ type: "album", id: albumId, ...fields }] });
 }
 
-export function addAlbumCredit(
-    albumId,
-    displayName,
-    roleName = "Performer",
-    identityId = null,
-) {
-    const body = { display_name: displayName, role_name: roleName };
-    if (identityId !== null) body.identity_id = identityId;
-    return fetchJson(`/api/v1/albums/${albumId}/credits`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+export function addAlbumCredit(albumId, displayName, roleName = "Performer", identityId = null) {
+    return mutate({ add: [{ type: "credit", album_id: albumId, name: displayName, role: roleName, id: identityId }] });
 }
 
 export function removeAlbumCredit(albumId, nameId) {
-    return fetchVoid(`/api/v1/albums/${albumId}/credits/${nameId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "credit", album_id: albumId, id: nameId }] });
 }
 
 export function addAlbumPublisher(albumId, publisherName, publisherId = null) {
-    const body =
-        publisherId !== null
-            ? { publisher_id: publisherId }
-            : { publisher_name: publisherName };
-    return fetchJson(`/api/v1/albums/${albumId}/publishers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-    });
+    return mutate({ add: [{ type: "publisher", album_id: albumId, name: publisherName, id: publisherId }] });
 }
 
 export function removeAlbumPublisher(albumId, publisherId) {
-    return fetchVoid(`/api/v1/albums/${albumId}/publishers/${publisherId}`, {
-        method: "DELETE",
-    });
+    return mutate({ remove: [{ type: "publisher", album_id: albumId, id: publisherId }] });
 }
 
 export async function fetchId3Frames() {
@@ -608,11 +458,11 @@ export function parseSpotifyCredits(rawText, referenceTitle) {
 }
 
 export function importSpotifyCredits(songId, credits, publishers) {
-    return fetchVoid("/api/v1/spotify/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ song_id: songId, credits, publishers }),
-    });
+    const add = [
+        ...credits.map(c => ({ type: "credit", song_id: songId, name: c.name, id: c.id ?? null, role: c.role })),
+        ...publishers.map(p => ({ type: "publisher", song_id: songId, name: p.name, id: p.id ?? null })),
+    ];
+    return mutate({ add });
 }
 
 export function splitterTokenize(text, separators) {
@@ -631,24 +481,13 @@ export function splitterPreview(names, target) {
     });
 }
 
-export function splitterConfirm(
-    songId,
-    tokens,
-    target,
-    classification,
-    remove,
-) {
-    return fetchJson("/api/v1/tools/splitter/confirm", {
+export async function splitterConfirm(songId, tokens, target, classification, remove) {
+    const payload = await fetchJson("/api/v1/tools/splitter/confirm", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            song_id: songId,
-            tokens,
-            target,
-            classification,
-            remove,
-        }),
+        body: JSON.stringify({ song_id: songId, tokens, target, classification, remove }),
     });
+    return mutate(payload);
 }
 
 export function previewFilenameParsing(filenames, pattern) {
@@ -668,11 +507,7 @@ export function applyFilenameParsing(items, pattern) {
 }
 
 export function cleanupOriginalFile(filePath = null, songId = null) {
-    return fetchJson("/api/v1/ingest/cleanup-original", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_path: filePath, song_id: songId }),
-    });
+    return mutate({ remove: [{ type: "original_file", file_path: filePath, song_id: songId }] });
 }
 
 export function getPendingConvert() {
@@ -686,9 +521,7 @@ export function getStagingOrphans() {
 export function deleteStagingOrphan(filePath) {
     return fetchJson(
         `/api/v1/ingest/staging-orphans?path=${encodeURIComponent(filePath)}`,
-        {
-            method: "DELETE",
-        },
+        { method: "DELETE" },
     );
 }
 

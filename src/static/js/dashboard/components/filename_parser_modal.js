@@ -8,7 +8,7 @@
  *   });
  */
 
-import { applyFilenameParsing, previewFilenameParsing } from "../api.js";
+import { applyFilenameParsing, previewFilenameParsing, mutate } from "../api.js";
 import { escapeHtml, wasMousedownInside } from "./utils.js";
 import { createModalLifecycle } from "./modal_lifecycle.js";
 
@@ -197,7 +197,8 @@ applyBtn.addEventListener("click", async () => {
             filename: e.filename,
         }));
 
-        await applyFilenameParsing(items, pattern);
+        const payload = await applyFilenameParsing(items, pattern);
+        await mutate(payload);
         closeFilenameParserModal();
         if (onApply) await onApply();
     } catch (err) {
