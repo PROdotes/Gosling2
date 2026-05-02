@@ -48,16 +48,29 @@ class LibraryService:
         actual_rules_path = rules_path or config.RENAME_RULES_PATH
         self._filing_service = FilingService(actual_rules_path)
 
-    def get_song(self, song_id: int) -> Optional[Song]:
+    def get_song(self, song_id: int, conn: Optional[sqlite3.Connection] = None) -> Optional[Song]:
         """Fetch a single song and all its credits by ID."""
         logger.debug(f"[LibraryService] -> get_song(id={song_id})")
-        with self._song_repo.get_connection() as conn:
+        if conn is not None:
+            # Caller owns the connection/transaction — do NOT use context manager
             song = self._song_repo.get_by_id(song_id, conn)
             if not song:
                 logger.warning(f"[LibraryService] <- get_song(id={song_id}) NOT_FOUND")
                 return None
-
             hydrated = self.hydrate_songs([song], conn=conn)
+            if not hydrated:
+                return None
+            result = hydrated[0]
+            logger.debug(f"[LibraryService] <- get_song(id={song_id}) '{result.title}'")
+            return result
+
+        with self._song_repo.get_connection() as owned_conn:
+            song = self._song_repo.get_by_id(song_id, owned_conn)
+            if not song:
+                logger.warning(f"[LibraryService] <- get_song(id={song_id}) NOT_FOUND")
+                return None
+
+            hydrated = self.hydrate_songs([song], conn=owned_conn)
             if not hydrated:
                 return None
 
