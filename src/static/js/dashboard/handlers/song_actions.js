@@ -9,6 +9,7 @@ import {
     deleteSong,
     rejectSong,
     patchSongScalars,
+    mutate,
     moveSongToLibrary,
     cleanupOriginalFile,
     syncSongId3,
@@ -278,15 +279,19 @@ export class SongActionsHandler {
         const input = actionTarget.querySelector("input");
         if (!input) return;
 
+        // Clicking a <label> wrapping an <input> fires two click events (label + synthetic input).
+        // Handle only the input event to avoid double-firing the mutation.
+        if (event && event.target !== input) return;
+
         const id = actionTarget.dataset.id || actionTarget.dataset.songId;
-        // When event.target is the <input> itself the browser has already toggled it,
-        // so checked reflects the new value. When target is the <label> or <span>
-        // the browser hasn't toggled yet, so we invert.
-        const isChecked =
-            event?.target === input ? input.checked : !input.checked;
+        const isChecked = input.checked;
 
         try {
-            await patchSongScalars(id, { is_active: isChecked });
+            await mutate({
+                command_type: "song_mutation",
+                song_ids: [Number(id)],
+                scalars: { is_active: isChecked },
+            });
 
             // Sync current items in any list results
             const state = this.ctx.getState();

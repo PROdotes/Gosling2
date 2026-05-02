@@ -276,9 +276,11 @@ Both mutators own auto-promote logic internally. On `action: "add"`:
 
 ---
 
-## SongMutator note
+## SongMutator + MediaMutator split
 
-`Songs` and `MediaSources` are two tables but one logical entity. SongMutator writes to both via `SongRepository.update_scalars()` which already handles the split internally. No separate MediaMutator for now — revisit if non-Song media types (jingles, ads) are added.
+`Songs` and `MediaSources` are two tables. Today `SongRepository.update_scalars()` writes to both via an internal split, but the seam between Song-the-subtype and Media-the-parent is real and we want a separate **MediaMutator** for future-proofing — once non-Song media types land (streams, commercials, jingles), they'll need to mutate Media rows without going through Song. Cleanly separating now avoids ripping it out later.
+
+**TBD:** field-level boundary (which scalars belong to MediaMutator vs SongMutator) and how Coordinator routes a `SongMutationCommand` whose `scalars` straddle both tables. Design this before implementation.
 
 ---
 
@@ -359,6 +361,7 @@ Entity renames have unbounded fan-out (a credit might appear on 500 songs); the 
 src/services/
   mutation_coordinator.py
   mutators/
+    media_mutator.py
     song_mutator.py
     credit_mutator.py
     tag_mutator.py

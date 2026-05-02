@@ -345,6 +345,14 @@ export function patchSongScalars(songId, fields) {
     });
 }
 
+export function mutate(command) {
+    return fetchJson("/api/v1/mutate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(command),
+    });
+}
+
 export function formatText(text, type) {
     return fetchJson("/api/v1/tools/format-text", {
         method: "POST",
