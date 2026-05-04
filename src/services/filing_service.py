@@ -195,6 +195,15 @@ class FilingService:
         shutil.copy2(str(source_path), str(target_absolute))
         return target_absolute
 
+    def move_if_needed(self, song: Song, library_root: Path) -> None:
+        """Move song to library if AUTO_MOVE_ON_APPROVE is enabled and song is approved (status 0)."""
+        from src.engine.config import AUTO_MOVE_ON_APPROVE, ProcessingStatus
+        if not AUTO_MOVE_ON_APPROVE:
+            return
+        if song.processing_status != ProcessingStatus.REVIEWED:
+            return
+        self.move_to_library(song, library_root)
+
     def move_to_library(self, song: Song, library_root: Path) -> Path:
         """Organizes a file into the library and removes the old source."""
         source_path = Path(song.source_path)

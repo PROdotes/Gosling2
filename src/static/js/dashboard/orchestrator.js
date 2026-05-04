@@ -132,15 +132,24 @@ export function manageSongTags(ctx, songId, songTitle, currentTags) {
         },
         onAdd: async (opt) => {
             const rawTag = opt.id == null ? (opt.rawInput || opt.name || opt.label) : null;
-            const tag = await addSongTag(
+            const result = await addSongTag(
                 songId,
                 null,
                 null,
                 opt.id ?? null,
                 rawTag,
             );
-            opt.id = tag.id;
-            opt.label = tag.name;
+            const song = result?.songs?.[0];
+            if (song) {
+                const { name: parsedName } = parseTagInput(rawTag || opt.label, rules);
+                const matched = song.tags.find(
+                    (t) => t.name.toLowerCase() === parsedName.toLowerCase()
+                );
+                if (matched) {
+                    opt.id = matched.id;
+                    opt.label = matched.name;
+                }
+            }
             await getUpdateCallback(ctx, songId)();
         },
         onRemove: async (item) => {

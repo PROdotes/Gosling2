@@ -38,7 +38,7 @@ class AlbumRepository(BaseRepository):
                 a.AlbumID, a.AlbumTitle, a.AlbumType, a.ReleaseYear,
                 GROUP_CONCAT(DISTINCT an.DisplayName) FILTER (WHERE r.RoleName = 'Performer') AS DisplayArtist,
                 MIN(p.PublisherName) AS DisplayPublisher,
-                (SELECT COUNT(*) FROM SongAlbums sa WHERE sa.AlbumID = a.AlbumID) AS SongCount
+                (SELECT COUNT(*) FROM SongAlbums sa JOIN MediaSources ms ON sa.SourceID = ms.SourceID WHERE sa.AlbumID = a.AlbumID AND ms.IsDeleted = 0) AS SongCount
             FROM Albums a
             LEFT JOIN AlbumCredits ac ON a.AlbumID = ac.AlbumID
             LEFT JOIN ArtistNames an ON ac.CreditedNameID = an.NameID AND an.IsDeleted = 0

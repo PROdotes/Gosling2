@@ -93,6 +93,8 @@ class AddAlbumItem(BaseModel):
     song_id: int
     name: Optional[str] = None
     id: Optional[int] = None
+    album_type: Optional[str] = None
+    release_year: Optional[int] = None
     track_number: Optional[int] = None
     disc_number: Optional[int] = None
     make_primary: bool = False

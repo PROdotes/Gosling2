@@ -3,6 +3,7 @@ from typing import Union
 
 from src.data.album_repository import AlbumRepository
 from src.data.song_album_repository import SongAlbumRepository
+from src.engine.config import ALBUM_DEFAULT_TYPE
 from src.engine.routers.mutation_models import (
     AddAlbumItem,
     RemoveAlbumItem,
@@ -35,7 +36,8 @@ class AlbumMutator:
         if item.id is not None:
             album_id = item.id
         else:
-            album_id = self._album_repo.create_album(item.name, None, None, conn)
+            album_type = item.album_type or ALBUM_DEFAULT_TYPE
+            album_id = self._album_repo.create_album(item.name, album_type, item.release_year, conn)
 
         has_primary = self._song_album_repo.has_primary(item.song_id, conn)
         self._song_album_repo.add_album(item.song_id, album_id, item.track_number, item.disc_number, conn)

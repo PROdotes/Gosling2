@@ -417,7 +417,14 @@ export async function quickCreateAlbum(songId, title = null) {
         body: JSON.stringify({ song_id: songId, title }),
     });
     if (!payload.add && !payload.update) return {};
-    return mutate(payload);
+    const result = await mutate(payload);
+    const song = result?.songs?.[0];
+    const albumTitle = title || song?.media_name;
+    const newAlbum = song?.albums?.find(a => a.album_title === albumTitle);
+    if (newAlbum?.album_id) {
+        await syncAlbumFromSong(newAlbum.album_id, songId);
+    }
+    return result;
 }
 
 export function updateAlbum(albumId, fields) {
@@ -460,7 +467,7 @@ export function parseSpotifyCredits(rawText, referenceTitle) {
 export function importSpotifyCredits(songId, credits, publishers) {
     const add = [
         ...credits.map(c => ({ type: "credit", song_id: songId, name: c.name, id: c.id ?? null, role: c.role })),
-        ...publishers.map(p => ({ type: "publisher", song_id: songId, name: p.name, id: p.id ?? null })),
+        ...publishers.map(p => ({ type: "publisher", song_id: songId, name: p, id: null })),
     ];
     return mutate({ add });
 }

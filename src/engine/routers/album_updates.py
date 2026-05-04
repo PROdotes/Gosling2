@@ -77,18 +77,11 @@ async def prepare_album_from_song(
             raise HTTPException(status_code=404, detail=f"Album {body.album_id} not found")
         return _sync_diff(song, body.album_id, album)
 
-    # No album yet — return the full payload including album creation
+    # No album yet — return only the album creation item.
+    # Credits/publishers are synced in a follow-up syncAlbumFromSong call once the album ID is known.
     album_title = (body.title or song.media_name or "Unknown Album").strip()
     add = [{"type": "album", "song_id": body.song_id, "id": None, "name": album_title,
             "album_type": ALBUM_DEFAULT_TYPE, "release_year": song.year,
             "track_number": 1, "disc_number": 1}]
-
-    for credit in (song.credits or []):
-        if credit.role_name == "Performer":
-            add.append({"type": "credit", "album_id": None, "name": credit.display_name,
-                        "id": credit.identity_id, "role": "Performer"})
-
-    for pub in (song.publishers or []):
-        add.append({"type": "publisher", "album_id": None, "name": pub.name, "id": pub.id})
 
     return {"add": add}

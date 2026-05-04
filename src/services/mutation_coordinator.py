@@ -1,12 +1,16 @@
 import sqlite3
-from typing import Any, List
+from typing import Any
 
 from src.data.base_repository import BaseRepository
+from src.engine.config import AUTO_SAVE_ID3, LIBRARY_ROOT, RENAME_RULES_PATH
 from src.engine.routers.mutation_models import (
     MutationRequest,
     UpdateSongItem,
 )
+from src.services.filing_service import FilingService
 from src.services.library_service import LibraryService
+from src.services.logger import logger
+from src.services.metadata_writer import MetadataWriter
 
 from src.services.mutators.album_mutator import AlbumMutator
 from src.services.mutators.credit_mutator import CreditMutator
@@ -33,6 +37,8 @@ class MutationCoordinator:
         self._publisher_mutator = PublisherMutator(db_path)
         self._album_mutator = AlbumMutator(db_path)
         self._delete_mutator = DeleteMutator(db_path)
+        self._id3_writer = MetadataWriter()
+        self._filing = FilingService(RENAME_RULES_PATH)
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
         conn = self._conn_factory.get_connection()
@@ -40,8 +46,7 @@ class MutationCoordinator:
             touched_song_ids: set[int] = set()
 
             for item in (body.delete or []):
-                deleted_song_ids = self._delete_mutator.apply_within("delete", item, conn)
-                touched_song_ids.update(deleted_song_ids)
+                self._delete_mutator.apply_within("delete", item, conn)
 
             for item in (body.remove or []):
                 self._route(item, "remove", conn)
@@ -58,12 +63,25 @@ class MutationCoordinator:
             conn.commit()
 
             songs = []
+            warnings = []
             for song_id in sorted(touched_song_ids):
                 post = self._library.get_song(song_id, conn)
-                if post:
-                    songs.append(post)
+                if not post:
+                    continue
+                songs.append(post)
+                if AUTO_SAVE_ID3:
+                    try:
+                        self._id3_writer.write_metadata(post)
+                    except Exception as e:
+                        logger.error(f"ID3 write failed for song {song_id}: {e}")
+                        warnings.append({"song_id": song_id, "kind": "id3_write", "error": str(e)})
+                try:
+                    self._filing.move_if_needed(post, LIBRARY_ROOT)
+                except Exception as e:
+                    logger.error(f"File move failed for song {song_id}: {e}")
+                    warnings.append({"song_id": song_id, "kind": "file_move", "error": str(e)})
 
-            return {"songs": [s.model_dump() for s in songs]}
+            return {"songs": [s.model_dump() for s in songs], "warnings": warnings}
 
         except Exception:
             conn.rollback()
