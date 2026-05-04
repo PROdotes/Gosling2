@@ -155,13 +155,12 @@ class TestCreditMutatorRemove:
         credits = _get_credits(conn, 6)
         assert any(c["RoleName"] == "Composer" for c in credits)
 
-    def test_remove_nonexistent_is_noop(self, mutator, conn):
+    def test_remove_nonexistent_raises(self, mutator, conn):
         item = RemoveCreditItem.model_validate(
             {"type": "credit", "song_id": 6, "id": 99999}
         )
-        mutator.apply_within("remove", item, conn, None)
-        conn.commit()
-        assert len(_get_credits(conn, 6)) == 2
+        with pytest.raises(LookupError):
+            mutator.apply_within("remove", item, conn, None)
 
 
 # ---------------------------------------------------------------------------

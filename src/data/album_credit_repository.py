@@ -96,8 +96,10 @@ class AlbumCreditRepository(BaseRepository):
         logger.debug(
             f"[AlbumCreditRepository] -> remove_credit(album_id={album_id}, name_id={name_id})"
         )
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             "DELETE FROM AlbumCredits WHERE AlbumID = ? AND CreditedNameID = ?",
             (album_id, name_id),
         )
         logger.debug("[AlbumCreditRepository] <- remove_credit() done")
+        return cursor.rowcount

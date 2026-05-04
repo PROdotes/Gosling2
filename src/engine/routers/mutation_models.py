@@ -25,7 +25,8 @@ def _reject_empty_string(v: Optional[str], field_name: str) -> Optional[str]:
 
 class AddCreditItem(BaseModel):
     type: Literal["credit"]
-    song_id: int
+    song_id: Optional[int] = None
+    album_id: Optional[int] = None
     name: str
     id: Optional[int] = None
     role: str
@@ -36,6 +37,12 @@ class AddCreditItem(BaseModel):
         if not v.strip():
             raise ValueError("must not be blank")
         return v
+
+    @model_validator(mode="after")
+    def exactly_one_target(self) -> "AddCreditItem":
+        if (self.song_id is None) == (self.album_id is None):
+            raise ValueError("exactly one of song_id or album_id must be set")
+        return self
 
 
 class AddTagItem(BaseModel):
@@ -71,16 +78,22 @@ class AddPublisherItem(BaseModel):
 class AddAlbumItem(BaseModel):
     type: Literal["album"]
     song_id: int
-    name: str
+    name: Optional[str] = None
     id: Optional[int] = None
     track_number: Optional[int] = None
     disc_number: Optional[int] = None
     make_primary: bool = False
 
+    @model_validator(mode="after")
+    def name_required_without_id(self) -> "AddAlbumItem":
+        if self.id is None and not (self.name and self.name.strip()):
+            raise ValueError("name is required when id is not provided")
+        return self
+
     @field_validator("name")
     @classmethod
     def non_empty(cls, v: str) -> str:
-        if not v.strip():
+        if v is not None and not v.strip():
             raise ValueError("must not be blank")
         return v
 
@@ -226,8 +239,15 @@ UpdateItem = Annotated[
 
 class RemoveCreditItem(BaseModel):
     type: Literal["credit"]
-    song_id: int
+    song_id: Optional[int] = None
+    album_id: Optional[int] = None
     id: int
+
+    @model_validator(mode="after")
+    def exactly_one_target(self) -> "RemoveCreditItem":
+        if (self.song_id is None) == (self.album_id is None):
+            raise ValueError("exactly one of song_id or album_id must be set")
+        return self
 
 
 class RemoveTagItem(BaseModel):

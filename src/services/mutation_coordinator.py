@@ -40,7 +40,7 @@ class MutationCoordinator:
         self._credit_mutator = CreditMutator(db_path)
         self._tag_mutator = TagMutator()
         self._publisher_mutator = PublisherMutator()
-        self._album_mutator = AlbumMutator()
+        self._album_mutator = AlbumMutator(db_path)
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
         conn = self._get_connection()
@@ -50,12 +50,12 @@ class MutationCoordinator:
 
             for item in (body.remove or []):
                 self._route(item, "remove", conn, batch_id)
-                if hasattr(item, "song_id"):
+                if hasattr(item, "song_id") and item.song_id is not None:
                     touched_song_ids.add(item.song_id)
 
             for item in (body.add or []):
                 self._route(item, "add", conn, batch_id)
-                if hasattr(item, "song_id"):
+                if hasattr(item, "song_id") and item.song_id is not None:
                     touched_song_ids.add(item.song_id)
 
             for item in (body.update or []):

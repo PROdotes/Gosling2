@@ -218,18 +218,20 @@ class SongAlbumRepository(BaseRepository):
 
     def remove_album(
         self, source_id: int, album_id: int, conn: sqlite3.Connection
-    ) -> None:
+    ) -> int:
         """
         Remove a song-album link. Keeps Album record. Does NOT commit.
         """
         logger.debug(
             f"[SongAlbumRepository] -> remove_album(source_id={source_id}, album_id={album_id})"
         )
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             "DELETE FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?",
             (source_id, album_id),
         )
         logger.debug("[SongAlbumRepository] <- remove_album() done")
+        return cursor.rowcount
 
     def update_track_info(
         self,
@@ -261,8 +263,52 @@ class SongAlbumRepository(BaseRepository):
 
         params.extend([source_id, album_id])
         sql = f"UPDATE SongAlbums SET {', '.join(updates)} WHERE SourceID = ? AND AlbumID = ?"
-        conn.cursor().execute(sql, params)
+        cursor = conn.cursor()
+        cursor.execute(sql, params)
         logger.debug("[SongAlbumRepository] <- update_track_info() done")
+        return cursor.rowcount
+
+    def has_primary(self, source_id: int, conn: sqlite3.Connection) -> bool:
+        """Return True if the song already has a primary album link."""
+        return conn.execute(
+            "SELECT 1 FROM SongAlbums WHERE SourceID = ? AND IsPrimary = 1",
+            (source_id,),
+        ).fetchone() is not None
+
+    def set_primary(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> None:
+        """Demote all album links for the song, then promote the given album. Does NOT commit."""
+        conn.execute("UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ?", (source_id,))
+        conn.execute(
+            "UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?",
+            (source_id, album_id),
+        )
+
+    def clear_primary(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> None:
+        """Set IsPrimary=0 for a specific song-album link. Does NOT commit."""
+        conn.execute(
+            "UPDATE SongAlbums SET IsPrimary = 0 WHERE SourceID = ? AND AlbumID = ?",
+            (source_id, album_id),
+        )
+
+    def get_link(self, source_id: int, album_id: int, conn: sqlite3.Connection) -> Optional[dict]:
+        """Return the raw link row for a song-album pair, or None if not linked."""
+        conn.row_factory = sqlite3.Row
+        return conn.execute(
+            "SELECT IsPrimary FROM SongAlbums WHERE SourceID = ? AND AlbumID = ?",
+            (source_id, album_id),
+        ).fetchone()
+
+    def promote_next(self, source_id: int, conn: sqlite3.Connection) -> None:
+        """Promote the lowest AlbumID link to primary, if any remain. Does NOT commit."""
+        row = conn.execute(
+            "SELECT AlbumID FROM SongAlbums WHERE SourceID = ? ORDER BY AlbumID LIMIT 1",
+            (source_id,),
+        ).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE SongAlbums SET IsPrimary = 1 WHERE SourceID = ? AND AlbumID = ?",
+                (source_id, row[0]),
+            )
 
     def _row_to_song_album(self, row: Mapping[str, Any]) -> SongAlbum:
         """Map a database row to a SongAlbum Pydantic model."""

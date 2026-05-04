@@ -17,8 +17,6 @@ class SongMutator:
         if not fields:
             return
 
-        existing = self._repo.get_by_id(item.id, conn)
-        if existing is None:
+        updated = self._repo.update_scalars(item.id, fields, conn)
+        if updated == 0:
             raise LookupError(f"Song {item.id} not found")
-
-        self._repo.update_scalars(item.id, fields, conn)

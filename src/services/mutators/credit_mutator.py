@@ -1,6 +1,7 @@
 import sqlite3
 from uuid import UUID
 
+from src.data.album_credit_repository import AlbumCreditRepository
 from src.data.song_credit_repository import SongCreditRepository
 from src.engine.routers.mutation_models import (
     AddCreditItem,
@@ -11,7 +12,8 @@ from src.engine.routers.mutation_models import (
 
 class CreditMutator:
     def __init__(self, db_path: str):
-        self._repo = SongCreditRepository(db_path)
+        self._song_repo = SongCreditRepository(db_path)
+        self._album_repo = AlbumCreditRepository(db_path)
 
     def apply_within(self, action: str, item, conn: sqlite3.Connection, batch_id: UUID) -> None:
         if action == "add":
@@ -24,12 +26,22 @@ class CreditMutator:
             raise ValueError(f"CreditMutator does not support action '{action}'")
 
     def _add(self, item: AddCreditItem, conn: sqlite3.Connection) -> None:
-        self._repo.add_credit(item.song_id, item.name, item.role, conn, identity_id=item.id)
+        if item.song_id is not None:
+            self._song_repo.add_credit(item.song_id, item.name, item.role, conn, identity_id=item.id)
+        else:
+            self._album_repo.add_credit(item.album_id, item.name, item.role, conn, identity_id=item.id)
 
     def _remove(self, item: RemoveCreditItem, conn: sqlite3.Connection) -> None:
-        self._repo.remove_credit(item.id, conn)
+        if item.song_id is not None:
+            removed = self._song_repo.remove_credit(item.id, conn)
+        else:
+            removed = self._album_repo.remove_credit(item.album_id, item.id, conn)
+        if removed == 0:
+            raise LookupError(f"Credit {item.id} not found")
 
     def _update(self, item: UpdateCreditEntityItem, conn: sqlite3.Connection) -> None:
         if item.display_name is None:
             return
-        self._repo.update_credit_name(item.id, item.display_name, conn)
+        updated = self._song_repo.update_credit_name(item.id, item.display_name, conn)
+        if updated == 0:
+            raise LookupError(f"ArtistName {item.id} not found")

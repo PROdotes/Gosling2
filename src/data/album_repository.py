@@ -195,11 +195,13 @@ class AlbumRepository(BaseRepository):
         if not valid:
             return
         set_clause = ", ".join(f"{col_map[k]} = ?" for k in valid)
-        conn.cursor().execute(
+        cursor = conn.cursor()
+        cursor.execute(
             f"UPDATE Albums SET {set_clause} WHERE AlbumID = ?",
             (*valid.values(), album_id),
         )
         logger.debug("[AlbumRepository] <- update_album() done")
+        return cursor.rowcount
 
     def soft_delete(self, album_id: int, conn: sqlite3.Connection) -> bool:
         """Set IsDeleted = 1 for an album. Returns True if a record was updated."""

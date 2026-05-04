@@ -223,12 +223,12 @@ class SongCreditRepository(BaseRepository):
         Does NOT commit.
         """
         logger.debug(f"[SongCreditRepository] -> remove_credit(credit_id={credit_id})")
-        conn.cursor().execute(
-            "DELETE FROM SongCredits WHERE CreditID = ?", (credit_id,)
-        )
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM SongCredits WHERE CreditID = ?", (credit_id,))
         logger.debug(
             f"[SongCreditRepository] <- remove_credit(credit_id={credit_id}) done"
         )
+        return cursor.rowcount
 
     def update_credit_name(
         self, name_id: int, new_name: str, conn: sqlite3.Connection
@@ -245,12 +245,8 @@ class SongCreditRepository(BaseRepository):
             "UPDATE ArtistNames SET DisplayName = ? WHERE NameID = ?",
             (new_name, name_id),
         )
-        if cursor.rowcount == 0:
-            logger.warning(
-                f"[SongCreditRepository] update_credit_name(id={name_id}) NOT_FOUND"
-            )
-            raise LookupError(f"ArtistName {name_id} not found")
         logger.debug("[SongCreditRepository] <- update_credit_name() done")
+        return cursor.rowcount
 
     def _row_to_song_credit(self, row: Mapping[str, Any]) -> SongCredit:
         """Maps a physical database row to the strict Pydantic SongCredit model, enforcing RoleID exists."""

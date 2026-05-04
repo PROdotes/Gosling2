@@ -183,12 +183,14 @@ class SongRepository(MediaSourceRepository):
         }
 
         cursor = conn.cursor()
+        media_rowcount = 0
         if media_source_fields:
             set_clause = ", ".join(f"{col_map[k]} = ?" for k in media_source_fields)
             cursor.execute(
                 f"UPDATE MediaSources SET {set_clause} WHERE SourceID = ?",
                 (*media_source_fields.values(), song_id),
             )
+            media_rowcount = cursor.rowcount
 
         if songs_fields:
             set_clause = ", ".join(f"{col_map[k]} = ?" for k in songs_fields)
@@ -198,6 +200,7 @@ class SongRepository(MediaSourceRepository):
             )
 
         logger.debug(f"[SongRepository] <- update_scalars(id={song_id}) done")
+        return media_rowcount if media_source_fields else cursor.rowcount
 
     def get_by_id(
         self, song_id: int, conn: Optional[sqlite3.Connection] = None

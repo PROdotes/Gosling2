@@ -224,6 +224,12 @@ Entity updates have unbounded fan-out (a credit on 500 songs); the API does not 
 
 ---
 
+## Repository contract
+
+Repo write methods (delete, update) return `cursor.rowcount`. They never raise on zero rows. The mutator checks the count and raises `LookupError` if the operation was expected to affect a row. This keeps business logic in the service layer.
+
+---
+
 ## Error mapping (router's job)
 
 | Exception | HTTP |
