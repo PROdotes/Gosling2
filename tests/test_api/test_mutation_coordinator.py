@@ -252,7 +252,7 @@ class TestTouchedSongIds:
 
     def test_song_tag_update_song_id(self, coordinator):
         assert 1 in self._song_ids(coordinator,
-            {"update": [{"type": "song_tag", "song_id": 1, "tag_id": 6, "is_primary": True}]})
+            {"update": [{"type": "song_tag", "song_id": 1, "tag_id": 1, "is_primary": True}]})
 
     def test_song_album_update_song_id(self, coordinator):
         assert 1 in self._song_ids(coordinator,
@@ -261,7 +261,7 @@ class TestTouchedSongIds:
     def test_entity_only_update_no_song_id(self, coordinator):
         # tag / album / credit / publisher entity updates have no song_id
         ids = self._song_ids(coordinator, {"update": [
-            {"type": "tag", "id": 6, "name": "Rock"},
+            {"type": "tag", "id": 6, "name": "Alt Rock Renamed"},
             {"type": "album", "id": 100, "title": "Nevermind"},
             {"type": "credit", "id": 1, "display_name": "Dave G"},
             {"type": "publisher", "id": 10, "name": "DGC"},
@@ -304,7 +304,7 @@ class TestResponseShape:
 
     def test_response_always_has_songs_and_warnings_keys(self, coordinator):
         result = coordinator.apply(MutationRequest.model_validate({
-            "update": [{"type": "tag", "id": 6, "name": "Rock"}]
+            "update": [{"type": "tag", "id": 6, "name": "Alt Rock Renamed"}]
         }))
         assert "songs" in result
         assert "warnings" in result

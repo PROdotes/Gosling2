@@ -48,22 +48,29 @@ class AddCreditItem(BaseModel):
 class AddTagItem(BaseModel):
     type: Literal["tag"]
     song_id: int
-    name: str
+    name: Optional[str] = None
     id: Optional[int] = None
-    category: str
+    category: Optional[str] = None
     make_primary: bool = False
 
     @field_validator("name", "category")
     @classmethod
-    def non_empty(cls, v: str) -> str:
-        if not v.strip():
+    def non_empty(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
             raise ValueError("must not be blank")
         return v
+
+    @model_validator(mode="after")
+    def id_or_name_and_category(self) -> "AddTagItem":
+        if self.id is None and not (self.name and self.category):
+            raise ValueError("either id or both name and category are required")
+        return self
 
 
 class AddPublisherItem(BaseModel):
     type: Literal["publisher"]
-    song_id: int
+    song_id: Optional[int] = None
+    album_id: Optional[int] = None
     name: str
     id: Optional[int] = None
 
@@ -73,6 +80,12 @@ class AddPublisherItem(BaseModel):
         if not v.strip():
             raise ValueError("must not be blank")
         return v
+
+    @model_validator(mode="after")
+    def exactly_one_target(self) -> "AddPublisherItem":
+        if (self.song_id is None) == (self.album_id is None):
+            raise ValueError("exactly one of song_id or album_id must be set")
+        return self
 
 
 class AddAlbumItem(BaseModel):
@@ -258,8 +271,15 @@ class RemoveTagItem(BaseModel):
 
 class RemovePublisherItem(BaseModel):
     type: Literal["publisher"]
-    song_id: int
+    song_id: Optional[int] = None
+    album_id: Optional[int] = None
     id: int
+
+    @model_validator(mode="after")
+    def exactly_one_target(self) -> "RemovePublisherItem":
+        if (self.song_id is None) == (self.album_id is None):
+            raise ValueError("exactly one of song_id or album_id must be set")
+        return self
 
 
 class RemoveAlbumItem(BaseModel):

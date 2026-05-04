@@ -29,8 +29,8 @@ class MutationCoordinator:
         self._library = library_service or LibraryService(db_path)
         self._song_mutator = SongMutator(db_path)
         self._credit_mutator = CreditMutator(db_path)
-        self._tag_mutator = TagMutator()
-        self._publisher_mutator = PublisherMutator()
+        self._tag_mutator = TagMutator(db_path)
+        self._publisher_mutator = PublisherMutator(db_path)
         self._album_mutator = AlbumMutator(db_path)
         self._delete_mutator = DeleteMutator(db_path)
 
