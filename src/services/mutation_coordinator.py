@@ -36,8 +36,8 @@ class MutationCoordinator:
     def __init__(self, db_path: str, library_service: LibraryService = None):
         self._db_path = db_path
         self._library = library_service or LibraryService(db_path)
-        self._song_mutator = SongMutator()
-        self._credit_mutator = CreditMutator()
+        self._song_mutator = SongMutator(db_path)
+        self._credit_mutator = CreditMutator(db_path)
         self._tag_mutator = TagMutator()
         self._publisher_mutator = PublisherMutator()
         self._album_mutator = AlbumMutator()

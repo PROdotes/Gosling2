@@ -354,33 +354,17 @@ class LibraryService:
                 }
             )
 
-            # --- 2. Desired State Sync (Declarative Physical Move) ---
+            # --- 2. Projected path (read-only) ---
             projected_path = None
 
-            # Optimization: Only calculate paths and check moves if song is Reviewed
-            # This prevents 500+ exists() checks during a simple library search
             if song.processing_status == config.ProcessingStatus.REVIEWED:
                 try:
                     projected_path = str(
                         self._library_root / self._filing_service.evaluate_routing(song)
                     )
-                    if song.source_path and os.path.normpath(
-                        song.source_path
-                    ) != os.path.normpath(projected_path):
-                        if config.AUTO_MOVE_ON_APPROVE:
-                            new_path = self._filing_service.move_to_library(
-                                song, self._library_root
-                            )
-                            self._song_repo.update_scalars(
-                                song.id, {"source_path": str(new_path)}, conn
-                            )
-                            song = song.model_copy(
-                                update={"source_path": str(new_path)}
-                            )
-                            projected_path = str(new_path)
                 except Exception as e:
                     logger.error(
-                        f"[LibraryService] Desired State Sync failed for {song.id}: {e}"
+                        f"[LibraryService] evaluate_routing failed for {song.id}: {e}"
                     )
 
             hydrated_songs.append(

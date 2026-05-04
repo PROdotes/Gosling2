@@ -2,9 +2,10 @@ import os
 import sqlite3
 from contextlib import asynccontextmanager
 import anyio.to_thread
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from src.engine.routers.catalog import router as catalog_router
 from src.engine.routers.metabolic import router as metabolic_router
@@ -45,6 +46,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="GOSLING2 Engine", lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    msgs = [e.get("msg", "validation error") for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": "; ".join(msgs)})
+
 
 # CORS middleware (restricted to trusted origins - Audit #4)
 app.add_middleware(

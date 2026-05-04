@@ -16,7 +16,6 @@ populated_db reference:
 """
 
 import pytest
-from pathlib import Path
 from src.services.catalog_service import CatalogService
 from tests.conftest import _connect
 
@@ -489,119 +488,6 @@ class TestSetPublisherParent:
 
 
 class TestAutoMoveOnApprove:
-    """AUTO_MOVE_ON_APPROVE: when True and song is REVIEWED, scalar saves auto-trigger move_to_library."""
-
-    def test_reviewed_auto_moves_when_enabled(self, populated_db, tmp_path, monkeypatch):
-        """REVIEWED song + AUTO_MOVE_ON_APPROVE=True + scalar save → file moved to computed target."""
-        from src.services.edit_service import EditService
-        from src.services.library_service import LibraryService
-        from tests.conftest import _connect
-
-        # Setup: library root and a source file in a staging dir
-        library_root = tmp_path / "library"
-        library_root.mkdir(parents=True, exist_ok=True)
-        staging_dir = tmp_path / "staging"
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        source_file = staging_dir / "Nirvana - Smells Like Teen Spirit.mp3"
-        source_file.write_bytes(b"mp3 content")
-
-        monkeypatch.setattr("src.engine.config.LIBRARY_ROOT", library_root)
-        monkeypatch.setattr("src.engine.config.AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr("src.engine.config.AUTO_SAVE_ID3", False)
-
-        # Write rules so filing_service knows where to put it
-        rules_path = tmp_path / "rules.json"
-        rules_path.write_text(
-            '{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'
-        )
-
-        # Update the DB source_path to point at our real file
-        conn = _connect(populated_db)
-        conn.execute(
-            "UPDATE MediaSources SET SourcePath = ? WHERE SourceID = 1",
-            (str(source_file),),
-        )
-        conn.execute(
-            "UPDATE MediaSources SET ProcessingStatus = 0 WHERE SourceID = 1"
-        )
-        conn.commit()
-        conn.close()
-
-        rules_path = tmp_path / "rules.json"; rules_path.write_text('{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'); edit = EditService(populated_db, rules_path=rules_path, library_root=(tmp_path / "library"))
-        lib = LibraryService(populated_db, rules_path=(locals().get("rules_path", None)))
-
-        edit.update_song_scalars(
-            1, {"media_name": "Smells Like Teen Spirit (Live)"}
-        )
-
-        # File should now be under library_root
-        moved = list(library_root.rglob("*.mp3"))
-        assert len(moved) == 1, f"Expected 1 file under library_root, got {moved}"
-        assert b"mp3 content" in moved[0].read_bytes()
-        assert not source_file.exists(), (
-            "Source file should be unlinked after move"
-        )
-
-        # DB source_path updated
-        song = lib.get_song(1)
-        assert song.source_path == str(moved[0])
-
-    def test_reviewed_no_auto_move_when_disabled(self, populated_db, tmp_path, monkeypatch):
-        """REVIEWED song + AUTO_MOVE_ON_APPROVE=False + scalar save → no move."""
-        from src.services.edit_service import EditService
-        from tests.conftest import _connect
-
-        staging_dir = tmp_path / "staging"
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        source_file = staging_dir / "Nirvana - Song.mp3"
-        source_file.write_bytes(b"unchanged content")
-
-        monkeypatch.setattr("src.engine.config.AUTO_MOVE_ON_APPROVE", False)
-
-        conn = _connect(populated_db)
-        conn.execute(
-            "UPDATE MediaSources SET SourcePath = ?, ProcessingStatus = 0 WHERE SourceID = 1",
-            (str(source_file),),
-        )
-        conn.commit()
-        conn.close()
-
-        rules_path = tmp_path / "rules.json"; rules_path.write_text('{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'); edit = EditService(populated_db, rules_path=rules_path, library_root=(tmp_path / "library"))
-        edit.update_song_scalars(1, {"year": 1992})
-
-        assert source_file.exists(), "Source file should not be moved when auto-move is disabled"
-        assert not list(
-            (tmp_path / "library").rglob("*.mp3")
-        ), "No file should exist under library_root"
-
-    def test_not_reviewed_no_auto_move_even_when_enabled(self, populated_db, tmp_path, monkeypatch):
-        """NOT_REVIEWED song + AUTO_MOVE_ON_APPROVE=True + scalar save → no move."""
-        from src.services.edit_service import EditService
-        from tests.conftest import _connect
-
-        staging_dir = tmp_path / "staging"
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        source_file = staging_dir / "Nirvana - Song.mp3"
-        source_file.write_bytes(b"unchanged content")
-
-        monkeypatch.setattr("src.engine.config.AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr("src.engine.config.AUTO_SAVE_ID3", False)
-
-        conn = _connect(populated_db)
-        conn.execute(
-            "UPDATE MediaSources SET SourcePath = ?, ProcessingStatus = 1 WHERE SourceID = 1",
-            (str(source_file),),
-        )
-        conn.commit()
-        conn.close()
-
-        rules_path = tmp_path / "rules.json"; rules_path.write_text('{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'); edit = EditService(populated_db, rules_path=rules_path, library_root=(tmp_path / "library"))
-        edit.update_song_scalars(1, {"year": 1992})
-
-        assert source_file.exists(), "Source file should not be moved when song is not REVIEWED"
-        assert not list(
-            (tmp_path / "library").rglob("*.mp3")
-        ), "No file should exist under library_root"
 
     def test_reviewed_file_already_at_target_no_op(self, populated_db, tmp_path, monkeypatch):
         """REVIEWED + AUTO_MOVE=True + source_path already equals computed target → no copy, no unlink."""
@@ -643,47 +529,6 @@ class TestAutoMoveOnApprove:
         )
         assert b"the only copy do not lose this" in perfect_file.read_bytes(), (
             "File contents were modified during same-file auto-move"
-        )
-
-    def test_auto_move_updates_source_path_to_target(self, populated_db, tmp_path, monkeypatch):
-        """After auto-move, DB source_path points to new location, not old staging path."""
-        from src.services.edit_service import EditService
-        from src.services.library_service import LibraryService
-        from tests.conftest import _connect
-
-        library_root = tmp_path / "library"
-        library_root.mkdir(parents=True, exist_ok=True)
-        staging_dir = tmp_path / "staging"
-        staging_dir.mkdir(parents=True, exist_ok=True)
-        source_file = staging_dir / "Nirvana - Smells Like Teen Spirit.mp3"
-        source_file.write_bytes(b"mp3")
-
-        monkeypatch.setattr("src.engine.config.LIBRARY_ROOT", library_root)
-        monkeypatch.setattr("src.engine.config.AUTO_MOVE_ON_APPROVE", True)
-        monkeypatch.setattr("src.engine.config.AUTO_SAVE_ID3", False)
-
-        rules_path = tmp_path / "rules.json"
-        rules_path.write_text(
-            '{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'
-        )
-
-        conn = _connect(populated_db)
-        conn.execute(
-            "UPDATE MediaSources SET SourcePath = ?, ProcessingStatus = 0 WHERE SourceID = 1",
-            (str(source_file),),
-        )
-        conn.commit()
-        conn.close()
-
-        rules_path = tmp_path / "rules.json"; rules_path.write_text('{"routing_rules":[], "default_rule":"{year}/{artist} - {title}"}'); edit = EditService(populated_db, rules_path=rules_path, library_root=(tmp_path / "library"))
-        lib = LibraryService(populated_db, rules_path=(locals().get("rules_path", None)))
-
-        edit.update_song_scalars(1, {"media_name": "Smells Like Teen Spirit"})
-
-        song = lib.get_song(1)
-        new_path = Path(song.source_path)
-        assert new_path.parent.parent == library_root, (
-            f"source_path should point under library_root, got {song.source_path}"
         )
 
     def test_set_parent_nonexistent_publisher_raises(self, populated_db):

@@ -3,6 +3,8 @@ from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.engine.config import SCALAR_VALIDATION, YEAR_MIN, YEAR_MAX
+
 
 # ---------------------------------------------------------------------------
 # Shared validators
@@ -119,15 +121,17 @@ class UpdateSongItem(BaseModel):
     @field_validator("year")
     @classmethod
     def year_range(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and not (1000 <= v <= 9999):
-            raise ValueError("year must be a 4-digit year")
+        if v is not None and not (YEAR_MIN <= v <= YEAR_MAX):
+            raise ValueError(f"year must be between {YEAR_MIN} and {YEAR_MAX}")
         return v
 
     @field_validator("bpm")
     @classmethod
     def bpm_positive(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and v <= 0:
-            raise ValueError("bpm must be positive")
+        if v is not None:
+            rules = SCALAR_VALIDATION["bpm"]
+            if not (rules["min"] <= v <= rules["max"]):
+                raise ValueError(f"bpm must be between {rules['min']} and {rules['max']}")
         return v
 
 
@@ -174,8 +178,8 @@ class UpdateAlbumEntityItem(BaseModel):
     @field_validator("release_year")
     @classmethod
     def year_range(cls, v: Optional[int]) -> Optional[int]:
-        if v is not None and not (1000 <= v <= 9999):
-            raise ValueError("release_year must be a 4-digit year")
+        if v is not None and not (YEAR_MIN <= v <= YEAR_MAX):
+            raise ValueError(f"release_year must be between {YEAR_MIN} and {YEAR_MAX}")
         return v
 
 

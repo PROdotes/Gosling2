@@ -423,6 +423,7 @@ export function wireScalarInputs(song, validationRules, onUpdated) {
             input.disabled = true;
             try {
                 const fresh = await patchSongScalars(song.id, { [field]: payload });
+                committedValue = raw;
                 updateListRowBlockers(song.id, fresh.review_blockers);
                 if (onUpdated) onUpdated(fresh);
             } catch (err) {

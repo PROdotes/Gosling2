@@ -1,3 +1,4 @@
+import datetime
 import os
 from enum import IntEnum
 from pathlib import Path
@@ -61,7 +62,9 @@ ALBUM_DEFAULT_TYPE = "Single"
 
 # Song defaults
 SONG_DEFAULT_YEAR = 2026
-YEAR_VALIDATION = {"min": 1860, "max_offset": 1}  # max = current_year + max_offset
+YEAR_MIN = 1860
+YEAR_MAX = datetime.date.today().year + 1
+YEAR_VALIDATION = {"min": YEAR_MIN, "max": YEAR_MAX, "max_offset": 1}
 
 # Scalar field validation rules (single source of truth — exposed via /api/v1/validation-rules)
 SCALAR_VALIDATION = {

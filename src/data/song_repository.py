@@ -165,6 +165,7 @@ class SongRepository(MediaSourceRepository):
                 "processing_status",
                 "source_path",
                 "audio_hash",
+                "notes",
             )
         }
         songs_fields = {k: v for k, v in fields.items() if k in ("bpm", "year", "isrc")}
@@ -175,6 +176,7 @@ class SongRepository(MediaSourceRepository):
             "processing_status": "ProcessingStatus",
             "source_path": "SourcePath",
             "audio_hash": "AudioHash",
+            "notes": "SourceNotes",
             "bpm": "TempoBPM",
             "year": "RecordingYear",
             "isrc": "ISRC",
