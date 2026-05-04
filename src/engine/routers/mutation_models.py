@@ -275,6 +275,46 @@ RemoveItem = Annotated[
 
 
 # ---------------------------------------------------------------------------
+# Delete items (entity-level soft-delete)
+# ---------------------------------------------------------------------------
+
+class DeleteSongItem(BaseModel):
+    type: Literal["song"]
+    id: Optional[int] = None
+    unlinked: bool = False
+
+
+class DeleteTagItem(BaseModel):
+    type: Literal["tag"]
+    id: Optional[int] = None
+    unlinked: bool = False
+
+
+class DeletePublisherItem(BaseModel):
+    type: Literal["publisher"]
+    id: Optional[int] = None
+    unlinked: bool = False
+
+
+class DeleteAlbumItem(BaseModel):
+    type: Literal["album"]
+    id: Optional[int] = None
+    unlinked: bool = False
+
+
+class DeleteIdentityItem(BaseModel):
+    type: Literal["identity"]
+    id: Optional[int] = None
+    unlinked: bool = False
+
+
+DeleteItem = Annotated[
+    Union[DeleteSongItem, DeleteTagItem, DeletePublisherItem, DeleteAlbumItem, DeleteIdentityItem],
+    Field(discriminator="type"),
+]
+
+
+# ---------------------------------------------------------------------------
 # Top-level request
 # ---------------------------------------------------------------------------
 
@@ -282,9 +322,10 @@ class MutationRequest(BaseModel):
     add: Optional[List[AddItem]] = None
     update: Optional[List[UpdateItem]] = None
     remove: Optional[List[RemoveItem]] = None
+    delete: Optional[List[DeleteItem]] = None
 
     @model_validator(mode="after")
     def at_least_one_change(self) -> "MutationRequest":
-        if not (self.add or self.update or self.remove):
-            raise ValueError("request must contain at least one item in add, update, or remove")
+        if not (self.add or self.update or self.remove or self.delete):
+            raise ValueError("request must contain at least one item in add, update, remove, or delete")
         return self

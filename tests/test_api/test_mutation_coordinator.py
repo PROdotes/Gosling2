@@ -98,6 +98,53 @@ class TestRouting:
                             {"update": [{"type": "album", "id": 100, "title": "Nevermind"}]})
         assert calls == [("update", "album")]
 
+    def test_delete_song_routes_to_delete_mutator(self, coordinator, monkeypatch):
+        calls = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "song", "id": 1}]}))
+        assert calls == [("delete", "song")]
+
+    def test_delete_tag_routes_to_delete_mutator(self, coordinator, monkeypatch):
+        calls = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "tag", "id": 6}]}))
+        assert calls == [("delete", "tag")]
+
+    def test_delete_publisher_routes_to_delete_mutator(self, coordinator, monkeypatch):
+        calls = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "publisher", "id": 1}]}))
+        assert calls == [("delete", "publisher")]
+
+    def test_delete_album_routes_to_delete_mutator(self, coordinator, monkeypatch):
+        calls = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "album", "id": 100}]}))
+        assert calls == [("delete", "album")]
+
+    def test_delete_identity_routes_to_delete_mutator(self, coordinator, monkeypatch):
+        calls = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: calls.append((action, item.type)))
+        coordinator.apply(MutationRequest.model_validate({"delete": [{"type": "identity", "id": 1}]}))
+        assert calls == [("delete", "identity")]
+
+    def test_delete_fires_before_remove(self, coordinator, monkeypatch):
+        order = []
+        monkeypatch.setattr(coordinator._delete_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: order.append("delete"))
+        monkeypatch.setattr(coordinator._tag_mutator, "apply_within",
+                            lambda action, item, conn, batch_id: order.append("remove"))
+        coordinator.apply(MutationRequest.model_validate({
+            "delete": [{"type": "tag", "id": 6}],
+            "remove": [{"type": "tag", "song_id": 1, "id": 99}],
+        }))
+        assert order == ["delete", "remove"]
+
     def test_mixed_request_all_mutators_called(self, coordinator, monkeypatch):
         received = {name: [] for name in ("song", "credit", "tag", "publisher", "album")}
 

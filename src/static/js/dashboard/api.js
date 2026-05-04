@@ -291,13 +291,13 @@ export function formatText(text, type) {
 }
 
 export function deleteSong(id, deleteFile = false) {
-    return mutate({ remove: [{ type: "song", id: Number(id), delete_file: deleteFile }] });
+    return mutate({ delete: [{ type: "song", id: Number(id), delete_file: deleteFile }] });
 }
 
 export function rejectSong(id) {
     return mutate({
         update: [{ type: "song", id: Number(id), notes: "REJECTED" }],
-        remove: [{ type: "song", id: Number(id) }],
+        delete: [{ type: "song", id: Number(id) }],
     });
 }
 
@@ -349,35 +349,35 @@ export function updateTag(tagId, name, category) {
 }
 
 export function deleteTag(tagId) {
-    return mutate({ remove: [{ type: "tag", id: tagId }] });
+    return mutate({ delete: [{ type: "tag", id: tagId }] });
 }
 
 export function bulkDeleteUnlinkedTags() {
-    return mutate({ remove: [{ type: "tag", unlinked: true }] });
+    return mutate({ delete: [{ type: "tag", unlinked: true }] });
 }
 
 export function deleteAlbum(albumId) {
-    return mutate({ remove: [{ type: "album", id: albumId }] });
+    return mutate({ delete: [{ type: "album", id: albumId }] });
 }
 
 export function bulkDeleteUnlinkedAlbums() {
-    return mutate({ remove: [{ type: "album", unlinked: true }] });
+    return mutate({ delete: [{ type: "album", unlinked: true }] });
 }
 
 export function deletePublisher(publisherId) {
-    return mutate({ remove: [{ type: "publisher", id: publisherId }] });
+    return mutate({ delete: [{ type: "publisher", id: publisherId }] });
 }
 
 export function bulkDeleteUnlinkedPublishers() {
-    return mutate({ remove: [{ type: "publisher", unlinked: true }] });
+    return mutate({ delete: [{ type: "publisher", unlinked: true }] });
 }
 
 export function deleteIdentity(identityId) {
-    return mutate({ remove: [{ type: "identity", id: identityId }] });
+    return mutate({ delete: [{ type: "identity", id: identityId }] });
 }
 
 export function bulkDeleteUnlinkedIdentities() {
-    return mutate({ remove: [{ type: "identity", unlinked: true }] });
+    return mutate({ delete: [{ type: "identity", unlinked: true }] });
 }
 
 export function addSongTag(songId, tagName, category, tagId = null, rawTag = null) {

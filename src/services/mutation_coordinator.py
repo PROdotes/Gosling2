@@ -3,23 +3,14 @@ from typing import Any
 from uuid import uuid4
 
 from src.engine.routers.mutation_models import (
-    AddAlbumItem,
-    AddCreditItem,
-    AddPublisherItem,
-    AddTagItem,
     MutationRequest,
-    UpdateAlbumEntityItem,
-    UpdateCreditEntityItem,
-    UpdatePublisherEntityItem,
-    UpdateSongAlbumItem,
     UpdateSongItem,
-    UpdateSongTagItem,
-    UpdateTagEntityItem,
 )
 from src.services.library_service import LibraryService
-from src.services.logger import logger
+
 from src.services.mutators.album_mutator import AlbumMutator
 from src.services.mutators.credit_mutator import CreditMutator
+from src.services.mutators.delete_mutator import DeleteMutator
 from src.services.mutators.publisher_mutator import PublisherMutator
 from src.services.mutators.song_mutator import SongMutator
 from src.services.mutators.tag_mutator import TagMutator
@@ -41,12 +32,16 @@ class MutationCoordinator:
         self._tag_mutator = TagMutator()
         self._publisher_mutator = PublisherMutator()
         self._album_mutator = AlbumMutator(db_path)
+        self._delete_mutator = DeleteMutator(db_path)
 
     def apply(self, body: MutationRequest) -> dict[str, Any]:
         conn = self._get_connection()
         batch_id = uuid4()
         try:
             touched_song_ids: set[int] = set()
+
+            for item in (body.delete or []):
+                self._delete_mutator.apply_within("delete", item, conn, batch_id)
 
             for item in (body.remove or []):
                 self._route(item, "remove", conn, batch_id)
